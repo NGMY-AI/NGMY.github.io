@@ -924,7 +924,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         onPersistConfig: widget.onPersistConfig,
       );
     }
-    final topPad = MediaQuery.paddingOf(context).top + (_searchOpen ? 210 : 178);
+    final topPad = MediaQuery.paddingOf(context).top + (_searchOpen ? 188 : 178);
     final bottomPad = MediaQuery.paddingOf(context).bottom + 12;
     final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
 
@@ -1022,14 +1022,15 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _searchQuery = v),
-                style: TextStyle(color: titleColor, fontSize: 14),
+                style: TextStyle(color: titleColor, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Search name or role (teacher, lawyer, therapist…)',
-                  hintStyle: TextStyle(color: mutedIcon),
-                  prefixIcon: Icon(Icons.badge_outlined, color: mutedIcon, size: 22),
+                  isDense: true,
+                  hintText: 'Search advisors…',
+                  hintStyle: TextStyle(color: mutedIcon, fontSize: 13),
+                  prefixIcon: Icon(Icons.search_rounded, color: mutedIcon, size: 18),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.close_rounded, color: mutedIcon, size: 20),
+                          icon: Icon(Icons.close_rounded, color: mutedIcon, size: 18),
                           onPressed: () {
                             _searchCtrl.clear();
                             setState(() => _searchQuery = '');
@@ -1038,7 +1039,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                       : null,
                   filled: true,
                   fillColor: Colors.transparent,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -1707,7 +1708,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   String _replyStyleSuffix() {
     if (_isTextCoach) {
-      return 'Reply as ${widget.profile.name} — sharp human wingman, copy-paste ready lines (no robot essay):';
+      return 'Reply as ${widget.profile.name} — output ONLY the exact text to send, no explanation:';
     }
     return 'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
   }
@@ -1948,7 +1949,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
         : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 76;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : _isTextCoach ? 148 : 88);
+    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : 88);
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final panelFg = isDark ? Colors.white : const Color(0xFF111827);
     final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
@@ -1980,7 +1981,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   final emptyHint = _isDebater
                       ? 'Debate here anytime — or paste what they said on iMessage/WhatsApp and get a reply to send back.'
                       : _isTextCoach
-                          ? 'Paste your chat or tap 📷 on a screenshot — pick Pickup Lines, Smart Mouth, or Reply Help above.'
+                          ? 'Paste a chat or screenshot — pick a mode from the dropdown.'
                       : _isTranslator
                       ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
                       : _isMshauri
@@ -2146,13 +2147,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_isTextCoach)
-                      ngmyTextCoachChatToolbar(
-                        isDark: isDark,
-                        mode: _textCoachMode,
-                        accent: accent,
-                        onModeChanged: (mode) => unawaited(_onTextCoachModeChanged(mode)),
-                      ),
                     if (_isDebater)
                       ngmyDebateChatToolbar(
                         isDark: isDark,
@@ -2212,36 +2206,44 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                       fillAlpha: 0.06,
                       blur: 12,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                        padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
                         child: Row(
                           children: [
+                            if (_isTextCoach)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4, right: 2),
+                                child: ngmyTextCoachModeDropdown(
+                                  isDark: isDark,
+                                  mode: _textCoachMode,
+                                  accent: accent,
+                                  onModeChanged: (mode) => unawaited(_onTextCoachModeChanged(mode)),
+                                ),
+                              ),
                             if (_allowsPhotoUpload)
                               IconButton(
                                 tooltip: _isTextCoach ? 'Send chat screenshot' : 'Send homework photo',
                                 onPressed: _busy ? null : _pickHomeworkPhoto,
-                                icon: Icon(Icons.photo_camera_rounded, color: accent, size: 22),
+                                icon: Icon(Icons.photo_camera_rounded, color: accent, size: 20),
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               ),
                             Expanded(
                               child: TextField(
                                 controller: _controller,
                                 minLines: 1,
-                                maxLines: 4,
-                                style: TextStyle(color: panelFg),
+                                maxLines: _isTextCoach ? 2 : 4,
+                                style: TextStyle(color: panelFg, fontSize: 14),
                                 decoration: InputDecoration(
                                   hintText: _isDebater
                                       ? (_debatePasteMode
                                           ? 'Paste their message here…'
                                           : 'Debate topic or your argument…')
-                                      : _isTextCoach
-                                          ? ngmyTextCoachPasteHint(_textCoachMode)
-                                      : _allowsPhotoUpload
-                                      ? 'Ask anything or send a homework photo…'
-                                      : ngmyCommunicateRoleIsRomantic(widget.profile.role)
-                                          ? 'Write from the heart…'
-                                          : 'Type your message…',
-                                  hintStyle: TextStyle(color: panelHint),
+                                      : 'Type your message…',
+                                  hintStyle: TextStyle(color: panelHint, fontSize: 13),
                                   border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                                 ),
                                 onSubmitted: (_) => _send(),
                               ),
@@ -2253,13 +2255,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                 onTap: _busy ? null : _send,
                                 customBorder: const CircleBorder(),
                                 child: Container(
-                                  width: 42,
-                                  height: 42,
+                                  width: 38,
+                                  height: 38,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: LinearGradient(colors: [accent, accent2]),
                                   ),
-                                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 17),
                                 ),
                               ),
                             ),

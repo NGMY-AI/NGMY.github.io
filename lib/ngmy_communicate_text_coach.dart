@@ -3,9 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// In-chat coaching modes for pickup lines, witty comebacks, and reply help.
 const kNgmyTextCoachModes = <String, String>{
-  'pickup_line': 'Pickup Lines',
-  'smart_mouth': 'Smart Mouth',
-  'reply_help': 'What Should I Reply?',
+  'pickup_line': 'Pickup line',
+  'smart_mouth': 'Smart mouth',
+  'reply_help': 'Reply',
 };
 
 String ngmyCommunicateNormalizeTextCoachMode(String raw) {
@@ -83,96 +83,76 @@ bool ngmyTextLooksLikePastedConversation(String text) {
   ).hasMatch(t);
 }
 
+const _ngmyTextCoachOutputFormat =
+    'OUTPUT FORMAT (strict): Reply with ONLY the exact text they should send — nothing else. '
+    'No explanations, no "here\'s what to say", no bullet labels, no coaching commentary, no "As an AI". '
+    'If you give more than one option, put each line on its own line with no numbering or labels. '
+    'Sound human — short, natural, copy-paste ready.\n';
+
 String ngmyTextCoachModePromptBlock(String mode, {required String userText}) {
   final m = ngmyCommunicateNormalizeTextCoachMode(mode);
   final pasted = ngmyTextLooksLikePastedConversation(userText);
   final contextNote = pasted
-      ? 'They pasted a REAL conversation — read every line. Your answer must fit ONLY what was said. '
-          'Never change the subject or answer a random question that was not in the chat.\n'
-      : 'Use the full chat history below. Stay on THEIR current topic — no random tangents.\n';
-
-  const humanVoice =
-      'VOICE (critical): Sound like a sharp human friend texting advice — not a robot, not an essay, not "As an AI". '
-      'Short punchy lines. Natural slang when it fits. Confident energy. No bullet-point lecture unless they asked for options.\n';
+      ? 'They pasted a real conversation — read every line. Your answer must fit ONLY what was said.\n'
+      : 'Use the chat history below. Stay on their current topic.\n';
 
   switch (m) {
     case 'pickup_line':
-      return 'MODE: PICKUP LINE COACH\n'
-          '$humanVoice'
+      return 'MODE: PICKUP LINE\n'
+          '$_ngmyTextCoachOutputFormat'
           '$contextNote'
-          'Your job: smooth, clever, flirty openers and follow-ups that fit the vibe of the conversation.\n'
-          'EXAMPLES OF THE ENERGY (do NOT copy blindly — adapt to their situation):\n'
-          '- "Do you have AirDrop?" → she says yes → "Can you put it on?" → she asks why → "I just want to share my feelings with you."\n'
-          '- "Do you have an application?" → she asks for what → "Boyfriend."\n'
-          'Give 1–3 lines they can actually send. If they need a follow-up for HER last message, write that follow-up — not a random new opener.\n'
-          'If they are mid-conversation, continue the bit naturally — setup → her reply → your killer next line.\n';
+          'Give smooth, clever, flirty openers or follow-ups that fit the conversation. '
+          'If they are mid-chat, continue the bit naturally — reply to her/his last message, not a random new opener.\n';
     case 'smart_mouth':
-      return 'MODE: SMART MOUTH / WITTY COMEBACK COACH\n'
-          '$humanVoice'
+      return 'MODE: SMART MOUTH\n'
+          '$_ngmyTextCoachOutputFormat'
           '$contextNote'
-          'Your job: clever, confident, funny comebacks — sharp but not corny spam. Roast with charm when appropriate.\n'
-          'EXAMPLES OF THE ENERGY (adapt to what they are actually dealing with):\n'
-          '- "It\'s only two things I gotta do in this world: be cool, and die."\n'
-          '- "God created the world. Everything else was made in China."\n'
-          '- "I don\'t know why we give money to the country that hates us — they should hate us for free."\n'
-          'The comeback must answer or riff on what the OTHER person said or the situation they described — never a random quote unrelated to the chat.\n'
-          'Give lines they can copy-paste. One killer line often beats a paragraph.\n';
+          'Give clever, confident, funny comebacks tied to what the other person said — never random off-topic quotes.\n';
     default:
-      return 'MODE: REPLY HELP — what should they text back?\n'
-          '$humanVoice'
+      return 'MODE: REPLY HELP\n'
+          '$_ngmyTextCoachOutputFormat'
           '$contextNote'
-          'Read who said what. Suggest 1–3 reply options that match the tone they want (flirty, funny, chill, firm).\n'
-          'Explain in one short sentence WHY each reply works, then give the exact text to send.\n'
-          'If they are stuck after her message, reply TO THAT MESSAGE — do not start a new topic.\n';
+          'Read who said what. Give the exact text they should send back — reply to the last message, do not start a new topic.\n';
   }
 }
 
 String ngmyTextCoachVisionInstruction(String text, {required bool hasPhoto, required String mode}) {
   if (!hasPhoto) return '';
-  return 'SCREENSHOT / PHOTO: Read the image carefully — OCR every message bubble, name, timestamp if visible. '
-      'Figure out who is who in the text thread. '
+  return 'SCREENSHOT: OCR every message bubble. Figure out who said what. '
       '${ngmyTextCoachModePromptBlock(mode, userText: text)}'
-      'Base your coaching ONLY on what you see in the screenshot plus their caption. '
-      'If the image is a chat, quote or paraphrase her/his last message before you suggest a reply.\n';
+      'Base your answer ONLY on the screenshot plus their caption.\n';
 }
 
-String ngmyTextCoachPasteHint(String mode) {
-  switch (ngmyCommunicateNormalizeTextCoachMode(mode)) {
-    case 'pickup_line':
-      return 'Paste her message or describe the vibe — I\'ll give you a line…';
-    case 'smart_mouth':
-      return 'Paste what they said — I\'ll cook a comeback…';
-    default:
-      return 'Paste the conversation or screenshot — what should I reply?';
-  }
-}
-
-Widget ngmyTextCoachChatToolbar({
+/// Compact mode picker — sits inside the chat input row.
+Widget ngmyTextCoachModeDropdown({
   required bool isDark,
   required String mode,
   required Color accent,
   required ValueChanged<String> onModeChanged,
 }) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: kNgmyTextCoachModes.entries.map((e) {
-          final selected = mode == e.key;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              selected: selected,
-              showCheckmark: false,
-              label: Text(e.value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
-              selectedColor: accent,
-              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-              side: BorderSide(color: selected ? accent : (isDark ? Colors.white24 : Colors.black12)),
-              onSelected: (_) => onModeChanged(e.key),
-            ),
-          );
-        }).toList(),
+  final fg = isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF374151);
+  return SizedBox(
+    width: 92,
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: ngmyCommunicateNormalizeTextCoachMode(mode),
+        isDense: true,
+        isExpanded: true,
+        icon: Icon(Icons.expand_more_rounded, size: 16, color: accent),
+        dropdownColor: isDark ? const Color(0xFF1E1B2E) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
+        items: kNgmyTextCoachModes.entries
+            .map(
+              (e) => DropdownMenuItem<String>(
+                value: e.key,
+                child: Text(e.value, overflow: TextOverflow.ellipsis),
+              ),
+            )
+            .toList(),
+        onChanged: (v) {
+          if (v != null) onModeChanged(v);
+        },
       ),
     ),
   );
