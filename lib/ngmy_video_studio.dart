@@ -20,9 +20,12 @@ import 'ngmy_news_banner_painter.dart';
 
 void showNgmyVideoStudio(BuildContext context) {
   Navigator.of(context).push(
-    MaterialPageRoute<void>(
+    PageRouteBuilder<void>(
       fullscreenDialog: true,
-      builder: (_) => const _NgmyVideoStudioPage(),
+      transitionDuration: const Duration(milliseconds: 180),
+      reverseTransitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (_, __, ___) => const _NgmyVideoStudioPage(),
+      transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
     ),
   );
 }
@@ -135,6 +138,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   final Map<String, bool> _logoVisible = {};
   final Map<String, NgmyLogoFrameStyle> _logoFrameStyles = {};
   String? _preparingSlotId;
+  bool _uiReady = false;
 
   final _headlineC = TextEditingController();
   final _titleC = TextEditingController();
@@ -152,7 +156,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   @override
   void initState() {
     super.initState();
-    _loadTemplate(_templateId, resetMedia: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadTemplate(_templateId, resetMedia: true);
+      setState(() => _uiReady = true);
+    });
   }
 
   Future<void> _disposeAllMedia() async {
@@ -635,7 +643,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           IconButton(icon: const Icon(Icons.close_rounded), onPressed: _closeStudio),
         ],
       ),
-      body: wide
+      body: !_uiReady
+          ? const Center(child: CircularProgressIndicator(color: _accent))
+          : wide
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -929,7 +939,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             aspectRatio: _format.aspectRatio,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: _buildStage(),
+              child: RepaintBoundary(child: _buildStage()),
             ),
           ),
           const SizedBox(height: 8),

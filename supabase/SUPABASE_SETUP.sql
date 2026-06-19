@@ -1,6 +1,10 @@
 -- NGMY — paste ONLY this file in Supabase → SQL Editor → Run
 -- Do NOT paste PowerShell or git commands here.
 
+create table if not exists public.config (
+  id text primary key
+);
+
 -- ========== STORE (shop listings for all users) ==========
 create table if not exists public.store_listings (
   id text primary key,
@@ -88,7 +92,47 @@ create table if not exists public.media (
   comments jsonb not null default '[]'::jsonb
 );
 
-create index if not exists media_timestamp_idx on public.media (timestamp desc);
+-- Legacy media tables may exist without timestamp — add columns before indexing.
+alter table public.media add column if not exists "userEmail" text not null default '';
+alter table public.media add column if not exists username text not null default 'User';
+alter table public.media add column if not exists "videoUrl" text not null default '';
+alter table public.media add column if not exists "contentType" text not null default 'video';
+alter table public.media add column if not exists caption text not null default '';
+alter table public.media add column if not exists timestamp text not null default '';
+alter table public.media add column if not exists likes integer not null default 0;
+alter table public.media add column if not exists "likedBy" jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists "savedBy" jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists comments jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists url text;
+alter table public.media add column if not exists type text;
+alter table public.media add column if not exists data jsonb default '{}'::jsonb;
+alter table public.media add column if not exists updated_at timestamptz default now();
+alter table public.media add column if not exists created_at timestamptz default now();
+
+update public.media
+set timestamp = to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+where (timestamp is null or trim(timestamp) = '')
+  and created_at is not null;
+
+update public.media
+set timestamp = to_char(updated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+where (timestamp is null or trim(timestamp) = '')
+  and updated_at is not null;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'media' and column_name = 'timestamp'
+  ) then
+    execute 'create index if not exists media_timestamp_idx on public.media ("timestamp" desc)';
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'media' and column_name = 'updated_at'
+  ) then
+    execute 'create index if not exists media_updated_at_idx on public.media (updated_at desc)';
+  end if;
+end $$;
 
 alter table public.media enable row level security;
 
@@ -118,3 +162,24 @@ create policy "ngmy_media_select" on storage.objects for select to public using 
 create policy "ngmy_media_insert" on storage.objects for insert to public with check (bucket_id = 'media');
 create policy "ngmy_media_update" on storage.objects for update to public using (bucket_id = 'media');
 create policy "ngmy_media_delete" on storage.objects for delete to public using (bucket_id = 'media');
+
+-- Realtime (safe to re-run — skips tables already in publication or missing)
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['store_listings', 'store_inquiries', 'ngmy_settings', 'media', 'config', 'users', 'transactions', 'announcements'] loop
+    if exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = t
+    ) and not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+-- Profile photo ref for cross-device sync (Supabase Storage URL or supabase:// ref).
+alter table public.users add column if not exists "profilePicturePath" text;

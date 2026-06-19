@@ -9513,6 +9513,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _applyPendingReferralLink(_currentUser!);
     }
     _restartSyncLoopsForCurrentUser();
+    unawaited(_refreshCurrentUserFromCloud());
+    unawaited(_maybeUploadLocalProfilePhotoToCloud(_currentUser!));
     unawaited(_refreshUserTransactionsFromCloud(force: true));
   }
 
@@ -11380,10 +11382,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 },
               )
             : MainScreen(
-                key: ValueKey(
-                  'main_${_currentUser!.email.toLowerCase().trim()}_'
-                  '${_currentUser!.accountBalance.toStringAsFixed(2)}_${_allTransactions.length}',
-                ),
+                key: ValueKey('main_${_currentUser!.email.toLowerCase().trim()}'),
                 user: _currentUser!, allTransactions: _allTransactions, allUsers: _allUsers, globalPlans: _globalPlans,
                 allMedia: _allMedia,
                 allAnnouncements: _allAnnouncements,
@@ -11621,6 +11620,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
                 onRefreshAdminData: _refreshAdminDashboardFromCloud,
                 onPushUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
+                onPersistUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
                 onSaveWalletPayments: _saveAdminWalletPayments,
                 onUpsertInvestmentPlan: _upsertAdminInvestmentPlan,
                 onRemoveInvestmentPlan: _removeAdminInvestmentPlan,
@@ -12924,10 +12924,11 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   }
 
   void _refreshOnBalanceChange() {
-    if (!mounted) return;
-    if (_content != null) {
-      setState(() => _content = widget.buildContent());
-    }
+    if (!mounted || _content == null) return;
+    // Only rebuild tabs that display wallet balance — not Media, Creator, Advisors, etc.
+    const balanceTabs = {0, 1, 2};
+    if (!balanceTabs.contains(widget.tabIndex)) return;
+    setState(() => _content = widget.buildContent());
   }
 
   @override
@@ -13030,6 +13031,7 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(UserData user)? onPushUserToCloud;
+  final Future<bool> Function(UserData user)? onPersistUserToCloud;
   final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
   final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
@@ -13042,7 +13044,7 @@ class MainScreen extends StatefulWidget {
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final Future<void> Function(String code)? onReferralLinked;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onRefreshLegalAndPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onReferralLinked});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onPersistUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onRefreshLegalAndPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onReferralLinked});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -13053,8 +13055,14 @@ String _announcementsSig(List<Announcement> items) {
   return '${items.length}:${latest.id}:${latest.timestamp.millisecondsSinceEpoch}';
 }
 
-String _investmentPlansSig(List<InvestmentPlan> plans) =>
-    jsonEncode(plans.map((e) => e.toJson()).toList());
+String _investmentPlansSig(List<InvestmentPlan> plans) {
+  if (plans.isEmpty) return '0';
+  var h = 0;
+  for (final p in plans) {
+    h = Object.hash(h, p.name, p.price, p.roi);
+  }
+  return '${plans.length}:$h';
+}
 
 String _legalContentSig(AppConfig config) =>
     '${config.termsAndConditions.length}:${config.privacyPolicy.length}:'
@@ -13813,6 +13821,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         onAddTransaction: widget.onAddTransaction,
         onRefreshLegalContent: widget.onRefreshLegalAndPlans,
         onReferralLinked: widget.onReferralLinked,
+        onPersistUserToCloud: widget.onPersistUserToCloud,
       ),
     };
     return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
@@ -24082,7 +24091,8 @@ class ProfileScreen extends StatefulWidget {
   final UserData user; final List<UserData> allUsers; final AppConfig config; final Function(ThemeMode) onThemeChanged; final ThemeMode currentThemeMode; final VoidCallback onLogout; final VoidCallback onDataChanged; final Function(AppTransaction) onAddTransaction;
   final Future<void> Function()? onRefreshLegalContent;
   final Future<void> Function(String code)? onReferralLinked;
-  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, this.onRefreshLegalContent, this.onReferralLinked});
+  final Future<bool> Function(UserData user)? onPersistUserToCloud;
+  const ProfileScreen({super.key, required this.user, required this.allUsers, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, this.onRefreshLegalContent, this.onReferralLinked, this.onPersistUserToCloud});
 
   @override State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -24601,9 +24611,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _profileAvatar = ngmyCachedProfileImage(cloudRef);
               _profileAvatarUploading = false;
             });
+            final myEmail = widget.user.email.toLowerCase().trim();
+            final uIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == myEmail);
+            if (uIdx >= 0) widget.allUsers[uIdx].profilePicturePath = cloudRef;
             widget.onDataChanged();
+            final dbOk = await widget.onPersistUserToCloud?.call(widget.user) ?? false;
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile photo saved to your account'), behavior: SnackBarBehavior.floating),
+              SnackBar(
+                content: Text(
+                  dbOk
+                      ? 'Profile photo saved — visible on all your devices.'
+                      : 'Photo uploaded but account sync failed. Stay online and try again.',
+                ),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: dbOk ? const Color(0xFF16A34A) : Colors.orange.shade800,
+              ),
             );
           } else {
             setState(() => _profileAvatarUploading = false);
