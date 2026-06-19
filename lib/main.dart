@@ -25709,32 +25709,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final e = TextEditingController(text: widget.user.email);
     final p = TextEditingController(text: widget.user.phone);
     final n = TextEditingController(text: widget.user.username);
-    showDialog(
-      context: ctx,
-      builder: (c) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: n, decoration: const InputDecoration(labelText: 'Username')),
-            TextField(controller: e, decoration: const InputDecoration(labelText: 'Email')),
-            TextField(
-              controller: p,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone',
-                helperText: 'Required — synced across your devices',
-              ),
-            ),
-          ],
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    const brand = Color(0xFF00B25A);
+    const accent = Color(0xFF6366F1);
+    var saving = false;
+
+    InputDecoration fieldDec(String label, {IconData? icon, String? helper}) {
+      return InputDecoration(
+        labelText: label,
+        helperText: helper,
+        prefixIcon: icon != null ? Icon(icon, size: 20) : null,
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1A2233) : const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () async {
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: isDark ? brand : accent, width: 1.6),
+        ),
+        labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+      );
+    }
+
+    showDialog<void>(
+      context: ctx,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDlg) {
+            Future<void> save() async {
+              if (saving) return;
               final phone = p.text.trim();
               if (!ngmyUserPhoneOnFile(phone)) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
+                ScaffoldMessenger.of(dialogCtx).showSnackBar(
                   const SnackBar(content: Text('Phone number is required (at least 10 digits).')),
                 );
                 return;
@@ -25744,25 +25754,155 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 (u) => u.email.toLowerCase().trim() != myEmail && u.phone.trim() == phone,
               );
               if (taken) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
+                ScaffoldMessenger.of(dialogCtx).showSnackBar(
                   const SnackBar(content: Text('That phone number is already registered to another account.')),
                 );
                 return;
               }
+              setDlg(() => saving = true);
               widget.user.username = n.text.trim();
               widget.user.email = e.text.trim();
               widget.user.phone = phone;
               widget.onDataChanged();
-              Navigator.pop(c);
-              setState(() {});
               await _pushUserPhoneToCloud(widget.user);
               await widget.onPersistUserToCloud?.call(widget.user);
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
-    );
+              if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+              if (mounted) setState(() {});
+            }
+
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? [const Color(0xFF0F3D2E), const Color(0xFF1E3A5F)]
+                                : [brand, accent],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.person_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Edit profile',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: saving ? null : () => Navigator.pop(dialogCtx),
+                              icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        color: isDark ? const Color(0xFF121826) : Colors.white,
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: n,
+                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              decoration: fieldDec('Username', icon: Icons.alternate_email_rounded),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: e,
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
+                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              decoration: fieldDec('Email', icon: Icons.email_outlined),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: p,
+                              keyboardType: TextInputType.phone,
+                              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                              decoration: fieldDec(
+                                'Phone',
+                                icon: Icons.phone_in_talk_rounded,
+                                helper: 'Required — synced across your devices',
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: saving ? null : () => Navigator.pop(dialogCtx),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Text('Cancel', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 2,
+                                  child: FilledButton(
+                                    onPressed: saving ? null : save,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: brand,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    child: saving
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      e.dispose();
+      p.dispose();
+      n.dispose();
+    });
   }
 
   void _showLegal(BuildContext ctx, String title, String content) {
@@ -26469,9 +26609,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       ? [const Color(0xFFC2185B), const Color(0xFF7B1FA2)]
       : [const Color(0xFFF06292), const Color(0xFFBA68C8)];
 
-    final jobColors = isDark
-      ? [const Color(0xFFE65100), const Color(0xFFBF360C)]
-      : [const Color(0xFFFF8A65), const Color(0xFFF4511E)];
+    final mediaColors = isDark
+      ? [const Color(0xFF5B21B6), const Color(0xFF7C3AED)]
+      : [const Color(0xFF8B5CF6), const Color(0xFF6366F1)];
 
     final helpColors = isDark
       ? [const Color(0xFF880E4F), const Color(0xFF4A148C)]
@@ -26532,7 +26672,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       routeName: 'NgmyStoreScreen',
                     ),
                   ),
-                  _hubBox('Job Marketplace', Icons.business_center_outlined, jobColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(
+                  _hubBox('Media', Icons.perm_media_rounded, mediaColors, () => NgmyNavigator.push(context, JobMarketplaceScreen(
                     user: widget.user,
                     allUsers: widget.allUsers,
                     allMedia: widget.allMedia,
@@ -26546,7 +26686,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
                     onSyncMediaPost: widget.onSyncMediaPost,
                     onSyncUserMedia: widget.onSyncUserMedia,
-                  ), routeName: 'JobMarketplaceScreen')),
+                  ), routeName: 'MediaScreen')),
                   _hubBox(
                     'Help Center',
                     Icons.support_agent_rounded,
@@ -39262,7 +39402,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     if (_isPosting) return;
     if (!widget.user.isAdmin) {
       if (mounted) {
-        _showGlassNotice('Admin only', 'Only the admin can post in Job Marketplace media.', isError: true);
+        _showGlassNotice('Admin only', 'Only the admin can post media here.', isError: true);
       }
       return;
     }
@@ -39442,7 +39582,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     if (!widget.user.isAdmin) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Only the admin can post in Job Marketplace media.')),
+          const SnackBar(content: Text('Only the admin can post media here.')),
         );
       }
       return;
@@ -39954,6 +40094,58 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     );
   }
 
+  Widget _buildMediaEmptyState(bool isDark) {
+    final muted = isDark ? Colors.white54 : const Color(0xFF64748B);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 80, 32, 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark
+                      ? [const Color(0xFF5B21B6).withOpacity(0.35), const Color(0xFF7C3AED).withOpacity(0.2)]
+                      : [const Color(0xFFEDE9FE), const Color(0xFFDDD6FE)],
+                ),
+              ),
+              child: Icon(
+                Icons.play_circle_outline_rounded,
+                size: 42,
+                color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Text(
+              'Nothing here yet',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: titleColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.user.isAdmin
+                  ? 'Tap + or open your profile to share the first photo or video.'
+                  : 'New photos and videos from NGMY will show up here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.45, color: muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -39970,33 +40162,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
         children: [
           Positioned.fill(
             child: mediaFeed.isEmpty
-                ? Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF111731) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(isDark ? 0.1 : 0.8)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.perm_media_rounded, size: 58, color: Colors.grey.withOpacity(0.55)),
-                          const SizedBox(height: 12),
-                          const Text('No media posted yet', style: TextStyle(fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.user.isAdmin
-                                ? 'Tap your profile, then Post, to upload a photo or video.'
-                                : 'Admin posts will appear here. Check back soon.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
+                ? _buildMediaEmptyState(isDark)
                 : ListView.builder(
                     padding: EdgeInsets.fromLTRB(12, topInset, 12, 120),
                     cacheExtent: 400,
