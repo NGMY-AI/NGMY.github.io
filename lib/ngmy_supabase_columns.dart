@@ -35,6 +35,12 @@ class NgmySupabaseColumns {
   static const userLogin =
       'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath';
 
+  /// Admin Users tab — every NGMY account row (paginated).
+  static const adminUsersList =
+      'email,username,phone,passwordHash,isAdmin,status,forceLogout,accountBalance,totalProfit,'
+      'canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount,'
+      'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper';
+
   /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =
       'id,userEmail,videoUrl,url,contentType,type,description,created_at,likes,shareCount,likedBy,savedBy,sharedBy,comments,data';

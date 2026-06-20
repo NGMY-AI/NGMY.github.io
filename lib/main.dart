@@ -3238,6 +3238,43 @@ Future<bool> _pushUserPhoneToCloud(UserData u) async {
   }
 }
 
+Map<String, dynamic> _userSignupRowForCloud(UserData u) {
+  final username = u.username.trim().isEmpty ? u.email.split('@').first : u.username.trim();
+  return {
+    'email': u.email.trim(),
+    'username': username,
+    'phone': u.phone.trim(),
+    'passwordHash': u.passwordHash,
+    'status': u.status.trim().isEmpty ? 'active' : u.status,
+    'isAdmin': u.isAdmin,
+  };
+}
+
+/// Saves a new or returning account to Supabase — minimal row first, then full profile.
+Future<bool> _pushSignupUserToCloudReliable(UserData u, {bool includeFreeTrial = false}) async {
+  if (u.email.trim().isEmpty) return false;
+  ngmyMarkUserAsAppLoginAccount(u);
+  for (var i = 0; i < 8; i++) {
+    if (!await ngmyCanReachCloud()) {
+      await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+      continue;
+    }
+    if (await _safeUpsertUserRow(_userSignupRowForCloud(u))) break;
+    if (i == 7) return false;
+    await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+  }
+  for (var i = 0; i < 6; i++) {
+    if (!await ngmyCanReachCloud()) {
+      await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+      continue;
+    }
+    final ok = await _pushUserToCloudFast(u, includeFreeTrial: includeFreeTrial);
+    if (ok) return true;
+    await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+  }
+  return false;
+}
+
 Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
   if (!await ngmyCanReachCloud()) return false;
   final row = _userRowForBulkSync(u, includeFreeTrial: includeFreeTrial);
@@ -4837,9 +4874,8 @@ bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
 
 bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
   if (u.email.trim().isEmpty) return false;
-  if (ngmyIsCivicRegistryOnlyAccount(u, config)) return false;
-  if (u.isAppLoginAccount) return true;
-  return ngmyIsRegisteredAppLoginUser(u) || ngmyLooksLikeAppLoginUser(u);
+  // Every NGMY cloud/local account except Civic Registry-only manual enroll rows.
+  return !ngmyIsCivicRegistryOnlyAccount(u, config);
 }
 
 List<String> ngmyGamePaywallMissedDays(UserData user) {
@@ -6994,6 +7030,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
+  String? _cloudUserRowEnsuredForEmail;
   AppConfig _config = AppConfig();
   List<InvestmentPlan> _globalPlans = [
     InvestmentPlan(name: 'Starter Plan', price: 5.0, roi: 0.0286),
@@ -7106,32 +7143,61 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _registerCloudUsersAsAppLogins(Iterable<UserData> users) {
     for (final u in users) {
-      if (u.isAppLoginAccount || ngmyLooksLikeAppLoginUser(u)) {
-        u.isAppLoginAccount = true;
-        ngmyRegisterAppLoginUser(u.email);
-      }
+      if (u.email.trim().isEmpty) continue;
+      u.isAppLoginAccount = true;
+      ngmyRegisterAppLoginUser(u.email);
     }
   }
 
+  Future<List<UserData>> _fetchAllUsersFromCloudPage({
+    required int from,
+    required int to,
+    String? columns,
+  }) async {
+    dynamic query = supabase.from('users').select(columns ?? '*').order('email');
+    final chunk = await query.range(from, to).timeout(kNgmyCloudLoadTimeout);
+    if (chunk == null) return const [];
+    return (chunk as List)
+        .map((e) => UserData.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
-    final all = <UserData>[];
-    var from = 0;
-    const pageSize = 1000;
-    while (from < 50000) {
-      final to = from + pageSize - 1;
-      final chunk = await supabase
-          .from('users')
-          .select()
-          .order('email')
-          .range(from, to)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (chunk == null || (chunk as List).isEmpty) break;
-      all.addAll(chunk.map((e) => UserData.fromJson(Map<String, dynamic>.from(e as Map))));
-      if (chunk.length < pageSize) break;
-      from += pageSize;
+    const columnSets = <String?>[
+      NgmySupabaseColumns.adminUsersList,
+      null,
+      NgmySupabaseColumns.userLogin,
+      'email,username,phone,passwordHash,accountBalance,status,isAdmin',
+      'email,username,phone,passwordHash',
+      'email',
+    ];
+    Object? lastError;
+    for (final columns in columnSets) {
+      final all = <UserData>[];
+      try {
+        var from = 0;
+        const pageSize = 1000;
+        while (from < 50000) {
+          final to = from + pageSize - 1;
+          final page = await _fetchAllUsersFromCloudPage(from: from, to: to, columns: columns);
+          if (page.isEmpty) break;
+          all.addAll(page);
+          if (page.length < pageSize) break;
+          from += pageSize;
+        }
+        if (all.isNotEmpty) {
+          _registerCloudUsersAsAppLogins(all);
+          return all;
+        }
+      } catch (e) {
+        lastError = e;
+        debugPrint('[admin] users fetch columns=${columns ?? '*'}: $e');
+      }
     }
-    _registerCloudUsersAsAppLogins(all);
-    return all;
+    if (lastError != null) {
+      debugPrint('[admin] users fetch failed: $lastError');
+    }
+    return const [];
   }
 
   void _mergeUsersDiscoveredFromTransactions(List<UserData> users, List<AppTransaction> txns) {
@@ -7185,7 +7251,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[logout] supabase signOut: $e');
     }
     if (!mounted) return;
+    _cloudUserRowEnsuredForEmail = null;
     setState(() => _currentUser = null);
+  }
+
+  Future<void> _ensureCurrentUserRegisteredInCloud() async {
+    if (_currentUser == null) return;
+    final key = ngmyNormalizeEmail(_currentUser!.email);
+    if (key.isEmpty || _cloudUserRowEnsuredForEmail == key) return;
+    _cloudUserRowEnsuredForEmail = key;
+    await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
   }
 
   Future<void> _restoreSessionFromLocalCache({SharedPreferences? prefs}) async {
@@ -7253,6 +7328,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
+    unawaited(_ensureCurrentUserRegisteredInCloud());
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -7544,7 +7620,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     await _persistSessionImmediately();
     await _applyPendingReferralLink(_currentUser!);
-    unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
+    unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshUserTransactionsFromCloud(force: true));
     unawaited(_refreshCurrentUserFromCloud());
@@ -8335,7 +8411,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminUsersPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     unawaited(_refreshAdminUsersFromCloud());
-    _adminUsersPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+    _adminUsersPoll = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshAdminUsersFromCloud());
     });
@@ -9941,7 +10017,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _persistSessionImmediately();
     if (_currentUser != null) {
       await _applyPendingReferralLink(_currentUser!);
-      unawaited(_pushUserToCloudFast(_currentUser!, includeFreeTrial: true));
+      unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
     }
     _restartSyncLoopsForCurrentUser();
     unawaited(_refreshCurrentUserFromCloud());
@@ -11788,11 +11864,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   unawaited(NgmyIncomeSound.unlockForWebUserGesture());
                   await _applyPendingReferralLink(user);
                   await _persistLocalOnly();
-                  for (var i = 0; i < 6; i++) {
-                    final ok = await _pushUserToCloudFast(_currentUser!, includeFreeTrial: true);
-                    if (ok) break;
-                    await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
-                  }
+                  await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
                   unawaited(_startBackgroundServicesWhenReady());
                 },
               )
@@ -19405,7 +19477,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_loadWalletApprovedArchive());
     _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
@@ -22139,7 +22211,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
     final subtitle = _adminUserListMode == 'civic'
         ? 'Civic Registry (${filtered.length})'
-        : 'Login (${filtered.length})';
+        : 'NGMY accounts (${filtered.length})';
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
@@ -22162,7 +22234,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black87),
                   dropdownColor: panelBg,
                   items: const [
-                    DropdownMenuItem(value: 'login', child: Text('Login')),
+                    DropdownMenuItem(value: 'login', child: Text('Accounts')),
                     DropdownMenuItem(value: 'civic', child: Text('Civic Registry')),
                   ],
                   onChanged: (v) {
