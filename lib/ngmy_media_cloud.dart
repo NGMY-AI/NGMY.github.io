@@ -62,6 +62,7 @@ Map<String, dynamic> ngmyMediaRowMinimalForCloud(Map<String, dynamic> raw) {
   final url = (raw['videoUrl'] ?? raw['video_url'] ?? raw['url'] ?? '').toString();
   final likedBy = raw['likedBy'] ?? raw['liked_by'];
   final savedBy = raw['savedBy'] ?? raw['saved_by'];
+  final sharedBy = raw['sharedBy'] ?? raw['shared_by'];
   final caption = (raw['caption'] ?? raw['description'] ?? '').toString();
   final ts = (raw['timestamp'] ?? raw['created_at'] ?? DateTime.now().toUtc().toIso8601String()).toString();
   return {
@@ -82,6 +83,7 @@ Map<String, dynamic> ngmyMediaRowMinimalForCloud(Map<String, dynamic> raw) {
       'likes': likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0,
       'likedBy': likedBy is List ? likedBy : const [],
       'savedBy': savedBy is List ? savedBy : const [],
+      'sharedBy': sharedBy is List ? sharedBy : const [],
     },
   };
 }
@@ -93,6 +95,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
   final url = (raw['videoUrl'] ?? raw['video_url'] ?? raw['url'] ?? '').toString();
   final likedBy = raw['likedBy'] ?? raw['liked_by'];
   final savedBy = raw['savedBy'] ?? raw['saved_by'];
+  final sharedBy = raw['sharedBy'] ?? raw['shared_by'];
   final comments = raw['comments'] ?? const [];
   final caption = (raw['caption'] ?? raw['description'] ?? '').toString();
   final ts = (raw['timestamp'] ?? raw['created_at'] ?? DateTime.now().toUtc().toIso8601String()).toString();
@@ -105,6 +108,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
     'likes': likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0,
     'likedBy': likedBy is List ? likedBy : const [],
     'savedBy': savedBy is List ? savedBy : const [],
+    'sharedBy': sharedBy is List ? sharedBy : const [],
   };
 
   void take(String key) {
@@ -143,6 +147,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
     'description': caption,
     'likedBy': likedBy is List ? likedBy : const [],
     'savedBy': savedBy is List ? savedBy : const [],
+    'sharedBy': sharedBy is List ? sharedBy : const [],
     'data': data,
   };
 
@@ -151,6 +156,7 @@ Map<String, dynamic> ngmyMediaRowForCloud(Map<String, dynamic> raw) {
   row['comments'] = comments is List ? comments : const [];
   row['likes'] = likedBy is List ? likedBy.length : (raw['likes'] as num?)?.toInt() ?? 0;
   row['shareCount'] = (raw['shareCount'] as num?)?.toInt() ?? 0;
+  row['sharedBy'] = sharedBy is List ? sharedBy : const [];
 
   return row;
 }
@@ -160,6 +166,7 @@ Map<String, dynamic> ngmyMediaJsonWithData(Map<String, dynamic> json) {
   final out = Map<String, dynamic>.from(json);
   final topLikedBy = ngmyJsonStringList(out['likedBy'] ?? out['liked_by']);
   final topSavedBy = ngmyJsonStringList(out['savedBy'] ?? out['saved_by']);
+  final topSharedBy = ngmyJsonStringList(out['sharedBy'] ?? out['shared_by']);
   final topComments = ngmyJsonMapList(out['comments'] ?? out['media_comments']);
 
   Map<String, dynamic>? nestedMap;
@@ -171,10 +178,12 @@ Map<String, dynamic> ngmyMediaJsonWithData(Map<String, dynamic> json) {
 
   final dataLikedBy = nestedMap != null ? ngmyJsonStringList(nestedMap['likedBy']) : const <String>[];
   final dataSavedBy = nestedMap != null ? ngmyJsonStringList(nestedMap['savedBy']) : const <String>[];
+  final dataSharedBy = nestedMap != null ? ngmyJsonStringList(nestedMap['sharedBy']) : const <String>[];
   final dataComments = nestedMap != null ? ngmyJsonMapList(nestedMap['comments']) : const <Map<String, dynamic>>[];
 
   out['likedBy'] = ngmyMergeStringLists(topLikedBy, dataLikedBy);
   out['savedBy'] = ngmyMergeStringLists(topSavedBy, dataSavedBy);
+  out['sharedBy'] = ngmyMergeStringLists(topSharedBy, dataSharedBy);
   out['comments'] = ngmyMergeCommentLists(topComments, dataComments);
   out['likes'] = out['likedBy'] is List ? (out['likedBy'] as List).length : (out['likes'] as num?)?.toInt() ?? 0;
   final topShare = (out['shareCount'] as num?)?.toInt() ?? 0;

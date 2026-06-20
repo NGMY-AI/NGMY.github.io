@@ -67,9 +67,9 @@ class NgmyMediaProfile {
 
   /// Instagram-style counts: 9999, 10K, 10.5K, 1M, etc.
   static String formatInstagramCount(int count) {
-    if (count < 10000) return count.toString();
+    if (count < 10000) return _commaFormat(count);
     if (count < 1000000) {
-      if (count % 1000 == 0) return '${count ~/ 1000}K';
+      if (count % 1000 == 0) return '${_commaFormat(count ~/ 1000)}K';
       final value = (count / 1000.0 * 10).round() / 10;
       final text = value.toStringAsFixed(1);
       return '${text.endsWith('.0') ? text.substring(0, text.length - 2) : text}K';
@@ -78,6 +78,17 @@ class NgmyMediaProfile {
     final value = (count / 1000000.0 * 10).round() / 10;
     final text = value.toStringAsFixed(1);
     return '${text.endsWith('.0') ? text.substring(0, text.length - 2) : text}M';
+  }
+
+  static String _commaFormat(int count) {
+    final s = count.toString();
+    if (s.length <= 3) return s;
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 
   static List<Map<String, dynamic>> activeStories(dynamic user) {

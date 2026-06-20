@@ -3562,6 +3562,7 @@ class MediaPost {
   int shareCount;
   List<String> likedBy;
   List<String> savedBy;
+  List<String> sharedBy;
   List<Map<String, dynamic>> comments;
   List<String> taggedUsers;
   double? mediaAspectRatio;
@@ -3584,6 +3585,7 @@ class MediaPost {
     this.shareCount = 0,
     this.likedBy = const <String>[],
     this.savedBy = const <String>[],
+    this.sharedBy = const <String>[],
     this.comments = const <Map<String, dynamic>>[],
     this.taggedUsers = const <String>[],
     this.mediaAspectRatio,
@@ -3628,6 +3630,7 @@ class MediaPost {
       'shareCount': shareCount,
       'likedBy': likedBy,
       'savedBy': savedBy,
+      'sharedBy': sharedBy,
       'comments': comments,
       'taggedUsers': taggedUsers,
       if (mediaAspectRatio != null) 'mediaAspectRatio': mediaAspectRatio,
@@ -3640,6 +3643,7 @@ class MediaPost {
     json = ngmyMediaJsonWithData(json);
     final likedBy = _jsonStringList(json['likedBy'] ?? json['liked_by']);
     final savedBy = _jsonStringList(json['savedBy'] ?? json['saved_by']);
+    final sharedBy = _jsonStringList(json['sharedBy'] ?? json['shared_by']);
     final comments = _jsonMapList(json['comments'] ?? json['media_comments']);
     final taggedUsers = _jsonStringList(json['taggedUsers'] ?? json['tagged_users']);
     final mon = NgmyMediaMonetization.fromJson(json);
@@ -3653,6 +3657,7 @@ class MediaPost {
       timestamp: DateTime.parse(json['timestamp'] ?? json['created_at'] ?? DateTime.now().toIso8601String()).toLocal(),
       likedBy: likedBy,
       savedBy: savedBy,
+      sharedBy: sharedBy,
       comments: comments,
       taggedUsers: taggedUsers,
       likes: likedBy.isNotEmpty ? likedBy.length : (json['likes'] ?? 0),
@@ -4073,6 +4078,7 @@ List<Map<String, dynamic>> _mergeCommentLists(
 MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
   final likedBy = _mergeStringLists(remote.likedBy, local.likedBy);
   final savedBy = _mergeStringLists(remote.savedBy, local.savedBy);
+  final sharedBy = _mergeStringLists(remote.sharedBy, local.sharedBy);
   final comments = _mergeCommentLists(local.comments, remote.comments);
   return MediaPost(
     id: remote.id,
@@ -4086,6 +4092,7 @@ MediaPost _combineMediaPosts(MediaPost remote, MediaPost local) {
     shareCount: remote.shareCount > local.shareCount ? remote.shareCount : local.shareCount,
     likedBy: likedBy,
     savedBy: savedBy,
+    sharedBy: sharedBy,
     comments: comments,
     taggedUsers: _mergeStringLists(remote.taggedUsers, local.taggedUsers),
     mediaAspectRatio: remote.mediaAspectRatio ?? local.mediaAspectRatio,
@@ -4127,6 +4134,12 @@ void _ngmyMediaRemoveLike(List<String> likedBy, String email) {
   final key = _ngmyMediaActorKey(email);
   if (key.isEmpty) return;
   likedBy.removeWhere((e) => _ngmyMediaActorKey(e) == key);
+}
+
+bool _ngmyMediaSharedByContains(List<String> sharedBy, String email) {
+  final key = _ngmyMediaActorKey(email);
+  if (key.isEmpty) return false;
+  return sharedBy.any((e) => _ngmyMediaActorKey(e) == key);
 }
 
 int _ngmyMediaLikeCount(MediaPost post) => math.max(post.likedBy.length, post.likes);
@@ -40980,14 +40993,63 @@ class _NgmyInstagramCommentBubblePainter extends CustomPainter {
     canvas.drawRRect(body, paint);
 
     final tail = Path()
-      ..moveTo(size.width * 0.17, size.height * 0.72)
-      ..lineTo(size.width * 0.06, size.height * 0.96)
-      ..lineTo(size.width * 0.31, size.height * 0.72);
+      ..moveTo(size.width * 0.20, size.height * 0.72)
+      ..lineTo(size.width * 0.15, size.height * 0.80)
+      ..lineTo(size.width * 0.27, size.height * 0.72);
     canvas.drawPath(tail, paint);
   }
 
   @override
   bool shouldRepaint(covariant _NgmyInstagramCommentBubblePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+class _NgmyInstagramSendIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _NgmyInstagramSendIcon({this.size = 24, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _NgmyInstagramSendIconPainter(color: color),
+    );
+  }
+}
+
+class _NgmyInstagramSendIconPainter extends CustomPainter {
+  final Color color;
+
+  _NgmyInstagramSendIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.078
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    final plane = Path()
+      ..moveTo(w * 0.12, h * 0.50)
+      ..quadraticBezierTo(w * 0.42, h * 0.18, w * 0.88, h * 0.14)
+      ..quadraticBezierTo(w * 0.52, h * 0.58, w * 0.12, h * 0.50);
+    canvas.drawPath(plane, paint);
+
+    final fold = Path()
+      ..moveTo(w * 0.20, h * 0.48)
+      ..quadraticBezierTo(w * 0.46, h * 0.54, w * 0.70, h * 0.26);
+    canvas.drawPath(fold, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NgmyInstagramSendIconPainter oldDelegate) =>
       oldDelegate.color != color;
 }
 
@@ -41585,8 +41647,19 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
   }
 
   Future<void> _recordShare() async {
-    setState(() => widget.post.shareCount += 1);
-    await _persistPostChange();
+    final email = _ngmyMediaActorKey(widget.currentUser.email);
+    var changed = false;
+    setState(() {
+      if (widget.currentUser.isAdmin) {
+        widget.post.shareCount += 1;
+        changed = true;
+      } else if (!_ngmyMediaSharedByContains(widget.post.sharedBy, email)) {
+        widget.post.sharedBy.add(email);
+        widget.post.shareCount += 1;
+        changed = true;
+      }
+    });
+    if (changed) await _persistPostChange();
   }
 
   Future<void> _sharePost() async {
@@ -42183,10 +42256,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                     _instagramMetric(
                       count: widget.post.shareCount,
                       onTap: _sharePost,
-                      icon: Icon(
-                        Icons.send_rounded,
+                      icon: _NgmyInstagramSendIcon(
                         size: 24,
-                        color: Theme.of(context).iconTheme.color,
+                        color: Theme.of(context).iconTheme.color ?? Colors.black87,
                       ),
                     ),
                     const Spacer(),
