@@ -4873,9 +4873,8 @@ bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
 }
 
 bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
-  if (u.email.trim().isEmpty) return false;
-  // Every NGMY cloud/local account except Civic Registry-only manual enroll rows.
-  return !ngmyIsCivicRegistryOnlyAccount(u, config);
+  // Admin Accounts tab: every NGMY account with an email (Civic-only rows use the Civic dropdown).
+  return u.email.trim().isNotEmpty;
 }
 
 List<String> ngmyGamePaywallMissedDays(UserData user) {
@@ -7031,6 +7030,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   String? _cloudUserRowEnsuredForEmail;
+  Timer? _cloudUserRowResyncTimer;
   AppConfig _config = AppConfig();
   List<InvestmentPlan> _globalPlans = [
     InvestmentPlan(name: 'Starter Plan', price: 5.0, roi: 0.0286),
@@ -7212,6 +7212,66 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<Set<String>> _fetchDistinctUserEmailsFromCloudTransactions() async {
+    final emails = <String>{};
+    var from = 0;
+    const pageSize = 1000;
+    while (from < 100000) {
+      final to = from + pageSize - 1;
+      final rows = await supabase
+          .from('transactions')
+          .select('userEmail')
+          .order('timestamp', ascending: false)
+          .range(from, to)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (rows == null || (rows as List).isEmpty) break;
+      for (final raw in rows) {
+        final key = ngmyNormalizeEmail((raw['userEmail'] ?? '').toString());
+        if (key.isNotEmpty) emails.add(key);
+      }
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+    return emails;
+  }
+
+  Future<void> _discoverUsersFromCloudActivityIntoAllUsers() async {
+    final keys = <String>{for (final u in _allUsers) ngmyNormalizeEmail(u.email)};
+    final discovered = <String>[];
+
+    try {
+      final txEmails = await _fetchDistinctUserEmailsFromCloudTransactions();
+      discovered.addAll(txEmails);
+    } catch (e) {
+      debugPrint('[admin] discover users from cloud tx: $e');
+    }
+
+    try {
+      final mediaRows = await supabase
+          .from('media')
+          .select('userEmail')
+          .limit(5000)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (mediaRows != null) {
+        for (final raw in mediaRows as List) {
+          final key = ngmyNormalizeEmail((raw['userEmail'] ?? '').toString());
+          if (key.isNotEmpty) discovered.add(key);
+        }
+      }
+    } catch (e) {
+      debugPrint('[admin] discover users from media: $e');
+    }
+
+    for (final key in discovered) {
+      if (key.isEmpty || keys.contains(key)) continue;
+      final user = UserData(email: key, username: key.split('@').first, isAppLoginAccount: true);
+      _allUsers.add(user);
+      ngmyRegisterAppLoginUser(key);
+      keys.add(key);
+      unawaited(_safeUpsertUserRow(_userSignupRowForCloud(user)));
+    }
+  }
+
   Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 10000}) async {
     final transData = await supabase
         .from('transactions')
@@ -7252,15 +7312,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     _cloudUserRowEnsuredForEmail = null;
+    _cloudUserRowResyncTimer?.cancel();
     setState(() => _currentUser = null);
   }
 
-  Future<void> _ensureCurrentUserRegisteredInCloud() async {
+  Future<void> _ensureCurrentUserRegisteredInCloud({bool force = false}) async {
     if (_currentUser == null) return;
     final key = ngmyNormalizeEmail(_currentUser!.email);
-    if (key.isEmpty || _cloudUserRowEnsuredForEmail == key) return;
+    if (key.isEmpty) return;
+    if (!force && _cloudUserRowEnsuredForEmail == key) return;
     _cloudUserRowEnsuredForEmail = key;
     await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
+  }
+
+  void _startCloudUserRowResyncLoop() {
+    _cloudUserRowResyncTimer?.cancel();
+    if (_currentUser == null) return;
+    unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
+    _cloudUserRowResyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
+      unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
+    });
   }
 
   Future<void> _restoreSessionFromLocalCache({SharedPreferences? prefs}) async {
@@ -7328,7 +7400,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
-    unawaited(_ensureCurrentUserRegisteredInCloud());
+    _startCloudUserRowResyncLoop();
+    unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -7370,6 +7443,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyWalletDecisionLedgerToTransactions();
       }
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
+      if (!lightweight) {
+        await _discoverUsersFromCloudActivityIntoAllUsers();
+      }
       ngmyHydrateAppLoginUserRegistry(_allUsers);
       _reconcileAllUserBalances();
       _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -7709,6 +7785,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminPendingTxnPoll?.cancel();
     _adminOperationalRequestsPoll?.cancel();
     _adminUsersPoll?.cancel();
+    _cloudUserRowResyncTimer?.cancel();
     debugPrint('[sync] background paused — realtime disconnected');
   }
 
@@ -7732,6 +7809,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
+    _startCloudUserRowResyncLoop();
     debugPrint('[sync] foreground resumed — realtime reconnected');
   }
 
@@ -7748,6 +7826,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
+    _startCloudUserRowResyncLoop();
     _startUserTransactionSync();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -8411,7 +8490,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminUsersPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     unawaited(_refreshAdminUsersFromCloud());
-    _adminUsersPoll = Timer.periodic(const Duration(seconds: 30), (_) {
+    _adminUsersPoll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshAdminUsersFromCloud());
     });
@@ -8425,8 +8504,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     try {
       final remote = await _fetchAllUsersFromCloud();
-      if (remote.isEmpty) return;
-      _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+      if (remote.isNotEmpty) {
+        _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+      } else {
+        _allUsers = localUsersBeforeFetch.values.toList();
+      }
+      await _discoverUsersFromCloudActivityIntoAllUsers();
+      _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
       ngmyHydrateAppLoginUserRegistry(_allUsers);
       _reconcileAllUserBalances();
       await _persistLocalOnly();
@@ -11864,7 +11948,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   unawaited(NgmyIncomeSound.unlockForWebUserGesture());
                   await _applyPendingReferralLink(user);
                   await _persistLocalOnly();
-                  await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
+                  var synced = false;
+                  for (var attempt = 0; attempt < 15; attempt++) {
+                    synced = await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
+                    if (synced) break;
+                    await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+                  }
+                  if (!synced && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Account saved on this device. Still connecting to server — retrying in background.'),
+                        duration: Duration(seconds: 6),
+                      ),
+                    );
+                  }
                   unawaited(_startBackgroundServicesWhenReady());
                 },
               )
@@ -19477,7 +19574,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_loadWalletApprovedArchive());
     _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
