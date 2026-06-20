@@ -579,10 +579,40 @@ String ngmyNormalizeCashAppTagForSubmit(String raw) {
 
 /// Emails that signed up or signed in on the login page (users table / session).
 final Set<String> ngmyAppLoginUserEmails = <String>{};
+const _kNgmyAppLoginEmailsKey = 'ngmy_app_login_emails_v1';
+
+Future<void> ngmyLoadAppLoginUserRegistry() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyAppLoginEmailsKey);
+    if (raw == null || raw.trim().isEmpty) return;
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return;
+    for (final e in decoded) {
+      final key = ngmyNormalizeEmail(e.toString());
+      if (key.isNotEmpty) ngmyAppLoginUserEmails.add(key);
+    }
+  } catch (e) {
+    debugPrint('[login registry] load: $e');
+  }
+}
+
+Future<void> ngmyPersistAppLoginUserRegistry() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final sorted = ngmyAppLoginUserEmails.toList()..sort();
+    await prefs.setString(_kNgmyAppLoginEmailsKey, jsonEncode(sorted));
+  } catch (e) {
+    debugPrint('[login registry] persist: $e');
+  }
+}
 
 void ngmyRegisterAppLoginUser(String email) {
   final key = ngmyNormalizeEmail(email);
-  if (key.isNotEmpty) ngmyAppLoginUserEmails.add(key);
+  if (key.isEmpty) return;
+  if (ngmyAppLoginUserEmails.add(key)) {
+    unawaited(ngmyPersistAppLoginUserRegistry());
+  }
 }
 
 void ngmyRegisterAppLoginUsers(Iterable<UserData> users) {
@@ -591,9 +621,17 @@ void ngmyRegisterAppLoginUsers(Iterable<UserData> users) {
   }
 }
 
+void ngmyMarkUserAsAppLoginAccount(UserData u) {
+  u.isAppLoginAccount = true;
+  ngmyRegisterAppLoginUser(u.email);
+}
+
 void ngmyHydrateAppLoginUserRegistry(Iterable<UserData> users) {
   for (final u in users) {
-    if (ngmyLooksLikeAppLoginUser(u)) ngmyRegisterAppLoginUser(u.email);
+    if (u.isAppLoginAccount || ngmyLooksLikeAppLoginUser(u)) {
+      u.isAppLoginAccount = true;
+      ngmyRegisterAppLoginUser(u.email);
+    }
   }
 }
 
@@ -4800,6 +4838,7 @@ bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
 bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
   if (u.email.trim().isEmpty) return false;
   if (ngmyIsCivicRegistryOnlyAccount(u, config)) return false;
+  if (u.isAppLoginAccount) return true;
   return ngmyIsRegisteredAppLoginUser(u) || ngmyLooksLikeAppLoginUser(u);
 }
 
@@ -6636,8 +6675,10 @@ class UserData {
   String clockInMissMonth;
   int clockInMissCount;
   List<String> clockInMissedDays;
+  /// True when this row was created via the login/sign-up page (not civic-only manual enroll).
+  bool isAppLoginAccount;
 
-  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
+  UserData({this.email = '', this.phone = '', this.username = 'User', this.accountBalance = 0.0, this.totalProfit = 0.0, this.isClockedIn = false, this.clockInStartTime, this.isAdmin = false, this.activeInvestment, this.status = 'active', this.forceLogout = false, this.referralCount = 0, this.points = 0, this.profilePicturePath, this.isAuthorizedRegistrar = false, this.isCivicRegistryKing = false, this.isCivicRegistryAdmin = false, this.civicRegistryStateSwitchesUsed = 0, this.civicRegistryAnchorState = '', this.isApprovedWorker = false, this.isApprovedHelper = false, this.canSellOnStore = false, this.lastClockInDate, this.lastClockInEarningsDate, this.todayClockInEarned = 0.0, this.passwordHash = '', this.state = 'Georgia', this.helps = 0, this.missed = 0, this.isEnrolledInRegistry = false, this.fullName, this.dob, this.idType, this.registryId, this.homeAddress, this.city, this.room, this.referredByCode = '', this.clockInPenaltyPercent = 0.0, this.pendingInvestmentName, this.pendingInvestmentAmount, this.pendingInvestmentRoi, this.savedCashAppTag = '', this.savedZelleInfo = '', this.savedBitcoinAddress = '', this.crownBadge = '', this.freeFixCredit = 0.0, this.freeTrialActive = false, this.freeTrialDailyAmount = 0.0, this.mediaBio = '', this.isAppLoginAccount = false, List<String>? mediaFollowers, List<String>? mediaFollowing, List<Map<String, dynamic>>? mediaHighlights, List<Map<String, dynamic>>? mediaStories, List<String>? readAnnouncementIds,
     List<String>? openedContributionReceiptKeys,
     List<String>? dismissedContributionReceiptKeys,
     this.clockInMissMonth = '',
@@ -6710,7 +6751,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys, 'clockInMissMonth': clockInMissMonth, 'clockInMissCount': clockInMissCount, 'clockInMissedDays': clockInMissedDays};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'isAppLoginAccount': isAppLoginAccount, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys, 'clockInMissMonth': clockInMissMonth, 'clockInMissCount': clockInMissCount, 'clockInMissedDays': clockInMissedDays};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -6785,6 +6826,7 @@ class UserData {
       freeTrialActive: json['freeTrialActive'] == true,
       freeTrialDailyAmount: (json['freeTrialDailyAmount'] ?? 0.0).toDouble(),
       mediaBio: (json['mediaBio'] ?? '').toString(),
+      isAppLoginAccount: json['isAppLoginAccount'] == true || json['is_app_login_account'] == true,
       mediaFollowers: _jsonStringList(json['mediaFollowers']),
       mediaFollowing: _jsonStringList(json['mediaFollowing']),
       mediaHighlights: _jsonMapList(json['mediaHighlights']),
@@ -7051,6 +7093,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       _preserveLocalSessionState(local, remoteUser);
       _mergeUserMediaProfileFields(local, remoteUser);
+      if (local.isAppLoginAccount) remoteUser.isAppLoginAccount = true;
       merged[key] = remoteUser;
       if (local.passwordHash.trim().isNotEmpty && merged[key]!.passwordHash.trim().isEmpty) {
         merged[key]!.passwordHash = local.passwordHash;
@@ -7062,7 +7105,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _registerCloudUsersAsAppLogins(Iterable<UserData> users) {
-    ngmyRegisterAppLoginUsers(users);
+    for (final u in users) {
+      if (u.isAppLoginAccount || ngmyLooksLikeAppLoginUser(u)) {
+        u.isAppLoginAccount = true;
+        ngmyRegisterAppLoginUser(u.email);
+      }
+    }
   }
 
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
@@ -7091,7 +7139,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     for (final t in txns) {
       final key = ngmyNormalizeEmail(t.userEmail);
       if (key.isEmpty || keys.contains(key)) continue;
-      users.add(UserData(email: key, username: key.split('@').first));
+      final discovered = UserData(email: key, username: key.split('@').first, isAppLoginAccount: true);
+      users.add(discovered);
+      ngmyRegisterAppLoginUser(key);
       keys.add(key);
     }
   }
@@ -7202,6 +7252,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startUserTransactionSync();
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
+    _startAdminUsersPoll();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -7243,6 +7294,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyWalletDecisionLedgerToTransactions();
       }
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
+      ngmyHydrateAppLoginUserRegistry(_allUsers);
       _reconcileAllUserBalances();
       _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
       for (final email in kNgmyAdminEmails) {
@@ -7477,7 +7529,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _currentUser = user;
     }
 
-    ngmyRegisterAppLoginUser(key);
+    ngmyMarkUserAsAppLoginAccount(_currentUser!);
     NgmyIncomeSound.bindSession(key);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (!mounted) return;
@@ -7580,6 +7632,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _userTxnSyncTimer?.cancel();
     _adminPendingTxnPoll?.cancel();
     _adminOperationalRequestsPoll?.cancel();
+    _adminUsersPoll?.cancel();
     debugPrint('[sync] background paused — realtime disconnected');
   }
 
@@ -7602,6 +7655,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startGameSettingsRefreshLoop();
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
+    _startAdminUsersPoll();
     debugPrint('[sync] foreground resumed — realtime reconnected');
   }
 
@@ -7617,6 +7671,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startMediaDeliveryLoop();
     _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
+    _startAdminUsersPoll();
     _startUserTransactionSync();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
@@ -8274,6 +8329,37 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Timer? _adminPendingTxnPoll;
   Timer? _adminOperationalRequestsPoll;
+  Timer? _adminUsersPoll;
+
+  void _startAdminUsersPoll() {
+    _adminUsersPoll?.cancel();
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    unawaited(_refreshAdminUsersFromCloud());
+    _adminUsersPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
+      unawaited(_refreshAdminUsersFromCloud());
+    });
+  }
+
+  Future<void> _refreshAdminUsersFromCloud() async {
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    if (!await ngmyCanReachCloud()) return;
+    final localUsersBeforeFetch = <String, UserData>{
+      for (final u in _allUsers) u.email.toLowerCase().trim(): u,
+    };
+    try {
+      final remote = await _fetchAllUsersFromCloud();
+      if (remote.isEmpty) return;
+      _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
+      ngmyHydrateAppLoginUserRegistry(_allUsers);
+      _reconcileAllUserBalances();
+      await _persistLocalOnly();
+      if (mounted) setState(() {});
+      NgmyAdminLiveRefresh.notify();
+    } catch (e) {
+      debugPrint('[admin] users poll: $e');
+    }
+  }
 
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
@@ -9837,6 +9923,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           username: fullName.isNotEmpty ? fullName : emailNorm.split('@').first,
           isAdmin: admins.contains(emailNorm),
           passwordHash: '',
+          isAppLoginAccount: true,
         );
         _allUsers.add(user);
         _currentUser = user;
@@ -9846,8 +9933,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         _currentUser = _allUsers[idx];
       }
+      ngmyMarkUserAsAppLoginAccount(_currentUser!);
     });
-    ngmyRegisterAppLoginUser(emailNorm);
     NgmyIncomeSound.bindSession(emailNorm);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     await _saveData();
@@ -10760,6 +10847,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _loadData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await ngmyLoadAppLoginUserRegistry();
       _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
       // Theme is already loaded before first frame to prevent startup flashing.
 
@@ -10860,6 +10948,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (uLocalEarly != null) {
         try {
           _allUsers = (jsonDecode(uLocalEarly) as List).map((e) => UserData.fromJson(e)).toList();
+          ngmyHydrateAppLoginUserRegistry(_allUsers);
         } catch (_) {
           prefs.remove('all_users');
         }
@@ -11688,20 +11777,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     username: u,
                     isAdmin: ngmyEmailIsAdmin(email),
                     passwordHash: passwordHash,
+                    isAppLoginAccount: true,
                   );
                   setState(() {
                     _currentUser = user;
                     _allUsers.add(user);
                   });
-                  ngmyRegisterAppLoginUser(email);
+                  ngmyMarkUserAsAppLoginAccount(user);
                   NgmyIncomeSound.bindSession(email);
                   unawaited(NgmyIncomeSound.unlockForWebUserGesture());
                   await _applyPendingReferralLink(user);
                   await _persistLocalOnly();
-                  for (var i = 0; i < 4; i++) {
-                    await _pushUserToCloudFast(_currentUser!, includeFreeTrial: true);
-                    if (await ngmyCanReachCloud()) break;
-                    await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+                  for (var i = 0; i < 6; i++) {
+                    final ok = await _pushUserToCloudFast(_currentUser!, includeFreeTrial: true);
+                    if (ok) break;
+                    await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
                   }
                   unawaited(_startBackgroundServicesWhenReady());
                 },
@@ -19315,7 +19405,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_loadWalletApprovedArchive());
     _lastSeenPendingWalletCount = _pendingWalletRequestCount();
     Future.microtask(() => unawaited(_pullAdminCloudData()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
