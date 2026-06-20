@@ -6982,7 +6982,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyAdminLiveRefresh.notify();
   }
 
-  /// Single realtime channel (all tables) — avoids 8 separate subscriptions per client.
+  /// One filtered Realtime channel per session (own user row + own transactions only).
   RealtimeChannel? _appSyncChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
@@ -7013,6 +7013,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _notifiedTransactionKeys = {};
   bool _allowConfigDiffNotifications = false;
   bool _realtimeStarted = false;
+  bool _realtimePaused = false;
+  bool _backgroundSyncPaused = false;
   bool _userExplicitlyLoggedOut = false;
   String _appShellSig = '';
   String _computeAppShellSig() {
@@ -7120,6 +7122,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _performLogout() async {
     _userExplicitlyLoggedOut = true;
+    _pauseBackgroundSync(disableRealtimeLoop: true);
     await ngmyWriteUserLoggedOutFlag(true);
     try {
       final p = await SharedPreferences.getInstance();
@@ -7189,6 +7192,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _restartSyncLoopsForCurrentUser() {
     if (_currentUser == null) return;
+    _realtimePaused = false;
+    _backgroundSyncPaused = false;
     if (!_realtimeStarted) {
       unawaited(_startBackgroundServicesWhenReady());
       return;
@@ -7560,9 +7565,51 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startBackgroundServices();
   }
 
+  /// Disconnect Supabase Realtime and stop cloud polling while the app is
+  /// backgrounded, logged out, or closed — saves Realtime message quota.
+  void _pauseBackgroundSync({bool disableRealtimeLoop = false}) {
+    _realtimePaused = true;
+    _backgroundSyncPaused = true;
+    if (disableRealtimeLoop) _realtimeStarted = false;
+    try {
+      _appSyncChannel?.unsubscribe();
+    } catch (_) {}
+    _appSyncChannel = null;
+    _configRefreshTimer?.cancel();
+    _gameSettingsRefreshTimer?.cancel();
+    _userTxnSyncTimer?.cancel();
+    _adminPendingTxnPoll?.cancel();
+    _adminOperationalRequestsPoll?.cancel();
+    debugPrint('[sync] background paused — realtime disconnected');
+  }
+
+  void _resumeBackgroundSync() {
+    if (!mounted || _currentUser == null || _userExplicitlyLoggedOut) {
+      _backgroundSyncPaused = false;
+      _realtimePaused = false;
+      return;
+    }
+    if (!_backgroundSyncPaused && _appSyncChannel != null) return;
+    _backgroundSyncPaused = false;
+    _realtimePaused = false;
+    if (!_realtimeStarted) {
+      unawaited(_startBackgroundServicesWhenReady());
+      return;
+    }
+    _subscribeToRealtime();
+    _startUserTransactionSync();
+    _startConfigRefreshLoop();
+    _startGameSettingsRefreshLoop();
+    _startAdminPendingTransactionPoll();
+    _startAdminOperationalRequestsPoll();
+    debugPrint('[sync] foreground resumed — realtime reconnected');
+  }
+
   void _startBackgroundServices() {
     if (_realtimeStarted) return;
     _realtimeStarted = true;
+    _realtimePaused = false;
+    _backgroundSyncPaused = false;
     _subscribeToRealtime();
     _subscribeToAuthState();
     _startConfigRefreshLoop();
@@ -7597,7 +7644,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_currentUser == null) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
     _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
-      if (!mounted || _currentUser == null) return;
+      if (!mounted || _currentUser == null || _backgroundSyncPaused) return;
       unawaited(_refreshUserTransactionsFromCloud());
     });
   }
@@ -7917,17 +7964,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       unawaited(_persistSessionImmediately());
+      _pauseBackgroundSync();
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_restoreSessionFromLocalCache());
       unawaited(_probeOfflineAtLaunch());
-      if (!_realtimeStarted) {
-        unawaited(_startBackgroundServicesWhenReady());
-      }
+      _resumeBackgroundSync();
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
@@ -8014,20 +8059,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     ngmyOnGameWinNotify = null;
     ngmyInAppNotify = null;
     ngmyOnStoreOrdersChanged = null;
+    _pauseBackgroundSync(disableRealtimeLoop: true);
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
     try { _autoThemeTimer?.cancel(); } catch (_) {}
-    try { _configRefreshTimer?.cancel(); } catch (_) {}
-    try { _gameSettingsRefreshTimer?.cancel(); } catch (_) {}
     try { _mediaDeliveryTimer?.cancel(); } catch (_) {}
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
     try { _heavySaveTimer?.cancel(); } catch (_) {}
-    try { _userTxnSyncTimer?.cancel(); } catch (_) {}
-    try { _adminPendingTxnPoll?.cancel(); } catch (_) {}
-    try { _adminOperationalRequestsPoll?.cancel(); } catch (_) {}
     NgmySupabaseSyncThrottle.reset();
     try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
-    try { _appSyncChannel?.unsubscribe(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
     super.dispose();
   }
@@ -8239,7 +8279,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminPendingTxnPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 60), (_) {
-      if (!mounted || !_ngmySessionIsAdmin(_currentUser)) return;
+      if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
   }
@@ -8249,7 +8289,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
     unawaited(_refreshAdminOperationalRequestsFromCloud());
     _adminOperationalRequestsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
-      if (!mounted || !_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+      if (!mounted || _backgroundSyncPaused || !_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
       unawaited(_refreshAdminOperationalRequestsFromCloud());
     });
   }
@@ -8626,7 +8666,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _gameSettingsRefreshTimer?.cancel();
     unawaited(_refreshGameCenterSettingsFromCloud());
     _gameSettingsRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (!mounted) return;
+      if (!mounted || _backgroundSyncPaused) return;
       unawaited(_refreshGameCenterSettingsFromCloud());
     });
   }
@@ -8636,8 +8676,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final isAdmin = _ngmySessionIsAdmin(_currentUser);
     // Fallback for non-admin users (no config/ngmy_settings realtime subscription).
     _configRefreshTimer = Timer.periodic(Duration(minutes: isAdmin ? 8 : 3), (_) async {
-      if (_isSyncing) return;
+      if (_isSyncing || _backgroundSyncPaused) return;
       await _refreshLegalAndPlansFromCloud();
+      await _reloadStoreFromSupabase();
       try {
         final cfg = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configPoll);
         if (cfg == null) return;
@@ -9822,103 +9863,49 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _subscribeToRealtime() {
+    if (_realtimePaused || _currentUser == null || _userExplicitlyLoggedOut) {
+      try {
+        _appSyncChannel?.unsubscribe();
+      } catch (_) {}
+      _appSyncChannel = null;
+      return;
+    }
     try {
       _appSyncChannel?.unsubscribe();
-      final isAdmin = _ngmySessionIsAdmin(_currentUser);
       final sessionEmail = (_currentUser?.email ?? '').trim();
-      final channelName = isAdmin
-          ? 'ngmy-app-sync-admin'
-          : 'ngmy-app-sync-${sessionEmail.toLowerCase().hashCode}';
-      var channel = supabase.channel(channelName);
-
-      if (isAdmin) {
-        channel = channel
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'users',
-              callback: (payload) => _onUsersChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'transactions',
-              callback: (payload) => _onTransactionsChange(payload),
-            );
-      } else if (sessionEmail.isNotEmpty) {
-        channel = channel
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'users',
-              filter: PostgresChangeFilter(
-                type: PostgresChangeFilterType.eq,
-                column: 'email',
-                value: sessionEmail,
-              ),
-              callback: (payload) => _onUsersChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'transactions',
-              filter: PostgresChangeFilter(
-                type: PostgresChangeFilterType.eq,
-                column: 'userEmail',
-                value: sessionEmail,
-              ),
-              callback: (payload) => _onTransactionsChange(payload),
-            );
-        // Regular users: skip config + ngmy_settings realtime (every row change
-        // broadcasts to all clients and burns quota). Fallback polls handle those.
-      }
-
-      if (isAdmin) {
-        _appSyncChannel = channel
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'config',
-              callback: (payload) => _onConfigChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'ngmy_settings',
-              callback: (payload) => _onNgmySettingsChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'store_listings',
-              callback: (payload) => _onStoreListingChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'store_inquiries',
-              callback: (payload) => _onStoreInquiryChange(payload),
-            )
-            .subscribe();
-      } else if (sessionEmail.isNotEmpty) {
-        _appSyncChannel = channel
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'store_listings',
-              callback: (payload) => _onStoreListingChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'store_inquiries',
-              callback: (payload) => _onStoreInquiryChange(payload),
-            )
-            .subscribe();
-      } else {
+      if (sessionEmail.isEmpty) {
         _appSyncChannel = null;
+        return;
       }
-      debugPrint('Realtime subscription active ($channelName)');
+      // Quota-safe: only this user's row + their transactions (filtered server-side).
+      // Config, store, admin-wide users/transactions, and media use HTTP polling instead.
+      final channelName = 'ngmy-sync-${sessionEmail.toLowerCase().hashCode}';
+      _appSyncChannel = supabase
+          .channel(channelName)
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'users',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'email',
+              value: sessionEmail,
+            ),
+            callback: (payload) => _onUsersChange(payload),
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'transactions',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'userEmail',
+              value: sessionEmail,
+            ),
+            callback: (payload) => _onTransactionsChange(payload),
+          )
+          .subscribe();
+      debugPrint('Realtime: own user + transactions only ($channelName)');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
     }
@@ -39289,7 +39276,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlightedPost());
       }
     });
-    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) => _silentRefreshFeed());
+    _mediaSyncTimer = Timer.periodic(const Duration(seconds: 60), (_) => _silentRefreshFeed());
   }
 
   String _feedSignature() {
@@ -42328,7 +42315,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Timer? _newsPollTimer;
   int _unreadNewsInternal = 0;
   List<Announcement> _newsItems = [];
-  RealtimeChannel? _newsChannel;
   final Set<String> _seenNewsIds = {};
 
   Future<void> _refreshUnreadNewsInternal() async {
@@ -42510,60 +42496,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 
   void _toggleKbModeForAdmin() {
     setState(() => _kbMode = !_kbMode);
-  }
-
-  void _subscribeNewsRealtime() {
-    try {
-      _newsChannel?.unsubscribe();
-      _newsChannel = Supabase.instance.client
-          .channel('ngmy_news_live_${widget.user.email.hashCode}')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'announcements',
-            callback: (payload) => _onNewsRealtime(payload),
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('[news] realtime subscribe: $e');
-    }
-  }
-
-  void _onNewsRealtime(PostgresChangePayload payload) {
-    try {
-      if (payload.eventType == PostgresChangeEvent.delete) {
-        final id = (payload.oldRecord['id'] ?? '').toString();
-        if (id.isEmpty) return;
-        setState(() => _newsItems.removeWhere((a) => a.id == id));
-        return;
-      }
-      final ann = Announcement.fromJson(payload.newRecord);
-      if (ann.id.isEmpty) return;
-      final isNew = !_seenNewsIds.contains(ann.id);
-      setState(() {
-        final idx = _newsItems.indexWhere((a) => a.id == ann.id);
-        if (idx == -1) {
-          _newsItems.add(ann);
-        } else {
-          _newsItems[idx] = ann;
-        }
-      });
-      if (isNew) {
-        _seenNewsIds.add(ann.id);
-        final me = widget.user.email.toLowerCase().trim();
-        final author = ann.authorEmail.toLowerCase().trim();
-        if (author != me) {
-          unawaited(_notifyNewsMessage(ann));
-        }
-      }
-      if (_activeTab == 1) {
-        _scrollNewsToBottom();
-      } else {
-        unawaited(_refreshUnreadNewsInternal());
-      }
-    } catch (e) {
-      debugPrint('[news] realtime apply: $e');
-    }
   }
 
   Future<void> _pollNewsFromCloud() async {
@@ -42766,9 +42698,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     _helperQuotaTimer?.cancel();
     _helperCountdownTimer?.cancel();
     _newsPollTimer?.cancel();
-    try {
-      _newsChannel?.unsubscribe();
-    } catch (_) {}
     _chatController.dispose();
     _newsController.dispose();
     _scrollController.dispose();
