@@ -1067,20 +1067,51 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
     }
   }
 
+  dynamic _resolveAdminUser() {
+    final adminEmail = (widget.adminUser?.email ?? '').toString().toLowerCase().trim();
+    if (adminEmail.isEmpty) return widget.adminUser;
+    for (final u in widget.allUsers) {
+      if (u.email.toString().toLowerCase().trim() == adminEmail) return u;
+    }
+    return widget.adminUser;
+  }
+
+  dynamic _resolveUserForGrant(dynamic picked) {
+    final key = picked.email.toString().toLowerCase().trim();
+    for (final u in widget.allUsers) {
+      if (u.email.toString().toLowerCase().trim() == key) return u;
+    }
+    return picked;
+  }
+
+  String _userInitial(dynamic user) {
+    final name = user.username.toString().trim();
+    if (name.isNotEmpty) return name.substring(0, 1).toUpperCase();
+    final email = user.email.toString().trim();
+    if (email.isNotEmpty) return email.substring(0, 1).toUpperCase();
+    return '?';
+  }
+
   void _openFollowerDemosSheet() {
     final queryCtrl = TextEditingController();
+    final adminUser = _resolveAdminUser();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: widget.isDark ? const Color(0xFF111731) : Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheet) {
           final q = queryCtrl.text.trim().toLowerCase();
-          final users = widget.allUsers.where((u) {
-            if (q.isEmpty) return true;
-            return u.username.toString().toLowerCase().contains(q) || u.email.toString().toLowerCase().contains(q);
-          }).toList();
+          final List<dynamic> users;
+          if (q.isEmpty) {
+            users = adminUser != null ? [adminUser] : const [];
+          } else {
+            users = widget.allUsers.where((u) {
+              return u.username.toString().toLowerCase().contains(q) || u.email.toString().toLowerCase().contains(q);
+            }).toList();
+          }
           return DraggableScrollableSheet(
             expand: false,
             initialChildSize: 0.88,
@@ -1092,6 +1123,13 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Grant Followers', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: widget.isDark ? Colors.white : Colors.black)),
+                  const SizedBox(height: 4),
+                  Text(
+                    q.isEmpty
+                        ? 'Your profile is shown first. Search to grant followers to another user.'
+                        : '${users.length} match(es)',
+                    style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black54),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: queryCtrl,
@@ -1100,90 +1138,102 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: GridView.builder(
-                      controller: scrollCtrl,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 8, childAspectRatio: 0.78),
-                      itemCount: users.length,
-                      itemBuilder: (_, i) {
-                        final u = users[i];
-                        final count = NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length;
-                        return GestureDetector(
-                          onTap: () async {
-                            final amtCtrl = TextEditingController(text: '10');
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (d) => AlertDialog(
-                                title: Text('Followers for ${u.username}'),
-                                content: TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'How many followers to add?')),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-                                  FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Grant')),
-                                ],
-                              ),
-                            );
-                            if (ok != true) return;
-                            final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
-                            if (n <= 0) return;
-                            final spread = await NgmyMediaDelivery.pickSchedule(context, count: n, label: 'followers');
-                            if (spread == null) return;
-                            if (spread.inMilliseconds <= 0) {
-                              NgmyMediaProfile.adminAddFollowers(u, n);
-                              final userOk = await widget.persistUser?.call(u) ?? false;
-                              setSheet(() {});
-                              if (context.mounted) {
-                                final shown = NgmyMediaProfile.formatInstagramCount(
-                                  NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length,
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(userOk
-                                        ? 'Added $n followers to ${u.username}. Total: $shown. Saved for all users.'
-                                        : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-                            if (widget.onEnqueueDelivery == null) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Scheduling is not available on this screen.')),
-                                );
-                              }
-                              return;
-                            }
-                            final ids = NgmyMediaProfile.adminBuildFollowerIds(u, n);
-                            final items = NgmyMediaDelivery.queueFollowers(
-                              userEmail: u.email.toString(),
-                              followerIds: ids,
-                              spread: spread,
-                            );
-                            await widget.onEnqueueDelivery!(items);
-                            setSheet(() {});
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Scheduled $n followers for ${u.username}. ${NgmyMediaDelivery.describeSpread(spread, n)}',
-                                  ),
+                    child: users.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No users found.',
+                              style: TextStyle(color: widget.isDark ? Colors.white54 : Colors.black54),
+                            ),
+                          )
+                        : GridView.builder(
+                            controller: scrollCtrl,
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 8, childAspectRatio: 0.78),
+                            itemCount: users.length,
+                            itemBuilder: (_, i) {
+                              final u = users[i];
+                              final count = NgmyMediaProfile.asStringList((u as dynamic).mediaFollowers).length;
+                              return GestureDetector(
+                                onTap: () async {
+                                  final target = _resolveUserForGrant(u);
+                                  NgmyMediaProfile.normalizeUserMediaFields(target);
+                                  final amtCtrl = TextEditingController(text: '10');
+                                  final ok = await showDialog<bool>(
+                                    context: context,
+                                    useRootNavigator: true,
+                                    builder: (d) => AlertDialog(
+                                      title: Text('Followers for ${target.username}'),
+                                      content: TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'How many followers to add?')),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+                                        FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Grant')),
+                                      ],
+                                    ),
+                                  );
+                                  if (ok != true) return;
+                                  final n = int.tryParse(amtCtrl.text.trim()) ?? 0;
+                                  if (n <= 0) return;
+                                  final spread = await NgmyMediaDelivery.pickSchedule(context, count: n, label: 'followers');
+                                  if (spread == null) return;
+                                  if (spread.inMilliseconds <= 0) {
+                                    NgmyMediaProfile.adminAddFollowers(target, n);
+                                    final userOk = await widget.persistUser?.call(target) ?? false;
+                                    widget.onDataChanged();
+                                    setSheet(() {});
+                                    if (context.mounted) {
+                                      final shown = NgmyMediaProfile.formatInstagramCount(
+                                        NgmyMediaProfile.asStringList((target as dynamic).mediaFollowers).length,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(userOk
+                                              ? 'Added $n followers to ${target.username}. Total: $shown. Saved for all users.'
+                                              : 'Could not save followers. Run supabase/users_media_profile_columns.sql in Supabase.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (widget.onEnqueueDelivery == null) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Scheduling is not available on this screen.')),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  final ids = NgmyMediaProfile.adminBuildFollowerIds(target, n);
+                                  final items = NgmyMediaDelivery.queueFollowers(
+                                    userEmail: target.email.toString(),
+                                    followerIds: ids,
+                                    spread: spread,
+                                  );
+                                  await widget.onEnqueueDelivery!(items);
+                                  widget.onDataChanged();
+                                  setSheet(() {});
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Scheduled $n followers for ${target.username}. ${NgmyMediaDelivery.describeSpread(spread, n)}',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Column(
+                                  children: [
+                                    CircleAvatar(radius: 26, child: Text(_userInitial(u), style: const TextStyle(fontWeight: FontWeight.w800))),
+                                    const SizedBox(height: 4),
+                                    Text(u.username.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black87)),
+                                    Text(
+                                      NgmyMediaProfile.formatInstagramCount(count),
+                                      style: TextStyle(fontSize: 9, color: widget.isDark ? Colors.white54 : Colors.black54),
+                                    ),
+                                  ],
                                 ),
                               );
-                            }
-                          },
-                          child: Column(
-                            children: [
-                              CircleAvatar(radius: 26, child: Text(u.username.toString().substring(0, 1).toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800))),
-                              const SizedBox(height: 4),
-                              Text(u.username.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white : Colors.black87)),
-                              Text(
-                                NgmyMediaProfile.formatInstagramCount(count),
-                                style: TextStyle(fontSize: 9, color: widget.isDark ? Colors.white54 : Colors.black54),
-                              ),
-                            ],
+                            },
                           ),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -1483,7 +1533,7 @@ class _NgmyMediaAdminPanelState extends State<NgmyMediaAdminPanel> {
                     child: _AdminToolButton(
                       icon: Icons.person_add_alt_1_rounded,
                       label: 'Grant Followers',
-                      sub: 'Pick user & amount',
+                      sub: 'Your profile first',
                       isDark: widget.isDark,
                       onTap: _openFollowerDemosSheet,
                     ),

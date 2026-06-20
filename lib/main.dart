@@ -41004,53 +41004,17 @@ class _NgmyInstagramCommentBubblePainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
+/// Instagram-style outlined paper plane (share / send).
 class _NgmyInstagramSendIcon extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _NgmyInstagramSendIcon({this.size = 24, required this.color});
+  const _NgmyInstagramSendIcon({this.size = 26, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _NgmyInstagramSendIconPainter(color: color),
-    );
+    return Icon(Icons.send_outlined, size: size, color: color);
   }
-}
-
-class _NgmyInstagramSendIconPainter extends CustomPainter {
-  final Color color;
-
-  _NgmyInstagramSendIconPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.078
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final w = size.width;
-    final h = size.height;
-
-    final plane = Path()
-      ..moveTo(w * 0.12, h * 0.50)
-      ..quadraticBezierTo(w * 0.42, h * 0.18, w * 0.88, h * 0.14)
-      ..quadraticBezierTo(w * 0.52, h * 0.58, w * 0.12, h * 0.50);
-    canvas.drawPath(plane, paint);
-
-    final fold = Path()
-      ..moveTo(w * 0.20, h * 0.48)
-      ..quadraticBezierTo(w * 0.46, h * 0.54, w * 0.70, h * 0.26);
-    canvas.drawPath(fold, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _NgmyInstagramSendIconPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 class VideoPostWidget extends StatefulWidget {
@@ -41671,12 +41635,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
 
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        Future<void> closeThen(Future<void> Function() action) async {
-          Navigator.pop(ctx);
+        // Run share/launch while the tap gesture is still active (required on web).
+        Future<void> runThenClose(Future<void> Function() action) async {
           await action();
+          if (ctx.mounted) Navigator.pop(ctx);
           await _recordShare();
         }
 
@@ -41707,12 +41673,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                   leading: const Icon(Icons.ios_share_rounded),
                   title: const Text('Share…'),
                   subtitle: const Text('Messages, email, or other apps'),
-                  onTap: () => closeThen(() => Share.share(fullText, subject: 'NGMY Media')),
+                  onTap: () => runThenClose(() => Share.share(fullText, subject: 'NGMY Media')),
                 ),
                 ListTile(
                   leading: const Icon(Icons.facebook_rounded, color: Color(0xFF1877F2)),
                   title: const Text('Facebook'),
-                  onTap: () => closeThen(
+                  onTap: () => runThenClose(
                     () => _launchMediaShareUrl(
                       Uri.parse('https://www.facebook.com/sharer/sharer.php?u=${Uri.encodeComponent(link)}'),
                     ),
@@ -41721,7 +41687,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 ListTile(
                   leading: const Icon(Icons.chat_rounded, color: Color(0xFF25D366)),
                   title: const Text('WhatsApp'),
-                  onTap: () => closeThen(
+                  onTap: () => runThenClose(
                     () => _launchMediaShareUrl(
                       Uri.parse('https://wa.me/?text=${Uri.encodeComponent(fullText)}'),
                     ),
@@ -41730,7 +41696,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 ListTile(
                   leading: const Icon(Icons.alternate_email_rounded),
                   title: const Text('X (Twitter)'),
-                  onTap: () => closeThen(
+                  onTap: () => runThenClose(
                     () => _launchMediaShareUrl(
                       Uri.parse(
                         'https://twitter.com/intent/tweet?text=${Uri.encodeComponent(shareText)}&url=${Uri.encodeComponent(link)}',
@@ -41741,7 +41707,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                 ListTile(
                   leading: const Icon(Icons.content_copy_rounded),
                   title: const Text('Copy NGMY link'),
-                  onTap: () => closeThen(() async {
+                  onTap: () => runThenClose(() async {
                     await Clipboard.setData(ClipboardData(text: link));
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -42257,7 +42223,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
                       count: widget.post.shareCount,
                       onTap: _sharePost,
                       icon: _NgmyInstagramSendIcon(
-                        size: 24,
+                        size: 26,
                         color: Theme.of(context).iconTheme.color ?? Colors.black87,
                       ),
                     ),

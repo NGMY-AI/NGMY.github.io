@@ -146,6 +146,7 @@ class NgmyMediaDelivery {
 
     return showDialog<Duration>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) {
         String preset = 'instant';
         return StatefulBuilder(
