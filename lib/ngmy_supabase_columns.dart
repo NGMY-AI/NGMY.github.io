@@ -39,7 +39,8 @@ class NgmySupabaseColumns {
   static const adminUsersList =
       'email,username,phone,passwordHash,isAdmin,status,forceLogout,accountBalance,totalProfit,'
       'canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount,'
-      'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper';
+      'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper,'
+      'crownBadge,freeFixCredit';
 
   /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =

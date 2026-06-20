@@ -3238,6 +3238,66 @@ Future<bool> _pushUserPhoneToCloud(UserData u) async {
   }
 }
 
+Future<bool> _pushUserProfileBasicsToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty) return false;
+  final username = u.username.trim().isEmpty ? email.split('@').first : u.username.trim();
+  return _safeUpsertUserRow({
+    'email': email,
+    'username': username,
+    'phone': u.phone.trim(),
+  });
+}
+
+Future<bool> _pushUserProfilePictureToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty) return false;
+  final photo = (u.profilePicturePath ?? '').trim();
+  if (photo.isEmpty || photo.startsWith('data:image')) return false;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    final ok = await _safeUpsertUserRow({
+      'email': email,
+      'profilePicturePath': photo,
+    });
+    if (ok) return true;
+    await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+  }
+  return false;
+}
+
+Future<bool> _pushUserAdminAccountFieldsToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty) return false;
+  return _safeUpsertUserRow({
+    'email': email,
+    'username': u.username.trim().isEmpty ? email.split('@').first : u.username.trim(),
+    'status': u.status.trim().isEmpty ? 'active' : u.status,
+    'crownBadge': u.crownBadge,
+    'forceLogout': u.forceLogout,
+    'isApprovedWorker': u.isApprovedWorker,
+    'isApprovedHelper': u.isApprovedHelper,
+    'freeFixCredit': u.freeFixCredit,
+    'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
+    'isCivicRegistryKing': u.isCivicRegistryKing,
+    'canSellOnStore': u.canSellOnStore,
+  });
+}
+
+Future<bool> _deleteUserFromCloud(String email) async {
+  final key = email.trim();
+  if (key.isEmpty || !await ngmyCanReachCloud()) return false;
+  try {
+    await Supabase.instance.client.from('users').delete().eq('email', key).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[admin] delete user cloud: $e');
+    return false;
+  }
+}
+
 Map<String, dynamic> _userSignupRowForCloud(UserData u) {
   final username = u.username.trim().isEmpty ? u.email.split('@').first : u.username.trim();
   return {
@@ -6051,6 +6111,14 @@ Future<String?> _uploadUserProfileAvatar({required String email, required Uint8L
   final safeKey = key.replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
   final path = 'avatars/$safeKey.jpg';
   final upload = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: path, contentType: 'image/jpeg');
+  if (upload.ref == null || upload.ref!.isEmpty) {
+    if (upload.error != null) debugPrint('[profile avatar] upload: ${upload.error}');
+    return null;
+  }
+  final publicUrl = ngmyProfileImageNetworkUrl(upload.ref);
+  if (publicUrl != null && publicUrl.isNotEmpty) {
+    return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+  }
   return upload.ref;
 }
 
@@ -6062,6 +6130,7 @@ Future<void> _maybeUploadLocalProfilePhotoToCloud(UserData u) async {
     final ref = await _uploadUserProfileAvatar(email: u.email, bytes: bytes);
     if (ref == null || ref.isEmpty) return;
     u.profilePicturePath = ref;
+    await _pushUserProfilePictureToCloud(u);
     await _pushUserToCloudFast(u);
   } catch (e) {
     debugPrint('[user] profile avatar migrate: $e');
@@ -8235,6 +8304,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final key = email.toLowerCase().trim();
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
       if (!mounted) return;
+      if ((remote.profilePicturePath ?? '').trim().isEmpty) {
+        try {
+          final photoRow = await supabase
+              .from('users')
+              .select('profilePicturePath')
+              .eq('email', email)
+              .maybeSingle()
+              .timeout(kNgmyCloudLoadTimeout);
+          if (photoRow != null) {
+            final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
+            if (_ngmyIsCloudProfilePhoto(cloudPhoto)) {
+              remote.profilePicturePath = cloudPhoto;
+            }
+          }
+        } catch (e) {
+          debugPrint('[user] profile photo fetch: $e');
+        }
+      }
+      if (!mounted) return;
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
@@ -8752,6 +8840,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
+    if (mounted) setState(() {});
     final isAdmin = _ngmySessionIsAdmin(_currentUser);
     if (isAdmin) {
       unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
@@ -10952,6 +11041,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       remote.savedBitcoinAddress = local.savedBitcoinAddress;
     }
     remote.phone = ngmyMergeAccountPhone(local: local.phone, remote: remote.phone);
+    final localUsername = local.username.trim();
+    final remoteUsername = remote.username.trim();
+    if (localUsername.isNotEmpty && localUsername != remoteUsername) {
+      remote.username = localUsername;
+    }
+    if (remote.crownBadge.trim().isEmpty && local.crownBadge.trim().isNotEmpty) {
+      remote.crownBadge = local.crownBadge;
+    }
+    if (remote.status == 'active' && local.status != 'active') {
+      remote.status = local.status;
+    }
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) {
@@ -15381,7 +15481,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _clockInNameTag(bool isLight) {
-    final name = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
+    final baseName = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
+    final crown = widget.user.crownBadge.trim().toLowerCase();
+    final name = crown == 'king'
+        ? '👑 $baseName'
+        : crown == 'queen'
+            ? '👸 $baseName'
+            : baseName;
     final useGlassBlur = !ngmyPreferLightGraphics;
 
     Widget glassCore(double shimmer) {
@@ -21906,6 +22012,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  void _mirrorAdminTargetOntoSession(UserData target) {
+    final adminKey = widget.user.email.toLowerCase().trim();
+    final targetKey = target.email.toLowerCase().trim();
+    if (adminKey != targetKey) return;
+    widget.user.status = target.status;
+    widget.user.crownBadge = target.crownBadge;
+    widget.user.forceLogout = target.forceLogout;
+    widget.user.isApprovedWorker = target.isApprovedWorker;
+    widget.user.freeFixCredit = target.freeFixCredit;
+    widget.user.isClockedIn = target.isClockedIn;
+    widget.user.clockInStartTime = target.clockInStartTime;
+    widget.user.lastClockInDate = target.lastClockInDate;
+    widget.user.lastClockInEarningsDate = target.lastClockInEarningsDate;
+    widget.user.clockInPenaltyPercent = target.clockInPenaltyPercent;
+    widget.user.username = target.username;
+  }
+
+  Future<void> _applyAdminUserAccountChange(UserData u, {required VoidCallback apply, String? snack}) async {
+    apply();
+    _mirrorAdminTargetOntoSession(u);
+    widget.onDataChanged();
+    setState(() {});
+    unawaited(_pushUserAdminAccountFieldsToCloud(u));
+    unawaited(widget.onPushUserToCloud?.call(u) ?? Future.value());
+    if (snack != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(snack)));
+    }
+  }
+
   Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => Material(
     color: color,
     elevation: 1,
@@ -21966,7 +22101,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _adminUserAvatar(u, radius: 34),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _adminUserAvatar(u, radius: 34),
+                        if (u.status == 'verified')
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: const Icon(Icons.verified, color: Colors.blue, size: 20),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -22034,10 +22184,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
             crossAxisSpacing: 5,
             childAspectRatio: 3.4,
             children: [
-              _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () { u.status = 'active'; widget.onDataChanged(); setState(() {}); }),
-              _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () { u.status = 'suspended'; widget.onDataChanged(); setState(() {}); }),
-              _adminActionBtn('Verify', Icons.verified_user, const Color(0xFF3B82F6), () { u.status = 'verified'; u.isApprovedWorker = true; widget.onDataChanged(); setState(() {}); }),
-              _adminActionBtn('Disable', Icons.person_off, const Color(0xFFEF4444), () { u.status = 'disabled'; widget.onDataChanged(); setState(() {}); }),
+              _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'active', snack: '${u.username} set to active.'))),
+              _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'suspended', snack: '${u.username} suspended.'))),
+              _adminActionBtn('Verify', Icons.verified_user, const Color(0xFF3B82F6), () => unawaited(_applyAdminUserAccountChange(u, apply: () { u.status = 'verified'; u.isApprovedWorker = true; }, snack: '${u.username} verified.'))),
+              _adminActionBtn('Disable', Icons.person_off, const Color(0xFFEF4444), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'disabled', snack: '${u.username} disabled.'))),
               _adminActionBtn('Add', Icons.add, const Color(0xFF14B8A6), () => _prompt(context, 'Add Money (\$)', (val) {
                 final amt = double.tryParse(val) ?? 0;
                 if (amt <= 0) return;
@@ -22054,17 +22204,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 widget.onDataChanged();
                 setState(() {});
               })),
-              _adminActionBtn('Reset', Icons.refresh, const Color(0xFF8B5CF6), () {
+              _adminActionBtn('Reset', Icons.refresh, const Color(0xFF8B5CF6), () => unawaited(_applyAdminUserAccountChange(u, apply: () {
                 u.isClockedIn = false;
                 u.clockInStartTime = null;
                 u.lastClockInDate = null;
                 u.lastClockInEarningsDate = null;
                 u.clockInPenaltyPercent = 0.0;
                 u.forceLogout = false;
-                widget.onDataChanged();
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${u.username} clock-in and session reset.')));
-              }),
+              }, snack: '${u.username} clock-in and session reset.'))),
               _adminActionBtn('Delete', Icons.delete_outline, const Color(0xFF374151), () async {
                 final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
                   title: const Text('Delete User?'),
@@ -22074,12 +22221,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('DELETE', style: TextStyle(color: Colors.red))),
                   ],
                 ));
-                if (ok == true) {
-                  widget.allUsers.remove(u);
-                  _selectedUserEmail = null;
-                  widget.onDataChanged();
-                  setState(() {});
-                }
+                if (ok != true) return;
+                final emailKey = u.email.toLowerCase().trim();
+                final deletedName = u.username;
+                widget.allUsers.removeWhere((x) => x.email.toLowerCase().trim() == emailKey);
+                ngmyAppLoginUserEmails.remove(emailKey);
+                unawaited(ngmyPersistAppLoginUserRegistry());
+                _selectedUserEmail = null;
+                widget.onDataChanged();
+                setState(() {});
+                final cloudOk = await _deleteUserFromCloud(u.email);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(cloudOk ? '$deletedName deleted.' : '$deletedName removed locally; cloud delete will retry when online.'),
+                ));
               }),
               _adminActionBtn('Referrals', Icons.link, const Color(0xFF06B6D4), () {
                 final code = 'REFD${u.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
@@ -22111,7 +22266,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 widget.onDataChanged();
                 setState(() {});
               })),
-              _adminActionBtn('Force Logout', Icons.logout, const Color(0xFFDC2626), () { u.forceLogout = true; widget.onDataChanged(); setState(() {}); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${u.username} will be logged out on next refresh.'))); }),
+              _adminActionBtn('Force Logout', Icons.logout, const Color(0xFFDC2626), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.forceLogout = true, snack: '${u.username} will be logged out on next refresh.'))),
               _adminActionBtn('Edit User', Icons.edit, const Color(0xFF6366F1), () => _showEditUserDialog(u, isDark)),
             ],
           ),
@@ -22120,11 +22275,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _adminActionBtn('King', Icons.emoji_events, const Color(0xFFF59E0B), () { u.crownBadge = 'king'; widget.onDataChanged(); setState(() {}); })),
+              Expanded(child: _adminActionBtn('King', Icons.emoji_events, const Color(0xFFF59E0B), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.crownBadge = 'king', snack: 'King crown assigned to ${u.username}.')))),
               const SizedBox(width: 6),
-              Expanded(child: _adminActionBtn('Queen', Icons.workspace_premium, const Color(0xFFEC4899), () { u.crownBadge = 'queen'; widget.onDataChanged(); setState(() {}); })),
+              Expanded(child: _adminActionBtn('Queen', Icons.workspace_premium, const Color(0xFFEC4899), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.crownBadge = 'queen', snack: 'Queen crown assigned to ${u.username}.')))),
               const SizedBox(width: 6),
-              Expanded(child: _adminActionBtn('Remove', Icons.close, const Color(0xFF374151), () { u.crownBadge = ''; widget.onDataChanged(); setState(() {}); })),
+              Expanded(child: _adminActionBtn('Remove', Icons.close, const Color(0xFF374151), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.crownBadge = '', snack: 'Crown removed from ${u.username}.')))),
             ],
           ),
           if (u.crownBadge.isNotEmpty) ...[
@@ -22153,10 +22308,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     onPressed: () => _prompt(context, 'Free Fix Credit (\$)', (val) {
                       final amt = double.tryParse(val) ?? 0;
                       if (amt <= 0) return;
-                      u.freeFixCredit += amt;
-                      widget.onDataChanged();
-                      setState(() {});
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Granted \$${formatCurrency(amt)} free fix credit to ${u.username}.')));
+                      unawaited(_applyAdminUserAccountChange(u, apply: () => u.freeFixCredit += amt, snack: 'Granted \$${formatCurrency(amt)} free fix credit to ${u.username}.'));
                     }),
                     icon: const Icon(Icons.build, size: 18),
                     label: const Text('Grant Free Fix', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -22265,14 +22417,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(c), child: const Text('CANCEL')),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             u.username = nameC.text.trim().isEmpty ? u.username : nameC.text.trim();
             u.email = emailC.text.trim().isEmpty ? u.email : emailC.text.trim();
             u.phone = phoneC.text.trim();
             u.fullName = fullC.text.trim().isEmpty ? u.fullName : fullC.text.trim();
-            widget.onDataChanged();
-            Navigator.pop(c);
-            setState(() {});
+            await _applyAdminUserAccountChange(
+              u,
+              apply: () {},
+              snack: '${u.username} updated.',
+            );
+            unawaited(_pushUserProfileBasicsToCloud(u));
+            if (c.mounted) Navigator.pop(c);
           },
           child: const Text('SAVE'),
         ),
@@ -25167,6 +25323,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _referralInputC.addListener(_scheduleReferralPreview);
     unawaited(_loadLinkedReferrerDisplay());
     unawaited(ngmyRegisterReferralCodesForUser(widget.user));
+    unawaited(_refreshProfilePhotoFromCloud());
+  }
+
+  Future<void> _refreshProfilePhotoFromCloud() async {
+    if (!await ngmyCanReachCloud()) return;
+    final email = widget.user.email.trim();
+    if (email.isEmpty) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('users')
+          .select('profilePicturePath')
+          .eq('email', email)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row == null || !mounted) return;
+      final remote = (row['profilePicturePath'] ?? '').toString().trim();
+      if (!_ngmyIsCloudProfilePhoto(remote)) return;
+      final local = (widget.user.profilePicturePath ?? '').trim();
+      if (local == remote) return;
+      if (local.startsWith('data:image')) return;
+      final emailKey = email.toLowerCase().trim();
+      setState(() {
+        widget.user.profilePicturePath = remote;
+        final uIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailKey);
+        if (uIdx >= 0) widget.allUsers[uIdx].profilePicturePath = remote;
+        _syncProfileAvatarCache();
+      });
+      widget.onDataChanged();
+    } catch (e) {
+      debugPrint('[profile] refresh photo from cloud: $e');
+    }
   }
 
   Future<void> _loadLinkedReferrerDisplay() async {
@@ -25315,6 +25502,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.user.profilePicturePath != widget.user.profilePicturePath) {
       _syncProfileAvatarCache();
+    }
+    if (oldWidget.user.username != widget.user.username ||
+        oldWidget.user.status != widget.user.status ||
+        oldWidget.user.crownBadge != widget.user.crownBadge ||
+        oldWidget.user.phone != widget.user.phone ||
+        oldWidget.user.email != widget.user.email) {
+      if (mounted) setState(() {});
     }
     if (oldWidget.user.referredByCode != widget.user.referredByCode) {
       if (widget.user.referredByCode.trim().isNotEmpty) {
@@ -25576,6 +25770,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 1000);
           if (img == null || !mounted) return;
           final bytes = await img.readAsBytes();
+          final previousPhoto = (widget.user.profilePicturePath ?? '').trim();
           final localPreview = 'data:image/jpeg;base64,${base64Encode(bytes)}';
           setState(() {
             _profileAvatarUploading = true;
@@ -25596,7 +25791,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final uIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == myEmail);
             if (uIdx >= 0) widget.allUsers[uIdx].profilePicturePath = cloudRef;
             widget.onDataChanged();
-            final dbOk = await widget.onPersistUserToCloud?.call(widget.user) ?? false;
+            var dbOk = await _pushUserProfilePictureToCloud(widget.user);
+            if (!dbOk) {
+              dbOk = await widget.onPersistUserToCloud?.call(widget.user) ?? false;
+            }
+            if (!dbOk) {
+              dbOk = await _pushUserProfilePictureToCloud(widget.user);
+            }
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -25610,10 +25811,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             );
           } else {
-            setState(() => _profileAvatarUploading = false);
+            final revert = previousPhoto.isEmpty ? null : previousPhoto;
+            setState(() {
+              _profileAvatarUploading = false;
+              widget.user.profilePicturePath = revert;
+              _profileAvatarPath = previousPhoto;
+              _profileAvatar = ngmyCachedProfileImage(revert);
+            });
             widget.onDataChanged();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Photo saved on this device — cloud upload failed. Try again when online.'), behavior: SnackBarBehavior.floating),
+              const SnackBar(
+                content: Text('Could not upload photo to cloud. Check connection and try again.'),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
         },
@@ -26021,6 +26231,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           builder: (dialogCtx, setDlg) {
             Future<void> save() async {
               if (saving) return;
+              final username = n.text.trim();
+              if (username.isEmpty) {
+                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                  const SnackBar(content: Text('Username is required.')),
+                );
+                return;
+              }
               final phone = p.text.trim();
               if (!ngmyUserPhoneOnFile(phone)) {
                 ScaffoldMessenger.of(dialogCtx).showSnackBar(
@@ -26039,11 +26256,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return;
               }
               setDlg(() => saving = true);
-              widget.user.username = n.text.trim();
+              widget.user.username = username;
               widget.user.email = e.text.trim();
               widget.user.phone = phone;
+              final uIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == myEmail);
+              if (uIdx >= 0) {
+                widget.allUsers[uIdx].username = username;
+                widget.allUsers[uIdx].email = widget.user.email;
+                widget.allUsers[uIdx].phone = phone;
+              }
               widget.onDataChanged();
-              await _pushUserPhoneToCloud(widget.user);
+              await _pushUserProfileBasicsToCloud(widget.user);
               await widget.onPersistUserToCloud?.call(widget.user);
               if (dialogCtx.mounted) Navigator.pop(dialogCtx);
               if (mounted) setState(() {});
