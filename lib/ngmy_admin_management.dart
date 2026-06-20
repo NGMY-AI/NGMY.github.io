@@ -127,6 +127,8 @@ Map<String, dynamic> _managementOperationalListsPayload(AppConfig config, {bool 
     'helpBusinesses': config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)).toList(),
     'civicRegistrarApplications':
         config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    'adminDeletedUserEmails': config.adminDeletedUserEmails,
+    'adminUserAccountStatusByEmail': config.adminUserAccountStatusByEmail,
     'savedAt': DateTime.now().toUtc().toIso8601String(),
   };
 }
@@ -191,6 +193,29 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
       config.civicRegistrarApplications,
       registrarApps,
     );
+  }
+  final deleted = payload['adminDeletedUserEmails'];
+  if (deleted is List) {
+    final merged = <String>{
+      for (final e in config.adminDeletedUserEmails) ngmyNormalizeEmail(e.toString()),
+      for (final e in deleted) ngmyNormalizeEmail(e.toString()),
+    }..removeWhere((e) => e.isEmpty);
+    config.adminDeletedUserEmails = merged.toList()..sort();
+  }
+  final statuses = payload['adminUserAccountStatusByEmail'];
+  if (statuses is Map) {
+    final next = Map<String, String>.from(config.adminUserAccountStatusByEmail);
+    statuses.forEach((k, v) {
+      final key = ngmyNormalizeEmail(k.toString());
+      final status = v.toString().trim().toLowerCase();
+      if (key.isEmpty) return;
+      if (status.isEmpty || status == 'active') {
+        next.remove(key);
+      } else {
+        next[key] = status;
+      }
+    });
+    config.adminUserAccountStatusByEmail = next;
   }
 }
 

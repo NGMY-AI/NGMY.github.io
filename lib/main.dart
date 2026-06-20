@@ -1452,6 +1452,10 @@ class AppConfig {
   List<String> invoiceLuxuryLifetimeEmails;
   /// Emails allowed to use Sell Item in NGMY Store (admin-granted; persisted in config).
   List<String> storeSellAccessEmails;
+  /// Admin-deleted accounts stay hidden until the user signs in again.
+  List<String> adminDeletedUserEmails;
+  /// Admin-forced account status (disabled/suspended/verified) until admin clears it.
+  Map<String, String> adminUserAccountStatusByEmail;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -1560,6 +1564,8 @@ class AppConfig {
     List<String>? invoicePremiumLifetimeEmails,
     List<String>? invoiceLuxuryLifetimeEmails,
     List<String>? storeSellAccessEmails,
+    List<String>? adminDeletedUserEmails,
+    Map<String, String>? adminUserAccountStatusByEmail,
   })  : civicCitiesByState = NgmyCivicRegistryStats.migrateLegacyCities(
           civicCitiesByState: civicCitiesByState ?? const {},
           legacyCities: cities,
@@ -1584,6 +1590,8 @@ class AppConfig {
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         civicRegistryMembers = civicRegistryMembers ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
+        adminDeletedUserEmails = adminDeletedUserEmails ?? const [],
+        adminUserAccountStatusByEmail = adminUserAccountStatusByEmail ?? const {},
         appBuilderPublished = appBuilderPublished ?? const [],
         appBuilderReviewQueue = appBuilderReviewQueue ?? const [],
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
@@ -1594,6 +1602,7 @@ class AppConfig {
         mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(mediaVirtualProfiles),
         mediaDeliveryQueue = mediaDeliveryQueue ?? const [],
         helpCenterHub = helpCenterHub ?? NgmyHelpCenterConfig.defaults().toMap();
+
   Map<String, dynamic> toJson() => {
     'officialCashApp': officialCashApp,
     'officialBitcoin': officialBitcoin,
@@ -1700,6 +1709,8 @@ class AppConfig {
     'invoicePremiumLifetimeEmails': invoicePremiumLifetimeEmails,
     'invoiceLuxuryLifetimeEmails': invoiceLuxuryLifetimeEmails,
     'storeSellAccessEmails': storeSellAccessEmails,
+    'adminDeletedUserEmails': adminDeletedUserEmails,
+    'adminUserAccountStatusByEmail': adminUserAccountStatusByEmail,
     'civicCitiesByState': civicCitiesByState.map((k, v) => MapEntry(k, v)),
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -1839,8 +1850,22 @@ class AppConfig {
     storeSellAccessEmails: List<String>.from(
       (json['storeSellAccessEmails'] ?? const []).map((e) => e.toString().toLowerCase().trim()).where((e) => e.isNotEmpty),
     ),
+    adminDeletedUserEmails: _emailListFromJson(json['adminDeletedUserEmails']),
+    adminUserAccountStatusByEmail: _adminUserAccountStatusFromJson(json['adminUserAccountStatusByEmail']),
   );
   }
+}
+
+Map<String, String> _adminUserAccountStatusFromJson(dynamic raw) {
+  final out = <String, String>{};
+  if (raw is Map) {
+    raw.forEach((k, v) {
+      final key = ngmyNormalizeEmail(k.toString());
+      final status = v.toString().trim().toLowerCase();
+      if (key.isNotEmpty && status.isNotEmpty && status != 'active') out[key] = status;
+    });
+  }
+  return out;
 }
 
 Map<String, String> _familyTreePhotoAccessFromJson(dynamic raw) {
@@ -4933,8 +4958,61 @@ bool ngmyIsCivicRegistryOnlyAccount(UserData u, AppConfig config) {
 }
 
 bool ngmyShowInAdminLoginUsersList(UserData u, AppConfig config) {
-  // Admin Accounts tab: every NGMY account with an email (Civic-only rows use the Civic dropdown).
-  return u.email.trim().isNotEmpty;
+  if (u.email.trim().isEmpty) return false;
+  if (ngmyIsAdminDeletedUser(config, u.email)) return false;
+  return true;
+}
+
+bool ngmyIsAdminDeletedUser(AppConfig config, String email) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return false;
+  return config.adminDeletedUserEmails.any((e) => ngmyNormalizeEmail(e) == key);
+}
+
+void ngmyMarkAdminDeletedUser(AppConfig config, String email) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return;
+  if (config.adminDeletedUserEmails.any((e) => ngmyNormalizeEmail(e) == key)) return;
+  config.adminDeletedUserEmails = [...config.adminDeletedUserEmails, key];
+}
+
+bool ngmyRestoreAdminDeletedUserOnLogin(AppConfig config, String email) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty || !ngmyIsAdminDeletedUser(config, key)) return false;
+  config.adminDeletedUserEmails =
+      config.adminDeletedUserEmails.where((e) => ngmyNormalizeEmail(e) != key).toList();
+  return true;
+}
+
+void ngmySetAdminUserAccountStatus(AppConfig config, String email, String status) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return;
+  final next = Map<String, String>.from(config.adminUserAccountStatusByEmail);
+  final normalized = status.trim().toLowerCase();
+  if (normalized.isEmpty || normalized == 'active') {
+    next.remove(key);
+  } else {
+    next[key] = normalized;
+  }
+  config.adminUserAccountStatusByEmail = next;
+}
+
+void ngmyApplyAdminAccountStatusOverride(AppConfig config, UserData u) {
+  final key = ngmyNormalizeEmail(u.email);
+  final override = config.adminUserAccountStatusByEmail[key];
+  if (override != null && override.isNotEmpty) {
+    u.status = override;
+  }
+}
+
+List<UserData> ngmyApplyAdminAccountActionsToUsers(AppConfig config, List<UserData> users) {
+  final out = <UserData>[];
+  for (final u in users) {
+    if (ngmyIsAdminDeletedUser(config, u.email)) continue;
+    ngmyApplyAdminAccountStatusOverride(config, u);
+    out.add(u);
+  }
+  return out;
 }
 
 List<String> ngmyGamePaywallMissedDays(UserData user) {
@@ -7207,7 +7285,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _preserveLocalSessionState(local, merged[key]!);
       if (ngmyEmailIsAdmin(key)) merged[key]!.isAdmin = true;
     }
-    return merged.values.toList();
+    return ngmyApplyAdminAccountActionsToUsers(_config, merged.values.toList());
   }
 
   void _registerCloudUsersAsAppLogins(Iterable<UserData> users) {
@@ -7273,7 +7351,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final keys = <String>{for (final u in users) ngmyNormalizeEmail(u.email)};
     for (final t in txns) {
       final key = ngmyNormalizeEmail(t.userEmail);
-      if (key.isEmpty || keys.contains(key)) continue;
+      if (key.isEmpty || keys.contains(key) || ngmyIsAdminDeletedUser(_config, key)) continue;
       final discovered = UserData(email: key, username: key.split('@').first, isAppLoginAccount: true);
       users.add(discovered);
       ngmyRegisterAppLoginUser(key);
@@ -7332,7 +7410,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
 
     for (final key in discovered) {
-      if (key.isEmpty || keys.contains(key)) continue;
+      if (key.isEmpty || keys.contains(key) || ngmyIsAdminDeletedUser(_config, key)) continue;
       final user = UserData(email: key, username: key.split('@').first, isAppLoginAccount: true);
       _allUsers.add(user);
       ngmyRegisterAppLoginUser(key);
@@ -7515,6 +7593,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (!lightweight) {
         await _discoverUsersFromCloudActivityIntoAllUsers();
       }
+      _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
       ngmyHydrateAppLoginUserRegistry(_allUsers);
       _reconcileAllUserBalances();
       _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
@@ -7751,6 +7830,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
 
     ngmyMarkUserAsAppLoginAccount(_currentUser!);
+    if (ngmyRestoreAdminDeletedUserOnLogin(_config, key)) {
+      unawaited(ngmyAdminPersistManagementConfig(_config));
+    }
     NgmyIncomeSound.bindSession(key);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (!mounted) return;
@@ -8595,10 +8677,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (remote.isNotEmpty) {
         _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
       } else {
-        _allUsers = localUsersBeforeFetch.values.toList();
+        _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, localUsersBeforeFetch.values.toList());
       }
       await _discoverUsersFromCloudActivityIntoAllUsers();
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
+      _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
       ngmyHydrateAppLoginUserRegistry(_allUsers);
       _reconcileAllUserBalances();
       await _persistLocalOnly();
@@ -10183,6 +10266,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _currentUser = _allUsers[idx];
       }
       ngmyMarkUserAsAppLoginAccount(_currentUser!);
+      if (ngmyRestoreAdminDeletedUserOnLogin(_config, emailNorm)) {
+        unawaited(ngmyAdminPersistManagementConfig(_config));
+      }
     });
     NgmyIncomeSound.bindSession(emailNorm);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
@@ -10815,6 +10901,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final updatedUser = UserData.fromJson(newRow);
         final email = updatedUser.email.toLowerCase().trim();
         if (email.isEmpty) return;
+        if (ngmyIsAdminDeletedUser(_config, email)) return;
         ngmyRegisterAppLoginUser(email);
         final grant = _canSellOnStoreForEmail(_config, email);
         updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
@@ -11380,6 +11467,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             }
             _applyWalletDecisionLedgerToTransactions();
             _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
+            _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
           } else {
             _applyWalletDecisionLedgerToTransactions();
           }
@@ -15484,9 +15572,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final baseName = widget.user.username.trim().isEmpty ? 'MEMBER' : widget.user.username.toUpperCase();
     final crown = widget.user.crownBadge.trim().toLowerCase();
     final name = crown == 'king'
-        ? '👑 $baseName'
+        ? '$baseName 👑'
         : crown == 'queen'
-            ? '👸 $baseName'
+            ? '$baseName 👸'
             : baseName;
     final useGlassBlur = !ngmyPreferLightGraphics;
 
@@ -22031,11 +22119,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _applyAdminUserAccountChange(UserData u, {required VoidCallback apply, String? snack}) async {
     apply();
+    ngmySetAdminUserAccountStatus(widget.config, u.email, u.status);
     _mirrorAdminTargetOntoSession(u);
     widget.onDataChanged();
     setState(() {});
     unawaited(_pushUserAdminAccountFieldsToCloud(u));
     unawaited(widget.onPushUserToCloud?.call(u) ?? Future.value());
+    unawaited(widget.onPersistManagementConfig?.call() ?? ngmyAdminPersistManagementConfig(widget.config));
     if (snack != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(snack)));
     }
@@ -22224,16 +22314,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 if (ok != true) return;
                 final emailKey = u.email.toLowerCase().trim();
                 final deletedName = u.username;
+                ngmyMarkAdminDeletedUser(widget.config, u.email);
+                ngmySetAdminUserAccountStatus(widget.config, u.email, 'active');
                 widget.allUsers.removeWhere((x) => x.email.toLowerCase().trim() == emailKey);
                 ngmyAppLoginUserEmails.remove(emailKey);
                 unawaited(ngmyPersistAppLoginUserRegistry());
                 _selectedUserEmail = null;
                 widget.onDataChanged();
                 setState(() {});
+                final configOk = await (widget.onPersistManagementConfig?.call() ?? ngmyAdminPersistManagementConfig(widget.config));
                 final cloudOk = await _deleteUserFromCloud(u.email);
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(cloudOk ? '$deletedName deleted.' : '$deletedName removed locally; cloud delete will retry when online.'),
+                  content: Text(
+                    cloudOk && configOk
+                        ? '$deletedName deleted.'
+                        : cloudOk
+                            ? '$deletedName deleted from cloud; admin sync pending.'
+                            : configOk
+                                ? '$deletedName removed from admin list; cloud delete pending.'
+                                : '$deletedName removed locally; sync when online.',
+                  ),
                 ));
               }),
               _adminActionBtn('Referrals', Icons.link, const Color(0xFF06B6D4), () {
