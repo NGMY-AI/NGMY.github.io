@@ -7,6 +7,7 @@ class NgmyDocShareItem {
     required this.createdAt,
     this.note,
     this.fromSender,
+    this.shortCode,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class NgmyDocShareItem {
   final String createdAt;
   final String? note;
   final String? fromSender;
+  final String? shortCode;
 
   bool get isImage => mime.startsWith('image/') || _extMatch(const ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp']);
 
@@ -43,6 +45,7 @@ class NgmyDocShareItem {
         'createdAt': createdAt,
         if (note != null && note!.trim().isNotEmpty) 'note': note,
         if (fromSender != null && fromSender!.trim().isNotEmpty) 'fromSender': fromSender,
+        if (shortCode != null && shortCode!.trim().isNotEmpty) 'shortCode': shortCode,
       };
 
   factory NgmyDocShareItem.fromJson(Map<String, dynamic> json) => NgmyDocShareItem(
@@ -53,9 +56,10 @@ class NgmyDocShareItem {
         createdAt: (json['createdAt'] ?? DateTime.now().toUtc().toIso8601String()).toString(),
         note: json['note']?.toString(),
         fromSender: json['fromSender']?.toString(),
+        shortCode: json['shortCode']?.toString(),
       );
 
-  NgmyDocShareItem copyWith({String? fromSender, String? note}) => NgmyDocShareItem(
+  NgmyDocShareItem copyWith({String? fromSender, String? note, String? shortCode}) => NgmyDocShareItem(
         id: id,
         name: name,
         mime: mime,
@@ -63,5 +67,6 @@ class NgmyDocShareItem {
         createdAt: createdAt,
         note: note ?? this.note,
         fromSender: fromSender ?? this.fromSender,
+        shortCode: shortCode ?? this.shortCode,
       );
 }

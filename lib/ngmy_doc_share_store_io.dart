@@ -50,6 +50,14 @@ Future<void> _writeIndex(String email, List<NgmyDocShareItem> items) async {
   await prefs.setString(_indexPrefsKey(email), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
+Future<void> _patchShortCode(String email, String itemId, String shortCode) async {
+  final items = await _readIndex(email);
+  final idx = items.indexWhere((e) => e.id == itemId);
+  if (idx < 0) return;
+  items[idx] = items[idx].copyWith(shortCode: shortCode);
+  await _writeIndex(email, items);
+}
+
 Future<File?> _fileForId(Directory root, String id) async {
   await for (final entity in root.list()) {
     if (entity is File && entity.uri.pathSegments.last.startsWith('$id.')) {
@@ -420,6 +428,10 @@ class NgmyDocShareStore {
       debugPrint('[doc share upload] ${item.name}: $e');
       return false;
     }
+  }
+
+  static Future<void> updateShortCode(String email, String itemId, String shortCode) async {
+    await _patchShortCode(email, itemId, shortCode);
   }
 
   static Future<void> delete(String email, String id) async {

@@ -5077,6 +5077,56 @@ String _ngmyClockInTransactionId(String email, DateTime day) {
   return 'clock_${key}_${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 }
 
+String _ngmyCrownPayTransactionId(String email, DateTime day) {
+  final d = _ngmyDateOnly(day);
+  final key = email.toLowerCase().trim();
+  return 'crown_${key}_${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+}
+
+bool _ngmyHasCrownPayForDay(String email, List<AppTransaction> txs, DateTime day) {
+  final id = _ngmyCrownPayTransactionId(email, day);
+  final key = email.toLowerCase().trim();
+  for (final t in txs) {
+    if (t.id == id && t.status == TransactionStatus.approved) return true;
+    if (t.userEmail.toLowerCase().trim() != key) continue;
+    if (t.status != TransactionStatus.approved) continue;
+    if (t.type != TransactionType.reimbursement) continue;
+    if (!(t.sourceDetails ?? '').toLowerCase().contains('crown daily reward')) continue;
+    if (_ngmySameCalendarDay(t.timestamp, day)) return true;
+  }
+  return false;
+}
+
+void _ngmyTryCrownDailyPayAtNoon(
+  UserData user,
+  List<AppTransaction> txs,
+  void Function(AppTransaction t) onAdd,
+) {
+  final now = DateTime.now();
+  if (!_ngmyIsPastNoon(now)) return;
+  final crown = user.crownBadge.trim().toLowerCase();
+  if (crown != 'king' && crown != 'queen') return;
+  if (_ngmyHasCrownPayForDay(user.email, txs, now)) return;
+  const amount = 1.0;
+  onAdd(
+    AppTransaction(
+      id: _ngmyCrownPayTransactionId(user.email, now),
+      userEmail: user.email,
+      amount: amount,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Crown daily reward (${crown == 'king' ? 'King' : 'Queen'})',
+      status: TransactionStatus.approved,
+      timestamp: now,
+    ),
+  );
+  ngmyPlayIncomeSoundForAmount(
+    beneficiaryEmail: user.email,
+    amount: amount,
+    dedupeKey: _ngmyCrownPayTransactionId(user.email, now),
+  );
+}
+
 /// Earliest active clock-in start today (from synced transactions), if not yet paid out.
 DateTime? _ngmyActiveClockInStartFromTransactions(String email, List<AppTransaction> txs) {
   final now = DateTime.now();
@@ -14300,6 +14350,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       if (_missPolicyCounter >= 60) {
         _missPolicyCounter = 0;
         _evaluateClockInMissPolicy();
+      }
+      if (_ngmyIsPastNoon(now)) {
+        final crown = widget.user.crownBadge.trim().toLowerCase();
+        if ((crown == 'king' || crown == 'queen') &&
+            !_ngmyHasCrownPayForDay(widget.user.email, widget.allTransactions, now)) {
+          _ngmyTryCrownDailyPayAtNoon(widget.user, widget.allTransactions, widget.onAddTransaction);
+          widget.onDataChanged();
+        }
       }
     });
   }

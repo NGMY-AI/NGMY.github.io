@@ -7,6 +7,7 @@ import 'ngmy_doc_share_local_server.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_payload.dart';
 import 'ngmy_doc_share_qr_stash.dart' show NgmyDocShareQrStash, kNgmyDocShareQrPrefixCloud, kNgmyDocShareCloudStashMaxBytes;
+import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_video_cloud.dart' show NgmyDocShareVideoCloud, kNgmyDocShareQrPrefixVideoCloud;
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
@@ -86,6 +87,35 @@ class NgmyDocShareSync {
   static Future<void> stopLanShare() async {
     await NgmyDocShareLocalServer.stop();
     await webrtc.stopWebRtc();
+  }
+
+  /// Assigns (or returns existing) 6-character type-in code for one library file.
+  static Future<String?> ensureShortCodeForItem({
+    required String ownerEmail,
+    required NgmyDocShareItem item,
+  }) async {
+    final existing = await NgmyDocShareShortCode.existingCodeForItem(
+      ownerEmail: ownerEmail,
+      itemId: item.id,
+    );
+    if (existing != null && existing.isNotEmpty) return existing;
+
+    final bundleJson = await exportBundleFile(ownerEmail: ownerEmail, items: [item]);
+    if (bundleJson.trim().isEmpty) return null;
+    if (bundleJson.length > kNgmyDocShareCloudStashMaxBytes) return null;
+
+    final stash = await NgmyDocShareQrStash.createFromBundleJson(
+      ownerEmail: ownerEmail,
+      bundleJson: bundleJson,
+      fileCount: 1,
+    );
+    if (stash == null) return null;
+
+    return NgmyDocShareShortCode.registerForStash(
+      ownerEmail: ownerEmail,
+      item: item,
+      stashToken: stash.token,
+    );
   }
 
   static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
@@ -191,6 +221,11 @@ class NgmyDocShareSync {
   }) async {
     var text = raw.trim();
     if (text.startsWith('\uFEFF')) text = text.substring(1);
+
+    final shortToken = await NgmyDocShareShortCode.resolveStashToken(text);
+    if (shortToken != null && shortToken.isNotEmpty) {
+      text = '$kNgmyDocShareQrPrefixCloud|$shortToken';
+    }
 
     if (text.startsWith('${kNgmyDocShareQrPrefixVideoCloud}|')) {
       final token = text.substring(kNgmyDocShareQrPrefixVideoCloud.length + 1).trim();

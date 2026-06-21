@@ -19,6 +19,7 @@ import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_playback.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
@@ -80,6 +81,32 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     final items = await NgmyDocShareStore.list(widget.email);
     if (!mounted) return;
     setState(() => _items = items.reversed.toList());
+    unawaited(_backfillShortCodes(_items));
+  }
+
+  Future<void> _backfillShortCodes(List<NgmyDocShareItem> items) async {
+    for (final item in items) {
+      if ((item.shortCode ?? '').trim().isNotEmpty) continue;
+      final code = await NgmyDocShareSync.ensureShortCodeForItem(ownerEmail: widget.email, item: item);
+      if (code == null || code.isEmpty) continue;
+      await NgmyDocShareStore.updateShortCode(widget.email, item.id, code);
+      if (!mounted) return;
+      setState(() {
+        final idx = _items.indexWhere((e) => e.id == item.id);
+        if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: code);
+      });
+    }
+  }
+
+  Future<void> _assignShortCodeForItem(NgmyDocShareItem item) async {
+    final code = await NgmyDocShareSync.ensureShortCodeForItem(ownerEmail: widget.email, item: item);
+    if (code == null || code.isEmpty) return;
+    await NgmyDocShareStore.updateShortCode(widget.email, item.id, code);
+    if (!mounted) return;
+    setState(() {
+      final idx = _items.indexWhere((e) => e.id == item.id);
+      if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: code);
+    });
   }
 
   void _toast(String msg) {
@@ -177,6 +204,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         final item = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: file);
         if (item != null) {
           added++;
+          await _assignShortCodeForItem(item);
         } else {
           skipped++;
         }
@@ -413,17 +441,36 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }, label: 'Preparing file…');
   }
 
-  Future<void> _scanQr() async {
-    if (!barcode_platform.ngmyBarcodeUseCamera) {
-      _toast('Use Import on web, or open on your phone to scan QR codes.');
-      return;
-    }
-    final raw = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _DocShareScanPage()),
+  Future<String?> _promptEnterShortCode(BuildContext context) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter share code'),
+        content: TextField(
+          controller: controller,
+          maxLength: 6,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            labelText: '6-digit code',
+            hintText: 'A3K9P2',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Receive')),
+        ],
+      ),
     );
-    if (raw == null || raw.isEmpty) return;
-    final scan = raw.trim();
+    controller.dispose();
+    final code = NgmyDocShareShortCode.normalizeInput(result ?? '');
+    if (code == null && (result ?? '').trim().isNotEmpty) {
+      _toast('Enter a valid 5–6 character code.');
+    }
+    return code;
+  }
 
+  Future<void> _importScanPayload(String scan) async {
     if (scan.startsWith('NGMYDOCSYNC3|') || scan.startsWith('NGMYDOCSYNC3|z|')) {
       await _withWork(() async {
         final session = await NgmyDocShareSync.beginWebRtcReceive(
@@ -469,20 +516,34 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         recipientEmail: widget.email,
         raw: scan,
         onProgress: (r, t) {
-          if (mounted) setState(() => _status = 'Receiving video $r of $t…');
+          if (mounted) setState(() => _status = 'Receiving $r of $t…');
         },
       );
       if (imported == null || imported.isEmpty) {
         final hint = scan.startsWith('N2|') || scan.contains('http://')
-            ? 'Video did not arrive. Same Wi‑Fi or hotspot, keep sender QR screen open, then scan again.'
-            : 'Could not restore files. Try scanning again or paste the share code.';
+            ? 'File did not arrive. Same Wi‑Fi or hotspot, keep sender screen open, then try again.'
+            : 'Could not restore files. Check the code and try again.';
         _toast(hint);
         return;
       }
       await _refresh();
       final videos = imported.where((e) => e.isVideo).length;
-      _toast(videos > 0 ? 'Received $videos video(s) to this phone.' : 'Restored ${imported.length} file(s) to this phone.');
-    }, label: 'Receiving video…');
+      _toast(videos > 0 ? 'Received $videos video(s).' : 'Restored ${imported.length} file(s).');
+    }, label: 'Receiving…');
+  }
+
+  Future<void> _scanQr() async {
+    if (!barcode_platform.ngmyBarcodeUseCamera) {
+      final code = await _promptEnterShortCode(context);
+      if (code == null || code.isEmpty) return;
+      await _importScanPayload(code);
+      return;
+    }
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const _DocShareScanPage()),
+    );
+    if (raw == null || raw.isEmpty) return;
+    await _importScanPayload(raw.trim());
   }
 
   Future<void> _saveItem(NgmyDocShareItem item) async {
@@ -644,7 +705,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            '${item.sizeLabel}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
+                            '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · Code ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
                             style: TextStyle(color: c.muted, fontSize: 11),
                           ),
                           trailing: Row(
@@ -1546,6 +1607,40 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
     if (mounted) Navigator.pop(context, text);
   }
 
+  Future<void> _enterShortCode() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter share code'),
+        content: TextField(
+          controller: controller,
+          maxLength: 6,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            labelText: '6-digit code',
+            hintText: 'A3K9P2',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Receive')),
+        ],
+      ),
+    );
+    controller.dispose();
+    final code = NgmyDocShareShortCode.normalizeInput(result ?? '');
+    if (code == null) {
+      if (mounted && (result ?? '').trim().isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter a valid 5–6 character code.')),
+        );
+      }
+      return;
+    }
+    if (mounted) Navigator.pop(context, code);
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -1572,6 +1667,11 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.pin_rounded),
+            tooltip: 'Enter 6-digit code',
+            onPressed: _enterShortCode,
+          ),
           IconButton(
             icon: const Icon(Icons.content_paste_rounded),
             tooltip: 'Paste Wi‑Fi link',
@@ -1607,7 +1707,7 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  'Fill the frame · bright screen · tap Paste if scan fails',
+                  'Fill the frame · bright screen · Paste link or tap # to type code',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, shadows: [Shadow(blurRadius: 8)]),
                 ),

@@ -288,6 +288,10 @@ class NgmyDocShareStore {
     _diskReceives.remove(id);
   }
 
+  static Future<void> updateShortCode(String email, String itemId, String shortCode) async {
+    await _patchShortCode(email, itemId, shortCode);
+  }
+
   static Future<void> delete(String email, String id) async {
     final items = await _readIndex(email);
     items.removeWhere((e) => e.id == id);
@@ -340,4 +344,12 @@ Future<List<NgmyDocShareItem>> _readIndex(String email) async {
 Future<void> _writeIndex(String email, List<NgmyDocShareItem> items) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_indexPrefsKey(email), jsonEncode(items.map((e) => e.toJson()).toList()));
+}
+
+Future<void> _patchShortCode(String email, String itemId, String shortCode) async {
+  final items = await _readIndex(email);
+  final idx = items.indexWhere((e) => e.id == itemId);
+  if (idx < 0) return;
+  items[idx] = items[idx].copyWith(shortCode: shortCode);
+  await _writeIndex(email, items);
 }
