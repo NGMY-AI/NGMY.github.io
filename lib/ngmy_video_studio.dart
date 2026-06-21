@@ -527,17 +527,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       return;
     }
     final cfg = _exportConfig();
-    final instant = cfg.canDirectDownload;
     setState(() {
       _exporting = true;
-      _exportProgress = instant ? 0.5 : 0.02;
-      _exportStatus = instant ? 'Saving your video…' : 'Starting export…';
+      _exportProgress = 0.02;
+      _exportStatus = 'Recording template into your video…';
     });
     await Future<void>.delayed(Duration.zero);
     try {
-      final msg = cfg.canDirectDownload
-          ? await exportNgmyVideoStudioDirect(videoSourceUrl: cfg.videoSourcesBySlot.values.first)
-          : await exportNgmyVideoStudioComposed(
+      final msg = await exportNgmyVideoStudioComposed(
               config: cfg,
               onProgress: (p, status) {
                 if (!mounted) return;

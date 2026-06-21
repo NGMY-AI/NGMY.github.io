@@ -18,12 +18,12 @@ const _exportCanvasFps = 30;
 const _exportVideoBitsPerSecond = 8000000;
 const _exportAudioBitsPerSecond = 192000;
 const _recorderTimesliceMs = 250;
-/// Max wall time for one export attempt (mobile seek loops used to exceed this).
-const _exportWallCapSec = 90.0;
+/// Hard stop for one export attempt on desktop.
+const _exportWallCapSec = 300.0;
 /// Mobile composed export — enough for typical clips without multi-hour hangs.
 const _mobileMaxRecordSeconds = 180.0;
-/// Hard stop for phone template export — then save original clip.
-const _mobileComposedExportTimeoutSec = 75;
+/// Mobile composed export — allow full clip length + template bake.
+const _mobileComposedExportTimeoutSec = 420;
 const _mobileExportMaxEdgePx = 1080;
 
 bool _ngmyExportCancelled = false;
@@ -488,9 +488,11 @@ DateTime _exportDeadlineFor(double durationSec) {
 }
 
 DateTime _exportAttemptDeadline(double durationSec) {
-  final budget = (durationSec * 1.35 + 25).ceil();
-  final cap = _ngmyIsMobileBrowser() ? math.min(_exportWallCapSec, durationSec + 35) : _exportWallCapSec;
-  return DateTime.now().add(Duration(seconds: math.min(budget, cap.ceil())));
+  final budget = (durationSec * 1.55 + 50).ceil();
+  if (_ngmyIsMobileBrowser()) {
+    return DateTime.now().add(Duration(seconds: budget.clamp(120, 360)));
+  }
+  return DateTime.now().add(Duration(seconds: math.min(budget, _exportWallCapSec.ceil())));
 }
 
 Future<void> _playVideoForRecord(html.VideoElement v) async {
@@ -993,7 +995,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
       final t = primary != null ? primary.currentTime.toDouble() : 0.0;
       final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-      if (wallMs > (_ngmyIsMobileBrowser() ? 5000 : 14000) && t < 0.08) {
+      if (wallMs > (_ngmyIsMobileBrowser() ? 12000 : 14000) && t < 0.08) {
         debugPrint('[studio export] video frozen at t=$t — aborting attempt');
         break;
       }
@@ -1339,24 +1341,14 @@ Future<String> exportNgmyVideoStudioComposed({
         onTimeout: () {
           cancelNgmyVideoStudioExport();
           _cleanupExportElements();
-          return _fallbackComposedExport(
-            config,
-            config.videoSourcesBySlot,
-            reason: 'export timed out on phone',
-            allowRawFallback: true,
-          );
+          return 'Export timed out. Keep this screen open and tap Download again — your template, logo, and sound are baked in during recording.';
         },
       );
     } catch (e, st) {
       debugPrint('[studio export] mobile composed failed: $e\n$st');
       cancelNgmyVideoStudioExport();
       _cleanupExportElements();
-      return _fallbackComposedExport(
-        config,
-        config.videoSourcesBySlot,
-        reason: 'export failed on phone',
-        allowRawFallback: true,
-      );
+      return 'Export failed: templates could not be saved. Wait for the preview to load, keep the screen open, and try Download again.';
     }
   }
   return _exportNgmyVideoStudioComposedCore(config: config, onProgress: onProgress);
@@ -1432,7 +1424,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         config,
         sources,
         reason: 'video metadata unavailable',
-        allowRawFallback: _ngmyIsMobileBrowser(),
+        allowRawFallback: false,
       );
     }
     await _flushProgress(onProgress, 0.07, 'Buffering video…');
@@ -1442,7 +1434,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         config,
         sources,
         reason: 'video still loading',
-        allowRawFallback: _ngmyIsMobileBrowser(),
+        allowRawFallback: false,
       );
     }
 
@@ -1648,6 +1640,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     final plans = appleMobile
         ? [
             (mime: primaryMime, audio: true, realtime: true),
+            (mime: fallbackMime, audio: true, realtime: true),
           ]
         : [
             (mime: primaryMime, audio: true, realtime: true),
@@ -1673,7 +1666,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio} realtime=${plan.realtime}');
         continue;
       }
-      if (result.hadAudio || appleMobile) {
+      if (result.hadAudio) {
         chunks = result.chunks;
         mimeType = plan.mime;
         break;
@@ -1700,7 +1693,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         config,
         sources,
         reason: 'recording produced no data',
-        allowRawFallback: _ngmyIsMobileBrowser() || _studioAllowsRawFallback(config),
+        allowRawFallback: false,
       );
     }
 
@@ -1713,13 +1706,8 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     var ext = blobType.contains('webm') ? 'webm' : 'mp4';
     if (apple) {
       if (blobType.contains('webm')) {
-        debugPrint('[studio export] WebM on iOS — falling back to original MP4 clip(s)');
-        return _fallbackComposedExport(
-          config,
-          sources,
-          reason: 'iPhone needs MP4 export',
-          allowRawFallback: _studioAllowsRawFallback(config),
-        );
+        debugPrint('[studio export] WebM on iOS — MP4 export required');
+        return 'Export failed: iPhone needs MP4 with your template baked in. Tap Download again and keep this screen open until saving finishes.';
       }
       blobType = 'video/mp4';
       ext = 'mp4';
@@ -1731,7 +1719,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         await ngmyStageIosStudioVideoFromBlob(blob, filename);
       } catch (e) {
         debugPrint('[studio export] iOS stage failed: $e');
-        return _fallbackComposedExport(config, sources, reason: 'could not stage video on iPhone');
+        return _fallbackComposedExport(config, sources, reason: 'could not stage video on iPhone', allowRawFallback: false);
       }
       if (!usedCanvasStream) {
         return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
@@ -1759,7 +1747,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         i.remove();
       } catch (_) {}
     }
-    return _fallbackComposedExport(config, sources, reason: 'export crashed');
+    return _fallbackComposedExport(config, sources, reason: 'export crashed', allowRawFallback: false);
   } finally {
     _cleanupExportElements();
     try {
