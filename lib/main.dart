@@ -924,9 +924,10 @@ List<AppTransaction> ngmyReplaceUserTransactionsFromCloud(
   final cloudIds = cloudOwn.map((t) => t.id).where((id) => id.isNotEmpty).toSet();
   final localPendingOnly = all.where((t) {
     if (ngmyNormalizeEmail(t.userEmail) != key) return false;
-    if (t.id.isEmpty) return true;
+    if (t.id.isEmpty) return false;
     if (cloudIds.contains(t.id)) return false;
-    return dirty.contains(t.id) || t.status == TransactionStatus.pending;
+    // Only keep rows this device created and has not finished syncing yet.
+    return dirty.contains(t.id);
   }).toList();
   final preserved = all.where((t) => ngmyNormalizeEmail(t.userEmail) != key).toList();
   return [...preserved, ...cloudOwn, ...localPendingOnly]
@@ -3396,9 +3397,9 @@ Future<bool> _pushSignupUserToCloudReliable(UserData u, {bool includeFreeTrial =
   return false;
 }
 
-Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false}) async {
+Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false, bool includeBalance = false}) async {
   if (!await ngmyCanReachCloud()) return false;
-  final row = _userRowForBulkSync(u, includeFreeTrial: includeFreeTrial);
+  final row = _userRowForBulkSync(u, includeFreeTrial: includeFreeTrial, includeBalance: includeBalance);
   final photo = (row['profilePicturePath'] ?? '').toString().trim();
   if (photo.startsWith('data:image')) {
     row.remove('profilePicturePath');
@@ -3948,7 +3949,7 @@ void _stripUserMediaProfileFieldsFromBulkRow(Map<String, dynamic> row) {
   }
 }
 
-Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = false}) {
+Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = false, bool includeBalance = false}) {
   final row = Map<String, dynamic>.from(u.toJson());
   _stripUserMediaProfileFieldsFromBulkRow(row);
   row['referralCode'] = ngmyReferralCodeForEmail(u.email);
@@ -3956,7 +3957,26 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
     row.remove('freeTrialActive');
     row.remove('freeTrialDailyAmount');
   }
+  if (!includeBalance) {
+    row.remove('accountBalance');
+  }
   return row;
+}
+
+Future<bool> _pushUserBalanceToCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty) return false;
+  try {
+    await Supabase.instance.client.from('users').upsert({
+      'email': email,
+      'accountBalance': u.accountBalance.clamp(0.0, double.infinity),
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[user] balance upsert: $e');
+    return false;
+  }
 }
 
 Future<void> _pushUserContributionReceiptReads(UserData u) async {
@@ -7311,6 +7331,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Map<String, int> _walletDecisionLedger = {};
   final Set<String> _withdrawalHoldTxnIds = {};
   bool _userWalletLedgerSettled = false;
+  String _lastWalletLedgerSignature = '';
   DateTime? _lastCurrentUserCloudRefresh;
   DateTime? _lastUserTxnCloudRefresh;
   Timer? _userTxnSyncTimer;
@@ -8297,6 +8318,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _appShellSig = _computeAppShellSig();
     _reconcileAllUserBalances();
     if (_currentUser != null) {
+      _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(_currentUser!.email);
       ngmySeedLiveBalance(
         _currentUser!.email,
         _currentUser!.accountBalance,
@@ -8457,7 +8479,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _refreshCurrentUserFromCloud();
     if (!mounted) return;
     setState(() {
-      _reconcileAllUserBalances();
+      _reconcileAllUserBalances(ledgerSettled: true);
     });
     if (_currentUser != null) {
       unawaited(NgmyGameNotifications.syncFromCloud(_currentUser!.email));
@@ -8703,7 +8725,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
           _currentUser = _allUsers[userIdx];
         }
-        unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
+        unawaited(_pushUserBalanceToCloud(_allUsers[userIdx]));
       }
     }
   }
@@ -10991,85 +11013,70 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _onUsersChange(PostgresChangePayload payload) {
     try {
+      // Profile row sync only — balance is NEVER read from the users table.
       if (payload.eventType == PostgresChangeEvent.delete) {
         final email = (payload.oldRecord['email'] ?? '').toString().toLowerCase().trim();
         if (email.isEmpty) return;
         setState(() => _allUsers.removeWhere((u) => u.email.toLowerCase().trim() == email));
         NgmyAdminLiveRefresh.notify();
-      } else {
-        final newRow = Map<String, dynamic>.from(payload.newRecord);
-        final updatedUser = UserData.fromJson(newRow);
-        final email = updatedUser.email.toLowerCase().trim();
-        if (email.isEmpty) return;
-        if (ngmyIsAdminDeletedUser(_config, email)) return;
-        ngmyRegisterAppLoginUser(email);
-        final grant = _canSellOnStoreForEmail(_config, email);
-        updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
-        setState(() {
-          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-          if (idx == -1) {
-            _allUsers.add(updatedUser);
+        return;
+      }
+      final newRow = Map<String, dynamic>.from(payload.newRecord);
+      final updatedUser = UserData.fromJson(newRow);
+      final email = updatedUser.email.toLowerCase().trim();
+      if (email.isEmpty) return;
+      if (ngmyIsAdminDeletedUser(_config, email)) return;
+      ngmyRegisterAppLoginUser(email);
+      final grant = _canSellOnStoreForEmail(_config, email);
+      updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
+      setState(() {
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+        if (idx == -1) {
+          updatedUser.accountBalance = ngmyResolveAccountBalance(
+            updatedUser.email,
+            updatedUser.accountBalance,
+            _allTransactions,
+          );
+          _allUsers.add(updatedUser);
+        } else {
+          final local = _allUsers[idx];
+          _preserveLocalSessionState(local, updatedUser);
+          updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
+          _mergeUserMediaProfileFields(local, updatedUser);
+          _ngmyReconcileClockInSession(updatedUser, _allTransactions);
+          _allUsers[idx] = updatedUser;
+        }
+        if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
+          if (updatedUser.forceLogout) {
+            updatedUser.forceLogout = false;
+            final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+            if (uIdx >= 0) _allUsers[uIdx].forceLogout = false;
+            unawaited(_pushUserToCloudFast(updatedUser));
+            _currentUser = null;
+            unawaited(_persistSessionImmediately());
           } else {
-            final local = _allUsers[idx];
-            updatedUser.accountBalance = local.accountBalance;
-            updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
-            _preserveLocalSessionState(local, updatedUser);
-            _mergeUserMediaProfileFields(local, updatedUser);
+            final localCurrent = _currentUser!;
+            _preserveLocalSessionState(localCurrent, updatedUser);
+            updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || localCurrent.canSellOnStore;
             _ngmyReconcileClockInSession(updatedUser, _allTransactions);
-            _allUsers[idx] = updatedUser;
-          }
-          if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
-            if (updatedUser.forceLogout) {
-              updatedUser.forceLogout = false;
-              final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-              if (idx >= 0) _allUsers[idx].forceLogout = false;
-              unawaited(_pushUserToCloudFast(updatedUser));
-              _currentUser = null;
-              unawaited(_persistSessionImmediately());
-            } else if (_dirtyUserEmails.contains(email)) {
-              // Local session owns balance during our own cloud write — avoid swapping in a stale user row.
-              ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
-              ngmySyncLiveBalanceFor(
-                _currentUser!.email,
-                _currentUser!.accountBalance,
-                allowIncrease: true,
-                force: true,
-              );
-              final remotePhoto = (updatedUser.profilePicturePath ?? '').trim();
-              if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
-                _currentUser!.profilePicturePath = updatedUser.profilePicturePath;
-                final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-                if (uIdx >= 0) _allUsers[uIdx].profilePicturePath = updatedUser.profilePicturePath;
-              }
-            } else {
-              updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
-              updatedUser.accountBalance = _currentUser!.accountBalance;
-              _preserveLocalSessionState(_currentUser!, updatedUser);
-              _ngmyReconcileClockInSession(updatedUser, _allTransactions);
-              ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
-              _currentUser = updatedUser;
-              ngmySyncLiveBalanceFor(
-                _currentUser!.email,
-                _currentUser!.accountBalance,
-                allowIncrease: true,
-                force: ngmyUserWalletLedgerSettled,
-              );
+            final listIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+            if (listIdx >= 0) _allUsers[listIdx] = updatedUser;
+            _currentUser = updatedUser;
+            final remotePhoto = (updatedUser.profilePicturePath ?? '').trim();
+            if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
+              _currentUser!.profilePicturePath = updatedUser.profilePicturePath;
             }
           }
-          final listIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-          if (listIdx >= 0) {
-            ngmyReconcileUserAccountBalance(_allUsers[listIdx], _allTransactions);
-          }
-        });
-        unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-          if (_currentUser != null) {
-            prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
-          }
-        }).catchError((_) {});
-        NgmyAdminLiveRefresh.notify();
-      }
+        }
+      });
+      unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+        if (_currentUser != null) {
+          prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+        }
+      }).catchError((_) {});
+      NgmyAdminLiveRefresh.notify();
     } catch (e) {
       debugPrint('Users realtime apply error: $e');
     }
@@ -11135,10 +11142,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final userIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == userKey);
         if (userIdx >= 0 && ngmyIsWalletDepositOrWithdraw(tx)) {
           if (tx.type == TransactionType.withdrawal &&
-              tx.status == TransactionStatus.pending &&
-              (previous == null || previous!.status != TransactionStatus.pending)) {
-            ngmyApplyPendingWithdrawalHold(_allUsers[userIdx], tx, _withdrawalHoldTxnIds);
-          } else if (tx.type == TransactionType.withdrawal &&
               tx.status == TransactionStatus.rejected &&
               previous?.status == TransactionStatus.pending) {
             ngmyReleasePendingWithdrawalHold(_allUsers[userIdx], tx, _withdrawalHoldTxnIds);
@@ -11153,9 +11156,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
             _currentUser = _allUsers[userIdx];
           }
-          if (becameApproved && previous?.status == TransactionStatus.pending) {
-            unawaited(_pushUserToCloudFast(_allUsers[userIdx]));
-          }
         } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
           ngmyDeliverTransactionAlerts(tx);
         }
@@ -11169,17 +11169,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         _reconcileAllUserBalances(ledgerSettled: _userWalletLedgerSettled);
         if (_currentUser != null) {
-          ngmySyncLiveBalanceFor(
-            _currentUser!.email,
-            _currentUser!.accountBalance,
-            allowIncrease: true,
-            force: _userWalletLedgerSettled,
-          );
           final userIdx = _allUsers.indexWhere(
             (u) => ngmyNormalizeEmail(u.email) == ngmyNormalizeEmail(_currentUser!.email),
           );
           if (userIdx >= 0 && (becameApproved || previous == null) && ngmyIsGameLedgerTransaction(tx)) {
             unawaited(_pushUserToCloudFast(_allUsers[userIdx], includeFreeTrial: true));
+          }
+          if (userIdx >= 0 &&
+              (previous == null || statusChanged || becameApproved) &&
+              ngmyNormalizeEmail(tx.userEmail) == ngmyNormalizeEmail(_currentUser!.email)) {
+            unawaited(_pushUserBalanceToCloud(_allUsers[userIdx]));
           }
         }
         if (tx.status == TransactionStatus.pending &&
@@ -11268,7 +11267,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
     _preserveRegistryEnrollmentFromLocal(local, remote);
-    ngmyReconcileUserAccountBalance(remote, _allTransactions);
+    remote.accountBalance = local.accountBalance;
   }
 
   void _seedWithdrawalHoldTxnIds() {
@@ -11279,6 +11278,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _withdrawalHoldTxnIds.add(t.id);
       }
     }
+  }
+
+  String _walletLedgerSignatureForEmail(String email) {
+    final key = ngmyNormalizeEmail(email);
+    if (key.isEmpty) return '';
+    final parts = <String>[];
+    for (final t in _allTransactions) {
+      if (ngmyNormalizeEmail(t.userEmail) != key) continue;
+      parts.add('${t.id}:${t.status.index}:${t.type.index}:${t.amount.toStringAsFixed(2)}');
+    }
+    parts.sort();
+    return parts.join('|');
   }
 
   void _reconcileAllUserBalances({bool ledgerSettled = false}) {
@@ -11293,12 +11304,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final key = _currentUser!.email.toLowerCase().trim();
       final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
       if (idx >= 0) _currentUser = _allUsers[idx];
-      ngmySyncLiveBalanceFor(
-        _currentUser!.email,
-        _currentUser!.accountBalance,
-        allowIncrease: true,
-        force: ledgerSettled,
-      );
+      final signature = _walletLedgerSignatureForEmail(_currentUser!.email);
+      final ledgerChanged = signature != _lastWalletLedgerSignature;
+      if (ledgerChanged) {
+        _lastWalletLedgerSignature = signature;
+        ngmySyncLiveBalanceFor(
+          _currentUser!.email,
+          _currentUser!.accountBalance,
+          allowIncrease: true,
+          force: true,
+        );
+      } else if (ledgerSettled) {
+        ngmySyncLiveBalanceFor(
+          _currentUser!.email,
+          _currentUser!.accountBalance,
+          allowIncrease: true,
+          force: true,
+        );
+      }
     }
   }
 
@@ -11995,7 +12018,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     for (final email in affectedEmails) {
       final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
-      if (idx >= 0) unawaited(_pushUserToCloudFast(_allUsers[idx], includeFreeTrial: true));
+      if (idx >= 0) unawaited(_pushUserBalanceToCloud(_allUsers[idx]));
     }
     _reconcileAllUserBalances();
     NgmyAdminLiveRefresh.notify();
@@ -12077,13 +12100,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _dirtyUserEmails.remove(userEmail);
           }
         }
-        if (userEmail.isNotEmpty) {
+        if (userEmail.isNotEmpty && _dirtyTransactionIds.isNotEmpty) {
           final mine = _allTransactions
-              .where((t) => t.userEmail.toLowerCase().trim() == userEmail)
+              .where((t) =>
+                  t.userEmail.toLowerCase().trim() == userEmail &&
+                  _dirtyTransactionIds.contains(t.id))
               .map((e) => Map<String, dynamic>.from(e.toJson()))
               .toList();
           if (mine.isNotEmpty) {
             await _safeUpsertTransactionRows(mine);
+            final syncedIds = mine
+                .map((e) => (e['id'] ?? '').toString())
+                .where((id) => id.isNotEmpty)
+                .toSet();
+            _dirtyTransactionIds.removeWhere(syncedIds.contains);
           }
         }
       }
@@ -12341,18 +12371,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == userKey) {
                         _currentUser = _allUsers[userIdx];
                       }
+                      _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(userKey);
                     }
                   });
                   unawaited(_pushTransactionToCloudReliable(t));
                   unawaited(_pushTransactionToCloudFast(t));
+                  _markTransactionDirty(t.id);
                   if (syncedUser != null) {
                     _markUserDirty(syncedUser!.email);
                     unawaited(_pushUserToCloudFast(syncedUser!, includeFreeTrial: true).then((ok) {
                       if (ok) _dirtyUserEmails.remove(ngmyNormalizeEmail(syncedUser!.email));
                     }));
-                  }
-                  _markTransactionDirty(t.id);
-                  if (syncedUser != null) {
+                    unawaited(_pushUserBalanceToCloud(syncedUser!));
                     ngmyNotifyBalanceChanged(
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
@@ -12466,6 +12496,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   NgmyAdminLiveRefresh.notify();
                   _markTransactionDirty(t.id);
                   if (syncedUser != null) {
+                    _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(syncedUser!.email);
+                    unawaited(_pushUserBalanceToCloud(syncedUser!));
                     ngmyNotifyBalanceChanged(
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
