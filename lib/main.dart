@@ -679,7 +679,8 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
   return total;
 }
 
-/// Authoritative balance from the transaction ledger (approved credits/debits + pending withdrawal holds).
+/// Authoritative balance from the transaction ledger, with cloud-stored balance as floor
+/// so every device matches after the other device earns or spends.
 double ngmyResolveAccountBalance(
   String email,
   double storedBalance,
@@ -687,11 +688,11 @@ double ngmyResolveAccountBalance(
 ) {
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
+  final stored = storedBalance.clamp(0.0, double.infinity);
   final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
-  if (txnCount == 0) {
-    return storedBalance.clamp(0.0, double.infinity);
-  }
+  if (txnCount == 0) return stored;
+  if (stored > ledger + 0.01) return stored;
   return ledger;
 }
 
@@ -1488,6 +1489,8 @@ class AppConfig {
   List<String> adminDeletedUserEmails;
   /// Admin-forced account status (disabled/suspended/verified) until admin clears it.
   Map<String, String> adminUserAccountStatusByEmail;
+  /// Admin-assigned King/Queen crown — synced via management config (works without users.crownBadge column).
+  Map<String, String> adminUserCrownBadgeByEmail;
 
   AppConfig({
     this.officialCashApp = 'NGMYpay',
@@ -1598,6 +1601,7 @@ class AppConfig {
     List<String>? storeSellAccessEmails,
     List<String>? adminDeletedUserEmails,
     Map<String, String>? adminUserAccountStatusByEmail,
+    Map<String, String>? adminUserCrownBadgeByEmail,
   })  : civicCitiesByState = NgmyCivicRegistryStats.migrateLegacyCities(
           civicCitiesByState: civicCitiesByState ?? const {},
           legacyCities: cities,
@@ -1624,6 +1628,7 @@ class AppConfig {
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
         adminDeletedUserEmails = adminDeletedUserEmails ?? const [],
         adminUserAccountStatusByEmail = adminUserAccountStatusByEmail ?? const {},
+        adminUserCrownBadgeByEmail = adminUserCrownBadgeByEmail ?? const {},
         appBuilderPublished = appBuilderPublished ?? const [],
         appBuilderReviewQueue = appBuilderReviewQueue ?? const [],
         gameTimeLimits = gameTimeLimits ?? ngmyDefaultGameTimeLimits(),
@@ -1743,6 +1748,7 @@ class AppConfig {
     'storeSellAccessEmails': storeSellAccessEmails,
     'adminDeletedUserEmails': adminDeletedUserEmails,
     'adminUserAccountStatusByEmail': adminUserAccountStatusByEmail,
+    'adminUserCrownBadgeByEmail': adminUserCrownBadgeByEmail,
     'civicCitiesByState': civicCitiesByState.map((k, v) => MapEntry(k, v)),
   };
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -1884,8 +1890,24 @@ class AppConfig {
     ),
     adminDeletedUserEmails: _emailListFromJson(json['adminDeletedUserEmails']),
     adminUserAccountStatusByEmail: _adminUserAccountStatusFromJson(json['adminUserAccountStatusByEmail']),
+    adminUserCrownBadgeByEmail: _adminUserCrownBadgeFromJson(json['adminUserCrownBadgeByEmail']),
   );
   }
+}
+
+Map<String, String> _adminUserCrownBadgeFromJson(dynamic raw) {
+  final out = <String, String>{};
+  if (raw is Map) {
+    raw.forEach((k, v) {
+      final key = ngmyNormalizeEmail(k.toString());
+      final crown = v.toString().trim().toLowerCase();
+      if (key.isEmpty) return;
+      if (crown == 'king' || crown == 'queen') {
+        out[key] = crown;
+      }
+    });
+  }
+  return out;
 }
 
 Map<String, String> _adminUserAccountStatusFromJson(dynamic raw) {
@@ -4005,25 +4027,47 @@ String _ngmyMergeAccountStatus(String local, String remote) {
 }
 
 void _mergeCloudProfileIdentityFields(UserData local, UserData remote) {
-  final localPhoto = (local.profilePicturePath ?? '').trim();
   final remotePhoto = (remote.profilePicturePath ?? '').trim();
   if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
     remote.profilePicturePath = remotePhoto;
-  } else if (_ngmyIsCloudProfilePhoto(localPhoto)) {
-    remote.profilePicturePath = localPhoto;
-  } else if (localPhoto.isNotEmpty && remotePhoto.isEmpty) {
-    remote.profilePicturePath = local.profilePicturePath;
   }
 
-  final localCrown = local.crownBadge.trim().toLowerCase();
   final remoteCrown = remote.crownBadge.trim().toLowerCase();
   if (remoteCrown == 'king' || remoteCrown == 'queen') {
-    remote.crownBadge = remote.crownBadge.trim().toLowerCase();
-  } else if (localCrown == 'king' || localCrown == 'queen') {
-    remote.crownBadge = local.crownBadge.trim().toLowerCase();
+    remote.crownBadge = remoteCrown;
   }
 
   remote.status = _ngmyMergeAccountStatus(local.status, remote.status);
+
+  final remoteUsername = remote.username.trim();
+  if (remoteUsername.isNotEmpty) {
+    remote.username = remoteUsername;
+  }
+}
+
+Future<UserData?> _fetchCloudUserRow(String email) async {
+  final raw = email.trim();
+  if (raw.isEmpty || !await ngmyCanReachCloud()) return null;
+  try {
+    final row = await Supabase.instance.client
+        .from('users')
+        .select()
+        .eq('email', raw)
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
+    if (row == null) return null;
+    return UserData.fromJson(Map<String, dynamic>.from(row));
+  } catch (e) {
+    debugPrint('[user] full row fetch: $e');
+    try {
+      final row = await ngmyFetchUserLoginRow(Supabase.instance.client, raw);
+      if (row == null) return null;
+      return UserData.fromJson(row);
+    } catch (e2) {
+      debugPrint('[user] login row fetch: $e2');
+      return null;
+    }
+  }
 }
 
 Future<bool> _pushUserBalanceToCloud(UserData u) async {
@@ -5116,6 +5160,27 @@ void ngmySetAdminUserAccountStatus(AppConfig config, String email, String status
   config.adminUserAccountStatusByEmail = next;
 }
 
+void ngmySetAdminUserCrownBadge(AppConfig config, String email, String crown) {
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty) return;
+  final next = Map<String, String>.from(config.adminUserCrownBadgeByEmail);
+  final normalized = crown.trim().toLowerCase();
+  if (normalized != 'king' && normalized != 'queen') {
+    next.remove(key);
+  } else {
+    next[key] = normalized;
+  }
+  config.adminUserCrownBadgeByEmail = next;
+}
+
+void ngmyApplyAdminCrownOverride(AppConfig config, UserData u) {
+  final key = ngmyNormalizeEmail(u.email);
+  final override = config.adminUserCrownBadgeByEmail[key];
+  if (override == 'king' || override == 'queen') {
+    u.crownBadge = override!;
+  }
+}
+
 void ngmyApplyAdminAccountStatusOverride(AppConfig config, UserData u) {
   final key = ngmyNormalizeEmail(u.email);
   final override = config.adminUserAccountStatusByEmail[key];
@@ -5129,6 +5194,7 @@ List<UserData> ngmyApplyAdminAccountActionsToUsers(AppConfig config, List<UserDa
   for (final u in users) {
     if (ngmyIsAdminDeletedUser(config, u.email)) continue;
     ngmyApplyAdminAccountStatusOverride(config, u);
+    ngmyApplyAdminCrownOverride(config, u);
     out.add(u);
   }
   return out;
@@ -7965,17 +8031,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       local.passwordHash = passwordHash;
       if (ngmyEmailIsAdmin(key)) local.isAdmin = true;
       try {
-        final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
-        if (row != null) {
-          final remote = UserData.fromJson(row);
+        final remote = await _fetchCloudUserRow(email);
+        if (remote != null) {
           remote.passwordHash = passwordHash;
           if (ngmyEmailIsAdmin(key)) remote.isAdmin = true;
-          remote.accountBalance = math.max(local.accountBalance, remote.accountBalance);
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
-          ngmyApplyAdminAccountStatusOverride(_config, remote);
-          ngmyReconcileUserAccountBalance(remote, _allTransactions);
-          await _hydrateUserCrownBadgeFromCloud(remote);
           _allUsers[index] = remote;
           _currentUser = remote;
         } else {
@@ -7988,9 +8049,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     } else {
       UserData user;
       try {
-        final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
-        if (row != null) {
-          user = UserData.fromJson(row);
+        final remote = await _fetchCloudUserRow(email);
+        if (remote != null) {
+          user = remote;
           user.passwordHash = passwordHash;
         } else {
           user = UserData(
@@ -8010,10 +8071,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
       }
       if (ngmyEmailIsAdmin(key)) user.isAdmin = true;
-      ngmyApplyAdminAccountStatusOverride(_config, user);
-      await _hydrateUserCrownBadgeFromCloud(user);
       _allUsers.add(user);
       _currentUser = user;
+    }
+
+    if (_currentUser != null) {
+      await _applyAuthoritativeCloudProfile(_currentUser!);
+      await _refreshUserTransactionsFromCloud(force: true);
+      ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
+      final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+      if (idx >= 0) {
+        _allUsers[idx] = _currentUser!;
+      }
+      unawaited(_pushUserBalanceToCloud(_currentUser!));
     }
 
     ngmyMarkUserAsAppLoginAccount(_currentUser!);
@@ -8036,7 +8106,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _applyPendingReferralLink(_currentUser!);
     unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
     _restartSyncLoopsForCurrentUser();
-    unawaited(_refreshUserTransactionsFromCloud(force: true));
     unawaited(_refreshCurrentUserFromCloud());
     unawaited(_maybeUploadLocalProfilePhotoToCloud(_currentUser!));
   }
@@ -8284,6 +8353,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyWalletDecisionLedgerToTransactions();
         _seedWithdrawalHoldTxnIds();
         _reconcileAllUserBalances(ledgerSettled: true);
+        if (_currentUser != null) {
+          unawaited(_pushUserBalanceToCloud(_currentUser!));
+        }
       });
       unawaited(_persistLocalOnly());
     } catch (e) {
@@ -8581,9 +8653,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final rowMap = Map<String, dynamic>.from(row);
       final remote = UserData.fromJson(rowMap);
       final key = email.toLowerCase().trim();
-      ngmyApplyAdminAccountStatusOverride(_config, remote);
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
-      await _hydrateUserCrownBadgeFromCloud(remote);
+      await _applyAuthoritativeCloudProfile(remote);
       if (!mounted) return;
       if ((remote.profilePicturePath ?? '').trim().isEmpty) {
         try {
@@ -8604,7 +8675,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       if (!mounted) return;
-      remote.accountBalance = _currentUser!.accountBalance;
+      await _refreshUserTransactionsFromCloud(force: true);
+      if (!mounted) return;
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
@@ -11105,6 +11177,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (email.isEmpty) return;
       if (ngmyIsAdminDeletedUser(_config, email)) return;
       ngmyApplyAdminAccountStatusOverride(_config, updatedUser);
+      ngmyApplyAdminCrownOverride(_config, updatedUser);
       ngmyRegisterAppLoginUser(email);
       final grant = _canSellOnStoreForEmail(_config, email);
       updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
@@ -11318,11 +11391,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       remote.savedBitcoinAddress = local.savedBitcoinAddress;
     }
     remote.phone = ngmyMergeAccountPhone(local: local.phone, remote: remote.phone);
-    final localUsername = local.username.trim();
-    final remoteUsername = remote.username.trim();
-    if (localUsername.isNotEmpty && localUsername != remoteUsername) {
-      remote.username = localUsername;
-    }
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) {
@@ -11332,11 +11400,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
     _preserveRegistryEnrollmentFromLocal(local, remote);
-    remote.accountBalance = ngmyResolveAccountBalance(
-      remote.email,
-      remote.accountBalance > local.accountBalance + 0.009 ? remote.accountBalance : local.accountBalance,
-      _allTransactions,
-    );
+  }
+
+  Future<void> _applyAuthoritativeCloudProfile(UserData user) async {
+    await ngmyHydrateManagementListsFromAllBackups(_config);
+    ngmyApplyAdminAccountStatusOverride(_config, user);
+    ngmyApplyAdminCrownOverride(_config, user);
+    await _hydrateUserCrownBadgeFromCloud(user);
+    final crown = user.crownBadge.trim().toLowerCase();
+    if (crown != 'king' && crown != 'queen') {
+      ngmyApplyAdminCrownOverride(_config, user);
+    }
   }
 
   void _seedWithdrawalHoldTxnIds() {
@@ -11649,10 +11723,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
             final localBefore = idx >= 0 ? _allUsers[idx] : localUsersBeforeFetch[sessionEmail];
             if (localBefore != null) {
-              remote.accountBalance = math.max(localBefore.accountBalance, remote.accountBalance);
+              _preserveLocalSessionState(localBefore, remote);
             }
             if (idx >= 0) {
-              _preserveLocalSessionState(_allUsers[idx], remote);
               _allUsers[idx] = remote;
             } else {
               _allUsers.add(remote);
@@ -22403,6 +22476,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _applyAdminUserAccountChange(UserData u, {required VoidCallback apply, String? snack}) async {
     apply();
     ngmySetAdminUserAccountStatus(widget.config, u.email, u.status);
+    ngmySetAdminUserCrownBadge(widget.config, u.email, u.crownBadge);
     _mirrorAdminTargetOntoSession(u);
     widget.onDataChanged();
     setState(() {});

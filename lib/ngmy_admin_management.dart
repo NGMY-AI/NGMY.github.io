@@ -129,6 +129,7 @@ Map<String, dynamic> _managementOperationalListsPayload(AppConfig config, {bool 
         config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     'adminDeletedUserEmails': config.adminDeletedUserEmails,
     'adminUserAccountStatusByEmail': config.adminUserAccountStatusByEmail,
+    'adminUserCrownBadgeByEmail': config.adminUserCrownBadgeByEmail,
     'savedAt': DateTime.now().toUtc().toIso8601String(),
   };
 }
@@ -216,6 +217,21 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
       }
     });
     config.adminUserAccountStatusByEmail = next;
+  }
+  final crowns = payload['adminUserCrownBadgeByEmail'];
+  if (crowns is Map) {
+    final next = Map<String, String>.from(config.adminUserCrownBadgeByEmail);
+    crowns.forEach((k, v) {
+      final key = ngmyNormalizeEmail(k.toString());
+      final crown = v.toString().trim().toLowerCase();
+      if (key.isEmpty) return;
+      if (crown == 'king' || crown == 'queen') {
+        next[key] = crown;
+      } else {
+        next.remove(key);
+      }
+    });
+    config.adminUserCrownBadgeByEmail = next;
   }
 }
 
