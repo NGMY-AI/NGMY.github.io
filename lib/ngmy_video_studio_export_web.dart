@@ -22,6 +22,9 @@ const _recorderTimesliceMs = 250;
 const _exportWallCapSec = 90.0;
 /// Mobile composed export — enough for typical clips without multi-hour hangs.
 const _mobileMaxRecordSeconds = 180.0;
+/// Hard stop for phone template export — then save original clip.
+const _mobileComposedExportTimeoutSec = 75;
+const _mobileExportMaxEdgePx = 1080;
 
 bool _ngmyExportCancelled = false;
 
@@ -230,7 +233,27 @@ html.VideoElement? _exportAudioElement;
 html.VideoElement? _ngmyWebAudioSourceVideo;
 Object? _ngmyExportAudioContext;
 
+Future<void> _flushProgress(
+  void Function(double progress, String status)? onProgress,
+  double progress,
+  String status,
+) async {
+  onProgress?.call(progress, status);
+  await Future<void>.delayed(Duration.zero);
+}
+
 Future<void> _resumeExportAudioContext() async {
+  try {
+    await Future.any<void>([
+      _resumeExportAudioContextImpl(),
+      Future<void>.delayed(const Duration(seconds: 2)),
+    ]);
+  } catch (e) {
+    debugPrint('[studio export] AudioContext resume: $e');
+  }
+}
+
+Future<void> _resumeExportAudioContextImpl() async {
   try {
     final ctor = js_util.getProperty(html.window, 'AudioContext') ??
         js_util.getProperty(html.window, 'webkitAudioContext');
@@ -270,6 +293,7 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
   // iOS Safari freezes off-screen videos — keep in viewport at near-zero opacity.
   final w = preferW ?? (v.videoWidth > 0 ? v.videoWidth : 720);
   final h = preferH ?? (v.videoHeight > 0 ? v.videoHeight : 1280);
+  final opacity = _ngmyIsMobileBrowser() ? '0.04' : '0.02';
   v
     ..style.position = 'fixed'
     ..style.left = '0'
@@ -277,7 +301,7 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.width = '${w}px'
     ..style.height = '${h}px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '0.02'
+    ..style.opacity = opacity
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
@@ -317,7 +341,8 @@ Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) a
   }
   html.document.body?.append(el);
   _stageHiddenVideoElement(el);
-  for (var i = 0; i < 120; i++) {
+  final metaLimit = _ngmyIsMobileBrowser() ? 35 : 120;
+  for (var i = 0; i < metaLimit; i++) {
     if (el.readyState >= html.MediaElement.HAVE_METADATA) break;
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
@@ -348,18 +373,39 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
   }
 }
 
-/// Export at the uploaded clip's native size — template overlays only, no crop.
+/// Export size — native on desktop; capped on phones so capture does not freeze.
 (int, int) _resolveExportCanvasSize(NgmyVideoStudioExportConfig config, html.VideoElement? primary) {
+  late int w;
+  late int h;
   if (primary != null) {
     var vw = primary.videoWidth;
     var vh = primary.videoHeight;
     if (vw > 0 && vh > 0) {
       if (vw.isOdd) vw++;
       if (vh.isOdd) vh++;
-      return (vw, vh);
+      w = vw;
+      h = vh;
+    } else {
+      final dims = _exportDimensions(config);
+      w = dims.$1;
+      h = dims.$2;
+    }
+  } else {
+    final dims = _exportDimensions(config);
+    w = dims.$1;
+    h = dims.$2;
+  }
+  if (_ngmyIsMobileBrowser()) {
+    final maxEdge = math.max(w, h);
+    if (maxEdge > _mobileExportMaxEdgePx) {
+      final scale = _mobileExportMaxEdgePx / maxEdge;
+      w = (w * scale).round();
+      h = (h * scale).round();
+      if (w.isOdd) w++;
+      if (h.isOdd) h++;
     }
   }
-  return _exportDimensions(config);
+  return (w, h);
 }
 
 bool _isFullFrameSlot(Rect r) =>
@@ -868,7 +914,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   for (final v in videoList) {
     v.pause();
     v.playbackRate = 1.0;
-    await _seekVideoTo(v, 0);
+    await _seekVideoTo(v, 0, fast: _ngmyIsMobileBrowser());
     if (withAudio && v == audioVideo) {
       v
         ..muted = false
@@ -947,7 +993,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
       final t = primary != null ? primary.currentTime.toDouble() : 0.0;
       final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-      if (wallMs > (_ngmyIsMobileBrowser() ? 14000 : 6000) && t < 0.08) {
+      if (wallMs > (_ngmyIsMobileBrowser() ? 5000 : 14000) && t < 0.08) {
         debugPrint('[studio export] video frozen at t=$t — aborting attempt');
         break;
       }
@@ -1286,20 +1332,55 @@ Future<String> exportNgmyVideoStudioComposed({
   required NgmyVideoStudioExportConfig config,
   void Function(double progress, String status)? onProgress,
 }) async {
+  if (_ngmyIsMobileBrowser()) {
+    try {
+      return await _exportNgmyVideoStudioComposedCore(config: config, onProgress: onProgress).timeout(
+        Duration(seconds: _mobileComposedExportTimeoutSec),
+        onTimeout: () {
+          cancelNgmyVideoStudioExport();
+          _cleanupExportElements();
+          return _fallbackComposedExport(
+            config,
+            config.videoSourcesBySlot,
+            reason: 'export timed out on phone',
+            allowRawFallback: true,
+          );
+        },
+      );
+    } catch (e, st) {
+      debugPrint('[studio export] mobile composed failed: $e\n$st');
+      cancelNgmyVideoStudioExport();
+      _cleanupExportElements();
+      return _fallbackComposedExport(
+        config,
+        config.videoSourcesBySlot,
+        reason: 'export failed on phone',
+        allowRawFallback: true,
+      );
+    }
+  }
+  return _exportNgmyVideoStudioComposedCore(config: config, onProgress: onProgress);
+}
+
+Future<String> _exportNgmyVideoStudioComposedCore({
+  required NgmyVideoStudioExportConfig config,
+  void Function(double progress, String status)? onProgress,
+}) async {
   _resetExportCancel();
   _cleanupExportElements();
-  await _resumeExportAudioContext();
+  await _flushProgress(onProgress, 0.01, 'Starting export…');
+  unawaited(_resumeExportAudioContext());
   final sources = config.videoSourcesBySlot;
   if (sources.isEmpty || sources.values.every((s) => s.trim().isEmpty)) {
     return 'Upload at least one video into a screen frame before downloading.';
   }
 
   if (!_webSupportsComposedCapture()) {
-    onProgress?.call(0.5, 'Saving your video…');
+    await _flushProgress(onProgress, 0.5, 'Saving your video…');
     return _fallbackComposedExport(config, sources, reason: 'browser cannot capture canvas');
   }
 
-  onProgress?.call(0.02, 'Loading your video…');
+  await _flushProgress(onProgress, 0.02, 'Loading your video…');
 
   final videos = <String, html.VideoElement>{};
   for (final e in sources.entries) {
@@ -1343,15 +1424,26 @@ Future<String> exportNgmyVideoStudioComposed({
   var usedCanvasStream = false;
 
   try {
-    onProgress?.call(0.06, 'Preparing studio export…');
+    await _flushProgress(onProgress, 0.06, 'Preparing studio export…');
 
-    final metaOk = await Future.wait(videos.values.map(_waitVideoMeta));
+    final metaOk = await Future.wait(videos.values.map((v) => _waitVideoMeta(v)));
     if (metaOk.contains(false)) {
-      return 'Video could not load for export. Re-upload the clip and try Download again.';
+      return _fallbackComposedExport(
+        config,
+        sources,
+        reason: 'video metadata unavailable',
+        allowRawFallback: _ngmyIsMobileBrowser(),
+      );
     }
-    final playOk = await Future.wait(videos.values.map(_waitVideoCanPlay));
+    await _flushProgress(onProgress, 0.07, 'Buffering video…');
+    final playOk = await Future.wait(videos.values.map((v) => _waitVideoCanPlay(v)));
     if (playOk.contains(false)) {
-      return 'Video is still loading. Wait a moment and tap Download again.';
+      return _fallbackComposedExport(
+        config,
+        sources,
+        reason: 'video still loading',
+        allowRawFallback: _ngmyIsMobileBrowser(),
+      );
     }
 
     var durationSec = await _resolveRecordingDurationAsync(videos.values);
@@ -1364,23 +1456,21 @@ Future<String> exportNgmyVideoStudioComposed({
       }
     }
 
-    onProgress?.call(0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
-    if (_ngmyIsMobileBrowser() && durationSec > 45) {
-      onProgress?.call(0.09, 'Recording ${_formatDurationLabel(durationSec)} — keep this screen open…');
-    }
+    await _flushProgress(onProgress, 0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
 
     final (w, h) = _resolveExportCanvasSize(config, primaryVideo);
     for (final v in videos.values) {
       _applyExportVideoStaging(v);
     }
     html.ImageElement? bannerOverlay;
-    if (config.newsBannerStyle != null) {
+    if (config.newsBannerStyle != null && !_ngmyIsMobileBrowser()) {
       try {
-        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(const Duration(seconds: 25));
+        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(const Duration(seconds: 12));
       } catch (e) {
         debugPrint('[studio export] banner overlay failed: $e');
       }
     }
+    await _flushProgress(onProgress, 0.09, 'Setting up recorder…');
     exportCanvas = html.CanvasElement(width: w, height: h);
     final canvas = exportCanvas!;
     final ctx = canvas.context2D;
@@ -1448,6 +1538,8 @@ Future<String> exportNgmyVideoStudioComposed({
 
       if (bannerOverlay != null) {
         ctx.drawImageScaled(bannerOverlay, 0, 0, w, h);
+      } else if (config.newsBannerStyle != null) {
+        _drawNewsBannerOnCanvas(ctx, w.toDouble(), h.toDouble(), config);
       } else if (config.showTextOverlay) {
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
       }
@@ -1480,7 +1572,7 @@ Future<String> exportNgmyVideoStudioComposed({
     for (final v in videos.values) {
       v.muted = true;
       v.pause();
-      await _seekVideoTo(v, 0);
+      await _seekVideoTo(v, 0, fast: _ngmyIsMobileBrowser());
     }
     for (var i = 0; i < 6; i++) {
       paintFrame();
@@ -1512,7 +1604,7 @@ Future<String> exportNgmyVideoStudioComposed({
       return _fallbackComposedExport(config, sources, reason: 'recording not supported');
     }
 
-    onProgress?.call(0.05, _ngmyRecordingStatus(0.05));
+    await _flushProgress(onProgress, 0.1, _ngmyRecordingStatus(0.1));
 
     List<html.Blob> chunks = const [];
     String? mimeType;
@@ -1543,7 +1635,9 @@ Future<String> exportNgmyVideoStudioComposed({
         videoList: videoList,
         primaryVideo: primaryVideo,
         durationSec: durationSec,
-        onProgress: (p, s) => onProgress?.call(p, s),
+        onProgress: (p, s) {
+          onProgress?.call(p, s);
+        },
         realtimePlayback: realtime,
         withAudio: hadAudio,
       );
@@ -1551,11 +1645,9 @@ Future<String> exportNgmyVideoStudioComposed({
     }
 
     final appleMobile = _ngmyIsAppleMobileBrowser();
-    // Realtime playback is fastest — one pass through the clip. Avoid slow per-frame seek on phones.
     final plans = appleMobile
         ? [
             (mime: primaryMime, audio: true, realtime: true),
-            (mime: fallbackMime, audio: true, realtime: true),
           ]
         : [
             (mime: primaryMime, audio: true, realtime: true),
@@ -1570,9 +1662,10 @@ Future<String> exportNgmyVideoStudioComposed({
     for (var i = 0; i < plans.length; i++) {
       if (_exportWasCancelled) break;
       final plan = plans[i];
-      onProgress?.call(
-        0.05 + (i * 0.01),
-        'Recording template… (attempt ${i + 1}/${plans.length})',
+      await _flushProgress(
+        onProgress,
+        0.12 + (i * 0.02),
+        'Recording ${_formatDurationLabel(durationSec)}…',
       );
       final result = await tryRecord(plan.mime, withAudio: plan.audio, realtime: plan.realtime);
       if (_exportWasCancelled) break;
@@ -1606,8 +1699,8 @@ Future<String> exportNgmyVideoStudioComposed({
       return _fallbackComposedExport(
         config,
         sources,
-        reason: 'recording produced no data — try Chrome on desktop for smooth export with sound',
-        allowRawFallback: false,
+        reason: 'recording produced no data',
+        allowRawFallback: _ngmyIsMobileBrowser() || _studioAllowsRawFallback(config),
       );
     }
 
@@ -1720,6 +1813,36 @@ Future<html.ImageElement?> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig 
 void _drawProgramBg(html.CanvasRenderingContext2D ctx, double w, double h, NgmyVideoStudioExportConfig c) {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, w, h);
+}
+
+void _drawNewsBannerOnCanvas(html.CanvasRenderingContext2D ctx, double w, double h, NgmyVideoStudioExportConfig c) {
+  void txt(String t, double x, double y, double size, String color, {String align = 'left'}) {
+    if (t.trim().isEmpty) return;
+    ctx.font = 'bold ${size}px Arial,sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.fillText(t, x, y);
+  }
+
+  final barH = h * 0.14;
+  final y0 = h - barH;
+  ctx.fillStyle = 'rgba(0,0,0,0.88)';
+  ctx.fillRect(0, y0, w, barH);
+  if (c.newsTopAccent) {
+    ctx.fillStyle = '#EF4444';
+    ctx.fillRect(0, y0, w, barH * 0.12);
+  }
+  final live = c.liveLabel.trim();
+  if (live.isNotEmpty) {
+    ctx.fillStyle = '#DC2626';
+    ctx.fillRect(w * 0.03, y0 + barH * 0.18, w * 0.16, barH * 0.28);
+    txt(live.toUpperCase(), w * 0.11, y0 + barH * 0.38, barH * 0.18, '#FFFFFF', align: 'center');
+  }
+  txt(c.title.toUpperCase(), w * 0.22, y0 + barH * 0.42, barH * 0.22, '#FBBF24');
+  txt(c.headline, w * 0.03, y0 + barH * 0.78, barH * 0.26, '#FFFFFF');
+  if (c.subtitle.trim().isNotEmpty) {
+    txt(c.subtitle, w * 0.03, y0 + barH * 0.95, barH * 0.18, '#D1D5DB');
+  }
 }
 
 void _drawTextOverlay(html.CanvasRenderingContext2D ctx, double w, double h, NgmyVideoStudioExportConfig c) {

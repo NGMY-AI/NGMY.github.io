@@ -530,9 +530,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final instant = cfg.canDirectDownload;
     setState(() {
       _exporting = true;
-      _exportProgress = instant ? 0.5 : 0;
-      _exportStatus = instant ? 'Saving your video…' : 'Preparing export…';
+      _exportProgress = instant ? 0.5 : 0.02;
+      _exportStatus = instant ? 'Saving your video…' : 'Starting export…';
     });
+    await Future<void>.delayed(Duration.zero);
     try {
       final msg = cfg.canDirectDownload
           ? await exportNgmyVideoStudioDirect(videoSourceUrl: cfg.videoSourcesBySlot.values.first)
@@ -674,6 +675,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
   Widget _exportOverlay() {
     final pct = (_exportProgress.clamp(0.0, 1.0) * 100).round();
+    final title = _exportStatus.isNotEmpty ? _exportStatus : 'Exporting…';
     return Positioned.fill(
       child: Material(
         color: Colors.black54,
@@ -687,13 +689,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Recording template',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
                     ),
                     const SizedBox(height: 14),
                     LinearProgressIndicator(
-                      value: _exportProgress > 0 ? _exportProgress.clamp(0.02, 0.99) : null,
+                      value: _exportProgress > 0.01 ? _exportProgress.clamp(0.02, 0.99) : null,
                       minHeight: 8,
                       borderRadius: BorderRadius.circular(6),
                       backgroundColor: Colors.white12,
@@ -701,7 +704,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      _exportStatus.isNotEmpty ? _exportStatus : '$pct%',
+                      _exportProgress > 0.01 ? '$pct% complete' : 'Please keep this screen open',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white70, fontSize: 13),
                     ),
