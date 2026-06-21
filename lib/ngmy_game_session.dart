@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Bumped after wallet balance changes so all screens repaint instantly.
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
@@ -7,26 +8,69 @@ final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 /// Authoritative live balance per user email (lowercase). Updated on every ledger change.
 final ValueNotifier<Map<String, double>> ngmyLiveBalanceCache = ValueNotifier<Map<String, double>>({});
 
+/// True after the signed-in user's full transaction ledger has synced from cloud.
+bool ngmyUserWalletLedgerSettled = false;
+
+const String _kNgmyVerifiedBalancePrefix = 'ngmy_verified_balance_';
+
 String _ngmyEmailKey(String email) => email.toLowerCase().trim();
 
-void ngmySeedLiveBalance(String email, double balance) {
+Future<double?> ngmyLoadVerifiedWalletBalance(String email) async {
+  final key = _ngmyEmailKey(email);
+  if (key.isEmpty) return null;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble('$_kNgmyVerifiedBalancePrefix$key');
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<void> ngmySaveVerifiedWalletBalance(String email, double balance) async {
   final key = _ngmyEmailKey(email);
   if (key.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('$_kNgmyVerifiedBalancePrefix$key', balance);
+  } catch (_) {}
+}
+
+/// While the ledger is still syncing, show only the last cloud-verified balance.
+double ngmyCapWalletBalanceIfUnsettled({
+  required double balance,
+  required double? verifiedCap,
+  required bool ledgerSettled,
+}) {
+  if (ledgerSettled || verifiedCap == null) return balance;
+  return verifiedCap;
+}
+
+void _ngmyWriteLiveBalance(String email, double balance, {required bool allowIncrease}) {
+  final key = _ngmyEmailKey(email);
+  if (key.isEmpty) return;
+  if (!allowIncrease) {
+    final prev = ngmyLiveBalanceCache.value[key];
+    if (prev != null && balance > prev + 0.001) balance = prev;
+  }
   final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
   next[key] = balance;
   ngmyLiveBalanceCache.value = next;
 }
 
-void ngmyNotifyBalanceChanged({String? email, double? balance}) {
+void ngmySeedLiveBalance(String email, double balance, {bool allowIncrease = true}) {
+  _ngmyWriteLiveBalance(email, balance, allowIncrease: allowIncrease);
+}
+
+void ngmyNotifyBalanceChanged({String? email, double? balance, bool allowIncrease = true}) {
   if (email != null && balance != null) {
-    ngmySeedLiveBalance(email, balance);
+    ngmySeedLiveBalance(email, balance, allowIncrease: allowIncrease);
   }
   ngmyBalanceTick.value++;
 }
 
 /// Keep live balance cache aligned with a ledger balance value.
-void ngmySyncLiveBalanceFor(String email, double balance) {
-  ngmyNotifyBalanceChanged(email: email, balance: balance);
+void ngmySyncLiveBalanceFor(String email, double balance, {bool allowIncrease = true}) {
+  ngmyNotifyBalanceChanged(email: email, balance: balance, allowIncrease: allowIncrease);
 }
 
 double ngmyLiveBalanceFor(String email, {double Function()? fallback}) {
