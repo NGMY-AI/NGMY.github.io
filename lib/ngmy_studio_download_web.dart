@@ -113,12 +113,11 @@ Future<bool> ngmyTryShareStudioVideoUrl(String href, String filename) async {
       return false;
     }
     var safeName = _ensureMp4Filename(filename);
-    final type = _ngmyIsAppleMobileBrowser()
-        ? 'video/mp4'
-        : (blob.type.isNotEmpty ? blob.type : 'video/mp4');
-    final shareBlob = _ngmyIsAppleMobileBrowser() && !blob.type.contains('mp4')
-        ? html.Blob([blob], 'video/mp4')
-        : blob;
+    if (_ngmyIsAppleMobileBrowser() && blob.type.contains('webm')) {
+      return false;
+    }
+    final type = blob.type.isNotEmpty ? blob.type : 'video/mp4';
+    final shareBlob = blob;
     final file = html.File([shareBlob], safeName, {'type': type});
     final shareData = js_util.jsify(<String, Object>{
       'files': [file],

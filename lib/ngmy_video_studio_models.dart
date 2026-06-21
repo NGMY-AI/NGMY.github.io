@@ -267,13 +267,12 @@ class NgmyVideoStudioExportConfig {
   /// True when templates, logos, text, or backdrop must be baked into the export.
   bool get needsComposedExport => !canDirectDownload;
 
-  /// One local video — download the raw clip directly (templates with text still use composed export).
+  /// One local video — save the original clip (no re-encode) unless logos/text/banners must be baked in.
   bool get canDirectDownload {
     final filled = videoSourcesBySlot.values.where((s) => s.trim().isNotEmpty).length;
     return filled == 1 &&
         logoDataUrlBySlot.isEmpty &&
         newsBannerStyle == null &&
-        !showTextOverlay &&
-        (backgroundAsset == null || backgroundAsset!.trim().isEmpty);
+        !showTextOverlay;
   }
 }
