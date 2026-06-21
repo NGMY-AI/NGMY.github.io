@@ -33,14 +33,16 @@ class NgmySupabaseColumns {
 
   /// Login probe — small payload, fast on slow networks.
   static const userLogin =
-      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,crownBadge';
+      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath';
+
+  /// Optional — only when users.crownBadge column exists (see users_crown_badge_column.sql).
+  static const userCrownBadge = 'crownBadge';
 
   /// Admin Users tab — every NGMY account row (paginated).
   static const adminUsersList =
       'email,username,phone,passwordHash,isAdmin,status,forceLogout,accountBalance,totalProfit,'
       'canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount,'
-      'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper,'
-      'crownBadge,freeFixCredit';
+      'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper';
 
   /// Media feed read — matches live Supabase (extras in `data` jsonb).
   static const mediaFeedCore =

@@ -1723,11 +1723,15 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       await _seekVideoTo(v, 0, fast: false);
     }
     if (primaryVideo != null) {
-      await _playVideoForRecord(primaryVideo);
-      await _waitForPlaybackStart(primaryVideo);
+      try {
+        await _playVideoForRecord(primaryVideo).timeout(const Duration(seconds: 6));
+        await _waitForPlaybackStart(primaryVideo).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('[studio export] pre-record warm-up: $e');
+      }
       primaryVideo.pause();
-      await _seekVideoTo(primaryVideo, 0, fast: false);
-      await _ensureExportAudioElement(primaryVideo);
+      await _seekVideoTo(primaryVideo, 0, fast: true);
+      unawaited(_ensureExportAudioElement(primaryVideo));
     }
     for (var i = 0; i < 6; i++) {
       paintFrame();
@@ -1945,7 +1949,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
 Future<html.ImageElement?> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig config, int w, int h) async {
   final scales = _ngmyIsMobileBrowser()
-      ? <double>[1.0, 0.85, 0.75, 0.65]
+      ? <double>[0.5, 0.45, 0.4, 0.65, 0.75]
       : <double>[1.0, 0.85, 0.75];
   for (final scale in scales) {
     final rw = math.max(360, (w * scale).round());

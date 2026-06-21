@@ -3329,6 +3329,30 @@ Future<bool> _pushUserProfilePictureToCloud(UserData u) async {
   return false;
 }
 
+Future<void> _hydrateUserCrownBadgeFromCloud(UserData u) async {
+  if (!await ngmyCanReachCloud()) return;
+  final email = u.email.trim();
+  if (email.isEmpty) return;
+  try {
+    final row = await Supabase.instance.client
+        .from('users')
+        .select(NgmySupabaseColumns.userCrownBadge)
+        .eq('email', email)
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
+    if (row == null) return;
+    final crown = (row[NgmySupabaseColumns.userCrownBadge] ?? '').toString().trim().toLowerCase();
+    if (crown == 'king' || crown == 'queen') {
+      u.crownBadge = crown;
+    } else if (crown.isEmpty) {
+      u.crownBadge = '';
+    }
+  } catch (e) {
+    if (_missingColumnFromError(e) != null) return;
+    debugPrint('[user] crown fetch: $e');
+  }
+}
+
 Future<bool> _pushUserAdminAccountFieldsToCloud(UserData u) async {
   if (!await ngmyCanReachCloud()) return false;
   final email = u.email.trim();
@@ -6637,21 +6661,30 @@ const String kNgmyConfigRowId = '1';
 
 Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = '*'}) async {
   final client = Supabase.instance.client;
-  for (final id in [kNgmyConfigRowId, 1]) {
+  Future<Map<String, dynamic>?> trySelect(String cols) async {
+    for (final id in [kNgmyConfigRowId, 1]) {
+      try {
+        final row = await client.from('config').select(cols).eq('id', id).maybeSingle();
+        if (row != null) return Map<String, dynamic>.from(row);
+      } catch (e) {
+        debugPrint('[config] fetch id=$id cols=$cols: $e');
+      }
+    }
     try {
-      final row = await client.from('config').select(columns).eq('id', id).maybeSingle();
+      final row = await client.from('config').select(cols).limit(1).maybeSingle();
       if (row != null) return Map<String, dynamic>.from(row);
     } catch (e) {
-      debugPrint('[config] fetch id=$id: $e');
+      debugPrint('[config] fetch any row cols=$cols: $e');
     }
+    return null;
   }
-  try {
-    final row = await client.from('config').select(columns).limit(1).maybeSingle();
-    if (row != null) return Map<String, dynamic>.from(row);
-  } catch (e) {
-    debugPrint('[config] fetch any row: $e');
+
+  if (columns != '*') {
+    final partial = await trySelect(columns);
+    if (partial != null) return partial;
+    return trySelect('*');
   }
-  return null;
+  return trySelect('*');
 }
 
 dynamic _ngmyConfigRowIdValue(Map<String, dynamic>? row) {
@@ -7458,8 +7491,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
     const columnSets = <String?>[
-      NgmySupabaseColumns.adminUsersList,
       null,
+      NgmySupabaseColumns.adminUsersList,
       NgmySupabaseColumns.userLogin,
       'email,username,phone,passwordHash,accountBalance,status,isAdmin',
       'email,username,phone,passwordHash',
@@ -7937,11 +7970,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final remote = UserData.fromJson(row);
           remote.passwordHash = passwordHash;
           if (ngmyEmailIsAdmin(key)) remote.isAdmin = true;
-          remote.accountBalance = local.accountBalance;
+          remote.accountBalance = math.max(local.accountBalance, remote.accountBalance);
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
           ngmyApplyAdminAccountStatusOverride(_config, remote);
           ngmyReconcileUserAccountBalance(remote, _allTransactions);
+          await _hydrateUserCrownBadgeFromCloud(remote);
           _allUsers[index] = remote;
           _currentUser = remote;
         } else {
@@ -7977,6 +8011,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       if (ngmyEmailIsAdmin(key)) user.isAdmin = true;
       ngmyApplyAdminAccountStatusOverride(_config, user);
+      await _hydrateUserCrownBadgeFromCloud(user);
       _allUsers.add(user);
       _currentUser = user;
     }
@@ -8548,6 +8583,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final key = email.toLowerCase().trim();
       ngmyApplyAdminAccountStatusOverride(_config, remote);
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
+      await _hydrateUserCrownBadgeFromCloud(remote);
       if (!mounted) return;
       if ((remote.profilePicturePath ?? '').trim().isEmpty) {
         try {
@@ -11296,7 +11332,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
     _preserveRegistryEnrollmentFromLocal(local, remote);
-    remote.accountBalance = local.accountBalance;
+    remote.accountBalance = ngmyResolveAccountBalance(
+      remote.email,
+      remote.accountBalance > local.accountBalance + 0.009 ? remote.accountBalance : local.accountBalance,
+      _allTransactions,
+    );
   }
 
   void _seedWithdrawalHoldTxnIds() {
@@ -11609,7 +11649,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
             final localBefore = idx >= 0 ? _allUsers[idx] : localUsersBeforeFetch[sessionEmail];
             if (localBefore != null) {
-              remote.accountBalance = localBefore.accountBalance;
+              remote.accountBalance = math.max(localBefore.accountBalance, remote.accountBalance);
             }
             if (idx >= 0) {
               _preserveLocalSessionState(_allUsers[idx], remote);
@@ -11697,6 +11737,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (configCore != null) cfgMap.addAll(configCore);
         final configHeavy = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.configBootstrapHeavy);
         if (configHeavy != null) cfgMap.addAll(configHeavy);
+        if (cfgMap.isEmpty) {
+          final fullCfg = await _fetchNgmyConfigRow();
+          if (fullCfg != null) cfgMap.addAll(fullCfg);
+        }
         if (cfgMap.isNotEmpty) {
           final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
           _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
