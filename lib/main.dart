@@ -3960,7 +3960,46 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
   if (!includeBalance) {
     row.remove('accountBalance');
   }
+  // Admin-set identity fields — never wipe cloud via routine profile sync.
+  row.remove('crownBadge');
+  row.remove('status');
+  row.remove('forceLogout');
+  final photo = (row['profilePicturePath'] ?? '').toString().trim();
+  if (photo.isEmpty || photo.startsWith('data:image')) {
+    row.remove('profilePicturePath');
+  }
   return row;
+}
+
+String _ngmyMergeAccountStatus(String local, String remote) {
+  const rank = {'disabled': 4, 'suspended': 3, 'verified': 2, 'active': 1};
+  final l = local.trim().toLowerCase();
+  final r = remote.trim().toLowerCase();
+  final lr = rank[l] ?? 1;
+  final rr = rank[r] ?? 1;
+  return lr >= rr ? l : r;
+}
+
+void _mergeCloudProfileIdentityFields(UserData local, UserData remote) {
+  final localPhoto = (local.profilePicturePath ?? '').trim();
+  final remotePhoto = (remote.profilePicturePath ?? '').trim();
+  if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
+    remote.profilePicturePath = remotePhoto;
+  } else if (_ngmyIsCloudProfilePhoto(localPhoto)) {
+    remote.profilePicturePath = localPhoto;
+  } else if (localPhoto.isNotEmpty && remotePhoto.isEmpty) {
+    remote.profilePicturePath = local.profilePicturePath;
+  }
+
+  final localCrown = local.crownBadge.trim().toLowerCase();
+  final remoteCrown = remote.crownBadge.trim().toLowerCase();
+  if (remoteCrown == 'king' || remoteCrown == 'queen') {
+    remote.crownBadge = remote.crownBadge.trim().toLowerCase();
+  } else if (localCrown == 'king' || localCrown == 'queen') {
+    remote.crownBadge = local.crownBadge.trim().toLowerCase();
+  }
+
+  remote.status = _ngmyMergeAccountStatus(local.status, remote.status);
 }
 
 Future<bool> _pushUserBalanceToCloud(UserData u) async {
@@ -7901,6 +7940,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           remote.accountBalance = local.accountBalance;
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
+          ngmyApplyAdminAccountStatusOverride(_config, remote);
           ngmyReconcileUserAccountBalance(remote, _allTransactions);
           _allUsers[index] = remote;
           _currentUser = remote;
@@ -7936,6 +7976,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
       }
       if (ngmyEmailIsAdmin(key)) user.isAdmin = true;
+      ngmyApplyAdminAccountStatusOverride(_config, user);
       _allUsers.add(user);
       _currentUser = user;
     }
@@ -8505,6 +8546,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final rowMap = Map<String, dynamic>.from(row);
       final remote = UserData.fromJson(rowMap);
       final key = email.toLowerCase().trim();
+      ngmyApplyAdminAccountStatusOverride(_config, remote);
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
       if (!mounted) return;
       if ((remote.profilePicturePath ?? '').trim().isEmpty) {
@@ -11026,6 +11068,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final email = updatedUser.email.toLowerCase().trim();
       if (email.isEmpty) return;
       if (ngmyIsAdminDeletedUser(_config, email)) return;
+      ngmyApplyAdminAccountStatusOverride(_config, updatedUser);
       ngmyRegisterAppLoginUser(email);
       final grant = _canSellOnStoreForEmail(_config, email);
       updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
@@ -11230,15 +11273,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.points > remote.points) {
       remote.points = local.points;
     }
-    final localPhoto = (local.profilePicturePath ?? '').trim();
-    final remotePhoto = (remote.profilePicturePath ?? '').trim();
-    if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
-      // Cloud URL is the cross-device source of truth.
-    } else if (_ngmyIsCloudProfilePhoto(localPhoto)) {
-      remote.profilePicturePath = local.profilePicturePath;
-    } else if (localPhoto.isNotEmpty && remotePhoto.isEmpty) {
-      remote.profilePicturePath = local.profilePicturePath;
-    }
+    _mergeCloudProfileIdentityFields(local, remote);
     _mergeUserMediaProfileFields(local, remote);
     if (local.savedCashAppTag.trim().isNotEmpty && remote.savedCashAppTag.trim().isEmpty) {
       remote.savedCashAppTag = local.savedCashAppTag;
@@ -11251,12 +11286,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final remoteUsername = remote.username.trim();
     if (localUsername.isNotEmpty && localUsername != remoteUsername) {
       remote.username = localUsername;
-    }
-    if (remote.crownBadge.trim().isEmpty && local.crownBadge.trim().isNotEmpty) {
-      remote.crownBadge = local.crownBadge;
-    }
-    if (remote.status == 'active' && local.status != 'active') {
-      remote.status = local.status;
     }
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
@@ -25667,6 +25696,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final local = (widget.user.profilePicturePath ?? '').trim();
       if (local == remote) return;
       if (local.startsWith('data:image')) return;
+      if (_ngmyIsCloudProfilePhoto(local) && local == remote) return;
       final emailKey = email.toLowerCase().trim();
       setState(() {
         widget.user.profilePicturePath = remote;

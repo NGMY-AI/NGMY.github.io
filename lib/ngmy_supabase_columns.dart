@@ -33,7 +33,7 @@ class NgmySupabaseColumns {
 
   /// Login probe — small payload, fast on slow networks.
   static const userLogin =
-      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath';
+      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,crownBadge';
 
   /// Admin Users tab — every NGMY account row (paginated).
   static const adminUsersList =
