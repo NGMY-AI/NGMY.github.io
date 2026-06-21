@@ -37,6 +37,237 @@ import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot
   );
 }
 
+/// Polished dialog for typing a 5–6 character Doc Share code.
+Future<String?> showNgmyDocShareEnterCodeDialog(
+  BuildContext context, {
+  bool scanScreenStyle = false,
+}) {
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: scanScreenStyle ? Colors.black.withValues(alpha: 0.72) : Colors.black54,
+    builder: (ctx) => _DocShareEnterCodeDialog(scanScreenStyle: scanScreenStyle),
+  );
+}
+
+class _DocShareEnterCodeDialog extends StatefulWidget {
+  const _DocShareEnterCodeDialog({this.scanScreenStyle = false});
+
+  final bool scanScreenStyle;
+
+  @override
+  State<_DocShareEnterCodeDialog> createState() => _DocShareEnterCodeDialogState();
+}
+
+class _DocShareEnterCodeDialogState extends State<_DocShareEnterCodeDialog> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _docShareColors(context);
+    final onScan = widget.scanScreenStyle;
+    final card = onScan ? const Color(0xFF151B28) : c.card;
+    final fg = onScan ? Colors.white : c.fg;
+    final muted = onScan ? Colors.white60 : c.muted;
+    final fieldFill = onScan ? const Color(0xFF0B0F18) : c.bg;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: kNgmyStudioHubAccent.withValues(alpha: onScan ? 0.25 : 0.12),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kNgmyStudioHubAccent.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.pin_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Enter share code',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Type the 5–6 character code shown under the sender\'s file.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted, fontSize: 13, height: 1.45),
+                ),
+                const SizedBox(height: 22),
+                TextField(
+                  controller: _controller,
+                  focusNode: _focus,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 8,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                    _UpperCaseTextFormatter(),
+                  ],
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: 'A3K9P2',
+                    hintStyle: TextStyle(
+                      color: muted.withValues(alpha: 0.45),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 8,
+                    ),
+                    filled: true,
+                    fillColor: fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: kNgmyStudioHubAccent, width: 2),
+                    ),
+                  ),
+                  onSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: fg,
+                          side: BorderSide(color: c.border),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kNgmyStudioHubAccent.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: _submit,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Receive file',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
+  }
+}
+
 class NgmyDocSharePage extends StatefulWidget {
   const NgmyDocSharePage({
     super.key,
@@ -468,27 +699,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<String?> _promptEnterShortCode(BuildContext context) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Enter share code'),
-        content: TextField(
-          controller: controller,
-          maxLength: 6,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
-            hintText: 'A3K9P2',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Receive')),
-        ],
-      ),
-    );
-    controller.dispose();
+    final result = await showNgmyDocShareEnterCodeDialog(context);
     final code = NgmyDocShareShortCode.normalizeInput(result ?? '');
     if (code == null && (result ?? '').trim().isNotEmpty) {
       _toast('Enter a valid 5–6 character code.');
@@ -1681,27 +1892,7 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
   }
 
   Future<void> _enterShortCode() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Enter share code'),
-        content: TextField(
-          controller: controller,
-          maxLength: 6,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
-            hintText: 'A3K9P2',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Receive')),
-        ],
-      ),
-    );
-    controller.dispose();
+    final result = await showNgmyDocShareEnterCodeDialog(context, scanScreenStyle: true);
     final code = NgmyDocShareShortCode.normalizeInput(result ?? '');
     if (code == null) {
       if (mounted && (result ?? '').trim().isNotEmpty) {
