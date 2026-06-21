@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -40,7 +41,35 @@ class NgmyDocShareSync {
     if (items.isEmpty) return null;
 
     if (items.any((i) => i.isVideo)) {
-      return _createQrForVideos(ownerEmail: ownerEmail, items: items);
+      final video = await _createQrForVideos(ownerEmail: ownerEmail, items: items);
+      if (video != null) {
+        unawaited(registerShortCodesForShare(
+          ownerEmail: ownerEmail,
+          items: items,
+          qrPayload: video.qrPayload,
+          mode: video.mode,
+        ));
+      }
+      return video;
+    }
+
+    // Phone: LAN share is instant and works offline — never read whole files into RAM first.
+    if (!kIsWeb) {
+      final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
+      if (lan != null) {
+        final result = (
+          qrPayload: lan.qrPayload,
+          fileCount: lan.fileCount,
+          mode: NgmyDocShareQrMode.lanDirect,
+        );
+        unawaited(registerShortCodesForShare(
+          ownerEmail: ownerEmail,
+          items: items,
+          qrPayload: result.qrPayload,
+          mode: result.mode,
+        ));
+        return result;
+      }
     }
 
     final bundleJson = await exportBundleFile(ownerEmail: ownerEmail, items: items);
@@ -52,17 +81,6 @@ class NgmyDocShareSync {
       return null;
     }
 
-    if (!kIsWeb) {
-      final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
-      if (lan != null) {
-        return (
-          qrPayload: lan.qrPayload,
-          fileCount: lan.fileCount,
-          mode: NgmyDocShareQrMode.lanDirect,
-        );
-      }
-    }
-
     if (bundleJson.length <= kNgmyDocShareCloudStashMaxBytes) {
       final stash = await NgmyDocShareQrStash.createFromBundleJson(
         ownerEmail: ownerEmail,
@@ -70,15 +88,31 @@ class NgmyDocShareSync {
         fileCount: items.length,
       );
       if (stash != null) {
-        return (
+        final result = (
           qrPayload: stash.qrPayload,
           fileCount: items.length,
           mode: NgmyDocShareQrMode.cloudStash,
         );
+        unawaited(registerShortCodesForShare(
+          ownerEmail: ownerEmail,
+          items: items,
+          qrPayload: result.qrPayload,
+          mode: result.mode,
+        ));
+        return result;
       }
     }
 
-    return _tryInlineQr(ownerEmail: ownerEmail, items: items, bundleJson: bundleJson);
+    final inline = await _tryInlineQr(ownerEmail: ownerEmail, items: items, bundleJson: bundleJson);
+    if (inline != null) {
+      unawaited(registerShortCodesForShare(
+        ownerEmail: ownerEmail,
+        items: items,
+        qrPayload: inline.qrPayload,
+        mode: inline.mode,
+      ));
+    }
+    return inline;
   }
 
   static bool payloadFitsBrandedQr(String payload) =>
@@ -89,33 +123,63 @@ class NgmyDocShareSync {
     await webrtc.stopWebRtc();
   }
 
-  /// Assigns (or returns existing) 6-character type-in code for one library file.
-  static Future<String?> ensureShortCodeForItem({
+  /// Local-only code for list display — no cloud upload (instant).
+  static Future<String> ensureLocalShortCodeForItem({
     required String ownerEmail,
     required NgmyDocShareItem item,
   }) async {
-    final existing = await NgmyDocShareShortCode.existingCodeForItem(
-      ownerEmail: ownerEmail,
-      itemId: item.id,
-    );
-    if (existing != null && existing.isNotEmpty) return existing;
+    final existing = (item.shortCode ?? '').trim();
+    if (existing.isNotEmpty) return existing.toUpperCase();
+    final code = NgmyDocShareShortCode.generateLocalCode();
+    await NgmyDocShareStore.updateShortCode(ownerEmail, item.id, code);
+    return code;
+  }
 
-    final bundleJson = await exportBundleFile(ownerEmail: ownerEmail, items: [item]);
-    if (bundleJson.trim().isEmpty) return null;
-    if (bundleJson.length > kNgmyDocShareCloudStashMaxBytes) return null;
+  /// Registers each file's typed code to the active share payload (tiny cloud write, no re-upload).
+  static Future<void> registerShortCodesForShare({
+    required String ownerEmail,
+    required List<NgmyDocShareItem> items,
+    required String qrPayload,
+    required NgmyDocShareQrMode mode,
+  }) async {
+    if (items.isEmpty || qrPayload.trim().isEmpty) return;
+    final payload = qrPayload.trim();
+    String? stashToken;
+    if (mode == NgmyDocShareQrMode.cloudStash && payload.startsWith('$kNgmyDocShareQrPrefixCloud|')) {
+      stashToken = payload.substring(kNgmyDocShareQrPrefixCloud.length + 1).trim();
+    }
 
-    final stash = await NgmyDocShareQrStash.createFromBundleJson(
-      ownerEmail: ownerEmail,
-      bundleJson: bundleJson,
-      fileCount: 1,
-    );
-    if (stash == null) return null;
-
-    return NgmyDocShareShortCode.registerForStash(
-      ownerEmail: ownerEmail,
-      item: item,
-      stashToken: stash.token,
-    );
+    for (final item in items) {
+      final code = await ensureLocalShortCodeForItem(ownerEmail: ownerEmail, item: item);
+      switch (mode) {
+        case NgmyDocShareQrMode.lanDirect:
+          await NgmyDocShareShortCode.registerForLanPayload(
+            ownerEmail: ownerEmail,
+            item: item,
+            code: code,
+            lanPayload: payload,
+          );
+        case NgmyDocShareQrMode.cloudStash:
+          if (stashToken != null && stashToken.isNotEmpty) {
+            await NgmyDocShareShortCode.registerForStash(
+              ownerEmail: ownerEmail,
+              item: item,
+              stashToken: stashToken,
+              code: code,
+            );
+          }
+        case NgmyDocShareQrMode.inlineInstant:
+          await NgmyDocShareShortCode.registerForInlinePayload(
+            ownerEmail: ownerEmail,
+            item: item,
+            code: code,
+            inlinePayload: payload,
+          );
+        case NgmyDocShareQrMode.webrtcLink:
+        case NgmyDocShareQrMode.videoCloud:
+          break;
+      }
+    }
   }
 
   static Future<void> applyWebRtcAnswer(String raw) => webrtc.applyAnswerQr(raw);
@@ -222,9 +286,11 @@ class NgmyDocShareSync {
     var text = raw.trim();
     if (text.startsWith('\uFEFF')) text = text.substring(1);
 
-    final shortToken = await NgmyDocShareShortCode.resolveStashToken(text);
-    if (shortToken != null && shortToken.isNotEmpty) {
-      text = '$kNgmyDocShareQrPrefixCloud|$shortToken';
+    if (NgmyDocShareShortCode.looksLikeShortCode(text)) {
+      final resolved = await NgmyDocShareShortCode.resolveSharePayload(text);
+      if (resolved != null && resolved.isNotEmpty) {
+        text = resolved;
+      }
     }
 
     if (text.startsWith('${kNgmyDocShareQrPrefixVideoCloud}|')) {

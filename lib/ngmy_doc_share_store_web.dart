@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_short_code.dart';
 
 Future<String> _downloadBytesWeb(List<int> bytes, String filename, {String mime = 'application/octet-stream'}) async {
   final safeName = filename.replaceAll(RegExp(r'[^\w\-.]+'), '_');
@@ -62,6 +63,7 @@ class NgmyDocShareStore {
       createdAt: DateTime.now().toUtc().toIso8601String(),
       note: note,
       fromSender: fromSender,
+      shortCode: NgmyDocShareShortCode.generateLocalCode(),
     );
     final key = _bytesPrefsKey(email, id);
     if (bytes.length <= _prefsMaxBytes) {
@@ -101,6 +103,7 @@ class NgmyDocShareStore {
         sizeBytes: entry.file.size,
         createdAt: DateTime.now().toUtc().toIso8601String(),
         note: 'From folder',
+        shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       _webFiles[id] = entry.file;
       items.add(item);

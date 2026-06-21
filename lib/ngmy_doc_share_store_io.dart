@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_short_code.dart';
 
 String _emailKey(String email) => email.toLowerCase().trim();
 
@@ -90,6 +91,7 @@ class NgmyDocShareStore {
       createdAt: DateTime.now().toUtc().toIso8601String(),
       note: note,
       fromSender: fromSender,
+      shortCode: NgmyDocShareShortCode.generateLocalCode(),
     );
     final root = await _userDir(email);
     final ext = _safeExt(item.name);
@@ -123,6 +125,7 @@ class NgmyDocShareStore {
         sizeBytes: bytes,
         createdAt: DateTime.now().toUtc().toIso8601String(),
         note: 'From folder',
+        shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       final userRoot = await _userDir(email);
       final ext = _safeExt(displayName);
@@ -161,6 +164,7 @@ class NgmyDocShareStore {
           sizeBytes: size,
           createdAt: DateTime.now().toUtc().toIso8601String(),
           note: note,
+          shortCode: NgmyDocShareShortCode.generateLocalCode(),
         );
         final root = await _userDir(email);
         final ext = _safeExt(name);

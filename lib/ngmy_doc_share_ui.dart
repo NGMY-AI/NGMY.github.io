@@ -81,15 +81,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     final items = await NgmyDocShareStore.list(widget.email);
     if (!mounted) return;
     setState(() => _items = items.reversed.toList());
-    unawaited(_backfillShortCodes(_items));
+    unawaited(_backfillLocalShortCodes(_items));
   }
 
-  Future<void> _backfillShortCodes(List<NgmyDocShareItem> items) async {
+  Future<void> _backfillLocalShortCodes(List<NgmyDocShareItem> items) async {
     for (final item in items) {
       if ((item.shortCode ?? '').trim().isNotEmpty) continue;
-      final code = await NgmyDocShareSync.ensureShortCodeForItem(ownerEmail: widget.email, item: item);
-      if (code == null || code.isEmpty) continue;
-      await NgmyDocShareStore.updateShortCode(widget.email, item.id, code);
+      final code = await NgmyDocShareSync.ensureLocalShortCodeForItem(ownerEmail: widget.email, item: item);
       if (!mounted) return;
       setState(() {
         final idx = _items.indexWhere((e) => e.id == item.id);
@@ -98,15 +96,21 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
   }
 
-  Future<void> _assignShortCodeForItem(NgmyDocShareItem item) async {
-    final code = await NgmyDocShareSync.ensureShortCodeForItem(ownerEmail: widget.email, item: item);
-    if (code == null || code.isEmpty) return;
-    await NgmyDocShareStore.updateShortCode(widget.email, item.id, code);
-    if (!mounted) return;
-    setState(() {
-      final idx = _items.indexWhere((e) => e.id == item.id);
-      if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: code);
-    });
+  Future<void> _copyShortCode(NgmyDocShareItem item) async {
+    final code = (item.shortCode ?? '').trim();
+    if (code.isEmpty) {
+      final assigned = await NgmyDocShareSync.ensureLocalShortCodeForItem(ownerEmail: widget.email, item: item);
+      if (!mounted) return;
+      setState(() {
+        final idx = _items.indexWhere((e) => e.id == item.id);
+        if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: assigned);
+      });
+      await Clipboard.setData(ClipboardData(text: assigned));
+      _toast('Code $assigned copied. Open Share via QR on sender phone first.');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: code.toUpperCase()));
+    _toast('Code ${code.toUpperCase()} copied');
   }
 
   void _toast(String msg) {
@@ -204,7 +208,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         final item = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: file);
         if (item != null) {
           added++;
-          await _assignShortCodeForItem(item);
         } else {
           skipped++;
         }
@@ -401,6 +404,15 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         return;
       }
       await _recordCreationIfNeeded();
+      await _refresh();
+      final shortCodes = batch
+          .map((b) {
+            final idx = _items.indexWhere((e) => e.id == b.id);
+            return (idx >= 0 ? _items[idx].shortCode : b.shortCode) ?? '';
+          })
+          .map((c) => c.trim().toUpperCase())
+          .where((c) => c.isNotEmpty)
+          .toList();
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
@@ -408,6 +420,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
             payload: created.qrPayload,
             fileCount: created.fileCount,
             mode: created.mode,
+            shortCodes: shortCodes,
           ),
         ),
       );
@@ -520,9 +533,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         },
       );
       if (imported == null || imported.isEmpty) {
-        final hint = scan.startsWith('N2|') || scan.contains('http://')
-            ? 'File did not arrive. Same Wi‑Fi or hotspot, keep sender screen open, then try again.'
-            : 'Could not restore files. Check the code and try again.';
+        String hint;
+        if (NgmyDocShareShortCode.looksLikeShortCode(scan)) {
+          hint = 'Code not active yet. Sender must tap Share via QR and keep that screen open.';
+        } else if (scan.startsWith('N2|') || scan.contains('http://')) {
+          hint = 'File did not arrive. Same Wi‑Fi or hotspot, keep sender screen open, then try again.';
+        } else {
+          hint = 'Could not restore files. Check the code and try again.';
+        }
         _toast(hint);
         return;
       }
@@ -704,9 +722,24 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          subtitle: Text(
-                            '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · Code ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
-                            style: TextStyle(color: c.muted, fontSize: 11),
+                          subtitle: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · Code ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
+                                  style: TextStyle(color: c.muted, fontSize: 11),
+                                ),
+                              ),
+                              if ((item.shortCode ?? '').trim().isNotEmpty)
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                  tooltip: 'Copy 6-digit code',
+                                  icon: Icon(Icons.copy_rounded, size: 16, color: c.muted),
+                                  onPressed: () => unawaited(_copyShortCode(item)),
+                                ),
+                            ],
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1127,11 +1160,13 @@ class _DocShareQrDisplayPage extends StatefulWidget {
     required this.payload,
     required this.fileCount,
     required this.mode,
+    this.shortCodes = const [],
   });
 
   final String payload;
   final int fileCount;
   final NgmyDocShareQrMode mode;
+  final List<String> shortCodes;
 
   @override
   State<_DocShareQrDisplayPage> createState() => _DocShareQrDisplayPageState();
@@ -1263,6 +1298,16 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
     }
   }
 
+  Future<void> _copyShortCodes(BuildContext context) async {
+    if (widget.shortCodes.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: widget.shortCodes.join(', ')));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Type-in code${widget.shortCodes.length > 1 ? 's' : ''} copied')),
+      );
+    }
+  }
+
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: widget.payload));
     if (context.mounted) {
@@ -1382,6 +1427,21 @@ class _DocShareQrDisplayPageState extends State<_DocShareQrDisplayPage> {
                         textAlign: TextAlign.center,
                         style: TextStyle(color: c.muted, fontSize: 12, height: 1.45),
                       ),
+                      if (widget.shortCodes.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.shortCodes.length == 1
+                              ? 'Type-in code: ${widget.shortCodes.first}'
+                              : 'Type-in codes: ${widget.shortCodes.join(', ')}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: c.muted, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _copyShortCodes(context),
+                          icon: const Icon(Icons.pin_rounded, size: 16),
+                          label: const Text('Copy 6-digit code'),
+                        ),
+                      ],
                       if (widget.mode == NgmyDocShareQrMode.lanDirect && _lanUrl != null) ...[
                         const SizedBox(height: 10),
                         Text(
