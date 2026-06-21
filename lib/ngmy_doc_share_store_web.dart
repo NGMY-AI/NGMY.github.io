@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_doc_share_blob_db_web.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_short_code.dart';
 
@@ -37,10 +38,59 @@ String _bytesPrefsKey(String email, String id) => 'ngmy_doc_share_blob_${_emailK
 
 String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
 
-const int _prefsMaxBytes = 3 * 1024 * 1024;
+const int _prefsMaxBytes = 512 * 1024; // legacy small-file prefs only; IndexedDB holds everything durable
 
 final Map<String, Uint8List> _memoryBlobs = {};
 final Map<String, html.File> _webFiles = {};
+
+Future<void> _persistBlob(String key, Uint8List bytes) async {
+  if (bytes.isEmpty) return;
+  _memoryBlobs[key] = bytes;
+  await ngmyDocShareIdbPut(key, bytes);
+}
+
+Future<Uint8List?> _loadBlob(String key) async {
+  final mem = _memoryBlobs[key];
+  if (mem != null && mem.isNotEmpty) return mem;
+  final idb = await ngmyDocShareIdbGet(key);
+  if (idb != null && idb.isNotEmpty) {
+    _memoryBlobs[key] = idb;
+    return idb;
+  }
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(key);
+  if (raw == null || raw.isEmpty) return null;
+  try {
+    final bytes = base64Decode(raw);
+    if (bytes.isNotEmpty) {
+      unawaited(_persistBlob(key, bytes));
+      await prefs.remove(key);
+    }
+    return bytes;
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<void> _persistHtmlFile(String email, String id, html.File file) async {
+  final key = _bytesPrefsKey(email, id);
+  try {
+    final reader = html.FileReader();
+    final done = Completer<ByteBuffer?>();
+    reader.onLoadEnd.listen((_) {
+      final result = reader.result;
+      done.complete(result is ByteBuffer ? result : null);
+    });
+    reader.onError.listen((_) => done.complete(null));
+    reader.readAsArrayBuffer(file);
+    final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
+    if (buf == null) return;
+    await _persistBlob(key, Uint8List.view(buf));
+    _webFiles.remove(id);
+  } catch (e) {
+    debugPrint('[doc share web persist] $e');
+  }
+}
 
 class NgmyDocShareStore {
   static Future<List<NgmyDocShareItem>> list(String email) => _readIndex(email);
@@ -66,16 +116,13 @@ class NgmyDocShareStore {
       shortCode: NgmyDocShareShortCode.generateLocalCode(),
     );
     final key = _bytesPrefsKey(email, id);
+    await _persistBlob(key, bytes);
+    // Keep tiny legacy mirror for very old builds only.
     if (bytes.length <= _prefsMaxBytes) {
-      final prefs = await SharedPreferences.getInstance();
       try {
-        final ok = await prefs.setString(key, base64Encode(bytes));
-        if (!ok) _memoryBlobs[key] = bytes;
-      } catch (_) {
-        _memoryBlobs[key] = bytes;
-      }
-    } else {
-      _memoryBlobs[key] = bytes;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(key, base64Encode(bytes));
+      } catch (_) {}
     }
     final items = await _readIndex(email)..add(item);
     await _writeIndex(email, items);
@@ -106,6 +153,7 @@ class NgmyDocShareStore {
         shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       _webFiles[id] = entry.file;
+      unawaited(_persistHtmlFile(email, id, entry.file));
       items.add(item);
       count++;
     }
@@ -184,20 +232,17 @@ class NgmyDocShareStore {
 
   static Future<Uint8List?> readBytes(String email, NgmyDocShareItem item) async {
     final key = _bytesPrefsKey(email, item.id);
-    final mem = _memoryBlobs[key];
-    if (mem != null) return mem;
+    final stored = await _loadBlob(key);
+    if (stored != null && stored.isNotEmpty) return stored;
     final webFile = _webFiles[item.id];
     if (webFile != null) {
-      return readByteRange(email, item, 0, webFile.size);
+      final range = await readByteRange(email, item, 0, webFile.size);
+      if (range != null && range.isNotEmpty) {
+        unawaited(_persistBlob(key, range));
+      }
+      return range;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(key);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      return base64Decode(raw);
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
   static Future<String?> filePath(String email, NgmyDocShareItem item) => Future.value(null);
@@ -295,6 +340,10 @@ class NgmyDocShareStore {
     await _patchShortCode(email, itemId, shortCode);
   }
 
+  static Future<void> updateStashToken(String email, String itemId, String stashToken) async {
+    await _patchStashToken(email, itemId, stashToken);
+  }
+
   static Future<void> delete(String email, String id) async {
     final items = await _readIndex(email);
     items.removeWhere((e) => e.id == id);
@@ -303,6 +352,7 @@ class NgmyDocShareStore {
     _webFiles.remove(id);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
+    await ngmyDocShareIdbDelete(key);
     await _writeIndex(email, items);
   }
 
@@ -354,5 +404,13 @@ Future<void> _patchShortCode(String email, String itemId, String shortCode) asyn
   final idx = items.indexWhere((e) => e.id == itemId);
   if (idx < 0) return;
   items[idx] = items[idx].copyWith(shortCode: shortCode);
+  await _writeIndex(email, items);
+}
+
+Future<void> _patchStashToken(String email, String itemId, String stashToken) async {
+  final items = await _readIndex(email);
+  final idx = items.indexWhere((e) => e.id == itemId);
+  if (idx < 0) return;
+  items[idx] = items[idx].copyWith(stashToken: stashToken);
   await _writeIndex(email, items);
 }

@@ -81,19 +81,43 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     final items = await NgmyDocShareStore.list(widget.email);
     if (!mounted) return;
     setState(() => _items = items.reversed.toList());
-    unawaited(_backfillLocalShortCodes(_items));
+    unawaited(_backfillShareMetadata(_items));
   }
 
-  Future<void> _backfillLocalShortCodes(List<NgmyDocShareItem> items) async {
+  Future<void> _backfillShareMetadata(List<NgmyDocShareItem> items) async {
     for (final item in items) {
-      if ((item.shortCode ?? '').trim().isNotEmpty) continue;
-      final code = await NgmyDocShareSync.ensureLocalShortCodeForItem(ownerEmail: widget.email, item: item);
-      if (!mounted) return;
-      setState(() {
-        final idx = _items.indexWhere((e) => e.id == item.id);
-        if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: code);
-      });
+      if ((item.shortCode ?? '').trim().isEmpty) {
+        final code = await NgmyDocShareSync.ensureLocalShortCodeForItem(ownerEmail: widget.email, item: item);
+        if (!mounted) return;
+        setState(() {
+          final idx = _items.indexWhere((e) => e.id == item.id);
+          if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: code);
+        });
+      }
+      if (!item.isVideo && (item.stashToken ?? '').trim().isEmpty) {
+        unawaited(NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item));
+      }
     }
+  }
+
+  Future<void> _scheduleCloudShareForItem(NgmyDocShareItem item) async {
+    if (item.isVideo) return;
+    await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
+    if (!mounted) return;
+    final fresh = await NgmyDocShareStore.list(widget.email);
+    NgmyDocShareItem? updated;
+    for (final e in fresh) {
+      if (e.id == item.id) {
+        updated = e;
+        break;
+      }
+    }
+    if (updated == null) return;
+    final saved = updated;
+    setState(() {
+      final idx = _items.indexWhere((e) => e.id == item.id);
+      if (idx >= 0) _items[idx] = saved;
+    });
   }
 
   Future<void> _copyShortCode(NgmyDocShareItem item) async {
@@ -106,7 +130,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         if (idx >= 0) _items[idx] = _items[idx].copyWith(shortCode: assigned);
       });
       await Clipboard.setData(ClipboardData(text: assigned));
-      _toast('Code $assigned copied. Open Share via QR on sender phone first.');
+      _toast('Code $assigned copied');
       return;
     }
     await Clipboard.setData(ClipboardData(text: code.toUpperCase()));
@@ -208,6 +232,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         final item = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: file);
         if (item != null) {
           added++;
+          unawaited(_scheduleCloudShareForItem(item));
         } else {
           skipped++;
         }
@@ -535,11 +560,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       if (imported == null || imported.isEmpty) {
         String hint;
         if (NgmyDocShareShortCode.looksLikeShortCode(scan)) {
-          hint = 'Code not active yet. Sender must tap Share via QR and keep that screen open.';
+          hint = 'Code not ready yet. Wait a few seconds after upload, then try again.';
         } else if (scan.startsWith('N2|') || scan.contains('http://')) {
           hint = 'File did not arrive. Same Wi‑Fi or hotspot, keep sender screen open, then try again.';
         } else {
-          hint = 'Could not restore files. Check the code and try again.';
+          hint = 'Could not restore files. Check connection and try again.';
         }
         _toast(hint);
         return;

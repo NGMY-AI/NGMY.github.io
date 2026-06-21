@@ -8,6 +8,7 @@ class NgmyDocShareItem {
     this.note,
     this.fromSender,
     this.shortCode,
+    this.stashToken,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class NgmyDocShareItem {
   final String? note;
   final String? fromSender;
   final String? shortCode;
+  final String? stashToken;
 
   bool get isImage => mime.startsWith('image/') || _extMatch(const ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp']);
 
@@ -46,6 +48,7 @@ class NgmyDocShareItem {
         if (note != null && note!.trim().isNotEmpty) 'note': note,
         if (fromSender != null && fromSender!.trim().isNotEmpty) 'fromSender': fromSender,
         if (shortCode != null && shortCode!.trim().isNotEmpty) 'shortCode': shortCode,
+        if (stashToken != null && stashToken!.trim().isNotEmpty) 'stashToken': stashToken,
       };
 
   factory NgmyDocShareItem.fromJson(Map<String, dynamic> json) => NgmyDocShareItem(
@@ -57,9 +60,16 @@ class NgmyDocShareItem {
         note: json['note']?.toString(),
         fromSender: json['fromSender']?.toString(),
         shortCode: json['shortCode']?.toString(),
+        stashToken: json['stashToken']?.toString(),
       );
 
-  NgmyDocShareItem copyWith({String? fromSender, String? note, String? shortCode}) => NgmyDocShareItem(
+  NgmyDocShareItem copyWith({
+    String? fromSender,
+    String? note,
+    String? shortCode,
+    String? stashToken,
+  }) =>
+      NgmyDocShareItem(
         id: id,
         name: name,
         mime: mime,
@@ -68,5 +78,6 @@ class NgmyDocShareItem {
         note: note ?? this.note,
         fromSender: fromSender ?? this.fromSender,
         shortCode: shortCode ?? this.shortCode,
+        stashToken: stashToken ?? this.stashToken,
       );
 }

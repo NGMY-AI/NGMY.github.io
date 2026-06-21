@@ -9,7 +9,7 @@ import 'ngmy_network_resilience.dart';
 /// Short QR prefix — full bundle lives in cloud stash (scannable like NGMY Advisors).
 const String kNgmyDocShareQrPrefixCloud = 'NGMYDOCSYNC1';
 
-const int kNgmyDocShareQrMaxUses = 25;
+const int kNgmyDocShareQrMaxUses = 100;
 
 /// Bundles larger than this use phone LAN instead of cloud stash.
 const int kNgmyDocShareCloudStashMaxBytes = 12 * 1024 * 1024;

@@ -59,6 +59,14 @@ Future<void> _patchShortCode(String email, String itemId, String shortCode) asyn
   await _writeIndex(email, items);
 }
 
+Future<void> _patchStashToken(String email, String itemId, String stashToken) async {
+  final items = await _readIndex(email);
+  final idx = items.indexWhere((e) => e.id == itemId);
+  if (idx < 0) return;
+  items[idx] = items[idx].copyWith(stashToken: stashToken);
+  await _writeIndex(email, items);
+}
+
 Future<File?> _fileForId(Directory root, String id) async {
   await for (final entity in root.list()) {
     if (entity is File && entity.uri.pathSegments.last.startsWith('$id.')) {
@@ -436,6 +444,10 @@ class NgmyDocShareStore {
 
   static Future<void> updateShortCode(String email, String itemId, String shortCode) async {
     await _patchShortCode(email, itemId, shortCode);
+  }
+
+  static Future<void> updateStashToken(String email, String itemId, String stashToken) async {
+    await _patchStashToken(email, itemId, stashToken);
   }
 
   static Future<void> delete(String email, String id) async {
