@@ -12,7 +12,6 @@ import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_video_cloud.dart' show NgmyDocShareVideoCloud, kNgmyDocShareQrPrefixVideoCloud;
 import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
-import 'ngmy_network_resilience.dart';
 
 const String kNgmyDocShareQrPrefixLan = 'N2';
 const String kNgmyDocShareQrPrefixLanLegacy = 'NGMYDOCSYNC2';
@@ -56,7 +55,7 @@ class NgmyDocShareSync {
 
     if (items.length == 1) {
       final existing = (items.first.stashToken ?? '').trim();
-      if (existing.isNotEmpty) {
+      if (existing.isNotEmpty && await NgmyDocShareQrStash.stashExists(existing)) {
         return (
           qrPayload: '$kNgmyDocShareQrPrefixCloud|$existing',
           fileCount: 1,
@@ -65,10 +64,8 @@ class NgmyDocShareSync {
       }
     }
 
-    if (await ngmyCanReachCloud()) {
-      final cloud = await _createCloudStashQr(ownerEmail: ownerEmail, items: items);
-      if (cloud != null) return cloud;
-    }
+    final cloud = await _createCloudStashQr(ownerEmail: ownerEmail, items: items);
+    if (cloud != null) return cloud;
 
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
@@ -116,12 +113,12 @@ class NgmyDocShareSync {
       await NgmyDocShareStore.updateStashToken(ownerEmail, items.first.id, stash.token);
     }
 
-    unawaited(registerShortCodesForShare(
+    await registerShortCodesForShare(
       ownerEmail: ownerEmail,
       items: items,
       qrPayload: stash.qrPayload,
       mode: NgmyDocShareQrMode.cloudStash,
-    ));
+    );
 
     return (
       qrPayload: stash.qrPayload,
@@ -130,27 +127,27 @@ class NgmyDocShareSync {
     );
   }
 
-  /// Background: upload one file to cloud stash + link typed code (no share screen needed).
-  static Future<void> ensureCloudShareForItem({
+  /// Uploads file to cloud + links typed code. Returns true when share is ready.
+  static Future<bool> ensureCloudShareForItem({
     required String ownerEmail,
     required NgmyDocShareItem item,
   }) async {
-    if (item.isVideo) return;
+    if (item.isVideo) return false;
     final token = (item.stashToken ?? '').trim();
     final code = await ensureLocalShortCodeForItem(ownerEmail: ownerEmail, item: item);
     if (token.isNotEmpty) {
-      await NgmyDocShareShortCode.registerForStash(
+      final registered = await NgmyDocShareShortCode.registerForStash(
         ownerEmail: ownerEmail,
         item: item,
         stashToken: token,
         code: code,
       );
-      return;
+      return registered && await NgmyDocShareQrStash.stashExists(token);
     }
-    if (!await ngmyCanReachCloud()) return;
     final bytes = await NgmyDocShareStore.readBytes(ownerEmail, item);
-    if (bytes == null || bytes.isEmpty) return;
-    await _createCloudStashQr(ownerEmail: ownerEmail, items: [item]);
+    if (bytes == null || bytes.isEmpty) return false;
+    final created = await _createCloudStashQr(ownerEmail: ownerEmail, items: [item]);
+    return created != null;
   }
 
   static bool payloadFitsBrandedQr(String payload) =>

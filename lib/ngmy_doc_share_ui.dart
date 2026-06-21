@@ -95,29 +95,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         });
       }
       if (!item.isVideo && (item.stashToken ?? '').trim().isEmpty) {
-        unawaited(NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item));
+        await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
+        if (!mounted) return;
       }
     }
-  }
-
-  Future<void> _scheduleCloudShareForItem(NgmyDocShareItem item) async {
-    if (item.isVideo) return;
-    await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
     if (!mounted) return;
     final fresh = await NgmyDocShareStore.list(widget.email);
-    NgmyDocShareItem? updated;
-    for (final e in fresh) {
-      if (e.id == item.id) {
-        updated = e;
-        break;
-      }
-    }
-    if (updated == null) return;
-    final saved = updated;
-    setState(() {
-      final idx = _items.indexWhere((e) => e.id == item.id);
-      if (idx >= 0) _items[idx] = saved;
-    });
+    setState(() => _items = fresh.reversed.toList());
   }
 
   Future<void> _copyShortCode(NgmyDocShareItem item) async {
@@ -232,7 +216,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         final item = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: file);
         if (item != null) {
           added++;
-          unawaited(_scheduleCloudShareForItem(item));
+          if (mounted) setState(() => _status = 'Preparing share…');
+          final ready = await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
+          if (!ready && mounted) {
+            _toast('Saved "${item.name}" — tap Share via QR once if code does not work yet.');
+          }
         } else {
           skipped++;
         }
@@ -560,11 +548,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       if (imported == null || imported.isEmpty) {
         String hint;
         if (NgmyDocShareShortCode.looksLikeShortCode(scan)) {
-          hint = 'Code not ready yet. Wait a few seconds after upload, then try again.';
+          hint = 'Invalid code or file no longer shared. Ask sender to re-upload the file.';
         } else if (scan.startsWith('N2|') || scan.contains('http://')) {
           hint = 'File did not arrive. Same Wi‑Fi or hotspot, keep sender screen open, then try again.';
         } else {
-          hint = 'Could not restore files. Check connection and try again.';
+          hint = 'Could not restore files. Ask sender to upload again, then scan or paste the new QR code.';
         }
         _toast(hint);
         return;
