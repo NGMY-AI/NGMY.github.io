@@ -4070,14 +4070,30 @@ Future<UserData?> _fetchCloudUserRow(String email) async {
   }
 }
 
-Future<bool> _pushUserBalanceToCloud(UserData u) async {
+Future<bool> _pushUserBalanceToCloud(UserData u, {bool allowDecrease = false}) async {
   if (!await ngmyCanReachCloud()) return false;
   final email = u.email.trim();
   if (email.isEmpty) return false;
+  final local = u.accountBalance.clamp(0.0, double.infinity);
   try {
+    if (!allowDecrease) {
+      final row = await Supabase.instance.client
+          .from('users')
+          .select('accountBalance')
+          .eq('email', email)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row != null) {
+        final cloud = (row['accountBalance'] ?? 0.0).toDouble();
+        if (cloud > local + 0.01) {
+          u.accountBalance = cloud;
+          return true;
+        }
+      }
+    }
     await Supabase.instance.client.from('users').upsert({
       'email': email,
-      'accountBalance': u.accountBalance.clamp(0.0, double.infinity),
+      'accountBalance': local,
     }).timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
@@ -8076,14 +8092,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
 
     if (_currentUser != null) {
-      await _applyAuthoritativeCloudProfile(_currentUser!);
-      await _refreshUserTransactionsFromCloud(force: true);
-      ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
-      final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-      if (idx >= 0) {
-        _allUsers[idx] = _currentUser!;
-      }
-      unawaited(_pushUserBalanceToCloud(_currentUser!));
+      unawaited(_syncSessionFromCloudAfterLogin(key));
     }
 
     ngmyMarkUserAsAppLoginAccount(_currentUser!);
@@ -8106,7 +8115,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _applyPendingReferralLink(_currentUser!);
     unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
     _restartSyncLoopsForCurrentUser();
-    unawaited(_refreshCurrentUserFromCloud());
     unawaited(_maybeUploadLocalProfilePhotoToCloud(_currentUser!));
   }
 
@@ -8353,9 +8361,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyWalletDecisionLedgerToTransactions();
         _seedWithdrawalHoldTxnIds();
         _reconcileAllUserBalances(ledgerSettled: true);
-        if (_currentUser != null) {
-          unawaited(_pushUserBalanceToCloud(_currentUser!));
-        }
       });
       unawaited(_persistLocalOnly());
     } catch (e) {
@@ -11410,6 +11415,54 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final crown = user.crownBadge.trim().toLowerCase();
     if (crown != 'king' && crown != 'queen') {
       ngmyApplyAdminCrownOverride(_config, user);
+    }
+  }
+
+  /// After login: pull advisors, management lists, full user row, and transactions
+  /// before showing balance — never push a lower balance to the cloud.
+  Future<void> _syncSessionFromCloudAfterLogin(String emailKey) async {
+    if (_currentUser == null || !await ngmyCanReachCloud()) return;
+    try {
+      await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+      await ngmyHydrateManagementListsFromAllBackups(_config);
+
+      double cloudStoredBalance = _currentUser!.accountBalance;
+      final cloudUser = await _fetchCloudUserRow(_currentUser!.email);
+      if (cloudUser != null) {
+        cloudStoredBalance = cloudUser.accountBalance;
+        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailKey);
+        final local = idx >= 0 ? _allUsers[idx] : _currentUser!;
+        cloudUser.passwordHash = _currentUser!.passwordHash;
+        if (ngmyEmailIsAdmin(emailKey)) cloudUser.isAdmin = true;
+        _preserveLocalSessionState(local, cloudUser);
+        _mergeUserMediaProfileFields(local, cloudUser);
+        await _applyAuthoritativeCloudProfile(cloudUser);
+        _currentUser = cloudUser;
+        if (idx >= 0) _allUsers[idx] = cloudUser;
+      }
+
+      await _refreshUserTransactionsFromCloud(force: true);
+      if (_currentUser == null || !mounted) return;
+
+      ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
+      if (_currentUser!.accountBalance < cloudStoredBalance - 0.01) {
+        _currentUser!.accountBalance = cloudStoredBalance;
+      }
+      final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailKey);
+      if (idx >= 0) {
+        _allUsers[idx].accountBalance = _currentUser!.accountBalance;
+        _allUsers[idx].crownBadge = _currentUser!.crownBadge;
+        _allUsers[idx].status = _currentUser!.status;
+        if ((_currentUser!.profilePicturePath ?? '').trim().isNotEmpty) {
+          _allUsers[idx].profilePicturePath = _currentUser!.profilePicturePath;
+        }
+      }
+
+      _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
+      if (mounted) setState(() {});
+      await _persistLocalOnly();
+    } catch (e, st) {
+      debugPrint('[login] cloud session sync: $e\n$st');
     }
   }
 
@@ -41722,6 +41775,7 @@ class MediaHubScreen extends StatelessWidget {
       config: config,
       apiKey: config.geminiApiKey,
       onDataChanged: onDataChanged,
+      onHydrateSettings: () => ngmyHydrateCommunicateSettingsFromAllBackups(config),
       onPersistConfig: () => ngmyAdminPersistManagementConfig(config),
       onChargeWallet: user.isAdmin
           ? null

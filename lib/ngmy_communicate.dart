@@ -801,6 +801,7 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
   final Future<bool> Function(double amount, String description)? onChargeWallet;
   final VoidCallback? onDataChanged;
   final Future<bool> Function()? onPersistConfig;
+  final Future<void> Function()? onHydrateSettings;
 
   const NgmyCommunicateWorldScreen({
     super.key,
@@ -811,6 +812,7 @@ class NgmyCommunicateWorldScreen extends StatefulWidget {
     this.onChargeWallet,
     this.onDataChanged,
     this.onPersistConfig,
+    this.onHydrateSettings,
   });
 
   @override
@@ -874,8 +876,12 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   }
 
   Future<void> _prepAvatars() async {
+    await widget.onHydrateSettings?.call();
     await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      widget.onDataChanged?.call();
+    }
   }
 
   @override

@@ -906,8 +906,21 @@ Map<String, dynamic> _communicateSettingsPayload(AppConfig config) => {
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
+bool _communicateProfilesEffectivelyEmpty(AppConfig config) {
+  if (config.communicateProfiles.isEmpty) return true;
+  for (final raw in config.communicateProfiles) {
+    if (raw is! Map) continue;
+    final id = (raw['id'] ?? '').toString().trim();
+    if (id.isEmpty) continue;
+    if (raw['active'] == false) continue;
+    return false;
+  }
+  return true;
+}
+
 void _applyCommunicateSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
-  if (ngmyShouldDeferRemoteConfigOverwrite()) return;
+  final localEmpty = _communicateProfilesEffectivelyEmpty(config);
+  if (ngmyShouldDeferRemoteConfigOverwrite() && !localEmpty) return;
   if (payload.containsKey('communicateEnabled')) {
     config.communicateEnabled = payload['communicateEnabled'] == true;
   }
