@@ -81,13 +81,15 @@ String ngmyAuthReachabilityMessage(Object err) {
     return 'Still connecting to the server. Wait a few seconds and try again.';
   }
   if (text.contains('timeout') || text.contains('timed out')) {
-    return 'Connection timed out. Check your internet and try again.';
+    return 'Connection timed out. Library and school Wi-Fi often block NGMY — try mobile data or home internet.';
   }
   if (text.contains('socket') ||
       text.contains('failed host lookup') ||
       text.contains('connection refused') ||
-      text.contains('network is unreachable')) {
-    return 'Could not reach the server. Check your internet and try again in a few seconds.';
+      text.contains('network is unreachable') ||
+      text.contains('clientexception') ||
+      text.contains('xmlhttprequest error')) {
+    return 'Could not reach the NGMY server. This Wi-Fi network may be blocking the app (common in libraries and schools). Try mobile data or home internet.';
   }
-  return 'Could not sign in from the server right now. Try again in a few seconds.';
+  return 'Could not sign in from the server right now. If you are on library Wi-Fi, try mobile data or home internet.';
 }

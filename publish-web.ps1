@@ -161,6 +161,12 @@ if (Test-Path $swTemplate) {
 
 $mainJs = Join-Path $PSScriptRoot "docs\main.dart.js"
 $mainJsSize = if (Test-Path $mainJs) { (Get-Item $mainJs).Length } else { 0 }
+$ogShare = Join-Path $PSScriptRoot "docs\og-share.png"
+if (-not (Test-Path $ogShare)) {
+    Write-Warning "Missing docs/og-share.png - social link previews will not show the NGMY logo."
+} else {
+    Write-Host "  og-share.png ready for Instagram/Facebook previews" -ForegroundColor DarkGray
+}
 Write-Host "  main.dart.js size: $mainJsSize bytes"
 Write-Host "  version.json build_number: $DeployId"
 

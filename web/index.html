@@ -59,6 +59,30 @@
 
   <meta name="description" content="Next Generation - Make Yours">
 
+  <link rel="canonical" href="https://ngmy.org/">
+
+  <!-- Link preview: Instagram, Facebook, iMessage, WhatsApp, etc. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NGMY">
+  <meta property="og:url" content="https://ngmy.org/">
+  <meta property="og:title" content="NGMY">
+  <meta property="og:description" content="Next Generation - Make Yours">
+  <meta property="og:image" content="https://ngmy.org/og-share.png">
+  <meta property="og:image:secure_url" content="https://ngmy.org/og-share.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="NGMY logo">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NGMY">
+  <meta name="twitter:description" content="Next Generation - Make Yours">
+  <meta name="twitter:image" content="https://ngmy.org/og-share.png">
+
+  <meta itemprop="name" content="NGMY">
+  <meta itemprop="description" content="Next Generation - Make Yours">
+  <meta itemprop="image" content="https://ngmy.org/og-share.png">
+
   <meta name="mobile-web-app-capable" content="yes">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -341,7 +365,7 @@
 
         if (err) err.style.display = "flex";
 
-        if (msgEl) msgEl.textContent = msg || "Clear site data for this URL, then reload.";
+        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps — try mobile data or home internet.";
 
       }
 
@@ -402,7 +426,7 @@
       ];
 
       function showBootstrapError(hint) {
-        var msg = hint || 'Could not open NGMY. Open once with Wi-Fi on, wait for the home screen, then try again.';
+        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login — try home internet or cellular data.';
         window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
       }
 
@@ -628,7 +652,7 @@
 
       function startApp() {
         var bootTimer = setTimeout(function () {
-          showBootstrapError('NGMY is still loading. Please wait up to 3 minutes on iPhone, then tap Reload.');
+          showBootstrapError('NGMY is still loading. On library or school Wi-Fi, try mobile data. Otherwise wait up to 3 minutes, then tap Reload.');
         }, 180000);
         window.addEventListener('flutter-first-frame', function () { clearTimeout(bootTimer); }, { once: true });
 
@@ -653,7 +677,7 @@
           }
           return offlineShellReady(cache).then(function (ready) {
             if (ready) return runBootstrapFromCache(cache);
-            showBootstrapError('Open NGMY once with Wi-Fi on, wait for the home screen, then you can use it offline.');
+            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. Library Wi-Fi may block the server.');
           });
         }).catch(function () {
           window.__ngmyHideSplash && window.__ngmyHideSplash();

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_network_resilience_io.dart' if (dart.library.html) 'ngmy_network_resilience_io_stub.dart';
 import 'ngmy_network_resilience_web_stub.dart' if (dart.library.html) 'ngmy_network_resilience_web.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_supabase_config.dart';
 
 /// Max wait for cloud reads on startup / refresh (slow Wi‑Fi should fall back to cache).
 const Duration kNgmyCloudLoadTimeout = Duration(seconds: 12);
@@ -38,8 +39,13 @@ Future<bool> ngmyCanReachCloud() async {
 Future<bool> _probeReachability() async {
   try {
     if (kIsWeb) {
-      final uri = Uri.parse('${_webVersionJsonUrl()}?t=${DateTime.now().millisecondsSinceEpoch}');
-      return await ngmyWebFetchOk(uri.toString(), kNgmyReachabilityTimeout);
+      final versionOk = await ngmyWebFetchOk(_webVersionJsonUrl(), kNgmyReachabilityTimeout);
+      if (!versionOk) return false;
+      final supabaseOk = await ngmyWebFetchOk(
+        '${kNgmySupabaseUrl}/rest/v1/',
+        kNgmyReachabilityTimeout,
+      );
+      return supabaseOk;
     }
     return await ngmyNativeReachabilityProbe(kNgmyReachabilityTimeout);
   } catch (_) {
