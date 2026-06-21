@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Bumped after wallet balance changes so all screens repaint instantly.
+String _ngmyEmailKey(String email) => email.toLowerCase().trim();
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 
 /// Authoritative live balance per user email (lowercase). Updated on every ledger change.
@@ -10,40 +9,6 @@ final ValueNotifier<Map<String, double>> ngmyLiveBalanceCache = ValueNotifier<Ma
 
 /// True after the signed-in user's full transaction ledger has synced from cloud.
 bool ngmyUserWalletLedgerSettled = false;
-
-const String _kNgmyVerifiedBalancePrefix = 'ngmy_verified_balance_';
-
-String _ngmyEmailKey(String email) => email.toLowerCase().trim();
-
-Future<double?> ngmyLoadVerifiedWalletBalance(String email) async {
-  final key = _ngmyEmailKey(email);
-  if (key.isEmpty) return null;
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getDouble('$_kNgmyVerifiedBalancePrefix$key');
-  } catch (_) {
-    return null;
-  }
-}
-
-Future<void> ngmySaveVerifiedWalletBalance(String email, double balance) async {
-  final key = _ngmyEmailKey(email);
-  if (key.isEmpty) return;
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('$_kNgmyVerifiedBalancePrefix$key', balance);
-  } catch (_) {}
-}
-
-/// While the ledger is still syncing, show only the last cloud-verified balance.
-double ngmyCapWalletBalanceIfUnsettled({
-  required double balance,
-  required double? verifiedCap,
-  required bool ledgerSettled,
-}) {
-  if (ledgerSettled || verifiedCap == null) return balance;
-  return verifiedCap;
-}
 
 void _ngmyWriteLiveBalance(String email, double balance, {required bool allowIncrease}) {
   final key = _ngmyEmailKey(email);
@@ -69,7 +34,9 @@ void ngmyNotifyBalanceChanged({String? email, double? balance, bool allowIncreas
 }
 
 /// Keep live balance cache aligned with a ledger balance value.
-void ngmySyncLiveBalanceFor(String email, double balance, {bool allowIncrease = true}) {
+/// While the ledger is still syncing, the on-screen balance stays frozen.
+void ngmySyncLiveBalanceFor(String email, double balance, {bool allowIncrease = true, bool force = false}) {
+  if (!force && !ngmyUserWalletLedgerSettled) return;
   ngmyNotifyBalanceChanged(email: email, balance: balance, allowIncrease: allowIncrease);
 }
 

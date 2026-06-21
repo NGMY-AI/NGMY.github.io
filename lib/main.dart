@@ -337,26 +337,8 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
       }
     }
 
-    final verifiedByEmail = <String, double>{};
     for (final u in users) {
-      final key = ngmyNormalizeEmail(u.email);
-      if (key.isEmpty) continue;
-      final stored = u.accountBalance.clamp(0.0, double.infinity);
-      final localVerified = await ngmyLoadVerifiedWalletBalance(u.email);
-      if (localVerified != null) {
-        verifiedByEmail[key] = math.min(localVerified, stored);
-      } else {
-        verifiedByEmail[key] = stored;
-      }
-    }
-
-    for (final u in users) {
-      ngmyReconcileUserAccountBalance(
-        u,
-        transactions,
-        verifiedCap: verifiedByEmail[ngmyNormalizeEmail(u.email)],
-        ledgerSettled: false,
-      );
+      ngmyReconcileUserAccountBalance(u, transactions);
     }
     if (currentUser != null) {
       final key = currentUser!.email.toLowerCase().trim();
@@ -701,22 +683,24 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
 double ngmyResolveAccountBalance(
   String email,
   double storedBalance,
-  List<AppTransaction> transactions, {
-  double? verifiedCap,
-  bool ledgerSettled = true,
-}) {
+  List<AppTransaction> transactions,
+) {
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
   final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
-  final resolved = txnCount == 0
-      ? storedBalance.clamp(0.0, double.infinity)
-      : ledger;
-  return ngmyCapWalletBalanceIfUnsettled(
-    balance: resolved,
-    verifiedCap: verifiedCap,
-    ledgerSettled: ledgerSettled,
-  ).clamp(0.0, double.infinity);
+  if (txnCount == 0) {
+    return storedBalance.clamp(0.0, double.infinity);
+  }
+  return ledger;
+}
+
+void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
+  user.accountBalance = ngmyResolveAccountBalance(
+    user.email,
+    user.accountBalance,
+    transactions,
+  );
 }
 
 /// Admin dashboard balance — cloud [accountBalance] is synced after every wallet change; the admin
@@ -730,21 +714,6 @@ double ngmyAdminDisplayBalance(UserData u, List<AppTransaction> transactions) {
   final ledger = ngmyBalanceFromApprovedTransactions(u.email, userTxns);
   if (stored > ledger + 0.01) return stored.clamp(0.0, double.infinity);
   return ledger;
-}
-
-void ngmyReconcileUserAccountBalance(
-  UserData user,
-  List<AppTransaction> transactions, {
-  double? verifiedCap,
-  bool ledgerSettled = true,
-}) {
-  user.accountBalance = ngmyResolveAccountBalance(
-    user.email,
-    user.accountBalance,
-    transactions,
-    verifiedCap: verifiedCap,
-    ledgerSettled: ledgerSettled,
-  );
 }
 
 bool ngmyIsGameLedgerTransaction(AppTransaction t) {
@@ -940,9 +909,9 @@ AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction re
   );
 }
 
-/// Replace a user's wallet deposit/withdraw rows with cloud truth, keeping only
-/// unsynced local pending rows so balances cannot drift between devices.
-List<AppTransaction> ngmyReplaceUserWalletTransactionsFromCloud(
+/// Replace all of a user's transaction rows with cloud truth, keeping only unsynced
+/// local pending rows so balances cannot drift between devices.
+List<AppTransaction> ngmyReplaceUserTransactionsFromCloud(
   List<AppTransaction> all,
   String email,
   List<AppTransaction> cloudTxns, {
@@ -951,22 +920,16 @@ List<AppTransaction> ngmyReplaceUserWalletTransactionsFromCloud(
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return all;
   final dirty = dirtyTransactionIds ?? const {};
-  final cloudWallet = cloudTxns
-      .where((t) => ngmyNormalizeEmail(t.userEmail) == key && ngmyIsWalletDepositOrWithdraw(t))
-      .toList();
-  final cloudIds = cloudWallet.map((t) => t.id).where((id) => id.isNotEmpty).toSet();
+  final cloudOwn = cloudTxns.where((t) => ngmyNormalizeEmail(t.userEmail) == key).toList();
+  final cloudIds = cloudOwn.map((t) => t.id).where((id) => id.isNotEmpty).toSet();
   final localPendingOnly = all.where((t) {
     if (ngmyNormalizeEmail(t.userEmail) != key) return false;
-    if (!ngmyIsWalletDepositOrWithdraw(t)) return false;
-    if (t.id.isEmpty) return false;
+    if (t.id.isEmpty) return true;
     if (cloudIds.contains(t.id)) return false;
     return dirty.contains(t.id) || t.status == TransactionStatus.pending;
   }).toList();
-  final preserved = all.where((t) {
-    if (ngmyNormalizeEmail(t.userEmail) != key) return true;
-    return !ngmyIsWalletDepositOrWithdraw(t);
-  }).toList();
-  return [...preserved, ...cloudWallet, ...localPendingOnly]
+  final preserved = all.where((t) => ngmyNormalizeEmail(t.userEmail) != key).toList();
+  return [...preserved, ...cloudOwn, ...localPendingOnly]
     ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 }
 
@@ -7347,7 +7310,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   final Set<String> _dirtyTransactionIds = {};
   Map<String, int> _walletDecisionLedger = {};
   final Set<String> _withdrawalHoldTxnIds = {};
-  final Map<String, double> _verifiedWalletBalanceByEmail = {};
   bool _userWalletLedgerSettled = false;
   DateTime? _lastCurrentUserCloudRefresh;
   DateTime? _lastUserTxnCloudRefresh;
@@ -7903,7 +7865,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (key.isEmpty) return;
     await _clearLoggedOutFlag();
     _resetWalletLedgerSyncState();
-    await _hydrateVerifiedWalletBalancesForUsers(_allUsers);
 
     var index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
     if (index >= 0) {
@@ -7916,15 +7877,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final remote = UserData.fromJson(row);
           remote.passwordHash = passwordHash;
           if (ngmyEmailIsAdmin(key)) remote.isAdmin = true;
-          await _applyCloudVerifiedCapForEmail(email);
+          remote.accountBalance = local.accountBalance;
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
-          ngmyReconcileUserAccountBalance(
-            remote,
-            _allTransactions,
-            verifiedCap: _verifiedCapForEmail(remote.email),
-            ledgerSettled: false,
-          );
+          ngmyReconcileUserAccountBalance(remote, _allTransactions);
           _allUsers[index] = remote;
           _currentUser = remote;
         } else {
@@ -8210,7 +8166,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _refreshWalletDecisionLedger();
       setState(() {
         if (!_ngmySessionIsAdmin(_currentUser)) {
-          _allTransactions = ngmyReplaceUserWalletTransactionsFromCloud(
+          _allTransactions = ngmyReplaceUserTransactionsFromCloud(
             _allTransactions,
             _currentUser!.email,
             remote,
@@ -8232,7 +8188,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _seedWithdrawalHoldTxnIds();
         _reconcileAllUserBalances(ledgerSettled: true);
       });
-      unawaited(_applyCloudVerifiedCapForEmail(_currentUser!.email));
       unawaited(_persistLocalOnly());
     } catch (e) {
       debugPrint('[user] transactions refresh: $e');
@@ -8322,6 +8277,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _hydrateFromLaunchBootstrap(NgmyLaunchBootstrap b) {
+    _resetWalletLedgerSyncState();
     _themeMode = b.themeMode;
     _currentUser = b.currentUser;
     if (b.users.isNotEmpty) _allUsers = List<UserData>.from(b.users);
@@ -8548,7 +8504,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
       if (!mounted) return;
-      await _applyCloudVerifiedCapForEmail(email);
+      remote.accountBalance = _currentUser!.accountBalance;
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx >= 0) {
@@ -11055,6 +11011,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _allUsers.add(updatedUser);
           } else {
             final local = _allUsers[idx];
+            updatedUser.accountBalance = local.accountBalance;
             updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
             _preserveLocalSessionState(local, updatedUser);
             _mergeUserMediaProfileFields(local, updatedUser);
@@ -11075,7 +11032,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               ngmySyncLiveBalanceFor(
                 _currentUser!.email,
                 _currentUser!.accountBalance,
-                allowIncrease: ngmyUserWalletLedgerSettled,
+                allowIncrease: true,
+                force: true,
               );
               final remotePhoto = (updatedUser.profilePicturePath ?? '').trim();
               if (_ngmyIsCloudProfilePhoto(remotePhoto)) {
@@ -11085,6 +11043,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               }
             } else {
               updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
+              updatedUser.accountBalance = _currentUser!.accountBalance;
               _preserveLocalSessionState(_currentUser!, updatedUser);
               _ngmyReconcileClockInSession(updatedUser, _allTransactions);
               ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
@@ -11092,11 +11051,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               ngmySyncLiveBalanceFor(
                 _currentUser!.email,
                 _currentUser!.accountBalance,
-                allowIncrease: ngmyUserWalletLedgerSettled,
+                allowIncrease: true,
+                force: ngmyUserWalletLedgerSettled,
               );
             }
           }
-          ngmyReconcileUserAccountBalance(updatedUser, _allTransactions);
+          final listIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+          if (listIdx >= 0) {
+            ngmyReconcileUserAccountBalance(_allUsers[listIdx], _allTransactions);
+          }
         });
         unawaited(NgmyAnnouncementReads.saveLocal(email, updatedUser.readAnnouncementIds.toSet()));
         SharedPreferences.getInstance().then((prefs) {
@@ -11209,7 +11172,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           ngmySyncLiveBalanceFor(
             _currentUser!.email,
             _currentUser!.accountBalance,
-            allowIncrease: ngmyUserWalletLedgerSettled,
+            allowIncrease: true,
+            force: _userWalletLedgerSettled,
           );
           final userIdx = _allUsers.indexWhere(
             (u) => ngmyNormalizeEmail(u.email) == ngmyNormalizeEmail(_currentUser!.email),
@@ -11322,95 +11286,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _userWalletLedgerSettled = true;
       ngmyUserWalletLedgerSettled = true;
     }
-    final settled = ledgerSettled || _userWalletLedgerSettled;
     for (final u in _allUsers) {
-      ngmyReconcileUserAccountBalance(
-        u,
-        _allTransactions,
-        verifiedCap: _verifiedCapForEmail(u.email),
-        ledgerSettled: settled,
-      );
+      ngmyReconcileUserAccountBalance(u, _allTransactions);
     }
     if (_currentUser != null) {
       final key = _currentUser!.email.toLowerCase().trim();
       final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
       if (idx >= 0) _currentUser = _allUsers[idx];
-      if (ledgerSettled) {
-        unawaited(_persistVerifiedWalletBalanceForUser(_currentUser!));
-        unawaited(_pushReconciledBalanceToCloud(_currentUser!));
-      }
       ngmySyncLiveBalanceFor(
         _currentUser!.email,
         _currentUser!.accountBalance,
-        allowIncrease: settled,
+        allowIncrease: true,
+        force: ledgerSettled,
       );
     }
-  }
-
-  Future<void> _hydrateVerifiedWalletBalancesForUsers(Iterable<UserData> users) async {
-    for (final u in users) {
-      final key = ngmyNormalizeEmail(u.email);
-      if (key.isEmpty) continue;
-      final stored = u.accountBalance.clamp(0.0, double.infinity);
-      final localVerified = await ngmyLoadVerifiedWalletBalance(u.email);
-      final candidate = localVerified != null ? math.min(localVerified, stored) : stored;
-      _mergeVerifiedWalletCap(key, candidate);
-    }
-  }
-
-  void _mergeVerifiedWalletCap(String key, double candidate) {
-    if (key.isEmpty) return;
-    final existing = _verifiedWalletBalanceByEmail[key];
-    if (existing == null || candidate < existing - 0.001) {
-      _verifiedWalletBalanceByEmail[key] = candidate;
-    }
-  }
-
-  Future<void> _applyCloudVerifiedCapForEmail(String email) async {
-    if (!await ngmyCanReachCloud()) return;
-    final raw = email.trim();
-    final key = ngmyNormalizeEmail(raw);
-    if (key.isEmpty) return;
-    try {
-      final row = await supabase
-          .from('users')
-          .select('accountBalance')
-          .eq('email', raw)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return;
-      final cloud = (row['accountBalance'] ?? 0.0).toDouble().clamp(0.0, double.infinity);
-      _mergeVerifiedWalletCap(key, cloud);
-    } catch (e) {
-      debugPrint('[wallet] cloud cap fetch: $e');
-    }
-  }
-
-  Future<void> _pushReconciledBalanceToCloud(UserData user) async {
-    if (!await ngmyCanReachCloud()) return;
-    final email = user.email.trim();
-    final key = ngmyNormalizeEmail(email);
-    if (key.isEmpty) return;
-    final balance = user.accountBalance.clamp(0.0, double.infinity);
-    try {
-      await supabase.from('users').upsert({
-        'email': email,
-        'accountBalance': balance,
-      }).timeout(kNgmyCloudWriteTimeout);
-      _verifiedWalletBalanceByEmail[key] = balance;
-      await ngmySaveVerifiedWalletBalance(email, balance);
-    } catch (e) {
-      debugPrint('[wallet] balance push: $e');
-    }
-  }
-
-  double? _verifiedCapForEmail(String email) => _verifiedWalletBalanceByEmail[ngmyNormalizeEmail(email)];
-
-  Future<void> _persistVerifiedWalletBalanceForUser(UserData user) async {
-    final key = ngmyNormalizeEmail(user.email);
-    if (key.isEmpty) return;
-    _verifiedWalletBalanceByEmail[key] = user.accountBalance;
-    await ngmySaveVerifiedWalletBalance(user.email, user.accountBalance);
   }
 
   void _resetWalletLedgerSyncState() {
@@ -11438,6 +11327,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _loadData() async {
+    _resetWalletLedgerSyncState();
     try {
       final prefs = await SharedPreferences.getInstance();
       await ngmyLoadAppLoginUserRegistry();
@@ -11583,10 +11473,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         }
       }
-      await _hydrateVerifiedWalletBalancesForUsers(_allUsers);
-      if (_currentUser != null) {
-        await _applyCloudVerifiedCapForEmail(_currentUser!.email);
-      }
       _reconcileAllUserBalances();
 
       if (mounted) {
@@ -11631,7 +11517,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         debugPrint('[ngmy] offline or slow network — using cached local data');
         if (localMedia.isNotEmpty) _allMedia = localMedia;
         if (localAnnouncements.isNotEmpty) _allAnnouncements = localAnnouncements;
-        await _hydrateVerifiedWalletBalancesForUsers(_allUsers);
         if (mounted) {
           setState(() => _reconcileAllUserBalances(ledgerSettled: true));
         }
@@ -11670,6 +11555,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final remote = UserData.fromJson(Map<String, dynamic>.from(row));
             ngmyRegisterAppLoginUser(sessionEmail);
             final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
+            final localBefore = idx >= 0 ? _allUsers[idx] : localUsersBeforeFetch[sessionEmail];
+            if (localBefore != null) {
+              remote.accountBalance = localBefore.accountBalance;
+            }
             if (idx >= 0) {
               _preserveLocalSessionState(_allUsers[idx], remote);
               _allUsers[idx] = remote;
@@ -11709,13 +11598,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (remoteTransactions.isNotEmpty || !bootstrapAdmin) {
           await _refreshWalletDecisionLedger();
           if (!bootstrapAdmin && sessionEmail.isNotEmpty) {
-            _allTransactions = ngmyReplaceUserWalletTransactionsFromCloud(
+            _allTransactions = ngmyReplaceUserTransactionsFromCloud(
               _allTransactions,
               sessionEmail,
               remoteTransactions,
               dirtyTransactionIds: _dirtyTransactionIds,
             );
-            await _applyCloudVerifiedCapForEmail(sessionEmail);
           } else {
             _allTransactions = _mergeTransactionsWithRemote(
               _allTransactions,
@@ -12448,12 +12336,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                           (t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) {
                         _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
                       }
-                      ngmyReconcileUserAccountBalance(
-                        _allUsers[userIdx],
-                        _allTransactions,
-                        verifiedCap: _verifiedCapForEmail(_allUsers[userIdx].email),
-                        ledgerSettled: _userWalletLedgerSettled,
-                      );
+                      ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == userKey) {
                         _currentUser = _allUsers[userIdx];
@@ -12475,9 +12358,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       balance: syncedUser!.accountBalance,
                       allowIncrease: true,
                     );
-                    if (_userWalletLedgerSettled) {
-                      unawaited(_persistVerifiedWalletBalanceForUser(syncedUser!));
-                    }
                   } else {
                     ngmyNotifyBalanceChanged();
                   }
@@ -12591,9 +12471,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       balance: syncedUser!.accountBalance,
                       allowIncrease: true,
                     );
-                    if (_userWalletLedgerSettled) {
-                      unawaited(_persistVerifiedWalletBalanceForUser(syncedUser!));
-                    }
                   } else {
                     ngmyNotifyBalanceChanged();
                   }
