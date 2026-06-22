@@ -711,6 +711,7 @@ class NgmyCommunicateSyncService {
     required bool isAdmin,
     required String raw,
     bool restoreHelper = false,
+    bool helperOnly = false,
   }) async {
     final bundle = await NgmyAdvisorSyncBundle.parseAsync(raw);
     if (bundle == null) return null;
@@ -741,6 +742,7 @@ class NgmyCommunicateSyncService {
     var threadCount = 0;
     var messageCount = 0;
     var avatarsRestored = 0;
+    if (!helperOnly) {
     for (final thread in bundle.threads) {
       if (thread.profileId.isEmpty || thread.messages.isEmpty) continue;
       await _mergeProfileSnapshotIntoConfig(config, thread);
@@ -789,14 +791,15 @@ class NgmyCommunicateSyncService {
       threadCount += 1;
       messageCount += thread.messages.length;
     }
-    if (avatarsRestored > 0) {
+    }
+    if (!helperOnly && avatarsRestored > 0) {
       await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config);
     }
-    if (threadCount > 0) {
+    if (!helperOnly && threadCount > 0) {
       await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config);
     }
     var helperCount = 0;
-    if (restoreHelper && bundle.helperMessages.isNotEmpty) {
+    if ((restoreHelper || helperOnly) && bundle.helperMessages.isNotEmpty) {
       helperCount = await NgmyAiMemoryStore.restoreMerged(email, bundle.helperMessages);
     }
 

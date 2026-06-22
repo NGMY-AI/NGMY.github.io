@@ -154,7 +154,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
     return ngmyPickBackupJsonViaBrowser();
   }
 
-  Future<void> _importRaw(String raw, {bool restoreHelper = false}) async {
+  Future<void> _importRaw(String raw, {bool restoreHelper = false, bool helperOnly = false}) async {
     await _withWork(() async {
       try {
         final result = await NgmyCommunicateSyncService.importBundle(
@@ -162,19 +162,29 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
           config: widget.config,
           isAdmin: widget.isAdmin,
           raw: raw,
-          restoreHelper: restoreHelper,
+          restoreHelper: restoreHelper || helperOnly,
+          helperOnly: helperOnly,
         );
         if (!mounted) return;
         if (result == null) {
-          _toast('No conversations found in that backup.');
+          _toast(helperOnly
+              ? 'No NGMY Helper messages found in that backup.'
+              : 'No conversations found in that backup.');
           return;
         }
         widget.onRestored?.call();
         await ngmyWarmCommunicateAvatarsFromConfig(widget.config);
         if (mounted) setState(() {});
-        var msg = 'Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}. Profile photos included when available.';
-        if (result.helperMessages > 0) {
-          msg += ' NGMY Helper chat restored (${result.helperMessages} messages).';
+        String msg;
+        if (helperOnly) {
+          msg = result.helperMessages > 0
+              ? 'Restored ${result.helperMessages} NGMY Helper message${result.helperMessages == 1 ? '' : 's'}.'
+              : 'No NGMY Helper messages in that QR.';
+        } else {
+          msg = 'Restored ${result.messages} messages across ${result.threads} advisor${result.threads == 1 ? '' : 's'}. Profile photos included when available.';
+          if (result.helperMessages > 0) {
+            msg += ' NGMY Helper chat restored (${result.helperMessages} messages).';
+          }
         }
         _toast(msg);
         await _refresh();
@@ -182,7 +192,9 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         if (!mounted) return;
         _toast(e.toString().replaceFirst('StateError: ', ''));
       }
-    }, busyLabel: restoreHelper ? 'Restoring chats + Helper…' : 'Restoring chats…');
+    }, busyLabel: helperOnly
+        ? 'Restoring NGMY Helper…'
+        : (restoreHelper ? 'Restoring chats + Helper…' : 'Restoring chats…'));
   }
 
   Future<void> _importFile() async {
@@ -222,14 +234,18 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
       _toast('Use a phone camera to scan, or upload the backup file on desktop.');
       return;
     }
-    final result = await Navigator.of(context).push<({String raw, bool restoreHelper})>(
-      MaterialPageRoute<({String raw, bool restoreHelper})>(
+    final result = await Navigator.of(context).push<({String raw, bool restoreHelper, bool helperOnly})>(
+      MaterialPageRoute<({String raw, bool restoreHelper, bool helperOnly})>(
         fullscreenDialog: true,
         builder: (_) => const _NgmyAdvisorSyncScanPage(),
       ),
     );
     if (result != null && result.raw.trim().isNotEmpty) {
-      await _importRaw(result.raw, restoreHelper: result.restoreHelper);
+      await _importRaw(
+        result.raw,
+        restoreHelper: result.restoreHelper,
+        helperOnly: result.helperOnly,
+      );
     }
   }
 
@@ -346,7 +362,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
               _SyncActionTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan QR to restore',
-                subtitle: 'Import from another device — toggle Helper restore in the scanner',
+                subtitle: 'Import from another device — toggle Helper at bottom or Helper only at top',
                 card: card,
                 border: border,
                 accent: !_canExport,
@@ -686,6 +702,7 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
   );
   bool _handled = false;
   bool _restoreHelper = false;
+  bool _helperOnly = false;
 
   @override
   void dispose() {
@@ -699,10 +716,70 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
       final raw = b.rawValue?.trim() ?? '';
       if (raw.startsWith(kNgmyAdvisorSyncQrPrefixV2) || raw.startsWith(kNgmyAdvisorSyncQrPrefix)) {
         _handled = true;
-        Navigator.pop(context, (raw: raw, restoreHelper: _restoreHelper));
+        Navigator.pop(
+          context,
+          (
+            raw: raw,
+            restoreHelper: _helperOnly || _restoreHelper,
+            helperOnly: _helperOnly,
+          ),
+        );
         return;
       }
     }
+  }
+
+  Widget _scanModeToggle({
+    required String label,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+    bool compact = false,
+  }) {
+    return Container(
+      padding: EdgeInsets.only(
+        left: compact ? 6 : 8,
+        right: compact ? 2 : 4,
+        top: 4,
+        bottom: 4,
+      ),
+      decoration: BoxDecoration(
+        color: value
+            ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: value
+              ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.75)
+              : Colors.white.withValues(alpha: 0.28),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: value ? Colors.white : Colors.white70,
+              fontSize: compact ? 10 : 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 2),
+          SizedBox(
+            height: compact ? 24 : 28,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              child: CupertinoSwitch(
+                value: value,
+                onChanged: onChanged,
+                activeTrackColor: kNgmyAdvisorsHubAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -713,6 +790,24 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
         title: const Text('Scan restore QR'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          _scanModeToggle(
+            label: 'Helper only',
+            value: _helperOnly,
+            compact: true,
+            onChanged: _handled
+                ? null
+                : (v) => setState(() {
+                      _helperOnly = v;
+                      if (v) _restoreHelper = true;
+                    }),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -736,7 +831,9 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Point at the NGMY Advisors restore QR code.',
+                        _helperOnly
+                            ? 'Helper-only mode — restores NGMY Helper chat only (no advisor threads).'
+                            : 'Point at the NGMY Advisors restore QR code.',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.95),
                           fontSize: 12,
@@ -745,47 +842,14 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.only(left: 8, right: 4, top: 4, bottom: 4),
-                      decoration: BoxDecoration(
-                        color: _restoreHelper
-                            ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.22)
-                            : Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _restoreHelper
-                              ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.75)
-                              : Colors.white.withValues(alpha: 0.28),
-                          width: 1.5,
-                        ),
+                    if (!_helperOnly) ...[
+                      const SizedBox(width: 8),
+                      _scanModeToggle(
+                        label: 'Helper',
+                        value: _restoreHelper,
+                        onChanged: _handled ? null : (v) => setState(() => _restoreHelper = v),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Helper',
-                            style: TextStyle(
-                              color: _restoreHelper ? Colors.white : Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          SizedBox(
-                            height: 28,
-                            child: FittedBox(
-                              fit: BoxFit.contain,
-                              child: CupertinoSwitch(
-                                value: _restoreHelper,
-                                onChanged: _handled ? null : (v) => setState(() => _restoreHelper = v),
-                                activeTrackColor: kNgmyAdvisorsHubAccent,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
