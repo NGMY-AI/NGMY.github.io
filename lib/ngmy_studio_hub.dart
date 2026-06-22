@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_doc_share_gate_ui.dart';
+import 'ngmy_fun_games.dart';
+import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
+import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_ai_client.dart';
 
@@ -48,7 +51,7 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
   }
 }
 
-/// Main tab content — 2-column grid of creator tools (Doc Share, AI Outfit, Video Studio, …).
+/// Main tab — Doc Share + hub letter tools up top; studios at the bottom.
 class NgmyCreatorHubTab extends StatelessWidget {
   const NgmyCreatorHubTab({
     super.key,
@@ -71,8 +74,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pinned top order: Doc Share → AI Outfit → Video Studio. Add new tools at the bottom only.
-    final tools = <_CreatorTool>[
+    final hubTools = <_CreatorTool>[
       _CreatorTool(
         icon: Icons.folder_shared_rounded,
         colors: const [Color(0xFF0D9488), Color(0xFF059669)],
@@ -90,6 +92,42 @@ class NgmyCreatorHubTab extends StatelessWidget {
           );
         },
       ),
+      _CreatorTool(
+        icon: Icons.change_history_rounded,
+        colors: const [Color(0xFF64748B), Color(0xFF1E293B)],
+        title: 'Pick Two',
+        subtitle: 'Price calculator & estimates',
+        onTap: () => NgmyHubToolBridge.invokeOrSnack(context, NgmyHubToolBridge.openPickTwo, 'Pick Two'),
+      ),
+      _CreatorTool(
+        icon: Icons.qr_code_2_rounded,
+        colors: const [Color(0xFF2563EB), Color(0xFF7C3AED)],
+        title: 'QR Generator',
+        subtitle: 'Create & save QR codes',
+        onTap: () {
+          if (NgmyHubToolBridge.openQrGenerator != null) {
+            NgmyHubToolBridge.openQrGenerator!();
+            return;
+          }
+          showNgmyQrGeneratorDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
+        },
+      ),
+      _CreatorTool(
+        icon: Icons.sports_esports_rounded,
+        colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+        title: 'Fun Games',
+        subtitle: 'Love, brain & fortune',
+        onTap: () {
+          if (NgmyHubToolBridge.openFunGames != null) {
+            NgmyHubToolBridge.openFunGames!();
+            return;
+          }
+          showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
+        },
+      ),
+    ];
+
+    final studioTools = <_CreatorTool>[
       _CreatorTool(
         icon: Icons.style_rounded,
         colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
@@ -131,19 +169,14 @@ class NgmyCreatorHubTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _CreatorHubTitle(),
-                    const SizedBox(height: 18),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.08,
-                      ),
-                      itemCount: tools.length,
-                      itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
-                    ),
+                    const SizedBox(height: 16),
+                    _sectionLabel(context, 'Share & hub tools'),
+                    const SizedBox(height: 10),
+                    _toolGrid(context, hubTools),
+                    const SizedBox(height: 22),
+                    _sectionLabel(context, 'Studios'),
+                    const SizedBox(height: 10),
+                    _toolGrid(context, studioTools),
                   ],
                 ),
               ),
@@ -151,6 +184,33 @@ class NgmyCreatorHubTab extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _sectionLabel(BuildContext context, String text) {
+    return Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+        fontWeight: FontWeight.w800,
+        fontSize: 10,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+
+  Widget _toolGrid(BuildContext context, List<_CreatorTool> tools) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.08,
+      ),
+      itemCount: tools.length,
+      itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
     );
   }
 }
