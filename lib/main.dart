@@ -680,7 +680,8 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
 }
 
 /// Authoritative balance from the transaction ledger, with cloud-stored balance as floor
-/// so every device matches after the other device earns or spends.
+/// when the ledger is behind (another device earned). When the ledger is lower, local
+/// spends (bets, purchases) win so balance drops immediately on this device.
 double ngmyResolveAccountBalance(
   String email,
   double storedBalance,
@@ -692,6 +693,7 @@ double ngmyResolveAccountBalance(
   final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
   if (txnCount == 0) return stored;
+  if (ledger < stored - 0.01) return ledger;
   if (stored > ledger + 0.01) return stored;
   return ledger;
 }
@@ -7468,7 +7470,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyAdminLiveRefresh.notify();
   }
 
-  /// One filtered Realtime channel per session (own user row + own transactions only).
+  /// Realtime: admins get all users/transactions + config; others get own row only.
   RealtimeChannel? _appSyncChannel;
   StreamSubscription<AuthState>? _authSub;
   bool _isSyncing = false;
@@ -8182,6 +8184,32 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _tryRestoreSessionFromSupabaseAuth();
     await _restoreSessionFromLocalCache();
     _startBackgroundServices();
+    unawaited(_catchUpCloudDataAfterConnect());
+  }
+
+  /// Re-pull cloud users, transactions, and balance after Supabase connects (fixes empty admin / split devices).
+  Future<void> _catchUpCloudDataAfterConnect() async {
+    await ngmyWaitForSupabaseReady();
+    if (!mounted || _currentUser == null || _userExplicitlyLoggedOut) return;
+    ngmyInvalidateCloudReachabilityCache();
+    if (!await ngmyCanReachCloud()) return;
+    if (mounted && _appOffline) setState(() => _appOffline = false);
+    try {
+      if (_ngmySessionIsAdmin(_currentUser)) {
+        await _refreshAdminCloudSnapshot(lightweight: false);
+        await _refreshPendingTransactionsFromCloud();
+        await _refreshAdminOperationalRequestsFromCloud();
+        if (mounted) {
+          setState(() {});
+          NgmyAdminLiveRefresh.notify();
+        }
+      } else {
+        final key = _currentUser!.email.toLowerCase().trim();
+        await _syncSessionFromCloudAfterLogin(key);
+      }
+    } catch (e, st) {
+      debugPrint('[sync] cloud catch-up: $e\n$st');
+    }
   }
 
   /// Disconnect Supabase Realtime and stop cloud polling while the app is
@@ -8225,6 +8253,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
+    if (_ngmySessionIsAdmin(_currentUser)) {
+      unawaited(_refreshAdminOperationalRequestsFromCloud());
+      unawaited(_refreshAdminUsersFromCloud());
+    }
     debugPrint('[sync] foreground resumed — realtime reconnected');
   }
 
@@ -8258,6 +8290,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         title: title,
         body: body,
         tag: tag,
+        adminDashboardAlert: true,
         cooldown: const Duration(days: 1),
         showInAppBanner: true,
       ),
@@ -8615,9 +8648,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (!mounted) return;
         unawaited(_refreshGameCenterSettingsFromCloud());
         unawaited(_refreshSessionFromCloudOnResume());
+        unawaited(_catchUpCloudDataAfterConnect());
       });
       if (_ngmySessionIsAdmin(_currentUser)) {
         unawaited(_refreshPendingTransactionsFromCloud());
+        unawaited(_refreshAdminOperationalRequestsFromCloud());
+        unawaited(_refreshAdminUsersFromCloud());
+        unawaited(_refreshAdminCloudSnapshot(lightweight: true));
         unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: true));
       }
       if (_allowConfigDiffNotifications) {
@@ -8972,7 +9009,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
-    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 60), (_) {
+    unawaited(_refreshPendingTransactionsFromCloud());
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshPendingTransactionsFromCloud());
     });
@@ -9056,7 +9094,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         });
       }
-      if (added > 0) unawaited(_persistLocalOnly());
+      if (added > 0) {
+        NgmyAdminLiveRefresh.notify();
+        unawaited(_persistLocalOnly());
+      }
     } catch (e) {
       debugPrint('[admin] pending txn poll: $e');
     }
@@ -10235,8 +10276,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     String? tag,
     Duration cooldown = const Duration(seconds: 50),
     bool showInAppBanner = true,
+    bool adminDashboardAlert = false,
   }) async {
-    if (kNgmySuppressInAppBannerPopups) return;
+    if (kNgmySuppressInAppBannerPopups &&
+        !(adminDashboardAlert && _ngmyReceivesAdminDashboardAlerts(_currentUser))) {
+      return;
+    }
     if (_currentUser == null) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
     if (kNgmySuppressWalletTransactionPopups) {
@@ -10293,7 +10338,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
 
     if (showInAppBanner) {
-      _showModernInAppNotice(title: title, body: body);
+      final showBanner = !kNgmySuppressInAppBannerPopups ||
+          (adminDashboardAlert && _ngmyReceivesAdminDashboardAlerts(_currentUser));
+      if (showBanner) {
+        _showModernInAppNotice(title: title, body: body);
+      }
     }
   }
 
@@ -10362,12 +10411,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String body,
     required String tag,
   }) async {
-    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
     await _pushInAppNotification(
       title: title,
       body: body,
       tag: tag,
       cooldown: const Duration(seconds: 12),
+      adminDashboardAlert: true,
     );
   }
 
@@ -10576,8 +10626,42 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _appSyncChannel = null;
         return;
       }
-      // Quota-safe: only this user's row + their transactions (filtered server-side).
-      // Config, store, admin-wide users/transactions, and media use HTTP polling instead.
+      final isAdmin = _ngmySessionIsAdmin(_currentUser);
+
+      if (isAdmin) {
+        final channelName = 'ngmy-admin-sync-${sessionEmail.toLowerCase().hashCode}';
+        _appSyncChannel = supabase
+            .channel(channelName)
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'users',
+              callback: (payload) => _onUsersChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'transactions',
+              callback: (payload) => _onTransactionsChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'config',
+              callback: (payload) => _onConfigChange(payload),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'ngmy_settings',
+              callback: (payload) => _onNgmySettingsChange(payload),
+            )
+            .subscribe();
+        debugPrint('Realtime: admin users + transactions + config ($channelName)');
+        return;
+      }
+
+      // Quota-safe for regular users: only this user's row + their transactions.
       final channelName = 'ngmy-sync-${sessionEmail.toLowerCase().hashCode}';
       _appSyncChannel = supabase
           .channel(channelName)
@@ -11731,7 +11815,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required UserData? localCurrent,
   }) async {
     try {
+      await ngmyWaitForSupabaseReady();
       _disabledSupabaseTables.clear();
+      ngmyInvalidateCloudReachabilityCache();
       if (!await ngmyCanReachCloud()) {
         debugPrint('[ngmy] offline or slow network — using cached local data');
         if (localMedia.isNotEmpty) _allMedia = localMedia;
@@ -11742,6 +11828,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await _finalizeBootstrapSession(prefs: prefs, safeGet: safeGet, localCurrent: localCurrent);
         if (mounted) setState(() => _appOffline = true);
         await _persistLocalSnapshot();
+        Future.delayed(const Duration(seconds: 6), () {
+          if (mounted) unawaited(_catchUpCloudDataAfterConnect());
+        });
         return;
       }
       if (mounted && _appOffline) setState(() => _appOffline = false);
@@ -12287,7 +12376,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
       if (online) {
       await ngmyIgnoreTimeout(() async {
-      final isAdmin = _currentUser?.isAdmin == true;
+      final isAdmin = _ngmySessionIsAdmin(_currentUser);
       final userEmail = _currentUser?.email.toLowerCase().trim() ?? '';
 
       if (heavy && fullCloud && isAdmin) {
@@ -12564,8 +12653,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       if (_ngmyIsClockInSessionStartTransaction(t) ||
                           (t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) {
                         _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
+                      } else if (t.status == TransactionStatus.approved) {
+                        ngmyApplyApprovedTransactionToBalance(
+                          _allUsers[userIdx],
+                          t,
+                          playSound: ngmyTransactionCountsAsIncome(t),
+                        );
+                      } else {
+                        ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       }
-                      ngmyReconcileUserAccountBalance(_allUsers[userIdx], _allTransactions);
                       syncedUser = _allUsers[userIdx];
                       if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == userKey) {
                         _currentUser = _allUsers[userIdx];
@@ -12581,7 +12677,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     unawaited(_pushUserToCloudFast(syncedUser!, includeFreeTrial: true).then((ok) {
                       if (ok) _dirtyUserEmails.remove(ngmyNormalizeEmail(syncedUser!.email));
                     }));
-                    unawaited(_pushUserBalanceToCloud(syncedUser!));
+                    unawaited(_pushUserBalanceToCloud(
+                      syncedUser!,
+                      allowDecrease: ngmyIsGameLedgerTransaction(t) ||
+                          t.type == TransactionType.adminRemove ||
+                          t.type == TransactionType.withdrawal,
+                    ));
                     ngmyNotifyBalanceChanged(
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
@@ -20209,13 +20310,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminInvest(isDark),
       _adminLegal(isDark),
       _adminWallet(isDark),
-      _adminMedia(isDark),
       _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 7)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -20261,9 +20361,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               frameBorder,
               badgeCount: _adminWalletPendingCount(),
             ),
-            _navItem(5, Icons.perm_media_outlined, 'Media', isDark, frameBg, frameBorder),
-            _navItem(6, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(7, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -20378,7 +20477,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "MEDIA", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -27693,28 +27792,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         onDataChanged: widget.onDataChanged,
                       ),
                       routeName: 'NgmyStoreScreen',
-                    ),
-                  ),
-                  _ngmyMediaHubBox(
-                    isDark: isDark,
-                    onTap: () => NgmyNavigator.push(
-                      context,
-                      JobMarketplaceScreen(
-                        user: widget.user,
-                        allUsers: widget.allUsers,
-                        allMedia: widget.allMedia,
-                        config: widget.config,
-                        onDataChanged: widget.onDataChanged,
-                        onAddTransaction: widget.onAddTransaction,
-                        onPost: widget.onPostMedia,
-                        onRefreshFromCloud: widget.onRefreshMediaFromCloud,
-                        onDeleteMedia: widget.onDeleteMedia,
-                        onPruneMedia: widget.onPruneMedia,
-                        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
-                        onSyncMediaPost: widget.onSyncMediaPost,
-                        onSyncUserMedia: widget.onSyncUserMedia,
-                      ),
-                      routeName: 'MediaScreen',
                     ),
                   ),
                   _hubBox(
