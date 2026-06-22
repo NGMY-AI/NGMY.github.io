@@ -49,9 +49,9 @@ Future<void> showNgmyRepairEstimateFlow({
     context: context,
     barrierColor: const Color(0xFF060B14),
     builder: (ctx) => Dialog(
-      backgroundColor: const Color(0xFF0A1222),
+      backgroundColor: const Color(0xFF0F172A),
       insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: _RepairEstimateSheet(
         geminiApiKey: geminiApiKey,
         refreshApiKey: refreshApiKey,
@@ -107,8 +107,10 @@ class _RepairEstimateSheet extends StatefulWidget {
 }
 
 class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
-  static const _accent = Color(0xFF10B981);
-  static const _accent2 = Color(0xFF06B6D4);
+  static const _accent = Color(0xFF0D9488);
+  static const _accent2 = Color(0xFF14B8A6);
+  static const _surface = Color(0xFF0F172A);
+  static const _panel = Color(0xFF1E293B);
 
   final _cityC = TextEditingController();
   final _stateC = TextEditingController();
@@ -345,18 +347,107 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
     );
   }
 
+  Widget _pricingBreakdownCard() {
+    final e = _estimate!;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_panel, _surface],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF5EEAD4)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Fair market · ${e.jobTierLabel}',
+                      style: const TextStyle(color: Color(0xFF99F6E4), fontSize: 10, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '\$${e.total.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(e.itemName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+          const SizedBox(height: 10),
+          if (e.estimatedLaborHours > 0 && e.laborRatePerHour > 0)
+            _breakdownRow(
+              'Labor',
+              '${e.estimatedLaborHours.toStringAsFixed(1)} hr × \$${e.laborRatePerHour.toStringAsFixed(0)}/hr',
+              e.laborCost,
+            )
+          else
+            _breakdownRow('Labor', 'Skilled repair time', e.laborCost),
+          const SizedBox(height: 4),
+          _breakdownRow('Materials', 'Parts at retail cost', e.materialsCost),
+          if (e.pricingNote.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              e.pricingNote.trim(),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 10, height: 1.35, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _breakdownRow(String label, String detail, double amount) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w700)),
+              Text(detail, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 9)),
+            ],
+          ),
+        ),
+        Text('\$${amount.toStringAsFixed(2)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 11, fontWeight: FontWeight.w800)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final maxH = MediaQuery.sizeOf(context).height * 0.9;
-    final previewMaxH = MediaQuery.sizeOf(context).height * 0.34;
+    final maxH = MediaQuery.sizeOf(context).height * 0.92;
+    final previewMaxH = MediaQuery.sizeOf(context).height * 0.38;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxH),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.35), _surface]),
+              border: Border(bottom: BorderSide(color: _accent.withValues(alpha: 0.25))),
+            ),
             child: Row(
               children: [
                 Material(
@@ -365,8 +456,8 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                     onTap: _loadingBiz ? null : _openBusinessProfile,
                     borderRadius: BorderRadius.circular(24),
                     child: Container(
-                      width: 44,
-                      height: 44,
+                      width: 46,
+                      height: 46,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(colors: [_accent, _accent2]),
@@ -385,10 +476,10 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Repair Estimate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                      const Text('Repair Estimate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
                       Text(
-                        _business.name.trim().isEmpty ? 'Tap profile to add your business' : _business.name.trim(),
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                        _business.name.trim().isEmpty ? 'Fair AI pricing · tap profile for your business' : _business.name.trim(),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 11),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -404,83 +495,119 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   GestureDetector(
                     onTap: _showPhotoOptions,
-                    child: RepaintBoundary(
-                      child: Container(
-                        height: 130,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: _accent.withValues(alpha: 0.45)),
-                          color: const Color(0xFF131B2E),
+                    child: Container(
+                      height: 148,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _photoImage == null ? _accent.withValues(alpha: 0.5) : Colors.white12,
+                          width: _photoImage == null ? 1.5 : 1,
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: _photoImage == null
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_a_photo_rounded, color: _accent.withValues(alpha: 0.9), size: 36),
-                                  const SizedBox(height: 6),
-                                  Text('Tap to photograph the item', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w700, fontSize: 12)),
-                                ],
-                              )
-                            : Image(
-                                image: _photoImage!,
-                                width: double.infinity,
-                                height: 130,
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                                filterQuality: FilterQuality.medium,
-                              ),
+                        color: _panel,
                       ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _photoImage == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _accent.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.photo_camera_rounded, color: _accent.withValues(alpha: 0.95), size: 32),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text('Photograph the repair', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                                Text(
+                                  'AI prices from the photo — notes optional',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                                ),
+                              ],
+                            )
+                          : Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image(
+                                  image: _photoImage!,
+                                  width: double.infinity,
+                                  height: 148,
+                                  fit: BoxFit.cover,
+                                  gaplessPlayback: true,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                                Positioned(
+                                  right: 8,
+                                  bottom: 8,
+                                  child: Material(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: InkWell(
+                                      onTap: _showPhotoOptions,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.refresh_rounded, color: Colors.white, size: 14),
+                                            SizedBox(width: 4),
+                                            Text('Retake', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _field(_cityC, 'City', Icons.location_city_rounded)),
+                      Expanded(child: _field(_cityC, 'City (for local rates)', Icons.location_city_rounded)),
                       const SizedBox(width: 8),
-                      Expanded(child: _field(_stateC, 'State', Icons.map_rounded)),
+                      SizedBox(width: 88, child: _field(_stateC, 'State', Icons.map_rounded)),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _field(_notesC, 'What to fix? (optional — we read the photo)', Icons.edit_note_rounded, maxLines: 2),
+                  _field(_notesC, 'Describe the issue (optional)', Icons.edit_note_rounded, maxLines: 2),
                   const SizedBox(height: 8),
                   _field(_clientC, 'Customer name (optional)', Icons.person_outline_rounded),
-                  const SizedBox(height: 10),
-                  Text('Style', style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 6),
-                  Row(
+                  const SizedBox(height: 12),
+                  Text('Document style', style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: kNgmyEstimateTemplateIds.map((id) {
                       final selected = _templateId == id;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(right: id == kNgmyEstimateTemplateIds.last ? 0 : 6),
-                          child: Material(
-                            color: selected ? _accent.withValues(alpha: 0.22) : const Color(0xFF131B2E),
-                            borderRadius: BorderRadius.circular(10),
-                            child: InkWell(
-                              onTap: () => setState(() => _templateId = id),
+                      return Material(
+                        color: selected ? _accent.withValues(alpha: 0.22) : _panel,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          onTap: () => setState(() => _templateId = id),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                            decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: selected ? _accent : Colors.white12),
-                                ),
-                                child: Text(
-                                  ngmyEstimateTemplateLabel(id),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: selected ? const Color(0xFF6EE7B7) : Colors.white60,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 10,
-                                  ),
-                                ),
+                              border: Border.all(color: selected ? _accent : Colors.white12),
+                            ),
+                            child: Text(
+                              ngmyEstimateTemplateLabel(id),
+                              style: TextStyle(
+                                color: selected ? const Color(0xFF99F6E4) : Colors.white60,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
                               ),
                             ),
                           ),
@@ -488,59 +615,44 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   FilledButton.icon(
                     onPressed: _busy ? null : _generate,
                     icon: _busy
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.auto_awesome_rounded, size: 20),
-                    label: Text(_busy ? 'Scanning photo…' : 'Generate estimate'),
-                    style: FilledButton.styleFrom(backgroundColor: _accent, minimumSize: const Size(double.infinity, 46)),
+                        : const Icon(Icons.price_check_rounded, size: 20),
+                    label: Text(_busy ? 'Analyzing job & pricing…' : 'Get fair estimate'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _accent,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
-                    Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontSize: 12)),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7F1D1D).withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(_error!, style: const TextStyle(color: Color(0xFFFECACA), fontSize: 12)),
+                    ),
                   ],
                   if (_estimate != null) ...[
+                    const SizedBox(height: 16),
+                    _pricingBreakdownCard(),
                     const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131B2E),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _accent.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(_estimate!.itemName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                                Text(
-                                  'Labor \$${_estimate!.laborCost.toStringAsFixed(2)} · Parts \$${_estimate!.materialsCost.toStringAsFixed(2)}',
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 10),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '\$${_estimate!.total.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Color(0xFF6EE7B7), fontWeight: FontWeight.w900, fontSize: 22),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text('Preview', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
+                    Text('Document preview', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       constraints: BoxConstraints(maxHeight: previewMaxH),
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF060B14),
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFF020617),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: Colors.white10),
                       ),
                       child: Center(
@@ -553,15 +665,16 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _download,
                       icon: const Icon(Icons.download_rounded, size: 18),
                       label: const Text('Download estimate'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: _accent,
-                        side: BorderSide(color: _accent.withValues(alpha: 0.6)),
-                        minimumSize: const Size(double.infinity, 44),
+                        foregroundColor: const Color(0xFF99F6E4),
+                        side: BorderSide(color: _accent.withValues(alpha: 0.65)),
+                        minimumSize: const Size(double.infinity, 46),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ],
@@ -616,7 +729,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
         hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 12),
         prefixIcon: Icon(icon, size: 18, color: Colors.white38),
         filled: true,
-        fillColor: const Color(0xFF131B2E),
+        fillColor: _panel,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
       ),
     );
