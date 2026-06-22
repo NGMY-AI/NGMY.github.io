@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_civic_id_scanner.dart';
+import 'ngmy_qr_download.dart';
 
 /// Georgia-style horizontal ID / passport card for Civic Registry members.
 class NgmyCivicRegistryIdCard extends StatelessWidget {
@@ -14,12 +17,14 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     this.photoPath,
     this.photoImage,
     this.scale = 1.0,
+    this.onQrTap,
   });
 
   final Map<String, dynamic> record;
   final String? photoPath;
   final ImageProvider? photoImage;
   final double scale;
+  final VoidCallback? onQrTap;
 
   static const _stateCodes = {
     'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
@@ -101,22 +106,40 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
   }
 
   static Widget _circlePhoto(ImageProvider? photo, double size, {double opacity = 1, double iconSize = 28}) {
+    final inner = size * 0.86;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFFE5E7EB),
-        border: Border.all(color: const Color(0xFF374151), width: 1.4),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 4, offset: const Offset(0, 2))],
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFD4AF37), Color(0xFF1E3A8A), Color(0xFFD4AF37)],
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 6, offset: const Offset(0, 2)),
+          BoxShadow(color: const Color(0xFFD4AF37).withOpacity(0.35), blurRadius: 4, offset: const Offset(0, 1)),
+        ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: photo != null
-          ? Opacity(
-              opacity: opacity,
-              child: Image(image: photo, fit: BoxFit.cover, width: size, height: size),
-            )
-          : Icon(Icons.person_rounded, size: iconSize, color: Colors.white),
+      child: Center(
+        child: Container(
+          width: inner,
+          height: inner,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFE5E7EB),
+            border: Border.all(color: Colors.white, width: 2.2),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: photo != null
+              ? Opacity(
+                  opacity: opacity,
+                  child: Image(image: photo, fit: BoxFit.cover, width: inner, height: inner),
+                )
+              : Icon(Icons.person_rounded, size: iconSize, color: const Color(0xFF6B7280)),
+        ),
+      ),
     );
   }
 
@@ -276,7 +299,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 4 * scale),
-                  _footerRow(registryId, phone, scale),
+                  _footerRow(registryId, phone, scale, onQrTap: onQrTap),
                 ],
               ),
             ),
@@ -445,10 +468,26 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _footerRow(String registryId, String phone, double scale) {
+  Widget _footerRow(String registryId, String phone, double scale, {VoidCallback? onQrTap}) {
     final ddRaw = '5 DD ${registryId.padRight(20, '0')}${phone.replaceAll(RegExp(r'\D'), '').padRight(8, '0')}';
     final dd = ddRaw.length > 28 ? ddRaw.substring(0, 28) : ddRaw;
     final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
+    final qr = Container(
+      padding: EdgeInsets.all(1.5 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFF374151), width: 0.8),
+        borderRadius: BorderRadius.circular(3 * scale),
+      ),
+      child: QrImageView(
+        data: qrData,
+        size: 24 * scale,
+        padding: EdgeInsets.zero,
+        backgroundColor: Colors.white,
+        eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
+        dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
+      ),
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -460,22 +499,20 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
             style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           ),
         ),
-        Container(
-          padding: EdgeInsets.all(1.5 * scale),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFF374151), width: 0.8),
-            borderRadius: BorderRadius.circular(3 * scale),
-          ),
-          child: QrImageView(
-            data: qrData,
-            size: 24 * scale,
-            padding: EdgeInsets.zero,
-            backgroundColor: Colors.white,
-            eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
-            dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
-          ),
-        ),
+        if (onQrTap != null)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onQrTap,
+              borderRadius: BorderRadius.circular(4 * scale),
+              child: Padding(
+                padding: EdgeInsets.all(2 * scale),
+                child: qr,
+              ),
+            ),
+          )
+        else
+          qr,
         SizedBox(width: 4 * scale),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -667,6 +704,7 @@ Widget _floatingIconButton({
   required IconData icon,
   required VoidCallback onPressed,
   String? tooltip,
+  bool busy = false,
 }) {
   return Material(
     color: Colors.white.withOpacity(0.92),
@@ -675,9 +713,78 @@ Widget _floatingIconButton({
     shape: const CircleBorder(),
     child: IconButton(
       tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, color: const Color(0xFF111827)),
+      onPressed: busy ? null : onPressed,
+      icon: busy
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          : Icon(icon, color: const Color(0xFF111827)),
       visualDensity: VisualDensity.compact,
+    ),
+  );
+}
+
+Future<Uint8List?> _captureCivicIdCardPng(GlobalKey captureKey) async {
+  await Future.delayed(const Duration(milliseconds: 120));
+  await WidgetsBinding.instance.endOfFrame;
+  final boundary = captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+  if (boundary == null) return null;
+  final image = await boundary.toImage(pixelRatio: 3.0);
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  return data?.buffer.asUint8List();
+}
+
+String _civicIdDownloadFilename(Map<String, dynamic> record) {
+  final registryId = (record['registryId'] ?? '').toString().trim();
+  final name = (record['fullName'] ?? 'civic_id').toString().trim().replaceAll(RegExp(r'[^\w\-]+'), '_');
+  if (registryId.isNotEmpty) return 'ngmy_civic_id_$registryId';
+  return 'ngmy_civic_id_$name';
+}
+
+Future<void> _showEnlargedCivicQrDialog(BuildContext context, String registryId) {
+  final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
+  final size = MediaQuery.sizeOf(context).width.clamp(260.0, 320.0);
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.72),
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Scan Civic Registry ID',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              registryId.isEmpty ? 'Registry QR' : registryId,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1E3A8A), width: 2),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: QrImageView(
+                data: qrData,
+                size: size,
+                padding: EdgeInsets.zero,
+                backgroundColor: Colors.white,
+                eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
+                dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -689,6 +796,8 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
   ImageProvider? photoImage,
   VoidCallback? onChangePhoto,
 }) {
+  final captureKey = GlobalKey();
+  var downloading = false;
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -696,71 +805,108 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
     barrierColor: Colors.black.withOpacity(0.35),
     pageBuilder: (ctx, _, __) {
       final resolvedPhoto = photoPath ?? (record['idPhotoPath'] ?? '').toString();
+      final registryId = (record['registryId'] ?? '').toString().trim();
       final maxH = MediaQuery.sizeOf(ctx).height * 0.82;
-      return SafeArea(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Center(
-              child: SizedBox(
-                height: maxH,
-                width: MediaQuery.sizeOf(ctx).width,
-                child: FittedBox(
-                  fit: BoxFit.contain,
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> downloadCard() async {
+            if (downloading) return;
+            setDialogState(() => downloading = true);
+            try {
+              final bytes = await _captureCivicIdCardPng(captureKey);
+              if (bytes == null) throw Exception('Could not render ID card.');
+              final msg = await downloadNgmyQrImage(bytes, _civicIdDownloadFilename(record));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Download failed: $e')),
+                );
+              }
+            } finally {
+              if (context.mounted) setDialogState(() => downloading = false);
+            }
+          }
+
+          return SafeArea(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Center(
                   child: SizedBox(
-                    width: 360,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        NgmyCivicRegistryIdCard(
-                          record: record,
-                          photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
-                          photoImage: photoImage,
-                          scale: 1,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Official Civic Registry ID',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.92),
-                            decoration: TextDecoration.none,
-                            shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+                    height: maxH,
+                    width: MediaQuery.sizeOf(ctx).width,
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: RepaintBoundary(
+                        key: captureKey,
+                        child: SizedBox(
+                          width: 360,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              NgmyCivicRegistryIdCard(
+                                record: record,
+                                photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
+                                photoImage: photoImage,
+                                scale: 1,
+                                onQrTap: () => _showEnlargedCivicQrDialog(context, registryId),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Official Civic Registry ID',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.92),
+                                  decoration: TextDecoration.none,
+                                  shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onChangePhoto != null)
-                    _floatingIconButton(
-                      icon: Icons.photo_camera_outlined,
-                      tooltip: 'Change photo',
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        onChangePhoto();
-                      },
-                    ),
-                  if (onChangePhoto != null) const SizedBox(width: 8),
-                  _floatingIconButton(
-                    icon: Icons.close,
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(ctx),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _floatingIconButton(
+                        icon: Icons.download_rounded,
+                        tooltip: 'Download ID',
+                        busy: downloading,
+                        onPressed: downloadCard,
+                      ),
+                      const SizedBox(width: 8),
+                      if (onChangePhoto != null)
+                        _floatingIconButton(
+                          icon: Icons.photo_camera_outlined,
+                          tooltip: 'Change photo',
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onChangePhoto();
+                          },
+                        ),
+                      if (onChangePhoto != null) const SizedBox(width: 8),
+                      _floatingIconButton(
+                        icon: Icons.close,
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       );
     },
   );

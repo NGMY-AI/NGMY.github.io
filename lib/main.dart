@@ -3381,7 +3381,7 @@ Future<bool> _pushUserAdminAccountFieldsToCloud(UserData u) async {
   if (!await ngmyCanReachCloud()) return false;
   final email = u.email.trim();
   if (email.isEmpty) return false;
-  return _safeUpsertUserRow({
+  final row = <String, dynamic>{
     'email': email,
     'username': u.username.trim().isEmpty ? email.split('@').first : u.username.trim(),
     'status': u.status.trim().isEmpty ? 'active' : u.status,
@@ -3393,7 +3393,12 @@ Future<bool> _pushUserAdminAccountFieldsToCloud(UserData u) async {
     'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
     'isCivicRegistryKing': u.isCivicRegistryKing,
     'canSellOnStore': u.canSellOnStore,
-  });
+  };
+  final fullName = (u.fullName ?? '').trim();
+  if (fullName.isNotEmpty) row['fullName'] = fullName;
+  final phone = u.phone.trim();
+  if (phone.isNotEmpty) row['phone'] = phone;
+  return _safeUpsertUserRow(row);
 }
 
 Future<bool> _deleteUserFromCloud(String email) async {
@@ -4008,6 +4013,10 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
   if (!includeBalance) {
     row.remove('accountBalance');
   }
+  // Username is pushed only via _pushUserProfileBasicsToCloud (self-edit) or
+  // _pushUserAdminAccountFieldsToCloud (admin) — never routine bulk sync, so
+  // admin renames are not overwritten by another device's stale local copy.
+  row.remove('username');
   // Admin-set identity fields — never wipe cloud via routine profile sync.
   row.remove('crownBadge');
   row.remove('status');
@@ -14593,6 +14602,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
     }
+    if (oldWidget.user.username != widget.user.username ||
+        oldWidget.user.crownBadge != widget.user.crownBadge ||
+        (oldWidget.user.fullName ?? '') != (widget.user.fullName ?? '')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
     if (oldWidget.user.accountBalance != widget.user.accountBalance) {
       ngmySeedLiveBalance(
         widget.user.email,
@@ -15517,6 +15533,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         oldWidget.user.displayedTodayEarnings != widget.user.displayedTodayEarnings ||
         oldWidget.user.todayDailyGoal != widget.user.todayDailyGoal ||
         oldWidget.user.email != widget.user.email ||
+        oldWidget.user.username != widget.user.username ||
+        oldWidget.user.crownBadge != widget.user.crownBadge ||
         oldWidget.allTransactions.length != widget.allTransactions.length) {
       _liveCacheTxnLen = -1;
       if (mounted) setState(() {});
@@ -22629,10 +22647,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     apply();
     ngmySetAdminUserAccountStatus(widget.config, u.email, u.status);
     ngmySetAdminUserCrownBadge(widget.config, u.email, u.crownBadge);
+    _syncCivicMemberRecordFromUser(widget.config, u);
     _mirrorAdminTargetOntoSession(u);
     widget.onDataChanged();
     setState(() {});
     unawaited(_pushUserAdminAccountFieldsToCloud(u));
+    unawaited(_pushUserProfileBasicsToCloud(u));
     unawaited(widget.onPushUserToCloud?.call(u) ?? Future.value());
     unawaited(widget.onPersistManagementConfig?.call() ?? ngmyAdminPersistManagementConfig(widget.config));
     if (snack != null && mounted) {
