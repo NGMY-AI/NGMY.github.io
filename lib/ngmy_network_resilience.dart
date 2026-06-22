@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'ngmy_network_resilience_io.dart' if (dart.library.html) 'ngmy_network_resilience_io_stub.dart';
-import 'ngmy_network_resilience_web_stub.dart' if (dart.library.html) 'ngmy_network_resilience_web.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_supabase_config.dart';
 
@@ -19,7 +19,13 @@ const Duration kNgmyReachabilityTimeout = Duration(seconds: 3);
 DateTime? _lastReachableAt;
 bool _lastReachable = true;
 
-/// True when the device reports online and a short network probe succeeds (or recently did).
+/// Clear cached reachability after a failed sync so the next attempt re-probes Supabase.
+void ngmyInvalidateCloudReachabilityCache() {
+  _lastReachableAt = null;
+  _lastReachable = true;
+}
+
+/// True when the device reports online and a short Supabase probe succeeds (or recently did).
 Future<bool> ngmyCanReachCloud() async {
   if (!await ngmyDeviceIsOnline()) {
     _lastReachable = false;
@@ -36,32 +42,31 @@ Future<bool> ngmyCanReachCloud() async {
   return ok;
 }
 
-Future<bool> _probeReachability() async {
+Map<String, String> get _ngmySupabaseProbeHeaders => {
+      'apikey': kNgmySupabaseAnonKey,
+      'Authorization': 'Bearer $kNgmySupabaseAnonKey',
+    };
+
+/// Authenticated read against Supabase — same check the app uses for real sync.
+Future<bool> _probeSupabaseRest() async {
   try {
-    if (kIsWeb) {
-      final versionOk = await ngmyWebFetchOk(_webVersionJsonUrl(), kNgmyReachabilityTimeout);
-      if (!versionOk) return false;
-      final supabaseOk = await ngmyWebFetchOk(
-        '${kNgmySupabaseUrl}/rest/v1/',
-        kNgmyReachabilityTimeout,
-      );
-      return supabaseOk;
-    }
-    return await ngmyNativeReachabilityProbe(kNgmyReachabilityTimeout);
-  } catch (_) {
+    final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/users?select=email&limit=1');
+    final resp = await http.get(uri, headers: _ngmySupabaseProbeHeaders).timeout(kNgmyReachabilityTimeout);
+    if (resp.statusCode >= 200 && resp.statusCode < 500) return true;
+    debugPrint('[ngmy] supabase probe status ${resp.statusCode}');
+    return false;
+  } catch (e) {
+    debugPrint('[ngmy] supabase probe failed: $e');
     return false;
   }
 }
 
-/// version.json lives at site root — not under /app/{slug}.
-String _webVersionJsonUrl() {
-  final origin = Uri.base.origin.isNotEmpty ? Uri.base.origin : 'https://ngmy.org';
-  var path = Uri.base.path;
-  final appIdx = path.toLowerCase().indexOf('/app/');
-  if (appIdx >= 0) path = path.substring(0, appIdx);
-  if (path.isEmpty || path == '/') return '$origin/version.json';
-  if (!path.endsWith('/')) path = '$path/';
-  return '$origin${path}version.json';
+Future<bool> _probeReachability() async {
+  if (await _probeSupabaseRest()) return true;
+  if (!kIsWeb) {
+    return await ngmyNativeReachabilityProbe(kNgmyReachabilityTimeout);
+  }
+  return false;
 }
 
 /// Runs [action] with a timeout; returns [onTimeout] or rethrows on other errors.
