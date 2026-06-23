@@ -74,7 +74,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pinned top order: Doc Share → AI Outfit → Video Studio. Add new tools at the bottom only.
+    // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Fun Games → Video Studio → 3D Mechanic Lab.
     final tools = <_CreatorTool>[
       _CreatorTool(
         icon: Icons.folder_shared_rounded,
@@ -92,32 +92,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
             onPersistConfig: onPersistConfig ?? () async => false,
           );
         },
-      ),
-      _CreatorTool(
-        icon: Icons.style_rounded,
-        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
-        title: 'AI Outfit',
-        subtitle: 'Virtual dress try-on',
-        onTap: () {
-          showNgmyOutfitStudio(
-            context: context,
-            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
-          );
-        },
-      ),
-      _CreatorTool(
-        icon: Icons.movie_creation_rounded,
-        colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
-        title: 'Video Studio',
-        subtitle: 'Templates, clips & export',
-        onTap: () => showNgmyVideoStudio(context),
-      ),
-      _CreatorTool(
-        icon: Icons.precision_manufacturing_rounded,
-        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
-        title: '3D Mechanic Lab',
-        subtitle: 'Disassemble cars & learn parts',
-        onTap: () => showNgmyMechanicStudio(context: context),
       ),
       _CreatorTool(
         icon: Icons.change_history_rounded,
@@ -140,6 +114,18 @@ class NgmyCreatorHubTab extends StatelessWidget {
         },
       ),
       _CreatorTool(
+        icon: Icons.style_rounded,
+        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
+        title: 'AI Outfit',
+        subtitle: 'Virtual dress try-on',
+        onTap: () {
+          showNgmyOutfitStudio(
+            context: context,
+            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
+          );
+        },
+      ),
+      _CreatorTool(
         icon: Icons.sports_esports_rounded,
         colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6)],
         title: 'Fun Games',
@@ -151,6 +137,20 @@ class NgmyCreatorHubTab extends StatelessWidget {
           }
           showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
         },
+      ),
+      _CreatorTool(
+        icon: Icons.movie_creation_rounded,
+        colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
+        title: 'Video Studio',
+        subtitle: 'Templates, clips & export',
+        onTap: () => showNgmyVideoStudio(context),
+      ),
+      _CreatorTool(
+        icon: Icons.precision_manufacturing_rounded,
+        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
+        title: '3D Mechanic Lab',
+        subtitle: 'Disassemble cars & learn parts',
+        onTap: () => showNgmyMechanicStudio(context: context),
       ),
     ];
 

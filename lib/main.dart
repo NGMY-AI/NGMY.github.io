@@ -7501,6 +7501,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   DateTime? _lastCurrentUserCloudRefresh;
   DateTime? _lastUserTxnCloudRefresh;
   Timer? _userTxnSyncTimer;
+  Timer? _currentUserPullTimer;
   Timer? _legalPlansRefreshDebounce;
   DateTime? _legalCloudRefreshPausedUntil;
   final Set<String> _disabledSupabaseTables = {};
@@ -7830,6 +7831,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
+    _startCurrentUserPullLoop();
     unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
@@ -8246,6 +8248,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminOperationalRequestsPoll?.cancel();
     _adminUsersPoll?.cancel();
     _cloudUserRowResyncTimer?.cancel();
+    _currentUserPullTimer?.cancel();
     debugPrint('[sync] background paused — realtime disconnected');
   }
 
@@ -8270,6 +8273,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
+    _startCurrentUserPullLoop();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminOperationalRequestsFromCloud());
       unawaited(_refreshAdminUsersFromCloud());
@@ -8292,6 +8296,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
     _startUserTransactionSync();
+    _startCurrentUserPullLoop();
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshPendingTransactionsFromCloud());
       unawaited(_refreshAdminDashboardFromCloud());
@@ -8321,6 +8326,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused) return;
       unawaited(_refreshUserTransactionsFromCloud());
+    });
+  }
+
+  /// Foreground fallback so a second device on the same account picks up
+  /// activeInvestment/totalProfit/clock-in/username changes within ~20s even
+  /// if the realtime websocket subscription never connects or silently drops
+  /// (common for backgrounded/standalone web views) — realtime is the fast
+  /// path, this is the guarantee.
+  void _startCurrentUserPullLoop() {
+    _currentUserPullTimer?.cancel();
+    if (_currentUser == null) return;
+    _currentUserPullTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
+      unawaited(_refreshCurrentUserFromCloud());
     });
   }
 
