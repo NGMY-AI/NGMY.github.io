@@ -7,6 +7,7 @@ import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_runtime.dart';
+import 'ngmy_app_builder_social_blueprints.dart';
 
 class NgmyAppBuilderCopilotResult {
   final String message;
@@ -22,6 +23,28 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   String ownerEmail = '',
   List<Map<String, String>> history = const [],
 }) async {
+  final resolvedOwnerEmail = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
+  final blueprintKind = NgmyAppSocialBlueprints.detectKind(userMessage);
+  if (blueprintKind != null && (project == null || _looksLikeBuildRequest(userMessage))) {
+    final built = NgmyAppSocialBlueprints.build(blueprintKind, ownerEmail: resolvedOwnerEmail, name: project?.name);
+    if (built != null) {
+      final merged = project == null
+          ? built
+          : built.copyWith(
+              id: project.id,
+              status: project.status,
+              slug: project.slug,
+              publicUrl: project.publicUrl,
+              publishedAt: project.publishedAt,
+              reviewNote: project.reviewNote,
+            );
+      return NgmyAppBuilderCopilotResult(
+        message: 'Built your ${NgmyAppSocialBlueprints.label(blueprintKind)} app — real screens, navigation, and working data are wired up. Check Preview, then ask me to tweak colors, text, or add more screens anytime.',
+        updatedProject: merged,
+      );
+    }
+  }
+
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppBuilderCopilotResult(
@@ -99,7 +122,12 @@ DOMAIN INTELLIGENCE — infer full apps from one command:
 - SOCIAL / FEED: post form, feed dataList, profile content, settings.
 - BOOKING / VENUE: venue form, venues_list, booking form, settings.
 - FITNESS: workoutPlan screens, progress stat, settings.
+- MONEY MAKING / SIDE HUSTLE / PASSIVE INCOME / EARN CASH / AFFILIATE: this is NOT a generic hero screen with a renamed title — it needs real earning mechanics. Build: home with a "stat" using "sumField":"amount" on collection "sales" (label "Total earned", prefix "\$") + menuGrid (Add listing→form, My listings→dataList, Record sale→form, Sales history→stat+dataList, Referral link→qrGenerator, Withdraw→form collection "payouts"). add_listing form (title, price as type "number", description as type "textarea", collection "listings"). add_sale form (item, amount as "number", buyer, collection "sales", navigateAfter "sales"). referral screen: text explaining the bonus + qrGenerator (mode "text") so they can share a code. withdraw form (amount, method, note, collection "payouts"). Wire shell.bottomNav across these screens.
 Always include ALL screens a real app of that type needs — never a single text screen.
+
+"stat" widget: add "sumField" (e.g. "amount") to total a numeric field instead of just counting records — use this for any earnings/revenue/total-sales dashboard. Add "prefix":"\$" for money.
+
+STRUCTURAL VS COSMETIC — when the user describes a different PURPOSE or TYPE of app than what is currently loaded (e.g. "turn this into a money making app", "make this a marketplace", "I want it to be a booking app instead"), you MUST restructure: add/replace screens, data collections, and navigation to match using the DOMAIN INTELLIGENCE above. Renaming the title/text on the existing screens WITHOUT adding the real screens/collections that domain needs is WRONG and will look broken to the user — they are asking for new functionality, not new words.
 
 Use kind "custom" with data.layout for ALL interactive screens. NEVER use kind "content" with only body text for features users can use.
 
@@ -544,6 +572,19 @@ Future<NgmyAppProject?> ngmyAppBuilderAiGenerateApp({
   final p = result.updatedProject;
   if (p == null) return null;
   return p.copyWith(ownerEmail: ownerEmail.toLowerCase().trim());
+}
+
+/// True when the message reads like "create/build/turn this into X" rather
+/// than a small tweak to the app already loaded (so mentioning e.g. "map" in
+/// passing doesn't hijack an unrelated edit on an existing project).
+bool _looksLikeBuildRequest(String message) {
+  final q = message.toLowerCase();
+  const verbs = [
+    'create', 'build', 'make', 'generate', 'give me', 'start over',
+    'turn this into', 'turn it into', 'i want an app', 'switch to', 'rebuild',
+    'convert this', 'change this into', 'change it into',
+  ];
+  return verbs.any((v) => q.contains(v));
 }
 
 String? _extractJson(String raw) {

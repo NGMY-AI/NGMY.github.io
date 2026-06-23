@@ -649,6 +649,11 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
       'add' => Icons.add_rounded,
       'venue' => Icons.location_city_rounded,
       'calendar' => Icons.calendar_month_rounded,
+      'list' => Icons.list_alt_rounded,
+      'sales' || 'money' || 'earnings' => Icons.attach_money_rounded,
+      'history' => Icons.history_rounded,
+      'share' || 'referral' => Icons.ios_share_rounded,
+      'wallet' || 'payout' || 'withdraw' => Icons.account_balance_wallet_rounded,
       _ => Icons.apps_rounded,
     };
   }
@@ -868,7 +873,23 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final collection = (node['collection'] ?? '').toString();
     final label = (node['label'] ?? 'Total').toString();
-    final count = collection.isEmpty ? 0 : store.recordCount(collection);
+    final sumField = (node['sumField'] ?? '').toString();
+    final prefix = (node['prefix'] ?? '').toString();
+    final suffix = (node['suffix'] ?? '').toString();
+    String display;
+    if (collection.isEmpty) {
+      display = sumField.isNotEmpty ? '${prefix}0' : '0';
+    } else if (sumField.isNotEmpty) {
+      final total = store.records(collection).fold<double>(0, (sum, record) {
+        final raw = record[sumField];
+        final n = raw is num ? raw : (num.tryParse(raw?.toString() ?? '') ?? 0);
+        return sum + n.toDouble();
+      });
+      final rounded = total == total.roundToDouble() ? total.toInt().toString() : total.toStringAsFixed(2);
+      display = '$prefix$rounded$suffix';
+    } else {
+      display = '$prefix${store.recordCount(collection)}$suffix';
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -877,7 +898,7 @@ class _StatCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text('$count', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32)),
+          Text(display, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32)),
           const SizedBox(width: 12),
           Expanded(child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14))),
         ],

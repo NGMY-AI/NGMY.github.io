@@ -360,6 +360,146 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
       _custom('settings', 'Settings', _settingsLayout('home')),
     ], appIcon: '📱'),
   ),
+  // Side hustle / money-making (showcase: Marketplace earnings)
+  NgmyAppTemplate(
+    id: 'side_hustle',
+    name: 'Side Hustle Marketplace',
+    description: 'Sell, track sales & get paid.',
+    icon: '💵',
+    badge: 'New',
+    themeColor: 0xFF16A34A,
+    build: (o) => _base(o, 'EarnFlow', 'Sell, track sales, and get paid', 0xFF16A34A, [
+      _custom('home', 'Dashboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Your earnings', 'style': 'title'},
+          {'type': 'stat', 'collection': 'sales', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total earned'},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'add', 'label': 'Add listing', 'target': 'add_listing'},
+            {'icon': 'list', 'label': 'My listings', 'target': 'listings'},
+            {'icon': 'sales', 'label': 'Record a sale', 'target': 'add_sale'},
+            {'icon': 'history', 'label': 'Sales history', 'target': 'sales'},
+            {'icon': 'share', 'label': 'Referral link', 'target': 'referral'},
+            {'icon': 'wallet', 'label': 'Withdraw', 'target': 'withdraw'},
+          ]},
+        ],
+      }),
+      _custom('add_listing', 'Add listing', {
+        'type': 'form', 'collection': 'listings', 'submitLabel': 'Save listing', 'successMessage': 'Listing added!', 'navigateAfter': 'listings',
+        'fields': [
+          {'id': 'title', 'label': 'What are you selling?', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+        ],
+      }),
+      _custom('listings', 'My listings', {
+        'type': 'dataList', 'collection': 'listings', 'titleField': 'title', 'subtitleField': 'price',
+        'emptyText': 'No listings yet — add your first item to sell.', 'addTarget': 'add_listing', 'addLabel': 'Add listing', 'allowDelete': true,
+      }),
+      _custom('add_sale', 'Record a sale', {
+        'type': 'form', 'collection': 'sales', 'submitLabel': 'Record sale', 'successMessage': 'Sale recorded — nice work!', 'navigateAfter': 'sales',
+        'fields': [
+          {'id': 'item', 'label': 'Item sold', 'type': 'text'},
+          {'id': 'amount', 'label': 'Sale amount (\$)', 'type': 'number'},
+          {'id': 'buyer', 'label': 'Buyer (optional)', 'type': 'text'},
+        ],
+      }),
+      _custom('sales', 'Sales history', {
+        'type': 'column',
+        'children': [
+          {'type': 'stat', 'collection': 'sales', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total earned'},
+          {'type': 'dataList', 'collection': 'sales', 'titleField': 'item', 'subtitleField': 'amount', 'emptyText': 'No sales yet.', 'addTarget': 'add_sale', 'addLabel': 'Record a sale', 'allowDelete': true},
+        ],
+      }),
+      _custom('referral', 'Referral link', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Earn by referring others', 'style': 'title'},
+          {'type': 'text', 'text': 'Share your link or code — generate a QR so people can scan and join.', 'style': 'body'},
+          {'type': 'qrGenerator', 'mode': 'text', 'title': 'Your referral code', 'placeholder': 'e.g. JOIN-WITH-ME10', 'accentColor': '#16A34A'},
+        ],
+      }),
+      _custom('withdraw', 'Withdraw earnings', {
+        'type': 'form', 'collection': 'payouts', 'submitLabel': 'Request payout', 'successMessage': 'Payout requested!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'amount', 'label': 'Amount to withdraw (\$)', 'type': 'number'},
+          {'id': 'method', 'label': 'Payout method (PayPal, Cash App, Bank)', 'type': 'text'},
+          {'id': 'note', 'label': 'Note (optional)', 'type': 'text'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '💵', shell: {
+      'bottomNav': [
+        {'icon': 'home', 'label': 'Home', 'target': 'home'},
+        {'icon': 'list', 'label': 'Listings', 'target': 'listings'},
+        {'icon': 'add', 'label': 'Sell', 'target': 'add_sale'},
+        {'icon': 'profile', 'label': 'Refer', 'target': 'referral'},
+        {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+      ],
+    }),
+  ),
+  // Booking & services (showcase: freelancer/service business earnings)
+  NgmyAppTemplate(
+    id: 'booking_pro',
+    name: 'Booking & Services',
+    description: 'Services, bookings & client earnings.',
+    icon: '📅',
+    themeColor: 0xFF7C3AED,
+    build: (o) => _base(o, 'BookFlow', 'Book services, track clients & earnings', 0xFF7C3AED, [
+      _custom('home', 'Dashboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Business overview', 'style': 'title'},
+          {'type': 'stat', 'collection': 'bookings', 'sumField': 'price', 'prefix': '\$', 'label': 'Total booked'},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'add', 'label': 'Add service', 'target': 'add_service'},
+            {'icon': 'list', 'label': 'Services', 'target': 'services'},
+            {'icon': 'calendar', 'label': 'New booking', 'target': 'add_booking'},
+            {'icon': 'history', 'label': 'Bookings', 'target': 'bookings'},
+            {'icon': 'person', 'label': 'Clients', 'target': 'add_client'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('add_service', 'Add service', {
+        'type': 'form', 'collection': 'services', 'submitLabel': 'Save service', 'successMessage': 'Service added!', 'navigateAfter': 'services',
+        'fields': [
+          {'id': 'name', 'label': 'Service name', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'duration', 'label': 'Duration (e.g. 30 min)', 'type': 'text'},
+        ],
+      }),
+      _custom('services', 'Services', {
+        'type': 'dataList', 'collection': 'services', 'titleField': 'name', 'subtitleField': 'price',
+        'emptyText': 'No services yet — add what you offer.', 'addTarget': 'add_service', 'addLabel': 'Add service', 'allowDelete': true,
+      }),
+      _custom('add_booking', 'New booking', {
+        'type': 'form', 'collection': 'bookings', 'submitLabel': 'Save booking', 'successMessage': 'Booking saved!', 'navigateAfter': 'bookings',
+        'fields': [
+          {'id': 'client', 'label': 'Client name', 'type': 'text'},
+          {'id': 'service', 'label': 'Service', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'date', 'label': 'Date & time', 'type': 'text'},
+        ],
+      }),
+      _custom('bookings', 'Bookings', {
+        'type': 'column',
+        'children': [
+          {'type': 'stat', 'collection': 'bookings', 'sumField': 'price', 'prefix': '\$', 'label': 'Total booked'},
+          {'type': 'dataList', 'collection': 'bookings', 'titleField': 'client', 'subtitleField': 'service', 'emptyText': 'No bookings yet.', 'addTarget': 'add_booking', 'addLabel': 'New booking', 'allowDelete': true},
+        ],
+      }),
+      _custom('add_client', 'Add client', {
+        'type': 'form', 'collection': 'clients', 'submitLabel': 'Save client', 'successMessage': 'Client saved!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Client name', 'type': 'text'},
+          {'id': 'phone', 'label': 'Phone', 'type': 'text'},
+          {'id': 'email', 'label': 'Email', 'type': 'text'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '📅'),
+  ),
   NgmyAppTemplate(
     id: 'blank',
     name: 'Blank Canvas',

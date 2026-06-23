@@ -20,7 +20,43 @@ class NgmyAppSocialBlueprints {
     if (q.contains('instagram') || q.contains('ig app')) {
       return 'instagram';
     }
+    if (q.contains('money making') ||
+        q.contains('money-making') ||
+        q.contains('make money') ||
+        q.contains('making money') ||
+        q.contains('money machine') ||
+        q.contains('money maker') ||
+        q.contains('side hustle') ||
+        q.contains('passive income') ||
+        q.contains('earn money') ||
+        q.contains('earn cash') ||
+        q.contains('earn extra') ||
+        q.contains('income app') ||
+        q.contains('hustle app') ||
+        (q.contains('affiliate') && !q.contains('map'))) {
+      return 'moneyMaker';
+    }
     return null;
+  }
+
+  /// Friendly label for the copilot's confirmation message.
+  static String label(String kind) {
+    switch (kind) {
+      case 'tiktok':
+        return 'TikTok-style video';
+      case 'facebook':
+        return 'Facebook-style social';
+      case 'google':
+        return 'Google-style search';
+      case 'instagram':
+        return 'Instagram-style photo & reels';
+      case 'maps':
+        return 'maps & navigation';
+      case 'moneyMaker':
+        return 'money-making';
+      default:
+        return kind;
+    }
   }
 
   static bool looksLikeGenericDemo(NgmyAppProject? project) {
@@ -45,6 +81,8 @@ class NgmyAppSocialBlueprints {
         return _instagram(ownerEmail: ownerEmail, name: name);
       case 'maps':
         return _maps(ownerEmail: ownerEmail, name: name);
+      case 'moneyMaker':
+        return _moneyMaker(ownerEmail: ownerEmail, name: name);
       default:
         return null;
     }
@@ -340,6 +378,204 @@ class NgmyAppSocialBlueprints {
               'children': [
                 {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'default': false},
                 {'type': 'button', 'label': 'Back to map', 'target': 'home'},
+              ],
+            },
+          },
+        ),
+      ],
+    );
+  }
+
+  static NgmyAppProject _moneyMaker({required String ownerEmail, String? name}) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    return NgmyAppProject(
+      id: 'app_money_${DateTime.now().millisecondsSinceEpoch}',
+      name: name ?? 'EarnFlow',
+      tagline: 'Sell, track sales, and get paid',
+      ownerEmail: ownerEmail,
+      themeColor: 0xFF16A34A,
+      appIcon: '💵',
+      createdAt: now,
+      updatedAt: now,
+      shell: {
+        'bottomNav': [
+          {'icon': 'home', 'label': 'Home', 'target': 'home'},
+          {'icon': 'list', 'label': 'Listings', 'target': 'listings'},
+          {'icon': 'add', 'label': 'Sell', 'target': 'add_sale'},
+          {'icon': 'profile', 'label': 'Refer', 'target': 'referral'},
+          {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+        ],
+      },
+      screens: [
+        NgmyAppScreen(
+          id: 'home',
+          title: 'Dashboard',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'text', 'text': 'Your earnings', 'style': 'title'},
+                {
+                  'type': 'stat',
+                  'collection': 'sales',
+                  'sumField': 'amount',
+                  'prefix': '\$',
+                  'label': 'Total earned',
+                },
+                {
+                  'type': 'menuGrid',
+                  'items': [
+                    {'icon': 'add', 'label': 'Add listing', 'target': 'add_listing'},
+                    {'icon': 'list', 'label': 'My listings', 'target': 'listings'},
+                    {'icon': 'sales', 'label': 'Record a sale', 'target': 'add_sale'},
+                    {'icon': 'history', 'label': 'Sales history', 'target': 'sales'},
+                    {'icon': 'share', 'label': 'Referral link', 'target': 'referral'},
+                    {'icon': 'wallet', 'label': 'Withdraw', 'target': 'withdraw'},
+                  ],
+                },
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'add_listing',
+          title: 'Add listing',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'form',
+              'collection': 'listings',
+              'submitLabel': 'Save listing',
+              'successMessage': 'Listing added!',
+              'navigateAfter': 'listings',
+              'fields': [
+                {'id': 'title', 'label': 'What are you selling?', 'type': 'text'},
+                {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+                {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'listings',
+          title: 'My listings',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'dataList',
+              'collection': 'listings',
+              'titleField': 'title',
+              'subtitleField': 'price',
+              'emptyText': 'No listings yet — add your first item to sell.',
+              'addTarget': 'add_listing',
+              'addLabel': 'Add listing',
+              'allowDelete': true,
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'add_sale',
+          title: 'Record a sale',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'form',
+              'collection': 'sales',
+              'submitLabel': 'Record sale',
+              'successMessage': 'Sale recorded — nice work!',
+              'navigateAfter': 'sales',
+              'fields': [
+                {'id': 'item', 'label': 'Item sold', 'type': 'text'},
+                {'id': 'amount', 'label': 'Sale amount (\$)', 'type': 'number'},
+                {'id': 'buyer', 'label': 'Buyer (optional)', 'type': 'text'},
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'sales',
+          title: 'Sales history',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {
+                  'type': 'stat',
+                  'collection': 'sales',
+                  'sumField': 'amount',
+                  'prefix': '\$',
+                  'label': 'Total earned',
+                },
+                {
+                  'type': 'dataList',
+                  'collection': 'sales',
+                  'titleField': 'item',
+                  'subtitleField': 'amount',
+                  'emptyText': 'No sales yet — record one to see it here.',
+                  'addTarget': 'add_sale',
+                  'addLabel': 'Record a sale',
+                  'allowDelete': true,
+                },
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'referral',
+          title: 'Referral link',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'text', 'text': 'Earn by referring others', 'style': 'title'},
+                {
+                  'type': 'text',
+                  'text': 'Share your link or code below — generate a QR code so people can scan and join.',
+                  'style': 'body',
+                },
+                {
+                  'type': 'qrGenerator',
+                  'mode': 'text',
+                  'title': 'Your referral code',
+                  'placeholder': 'e.g. JOIN-WITH-ME10',
+                  'accentColor': '#16A34A',
+                },
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'withdraw',
+          title: 'Withdraw earnings',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'form',
+              'collection': 'payouts',
+              'submitLabel': 'Request payout',
+              'successMessage': 'Payout requested!',
+              'navigateAfter': 'home',
+              'fields': [
+                {'id': 'amount', 'label': 'Amount to withdraw (\$)', 'type': 'number'},
+                {'id': 'method', 'label': 'Payout method (PayPal, Cash App, Bank)', 'type': 'text'},
+                {'id': 'note', 'label': 'Note (optional)', 'type': 'text'},
+              ],
+            },
+          },
+        ),
+        NgmyAppScreen(
+          id: 'settings',
+          title: 'Settings',
+          kind: NgmyAppScreenKind.custom,
+          data: {
+            'layout': {
+              'type': 'column',
+              'children': [
+                {'type': 'switch', 'setting': 'dark_mode', 'label': 'Dark mode', 'default': false},
+                {'type': 'button', 'label': 'Back to dashboard', 'target': 'home'},
               ],
             },
           },
