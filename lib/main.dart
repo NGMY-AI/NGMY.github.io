@@ -1346,7 +1346,12 @@ Future<bool> _safeUpsertUserRow(Map<String, dynamic> row) async {
   var working = Map<String, dynamic>.from(row);
   for (var i = 0; i < 12; i++) {
     try {
-      await Supabase.instance.client.from('users').upsert(working).timeout(kNgmyCloudWriteTimeout);
+      // users.id is the table's primary key, but every row here is keyed by
+      // email (a separate unique index) and never includes id — without
+      // onConflict, PostgREST's default upsert targets the primary key,
+      // tries to INSERT a brand-new row, and silently fails on the email
+      // unique-constraint violation, so existing rows never actually update.
+      await Supabase.instance.client.from('users').upsert(working, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e) ?? _missingColumnFromError(e);
@@ -2375,7 +2380,7 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
       'isCivicRegistryAdmin': u.isCivicRegistryAdmin,
       'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
       'civicRegistryAnchorState': u.civicRegistryAnchorState,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[user] civic registrar profile upsert: $e');
   }
@@ -3317,7 +3322,7 @@ Future<bool> _pushUserPhoneToCloud(UserData u) async {
     await Supabase.instance.client.from('users').upsert({
       'email': email,
       'phone': phone,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[user] phone upsert: $e');
@@ -3474,7 +3479,7 @@ Future<bool> _pushUserMediaProfileFast(UserData u) async {
       'mediaBio': u.mediaBio ?? '',
       'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
       'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[user media] fast upsert: $e');
@@ -4106,7 +4111,7 @@ Future<bool> _pushUserBalanceToCloud(UserData u, {bool allowDecrease = false}) a
     await Supabase.instance.client.from('users').upsert({
       'email': email,
       'accountBalance': local,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[user] balance upsert: $e');
@@ -4123,7 +4128,7 @@ Future<void> _pushUserContributionReceiptReads(UserData u) async {
       'email': email,
       'openedContributionReceiptKeys': u.openedContributionReceiptKeys,
       'dismissedContributionReceiptKeys': u.dismissedContributionReceiptKeys,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[user] contribution receipt reads upsert: $e');
   }
@@ -4138,7 +4143,7 @@ Future<void> _pushUserCanSellOnStore(UserData u) async {
       'email': email,
       'canSellOnStore': u.canSellOnStore,
       'can_sell_on_store': u.canSellOnStore,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[user] canSellOnStore upsert: $e');
   }
@@ -4151,7 +4156,7 @@ Future<void> _pushUserFreeTrialToCloud(UserData u) async {
       'email': u.email,
       'freeTrialActive': u.freeTrialActive,
       'freeTrialDailyAmount': u.freeTrialDailyAmount,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[user] trial upsert: $e');
   }
@@ -4173,7 +4178,7 @@ Future<bool> _upsertUserReadAnnouncements(UserData u) async {
       'email': u.email,
       'username': u.username,
       'readAnnouncementIds': u.readAnnouncementIds,
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[user read announcements] upsert: $e');
@@ -4194,7 +4199,7 @@ Future<bool> _upsertUserMediaSocialFields(UserData u) async {
       'mediaBio': u.mediaBio ?? '',
       'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
       'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
-    }).timeout(kNgmyCloudWriteTimeout);
+    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[user media social] upsert: $e');
@@ -8159,7 +8164,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await Supabase.instance.client.from('users').upsert(rows.map((r) {
         final u = UserData.fromJson(r);
         return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
-      }).toList());
+      }).toList(), onConflict: 'email');
     } catch (e) {
       debugPrint('[referral] cloud sync: $e');
     }
@@ -9242,6 +9247,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await _safeUpsertRows(
           'users',
           usersToSync.map((u) => _userRowForBulkSync(u, includeFreeTrial: true)).toList(),
+          onConflict: 'email',
         );
       }
       await _persistOperationalConfigToCloud(_config);
@@ -9715,7 +9721,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (!ok) {
       try {
-        await _safeUpsertRows('users', [Map<String, dynamic>.from(user.toJson())]);
+        await _safeUpsertRows('users', [Map<String, dynamic>.from(user.toJson())], onConflict: 'email');
         ok = true;
       } catch (e) {
         debugPrint('[user media sync] fallback upsert failed: $e');
@@ -12248,7 +12254,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return error.toString().contains("Could not find the table 'public.$table'");
   }
 
-  Future<bool> _safeUpsertRows(String table, List<Map<String, dynamic>> rows) async {
+  Future<bool> _safeUpsertRows(String table, List<Map<String, dynamic>> rows, {String? onConflict}) async {
     if (rows.isEmpty) return true;
     if (_disabledSupabaseTables.contains(table)) return false;
 
@@ -12257,7 +12263,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     for (int i = 0; i < 12; i++) {
       try {
-        await supabase.from(table).upsert(working).timeout(kNgmyCloudWriteTimeout);
+        await supabase.from(table).upsert(working, onConflict: onConflict).timeout(kNgmyCloudWriteTimeout);
         if (removed.isNotEmpty) {
           debugPrint('[$table] synced with removed columns: ${removed.join(', ')}');
         }
@@ -26394,7 +26400,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 .upsert(rows.map((r) {
                   final u = UserData.fromJson(r);
                   return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
-                }).toList())
+                }).toList(), onConflict: 'email')
                 .timeout(kNgmyCloudWriteTimeout)
                 .catchError((_) {}),
           );
@@ -30443,7 +30449,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       try {
         await Supabase.instance.client
             .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]))
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
             .timeout(kNgmyCloudWriteTimeout);
       } catch (e) {
         userCloudOk = false;
@@ -30479,7 +30485,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       try {
         await Supabase.instance.client
             .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]))
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
             .timeout(kNgmyCloudWriteTimeout);
       } catch (e) {
         userCloudOk = false;
