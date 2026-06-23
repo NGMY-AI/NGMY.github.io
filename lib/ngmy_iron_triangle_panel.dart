@@ -65,6 +65,10 @@ class NgmyIronTrianglePanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
+          // Fixed height so the panel never grows/shrinks as toggles change
+          // which result message (1 vs 2 lines) is shown.
+          height: 56,
+          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
@@ -82,6 +86,8 @@ class NgmyIronTrianglePanel extends StatelessWidget {
           child: Text(
             resultText,
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.88),
               fontWeight: FontWeight.w600,
@@ -283,18 +289,53 @@ class NgmyChromeTrianglePainter extends CustomPainter {
       ..lineTo(right.dx, right.dy)
       ..lineTo(left.dx, left.dy)
       ..close();
+    final bounds = Rect.fromLTWH(0, 0, w, h);
 
+    // Drop shadow under the plate so it reads as a solid cast-iron slab.
+    canvas.drawPath(
+      path.shift(const Offset(0, 2.2)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+
+    // Solid forged-iron fill — dark gunmetal core, not a thin wire outline.
     canvas.drawPath(
       path,
       Paint()
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFE5E7EB), Color(0xFF9CA3AF), Color(0xFF4B5563)],
-        ).createShader(Rect.fromLTWH(0, 0, w, h))
+          colors: [Color(0xFF94A3B8), Color(0xFF475569), Color(0xFF1E293B), Color(0xFF111827)],
+          stops: [0.0, 0.32, 0.72, 1.0],
+        ).createShader(bounds),
+    );
+
+    // Diagonal brushed-metal sheen across the slab.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment(-1.0, -1.0),
+          end: Alignment(0.5, 0.7),
+          colors: [Color(0x40FFFFFF), Colors.transparent, Color(0x33000000)],
+          stops: [0.0, 0.45, 1.0],
+        ).createShader(bounds),
+    );
+
+    // Bright bevel edge along the top-left faces, dark edge bottom-right —
+    // the classic cast-metal highlight/shadow pairing.
+    canvas.drawPath(
+      path,
+      Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.8
-        ..strokeJoin = StrokeJoin.round,
+        ..strokeWidth = 1.6
+        ..strokeJoin = StrokeJoin.round
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF1F5F9), Color(0xFF64748B), Color(0xFF020617)],
+        ).createShader(bounds),
     );
 
     _vertex(canvas, top, fastOn, const Color(0xFFF97316));
