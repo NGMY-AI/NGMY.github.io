@@ -37,6 +37,8 @@ import 'ngmy_back_scope.dart';
 import 'ngmy_barcode_lookup.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_iron_triangle_panel.dart';
+import 'ngmy_invoice_guest.dart';
+import 'ngmy_admin_invoice_publisher.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
@@ -451,6 +453,8 @@ void main() async {
 
   final guestAppSlug = kIsWeb ? ngmyPublishedAppSlugFromLaunch() : null;
   final isGuestPublishedApp = guestAppSlug != null && guestAppSlug.trim().isNotEmpty;
+  final guestInvoiceSlug = kIsWeb && !isGuestPublishedApp ? ngmyPublishedInvoiceSlugFromLaunch() : null;
+  final isGuestPublishedInvoice = guestInvoiceSlug != null && guestInvoiceSlug.trim().isNotEmpty;
 
   Future<void> initSupabase() async {
     try {
@@ -463,14 +467,18 @@ void main() async {
     }
   }
 
-  // Guest app links need cloud registry — init Supabase before first load attempt.
-  if (isGuestPublishedApp) {
+  // Guest app/invoice links need cloud registry — init Supabase before first load attempt.
+  if (isGuestPublishedApp || isGuestPublishedInvoice) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
   }
 
   runZonedGuarded(() {
     if (isGuestPublishedApp) {
       runApp(NgmyGuestPublishedApp(slug: guestAppSlug.trim().toLowerCase()));
+      return;
+    }
+    if (isGuestPublishedInvoice) {
+      runApp(NgmyGuestPublishedInvoice(slug: guestInvoiceSlug.trim().toLowerCase()));
       return;
     }
     final app = NGMYApp(launchBootstrap: launchBootstrap);
@@ -481,7 +489,7 @@ void main() async {
     debugPrint('[zone] $e\n$st');
   });
 
-  if (!isGuestPublishedApp) {
+  if (!isGuestPublishedApp && !isGuestPublishedInvoice) {
     // Never block first frame on cloud — cold start offline must show cached home immediately.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12)));
   }
@@ -20367,10 +20375,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminWallet(isDark),
       _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
+      NgmyAdminInvoicePublisherScreen(adminEmail: widget.user.email),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 7)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -20418,6 +20427,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
             _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
             _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(7, Icons.receipt_long_rounded, 'Invoices', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -20532,7 +20542,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR", "INVOICES"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
