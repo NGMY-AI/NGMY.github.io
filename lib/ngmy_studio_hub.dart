@@ -94,11 +94,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         },
       ),
       _CreatorTool(
-        icon: Icons.change_history_rounded,
-        colors: const [Color(0xFF64748B), Color(0xFF1E293B)],
-        title: 'Pick Two',
-        subtitle: 'Price calculator & estimates',
-        onTap: () => NgmyHubToolBridge.invokeOrSnack(context, NgmyHubToolBridge.openPickTwo, 'Pick Two'),
+        icon: Icons.request_quote_rounded,
+        colors: const [Color(0xFF16A34A), Color(0xFF065F46)],
+        title: 'Quote Calc',
+        subtitle: 'Invoices, rates & estimates',
+        onTap: () => NgmyHubToolBridge.invokeOrSnack(context, NgmyHubToolBridge.openPickTwo, 'Quote Calc'),
       ),
       _CreatorTool(
         icon: Icons.qr_code_2_rounded,
@@ -272,7 +272,7 @@ class _CreatorToolCard extends StatelessWidget {
             border: Border.all(color: tool.colors.first.withValues(alpha: 0.35)),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Center(
@@ -289,6 +289,7 @@ class _CreatorToolCard extends StatelessWidget {
               ),
               Text(
                 tool.title,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w900,
@@ -298,6 +299,7 @@ class _CreatorToolCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 tool.subtitle,
+                textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

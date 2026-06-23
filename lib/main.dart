@@ -21268,7 +21268,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       categoryShell(
                         title: 'G-Services Estimates',
-                        subtitle: 'Monthly photo repair estimates in Pick Two calculator',
+                        subtitle: 'Monthly photo repair estimates in Quote Calc',
                         icon: Icons.account_balance_wallet_rounded,
                         accent: const Color(0xFF06B6D4),
                         expanded: repairEstimateExpanded,
@@ -28439,12 +28439,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            gradient: const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFF4B5563), Color(0xFF1F2937)]),
+                            gradient: const LinearGradient(colors: [Color(0xFF16A34A), Color(0xFF065F46)]),
                           ),
-                          child: const Icon(Icons.change_history_rounded, color: Colors.white, size: 16),
+                          child: const Icon(Icons.request_quote_rounded, color: Colors.white, size: 16),
                         ),
                         const SizedBox(width: 8),
-                        const Text('Pick Two', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 0.3)),
+                        const Text('Quote Calc', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 0.3)),
                         const Spacer(),
                         IconButton(
                           visualDensity: VisualDensity.compact,
