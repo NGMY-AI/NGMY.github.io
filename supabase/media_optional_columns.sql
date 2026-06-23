@@ -34,9 +34,19 @@ alter table public.media add column if not exists monetization jsonb default '{}
 
 
 
--- Realtime: new posts + pending wallet requests reach admins/other users
+-- Realtime: new posts + pending wallet requests reach admins/other users (safe to re-run)
 
-alter publication supabase_realtime add table public.media;
-
-alter publication supabase_realtime add table public.transactions;
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['media', 'transactions'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 

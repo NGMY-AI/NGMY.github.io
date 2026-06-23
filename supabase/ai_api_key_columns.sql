@@ -27,3 +27,4 @@ drop policy if exists "config_write_all_update" on public.config;
 create policy "config_read_all" on public.config for select using (true);
 create policy "config_write_all_insert" on public.config for insert with check (true);
 create policy "config_write_all_update" on public.config for update using (true);
+Japanese are incredibly smart they invented this super useful double sided tape this isn't ordinary tape it's nano tape cut it precisely to the length you need stick it wherever you want and when you're done peel it off easily without leaving any sticky residue it can fix almost anything mount a router hang wall art and even if you hammer it it won't come off even carpets that always slip 1 strip and they're locked in place gets dirty no worries just rinse it with water and it's clean again plus it's reusable and the

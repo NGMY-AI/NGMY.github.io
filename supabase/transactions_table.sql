@@ -1,5 +1,6 @@
 -- NGMY wallet transactions (deposits, withdrawals, admin adjustments)
 -- Run in Supabase → SQL Editor if deposit/withdraw approvals do not sync.
+-- Safe to run more than once (skips realtime if already published).
 
 create table if not exists public.transactions (
   id text primary key,
@@ -30,5 +31,13 @@ create policy "transactions_insert" on public.transactions for insert with check
 create policy "transactions_update" on public.transactions for update using (true);
 create policy "transactions_delete" on public.transactions for delete using (true);
 
--- Realtime: other users + admin see approvals immediately
-alter publication supabase_realtime add table public.transactions;
+-- Realtime: other users + admin see approvals immediately (no error if already added)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'transactions'
+  ) then
+    alter publication supabase_realtime add table public.transactions;
+  end if;
+end $$;

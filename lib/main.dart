@@ -100,7 +100,6 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_hub_tools_bridge.dart';
-import 'ngmy_hub_order_lookup.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart';
 import 'ngmy_help_center_admin.dart';
@@ -27625,9 +27624,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   final _itemQtyC = TextEditingController(text: '1');
   final _itemDiscountC = TextEditingController(text: '0');
   final _paymentInfoC = TextEditingController(text: 'Thank you for your business!');
-  final _civicOrderC = TextEditingController();
-  final _storeOrderC = TextEditingController();
-  final _helpOrderC = TextEditingController();
 
   @override
   void initState() {
@@ -27743,9 +27739,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _itemQtyC.dispose();
     _itemDiscountC.dispose();
     _paymentInfoC.dispose();
-    _civicOrderC.dispose();
-    _storeOrderC.dispose();
-    _helpOrderC.dispose();
     for (final c in [_bizNameC, _bizStreetC, _bizCityStateZipC, _bizPhoneC, _paymentInfoC]) {
       c.removeListener(_persistInvoiceProviderProfile);
     }
@@ -27797,15 +27790,13 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                 crossAxisCount: 2,
                 mainAxisSpacing: 15,
                 crossAxisSpacing: 15,
-                childAspectRatio: 1.35,
+                childAspectRatio: 1.6,
                 children: [
-                  _hubServiceBox(
-                    title: 'Civic Registry',
-                    icon: Icons.shield_outlined,
-                    colors: civicColors,
-                    orderController: _civicOrderC,
-                    orderChannel: 'civic',
-                    onTap: () => NgmyNavigator.push(
+                  _hubBox(
+                    'Civic Registry',
+                    Icons.shield_outlined,
+                    civicColors,
+                    () => NgmyNavigator.push(
                       context,
                       CivicRegistryScreen(
                         user: widget.user,
@@ -27818,13 +27809,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       routeName: 'CivicRegistryScreen',
                     ),
                   ),
-                  _hubServiceBox(
-                    title: 'NGMY Store',
-                    icon: Icons.shopping_bag_outlined,
-                    colors: storeColors,
-                    orderController: _storeOrderC,
-                    orderChannel: 'store',
-                    onTap: () => NgmyNavigator.push(
+                  _hubBox(
+                    'NGMY Store',
+                    Icons.shopping_bag_outlined,
+                    storeColors,
+                    () => NgmyNavigator.push(
                       context,
                       NgmyStoreScreen(
                         user: widget.user,
@@ -27836,13 +27825,11 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                       routeName: 'NgmyStoreScreen',
                     ),
                   ),
-                  _hubServiceBox(
-                    title: 'Help Center',
-                    icon: Icons.support_agent_rounded,
-                    colors: helpColors,
-                    orderController: _helpOrderC,
-                    orderChannel: 'help',
-                    onTap: () => NgmyNavigator.push(
+                  _hubBox(
+                    'Help Center',
+                    Icons.support_agent_rounded,
+                    helpColors,
+                    () => NgmyNavigator.push(
                       context,
                       NgmyHelpCenterScreen(
                         configMap: widget.config.helpCenterHub,
@@ -29180,94 +29167,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _hubServiceBox({
-    required String title,
-    required IconData icon,
-    required List<Color> colors,
-    required TextEditingController orderController,
-    required String orderChannel,
-    required VoidCallback onTap,
-  }) {
-    void lookupOrder([String? query]) {
-      showNgmyHubOrderLookup(
-        context: context,
-        channel: orderChannel,
-        config: widget.config,
-        userEmail: widget.user.email,
-        initialQuery: query ?? orderController.text,
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: colors[0].withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(14),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 26, color: Colors.white),
-                    const SizedBox(height: 6),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Material(
-            color: Colors.black26,
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: orderController,
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Order #',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                      ),
-                      onSubmitted: lookupOrder,
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    onPressed: () => lookupOrder(),
-                    icon: const Icon(Icons.search_rounded, color: Colors.white, size: 16),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

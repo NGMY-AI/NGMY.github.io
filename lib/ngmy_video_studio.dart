@@ -603,39 +603,86 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: _panel,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.white,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF130B26), Color(0xFF062018)],
+            ),
+            border: Border(bottom: BorderSide(color: Color(0x33FFFFFF), width: 1)),
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: _closeStudio,
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.live_tv_rounded, color: _accent, size: 22),
-            SizedBox(width: 10),
-            Text('NGMY Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+                ),
+                boxShadow: [
+                  BoxShadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text('NGMY Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
           ],
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 4),
-            child: FilledButton.icon(
-              onPressed: _exporting ? null : _export,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF00B25A),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFF00B25A).withValues(alpha: 0.55),
-                disabledForegroundColor: Colors.white70,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                gradient: _exporting
+                    ? null
+                    : const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00D4A0)]),
+                color: _exporting ? const Color(0xFF00B25A).withValues(alpha: 0.45) : null,
+                boxShadow: _exporting
+                    ? null
+                    : [BoxShadow(color: const Color(0xFF00B25A).withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))],
               ),
-              icon: _exporting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.download_rounded, size: 18),
-              label: Text(_exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download'),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _exporting ? null : _export,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _exporting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          _exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           IconButton(icon: const Icon(Icons.close_rounded), onPressed: _closeStudio),
@@ -749,10 +796,18 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.all(3),
-              child: Material(
-                color: sel ? _accent : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: sel ? const LinearGradient(colors: [kNgmyStudioNavAccent, _accent]) : null,
+                  boxShadow: sel
+                      ? [BoxShadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]
+                      : null,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => _setFormat(f),
                   child: Padding(
@@ -769,6 +824,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                         Text(f.sizeLabel, style: TextStyle(color: sel ? Colors.white70 : Colors.white38, fontSize: 9)),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ),
@@ -933,7 +989,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Preview · ${_format.sizeLabel}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+          _panelTitle(Icons.smart_display_rounded, 'Preview · ${_format.sizeLabel}'),
           const SizedBox(height: 8),
           AspectRatio(
             aspectRatio: _format.aspectRatio,
@@ -1262,7 +1318,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Media layers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+            _panelTitle(Icons.layers_rounded, 'Media layers'),
             if (_picking)
               LinearProgressIndicator(
                 minHeight: 2,
@@ -1347,7 +1403,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(isLogo ? 'Brand logo' : 'Resize: ${slotDef.label}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                      _panelTitle(isLogo ? Icons.workspace_premium_rounded : Icons.aspect_ratio_rounded, isLogo ? 'Brand logo' : 'Resize: ${slotDef.label}'),
                       if (isLogo) ...[
                         const SizedBox(height: 6),
                         SwitchListTile(
@@ -1415,10 +1471,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                _def.isNewsBanner ? 'Overlay text' : 'Text overlays',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
-              ),
+              _panelTitle(Icons.text_fields_rounded, _def.isNewsBanner ? 'Overlay text' : 'Text overlays'),
               const SizedBox(height: 4),
               Text(
                 'Main banner · brand name · social left · social right',
@@ -1453,6 +1506,25 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         ),
       ],
     ];
+  }
+
+  Widget _panelTitle(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          ShaderMask(
+            shaderCallback: (bounds) =>
+                const LinearGradient(colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2]).createShader(bounds),
+            child: Icon(icon, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _field(String label, TextEditingController c, {int maxLines = 1}) {

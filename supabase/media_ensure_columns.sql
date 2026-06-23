@@ -1,21 +1,6 @@
--- NGMY Media Hub — run in Supabase SQL Editor
--- REQUIRED: also run storage_media_bucket.sql (creates bucket + upload policies)
+-- NGMY Media — ensure columns exist on legacy media tables (safe to re-run).
+-- Run before media indexes, or include via SUPABASE_SETUP.sql / media_tables.sql.
 
-create table if not exists public.media (
-  id text primary key,
-  "userEmail" text not null default '',
-  username text not null default 'User',
-  "videoUrl" text not null default '',
-  "contentType" text not null default 'video',
-  caption text not null default '',
-  timestamp text not null default '',
-  likes integer not null default 0,
-  "likedBy" jsonb not null default '[]'::jsonb,
-  "savedBy" jsonb not null default '[]'::jsonb,
-  comments jsonb not null default '[]'::jsonb
-);
-
--- Legacy tables: add missing columns before creating indexes.
 alter table public.media add column if not exists "userEmail" text not null default '';
 alter table public.media add column if not exists username text not null default 'User';
 alter table public.media add column if not exists "videoUrl" text not null default '';
@@ -32,6 +17,17 @@ alter table public.media add column if not exists data jsonb default '{}'::jsonb
 alter table public.media add column if not exists updated_at timestamptz default now();
 alter table public.media add column if not exists created_at timestamptz default now();
 
+-- Backfill timestamp from legacy date columns when empty.
+update public.media
+set timestamp = to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+where (timestamp is null or trim(timestamp) = '')
+  and created_at is not null;
+
+update public.media
+set timestamp = to_char(updated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+where (timestamp is null or trim(timestamp) = '')
+  and updated_at is not null;
+
 do $$
 begin
   if exists (
@@ -44,24 +40,10 @@ begin
     where table_schema = 'public' and table_name = 'media' and column_name = 'updated_at'
   ) then
     execute 'create index if not exists media_updated_at_idx on public.media (updated_at desc)';
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'media' and column_name = 'created_at'
+  ) then
+    execute 'create index if not exists media_created_at_idx on public.media (created_at desc)';
   end if;
 end $$;
-
-alter table public.media enable row level security;
-
-drop policy if exists "media_read" on public.media;
-drop policy if exists "media_insert" on public.media;
-drop policy if exists "media_update" on public.media;
-drop policy if exists "media_delete" on public.media;
-
-create policy "media_read" on public.media for select using (true);
-create policy "media_insert" on public.media for insert with check (true);
-create policy "media_update" on public.media for update using (true);
-create policy "media_delete" on public.media for delete using (true);
-
--- Run media_optional_columns.sql for monetization / tags / extra realtime tables
-
--- Realtime (required for deletes to disappear on other users' phones immediately):
--- Supabase Dashboard → Database → Publications → supabase_realtime → enable table "media"
--- Or run once (if your project allows):
--- alter publication supabase_realtime add table public.media;

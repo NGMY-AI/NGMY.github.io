@@ -74,7 +74,8 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hubTools = <_CreatorTool>[
+    // Pinned top order: Doc Share → AI Outfit → Video Studio. Add new tools at the bottom only.
+    final tools = <_CreatorTool>[
       _CreatorTool(
         icon: Icons.folder_shared_rounded,
         colors: const [Color(0xFF0D9488), Color(0xFF059669)],
@@ -91,6 +92,32 @@ class NgmyCreatorHubTab extends StatelessWidget {
             onPersistConfig: onPersistConfig ?? () async => false,
           );
         },
+      ),
+      _CreatorTool(
+        icon: Icons.style_rounded,
+        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
+        title: 'AI Outfit',
+        subtitle: 'Virtual dress try-on',
+        onTap: () {
+          showNgmyOutfitStudio(
+            context: context,
+            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
+          );
+        },
+      ),
+      _CreatorTool(
+        icon: Icons.movie_creation_rounded,
+        colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
+        title: 'Video Studio',
+        subtitle: 'Templates, clips & export',
+        onTap: () => showNgmyVideoStudio(context),
+      ),
+      _CreatorTool(
+        icon: Icons.precision_manufacturing_rounded,
+        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
+        title: '3D Mechanic Lab',
+        subtitle: 'Disassemble cars & learn parts',
+        onTap: () => showNgmyMechanicStudio(context: context),
       ),
       _CreatorTool(
         icon: Icons.change_history_rounded,
@@ -127,35 +154,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
       ),
     ];
 
-    final studioTools = <_CreatorTool>[
-      _CreatorTool(
-        icon: Icons.style_rounded,
-        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
-        title: 'AI Outfit',
-        subtitle: 'Virtual dress try-on',
-        onTap: () {
-          showNgmyOutfitStudio(
-            context: context,
-            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
-          );
-        },
-      ),
-      _CreatorTool(
-        icon: Icons.movie_creation_rounded,
-        colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
-        title: 'Video Studio',
-        subtitle: 'Templates, clips & export',
-        onTap: () => showNgmyVideoStudio(context),
-      ),
-      _CreatorTool(
-        icon: Icons.precision_manufacturing_rounded,
-        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
-        title: '3D Mechanic Lab',
-        subtitle: 'Disassemble cars & learn parts',
-        onTap: () => showNgmyMechanicStudio(context: context),
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
@@ -169,14 +167,19 @@ class NgmyCreatorHubTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _CreatorHubTitle(),
-                    const SizedBox(height: 16),
-                    _sectionLabel(context, 'Share & hub tools'),
-                    const SizedBox(height: 10),
-                    _toolGrid(context, hubTools),
-                    const SizedBox(height: 22),
-                    _sectionLabel(context, 'Studios'),
-                    const SizedBox(height: 10),
-                    _toolGrid(context, studioTools),
+                    const SizedBox(height: 18),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.08,
+                      ),
+                      itemCount: tools.length,
+                      itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
+                    ),
                   ],
                 ),
               ),
@@ -184,33 +187,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _sectionLabel(BuildContext context, String text) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
-        fontWeight: FontWeight.w800,
-        fontSize: 10,
-        letterSpacing: 1.1,
-      ),
-    );
-  }
-
-  Widget _toolGrid(BuildContext context, List<_CreatorTool> tools) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.08,
-      ),
-      itemCount: tools.length,
-      itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
     );
   }
 }
@@ -298,16 +274,19 @@ class _CreatorToolCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: tool.colors),
-                  borderRadius: BorderRadius.circular(16),
+              Expanded(
+                child: Center(
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: tool.colors),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(tool.icon, color: Colors.white, size: 46),
+                  ),
                 ),
-                child: Icon(tool.icon, color: Colors.white, size: 38),
               ),
-              const Spacer(),
               Text(
                 tool.title,
                 style: TextStyle(

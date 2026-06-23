@@ -1,11 +1,20 @@
 -- NGMY MEDIA FIX — Run once in Supabase SQL Editor (after your other steps)
 -- Fixes "Sync failed / database row failed" when posting photos or videos
+-- Also fixes: ERROR 42703 column "timestamp" does not exist
 
+alter table public.media add column if not exists timestamp text not null default '';
 alter table public.media add column if not exists data jsonb default '{}'::jsonb;
 alter table public.media add column if not exists updated_at timestamptz default now();
+alter table public.media add column if not exists created_at timestamptz default now();
 
 alter table public.media add column if not exists "userEmail" text default '';
+alter table public.media add column if not exists username text default 'User';
 alter table public.media add column if not exists "videoUrl" text default '';
 alter table public.media add column if not exists "contentType" text default 'video';
+alter table public.media add column if not exists caption text default '';
+alter table public.media add column if not exists likes integer default 0;
 alter table public.media add column if not exists "likedBy" jsonb default '[]'::jsonb;
 alter table public.media add column if not exists "savedBy" jsonb default '[]'::jsonb;
+alter table public.media add column if not exists comments jsonb default '[]'::jsonb;
+
+create index if not exists media_timestamp_idx on public.media ("timestamp" desc);

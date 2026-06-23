@@ -86,7 +86,36 @@ create table if not exists public.media (
   comments jsonb not null default '[]'::jsonb
 );
 
-create index if not exists media_timestamp_idx on public.media (timestamp desc);
+alter table public.media add column if not exists "userEmail" text not null default '';
+alter table public.media add column if not exists username text not null default 'User';
+alter table public.media add column if not exists "videoUrl" text not null default '';
+alter table public.media add column if not exists "contentType" text not null default 'video';
+alter table public.media add column if not exists caption text not null default '';
+alter table public.media add column if not exists timestamp text not null default '';
+alter table public.media add column if not exists likes integer not null default 0;
+alter table public.media add column if not exists "likedBy" jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists "savedBy" jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists comments jsonb not null default '[]'::jsonb;
+alter table public.media add column if not exists url text;
+alter table public.media add column if not exists type text;
+alter table public.media add column if not exists data jsonb default '{}'::jsonb;
+alter table public.media add column if not exists updated_at timestamptz default now();
+alter table public.media add column if not exists created_at timestamptz default now();
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'media' and column_name = 'timestamp'
+  ) then
+    execute 'create index if not exists media_timestamp_idx on public.media ("timestamp" desc)';
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'media' and column_name = 'updated_at'
+  ) then
+    execute 'create index if not exists media_updated_at_idx on public.media (updated_at desc)';
+  end if;
+end $$;
 
 alter table public.media enable row level security;
 
