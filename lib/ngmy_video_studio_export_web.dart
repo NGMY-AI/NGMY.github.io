@@ -229,6 +229,37 @@ int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
   }
 }
 
+/// Samples 5 spread-out points instead of 1 — a single center pixel can sit
+/// on a static-colored part of the video (a plain background, a logo) for
+/// long stretches of genuinely fine footage, which previously made the
+/// freeze-detector reject good recordings as "frozen".
+List<int>? _sampleCanvasRegionFingerprint(
+  html.CanvasRenderingContext2D ctx,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+  int canvasW,
+  int canvasH,
+) {
+  const offsets = [
+    [0.5, 0.5],
+    [0.2, 0.2],
+    [0.8, 0.2],
+    [0.2, 0.8],
+    [0.8, 0.8],
+  ];
+  final out = <int>[];
+  for (final o in offsets) {
+    final x = (dx + dw * o[0]).round().clamp(0, canvasW - 1);
+    final y = (dy + dh * o[1]).round().clamp(0, canvasH - 1);
+    final v = _sampleCanvasPixel(ctx, x, y);
+    if (v == null) return null;
+    out.add(v);
+  }
+  return out;
+}
+
 html.VideoElement? _exportAudioElement;
 html.VideoElement? _ngmyWebAudioSourceVideo;
 Object? _ngmyExportAudioContext;
@@ -621,11 +652,16 @@ void _styleExportCanvas(html.CanvasElement canvas, int w, int h) {
     ..style.top = '0'
     ..style.width = '${w}px'
     ..style.height = '${h}px'
-    ..style.opacity = '0.05'
+    ..style.opacity = '0.03'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '2'
+    ..style.zIndex = '2147483639'
     ..style.transform = 'translateZ(0)';
   canvas.style.setProperty('will-change', 'transform');
+  // Same technique as _stageHiddenVideoElement — captureStream() reads the
+  // painted buffer regardless of clipping, but without this the template
+  // animation flickers faintly on top of the whole app during export.
+  canvas.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
+  canvas.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
 }
 
 html.MediaStream _videoOnlyStream(html.MediaStream source) {
@@ -929,7 +965,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   required html.MediaStream stream,
   required String mimeType,
   required void Function() paintFrame,
-  required int? Function()? samplePaintFingerprint,
+  required List<int>? Function()? samplePaintFingerprint,
   required List<html.VideoElement> videoList,
   required html.VideoElement? primaryVideo,
   required double durationSec,
@@ -938,6 +974,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   required bool seekSyncPlayback,
   required bool withAudio,
 }) async {
+
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
@@ -1033,7 +1070,7 @@ Future<List<html.Blob>> _recordCanvasExport({
       await _playVideoForRecord(audioVideo);
     }
 
-    int? lastFp;
+    List<int>? lastFp;
     var sameFpStreak = 0;
     var distinctFpCount = 0;
 
@@ -1051,7 +1088,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
       final fp = samplePaintFingerprint?.call();
       if (fp != null) {
-        if (fp == lastFp) {
+        if (listEquals(fp, lastFp)) {
           sameFpStreak++;
         } else {
           sameFpStreak = 0;
@@ -1115,7 +1152,7 @@ Future<List<html.Blob>> _recordCanvasExport({
     var tick = 0;
     var lastT = -1.0;
     var stallTicks = 0;
-    int? lastFp;
+    List<int>? lastFp;
     var distinctFpCount = 0;
 
     while (DateTime.now().isBefore(wallEnd) &&
@@ -1141,7 +1178,7 @@ Future<List<html.Blob>> _recordCanvasExport({
       maxRecordedSec = math.max(maxRecordedSec, t);
       final fp = samplePaintFingerprint?.call();
       if (fp != null && t > 0.08) {
-        if (fp != lastFp) {
+        if (!listEquals(fp, lastFp)) {
           distinctFpCount++;
           lastFp = fp;
         }
@@ -1642,7 +1679,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
     } catch (_) {}
 
-    int? paintFingerprint;
+    List<int>? paintFingerprint;
 
     void paintFrame() {
       if (backdrop != null) {
@@ -1680,11 +1717,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
           if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
             _drawVideoInSlot(ctx, video, r, dx, dy, dw, dh, w, h);
             if (video == primaryVideo) {
-              paintFingerprint = _sampleCanvasPixel(
-                ctx,
-                (dx + dw / 2).round().clamp(0, w - 1),
-                (dy + dh / 2).round().clamp(0, h - 1),
-              );
+              paintFingerprint = _sampleCanvasRegionFingerprint(ctx, dx, dy, dw, dh, w, h);
             }
           }
         } catch (e) {
