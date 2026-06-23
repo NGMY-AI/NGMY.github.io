@@ -82,19 +82,20 @@ List<NgmyInvoiceTemplate> ngmyEssentialLuxuryTemplates() =>
     ngmyInvoiceTemplates().where((t) => t.essentialLuxury).toList();
 
 List<NgmyInvoiceTemplate> ngmyInvoiceTemplates() => const [
-  // Standard — redesigned classics
-  NgmyInvoiceTemplate(id: 'modern', label: 'Modern', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.modernWave, gradient: [Color(0xFF0B1F3A), Color(0xFF00B4D8)], accent: Color(0xFF00B4D8)),
-  NgmyInvoiceTemplate(id: 'corporate', label: 'Corporate', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.standardCorporateLux, gradient: [Color(0xFF0A1628), Color(0xFF1E3A8A), Color(0xFF0F172A)], accent: Color(0xFFD4AF37), accent2: Color(0xFF2563EB)),
-  NgmyInvoiceTemplate(id: 'rose_gold', label: 'Rose Gold', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.roseLuxury, gradient: [Color(0xFFF8E8E8), Color(0xFFE29595)], accent: Color(0xFFB76E79), accent2: Color(0xFF301934), lightBackground: true),
-  NgmyInvoiceTemplate(id: 'emerald', label: 'Emerald', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.emeraldPrestige, gradient: [Color(0xFF022C22), Color(0xFF065F46)], accent: Color(0xFF10B981), accent2: Color(0xFFD4AF37)),
+  // Standard — only these five are free; order matches the picker grid.
   NgmyInvoiceTemplate(id: 'creative', label: 'Creative', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.standardCreativeLux, gradient: [Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFF831843)], accent: Color(0xFFC084FC), accent2: Color(0xFFEC4899)),
-  NgmyInvoiceTemplate(id: 'exclusive', label: 'Exclusive', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.exclusiveGold, gradient: [Color(0xFF0C0C0C), Color(0xFF1A1A2E)], accent: Color(0xFFD4AF37), accent2: Color(0xFFC0C0C0)),
-  NgmyInvoiceTemplate(id: 'classic', label: 'Classic', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.standardClassicLux, gradient: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)], accent: Color(0xFFCBD5E1), accent2: Color(0xFFD4AF37)),
+  NgmyInvoiceTemplate(id: 'modern', label: 'Modern', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.modernWave, gradient: [Color(0xFF0B1F3A), Color(0xFF00B4D8)], accent: Color(0xFF00B4D8)),
+  NgmyInvoiceTemplate(id: 'rose_gold', label: 'Rose Gold', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.roseLuxury, gradient: [Color(0xFFF8E8E8), Color(0xFFE29595)], accent: Color(0xFFB76E79), accent2: Color(0xFF301934), lightBackground: true),
   NgmyInvoiceTemplate(id: 'minimal', label: 'Minimal', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.standardMinimalLux, gradient: [Color(0xFFFFFBF5), Color(0xFFF5F0E8), Color(0xFFE8E0D4)], accent: Color(0xFFB8860B), accent2: Color(0xFF78716C), lightBackground: true),
-  NgmyInvoiceTemplate(id: 'executive', label: 'Executive', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.classic, gradient: [Color(0xFF0F172A), Color(0xFF1E293B)], accent: Color(0xFF94A3B8)),
-  NgmyInvoiceTemplate(id: 'gold_foil', label: 'Gold Foil', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.goldFoil, gradient: [Color(0xFF1C1917), Color(0xFF44403C)], accent: Color(0xFFFBBF24)),
-  NgmyInvoiceTemplate(id: 'marble', label: 'Marble', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.marble, gradient: [Color(0xFFF5F5F4), Color(0xFFE7E5E4)], accent: Color(0xFF78716C), lightBackground: true),
   NgmyInvoiceTemplate(id: 'diamond', label: 'Diamond', category: kNgmyInvoiceStandardCategory, layout: NgmyInvoiceLayout.standardDiamondLux, gradient: [Color(0xFFF0F9FF), Color(0xFFE0F2FE), Color(0xFFBAE6FD)], accent: Color(0xFF0284C7), accent2: Color(0xFF38BDF8), lightBackground: true),
+  // Former Standard templates — now paid (Premium tier).
+  NgmyInvoiceTemplate(id: 'corporate', label: 'Corporate', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.standardCorporateLux, gradient: [Color(0xFF0A1628), Color(0xFF1E3A8A), Color(0xFF0F172A)], accent: Color(0xFFD4AF37), accent2: Color(0xFF2563EB)),
+  NgmyInvoiceTemplate(id: 'emerald', label: 'Emerald', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.emeraldPrestige, gradient: [Color(0xFF022C22), Color(0xFF065F46)], accent: Color(0xFF10B981), accent2: Color(0xFFD4AF37)),
+  NgmyInvoiceTemplate(id: 'exclusive', label: 'Exclusive', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.exclusiveGold, gradient: [Color(0xFF0C0C0C), Color(0xFF1A1A2E)], accent: Color(0xFFD4AF37), accent2: Color(0xFFC0C0C0)),
+  NgmyInvoiceTemplate(id: 'classic', label: 'Classic', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.standardClassicLux, gradient: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)], accent: Color(0xFFCBD5E1), accent2: Color(0xFFD4AF37)),
+  NgmyInvoiceTemplate(id: 'executive', label: 'Executive', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.classic, gradient: [Color(0xFF0F172A), Color(0xFF1E293B)], accent: Color(0xFF94A3B8)),
+  NgmyInvoiceTemplate(id: 'gold_foil', label: 'Gold Foil', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.goldFoil, gradient: [Color(0xFF1C1917), Color(0xFF44403C)], accent: Color(0xFFFBBF24)),
+  NgmyInvoiceTemplate(id: 'marble', label: 'Marble', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.marble, gradient: [Color(0xFFF5F5F4), Color(0xFFE7E5E4)], accent: Color(0xFF78716C), lightBackground: true),
   // Premium luxurious — midnight-inspired
   NgmyInvoiceTemplate(id: 'midnight_royale', label: 'Midnight Royale', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.midnightRoyale, gradient: [Color(0xFF020617), Color(0xFF0F172A)], accent: Color(0xFFD4AF37), accent2: Color(0xFF1E293B)),
   NgmyInvoiceTemplate(id: 'obsidian_chevron', label: 'Obsidian Chevron', category: kNgmyInvoicePremiumCategory, layout: NgmyInvoiceLayout.obsidianChevron, gradient: [Color(0xFF0A0A0A), Color(0xFF1A1A1A)], accent: Color(0xFFDC2626), accent2: Color(0xFF111111)),
