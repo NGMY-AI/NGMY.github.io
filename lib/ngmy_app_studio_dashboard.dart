@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_admin_invoice_publisher.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_templates.dart';
@@ -83,6 +84,7 @@ enum NgmyStudioNav {
   integrations,
   previewTest,
   publishApp,
+  invoiceLinks,
   settings,
 }
 
@@ -785,6 +787,7 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
                   _navTile(NgmyStudioNav.integrations, Icons.hub_outlined, 'Integrations'),
                   _navTile(NgmyStudioNav.previewTest, Icons.play_circle_outline_rounded, 'Preview & Test'),
                   _navTile(NgmyStudioNav.publishApp, Icons.rocket_launch_outlined, 'Publish App'),
+                  if (widget.isAdmin) _navTile(NgmyStudioNav.invoiceLinks, Icons.receipt_long_rounded, 'Invoices'),
                   _navTile(NgmyStudioNav.settings, Icons.settings_outlined, 'Settings'),
                 ],
               ),
@@ -989,6 +992,9 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
 
   Widget _centerWorkspace({required bool compact}) {
     if (_nav == NgmyStudioNav.myProjects) return _myProjectsPanel(compact: compact);
+    if (_nav == NgmyStudioNav.invoiceLinks && widget.isAdmin) {
+      return NgmyAdminInvoiceLinksPanel(adminEmail: widget.userEmail);
+    }
     if (_nav == NgmyStudioNav.aiAssistant) {
       return NgmyAppStudioAiPanel(
         project: widget.activeProject,
