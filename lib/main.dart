@@ -15317,6 +15317,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
             onTap: () => setState(() {
               _idx = 5;
               _visitedTabs.add(5);
+              // Build NGMY Hub in the background too — Pick Two/QR/Fun Games in
+              // Creator Toolkit call back into Hub's NgmyHubToolBridge, which only
+              // registers once Hub's State has been created.
+              _visitedTabs.add(3);
             }),
             customBorder: const CircleBorder(),
             child: SizedBox(

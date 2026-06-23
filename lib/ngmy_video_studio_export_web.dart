@@ -1731,7 +1731,15 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       }
       primaryVideo.pause();
       await _seekVideoTo(primaryVideo, 0, fast: true);
-      unawaited(_ensureExportAudioElement(primaryVideo));
+      // Must finish before recording starts — otherwise the first attempt's
+      // useDedicatedAudio check races this and falls back to unmuting the
+      // staged (visible) video for audio, which browsers often block from
+      // autoplaying without a fresh tap, freezing playback at "Starting…".
+      try {
+        await _ensureExportAudioElement(primaryVideo).timeout(const Duration(seconds: 10));
+      } catch (e) {
+        debugPrint('[studio export] dedicated audio element warm-up: $e');
+      }
     }
     for (var i = 0; i < 6; i++) {
       paintFrame();

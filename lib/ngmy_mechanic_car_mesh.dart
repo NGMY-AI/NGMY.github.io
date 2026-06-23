@@ -94,8 +94,10 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
   final wheelFrontZ = -1.45 * ls;
   final wheelRearZ = 1.35 * ls;
 
-  void addWheel(double x, double z) {
-    const segments = 10;
+  void addWheel(double x, double z, {bool showCaliper = false}) {
+    const segments = 16;
+    final outward = x > 0 ? 1.0 : -1.0;
+    // Tire sidewall (outer face).
     for (var i = 0; i < segments; i++) {
       final a0 = i / segments * math.pi * 2;
       final a1 = (i + 1) / segments * math.pi * 2;
@@ -106,40 +108,79 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
       faces.add(NgmyCarMeshFace(
         verts: [
           NgmyCarVec3(x, wheelY, z),
-          NgmyCarVec3(x + r0 * (x > 0 ? 0.12 : -0.12), y0, z + r0),
-          NgmyCarVec3(x + r1 * (x > 0 ? 0.12 : -0.12), y1, z + r1),
+          NgmyCarVec3(x + r0 * outward * 0.12, y0, z + r0),
+          NgmyCarVec3(x + r1 * outward * 0.12, y1, z + r1),
         ],
         color: tire,
         shade: 0.75,
         isWheel: true,
       ));
+    }
+    // Brake rotor peeking through the rim (only visible on the inner-facing side).
+    if (showCaliper) {
+      faces.add(NgmyCarMeshFace(
+        verts: [
+          NgmyCarVec3(x + outward * 0.02, wheelY + wheelR * 0.12, z - wheelR * 0.1),
+          NgmyCarVec3(x + outward * 0.02, wheelY + wheelR * 0.32, z - wheelR * 0.18),
+          NgmyCarVec3(x + outward * 0.02, wheelY + wheelR * 0.06, z - wheelR * 0.42),
+        ],
+        color: const Color(0xFFB91C1C),
+        shade: 0.95,
+        isWheel: true,
+      ));
+    }
+    // Alloy rim face + 6 spokes.
+    for (var i = 0; i < segments; i++) {
+      final a0 = i / segments * math.pi * 2;
+      final a1 = (i + 1) / segments * math.pi * 2;
+      final y0 = wheelY + math.sin(a0) * wheelR * 0.55;
+      final y1 = wheelY + math.sin(a1) * wheelR * 0.55;
+      final r0 = math.cos(a0) * wheelR * 0.55;
+      final r1 = math.cos(a1) * wheelR * 0.55;
       faces.add(NgmyCarMeshFace(
         verts: [
           NgmyCarVec3(x, wheelY, z),
-          NgmyCarVec3(x + r0 * (x > 0 ? 0.08 : -0.08), y0, z + r0),
-          NgmyCarVec3(x + r1 * (x > 0 ? 0.08 : -0.08), y1, z + r1),
+          NgmyCarVec3(x + r0 * outward * 0.08, y0, z + r0),
+          NgmyCarVec3(x + r1 * outward * 0.08, y1, z + r1),
         ],
         color: wheelColor,
         shade: 1.05,
         isWheel: true,
       ));
     }
+    const spokes = 6;
+    for (var i = 0; i < spokes; i++) {
+      final mid = i / spokes * math.pi * 2;
+      final half = math.pi / spokes * 0.34;
+      final a0 = mid - half;
+      final a1 = mid + half;
+      final y0 = wheelY + math.sin(a0) * wheelR * 0.5;
+      final y1 = wheelY + math.sin(a1) * wheelR * 0.5;
+      final r0 = math.cos(a0) * wheelR * 0.5;
+      final r1 = math.cos(a1) * wheelR * 0.5;
+      faces.add(NgmyCarMeshFace(
+        verts: [
+          NgmyCarVec3(x + outward * 0.005, wheelY, z),
+          NgmyCarVec3(x + r0 * outward * 0.07, y0, z + r0),
+          NgmyCarVec3(x + r1 * outward * 0.07, y1, z + r1),
+        ],
+        color: trim,
+        shade: 1.25,
+        isWheel: true,
+      ));
+    }
+    // Center cap.
     faces.add(NgmyCarMeshFace(
       verts: [
-        NgmyCarVec3(x - 0.06, wheelY, z),
-        NgmyCarVec3(x + 0.06, wheelY, z),
-        NgmyCarVec3(x, wheelY + 0.04, z + 0.06),
+        NgmyCarVec3(x - 0.045, wheelY - 0.045, z),
+        NgmyCarVec3(x + 0.045, wheelY - 0.045, z),
+        NgmyCarVec3(x, wheelY + 0.055, z + 0.05),
       ],
       color: trim,
-      shade: 1.2,
+      shade: 1.3,
       isWheel: true,
     ));
   }
-
-  addWheel(-wheelX, wheelFrontZ);
-  addWheel(wheelX, wheelFrontZ);
-  addWheel(-wheelX, wheelRearZ);
-  addWheel(wheelX, wheelRearZ);
 
   void quad(NgmyCarVec3 a, NgmyCarVec3 b, NgmyCarVec3 c, NgmyCarVec3 d, Color c0, {double shade = 1, String? hide, bool glass = false}) {
     faces.add(NgmyCarMeshFace(verts: [a, b, c], color: c0, shade: shade, hideWhenPartRemoved: hide, isGlass: glass));
@@ -155,6 +196,39 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
   final cabinRear = (car.id == 'pickup' ? 0.35 : 0.95) * ls;
   final hoodEnd = cabinFront;
   final w = 0.92 * ls;
+
+  // Recessed wheel-arch lip behind each wheel so it reads as a cutout in the body, not a clipped circle.
+  void addWheelArch(double x, double z) {
+    const arcSegs = 8;
+    final archR = wheelR * 1.22;
+    for (var i = 0; i < arcSegs; i++) {
+      final a = math.pi * 0.08 + (math.pi * 0.84) * (i / arcSegs);
+      final a2 = math.pi * 0.08 + (math.pi * 0.84) * ((i + 1) / arcSegs);
+      final y0 = wheelY + math.cos(a) * archR;
+      final y1 = wheelY + math.cos(a2) * archR;
+      final zz0 = z + math.sin(a) * archR * 0.55;
+      final zz1 = z + math.sin(a2) * archR * 0.55;
+      faces.add(NgmyCarMeshFace(
+        verts: [
+          NgmyCarVec3(x, y0, zz0),
+          NgmyCarVec3(x, y1, zz1),
+          NgmyCarVec3(x - (x > 0 ? 0.05 : -0.05), math.min(y0, y1) - 0.02, (zz0 + zz1) / 2),
+        ],
+        color: dark,
+        shade: 0.6,
+      ));
+    }
+  }
+
+  addWheelArch(-w, wheelFrontZ);
+  addWheelArch(w, wheelFrontZ);
+  addWheelArch(-w, wheelRearZ);
+  addWheelArch(w, wheelRearZ);
+
+  addWheel(-wheelX, wheelFrontZ, showCaliper: true);
+  addWheel(wheelX, wheelFrontZ, showCaliper: true);
+  addWheel(-wheelX, wheelRearZ);
+  addWheel(wheelX, wheelRearZ);
 
   // Ground shadow plate
   quad(
@@ -242,6 +316,29 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
     shade: 0.98,
   );
 
+  // B-pillar (seam between front and rear doors) + door handles.
+  final doorSplit = (cabinFront + cabinRear) / 2;
+  for (final sx in [-1.0, 1.0]) {
+    quad(
+      NgmyCarVec3(sx * w * 1.001, sill + 0.02, doorSplit - 0.012),
+      NgmyCarVec3(sx * w * 1.001, sill + 0.02, doorSplit + 0.012),
+      NgmyCarVec3(sx * w * 1.001, roof - 0.02, doorSplit + 0.012),
+      NgmyCarVec3(sx * w * 1.001, roof - 0.02, doorSplit - 0.012),
+      dark,
+      shade: 0.55,
+    );
+    for (final doorZ in [(cabinFront + doorSplit) / 2, (doorSplit + cabinRear) / 2]) {
+      quad(
+        NgmyCarVec3(sx * w * 1.001, belt + 0.05, doorZ - 0.06),
+        NgmyCarVec3(sx * w * 1.001, belt + 0.05, doorZ + 0.06),
+        NgmyCarVec3(sx * w * 1.001, belt + 0.08, doorZ + 0.06),
+        NgmyCarVec3(sx * w * 1.001, belt + 0.08, doorZ - 0.06),
+        trim,
+        shade: 1.2,
+      );
+    }
+  }
+
   // Roof
   quad(
     NgmyCarVec3(-w * 0.82, roof, cabinFront + 0.05),
@@ -321,16 +418,43 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
     dark,
     shade: 0.78,
   );
-
-  // Grille
+  // Lower bumper lip.
   quad(
-    NgmyCarVec3(-w * 0.42, sill + 0.06, front - 0.02),
-    NgmyCarVec3(w * 0.42, sill + 0.06, front - 0.02),
-    NgmyCarVec3(w * 0.42, belt - 0.04, front - 0.02),
-    NgmyCarVec3(-w * 0.42, belt - 0.04, front - 0.02),
-    grille,
-    shade: 0.7,
+    NgmyCarVec3(-w * 0.85, sill - 0.04, front + 0.1),
+    NgmyCarVec3(w * 0.85, sill - 0.04, front + 0.1),
+    NgmyCarVec3(w * 0.85, sill + 0.02, front + 0.05),
+    NgmyCarVec3(-w * 0.85, sill + 0.02, front + 0.05),
+    Color.lerp(dark, Colors.black, 0.4)!,
+    shade: 0.65,
   );
+  // Fog lights.
+  for (final sx in [-1.0, 1.0]) {
+    quad(
+      NgmyCarVec3(sx * w * 0.62, sill + 0.0, front + 0.02),
+      NgmyCarVec3(sx * w * 0.7, sill + 0.0, front + 0.02),
+      NgmyCarVec3(sx * w * 0.7, sill + 0.06, front + 0.02),
+      NgmyCarVec3(sx * w * 0.62, sill + 0.06, front + 0.02),
+      trim,
+      shade: 1.1,
+    );
+  }
+
+  // Grille — slatted instead of one flat block.
+  const grilleSlats = 4;
+  for (var i = 0; i < grilleSlats; i++) {
+    final t0 = i / grilleSlats;
+    final t1 = (i + 0.78) / grilleSlats;
+    final y0 = sill + 0.06 + (belt - 0.04 - (sill + 0.06)) * t0;
+    final y1 = sill + 0.06 + (belt - 0.04 - (sill + 0.06)) * t1;
+    quad(
+      NgmyCarVec3(-w * 0.42, y0, front - 0.02),
+      NgmyCarVec3(w * 0.42, y0, front - 0.02),
+      NgmyCarVec3(w * 0.42, y1, front - 0.02),
+      NgmyCarVec3(-w * 0.42, y1, front - 0.02),
+      grille,
+      shade: 0.7,
+    );
+  }
 
   // Headlights
   for (final sx in [-1.0, 1.0]) {
@@ -344,7 +468,7 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
     );
   }
 
-  // Taillights
+  // Taillights — wrap from the rear face onto the quarter panel for depth.
   for (final sx in [-1.0, 1.0]) {
     quad(
       NgmyCarVec3(sx * w * 0.72, sill + 0.06, rear + 0.01),
@@ -354,7 +478,25 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
       taillight,
       shade: 1.2,
     );
+    quad(
+      NgmyCarVec3(sx * w * 0.95, sill + 0.06, rear - 0.1),
+      NgmyCarVec3(sx * w * 0.95, belt - 0.02, rear - 0.1),
+      NgmyCarVec3(sx * w * 0.88, belt - 0.02, rear),
+      NgmyCarVec3(sx * w * 0.88, sill + 0.06, rear),
+      taillight,
+      shade: 1.0,
+    );
   }
+
+  // Exhaust tip.
+  quad(
+    NgmyCarVec3(w * 0.32, sill - 0.04, rear + 0.02),
+    NgmyCarVec3(w * 0.4, sill - 0.04, rear + 0.02),
+    NgmyCarVec3(w * 0.4, sill + 0.04, rear + 0.02),
+    NgmyCarVec3(w * 0.32, sill + 0.04, rear + 0.02),
+    const Color(0xFFE2E8F0),
+    shade: 0.95,
+  );
 
   // Side mirrors
   for (final sx in [-1.0, 1.0]) {
@@ -400,15 +542,17 @@ List<NgmyCarMeshFace> ngmyBuildMechanicCarMesh(NgmyMechanicCarProfile car, {requ
     );
   }
 
-  // Accent stripe
-  quad(
-    NgmyCarVec3(-w * 1.01, belt - 0.01, hoodEnd),
-    NgmyCarVec3(-w * 1.01, belt - 0.01, cabinRear),
-    NgmyCarVec3(-w * 1.01, belt + 0.01, cabinRear),
-    NgmyCarVec3(-w * 1.01, belt + 0.01, hoodEnd),
-    accent,
-    shade: 1.15,
-  );
+  // Accent stripe (both sides — character line along the beltline).
+  for (final sx in [-1.0, 1.0]) {
+    quad(
+      NgmyCarVec3(sx * w * 1.001, belt - 0.01, hoodEnd),
+      NgmyCarVec3(sx * w * 1.001, belt - 0.01, cabinRear),
+      NgmyCarVec3(sx * w * 1.001, belt + 0.01, cabinRear),
+      NgmyCarVec3(sx * w * 1.001, belt + 0.01, hoodEnd),
+      accent,
+      shade: 1.15,
+    );
+  }
 
   return faces;
 }
