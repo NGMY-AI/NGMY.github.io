@@ -1,9 +1,13 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_invoice_publish_registry.dart';
 import 'ngmy_invoice_storage.dart';
+import 'ngmy_qr_download.dart';
 
 const String _kInvoicePublicBaseUrl = 'https://ngmy.org/invoice/';
 
@@ -46,9 +50,12 @@ class _NgmyAdminInvoiceLinksPanelState extends State<NgmyAdminInvoiceLinksPanel>
   final _amountC = TextEditingController();
   final _dueC = TextEditingController();
   final _payUrlC = TextEditingController();
+  final _payLabelC = TextEditingController();
+  final GlobalKey _previewKey = GlobalKey();
 
   Duration? _publishDuration = const Duration(days: 3);
   bool _publishing = false;
+  bool _downloading = false;
   Map<String, dynamic>? _preview;
   List<Map<String, dynamic>> _published = [];
 
@@ -65,6 +72,7 @@ class _NgmyAdminInvoiceLinksPanelState extends State<NgmyAdminInvoiceLinksPanel>
     _amountC.dispose();
     _dueC.dispose();
     _payUrlC.dispose();
+    _payLabelC.dispose();
     super.dispose();
   }
 
@@ -83,10 +91,33 @@ class _NgmyAdminInvoiceLinksPanelState extends State<NgmyAdminInvoiceLinksPanel>
       'amount': _amountC.text.trim(),
       'due': _dueC.text.trim(),
       'payUrl': _payUrlC.text.trim(),
+      'payLabel': _payLabelC.text.trim(),
       'invoiceNo': 'INV-${DateTime.now().millisecondsSinceEpoch % 100000}',
       'createdAt': DateTime.now().toUtc().toIso8601String(),
       'templateId': _templateId,
     };
+  }
+
+  Future<void> _downloadInvoice() async {
+    setState(() => _downloading = true);
+    try {
+      await Future.delayed(const Duration(milliseconds: 120));
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Preview is not ready yet.');
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+      if (bytes == null) throw Exception('Could not render invoice image.');
+      final filename = 'invoice_${_clientC.text.trim().isEmpty ? 'draft' : _clientC.text.trim()}_${DateTime.now().millisecondsSinceEpoch}';
+      final msg = await downloadNgmyQrImage(bytes, filename);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFF16A34A)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e'), backgroundColor: const Color(0xFFEF4444)));
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
   }
 
   String _generateSlug() {
@@ -241,6 +272,7 @@ class _NgmyAdminInvoiceLinksPanelState extends State<NgmyAdminInvoiceLinksPanel>
           _field(_amountC, 'Total amount (\$)', keyboard: TextInputType.number),
           _field(_dueC, 'Due date'),
           _field(_payUrlC, 'Payment link (optional — for QR)'),
+          _field(_payLabelC, 'Text shown under the QR (optional — link itself stays hidden)'),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -268,13 +300,32 @@ class _NgmyAdminInvoiceLinksPanelState extends State<NgmyAdminInvoiceLinksPanel>
             ],
           ),
           const SizedBox(height: 22),
-          Text('Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7))),
+          Row(
+            children: [
+              Text('Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7))),
+              const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _downloading ? null : _downloadInvoice,
+                icon: _downloading
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.download_rounded, size: 18),
+                label: Text(_downloading ? 'Downloading…' : 'Download'),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
-          ngmyAppBuilderInvoicePreview(
-            templateId: _templateId,
-            record: preview,
-            theme: widget.theme,
-            isDark: true,
+          // Invoices render in light mode regardless of the dashboard's dark
+          // theme — matches what users see when they create one in App Builder.
+          RepaintBoundary(
+            key: _previewKey,
+            child: ngmyAppBuilderInvoicePreview(
+              templateId: _templateId,
+              record: preview,
+              theme: widget.theme,
+              isDark: false,
+              payLabel: _payLabelC.text.trim().isEmpty ? null : _payLabelC.text.trim(),
+              showPaymentLink: false,
+            ),
           ),
           const SizedBox(height: 26),
           Text('Published invoices on this device', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7))),

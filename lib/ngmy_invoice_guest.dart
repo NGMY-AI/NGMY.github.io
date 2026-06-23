@@ -146,6 +146,7 @@ class _NgmyGuestInvoiceHostScreenState extends State<NgmyGuestInvoiceHostScreen>
 
     final record = Map<String, dynamic>.from(_entry!['data'] as Map);
     final templateId = (record['templateId'] ?? 'classic').toString();
+    final payLabel = (record['payLabel'] ?? '').toString().trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFF111827),
@@ -155,11 +156,15 @@ class _NgmyGuestInvoiceHostScreenState extends State<NgmyGuestInvoiceHostScreen>
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
+            // Light mode — matches what users see when they create an
+            // invoice in App Builder, regardless of this page's dark chrome.
             child: ngmyAppBuilderInvoicePreview(
               templateId: templateId,
               record: record,
               theme: const Color(0xFF2563EB),
-              isDark: true,
+              isDark: false,
+              payLabel: payLabel.isEmpty ? null : payLabel,
+              showPaymentLink: false,
             ),
           ),
         ),

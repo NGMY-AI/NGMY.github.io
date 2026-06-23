@@ -14,6 +14,7 @@ class NgmyRuntimeQrDisplay extends StatelessWidget {
     this.label = '',
     this.isDark = false,
     this.size = 200,
+    this.showPayload = true,
   });
 
   final String data;
@@ -21,6 +22,9 @@ class NgmyRuntimeQrDisplay extends StatelessWidget {
   final String label;
   final bool isDark;
   final double size;
+  /// When false, the raw link/text encoded in the QR is never printed as
+  /// visible text below it — only the QR image (and [label], if set) show.
+  final bool showPayload;
 
   @override
   Widget build(BuildContext context) {
@@ -64,12 +68,14 @@ class NgmyRuntimeQrDisplay extends StatelessWidget {
           const SizedBox(height: 10),
           Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
         ],
-        const SizedBox(height: 6),
-        SelectableText(
-          payload,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-        ),
+        if (showPayload) ...[
+          const SizedBox(height: 6),
+          SelectableText(
+            payload,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+          ),
+        ],
       ],
     );
   }

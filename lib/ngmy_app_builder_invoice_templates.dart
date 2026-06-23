@@ -50,6 +50,8 @@ Widget ngmyInvoicePayBlock({
   required String amount,
   Color? accent,
   bool compact = false,
+  String? payLabel,
+  bool showPaymentLink = true,
 }) {
   if (payUrl.trim().isEmpty) return const SizedBox.shrink();
   final c = accent ?? theme;
@@ -97,8 +99,9 @@ Widget ngmyInvoicePayBlock({
           data: payUrl,
           theme: c,
           isDark: isDark,
-          label: 'Pay with QR',
+          label: payLabel ?? (showPaymentLink ? 'Pay with QR' : ''),
           size: compact ? 120 : 148,
+          showPayload: showPaymentLink,
         ),
         const SizedBox(height: 8),
         Text('Secure payment link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.withValues(alpha: 0.85))),
@@ -126,6 +129,8 @@ Widget ngmyAppBuilderInvoicePreview({
   required Map<String, dynamic> record,
   required Color theme,
   required bool isDark,
+  String? payLabel,
+  bool showPaymentLink = true,
 }) {
   final payUrl = (record['payUrl'] ?? '').toString().trim();
   final client = (record['client'] ?? '').toString();
@@ -161,7 +166,7 @@ Widget ngmyAppBuilderInvoicePreview({
             ],
           ),
         ),
-        ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: isDark, amount: amount, accent: amountColor),
+        ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: isDark, amount: amount, accent: amountColor, payLabel: payLabel, showPaymentLink: showPaymentLink),
       ],
     );
   }
@@ -341,7 +346,7 @@ Widget ngmyAppBuilderInvoicePreview({
             if (items.isNotEmpty) ...[const SizedBox(height: 4), Text(items, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54))],
             const SizedBox(height: 8),
             Text('\$$amount', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: theme)),
-            ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: isDark, amount: amount, compact: true),
+            ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: isDark, amount: amount, compact: true, payLabel: payLabel, showPaymentLink: showPaymentLink),
           ],
         ),
       );
@@ -392,7 +397,7 @@ Widget ngmyAppBuilderInvoicePreview({
             const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(thickness: 1)),
             Text('TOTAL  \$$amount', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: theme)),
             if (due.isNotEmpty) Text('Due $due', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-            ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: false, amount: amount, compact: true),
+            ngmyInvoicePayBlock(payUrl: payUrl, theme: theme, isDark: false, amount: amount, compact: true, payLabel: payLabel, showPaymentLink: showPaymentLink),
           ],
         ),
       );
