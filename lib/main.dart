@@ -7751,7 +7751,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _cloudUserRowResyncTimer?.cancel();
     if (_currentUser == null) return;
     unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
-    _cloudUserRowResyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+    _cloudUserRowResyncTimer = Timer.periodic(const Duration(minutes: 5), (_) async {
+      if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
+      // Pull-merge before push — otherwise a device whose local copy missed a
+      // realtime update (clock-in earnings, activeInvestment, totalProfit set by
+      // another device on this same account) would blindly stomp the cloud row
+      // with its own stale snapshot every 5 minutes, blanking those fields on
+      // every other device.
+      await _refreshCurrentUserFromCloud();
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
       unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
     });
