@@ -314,6 +314,13 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
+  // Stays sized/positioned "in viewport" (needed so iOS doesn't pause/freeze it),
+  // but visually clipped to a 1px speck — captureStream()/drawImage() read the
+  // decoded frame buffer, not the painted pixels, so clipping doesn't affect
+  // recording. Without this it shows through as a faint moving "shadow" video
+  // over the whole app during export.
+  v.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
+  v.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
