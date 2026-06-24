@@ -241,6 +241,14 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
     return (text: null, error: 'No API key configured.');
   }
 
+  // App Builder replies are a full multi-screen app as JSON — 2048 tokens
+  // (the budget used for short chat replies elsewhere) cuts that off
+  // mid-structure. Small text-only edits fit and succeed; full rebuilds get
+  // truncated, fail to parse, and only the chat preamble survives — which
+  // looks exactly like "the AI only changes text". Use a much larger budget
+  // and a stronger model here.
+  const appBuilderMaxTokens = 8000;
+
   Future<({String? text, String? error})> runDirect() async {
     switch (creds.provider) {
       case NgmyAiProviderKind.gemini:
@@ -248,15 +256,16 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
         if (strong.text != null) return strong;
         return _callGeminiDirect(creds.apiKey, prompt);
       case NgmyAiProviderKind.openai:
-        return _callOpenAiDirect(creds.apiKey, prompt, model: 'gpt-4o');
+        return _callOpenAiDirect(creds.apiKey, prompt, model: 'gpt-4o', maxTokens: appBuilderMaxTokens);
       case NgmyAiProviderKind.anthropic:
-        return _callAnthropicDirect(creds.apiKey, prompt);
+        return _callAnthropicDirect(creds.apiKey, prompt, maxTokens: appBuilderMaxTokens, preferStrong: true);
       case NgmyAiProviderKind.openaiCompatible:
         return _callOpenAiDirect(
           creds.apiKey,
           prompt,
           baseUrl: creds.openAiBaseUrl ?? 'https://api.openai.com/v1',
           model: 'gpt-4o',
+          maxTokens: appBuilderMaxTokens,
         );
     }
   }
@@ -267,6 +276,7 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
       prompt: prompt,
       provider: creds.provider,
       openAiBaseUrl: creds.openAiBaseUrl,
+      mode: 'appBuilder',
     );
     if (proxied.text != null) return proxied;
     final direct = await runDirect();
@@ -281,6 +291,7 @@ Future<({String? text, String? error})> _callOpenAiDirect(
   String prompt, {
   String baseUrl = 'https://api.openai.com/v1',
   String model = 'gpt-4o-mini',
+  int maxTokens = 2048,
 }) async {
   Object? lastError;
   String? lastBody;
@@ -299,7 +310,7 @@ Future<({String? text, String? error})> _callOpenAiDirect(
               'messages': [
                 {'role': 'user', 'content': prompt},
               ],
-              'max_tokens': 2048,
+              'max_tokens': maxTokens,
             }),
           )
           .timeout(const Duration(seconds: 90));
@@ -323,10 +334,18 @@ Future<({String? text, String? error})> _callOpenAiDirect(
   return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
 }
 
-Future<({String? text, String? error})> _callAnthropicDirect(String apiKey, String prompt) async {
+Future<({String? text, String? error})> _callAnthropicDirect(
+  String apiKey,
+  String prompt, {
+  int maxTokens = 2048,
+  bool preferStrong = false,
+}) async {
   Object? lastError;
   String? lastBody;
-  for (final model in ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-haiku-20240307']) {
+  final models = preferStrong
+      ? ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-haiku-20240307']
+      : ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-haiku-20240307'];
+  for (final model in models) {
     try {
       final response = await http
           .post(
@@ -338,7 +357,7 @@ Future<({String? text, String? error})> _callAnthropicDirect(String apiKey, Stri
             },
             body: jsonEncode({
               'model': model,
-              'max_tokens': 2048,
+              'max_tokens': maxTokens,
               'messages': [
                 {'role': 'user', 'content': prompt},
               ],
@@ -372,6 +391,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
   required NgmyAiProviderKind provider,
   String? openAiBaseUrl,
   List<NgmyAiImagePart> images = const [],
+  String? mode,
 }) async {
   try {
     final client = Supabase.instance.client;
@@ -379,6 +399,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
       'provider': images.isNotEmpty ? NgmyAiProviderKind.gemini.name : provider.name,
       'apiKey': apiKey,
       'prompt': prompt,
+      if (mode != null && mode.isNotEmpty) 'mode': mode,
       if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
       if (images.isNotEmpty)
         'images': images

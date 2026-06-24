@@ -395,6 +395,16 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
       _custom('listings', 'My listings', {
         'type': 'dataList', 'collection': 'listings', 'titleField': 'title', 'subtitleField': 'price',
         'emptyText': 'No listings yet — add your first item to sell.', 'addTarget': 'add_listing', 'addLabel': 'Add listing', 'allowDelete': true,
+        'itemActions': [
+          {
+            'label': 'Mark sold',
+            'targetCollection': 'sales',
+            'copyFields': {'title': 'item', 'price': 'amount'},
+            'extraFields': {},
+            'removeSource': true,
+            'successMessage': 'Sale recorded — nice work!',
+          },
+        ],
       }),
       _custom('add_sale', 'Record a sale', {
         'type': 'form', 'collection': 'sales', 'submitLabel': 'Record sale', 'successMessage': 'Sale recorded — nice work!', 'navigateAfter': 'sales',
@@ -499,6 +509,663 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
       }),
       _custom('settings', 'Settings', _settingsLayout('home')),
     ], appIcon: '📅'),
+  ),
+  // Habit Tracker — checklist-first home, not menu-first
+  NgmyAppTemplate(
+    id: 'habit_tracker',
+    name: 'Habit Tracker',
+    description: 'Daily checklist, streaks & progress.',
+    icon: '🔥',
+    themeColor: 0xFF14B8A6,
+    build: (o) => _base(o, 'Habit Flow', 'Build habits that stick', 0xFF14B8A6, [
+      _custom('home', 'Today', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🔥', 'title': 'Today\'s habits', 'subtitle': 'Check them off as you go'},
+          {'type': 'checklist', 'id': 'daily_habits', 'items': [
+            {'id': 'water', 'label': 'Drink water'},
+            {'id': 'walk', 'label': 'Move for 20 minutes'},
+            {'id': 'read', 'label': 'Read 10 pages'},
+            {'id': 'sleep', 'label': 'Sleep by 11pm'},
+          ]},
+          {'type': 'progress', 'label': 'Weekly goal', 'value': 0.6},
+          {'type': 'stat', 'collection': 'completions', 'label': 'Habits logged'},
+          {'type': 'button', 'label': 'Log a habit', 'target': 'log_habit'},
+        ],
+      }),
+      _custom('log_habit', 'Log a habit', {
+        'type': 'form', 'collection': 'completions', 'submitLabel': 'Log it', 'successMessage': 'Nice work!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'habit', 'label': 'Habit name', 'type': 'text'},
+          {'id': 'notes', 'label': 'Notes (optional)', 'type': 'textarea'},
+        ],
+      }),
+      _custom('history', 'History', {
+        'type': 'dataList', 'collection': 'completions', 'titleField': 'habit', 'subtitleField': 'notes',
+        'emptyText': 'Nothing logged yet.', 'addTarget': 'log_habit', 'addLabel': 'Log a habit', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🔥', shell: {
+      'bottomNav': [
+        {'icon': 'home', 'label': 'Today', 'target': 'home'},
+        {'icon': 'discover', 'label': 'History', 'target': 'history'},
+        {'icon': 'profile', 'label': 'Settings', 'target': 'settings'},
+      ],
+    }),
+  ),
+  // Personal Finance Dashboard — stat/progress dominant
+  NgmyAppTemplate(
+    id: 'finance_dash',
+    name: 'Money Tracker',
+    description: 'Income, spending & budget at a glance.',
+    icon: '💰',
+    themeColor: 0xFF3B82F6,
+    build: (o) => _base(o, 'Money Tracker', 'Know where every dollar goes', 0xFF3B82F6, [
+      _custom('home', 'Overview', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'This month', 'style': 'title'},
+          {'type': 'stat', 'collection': 'income', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total income'},
+          {'type': 'stat', 'collection': 'expenses', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total spent'},
+          {'type': 'progress', 'label': 'Budget used', 'value': 0.55},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'add', 'label': 'Add income', 'target': 'add_income'},
+            {'icon': 'cart', 'label': 'Add expense', 'target': 'add_expense'},
+            {'icon': 'list', 'label': 'Transactions', 'target': 'transactions'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('add_income', 'Add income', {
+        'type': 'form', 'collection': 'income', 'submitLabel': 'Save', 'successMessage': 'Income added!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'source', 'label': 'Source', 'type': 'text'},
+          {'id': 'amount', 'label': 'Amount (\$)', 'type': 'number'},
+        ],
+      }),
+      _custom('add_expense', 'Add expense', {
+        'type': 'form', 'collection': 'expenses', 'submitLabel': 'Save', 'successMessage': 'Expense added!', 'navigateAfter': 'transactions',
+        'fields': [
+          {'id': 'category', 'label': 'Category', 'type': 'text'},
+          {'id': 'amount', 'label': 'Amount (\$)', 'type': 'number'},
+        ],
+      }),
+      _custom('transactions', 'Transactions', {
+        'type': 'dataList', 'collection': 'expenses', 'titleField': 'category', 'subtitleField': 'amount',
+        'emptyText': 'No expenses logged yet.', 'addTarget': 'add_expense', 'addLabel': 'Add expense', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '💰'),
+  ),
+  // Job Board — dataList + itemActions "Apply"
+  NgmyAppTemplate(
+    id: 'job_board',
+    name: 'Job Board',
+    description: 'Post roles, track applicants.',
+    icon: '💼',
+    themeColor: 0xFF334155,
+    build: (o) => _base(o, 'WorkBoard', 'Post roles and track who applies', 0xFF334155, [
+      _custom('home', 'Open roles', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '💼', 'title': 'Open roles', 'subtitle': 'Tap Apply — no retyping the role details'},
+          {'type': 'stat', 'collection': 'jobs', 'label': 'Open roles'},
+          {'type': 'dataList', 'collection': 'jobs', 'titleField': 'title', 'subtitleField': 'company',
+            'emptyText': 'No roles posted yet.', 'addTarget': 'add_job', 'addLabel': 'Post a role', 'allowDelete': true,
+            'itemActions': [
+              {'label': 'Apply', 'targetCollection': 'applications', 'copyFields': {'title': 'jobTitle', 'company': 'company'}, 'extraFields': {}, 'removeSource': false, 'successMessage': 'Application sent!'},
+            ],
+          },
+        ],
+      }),
+      _custom('add_job', 'Post a role', {
+        'type': 'form', 'collection': 'jobs', 'submitLabel': 'Post role', 'successMessage': 'Role posted!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'title', 'label': 'Role title', 'type': 'text'},
+          {'id': 'company', 'label': 'Company', 'type': 'text'},
+          {'id': 'pay', 'label': 'Pay range', 'type': 'text'},
+        ],
+      }),
+      _custom('applications', 'Applications', {
+        'type': 'dataList', 'collection': 'applications', 'titleField': 'jobTitle', 'subtitleField': 'company',
+        'emptyText': 'No applications yet.', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '💼', shell: {
+      'bottomNav': [
+        {'icon': 'home', 'label': 'Roles', 'target': 'home'},
+        {'icon': 'inbox', 'label': 'Applications', 'target': 'applications'},
+        {'icon': 'profile', 'label': 'Settings', 'target': 'settings'},
+      ],
+    }),
+  ),
+  // Community Forum — socialFeed-based, not menu hub
+  NgmyAppTemplate(
+    id: 'community_forum',
+    name: 'Community Forum',
+    description: 'Discussion feed, posts & replies.',
+    icon: '🗣️',
+    themeColor: 0xFFA21CAF,
+    build: (o) => _base(o, 'TownHall', 'Where the community talks', 0xFFA21CAF, [
+      _custom('feed', 'Discussions', {'type': 'socialFeed', 'collection': 'threads'}, fullBleed: true, hideAppBar: true),
+      _custom('create', 'Start a thread', {
+        'type': 'postComposer', 'mode': 'post', 'collection': 'threads', 'captionField': 'body', 'navigateAfter': 'feed',
+      }),
+      _custom('profile', 'Profile', {'type': 'profile'}),
+      _custom('settings', 'Settings', _settingsLayout('feed')),
+    ], appIcon: '🗣️', shell: {
+      'bottomNav': [
+        {'icon': 'feed', 'label': 'Feed', 'target': 'feed'},
+        {'icon': 'create', 'label': 'Post', 'target': 'create'},
+        {'icon': 'profile', 'label': 'Profile', 'target': 'profile'},
+      ],
+    }),
+  ),
+  // Podcast / Audio Hub — tabs of episodes, link-based playback
+  NgmyAppTemplate(
+    id: 'podcast_hub',
+    name: 'Podcast Hub',
+    description: 'Episodes, categories & playback links.',
+    icon: '🎙️',
+    themeColor: 0xFF1F2937,
+    build: (o) => _base(o, 'AirWave', 'Your show, organized', 0xFF1F2937, [
+      _custom('home', 'Episodes', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🎙️', 'title': 'AirWave', 'subtitle': 'New episodes & fan favorites'},
+          {'type': 'tabs', 'tabs': [
+            {'label': 'Latest', 'layout': {'type': 'dataList', 'collection': 'episodes', 'titleField': 'title', 'subtitleField': 'duration', 'urlField': 'audioUrl', 'emptyText': 'No episodes yet.', 'addTarget': 'add_episode', 'addLabel': 'Add episode', 'allowDelete': true}},
+            {'label': 'About', 'layout': {'type': 'column', 'children': [
+              {'type': 'text', 'text': 'About this show', 'style': 'title'},
+              {'type': 'text', 'text': 'Add episodes with a link — listeners tap to play.', 'style': 'body'},
+            ]}},
+          ]},
+        ],
+      }),
+      _custom('add_episode', 'Add episode', {
+        'type': 'form', 'collection': 'episodes', 'submitLabel': 'Publish', 'successMessage': 'Episode published!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'title', 'label': 'Episode title', 'type': 'text'},
+          {'id': 'duration', 'label': 'Duration', 'type': 'text'},
+          {'id': 'audioUrl', 'label': 'Audio link', 'type': 'text'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🎙️'),
+  ),
+  // Event Ticketing — dataList of events + RSVP + QR ticket code
+  NgmyAppTemplate(
+    id: 'event_tickets',
+    name: 'Event Ticketing',
+    description: 'Events, RSVPs & shareable QR codes.',
+    icon: '🎫',
+    themeColor: 0xFFF59E0B,
+    build: (o) => _base(o, 'TicketBox', 'Sell out your next event', 0xFFF59E0B, [
+      _custom('home', 'Events', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🎫', 'title': 'Upcoming events', 'subtitle': 'RSVP and share a ticket code'},
+          {'type': 'dataList', 'collection': 'events', 'titleField': 'name', 'subtitleField': 'date',
+            'emptyText': 'No events yet.', 'addTarget': 'add_event', 'addLabel': 'Add event', 'allowDelete': true},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'add', 'label': 'RSVP', 'target': 'rsvp'},
+            {'icon': 'star', 'label': 'My ticket', 'target': 'ticket'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('add_event', 'Add event', {
+        'type': 'form', 'collection': 'events', 'submitLabel': 'Save event', 'successMessage': 'Event added!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Event name', 'type': 'text'},
+          {'id': 'date', 'label': 'Date & time', 'type': 'text'},
+          {'id': 'venue', 'label': 'Venue', 'type': 'text'},
+        ],
+      }),
+      _custom('rsvp', 'RSVP', {
+        'type': 'form', 'collection': 'tickets', 'submitLabel': 'RSVP', 'successMessage': 'You\'re on the list!', 'navigateAfter': 'ticket',
+        'fields': [
+          {'id': 'event', 'label': 'Event name', 'type': 'text'},
+          {'id': 'attendee', 'label': 'Your name', 'type': 'text'},
+          {'id': 'email', 'label': 'Email', 'type': 'email'},
+        ],
+      }),
+      _custom('ticket', 'My ticket', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Show this at the door', 'style': 'title'},
+          {'type': 'qrGenerator', 'mode': 'text', 'title': 'Ticket code', 'placeholder': 'e.g. your confirmation code', 'accentColor': '#F59E0B'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🎫'),
+  ),
+  // Donation / Nonprofit — sumField stat + shareable QR
+  NgmyAppTemplate(
+    id: 'donate_nonprofit',
+    name: 'Giving Campaign',
+    description: 'Raise funds, track donors, share a link.',
+    icon: '❤️',
+    badge: 'New',
+    themeColor: 0xFFE11D48,
+    build: (o) => _base(o, 'GiveFlow', 'Every donation counts', 0xFFE11D48, [
+      _custom('home', 'Campaign', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '❤️', 'title': 'Help us reach our goal', 'subtitle': 'Thank you for giving'},
+          {'type': 'stat', 'collection': 'donations', 'sumField': 'amount', 'prefix': '\$', 'label': 'Raised so far'},
+          {'type': 'progress', 'label': 'Goal progress', 'value': 0.7},
+          {'type': 'menuGrid', 'style': 'neon', 'items': [
+            {'icon': 'wallet', 'label': 'Donate', 'target': 'donate'},
+            {'icon': 'list', 'label': 'Donors', 'target': 'donors'},
+            {'icon': 'share', 'label': 'Share', 'target': 'share'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('donate', 'Donate', {
+        'type': 'form', 'collection': 'donations', 'submitLabel': 'Give now', 'successMessage': 'Thank you for your gift!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Your name', 'type': 'text'},
+          {'id': 'amount', 'label': 'Amount (\$)', 'type': 'number'},
+          {'id': 'message', 'label': 'Message (optional)', 'type': 'textarea'},
+        ],
+      }),
+      _custom('donors', 'Donors', {
+        'type': 'dataList', 'collection': 'donations', 'titleField': 'name', 'subtitleField': 'amount',
+        'emptyText': 'No donations yet — be the first!', 'allowDelete': false,
+      }),
+      _custom('share', 'Share the campaign', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Spread the word', 'style': 'title'},
+          {'type': 'qrGenerator', 'mode': 'url', 'title': 'Campaign link', 'placeholder': 'https://yourcampaign.org', 'accentColor': '#E11D48'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '❤️'),
+  ),
+  // Class / Coaching Booking — session checklist, not menu-first
+  NgmyAppTemplate(
+    id: 'coaching_booking',
+    name: 'Coaching Studio',
+    description: 'Sessions, bookings & client roster.',
+    icon: '🧘',
+    themeColor: 0xFF7E22CE,
+    build: (o) => _base(o, 'CoachFlow', 'Run your sessions like a pro', 0xFF7E22CE, [
+      _custom('home', 'Today', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🧘', 'title': 'Today\'s sessions', 'subtitle': 'Check off as you complete them'},
+          {'type': 'workoutPlan', 'planId': 'today_sessions', 'title': 'Schedule', 'exercises': [
+            {'id': 's1', 'name': 'Morning session', 'sets': '9:00 AM'},
+            {'id': 's2', 'name': 'Afternoon session', 'sets': '2:00 PM'},
+            {'id': 's3', 'name': 'Evening session', 'sets': '6:00 PM'},
+          ]},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'calendar', 'label': 'Book session', 'target': 'add_booking'},
+            {'icon': 'list', 'label': 'Bookings', 'target': 'bookings'},
+            {'icon': 'person', 'label': 'Clients', 'target': 'add_client'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('add_booking', 'Book a session', {
+        'type': 'form', 'collection': 'bookings', 'submitLabel': 'Book it', 'successMessage': 'Session booked!', 'navigateAfter': 'bookings',
+        'fields': [
+          {'id': 'client', 'label': 'Client name', 'type': 'text'},
+          {'id': 'sessionType', 'label': 'Session type', 'type': 'text'},
+          {'id': 'date', 'label': 'Date & time', 'type': 'text'},
+        ],
+      }),
+      _custom('bookings', 'Bookings', {
+        'type': 'dataList', 'collection': 'bookings', 'titleField': 'client', 'subtitleField': 'sessionType',
+        'emptyText': 'No sessions booked yet.', 'addTarget': 'add_booking', 'addLabel': 'Book session', 'allowDelete': true,
+      }),
+      _custom('add_client', 'Add client', {
+        'type': 'form', 'collection': 'clients', 'submitLabel': 'Save client', 'successMessage': 'Client added!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Client name', 'type': 'text'},
+          {'id': 'phone', 'label': 'Phone', 'type': 'text'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🧘'),
+  ),
+  // Photography Portfolio — image-led, not menu hub
+  NgmyAppTemplate(
+    id: 'photo_portfolio',
+    name: 'Photo Portfolio',
+    description: 'Showcase galleries & booking requests.',
+    icon: '📷',
+    themeColor: 0xFF111827,
+    build: (o) => _base(o, 'Frame & Light', 'Photography that speaks for itself', 0xFF111827, [
+      _custom('home', 'Portfolio', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '📷', 'title': 'Frame & Light', 'subtitle': 'Recent work'},
+          {'type': 'image', 'url': ''},
+          {'type': 'dataList', 'collection': 'galleries', 'titleField': 'title', 'subtitleField': 'description',
+            'emptyText': 'No galleries yet — add your first shoot.', 'addTarget': 'add_gallery', 'addLabel': 'Add gallery', 'allowDelete': true},
+          {'type': 'button', 'label': 'Book a shoot', 'target': 'contact'},
+        ],
+      }),
+      _custom('add_gallery', 'Add gallery', {
+        'type': 'form', 'collection': 'galleries', 'submitLabel': 'Save gallery', 'successMessage': 'Gallery added!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'title', 'label': 'Gallery title', 'type': 'text'},
+          {'id': 'coverUrl', 'label': 'Cover image URL', 'type': 'text'},
+          {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+        ],
+      }),
+      _custom('contact', 'Book a shoot', {
+        'type': 'column',
+        'children': [
+          {'type': 'contact', 'name': 'Booking', 'email': 'hello@example.com'},
+          {'type': 'form', 'collection': 'inquiries', 'submitLabel': 'Send request', 'successMessage': 'Request sent!', 'navigateAfter': 'home',
+            'fields': [
+              {'id': 'name', 'label': 'Your name', 'type': 'text'},
+              {'id': 'date', 'label': 'Preferred date', 'type': 'text'},
+              {'id': 'details', 'label': 'What kind of shoot?', 'type': 'textarea'},
+            ]},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '📷'),
+  ),
+  // Recipe Box — dataList + textarea-heavy form
+  NgmyAppTemplate(
+    id: 'recipe_box',
+    name: 'Recipe Box',
+    description: 'Save recipes, ingredients & steps.',
+    icon: '🍳',
+    themeColor: 0xFFEA580C,
+    build: (o) => _base(o, 'Recipe Box', 'Your kitchen, organized', 0xFFEA580C, [
+      _custom('home', 'Recipes', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🍳', 'title': 'Your recipes', 'subtitle': 'Save and find them anytime'},
+          {'type': 'dataList', 'collection': 'recipes', 'titleField': 'name', 'subtitleField': 'cookTime',
+            'emptyText': 'No recipes saved yet.', 'addTarget': 'add_recipe', 'addLabel': 'Add recipe', 'allowDelete': true},
+        ],
+      }),
+      _custom('add_recipe', 'Add recipe', {
+        'type': 'form', 'collection': 'recipes', 'submitLabel': 'Save recipe', 'successMessage': 'Recipe saved!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Recipe name', 'type': 'text'},
+          {'id': 'cookTime', 'label': 'Cook time', 'type': 'text'},
+          {'id': 'ingredients', 'label': 'Ingredients', 'type': 'textarea'},
+          {'id': 'steps', 'label': 'Steps', 'type': 'textarea'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🍳'),
+  ),
+  // Pet Care Tracker — checklist + visit log
+  NgmyAppTemplate(
+    id: 'pet_care',
+    name: 'Pet Care Tracker',
+    description: 'Daily care, vet visits & reminders.',
+    icon: '🐾',
+    themeColor: 0xFF65A30D,
+    build: (o) => _base(o, 'PawLog', 'Never miss a thing', 0xFF65A30D, [
+      _custom('home', 'Daily care', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🐾', 'title': 'Daily care', 'subtitle': 'Check off today\'s routine'},
+          {'type': 'checklist', 'id': 'pet_daily', 'items': [
+            {'id': 'feed', 'label': 'Feed'},
+            {'id': 'walk', 'label': 'Walk'},
+            {'id': 'meds', 'label': 'Medicine'},
+            {'id': 'water', 'label': 'Fresh water'},
+          ]},
+          {'type': 'stat', 'collection': 'vet_visits', 'label': 'Vet visits logged'},
+          {'type': 'button', 'label': 'Log vet visit', 'target': 'log_visit'},
+        ],
+      }),
+      _custom('log_visit', 'Log vet visit', {
+        'type': 'form', 'collection': 'vet_visits', 'submitLabel': 'Save', 'successMessage': 'Visit logged!', 'navigateAfter': 'visits',
+        'fields': [
+          {'id': 'petName', 'label': 'Pet name', 'type': 'text'},
+          {'id': 'reason', 'label': 'Reason for visit', 'type': 'text'},
+          {'id': 'date', 'label': 'Date', 'type': 'text'},
+        ],
+      }),
+      _custom('visits', 'Vet visits', {
+        'type': 'dataList', 'collection': 'vet_visits', 'titleField': 'petName', 'subtitleField': 'reason',
+        'emptyText': 'No visits logged yet.', 'addTarget': 'log_visit', 'addLabel': 'Log vet visit', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🐾'),
+  ),
+  // Freelancer Invoicing — invoiceBuilder-first, distinct from CRM tabs layout
+  NgmyAppTemplate(
+    id: 'freelance_invoicing',
+    name: 'Freelancer Invoicing',
+    description: 'Create invoices, track clients & income.',
+    icon: '🧾',
+    themeColor: 0xFF1E3A8A,
+    build: (o) => _base(o, 'InvoiceFlow', 'Get paid, stay organized', 0xFF1E3A8A, [
+      _custom('home', 'Dashboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Your business', 'style': 'title'},
+          {'type': 'stat', 'collection': 'invoices', 'sumField': 'amount', 'prefix': '\$', 'label': 'Invoiced'},
+          {'type': 'menuGrid', 'items': [
+            {'icon': 'add', 'label': 'New invoice', 'target': 'new_invoice'},
+            {'icon': 'person', 'label': 'Clients', 'target': 'add_client'},
+            {'icon': 'list', 'label': 'Client list', 'target': 'clients'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('new_invoice', 'New invoice', {'type': 'invoiceBuilder', 'collection': 'invoices', 'title': 'New Invoice'}),
+      _custom('add_client', 'Add client', {
+        'type': 'form', 'collection': 'clients', 'submitLabel': 'Save client', 'successMessage': 'Client added!', 'navigateAfter': 'clients',
+        'fields': [
+          {'id': 'name', 'label': 'Client name', 'type': 'text'},
+          {'id': 'email', 'label': 'Email', 'type': 'email'},
+        ],
+      }),
+      _custom('clients', 'Clients', {
+        'type': 'dataList', 'collection': 'clients', 'titleField': 'name', 'subtitleField': 'email',
+        'emptyText': 'No clients yet.', 'addTarget': 'add_client', 'addLabel': 'Add client', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🧾'),
+  ),
+  // Score Tracker — stat + leaderboard dataList
+  NgmyAppTemplate(
+    id: 'trivia_game',
+    name: 'Trivia Night Scorekeeper',
+    description: 'Log rounds, track scores & leaderboard.',
+    icon: '🏆',
+    themeColor: 0xFFDB2777,
+    build: (o) => _base(o, 'Trivia Night', 'Keep score, settle the debate', 0xFFDB2777, [
+      _custom('home', 'Leaderboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🏆', 'title': 'Trivia Night', 'subtitle': 'Log every round'},
+          {'type': 'menuGrid', 'style': 'pulse', 'items': [
+            {'icon': 'add', 'label': 'Log round', 'target': 'log_round'},
+            {'icon': 'star', 'label': 'Leaderboard', 'target': 'leaderboard'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('log_round', 'Log a round', {
+        'type': 'form', 'collection': 'scores', 'submitLabel': 'Save score', 'successMessage': 'Score logged!', 'navigateAfter': 'leaderboard',
+        'fields': [
+          {'id': 'playerName', 'label': 'Player / team name', 'type': 'text'},
+          {'id': 'score', 'label': 'Round score', 'type': 'number'},
+        ],
+      }),
+      _custom('leaderboard', 'Leaderboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'stat', 'collection': 'scores', 'sumField': 'score', 'label': 'Total points scored'},
+          {'type': 'dataList', 'collection': 'scores', 'titleField': 'playerName', 'subtitleField': 'score',
+            'emptyText': 'No rounds logged yet.', 'addTarget': 'log_round', 'addLabel': 'Log round', 'allowDelete': true},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🏆'),
+  ),
+  // Real Estate Listings — mapView-first
+  NgmyAppTemplate(
+    id: 'real_estate',
+    name: 'Real Estate Listings',
+    description: 'Map of properties, inquiries & saves.',
+    icon: '🏠',
+    badge: 'New',
+    themeColor: 0xFF0C4A6E,
+    build: (o) => _base(o, 'HomeFinder', 'Properties on the map', 0xFF0C4A6E, [
+      _custom('home', 'Map', {
+        'type': 'mapView', 'collection': 'properties', 'titleField': 'address', 'subtitleField': 'price',
+        'latField': 'lat', 'lngField': 'lng', 'height': 440, 'centerLat': 39.8283, 'centerLng': -98.5795,
+        'placeholder': 'Search properties…',
+      }, fullBleed: true, hideAppBar: true),
+      _custom('add_property', 'List a property', {
+        'type': 'form', 'collection': 'properties', 'submitLabel': 'List it', 'successMessage': 'Property listed!', 'navigateAfter': 'listings',
+        'fields': [
+          {'id': 'address', 'label': 'Address', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'bedrooms', 'label': 'Bedrooms', 'type': 'number'},
+          {'id': 'lat', 'label': 'Latitude', 'type': 'number'},
+          {'id': 'lng', 'label': 'Longitude', 'type': 'number'},
+        ],
+      }),
+      _custom('listings', 'Listings', {
+        'type': 'dataList', 'collection': 'properties', 'titleField': 'address', 'subtitleField': 'price',
+        'emptyText': 'No properties listed yet.', 'addTarget': 'add_property', 'addLabel': 'List a property', 'allowDelete': true,
+      }),
+      _custom('inquire', 'Inquire', {
+        'type': 'form', 'collection': 'inquiries', 'submitLabel': 'Send inquiry', 'successMessage': 'Inquiry sent!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Your name', 'type': 'text'},
+          {'id': 'phone', 'label': 'Phone', 'type': 'text'},
+          {'id': 'message', 'label': 'Message', 'type': 'textarea'},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🏠', shell: {
+      'bottomNav': [
+        {'icon': 'home', 'label': 'Map', 'target': 'home'},
+        {'icon': 'search', 'label': 'Listings', 'target': 'listings'},
+        {'icon': 'add', 'label': 'List', 'target': 'add_property'},
+        {'icon': 'inbox', 'label': 'Inquire', 'target': 'inquire'},
+        {'icon': 'profile', 'label': 'Settings', 'target': 'settings'},
+      ],
+    }),
+  ),
+  // Restaurant Menu & Orders — tabs by category, itemActions "Add to order"
+  NgmyAppTemplate(
+    id: 'restaurant_menu',
+    name: 'Restaurant Menu & Orders',
+    description: 'Menu by category, tap to add to order.',
+    icon: '🍽️',
+    themeColor: 0xFFB91C1C,
+    build: (o) => _base(o, 'TableFlow', 'Menu in, order out', 0xFFB91C1C, [
+      _custom('home', 'Menu', {
+        'type': 'column',
+        'children': [
+          {'type': 'hero', 'emoji': '🍽️', 'title': 'Today\'s menu', 'subtitle': 'Tap "Add to order" — no retyping'},
+          {'type': 'tabs', 'tabs': [
+            {'label': 'Starters', 'layout': {'type': 'dataList', 'collection': 'starters', 'titleField': 'name', 'subtitleField': 'price', 'addTarget': 'add_starter', 'addLabel': 'Add starter', 'allowDelete': true, 'itemActions': [
+              {'label': 'Add to order', 'targetCollection': 'orders', 'copyFields': {'name': 'item', 'price': 'amount'}, 'extraFields': {}, 'removeSource': false, 'successMessage': 'Added to order!'},
+            ]}},
+            {'label': 'Mains', 'layout': {'type': 'dataList', 'collection': 'mains', 'titleField': 'name', 'subtitleField': 'price', 'addTarget': 'add_main', 'addLabel': 'Add main', 'allowDelete': true, 'itemActions': [
+              {'label': 'Add to order', 'targetCollection': 'orders', 'copyFields': {'name': 'item', 'price': 'amount'}, 'extraFields': {}, 'removeSource': false, 'successMessage': 'Added to order!'},
+            ]}},
+            {'label': 'Desserts', 'layout': {'type': 'dataList', 'collection': 'desserts', 'titleField': 'name', 'subtitleField': 'price', 'addTarget': 'add_dessert', 'addLabel': 'Add dessert', 'allowDelete': true, 'itemActions': [
+              {'label': 'Add to order', 'targetCollection': 'orders', 'copyFields': {'name': 'item', 'price': 'amount'}, 'extraFields': {}, 'removeSource': false, 'successMessage': 'Added to order!'},
+            ]}},
+          ]},
+        ],
+      }),
+      _custom('add_starter', 'Add starter', {
+        'type': 'form', 'collection': 'starters', 'submitLabel': 'Save', 'successMessage': 'Added to menu!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Dish name', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+        ],
+      }),
+      _custom('add_main', 'Add main', {
+        'type': 'form', 'collection': 'mains', 'submitLabel': 'Save', 'successMessage': 'Added to menu!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Dish name', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+        ],
+      }),
+      _custom('add_dessert', 'Add dessert', {
+        'type': 'form', 'collection': 'desserts', 'submitLabel': 'Save', 'successMessage': 'Added to menu!', 'navigateAfter': 'home',
+        'fields': [
+          {'id': 'name', 'label': 'Dish name', 'type': 'text'},
+          {'id': 'price', 'label': 'Price (\$)', 'type': 'number'},
+          {'id': 'description', 'label': 'Description', 'type': 'textarea'},
+        ],
+      }),
+      _custom('orders', 'Current order', {
+        'type': 'column',
+        'children': [
+          {'type': 'stat', 'collection': 'orders', 'sumField': 'amount', 'prefix': '\$', 'label': 'Order total'},
+          {'type': 'dataList', 'collection': 'orders', 'titleField': 'item', 'subtitleField': 'amount', 'emptyText': 'No items added yet.', 'allowDelete': true},
+        ],
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🍽️', shell: {
+      'bottomNav': [
+        {'icon': 'home', 'label': 'Menu', 'target': 'home'},
+        {'icon': 'create', 'label': 'Order', 'target': 'orders'},
+        {'icon': 'profile', 'label': 'Settings', 'target': 'settings'},
+      ],
+    }),
+  ),
+  // Membership Manager — itemActions "Renew", a third distinct use of linked records
+  NgmyAppTemplate(
+    id: 'membership_manager',
+    name: 'Membership Manager',
+    description: 'Members, renewals & revenue.',
+    icon: '🪪',
+    themeColor: 0xFF047857,
+    build: (o) => _base(o, 'MemberFlow', 'Memberships, simplified', 0xFF047857, [
+      _custom('home', 'Dashboard', {
+        'type': 'column',
+        'children': [
+          {'type': 'text', 'text': 'Membership overview', 'style': 'title'},
+          {'type': 'stat', 'collection': 'members', 'label': 'Active members'},
+          {'type': 'stat', 'collection': 'payments', 'sumField': 'amount', 'prefix': '\$', 'label': 'Revenue collected'},
+          {'type': 'menuGrid', 'style': 'hologram', 'items': [
+            {'icon': 'add', 'label': 'Add member', 'target': 'add_member'},
+            {'icon': 'list', 'label': 'Members', 'target': 'members'},
+            {'icon': 'history', 'label': 'Payments', 'target': 'payments'},
+            {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
+          ]},
+        ],
+      }),
+      _custom('add_member', 'Add member', {
+        'type': 'form', 'collection': 'members', 'submitLabel': 'Save member', 'successMessage': 'Member added!', 'navigateAfter': 'members',
+        'fields': [
+          {'id': 'name', 'label': 'Member name', 'type': 'text'},
+          {'id': 'plan', 'label': 'Plan', 'type': 'text'},
+          {'id': 'fee', 'label': 'Monthly fee (\$)', 'type': 'number'},
+        ],
+      }),
+      _custom('members', 'Members', {
+        'type': 'dataList', 'collection': 'members', 'titleField': 'name', 'subtitleField': 'plan',
+        'emptyText': 'No members yet.', 'addTarget': 'add_member', 'addLabel': 'Add member', 'allowDelete': true,
+        'itemActions': [
+          {'label': 'Renew', 'targetCollection': 'payments', 'copyFields': {'name': 'member', 'fee': 'amount'}, 'extraFields': {}, 'removeSource': false, 'successMessage': 'Payment logged!'},
+        ],
+      }),
+      _custom('payments', 'Payments', {
+        'type': 'dataList', 'collection': 'payments', 'titleField': 'member', 'subtitleField': 'amount',
+        'emptyText': 'No payments logged yet.', 'allowDelete': true,
+      }),
+      _custom('settings', 'Settings', _settingsLayout('home')),
+    ], appIcon: '🪪'),
   ),
   NgmyAppTemplate(
     id: 'blank',

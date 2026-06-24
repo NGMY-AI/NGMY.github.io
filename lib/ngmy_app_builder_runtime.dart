@@ -668,9 +668,47 @@ class _DataList extends StatelessWidget {
 
   const _DataList({required this.node, required this.theme, required this.store, required this.onNavigate, required this.onSnack});
 
+  List<Map<String, dynamic>> _itemActions() {
+    final raw = node['itemActions'];
+    if (raw is! List) return const [];
+    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Runs an itemAction (e.g. "Mark sold") — copies fields from this record
+  /// into a new record in another collection instead of asking the user to
+  /// retype data that's already on screen, then optionally removes (or
+  /// leaves untouched) the source record.
+  Future<void> _runItemAction(Map<String, dynamic> action, Map<String, dynamic> record) async {
+    final targetCollection = (action['targetCollection'] ?? action['collection'] ?? '').toString();
+    if (targetCollection.isEmpty) return;
+    final copyFields = action['copyFields'];
+    final targetFields = <String, dynamic>{};
+    if (copyFields is Map) {
+      for (final entry in copyFields.entries) {
+        final sourceField = entry.key.toString();
+        final targetField = entry.value.toString();
+        if (record.containsKey(sourceField)) {
+          targetFields[targetField] = record[sourceField];
+        }
+      }
+    }
+    final extraFields = action['extraFields'];
+    if (extraFields is Map) {
+      for (final entry in extraFields.entries) {
+        targetFields[entry.key.toString()] = entry.value;
+      }
+    }
+    await store.addRecord(targetCollection, targetFields);
+    if (action['removeSource'] == true) {
+      await store.deleteRecord(collection, record['id']?.toString() ?? '');
+    }
+    onSnack((action['successMessage'] ?? 'Done').toString());
+  }
+
+  String get collection => (node['collection'] ?? '').toString();
+
   @override
   Widget build(BuildContext context) {
-    final collection = (node['collection'] ?? '').toString();
     final titleField = (node['titleField'] ?? 'name').toString();
     final subtitleField = (node['subtitleField'] ?? 'subtitle').toString();
     final emptyText = (node['emptyText'] ?? 'Nothing here yet.').toString();
@@ -678,6 +716,7 @@ class _DataList extends StatelessWidget {
     final allowDelete = node['allowDelete'] != false;
     final urlField = (node['urlField'] ?? node['linkField'] ?? 'url').toString();
     final records = store.records(collection);
+    final itemActions = _itemActions();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -694,28 +733,48 @@ class _DataList extends StatelessWidget {
           final link = (r[urlField] ?? r['url'] ?? r['link'] ?? '').toString().trim();
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: theme.withValues(alpha: 0.15), child: Icon(link.isNotEmpty ? Icons.play_circle_rounded : Icons.article_rounded, color: theme, size: 20)),
-              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-              onTap: link.isNotEmpty ? () => ngmyRuntimeOpenUrl(link, onSnack) : null,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (link.isNotEmpty)
-                    IconButton(
-                      icon: Icon(Icons.open_in_new_rounded, color: theme),
-                      onPressed: () => ngmyRuntimeOpenUrl(link, onSnack),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  leading: CircleAvatar(backgroundColor: theme.withValues(alpha: 0.15), child: Icon(link.isNotEmpty ? Icons.play_circle_rounded : Icons.article_rounded, color: theme, size: 20)),
+                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: subtitle.isEmpty ? null : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  onTap: link.isNotEmpty ? () => ngmyRuntimeOpenUrl(link, onSnack) : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (link.isNotEmpty)
+                        IconButton(
+                          icon: Icon(Icons.open_in_new_rounded, color: theme),
+                          onPressed: () => ngmyRuntimeOpenUrl(link, onSnack),
+                        ),
+                      if (allowDelete)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                          onPressed: () => store.deleteRecord(collection, r['id']?.toString() ?? ''),
+                        )
+                      else if (link.isEmpty)
+                        const Icon(Icons.chevron_right_rounded),
+                    ],
+                  ),
+                ),
+                if (itemActions.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: itemActions.map((action) {
+                        return OutlinedButton(
+                          onPressed: () => _runItemAction(action, r),
+                          style: OutlinedButton.styleFrom(foregroundColor: theme, side: BorderSide(color: theme)),
+                          child: Text((action['label'] ?? 'Run').toString()),
+                        );
+                      }).toList(),
                     ),
-                  if (allowDelete)
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                      onPressed: () => store.deleteRecord(collection, r['id']?.toString() ?? ''),
-                    )
-                  else if (link.isEmpty)
-                    const Icon(Icons.chevron_right_rounded),
-                ],
-              ),
+                  ),
+              ],
             ),
           );
         }),
@@ -1108,6 +1167,16 @@ FORM (saves data):
 DATA LIST (shows saved items):
 {"type":"dataList","collection":"venues","titleField":"name","subtitleField":"capacity",
  "emptyText":"No venues yet. Tap Add to create one.","addTarget":"create_venue","addLabel":"Add Venue","allowDelete":true}
+
+DATA LIST ITEM ACTIONS (REAL buttons — turn one record into another WITHOUT retyping anything):
+Use this any time an item in a list needs to become a record in a different collection (a listing becomes a sale, an applicant becomes a hire, a quote becomes an invoice, a booking becomes a completed session). NEVER make the user re-type data that is already on the record — copy it.
+{"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[
+  {"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}
+]}
+- copyFields: {"sourceFieldOnThisRecord":"targetFieldOnNewRecord"} — values are copied as-is, the user never retypes them.
+- extraFields: literal values merged into the new record (e.g. a fixed "status":"sold").
+- removeSource: true deletes the original record after creating the linked one (use for one-shot conversions like "sold"); omit/false to keep both (use for "applied", "booked", etc. where the source should stay).
+- A button per action renders under the row's title/subtitle. Tapping it creates the linked record immediately — no form, no retyping.
 
 SETTINGS (working toggles):
 {"type":"switch","setting":"notifications","label":"Push notifications","subtitle":"Get alerts for bookings","default":true}

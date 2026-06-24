@@ -77,6 +77,7 @@ async function geminiChat(
   apiKey: string,
   prompt: string,
   images: GeminiImagePart[] = [],
+  appBuilder = false,
 ): Promise<string> {
   const models = [
     "gemini-2.5-flash",
@@ -107,6 +108,11 @@ async function geminiChat(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: geminiParts }],
+        // App Builder replies are a full multi-screen app as JSON — needs a
+        // much larger output budget than a short chat reply.
+        ...(appBuilder
+          ? { generationConfig: { maxOutputTokens: 16384 } }
+          : {}),
       }),
     });
     if (res.ok) {
@@ -124,6 +130,7 @@ async function openAiChat(
   apiKey: string,
   prompt: string,
   baseUrl = "https://api.openai.com/v1",
+  appBuilder = false,
 ): Promise<string> {
   const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
@@ -132,9 +139,9 @@ async function openAiChat(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: appBuilder ? "gpt-4o" : "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 2048,
+      max_tokens: appBuilder ? 8000 : 2048,
     }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -144,25 +151,43 @@ async function openAiChat(
   return String(text).trim();
 }
 
-async function anthropicChat(apiKey: string, prompt: string): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-haiku-latest",
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  const text = data?.content?.[0]?.text;
-  if (!text) throw new Error("Empty Anthropic response");
-  return String(text).trim();
+async function anthropicChat(
+  apiKey: string,
+  prompt: string,
+  appBuilder = false,
+): Promise<string> {
+  // App Builder needs a stronger model and a much larger token budget — a
+  // full multi-screen app as JSON does not fit in the 2048-token budget
+  // used for short chat replies, so it gets cut off mid-structure and fails
+  // to parse, leaving only the chat preamble (looks like "nothing changed").
+  const models = appBuilder
+    ? ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"]
+    : ["claude-3-5-haiku-latest"];
+  const maxTokens = appBuilder ? 8000 : 2048;
+  let lastErr = "Anthropic request failed";
+  for (const model of models) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.content?.[0]?.text;
+      if (text && String(text).trim()) return String(text).trim();
+    } else {
+      lastErr = await res.text();
+    }
+  }
+  throw new Error(lastErr);
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -278,6 +303,9 @@ serve(async (req) => {
     const images: GeminiImagePart[] = Array.isArray(body?.images)
       ? body.images
       : [];
+    // App Builder sends a full multi-screen app as JSON, which needs a much
+    // bigger output budget (and a stronger model) than a short chat reply.
+    const appBuilder = String(body?.mode ?? "") === "appBuilder";
 
     if (!apiKey || !prompt) {
       return new Response(
@@ -292,21 +320,22 @@ serve(async (req) => {
     let text = "";
     switch (provider) {
       case "openai":
-        text = await openAiChat(apiKey, prompt);
+        text = await openAiChat(apiKey, prompt, "https://api.openai.com/v1", appBuilder);
         break;
       case "anthropic":
-        text = await anthropicChat(apiKey, prompt);
+        text = await anthropicChat(apiKey, prompt, appBuilder);
         break;
       case "openaiCompatible":
         text = await openAiChat(
           apiKey,
           prompt,
           openAiBaseUrl ?? "https://api.openai.com/v1",
+          appBuilder,
         );
         break;
       case "gemini":
       default:
-        text = await geminiChat(apiKey, prompt, images);
+        text = await geminiChat(apiKey, prompt, images, appBuilder);
         break;
     }
 
