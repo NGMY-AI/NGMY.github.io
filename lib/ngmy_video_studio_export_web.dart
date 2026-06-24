@@ -220,46 +220,6 @@ Future<void> _awaitVideoFramePulse(List<html.VideoElement> videos) async {
   await Future<void>.delayed(const Duration(milliseconds: 16));
 }
 
-int? _sampleCanvasPixel(html.CanvasRenderingContext2D ctx, int x, int y) {
-  try {
-    final d = ctx.getImageData(x, y, 1, 1).data;
-    return d[0] + (d[1] << 8) + (d[2] << 16) + (d[3] << 24);
-  } catch (_) {
-    return null;
-  }
-}
-
-/// Samples 5 spread-out points instead of 1 — a single center pixel can sit
-/// on a static-colored part of the video (a plain background, a logo) for
-/// long stretches of genuinely fine footage, which previously made the
-/// freeze-detector reject good recordings as "frozen".
-List<int>? _sampleCanvasRegionFingerprint(
-  html.CanvasRenderingContext2D ctx,
-  double dx,
-  double dy,
-  double dw,
-  double dh,
-  int canvasW,
-  int canvasH,
-) {
-  const offsets = [
-    [0.5, 0.5],
-    [0.2, 0.2],
-    [0.8, 0.2],
-    [0.2, 0.8],
-    [0.8, 0.8],
-  ];
-  final out = <int>[];
-  for (final o in offsets) {
-    final x = (dx + dw * o[0]).round().clamp(0, canvasW - 1);
-    final y = (dy + dh * o[1]).round().clamp(0, canvasH - 1);
-    final v = _sampleCanvasPixel(ctx, x, y);
-    if (v == null) return null;
-    out.add(v);
-  }
-  return out;
-}
-
 html.VideoElement? _exportAudioElement;
 html.VideoElement? _ngmyWebAudioSourceVideo;
 Object? _ngmyExportAudioContext;
@@ -972,7 +932,6 @@ Future<List<html.Blob>> _recordCanvasExport({
   required html.MediaStream stream,
   required String mimeType,
   required void Function() paintFrame,
-  required List<int>? Function()? samplePaintFingerprint,
   required List<html.VideoElement> videoList,
   required html.VideoElement? primaryVideo,
   required double durationSec,
@@ -1079,8 +1038,6 @@ Future<List<html.Blob>> _recordCanvasExport({
   var tick = 0;
   var lastT = -1.0;
   var stallTicks = 0;
-  List<int>? lastFp;
-  var distinctFpCount = 0;
 
   while (DateTime.now().isBefore(wallEnd) &&
       DateTime.now().isBefore(deadline) &&
@@ -1103,13 +1060,6 @@ Future<List<html.Blob>> _recordCanvasExport({
 
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
     maxRecordedSec = math.max(maxRecordedSec, t);
-    final fp = samplePaintFingerprint?.call();
-    if (fp != null && t > 0.08) {
-      if (!listEquals(fp, lastFp)) {
-        distinctFpCount++;
-        lastFp = fp;
-      }
-    }
     final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
     if (wallMs > (_ngmyIsMobileBrowser() ? 14000 : 16000) && t < 0.08) {
       debugPrint('[studio export] video frozen at t=$t — aborting attempt');
@@ -1136,12 +1086,6 @@ Future<List<html.Blob>> _recordCanvasExport({
     if (ended || t >= durationSec - 0.04 || wallMs >= durationMs || stallTicks > stallLimit) {
       break;
     }
-  }
-
-  final minDistinctRealtime = math.min(10, math.max(4, (durationSec * 4).round()));
-  if (distinctFpCount < minDistinctRealtime && maxRecordedSec > 1.0) {
-    debugPrint('[studio export] rejected: distinctFrames=$distinctFpCount');
-    abortedFrozen = true;
   }
 
   for (final v in videoList) {
@@ -1479,8 +1423,6 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       js_util.setProperty(ctx, 'imageSmoothingQuality', 'high');
     } catch (_) {}
 
-    List<int>? paintFingerprint;
-
     void paintFrame() {
       if (backdrop != null) {
         ctx.drawImageScaled(backdrop!, 0, 0, w, h);
@@ -1516,9 +1458,6 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         try {
           if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
             _drawVideoInSlot(ctx, video, r, dx, dy, dw, dh, w, h);
-            if (video == primaryVideo) {
-              paintFingerprint = _sampleCanvasRegionFingerprint(ctx, dx, dy, dw, dh, w, h);
-            }
           }
         } catch (e) {
           debugPrint('[studio export] drawImage failed (CORS?): $e');
@@ -1637,7 +1576,6 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         stream: recordStream,
         mimeType: mime,
         paintFrame: paintFrame,
-        samplePaintFingerprint: () => paintFingerprint,
         videoList: videoList,
         primaryVideo: primaryVideo,
         durationSec: durationSec,
