@@ -15,7 +15,7 @@ const _metaTimeout = Duration(seconds: 18);
 /// Up to 10 minutes — full-length template export.
 const _maxRecordSeconds = 600.0;
 const _exportCanvasFps = 30;
-const _exportVideoBitsPerSecond = 8000000;
+const _exportVideoBitsPerSecond = 14000000;
 const _exportAudioBitsPerSecond = 192000;
 const _recorderTimesliceMs = 250;
 /// Hard stop for one export attempt on desktop.
@@ -941,7 +941,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 5500000 : (_ngmyIsMobileBrowser() ? 6500000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 7500000 : (_ngmyIsMobileBrowser() ? 9000000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1008,7 +1008,12 @@ Future<List<html.Blob>> _recordCanvasExport({
   final attemptDeadline = _exportAttemptDeadline(durationSec);
   final wallStart = DateTime.now();
   final wallEnd = wallStart.add(Duration(milliseconds: durationMs + 2000));
-  final stallLimit = math.max(480, (durationSec * 8).round());
+  // Real elapsed time with no playback progress, not a tick count — a tick
+  // count assumes each loop iteration costs a certain amount of wall time,
+  // which broke once per-frame work got cheaper/more expensive elsewhere
+  // (a faster loop blew through the same tick budget in a fraction of the
+  // real time it was calibrated for, truncating recordings early).
+  final stallLimitMs = _ngmyIsMobileBrowser() ? 9000 : 7000;
   final startupGraceMs = _ngmyIsMobileBrowser() ? 8000 : 3500;
 
   onProgress(0.06, 'Starting playback…');
@@ -1037,7 +1042,7 @@ Future<List<html.Blob>> _recordCanvasExport({
 
   var tick = 0;
   var lastT = -1.0;
-  var stallTicks = 0;
+  var lastProgressWallMs = 0;
 
   while (DateTime.now().isBefore(wallEnd) &&
       DateTime.now().isBefore(deadline) &&
@@ -1067,15 +1072,13 @@ Future<List<html.Blob>> _recordCanvasExport({
       break;
     }
     if (wallMs >= startupGraceMs) {
-      if ((t - lastT).abs() < 0.006) {
-        stallTicks++;
-      } else {
-        stallTicks = 0;
+      if ((t - lastT).abs() >= 0.006) {
         lastT = t;
+        lastProgressWallMs = wallMs;
       }
     } else {
-      stallTicks = 0;
       lastT = t;
+      lastProgressWallMs = wallMs;
     }
 
     final p = _exportProgress(durationSec, t, wallMs, durationMs);
@@ -1083,7 +1086,10 @@ Future<List<html.Blob>> _recordCanvasExport({
 
     final ended = primary != null &&
         (primary.ended || primary.currentTime >= durationSec - 0.05);
-    if (ended || t >= durationSec - 0.04 || wallMs >= durationMs || stallTicks > stallLimit) {
+    if (ended ||
+        t >= durationSec - 0.04 ||
+        wallMs >= durationMs ||
+        (wallMs - lastProgressWallMs) > stallLimitMs) {
       break;
     }
   }
