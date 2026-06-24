@@ -536,6 +536,7 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
     final items = _parseItems(node['items']);
     final cols = (node['columns'] as num?)?.toInt() ?? 2;
     final style = (node['style'] ?? 'classic').toString().toLowerCase();
+    final dark = widget.isDarkMode;
     return AnimatedBuilder(
       animation: _menuFx,
       builder: (context, _) {
@@ -550,34 +551,64 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
           childAspectRatio: 1.05,
           children: items.map((item) {
             final customEmoji = (item['emoji'] ?? '').toString().trim();
-            final borderColor = switch (style) {
-              'neon' => Color.lerp(widget.theme, const Color(0xFF38BDF8), shimmer)!,
-              'hologram' => Color.lerp(widget.theme, const Color(0xFFEC4899), shimmer * 0.7)!,
-              'pulse' => widget.theme.withValues(alpha: 0.35 + shimmer * 0.45),
-              _ => widget.theme.withValues(alpha: 0.2),
-            };
+            // Real per-style looks — a flat 8%-opacity tile (the old look)
+            // reads as an empty outline on a dark canvas, which is exactly
+            // why every app's menu grid looked like the same blank boxes.
+            late Color fill;
+            late Color iconBadge;
+            late Color labelColor;
+            Gradient? gradient;
+            List<BoxShadow>? shadow;
+            Border? border;
+            switch (style) {
+              case 'neon':
+                final glow = Color.lerp(widget.theme, const Color(0xFF38BDF8), shimmer)!;
+                fill = dark ? const Color(0xFF0B1220) : Colors.white;
+                iconBadge = glow;
+                labelColor = dark ? Colors.white : const Color(0xFF0F172A);
+                border = Border.all(color: glow, width: 1.8);
+                shadow = [BoxShadow(color: glow.withValues(alpha: 0.45 + shimmer * 0.25), blurRadius: 14 + shimmer * 8, spreadRadius: 0.5)];
+                break;
+              case 'hologram':
+                gradient = LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.theme.withValues(alpha: 0.92),
+                    Color.lerp(const Color(0xFF7C3AED), const Color(0xFFEC4899), shimmer)!.withValues(alpha: 0.9),
+                  ],
+                );
+                fill = widget.theme;
+                iconBadge = Colors.white;
+                labelColor = Colors.white;
+                shadow = [BoxShadow(color: widget.theme.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))];
+                break;
+              case 'pulse':
+                fill = widget.theme.withValues(alpha: 0.78 + shimmer * 0.22);
+                iconBadge = Colors.white;
+                labelColor = Colors.white;
+                shadow = [BoxShadow(color: widget.theme.withValues(alpha: 0.3 + shimmer * 0.25), blurRadius: 10 + shimmer * 10)];
+                break;
+              default:
+                fill = dark ? widget.theme.withValues(alpha: 0.22) : widget.theme.withValues(alpha: 0.12);
+                iconBadge = widget.theme;
+                labelColor = dark ? Colors.white : const Color(0xFF0F172A);
+                border = Border.all(color: widget.theme.withValues(alpha: 0.28));
+                shadow = [BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.25 : 0.06), blurRadius: 8, offset: const Offset(0, 3))];
+            }
             return Material(
-              color: widget.theme.withValues(alpha: style == 'pulse' ? 0.06 + shimmer * 0.08 : 0.08),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
-              elevation: style == 'neon' ? 4 + shimmer * 6 : 0,
-              shadowColor: widget.theme.withValues(alpha: 0.4),
               child: InkWell(
                 onTap: () => widget.onNavigate((item['target'] ?? item['targetScreenId'] ?? '').toString()),
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   decoration: BoxDecoration(
+                    color: gradient == null ? fill : null,
+                    gradient: gradient,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor, width: style == 'neon' ? 1.6 : 1),
-                    gradient: style == 'hologram'
-                        ? LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              widget.theme.withValues(alpha: 0.12 + shimmer * 0.1),
-                              const Color(0xFF7C3AED).withValues(alpha: 0.08 + shimmer * 0.12),
-                            ],
-                          )
-                        : null,
+                    border: border,
+                    boxShadow: shadow,
                   ),
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -586,14 +617,22 @@ class _NgmyAppLayoutRendererState extends State<NgmyAppLayoutRenderer> with Sing
                       if (customEmoji.isNotEmpty)
                         Text(customEmoji, style: TextStyle(fontSize: 28 + shimmer * (style == 'pulse' ? 4 : 0)))
                       else
-                        Icon(_iconData(item['icon']), color: widget.theme, size: 30),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: style == 'classic' || style == 'neon' ? iconBadge.withValues(alpha: dark ? 0.22 : 0.16) : Colors.white.withValues(alpha: 0.22),
+                          ),
+                          child: Icon(_iconData(item['icon']), color: style == 'classic' || style == 'neon' ? iconBadge : Colors.white, size: 24),
+                        ),
                       const SizedBox(height: 8),
                       Text(
                         (item['label'] ?? 'Menu').toString(),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: labelColor),
                       ),
                     ],
                   ),

@@ -99,7 +99,17 @@ Use forms + dataList + stat + buttons + checklist + customCode notes. Multi-scre
 BOOKING / CRM / SCHOOL / CHURCH / PORTFOLIO / DASHBOARDS:
 Infer 5-8 screens minimum. Every data type gets form + list pair. Home shows stats and navigation.
 
-AI CUSTOM BUILDS ONLY: Design unique layouts per request — mapView, socialFeed, reelFeed, searchHub, tabs, product feeds, CRM dashboards. Do NOT default every app to hero+stat+menuGrid. Do NOT tell users to pick templates — YOU build it in ---APP_JSON---.
+AI CUSTOM BUILDS ONLY: Design unique layouts per request — mapView, socialFeed, reelFeed, searchHub, tabs, product feeds, CRM dashboards. Do NOT tell users to pick templates — YOU build it in ---APP_JSON---.
+
+VISUAL VARIETY IS MANDATORY — this is not optional polish, it is the difference between a working app and a broken-looking one. hero+stat+menuGrid as the ONLY pattern, used for every single app regardless of what it does, is exactly what makes apps look like cookie-cutter copies of each other and is the single biggest complaint users have. Before writing the home screen, pick ONE dominant pattern based on what the app actually needs — do not reach for hero+stat+menuGrid by default:
+- Checklist-led (habit trackers, daily routines, pet/plant care): lead with "checklist", hero optional, menuGrid optional/secondary.
+- Schedule-led (coaching, fitness, classes): lead with "workoutPlan", not a menu of links to it.
+- Catalog-led (recipe boxes, listings, directories): lead with "dataList" directly on the home screen, no menu wrapper needed.
+- Dashboard-led (finance, sales, analytics): lead with 2-3 "stat" widgets (use "sumField" for totals) plus a "progress" bar, menuGrid secondary and smaller.
+- Tabs-led (multi-category content — menus, episodes, multi-section info): lead with "tabs", each tab its own mini layout.
+- Feed-led (social/community/marketplace browsing): socialFeed/reelFeed/searchHub fullBleed, never a menu hub.
+- Map-led (places, real estate, delivery, travel): mapView fullBleed, never a menu hub.
+Only fall back to hero+stat+menuGrid for apps that are genuinely just "a few unrelated tools in one place" with no natural dominant widget — and even then, vary it: alternate which "style" the menuGrid uses ("classic", "neon", "hologram", "pulse" — pick whichever fits the app's mood, do not always use "classic"), vary whether stat appears above or below the hero, and vary the emoji/theme color so two different app ideas never render identically.
 
 MEDIA / SOCIAL: use socialFeed or reelFeed widgets — NOT plain dataList as home.
 
@@ -121,7 +131,7 @@ DOMAIN INTELLIGENCE — infer full apps from one command:
 - STORE / SHOP / E-COMMERCE: home (hero+stat+menuGrid), add_product form (collection: products), products_list dataList, product detail optional, cart dataList (collection: cart), checkout form, settings with dark_mode. Wire Browse→list, Sell→form, Cart→cart, Checkout button on cart.
 - SOCIAL / FEED: post form, feed dataList, profile content, settings.
 - BOOKING / VENUE: venue form, venues_list, booking form, settings.
-- FITNESS: workoutPlan screens, progress stat, settings.
+- FITNESS / WORKOUT / CALORIE / DIET / HABIT TRACKING: home screen MUST lead with "workoutPlan" or "checklist" directly (not a menuGrid of links to them) + a "stat" or "progress" widget, settings. Never wrap these behind a hero+menuGrid hub — the checkable list itself is the home screen.
 - MONEY MAKING / SIDE HUSTLE / PASSIVE INCOME / EARN CASH / AFFILIATE: this is NOT a generic hero screen with a renamed title — it needs real earning mechanics. Build: home with a "stat" using "sumField":"amount" on collection "sales" (label "Total earned", prefix "\$") + menuGrid (Add listing→form, My listings→dataList, Sales history→stat+dataList, Referral link→qrGenerator, Withdraw→form collection "payouts"). add_listing form (title, price as type "number", description as type "textarea", collection "listings"). My listings dataList MUST use itemActions so selling something never makes the user retype the title/price: {"type":"dataList","collection":"listings","titleField":"title","subtitleField":"price","itemActions":[{"label":"Mark sold","targetCollection":"sales","copyFields":{"title":"item","price":"amount"},"extraFields":{},"removeSource":true,"successMessage":"Sale recorded!"}],"addTarget":"add_listing","addLabel":"Add listing"} — this is the ONLY way to record a sale, there is no separate "record a sale" form to retype into. referral screen: text explaining the bonus + qrGenerator (mode "text") so they can share a code. withdraw form (amount, method, note, collection "payouts"). Wire shell.bottomNav across these screens.
 Always include ALL screens a real app of that type needs — never a single text screen.
 

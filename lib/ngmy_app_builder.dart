@@ -2424,7 +2424,17 @@ class _NgmyAppRuntimeScreenState extends State<NgmyAppRuntimeScreen> {
   void _go(String? targetId) {
     if (targetId == null || targetId.trim().isEmpty) return;
     final next = widget.project.screenById(targetId);
-    if (next != null) setState(() => _screenId = next.id);
+    if (next != null) {
+      setState(() => _screenId = next.id);
+      return;
+    }
+    // A button/menu item pointed at a screen id that doesn't exist in this
+    // app — silently doing nothing looks like the button is broken. Surface
+    // it instead so it's obvious this is a missing-screen problem, not a
+    // dead button.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('This button points to a screen that doesn\'t exist yet ("$targetId"). Ask the AI to add it, or edit the button\'s target.')),
+    );
   }
 
   @override
