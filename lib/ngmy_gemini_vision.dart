@@ -126,7 +126,7 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
     };
 
     try {
-      final res = await client.functions.invoke('ngmy-ai-chat', body: body);
+      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
       if (res.status == 200) {
         final data = res.data;
         if (data is Map) {
@@ -140,7 +140,7 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
       } else if (res.status == 404) {
         return (
           text: null,
-          error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase, then try again.',
+          error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase, then try again.',
         );
       } else {
         return (text: null, error: 'AI proxy HTTP ${res.status}');
@@ -153,7 +153,7 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
     final base = restUrl.contains('/rest/v1')
         ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
         : restUrl;
-    final url = '$base/functions/v1/ngmy-ai-chat';
+    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
     final session = client.auth.currentSession;
     final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
     final token = session?.accessToken ?? anonKey;
@@ -180,7 +180,7 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
     if (response.statusCode == 404) {
       return (
         text: null,
-        error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase Dashboard.',
+        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase Dashboard.',
       );
     }
     return (text: null, error: _visionApiError('HTTP ${response.statusCode}', body: response.body));

@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_ai_client.dart';
+
 /// ElevenLabs text-to-speech for translated chat messages (English / Swahili).
 class NgmyElevenLabsTts {
   NgmyElevenLabsTts._();
@@ -115,7 +117,7 @@ class NgmyElevenLabsTts {
 
     for (final model in _models) {
       final viaAiChat = await _fetchViaSupabaseFunction(
-        functionName: 'ngmy-ai-chat',
+        functionName: kNgmySupabaseAiFunction,
         apiKey: apiKey,
         text: text,
         langCode: langCode,
@@ -140,7 +142,7 @@ class NgmyElevenLabsTts {
 
     if (kIsWeb && (lastError == null || lastError.contains('404'))) {
       lastError =
-          'Voice proxy needs updating. Admin: redeploy Supabase function ngmy-ai-chat (see supabase/functions/ngmy-ai-chat).';
+          'Voice proxy needs updating. Admin: redeploy Supabase function $kNgmySupabaseAiFunction (see supabase/functions/ngmy-ai-chat).';
     }
 
     return (bytes: null, error: _friendlyError(lastError));
@@ -156,7 +158,7 @@ class NgmyElevenLabsTts {
       return 'ElevenLabs character quota used up. Add credits in your ElevenLabs account.';
     }
     if (lower.contains('prompt are required') || lower.contains('voice proxy not deployed')) {
-      return 'Voice server needs updating. Supabase Dashboard → Edge Functions → redeploy ngmy-ai-chat, then try again.';
+      return 'Voice server needs updating. Supabase Dashboard → Edge Functions → redeploy $kNgmySupabaseAiFunction, then try again.';
     }
     if (lower.contains('401')) {
       return 'ElevenLabs auth failed (401). Check the API key and that Text-to-Speech is enabled for that key.';

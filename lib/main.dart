@@ -25293,7 +25293,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                       const SizedBox(height: 6),
                       Text(
                         'Lets users tap a speaker icon in Message translator to hear translations aloud (English & Swahili). '
-                        'On web, redeploy Supabase function ngmy-ai-chat after updates.',
+                        'On web, redeploy the Supabase AI proxy function after updates.',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),

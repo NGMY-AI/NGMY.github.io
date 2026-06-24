@@ -8,6 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_supabase_columns.dart';
 
+/// Slug of the Supabase Edge Function that proxies AI calls. Update this if
+/// the function is ever recreated under a different name in the Dashboard.
+const String kNgmySupabaseAiFunction = 'bright-handler';
+
 /// Supported AI backends for NGMY Helper (auto-detected from key shape or prefix).
 enum NgmyAiProviderKind {
   gemini,
@@ -413,7 +417,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
 
     // Preferred: Supabase Functions client (handles auth headers).
     try {
-      final res = await client.functions.invoke('ngmy-ai-chat', body: body);
+      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
       if (res.status == 200) {
         final data = res.data;
         if (data is Map) {
@@ -427,7 +431,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
       } else if (res.status == 404) {
         return (
           text: null,
-          error: 'AI proxy not deployed yet. Admin: run supabase functions deploy ngmy-ai-chat in Supabase.',
+          error: 'AI proxy not deployed yet. Admin: run supabase functions deploy $kNgmySupabaseAiFunction in Supabase.',
         );
       } else {
         return (text: null, error: 'AI proxy HTTP ${res.status}');
@@ -441,7 +445,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
     final base = restUrl.contains('/rest/v1')
         ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
         : restUrl;
-    final url = '$base/functions/v1/ngmy-ai-chat';
+    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
     final session = client.auth.currentSession;
     final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
     final token = session?.accessToken ?? anonKey;
@@ -468,7 +472,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
     if (response.statusCode == 404) {
       return (
         text: null,
-        error: 'AI proxy not deployed. Deploy ngmy-ai-chat Edge Function in Supabase Dashboard.',
+        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction Edge Function in Supabase Dashboard.',
       );
     }
     return (text: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
@@ -578,7 +582,7 @@ String ngmyAiHelperFailureMessage({
   final provider = ngmyAiProviderLabel(creds.provider);
   final err = (lastError ?? '').trim();
   if (err.contains('proxy not deployed') || err.contains('404')) {
-    return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the ngmy-ai-chat Edge Function, then try again.';
+    return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the $kNgmySupabaseAiFunction Edge Function, then try again.';
   }
   if (err.isNotEmpty) {
     return 'NGMY Helper could not reach $provider: $err';
@@ -1006,7 +1010,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
     };
 
     try {
-      final res = await client.functions.invoke('ngmy-ai-chat', body: body);
+      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
       if (res.status == 200) {
         final data = res.data;
         if (data is Map) {
@@ -1020,7 +1024,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
       } else if (res.status == 404) {
         return (
           bytes: null,
-          error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase, then try again.',
+          error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase, then try again.',
         );
       } else {
         return (bytes: null, error: 'AI proxy HTTP ${res.status}');
@@ -1033,7 +1037,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
     final base = restUrl.contains('/rest/v1')
         ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
         : restUrl;
-    final url = '$base/functions/v1/ngmy-ai-chat';
+    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
     final session = client.auth.currentSession;
     final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
     final token = session?.accessToken ?? anonKey;
@@ -1060,7 +1064,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
     if (response.statusCode == 404) {
       return (
         bytes: null,
-        error: 'AI proxy not deployed. Deploy ngmy-ai-chat in Supabase Dashboard.',
+        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase Dashboard.',
       );
     }
     return (bytes: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
