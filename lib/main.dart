@@ -99,6 +99,7 @@ import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_account_snapshot_ui.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -15841,14 +15842,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               Expanded(
                 child: Row(
                   children: [
-                    _ngmyGlassGreenShell(
-                      shimmer: shimmer,
-                      borderRadius: BorderRadius.circular(13),
-                      padding: const EdgeInsets.all(1.5),
-                      child: SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: Center(child: Icon(Icons.wifi_rounded, color: Colors.white.withValues(alpha: 0.96), size: 20)),
+                    GestureDetector(
+                      onTap: () => showNgmyAccountSnapshotPage(context, user: widget.user),
+                      child: _ngmyGlassGreenShell(
+                        shimmer: shimmer,
+                        borderRadius: BorderRadius.circular(13),
+                        padding: const EdgeInsets.all(1.5),
+                        child: SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Center(child: Icon(Icons.wifi_rounded, color: Colors.white.withValues(alpha: 0.96), size: 20)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
