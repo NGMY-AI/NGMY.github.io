@@ -4,27 +4,34 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'main.dart';
 import 'ngmy_account_snapshot.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
+import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
 
-/// [user] is the app's UserData (declared in main.dart); kept dynamic here
-/// to avoid importing main.dart back into this file.
-Future<void> showNgmyAccountSnapshotPage(BuildContext context, {required dynamic user}) {
+/// Backup/restore for the local-only Growth Income copy. [user]/[transactions]
+/// are that local copy's current state (not the live database account).
+Future<void> showNgmyAccountSnapshotPage(
+  BuildContext context, {
+  required UserData user,
+  required List<AppTransaction> transactions,
+}) {
   return NgmyNavigator.push<void>(
     context,
-    NgmyAccountSnapshotPage(user: user),
+    NgmyAccountSnapshotPage(user: user, transactions: transactions),
     fullscreenDialog: true,
   );
 }
 
 class NgmyAccountSnapshotPage extends StatefulWidget {
-  const NgmyAccountSnapshotPage({super.key, required this.user});
+  const NgmyAccountSnapshotPage({super.key, required this.user, required this.transactions});
 
-  final dynamic user;
+  final UserData user;
+  final List<AppTransaction> transactions;
 
   @override
   State<NgmyAccountSnapshotPage> createState() => _NgmyAccountSnapshotPageState();
@@ -60,13 +67,13 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
 
   Future<void> _exportFile() async {
     await _withWork(() async {
-      final msg = await NgmyAccountSnapshot.exportToFile(widget.user);
+      final msg = await NgmyAccountSnapshot.exportToFile(widget.user, widget.transactions);
       _toast(msg);
     }, busyLabel: 'Preparing download…');
   }
 
   Future<void> _showQr() async {
-    final snapshot = NgmyAccountSnapshot.fromUser(widget.user);
+    final snapshot = NgmyAccountSnapshot.fromUser(widget.user, widget.transactions);
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
@@ -91,13 +98,26 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     return ngmyPickBackupJsonViaBrowser();
   }
 
-  void _openSnapshotView(NgmyAccountSnapshot snapshot) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => _NgmyAccountSnapshotViewPage(snapshot: snapshot),
+  Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore this snapshot?'),
+        content: Text(
+          'This replaces your local growth income data (balance, investment, clock-in, wallet history) '
+          'with the saved snapshot from ${snapshot.exportedAt.month}/${snapshot.exportedAt.day}/${snapshot.exportedAt.year}.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Restore')),
+        ],
       ),
     );
+    if (ok != true) return;
+    final restoredUser = snapshot.toUserData(widget.user.email);
+    await NgmyLocalGrowthIncomeStore.replace(widget.user.email, restoredUser, snapshot.transactions);
+    if (!mounted) return;
+    _toast('Restored. Go back to see your local growth income updated.');
   }
 
   Future<void> _importFile() async {
@@ -109,7 +129,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         _toast('Could not read that backup file.');
         return;
       }
-      _openSnapshotView(snapshot);
+      await _confirmRestore(snapshot);
     }, busyLabel: 'Reading file…');
   }
 
@@ -130,7 +150,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       _toast('Could not read that QR code.');
       return;
     }
-    _openSnapshotView(snapshot);
+    await _confirmRestore(snapshot);
   }
 
   @override
@@ -152,7 +172,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Account snapshot', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17)),
+        title: Text('Backup & restore', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17)),
         centerTitle: true,
       ),
       body: Stack(
@@ -176,8 +196,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                     SizedBox(width: 14),
                     Expanded(
                       child: Text(
-                        'Save a personal record of your balance, investment, and clock-in streak on this device. '
-                        'Your real account balance always comes from logging in — this is just a backup you keep for yourself.',
+                        'Save this local growth income to a file or QR code, or restore a saved copy on this or '
+                        'another device. This only affects the local copy behind the wifi icon, not your real account.',
                         style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.4, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -190,7 +210,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
               _SnapshotActionTile(
                 icon: Icons.download_rounded,
                 label: 'Download snapshot file',
-                subtitle: 'Saves balance, investment & clock-in info to a file',
+                subtitle: 'Saves balance, investment, clock-in & wallet history to a file',
                 card: card,
                 border: border,
                 onTap: _working ? null : _exportFile,
@@ -199,19 +219,19 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
               _SnapshotActionTile(
                 icon: Icons.qr_code_2_rounded,
                 label: 'Show QR code',
-                subtitle: 'Scan with another device to view this record',
+                subtitle: 'Scan with another device to restore there',
                 card: card,
                 border: border,
                 accent: true,
                 onTap: _working ? null : _showQr,
               ),
               const SizedBox(height: 22),
-              Text('View a saved copy', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
+              Text('Restore a saved copy', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
               const SizedBox(height: 10),
               _SnapshotActionTile(
                 icon: Icons.upload_file_rounded,
                 label: 'Upload backup file',
-                subtitle: 'Open a snapshot file you saved earlier',
+                subtitle: 'Replace local data with a snapshot file',
                 card: card,
                 border: border,
                 onTap: _working ? null : _importFile,
@@ -220,15 +240,15 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
               _SnapshotActionTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan QR code',
-                subtitle: 'Open a snapshot from another device',
+                subtitle: 'Replace local data with a snapshot from another device',
                 card: card,
                 border: border,
                 onTap: _working ? null : _scanQr,
               ),
               const SizedBox(height: 18),
               Text(
-                'Viewing a saved copy never changes your live balance or investment. '
-                'Your account always reflects what is on your logged-in account.',
+                'Restoring replaces your local growth income data on this device. It never touches your real, '
+                'database-backed account.',
                 style: TextStyle(fontSize: 11.5, height: 1.4, color: muted),
               ),
             ],
@@ -370,7 +390,7 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                     NgmyBrandedQrWidget(data: qrPayload, large: true),
                     const SizedBox(height: 18),
                     Text(
-                      'Scan on another device to view this saved record. It will not change your live balance there.',
+                      'Scan on another device to restore this local growth income there.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                     ),
@@ -433,97 +453,6 @@ class _NgmyAccountSnapshotScanPageState extends State<_NgmyAccountSnapshotScanPa
             return;
           }
         },
-      ),
-    );
-  }
-}
-
-class _NgmyAccountSnapshotViewPage extends StatelessWidget {
-  const _NgmyAccountSnapshotViewPage({required this.snapshot});
-
-  final NgmyAccountSnapshot snapshot;
-
-  String _money(double v) => '\$${v.toStringAsFixed(2)}';
-  String _date(DateTime? d) => d == null ? '—' : '${d.month}/${d.day}/${d.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-    final investment = snapshot.activeInvestment;
-
-    final rows = <(String, String)>[
-      ('Saved on', _date(snapshot.exportedAt)),
-      ('Balance at save time', _money(snapshot.accountBalance)),
-      ('Total profit at save time', _money(snapshot.totalProfit)),
-      ('Clocked in', snapshot.isClockedIn ? 'Yes' : 'No'),
-      ('Last clock-in', _date(snapshot.lastClockInDate)),
-      if (investment != null) ('Investment', investment.name),
-      if (investment != null) ('Investment amount', _money(investment.amount)),
-      if (investment != null) ('Days clocked in', '${investment.daysClockedIn}'),
-      ('Points', '${snapshot.points}'),
-      ('Referrals', '${snapshot.referralCount}'),
-    ];
-
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        title: Text('Saved snapshot', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17)),
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 4, 18, 32),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline_rounded, color: Color(0xFFB45309)),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'This is a read-only record from when it was saved. Your current account balance always comes from your logged-in account and is not changed by viewing this.',
-                    style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: border),
-            ),
-            child: Column(
-              children: [
-                for (final row in rows)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(row.$1, style: TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w600))),
-                        Text(row.$2, style: TextStyle(fontSize: 13, color: titleColor, fontWeight: FontWeight.w800)),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

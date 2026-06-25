@@ -99,7 +99,7 @@ import 'ngmy_oauth.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
-import 'ngmy_account_snapshot_ui.dart';
+import 'ngmy_local_growth_income_ui.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -15843,7 +15843,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => showNgmyAccountSnapshotPage(context, user: widget.user),
+                      onTap: () => showNgmyLocalGrowthIncomePage(
+                        context,
+                        liveUser: widget.user,
+                        config: widget.config,
+                        plans: widget.globalPlans,
+                      ),
                       child: _ngmyGlassGreenShell(
                         shimmer: shimmer,
                         borderRadius: BorderRadius.circular(13),
