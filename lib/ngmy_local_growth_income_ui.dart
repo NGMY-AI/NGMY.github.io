@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
+import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_clock_in_investment_dialog.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
@@ -189,7 +190,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
 
     if (_loading || _user == null) {
       return Scaffold(
@@ -236,77 +236,96 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     ];
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Local Growth Income', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 16)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.save_alt_rounded, color: titleColor),
-            tooltip: 'Backup / Restore',
-            onPressed: _openBackup,
-          ),
-        ],
-      ),
-      body: IndexedStack(index: _idx, children: pages),
-      bottomNavigationBar: _LocalBottomNav(index: _idx, onChanged: (i) => setState(() => _idx = i)),
-    );
-  }
-}
-
-class _LocalBottomNav extends StatelessWidget {
-  const _LocalBottomNav({required this.index, required this.onChanged});
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  static const _items = [
-    (Icons.home_rounded, 'Home'),
-    (Icons.trending_up_rounded, 'Invest'),
-    (Icons.account_balance_wallet_rounded, 'Wallet'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF11161F) : Colors.white;
-    final selected = WorksheetPalette.green;
-    final unselected = Colors.grey;
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        height: 64,
-        color: bg,
-        child: Row(
-          children: List.generate(_items.length, (i) {
-            final item = _items[i];
-            final isSelected = i == index;
-            return Expanded(
-              child: InkWell(
-                onTap: () => onChanged(i),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.$1, color: isSelected ? selected : unselected, size: 26),
-                    const SizedBox(height: 2),
-                    Text(item.$2, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isSelected ? selected : unselected)),
-                  ],
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: FloatingTitle(
+                title: 'LOCAL GROWTH INCOME',
+                leading: _headerCircleButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  isDark: isDark,
+                  onTap: () => Navigator.pop(context),
+                ),
+                trailing: _headerCircleButton(
+                  icon: Icons.save_alt_rounded,
+                  isDark: isDark,
+                  onTap: _openBackup,
                 ),
               ),
-            );
-          }),
+            ),
+          ),
+          Expanded(child: IndexedStack(index: _idx, children: pages)),
+        ],
+      ),
+      bottomNavigationBar: Material(
+        type: MaterialType.transparency,
+        elevation: 0,
+        color: Colors.transparent,
+        child: _buildLocalBottomNavBar(),
+      ),
+    );
+  }
+
+  Widget _headerCircleButton({required IconData icon, required bool isDark, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: WorksheetPalette.green, size: 18),
+      ),
+    );
+  }
+
+  Widget _buildLocalBottomNavBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
+      child: SafeArea(
+        top: false,
+        child: NgmySculptedBottomNavFrame(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _navIcon(0, Icons.home_rounded),
+              _navIcon(1, Icons.trending_up_rounded),
+              _navIcon(2, Icons.account_balance_wallet_rounded),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _navIcon(int i, IconData icon) => Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _idx = i),
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              height: NgmyBottomNavMetrics.barHeight,
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+                  size: NgmyBottomNavMetrics.sideIconSize,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 /// Mirrors WalletScreen's look (FloatingTitle, gradient header, Deposit /

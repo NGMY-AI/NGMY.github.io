@@ -158,128 +158,186 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
 
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Backup & restore', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17)),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          ListView(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 32),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [WorksheetPalette.green, WorksheetPalette.greenDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.shield_outlined, color: Colors.white, size: 28),
-                    SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        'Save this local growth income to a file or QR code, or restore a saved copy on this or '
-                        'another device. This only affects the local copy behind the wifi icon, not your real account.',
-                        style: TextStyle(color: Colors.white, fontSize: 12.5, height: 1.4, fontWeight: FontWeight.w600),
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+              children: [
+                FloatingTitle(
+                  title: 'BACKUP & RESTORE',
+                  leading: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
+                        shape: BoxShape.circle,
                       ),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, color: WorksheetPalette.green, size: 16),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text('Save a copy', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
-              const SizedBox(height: 10),
-              _SnapshotActionTile(
-                icon: Icons.download_rounded,
-                label: 'Download snapshot file',
-                subtitle: 'Saves balance, investment, clock-in & wallet history to a file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _exportFile,
-              ),
-              const SizedBox(height: 8),
-              _SnapshotActionTile(
-                icon: Icons.qr_code_2_rounded,
-                label: 'Show QR code',
-                subtitle: 'Scan with another device to restore there',
-                card: card,
-                border: border,
-                accent: true,
-                onTap: _working ? null : _showQr,
-              ),
-              const SizedBox(height: 22),
-              Text('Restore a saved copy', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
-              const SizedBox(height: 10),
-              _SnapshotActionTile(
-                icon: Icons.upload_file_rounded,
-                label: 'Upload backup file',
-                subtitle: 'Replace local data with a snapshot file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _importFile,
-              ),
-              const SizedBox(height: 8),
-              _SnapshotActionTile(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Scan QR code',
-                subtitle: 'Replace local data with a snapshot from another device',
-                card: card,
-                border: border,
-                onTap: _working ? null : _scanQr,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Restoring replaces your local growth income data on this device. It never touches your real, '
-                'database-backed account.',
-                style: TextStyle(fontSize: 11.5, height: 1.4, color: muted),
-              ),
-            ],
-          ),
-          if (_working)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Material(
-                elevation: 8,
-                color: card,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(24),
+                    border: isDark ? null : Border.all(color: WorksheetPalette.green.withValues(alpha: 0.12)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08), blurRadius: 18, offset: const Offset(0, 8))],
+                  ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: _accent)),
-                      const SizedBox(width: 12),
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [WorksheetPalette.green, WorksheetPalette.greenDark],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 6))],
+                        ),
+                        child: const Icon(Icons.shield_rounded, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(width: 16),
                       Expanded(
-                        child: Text(
-                          _statusMessage ?? 'Working…',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: titleColor, fontSize: 13),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Your local copy, protected', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: titleColor)),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Save this device\'s growth income to a file or QR, or restore a saved copy. '
+                              'Only affects the local copy behind the wifi icon — never your real account.',
+                              style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 26),
+                _SectionLabel(label: 'Save a copy', color: titleColor),
+                const SizedBox(height: 12),
+                _SnapshotActionTile(
+                  icon: Icons.download_rounded,
+                  label: 'Download snapshot file',
+                  subtitle: 'Balance, investment, clock-in & wallet history',
+                  card: card,
+                  isDark: isDark,
+                  onTap: _working ? null : _exportFile,
+                ),
+                const SizedBox(height: 10),
+                _SnapshotActionTile(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'Show QR code',
+                  subtitle: 'Scan with another device to restore there',
+                  card: card,
+                  isDark: isDark,
+                  accent: true,
+                  onTap: _working ? null : _showQr,
+                ),
+                const SizedBox(height: 26),
+                _SectionLabel(label: 'Restore a saved copy', color: titleColor),
+                const SizedBox(height: 12),
+                _SnapshotActionTile(
+                  icon: Icons.upload_file_rounded,
+                  label: 'Upload backup file',
+                  subtitle: 'Replace local data with a snapshot file',
+                  card: card,
+                  isDark: isDark,
+                  onTap: _working ? null : _importFile,
+                ),
+                const SizedBox(height: 10),
+                _SnapshotActionTile(
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: 'Scan QR code',
+                  subtitle: 'Restore a snapshot from another device',
+                  card: card,
+                  isDark: isDark,
+                  onTap: _working ? null : _scanQr,
+                ),
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 15, color: muted),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Restoring replaces your local growth income data on this device. It never touches your '
+                          'real, database-backed account.',
+                          style: TextStyle(fontSize: 11.5, height: 1.4, color: muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-        ],
+            if (_working)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Material(
+                  elevation: 8,
+                  color: card,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: _accent)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _statusMessage ?? 'Working…',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: titleColor, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 4, height: 14, decoration: BoxDecoration(color: WorksheetPalette.green, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: color, letterSpacing: 0.2)),
+      ],
     );
   }
 }
@@ -290,7 +348,7 @@ class _SnapshotActionTile extends StatelessWidget {
     required this.label,
     required this.subtitle,
     required this.card,
-    required this.border,
+    required this.isDark,
     required this.onTap,
     this.accent = false,
   });
@@ -299,7 +357,7 @@ class _SnapshotActionTile extends StatelessWidget {
   final String label;
   final String subtitle;
   final Color card;
-  final Color border;
+  final bool isDark;
   final VoidCallback? onTap;
   final bool accent;
 
@@ -307,43 +365,53 @@ class _SnapshotActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-    final iconBg = accent ? _accent : _accent.withValues(alpha: 0.12);
-    final iconFg = accent ? Colors.white : _accent;
 
     return Material(
       color: card,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent ? _accent.withValues(alpha: 0.45) : border),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.26 : 0.07), blurRadius: 14, offset: const Offset(0, 6))],
           ),
           child: Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: iconFg, size: 22),
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: accent
+                      ? const LinearGradient(colors: [WorksheetPalette.green, WorksheetPalette.greenDark], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                      : null,
+                  color: accent ? null : _accent.withValues(alpha: isDark ? 0.16 : 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: accent ? [BoxShadow(color: _accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))] : null,
+                ),
+                child: Icon(icon, color: accent ? Colors.white : _accent, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: titleColor)),
-                    Text(subtitle, style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
+                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: titleColor)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 11.5, color: muted, height: 1.3)),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: muted),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(color: muted.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(Icons.chevron_right_rounded, color: muted, size: 18),
+              ),
             ],
           ),
         ),
