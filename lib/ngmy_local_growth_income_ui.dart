@@ -232,6 +232,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         user: _user!,
         transactions: sorted,
         onAdd: _onAddTransaction,
+        onBackup: _openBackup,
       ),
     ];
 
@@ -252,24 +253,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
                       icon: Icons.arrow_back_ios_new_rounded,
                       isDark: isDark,
                       onTap: () => Navigator.pop(context),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'GROWTH INCOME',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
-                            letterSpacing: 1,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ),
-                    ),
-                    _headerCircleButton(
-                      icon: Icons.save_alt_rounded,
-                      isDark: isDark,
-                      onTap: _openBackup,
                     ),
                   ],
                 ),
@@ -350,11 +333,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 /// instantly to the local balance — there's no admin to approve anything
 /// in this local-only copy.
 class _LocalWalletTab extends StatefulWidget {
-  const _LocalWalletTab({super.key, required this.user, required this.transactions, required this.onAdd});
+  const _LocalWalletTab({super.key, required this.user, required this.transactions, required this.onAdd, required this.onBackup});
 
   final UserData user;
   final List<AppTransaction> transactions;
   final void Function(AppTransaction) onAdd;
+  final VoidCallback onBackup;
 
   @override
   State<_LocalWalletTab> createState() => _LocalWalletTabState();
@@ -442,7 +426,23 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
         child: Column(
           children: [
-            const FloatingTitle(title: 'MY WALLET'),
+            FloatingTitle(
+              title: 'MY WALLET',
+              trailing: InkWell(
+                onTap: widget.onBackup,
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.save_alt_rounded, color: WorksheetPalette.green, size: 18),
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
