@@ -227,6 +227,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
             child: Icon(Icons.arrow_back_ios_new_rounded, color: WorksheetPalette.green, size: 20),
           ),
         ),
+        disableLocalGrowthIncomeEntry: true,
       ),
       InvestScreen(
         key: const ValueKey('ngmy_local_invest'),

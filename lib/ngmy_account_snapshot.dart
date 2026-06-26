@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'main.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_local_growth_income.dart';
+import 'ngmy_local_growth_income_stash.dart';
 
 const String kNgmySnapshotMarker = 'ngmyAccountSnapshot';
 const int kNgmySnapshotVersion = 2;
@@ -115,38 +116,31 @@ class NgmyAccountSnapshot {
 
   String toJson() => const JsonEncoder.withIndent('  ').convert(toMap());
 
-  /// QR codes have no server to offload the payload to (unlike the advisor/
-  /// family-tree QR flows, which stash the bulk of the data in Supabase and
-  /// only encode a short token) — this copy must stay fully local, so the
-  /// transaction history is left out of the QR specifically. Including it
-  /// made the encoded text so long that the QR needed far more modules,
-  /// shrinking every dot to the point phone cameras couldn't focus on them.
-  /// Money/ROI fields are packed as integer cents/basis-points and dates as
-  /// epoch seconds (instead of raw doubles and millisecond ISO strings) to
-  /// keep the module count — and so each dot's on-screen size — as low as
-  /// possible. The downloadable file still includes full history & precision.
-  Map<String, dynamic> _toCompactMap() => {
-        'qb': (accountBalance * 100).round(),
-        'qp': (totalProfit * 100).round(),
-        'qu': username,
-        if (isClockedIn) 'qc': true,
-        if (clockInStartTime != null) 'qs': clockInStartTime!.toUtc().millisecondsSinceEpoch ~/ 1000,
-        if (lastClockInDate != null) 'ql': lastClockInDate!.toUtc().millisecondsSinceEpoch ~/ 1000,
-        if (lastClockInEarningsDate != null) 'qe': lastClockInEarningsDate!.toUtc().millisecondsSinceEpoch ~/ 1000,
-        if (todayClockInEarned != 0) 'qt': (todayClockInEarned * 100).round(),
-        if (clockInPenaltyPercent != 0) 'qn': clockInPenaltyPercent.round(),
-        if (activeInvestment != null)
-          'qi': {
-            'n': activeInvestment!.name,
-            'a': (activeInvestment!.amount * 100).round(),
-            'r': (activeInvestment!.dailyROI * 100).round(),
-            'p': activeInvestment!.purchaseDate.toUtc().millisecondsSinceEpoch ~/ 1000,
-            't': (activeInvestment!.totalEarned * 100).round(),
-            'd': activeInvestment!.daysClockedIn,
-          },
-      };
+  /// Same relay trick as the advisor/family-tree QR flows: the full snapshot
+  /// (including transaction history) is stashed in the cloud as an opaque
+  /// blob keyed by a random token, and the QR/code only ever carries that
+  /// short token — never balance data itself, and the stash is never read
+  /// as a source of truth for any balance. This is what keeps the QR's
+  /// dots big: a ~20-character token needs far fewer modules than the
+  /// snapshot itself ever could.
+  Future<({String qrPayload, String code})?> toStashedPayload({required String ownerEmail}) {
+    return NgmyLocalSnapshotStash.create(ownerEmail: ownerEmail, snapshotJson: toJson());
+  }
 
-  String toQrPayload() => '$kNgmySnapshotQrPrefix${base64Url.encode(utf8.encode(jsonEncode(_toCompactMap())))}';
+  /// Resolves anything Backup & Restore can receive: a typed 5–6 character
+  /// code, a scanned short-token QR, an uploaded file's full JSON text, or
+  /// (for backward compatibility) an older self-contained compact QR.
+  static Future<NgmyAccountSnapshot?> resolveAny(String raw) async {
+    final stashed = await NgmyLocalSnapshotStash.resolve(raw);
+    if (stashed != null) {
+      try {
+        final decoded = jsonDecode(stashed);
+        if (decoded is Map) return fromMap(Map<String, dynamic>.from(decoded));
+      } catch (_) {}
+      return null;
+    }
+    return parse(raw);
+  }
 
   static NgmyAccountSnapshot? parse(String raw) {
     try {

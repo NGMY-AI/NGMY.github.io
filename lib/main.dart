@@ -15482,7 +15482,8 @@ class HomeScreen extends StatefulWidget {
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final VoidCallback? onOpenInvest;
   final Widget? homeLeadingOverride;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride});
+  final bool disableLocalGrowthIncomeEntry;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -15845,12 +15846,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => showNgmyLocalGrowthIncomePage(
-                        context,
-                        liveUser: widget.user,
-                        config: widget.config,
-                        plans: widget.globalPlans,
-                      ),
+                      onTap: widget.disableLocalGrowthIncomeEntry
+                          ? null
+                          : () => showNgmyLocalGrowthIncomePage(
+                                context,
+                                liveUser: widget.user,
+                                config: widget.config,
+                                plans: widget.globalPlans,
+                              ),
                       child: _ngmyGlassGreenShell(
                         shimmer: shimmer,
                         borderRadius: BorderRadius.circular(13),

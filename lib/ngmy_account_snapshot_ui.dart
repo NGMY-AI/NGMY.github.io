@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_local_growth_income.dart';
+import 'ngmy_local_growth_income_stash.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -78,13 +79,34 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   Future<void> _showQr() async {
-    final snapshot = NgmyAccountSnapshot.fromUser(widget.user, widget.transactions);
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => _NgmyAccountSnapshotQrPage(qrPayload: snapshot.toQrPayload()),
-      ),
-    );
+    await _withWork(() async {
+      final snapshot = NgmyAccountSnapshot.fromUser(widget.user, widget.transactions);
+      final stashed = await snapshot.toStashedPayload(ownerEmail: widget.realEmail);
+      if (stashed == null) {
+        _toast('Could not create a QR right now. Check your connection and try again.');
+        return;
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => _NgmyAccountSnapshotQrPage(qrPayload: stashed.qrPayload, code: stashed.code),
+        ),
+      );
+    }, busyLabel: 'Creating QR code…');
+  }
+
+  Future<void> _enterCode() async {
+    final code = await _showEnterCodeDialog(context);
+    if (code == null || code.trim().isEmpty) return;
+    await _withWork(() async {
+      final snapshot = await NgmyAccountSnapshot.resolveAny(code);
+      if (snapshot == null) {
+        _toast('That code didn\'t match anything. Double-check it and try again.');
+        return;
+      }
+      await _confirmRestore(snapshot);
+    }, busyLabel: 'Looking up code…');
   }
 
   Future<String?> _pickBackupText() async {
@@ -104,8 +126,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
-    // QR codes don't carry wallet history (kept out so the QR stays scannable —
-    // see NgmyAccountSnapshot.toQrPayload). Keep the existing history in that case.
+    // Only an older, self-contained QR (kept for backward compatibility)
+    // ever arrives with no transaction history — current QR/code restores
+    // and file imports both carry full history via the cloud stash.
     final keepsHistory = snapshot.transactions.isEmpty;
     final ok = await showDialog<bool>(
       context: context,
@@ -155,12 +178,14 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       ),
     );
     if (raw == null || raw.trim().isEmpty) return;
-    final snapshot = NgmyAccountSnapshot.parse(raw);
-    if (snapshot == null) {
-      _toast('Could not read that QR code.');
-      return;
-    }
-    await _confirmRestore(snapshot);
+    await _withWork(() async {
+      final snapshot = await NgmyAccountSnapshot.resolveAny(raw);
+      if (snapshot == null) {
+        _toast('Could not read that QR code.');
+        return;
+      }
+      await _confirmRestore(snapshot);
+    }, busyLabel: 'Loading…');
   }
 
   @override
@@ -245,6 +270,13 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                _SnapshotWideCard(
+                  icon: Icons.pin_rounded,
+                  label: 'Enter Code',
+                  colors: const [Color(0xFFEC4899), Color(0xFFBE185D)],
+                  onTap: _working ? null : _enterCode,
+                ),
                 const SizedBox(height: 28),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -259,8 +291,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Download or scan a QR to save where you are now. Upload or scan one later to bring it back — '
-                          'on this device or another. Never touches your real, database-backed account.',
+                          'Download a file, show a QR, or get a 6-character code to save where you are now. '
+                          'Upload, scan, or type that code later to bring it back — on this device or another. '
+                          'Never touches your real, database-backed account.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -344,25 +377,68 @@ class _SnapshotGridCard extends StatelessWidget {
   }
 }
 
+class _SnapshotWideCard extends StatelessWidget {
+  const _SnapshotWideCard({required this.icon, required this.label, required this.colors, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final List<Color> colors;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8))],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NgmyAccountSnapshotQrPage extends StatelessWidget {
-  const _NgmyAccountSnapshotQrPage({required this.qrPayload});
+  const _NgmyAccountSnapshotQrPage({required this.qrPayload, required this.code});
 
   final String qrPayload;
+  final String code;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final screenW = MediaQuery.of(context).size.width;
-    final qrSize = (screenW - 116).clamp(220.0, 380.0);
+    final titleColor = isDark ? Colors.white : Colors.black87;
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: bg,
         elevation: 0,
-        title: const Text('Snapshot QR', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text('Restore QR', style: TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: true,
       ),
       body: Padding(
@@ -381,15 +457,36 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    NgmyBrandedQrWidget(
-                      data: qrPayload,
-                      large: true,
-                      sizeOverride: qrSize,
-                      errorCorrectionLevel: QrErrorCorrectLevel.L,
-                    ),
+                    const SizedBox(height: 8),
+                    NgmyBrandedQrWidget(data: qrPayload, large: true),
                     const SizedBox(height: 18),
+                    Text('Code: $code', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: code));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Code $code copied')));
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: WorksheetPalette.green.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.copy_rounded, size: 14, color: WorksheetPalette.green),
+                            const SizedBox(width: 6),
+                            Text('Copy code', style: TextStyle(color: WorksheetPalette.green, fontWeight: FontWeight.w800, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     Text(
-                      'Scan on another device to restore this growth income there.',
+                      'Scan this QR, or type the code, on another device to restore this growth income there.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                     ),
@@ -446,12 +543,161 @@ class _NgmyAccountSnapshotScanPageState extends State<_NgmyAccountSnapshotScanPa
           for (final barcode in capture.barcodes) {
             final raw = barcode.rawValue?.trim();
             if (raw == null || raw.isEmpty) continue;
-            if (!raw.startsWith(kNgmySnapshotQrPrefix)) continue;
+            final isOurs = raw.startsWith(kNgmySnapshotQrPrefix) || raw.startsWith('$kNgmyLocalSnapshotStashPrefix|');
+            if (!isOurs) continue;
             _handled = true;
             Navigator.pop(context, raw);
             return;
           }
         },
+      ),
+    );
+  }
+}
+
+Future<String?> _showEnterCodeDialog(BuildContext context) {
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black54,
+    builder: (ctx) => const _EnterCodeDialog(),
+  );
+}
+
+class _EnterCodeDialog extends StatefulWidget {
+  const _EnterCodeDialog();
+
+  @override
+  State<_EnterCodeDialog> createState() => _EnterCodeDialogState();
+}
+
+class _EnterCodeDialogState extends State<_EnterCodeDialog> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final fg = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final fieldFill = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
+    final border = isDark ? Colors.white24 : const Color(0xFFD1D5DB);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+            boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.18), blurRadius: 32, offset: const Offset(0, 12))],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFBE185D)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6))],
+                  ),
+                  child: const Icon(Icons.pin_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 16),
+                Text('Enter restore code', textAlign: TextAlign.center, style: TextStyle(color: fg, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.3)),
+                const SizedBox(height: 8),
+                Text(
+                  'Type the 6-character code shown under the QR on the other device.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted, fontSize: 13, height: 1.45),
+                ),
+                const SizedBox(height: 22),
+                TextField(
+                  controller: _controller,
+                  focusNode: _focus,
+                  maxLength: 6,
+                  textAlign: TextAlign.center,
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: TextStyle(color: fg, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 8),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                    TextInputFormatter.withFunction(
+                      (oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase()),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: 'A3K9P2',
+                    hintStyle: TextStyle(color: muted.withValues(alpha: 0.45), fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 8),
+                    filled: true,
+                    fillColor: fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: WorksheetPalette.green, width: 2)),
+                  ),
+                  onSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: fg,
+                          side: BorderSide(color: border),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: WorksheetPalette.green,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Restore', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
