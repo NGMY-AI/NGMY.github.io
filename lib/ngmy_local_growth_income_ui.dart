@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
@@ -239,7 +240,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _LocalWalletTab(
         key: const ValueKey('ngmy_local_wallet'),
         user: _user!,
-        transactions: sorted,
         onAdd: _onAddTransaction,
         onBackup: _openBackup,
         liveUser: widget.liveUser,
@@ -308,7 +308,6 @@ class _LocalWalletTab extends StatefulWidget {
   const _LocalWalletTab({
     super.key,
     required this.user,
-    required this.transactions,
     required this.onAdd,
     required this.onBackup,
     required this.liveUser,
@@ -316,7 +315,6 @@ class _LocalWalletTab extends StatefulWidget {
   });
 
   final UserData user;
-  final List<AppTransaction> transactions;
   final void Function(AppTransaction) onAdd;
   final VoidCallback onBackup;
   final UserData liveUser;
@@ -328,7 +326,7 @@ class _LocalWalletTab extends StatefulWidget {
 
 class _LocalWalletTabState extends State<_LocalWalletTab> {
   final TextEditingController _amt = TextEditingController();
-  int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
+  int _view = 0; // 0: Deposit, 1: Withdraw
 
   @override
   void dispose() {
@@ -339,6 +337,13 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _notifyWhatsApp(String message) async {
+    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   void _deposit() {
@@ -358,6 +363,9 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       timestamp: DateTime.now(),
     ));
     _toast('Added \$${formatCurrency(a)} to your balance.');
+    unawaited(_notifyWhatsApp(
+      'NGMY Growth Income deposit — ${widget.user.username}: \$${formatCurrency(a)}. Sending proof now.',
+    ));
     _amt.clear();
     setState(() {});
   }
@@ -389,6 +397,10 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       timestamp: DateTime.now(),
     ));
     _toast('Withdrew \$${formatCurrency(a)}. You receive \$${formatCurrency(receive)} after fee.');
+    unawaited(_notifyWhatsApp(
+      'NGMY Growth Income withdrawal request — ${widget.user.username}: \$${formatCurrency(a)} '
+      '(fee \$${formatCurrency(fee)}, you receive \$${formatCurrency(receive)}).',
+    ));
     _amt.clear();
     setState(() {});
   }
@@ -400,7 +412,6 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     final inputBg = isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC);
     final inputBorder = isDark ? const Color(0xFF2B3440) : const Color(0xFFD1D5DB);
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
 
     return SafeArea(
       bottom: false,
@@ -472,15 +483,10 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 Expanded(child: _viewTab('Deposit', 0)),
                 const SizedBox(width: 8),
                 Expanded(child: _viewTab('Withdraw', 1)),
-                const SizedBox(width: 8),
-                Expanded(child: _viewTab('History', 2)),
               ],
             ),
             const SizedBox(height: 16),
-            if (_view == 2)
-              _historyList(muted, titleColor, cardBg)
-            else
-              Container(
+            Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: cardBg,
@@ -568,45 +574,4 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
-  Widget _historyList(Color muted, Color titleColor, Color cardBg) {
-    if (widget.transactions.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Text('No transactions yet.', style: TextStyle(color: muted)),
-      );
-    }
-    return Column(
-      children: widget.transactions.map((t) {
-        final isWithdrawal = t.type == TransactionType.withdrawal;
-        final isAdd = t.type == TransactionType.deposit || t.type == TransactionType.reimbursement;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(14)),
-          child: Row(
-            children: [
-              Icon(
-                isWithdrawal ? Icons.south_west_rounded : Icons.north_east_rounded,
-                color: isAdd ? const Color(0xFF22C55E) : Colors.redAccent,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t.sourceDetails ?? t.type.name, style: TextStyle(color: titleColor, fontWeight: FontWeight.w700, fontSize: 12)),
-                    Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(color: muted, fontSize: 11)),
-                  ],
-                ),
-              ),
-              Text(
-                '${isAdd ? '+' : '-'}\$${formatCurrency(t.amount)}',
-                style: TextStyle(fontWeight: FontWeight.w800, color: isAdd ? const Color(0xFF22C55E) : Colors.redAccent),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
 }
