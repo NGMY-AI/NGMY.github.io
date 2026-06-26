@@ -15481,7 +15481,8 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final VoidCallback? onOpenInvest;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest});
+  final Widget? homeLeadingOverride;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -15649,18 +15650,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         );
                       }
                     : null,
-                leading: InkWell(
-                  onTap: () => NgmyNavigator.push(
-                    context,
-                    LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
-                    routeName: 'LoanServiceScreen',
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
-                    child: Icon(Icons.attach_money_rounded, color: isLight ? Colors.white : Colors.greenAccent, size: 20),
-                  ),
-                ),
+                leading: widget.homeLeadingOverride ??
+                    InkWell(
+                      onTap: () => NgmyNavigator.push(
+                        context,
+                        LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                        routeName: 'LoanServiceScreen',
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
+                        child: Icon(Icons.attach_money_rounded, color: isLight ? Colors.white : Colors.greenAccent, size: 20),
+                      ),
+                    ),
                 trailing: IconButton(
                   tooltip: 'NGMY Helper',
                   icon: Container(

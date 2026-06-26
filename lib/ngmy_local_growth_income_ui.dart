@@ -219,6 +219,14 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         onDeleteAnnouncement: (_) {},
         onClearAllAnnouncements: () {},
         onOpenInvest: () => setState(() => _idx = 1),
+        homeLeadingOverride: InkWell(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(color: Colors.transparent, shape: BoxShape.circle),
+            child: Icon(Icons.arrow_back_ios_new_rounded, color: WorksheetPalette.green, size: 20),
+          ),
+        ),
       ),
       InvestScreen(
         key: const ValueKey('ngmy_local_invest'),
@@ -233,6 +241,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         transactions: sorted,
         onAdd: _onAddTransaction,
         onBackup: _openBackup,
+        liveUser: widget.liveUser,
+        config: widget.config,
       ),
     ];
 
@@ -294,12 +304,22 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 /// instantly to the local balance — there's no admin to approve anything
 /// in this local-only copy.
 class _LocalWalletTab extends StatefulWidget {
-  const _LocalWalletTab({super.key, required this.user, required this.transactions, required this.onAdd, required this.onBackup});
+  const _LocalWalletTab({
+    super.key,
+    required this.user,
+    required this.transactions,
+    required this.onAdd,
+    required this.onBackup,
+    required this.liveUser,
+    required this.config,
+  });
 
   final UserData user;
   final List<AppTransaction> transactions;
   final void Function(AppTransaction) onAdd;
   final VoidCallback onBackup;
+  final UserData liveUser;
+  final AppConfig config;
 
   @override
   State<_LocalWalletTab> createState() => _LocalWalletTabState();
@@ -389,6 +409,24 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
           children: [
             FloatingTitle(
               title: 'MY WALLET',
+              leading: InkWell(
+                onTap: () => NgmyNavigator.push(
+                  context,
+                  LoanServiceScreen(user: widget.liveUser, config: widget.config, onDataChanged: () {}),
+                  routeName: 'LoanServiceScreen',
+                ),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.transparent : WorksheetPalette.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.attach_money_rounded, color: isDark ? Colors.greenAccent : Colors.white, size: 20),
+                ),
+              ),
               trailing: InkWell(
                 onTap: widget.onBackup,
                 customBorder: const CircleBorder(),
