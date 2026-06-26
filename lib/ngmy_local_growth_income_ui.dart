@@ -52,7 +52,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   }
 
   Future<void> _load() async {
-    final loaded = await NgmyLocalGrowthIncomeStore.load(widget.liveUser);
+    final loaded = await NgmyLocalGrowthIncomeStore.load(widget.liveUser.email, widget.liveUser);
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
     NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
@@ -103,7 +103,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       return;
     }
     if (user.isClockedIn) {
-      _toast('Your local clock-in session is already running.');
+      _toast('Your clock-in session is already running.');
       return;
     }
     if (!NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now)) {
@@ -123,11 +123,11 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       amount: 0,
       type: TransactionType.reimbursement,
       method: PaymentMethod.system,
-      sourceDetails: 'Clock-in session started (local)',
+      sourceDetails: 'Clock-in session started',
       status: TransactionStatus.approved,
       timestamp: now,
     ));
-    _toast('Local clock-in started. Earnings settle the next time you open this.');
+    _toast('Clock-in started. Earnings settle the next time you open this.');
   }
 
   void _onInvest(String name, double price, double roi, double cost) {
@@ -139,11 +139,11 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
     final txnId = ngmyInvestPurchaseTxnId(user.email, name, price);
     if (ngmyHasApprovedInvestPurchase(user.email, _transactions, txnId)) {
-      _toast('You already own this plan locally.');
+      _toast('You already own this plan.');
       return;
     }
     if (user.accountBalance < cost) {
-      _toast('Insufficient local balance. Add funds in the Wallet tab first.');
+      _toast('Insufficient balance. Add funds in the Wallet tab first.');
       return;
     }
     setState(() => _investPurchaseInFlight = true);
@@ -166,12 +166,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       amount: cost,
       type: TransactionType.adminRemove,
       method: PaymentMethod.system,
-      sourceDetails: 'Direct investment buy (local): $name',
+      sourceDetails: 'Direct investment buy: $name',
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     ));
     setState(() => _investPurchaseInFlight = false);
-    _toast('Plan purchased locally: $name');
+    _toast('Plan purchased: $name');
   }
 
   void _toast(String msg) {
@@ -182,7 +182,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   Future<void> _openBackup() async {
     final user = _user;
     if (user == null) return;
-    await showNgmyAccountSnapshotPage(context, user: user, transactions: _transactions);
+    await showNgmyAccountSnapshotPage(context, realEmail: widget.liveUser.email, user: user, transactions: _transactions);
     await _load();
   }
 
@@ -245,7 +245,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: FloatingTitle(
-                title: 'LOCAL GROWTH INCOME',
+                title: 'GROWTH INCOME',
                 leading: _headerCircleButton(
                   icon: Icons.arrow_back_ios_new_rounded,
                   isDark: isDark,
@@ -370,11 +370,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       amount: a,
       type: TransactionType.deposit,
       method: PaymentMethod.system,
-      sourceDetails: 'Local deposit',
+      sourceDetails: 'Deposit',
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     ));
-    _toast('Added \$${formatCurrency(a)} to your local balance.');
+    _toast('Added \$${formatCurrency(a)} to your balance.');
     _amt.clear();
     setState(() {});
   }
@@ -390,7 +390,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       return;
     }
     if (a > widget.user.accountBalance) {
-      _toast('Insufficient local balance. You have \$${formatCurrency(widget.user.accountBalance)}.');
+      _toast('Insufficient balance. You have \$${formatCurrency(widget.user.accountBalance)}.');
       return;
     }
     final fee = a * 0.15;
@@ -401,11 +401,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       amount: a,
       type: TransactionType.withdrawal,
       method: PaymentMethod.system,
-      sourceDetails: 'Local withdrawal - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
+      sourceDetails: 'Withdrawal - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     ));
-    _toast('Withdrew \$${formatCurrency(a)} locally. You receive \$${formatCurrency(receive)} after fee.');
+    _toast('Withdrew \$${formatCurrency(a)}. You receive \$${formatCurrency(receive)} after fee.');
     _amt.clear();
     setState(() {});
   }
@@ -425,7 +425,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
         child: Column(
           children: [
-            const FloatingTitle(title: 'MY WALLET (LOCAL)'),
+            const FloatingTitle(title: 'MY WALLET'),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
@@ -439,7 +439,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                    const Text('Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Text(
                       '\$${formatCurrency(widget.user.accountBalance)}',
@@ -555,7 +555,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     if (widget.transactions.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 30),
-        child: Text('No local transactions yet.', style: TextStyle(color: muted)),
+        child: Text('No transactions yet.', style: TextStyle(color: muted)),
       );
     }
     return Column(

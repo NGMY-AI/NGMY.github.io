@@ -13,23 +13,27 @@ import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
 
-/// Backup/restore for the local-only Growth Income copy. [user]/[transactions]
-/// are that local copy's current state (not the live database account).
+/// Backup/restore for the Growth Income copy behind the wifi icon.
+/// [user]/[transactions] are that copy's current state (not the live
+/// database account); [realEmail] is the signed-in account's real email,
+/// used only to locate the right local storage slot.
 Future<void> showNgmyAccountSnapshotPage(
   BuildContext context, {
+  required String realEmail,
   required UserData user,
   required List<AppTransaction> transactions,
 }) {
   return NgmyNavigator.push<void>(
     context,
-    NgmyAccountSnapshotPage(user: user, transactions: transactions),
+    NgmyAccountSnapshotPage(realEmail: realEmail, user: user, transactions: transactions),
     fullscreenDialog: true,
   );
 }
 
 class NgmyAccountSnapshotPage extends StatefulWidget {
-  const NgmyAccountSnapshotPage({super.key, required this.user, required this.transactions});
+  const NgmyAccountSnapshotPage({super.key, required this.realEmail, required this.user, required this.transactions});
 
+  final String realEmail;
   final UserData user;
   final List<AppTransaction> transactions;
 
@@ -104,7 +108,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Restore this snapshot?'),
         content: Text(
-          'This replaces your local growth income data (balance, investment, clock-in, wallet history) '
+          'This replaces your growth income data (balance, investment, clock-in, wallet history) '
           'with the saved snapshot from ${snapshot.exportedAt.month}/${snapshot.exportedAt.day}/${snapshot.exportedAt.year}.',
         ),
         actions: [
@@ -114,10 +118,10 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       ),
     );
     if (ok != true) return;
-    final restoredUser = snapshot.toUserData(widget.user.email);
-    await NgmyLocalGrowthIncomeStore.replace(widget.user.email, restoredUser, snapshot.transactions);
+    final restoredUser = snapshot.toUserData(widget.realEmail);
+    await NgmyLocalGrowthIncomeStore.replace(widget.realEmail, restoredUser, snapshot.transactions);
     if (!mounted) return;
-    _toast('Restored. Go back to see your local growth income updated.');
+    _toast('Restored. Go back to see it updated.');
   }
 
   Future<void> _importFile() async {
@@ -157,7 +161,6 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
 
@@ -168,123 +171,91 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         child: Stack(
           children: [
             ListView(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               children: [
-                FloatingTitle(
-                  title: 'BACKUP & RESTORE',
-                  leading: InkWell(
-                    onTap: () => Navigator.pop(context),
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
-                        shape: BoxShape.circle,
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06), shape: BoxShape.circle),
+                        child: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 16),
                       ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, color: WorksheetPalette.green, size: 16),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
+                Text('Backup & Restore', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 28, color: titleColor, letterSpacing: -0.5)),
+                const SizedBox(height: 8),
+                Text(
+                  'Keep a copy of this growth income on your device, or bring one back.',
+                  style: TextStyle(fontSize: 13.5, height: 1.4, color: muted, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SnapshotGridCard(
+                        icon: Icons.file_download_rounded,
+                        label: 'Download',
+                        colors: const [Color(0xFF22C55E), Color(0xFF15803D)],
+                        onTap: _working ? null : _exportFile,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: _SnapshotGridCard(
+                        icon: Icons.qr_code_2_rounded,
+                        label: 'Show QR',
+                        colors: const [Color(0xFF6366F1), Color(0xFF4338CA)],
+                        onTap: _working ? null : _showQr,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SnapshotGridCard(
+                        icon: Icons.file_upload_rounded,
+                        label: 'Upload',
+                        colors: const [Color(0xFFF59E0B), Color(0xFFB45309)],
+                        onTap: _working ? null : _importFile,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: _SnapshotGridCard(
+                        icon: Icons.qr_code_scanner_rounded,
+                        label: 'Scan QR',
+                        colors: const [Color(0xFF06B6D4), Color(0xFF0E7490)],
+                        onTap: _working ? null : _scanQr,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: card,
-                    borderRadius: BorderRadius.circular(24),
-                    border: isDark ? null : Border.all(color: WorksheetPalette.green.withValues(alpha: 0.12)),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08), blurRadius: 18, offset: const Offset(0, 8))],
+                    color: isDark ? Colors.white.withValues(alpha: 0.06) : WorksheetPalette.green.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [WorksheetPalette.green, WorksheetPalette.greenDark],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 6))],
-                        ),
-                        child: const Icon(Icons.shield_rounded, color: Colors.white, size: 26),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Your local copy, protected', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: titleColor)),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Save this device\'s growth income to a file or QR, or restore a saved copy. '
-                              'Only affects the local copy behind the wifi icon — never your real account.',
-                              style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 26),
-                _SectionLabel(label: 'Save a copy', color: titleColor),
-                const SizedBox(height: 12),
-                _SnapshotActionTile(
-                  icon: Icons.download_rounded,
-                  label: 'Download snapshot file',
-                  subtitle: 'Balance, investment, clock-in & wallet history',
-                  card: card,
-                  isDark: isDark,
-                  onTap: _working ? null : _exportFile,
-                ),
-                const SizedBox(height: 10),
-                _SnapshotActionTile(
-                  icon: Icons.qr_code_2_rounded,
-                  label: 'Show QR code',
-                  subtitle: 'Scan with another device to restore there',
-                  card: card,
-                  isDark: isDark,
-                  accent: true,
-                  onTap: _working ? null : _showQr,
-                ),
-                const SizedBox(height: 26),
-                _SectionLabel(label: 'Restore a saved copy', color: titleColor),
-                const SizedBox(height: 12),
-                _SnapshotActionTile(
-                  icon: Icons.upload_file_rounded,
-                  label: 'Upload backup file',
-                  subtitle: 'Replace local data with a snapshot file',
-                  card: card,
-                  isDark: isDark,
-                  onTap: _working ? null : _importFile,
-                ),
-                const SizedBox(height: 10),
-                _SnapshotActionTile(
-                  icon: Icons.qr_code_scanner_rounded,
-                  label: 'Scan QR code',
-                  subtitle: 'Restore a snapshot from another device',
-                  card: card,
-                  isDark: isDark,
-                  onTap: _working ? null : _scanQr,
-                ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 15, color: muted),
-                      const SizedBox(width: 8),
+                      Icon(Icons.bolt_rounded, size: 18, color: WorksheetPalette.green),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Restoring replaces your local growth income data on this device. It never touches your '
-                          'real, database-backed account.',
-                          style: TextStyle(fontSize: 11.5, height: 1.4, color: muted),
+                          'Download or scan a QR to save where you are now. Upload or scan one later to bring it back — '
+                          'on this device or another. Never touches your real, database-backed account.',
+                          style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -299,7 +270,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                 bottom: 0,
                 child: Material(
                   elevation: 8,
-                  color: card,
+                  color: isDark ? const Color(0xFF151B28) : Colors.white,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                     child: Row(
@@ -324,94 +295,41 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(width: 4, height: 14, decoration: BoxDecoration(color: WorksheetPalette.green, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: color, letterSpacing: 0.2)),
-      ],
-    );
-  }
-}
-
-class _SnapshotActionTile extends StatelessWidget {
-  const _SnapshotActionTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.card,
-    required this.isDark,
-    required this.onTap,
-    this.accent = false,
-  });
+class _SnapshotGridCard extends StatelessWidget {
+  const _SnapshotGridCard({required this.icon, required this.label, required this.colors, required this.onTap});
 
   final IconData icon;
   final String label;
-  final String subtitle;
-  final Color card;
-  final bool isDark;
+  final List<Color> colors;
   final VoidCallback? onTap;
-  final bool accent;
-
-  static const Color _accent = WorksheetPalette.green;
 
   @override
   Widget build(BuildContext context) {
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-
     return Material(
-      color: card,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          height: 128,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.26 : 0.07), blurRadius: 14, offset: const Offset(0, 6))],
+            gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8))],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: accent
-                      ? const LinearGradient(colors: [WorksheetPalette.green, WorksheetPalette.greenDark], begin: Alignment.topLeft, end: Alignment.bottomRight)
-                      : null,
-                  color: accent ? null : _accent.withValues(alpha: isDark ? 0.16 : 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: accent ? [BoxShadow(color: _accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))] : null,
-                ),
-                child: Icon(icon, color: accent ? Colors.white : _accent, size: 22),
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: titleColor)),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: TextStyle(fontSize: 11.5, color: muted, height: 1.3)),
-                  ],
-                ),
-              ),
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(color: muted.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(Icons.chevron_right_rounded, color: muted, size: 18),
-              ),
+              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
             ],
           ),
         ),
@@ -458,7 +376,7 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                     NgmyBrandedQrWidget(data: qrPayload, large: true),
                     const SizedBox(height: 18),
                     Text(
-                      'Scan on another device to restore this local growth income there.',
+                      'Scan on another device to restore this growth income there.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                     ),

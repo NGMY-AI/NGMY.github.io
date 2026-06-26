@@ -2,18 +2,20 @@ import 'dart:convert';
 
 import 'main.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'ngmy_local_growth_income.dart';
 
 const String kNgmySnapshotMarker = 'ngmyAccountSnapshot';
 const int kNgmySnapshotVersion = 2;
 const String kNgmySnapshotQrPrefix = 'NGMYSNAP1|';
 
-/// A full backup of the local-only Growth Income copy (balance, investment,
-/// clock-in state, wallet history) behind the home screen's wifi icon.
-/// Restoring this overwrites that local copy — safe to do since it was
-/// never tied to the real database-backed account.
+/// A full backup of the Growth Income copy behind the home screen's wifi
+/// icon (balance, investment, clock-in state, wallet history). Restoring
+/// this overwrites that copy — safe to do since it was never tied to the
+/// real database-backed account.
 class NgmyAccountSnapshot {
   const NgmyAccountSnapshot({
     required this.email,
+    required this.username,
     required this.accountBalance,
     required this.totalProfit,
     required this.isClockedIn,
@@ -28,6 +30,7 @@ class NgmyAccountSnapshot {
   });
 
   final String email;
+  final String username;
   final double accountBalance;
   final double totalProfit;
   final bool isClockedIn;
@@ -42,6 +45,7 @@ class NgmyAccountSnapshot {
 
   factory NgmyAccountSnapshot.fromUser(UserData user, List<AppTransaction> transactions) => NgmyAccountSnapshot(
         email: user.email.trim().toLowerCase(),
+        username: user.username,
         accountBalance: user.accountBalance,
         totalProfit: user.totalProfit,
         isClockedIn: user.isClockedIn,
@@ -55,10 +59,12 @@ class NgmyAccountSnapshot {
         exportedAt: DateTime.now(),
       );
 
-  /// Rebuilds a [UserData] (email aside) from this snapshot, suitable for
-  /// writing straight into [NgmyLocalGrowthIncomeStore].
-  UserData toUserData(String email) => UserData(
-        email: email,
+  /// Rebuilds a [UserData] from this snapshot, suitable for writing straight
+  /// into [NgmyLocalGrowthIncomeStore]. [realEmail] is the signed-in account's
+  /// real email — the stored identity email is derived from it.
+  UserData toUserData(String realEmail) => UserData(
+        email: NgmyLocalGrowthIncomeStore.identityEmailFor(realEmail),
+        username: username,
         accountBalance: accountBalance,
         totalProfit: totalProfit,
         isClockedIn: isClockedIn,
@@ -73,6 +79,7 @@ class NgmyAccountSnapshot {
   Map<String, dynamic> toMap() => {
         kNgmySnapshotMarker: kNgmySnapshotVersion,
         'email': email,
+        'username': username,
         'accountBalance': accountBalance,
         'totalProfit': totalProfit,
         'isClockedIn': isClockedIn,
@@ -170,6 +177,7 @@ class NgmyAccountSnapshot {
 
     return NgmyAccountSnapshot(
       email: (map['email'] ?? '').toString(),
+      username: (map['username'] ?? 'User').toString(),
       accountBalance: (map['accountBalance'] as num? ?? 0).toDouble(),
       totalProfit: (map['totalProfit'] as num? ?? 0).toDouble(),
       isClockedIn: map['isClockedIn'] == true,
@@ -187,7 +195,7 @@ class NgmyAccountSnapshot {
   static Future<String> exportToFile(UserData user, List<AppTransaction> transactions) async {
     final snapshot = NgmyAccountSnapshot.fromUser(user, transactions);
     final safe = snapshot.email.replaceAll(RegExp(r'[^\w\-.]+'), '_');
-    final filename = 'ngmy-local-growth-income-$safe.ngmy.json';
+    final filename = 'ngmy-growth-income-$safe.ngmy.json';
     return downloadNgmyAdvisorSyncJson(snapshot.toJson(), filename);
   }
 }

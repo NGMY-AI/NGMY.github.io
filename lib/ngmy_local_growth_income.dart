@@ -8,39 +8,48 @@ import 'main.dart';
 /// investment, clock-in streak, wallet history). Never touches Supabase —
 /// the real Growth Income tabs and their database sync are untouched.
 class NgmyLocalGrowthIncomeStore {
-  static String _key(String email) => 'ngmy_local_growth_income_${email.toLowerCase().trim()}';
+  static String _normalize(String email) => email.toLowerCase().trim();
+
+  static String _key(String realEmail) => 'ngmy_local_growth_income_${_normalize(realEmail)}';
+
+  /// The `UserData.email` used internally for this copy. Deliberately distinct
+  /// from the real account email so widgets we reuse from the real app (like
+  /// `NgmyLiveBalance`, which caches balances globally per real email) never
+  /// collide with the real account's cached balance — that mismatch was the
+  /// cause of the balance shown here disagreeing with the local figures.
+  static String identityEmailFor(String realEmail) => '${_normalize(realEmail)}+local.ngmy';
 
   /// Loads the local copy, seeding it once from [liveUserSeed] the first time
   /// this device opens it. After that the local copy is fully independent.
-  static Future<({UserData user, List<AppTransaction> transactions})> load(UserData liveUserSeed) async {
+  static Future<({UserData user, List<AppTransaction> transactions})> load(String realEmail, UserData liveUserSeed) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key(liveUserSeed.email));
+    final raw = prefs.getString(_key(realEmail));
     if (raw == null || raw.trim().isEmpty) {
-      final seeded = _seedFrom(liveUserSeed);
-      await save(liveUserSeed.email, seeded, const []);
+      final seeded = _seedFrom(realEmail, liveUserSeed);
+      await save(realEmail, seeded, const []);
       return (user: seeded, transactions: <AppTransaction>[]);
     }
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      return (user: _userFromMap(liveUserSeed.email, map), transactions: _transactionsFromMap(map));
+      return (user: _userFromMap(realEmail, map), transactions: _transactionsFromMap(map));
     } catch (_) {
-      final seeded = _seedFrom(liveUserSeed);
+      final seeded = _seedFrom(realEmail, liveUserSeed);
       return (user: seeded, transactions: <AppTransaction>[]);
     }
   }
 
-  static Future<void> save(String email, UserData user, List<AppTransaction> transactions) async {
+  static Future<void> save(String realEmail, UserData user, List<AppTransaction> transactions) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(email), jsonEncode(_toMap(user, transactions)));
+    await prefs.setString(_key(realEmail), jsonEncode(_toMap(user, transactions)));
   }
 
   /// Overwrites the local copy outright (used by snapshot restore — safe here
   /// since this state was never database-authoritative).
-  static Future<void> replace(String email, UserData user, List<AppTransaction> transactions) =>
-      save(email, user, transactions);
+  static Future<void> replace(String realEmail, UserData user, List<AppTransaction> transactions) =>
+      save(realEmail, user, transactions);
 
-  static UserData _seedFrom(UserData live) => UserData(
-        email: live.email,
+  static UserData _seedFrom(String realEmail, UserData live) => UserData(
+        email: identityEmailFor(realEmail),
         username: live.username,
         accountBalance: live.accountBalance,
         totalProfit: live.totalProfit,
@@ -63,6 +72,7 @@ class NgmyLocalGrowthIncomeStore {
       );
 
   static Map<String, dynamic> _toMap(UserData user, List<AppTransaction> transactions) => {
+        'username': user.username,
         'accountBalance': user.accountBalance,
         'totalProfit': user.totalProfit,
         'isClockedIn': user.isClockedIn,
@@ -87,7 +97,7 @@ class NgmyLocalGrowthIncomeStore {
         'transactions': transactions.map(_txnToMap).toList(),
       };
 
-  static UserData _userFromMap(String email, Map<String, dynamic> map) {
+  static UserData _userFromMap(String realEmail, Map<String, dynamic> map) {
     DateTime? parseDate(dynamic v) => v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
     ActiveInvestment? investment;
     final rawInvestment = map['activeInvestment'];
@@ -103,7 +113,8 @@ class NgmyLocalGrowthIncomeStore {
       );
     }
     return UserData(
-      email: email,
+      email: identityEmailFor(realEmail),
+      username: (map['username'] ?? 'User').toString(),
       accountBalance: (map['accountBalance'] as num? ?? 0).toDouble(),
       totalProfit: (map['totalProfit'] as num? ?? 0).toDouble(),
       isClockedIn: map['isClockedIn'] == true,
