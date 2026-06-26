@@ -911,6 +911,9 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final bool compact;
   final bool large;
   final GlobalKey? captureKey;
+  final int? errorCorrectionLevel;
+  final double? sizeOverride;
+  final bool showLogo;
 
   const NgmyBrandedQrWidget({
     super.key,
@@ -918,6 +921,9 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     this.compact = false,
     this.large = false,
     this.captureKey,
+    this.errorCorrectionLevel,
+    this.sizeOverride,
+    this.showLogo = true,
   });
 
   static Future<Uint8List?> capturePng(GlobalKey key, {double pixelRatio = 4}) async {
@@ -936,7 +942,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = large ? 300.0 : (compact ? 130.0 : 248.0);
+    final size = sizeOverride ?? (large ? 300.0 : (compact ? 130.0 : 248.0));
     final logoSize = large ? 64.0 : (compact ? 28.0 : 52.0);
     final ring = large ? 26.0 : (compact ? 14.0 : 22.0);
     final outerPad = large ? 36.0 : 28.0;
@@ -970,33 +976,34 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                   size: size - 20,
                   padding: EdgeInsets.zero,
                   backgroundColor: Colors.white,
-                  errorCorrectionLevel: QrErrorCorrectLevel.H,
+                  errorCorrectionLevel: errorCorrectionLevel ?? QrErrorCorrectLevel.H,
                   eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.circle, color: _ink),
                   dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: _ink),
                 ),
-                Container(
-                  width: logoSize + 8,
-                  height: logoSize + 8,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(compact ? 8 : (large ? 14 : 12)),
-                    border: Border.all(color: _accent.withOpacity(0.35), width: 2),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(compact ? 6 : (large ? 10 : 8)),
-                    child: Image.network(
-                      _kNgmyLogoUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: _accent.withOpacity(0.12),
-                        alignment: Alignment.center,
-                        child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: large ? 13 : (compact ? 8 : 11), color: _accentDeep)),
+                if (showLogo)
+                  Container(
+                    width: logoSize + 8,
+                    height: logoSize + 8,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(compact ? 8 : (large ? 14 : 12)),
+                      border: Border.all(color: _accent.withOpacity(0.35), width: 2),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(compact ? 6 : (large ? 10 : 8)),
+                      child: Image.network(
+                        _kNgmyLogoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: _accent.withOpacity(0.12),
+                          alignment: Alignment.center,
+                          child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: large ? 13 : (compact ? 8 : 11), color: _accentDeep)),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

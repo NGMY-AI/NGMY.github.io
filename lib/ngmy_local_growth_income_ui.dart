@@ -239,51 +239,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     return Scaffold(
       extendBody: true,
       backgroundColor: bg,
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-              child: SizedBox(
-                height: 60,
-                child: Row(
-                  children: [
-                    _headerCircleButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      isDark: isDark,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(child: IndexedStack(index: _idx, children: pages)),
-        ],
-      ),
+      body: IndexedStack(index: _idx, children: pages),
       bottomNavigationBar: Material(
         type: MaterialType.transparency,
         elevation: 0,
         color: Colors.transparent,
         child: _buildLocalBottomNavBar(),
-      ),
-    );
-  }
-
-  Widget _headerCircleButton({required IconData icon, required bool isDark, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: WorksheetPalette.green, size: 18),
       ),
     );
   }

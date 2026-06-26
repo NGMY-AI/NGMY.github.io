@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot.dart';
@@ -353,6 +354,8 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final screenW = MediaQuery.of(context).size.width;
+    final qrSize = (screenW - 116).clamp(220.0, 380.0);
 
     return Scaffold(
       backgroundColor: bg,
@@ -378,7 +381,13 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    NgmyBrandedQrWidget(data: qrPayload, large: true),
+                    NgmyBrandedQrWidget(
+                      data: qrPayload,
+                      large: true,
+                      sizeOverride: qrSize,
+                      errorCorrectionLevel: QrErrorCorrectLevel.L,
+                      showLogo: false,
+                    ),
                     const SizedBox(height: 18),
                     Text(
                       'Scan on another device to restore this growth income there.',

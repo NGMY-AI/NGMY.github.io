@@ -125,23 +125,22 @@ class NgmyAccountSnapshot {
   Map<String, dynamic> _toCompactMap() => {
         'qb': accountBalance,
         'qp': totalProfit,
-        'qc': isClockedIn,
-        'qs': clockInStartTime?.toUtc().toIso8601String(),
-        'ql': lastClockInDate?.toUtc().toIso8601String(),
-        'qe': lastClockInEarningsDate?.toUtc().toIso8601String(),
-        'qt': todayClockInEarned,
-        'qn': clockInPenaltyPercent,
         'qu': username,
-        'qi': activeInvestment == null
-            ? null
-            : {
-                'n': activeInvestment!.name,
-                'a': activeInvestment!.amount,
-                'r': activeInvestment!.dailyROI,
-                'p': activeInvestment!.purchaseDate.toUtc().toIso8601String(),
-                't': activeInvestment!.totalEarned,
-                'd': activeInvestment!.daysClockedIn,
-              },
+        if (isClockedIn) 'qc': true,
+        if (clockInStartTime != null) 'qs': clockInStartTime!.toUtc().millisecondsSinceEpoch,
+        if (lastClockInDate != null) 'ql': lastClockInDate!.toUtc().millisecondsSinceEpoch,
+        if (lastClockInEarningsDate != null) 'qe': lastClockInEarningsDate!.toUtc().millisecondsSinceEpoch,
+        if (todayClockInEarned != 0) 'qt': todayClockInEarned,
+        if (clockInPenaltyPercent != 0) 'qn': clockInPenaltyPercent,
+        if (activeInvestment != null)
+          'qi': {
+            'n': activeInvestment!.name,
+            'a': activeInvestment!.amount,
+            'r': activeInvestment!.dailyROI,
+            'p': activeInvestment!.purchaseDate.toUtc().millisecondsSinceEpoch,
+            't': activeInvestment!.totalEarned,
+            'd': activeInvestment!.daysClockedIn,
+          },
       };
 
   String toQrPayload() => '$kNgmySnapshotQrPrefix${base64Url.encode(utf8.encode(jsonEncode(_toCompactMap())))}';
@@ -165,7 +164,11 @@ class NgmyAccountSnapshot {
   }
 
   static NgmyAccountSnapshot? _fromCompactMap(Map<String, dynamic> map) {
-    DateTime? parseDate(dynamic v) => v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return DateTime.fromMillisecondsSinceEpoch(v.toInt(), isUtc: true).toLocal();
+      return DateTime.tryParse(v.toString())?.toLocal();
+    }
     ActiveInvestment? investment;
     final rawInvestment = map['qi'];
     if (rawInvestment is Map) {
