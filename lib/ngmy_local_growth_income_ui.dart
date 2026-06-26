@@ -244,17 +244,34 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-              child: FloatingTitle(
-                title: 'GROWTH INCOME',
-                leading: _headerCircleButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  isDark: isDark,
-                  onTap: () => Navigator.pop(context),
-                ),
-                trailing: _headerCircleButton(
-                  icon: Icons.save_alt_rounded,
-                  isDark: isDark,
-                  onTap: _openBackup,
+              child: SizedBox(
+                height: 60,
+                child: Row(
+                  children: [
+                    _headerCircleButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      isDark: isDark,
+                      onTap: () => Navigator.pop(context),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'GROWTH INCOME',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            letterSpacing: 1,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _headerCircleButton(
+                      icon: Icons.save_alt_rounded,
+                      isDark: isDark,
+                      onTap: _openBackup,
+                    ),
+                  ],
                 ),
               ),
             ),

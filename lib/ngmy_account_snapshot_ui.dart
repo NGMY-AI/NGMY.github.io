@@ -103,12 +103,16 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
+    // QR codes don't carry wallet history (kept out so the QR stays scannable —
+    // see NgmyAccountSnapshot.toQrPayload). Keep the existing history in that case.
+    final keepsHistory = snapshot.transactions.isEmpty;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Restore this snapshot?'),
         content: Text(
-          'This replaces your growth income data (balance, investment, clock-in, wallet history) '
+          'This replaces your balance, investment, and clock-in data '
+          '${keepsHistory ? '(your wallet history stays as-is)' : 'and wallet history'} '
           'with the saved snapshot from ${snapshot.exportedAt.month}/${snapshot.exportedAt.day}/${snapshot.exportedAt.year}.',
         ),
         actions: [
@@ -119,7 +123,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     );
     if (ok != true) return;
     final restoredUser = snapshot.toUserData(widget.realEmail);
-    await NgmyLocalGrowthIncomeStore.replace(widget.realEmail, restoredUser, snapshot.transactions);
+    final transactions = keepsHistory ? widget.transactions : snapshot.transactions;
+    await NgmyLocalGrowthIncomeStore.replace(widget.realEmail, restoredUser, transactions);
     if (!mounted) return;
     _toast('Restored. Go back to see it updated.');
   }
@@ -312,7 +317,7 @@ class _SnapshotGridCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: Container(
-          height: 128,
+          height: 140,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
@@ -320,15 +325,15 @@ class _SnapshotGridCard extends StatelessWidget {
             boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 8))],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
-                child: Icon(icon, color: Colors.white, size: 20),
+                child: Icon(icon, color: Colors.white, size: 30),
               ),
+              const SizedBox(height: 12),
               Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
             ],
           ),

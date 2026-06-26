@@ -115,21 +115,85 @@ class NgmyAccountSnapshot {
 
   String toJson() => const JsonEncoder.withIndent('  ').convert(toMap());
 
-  String toQrPayload() => '$kNgmySnapshotQrPrefix${base64Url.encode(utf8.encode(jsonEncode(toMap())))}';
+  /// QR codes have no server to offload the payload to (unlike the advisor/
+  /// family-tree QR flows, which stash the bulk of the data in Supabase and
+  /// only encode a short token) — this copy must stay fully local, so the
+  /// transaction history is left out of the QR specifically. Including it
+  /// made the encoded text so long that the QR needed far more modules,
+  /// shrinking every dot to the point phone cameras couldn't focus on them.
+  /// The downloadable file still includes full history.
+  Map<String, dynamic> _toCompactMap() => {
+        'qb': accountBalance,
+        'qp': totalProfit,
+        'qc': isClockedIn,
+        'qs': clockInStartTime?.toUtc().toIso8601String(),
+        'ql': lastClockInDate?.toUtc().toIso8601String(),
+        'qe': lastClockInEarningsDate?.toUtc().toIso8601String(),
+        'qt': todayClockInEarned,
+        'qn': clockInPenaltyPercent,
+        'qu': username,
+        'qi': activeInvestment == null
+            ? null
+            : {
+                'n': activeInvestment!.name,
+                'a': activeInvestment!.amount,
+                'r': activeInvestment!.dailyROI,
+                'p': activeInvestment!.purchaseDate.toUtc().toIso8601String(),
+                't': activeInvestment!.totalEarned,
+                'd': activeInvestment!.daysClockedIn,
+              },
+      };
+
+  String toQrPayload() => '$kNgmySnapshotQrPrefix${base64Url.encode(utf8.encode(jsonEncode(_toCompactMap())))}';
 
   static NgmyAccountSnapshot? parse(String raw) {
     try {
       var text = raw.trim();
       if (text.startsWith('﻿')) text = text.substring(1);
+      var isQr = false;
       if (text.startsWith(kNgmySnapshotQrPrefix)) {
+        isQr = true;
         text = utf8.decode(base64Url.decode(text.substring(kNgmySnapshotQrPrefix.length)));
       }
       final decoded = jsonDecode(text);
       if (decoded is! Map) return null;
-      return fromMap(Map<String, dynamic>.from(decoded));
+      final map = Map<String, dynamic>.from(decoded);
+      return isQr ? _fromCompactMap(map) : fromMap(map);
     } catch (_) {
       return null;
     }
+  }
+
+  static NgmyAccountSnapshot? _fromCompactMap(Map<String, dynamic> map) {
+    DateTime? parseDate(dynamic v) => v == null ? null : DateTime.tryParse(v.toString())?.toLocal();
+    ActiveInvestment? investment;
+    final rawInvestment = map['qi'];
+    if (rawInvestment is Map) {
+      final m = Map<String, dynamic>.from(rawInvestment);
+      investment = ActiveInvestment(
+        name: (m['n'] ?? '').toString(),
+        amount: (m['a'] as num? ?? 0).toDouble(),
+        dailyROI: (m['r'] as num? ?? 0).toDouble(),
+        purchaseDate: parseDate(m['p']) ?? DateTime.now(),
+        totalEarned: (m['t'] as num? ?? 0).toDouble(),
+        daysClockedIn: (m['d'] as num? ?? 0).toInt(),
+      );
+    }
+    return NgmyAccountSnapshot(
+      email: '',
+      username: (map['qu'] ?? 'User').toString(),
+      accountBalance: (map['qb'] as num? ?? 0).toDouble(),
+      totalProfit: (map['qp'] as num? ?? 0).toDouble(),
+      isClockedIn: map['qc'] == true,
+      clockInStartTime: parseDate(map['qs']),
+      lastClockInDate: parseDate(map['ql']),
+      lastClockInEarningsDate: parseDate(map['qe']),
+      todayClockInEarned: (map['qt'] as num? ?? 0).toDouble(),
+      clockInPenaltyPercent: (map['qn'] as num? ?? 0).toDouble(),
+      activeInvestment: investment,
+      transactions: const [],
+      exportedAt: DateTime.now(),
+    );
   }
 
   static NgmyAccountSnapshot? fromMap(Map<String, dynamic> map) {
