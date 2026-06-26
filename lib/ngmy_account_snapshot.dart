@@ -121,24 +121,27 @@ class NgmyAccountSnapshot {
   /// transaction history is left out of the QR specifically. Including it
   /// made the encoded text so long that the QR needed far more modules,
   /// shrinking every dot to the point phone cameras couldn't focus on them.
-  /// The downloadable file still includes full history.
+  /// Money/ROI fields are packed as integer cents/basis-points and dates as
+  /// epoch seconds (instead of raw doubles and millisecond ISO strings) to
+  /// keep the module count — and so each dot's on-screen size — as low as
+  /// possible. The downloadable file still includes full history & precision.
   Map<String, dynamic> _toCompactMap() => {
-        'qb': accountBalance,
-        'qp': totalProfit,
+        'qb': (accountBalance * 100).round(),
+        'qp': (totalProfit * 100).round(),
         'qu': username,
         if (isClockedIn) 'qc': true,
-        if (clockInStartTime != null) 'qs': clockInStartTime!.toUtc().millisecondsSinceEpoch,
-        if (lastClockInDate != null) 'ql': lastClockInDate!.toUtc().millisecondsSinceEpoch,
-        if (lastClockInEarningsDate != null) 'qe': lastClockInEarningsDate!.toUtc().millisecondsSinceEpoch,
-        if (todayClockInEarned != 0) 'qt': todayClockInEarned,
-        if (clockInPenaltyPercent != 0) 'qn': clockInPenaltyPercent,
+        if (clockInStartTime != null) 'qs': clockInStartTime!.toUtc().millisecondsSinceEpoch ~/ 1000,
+        if (lastClockInDate != null) 'ql': lastClockInDate!.toUtc().millisecondsSinceEpoch ~/ 1000,
+        if (lastClockInEarningsDate != null) 'qe': lastClockInEarningsDate!.toUtc().millisecondsSinceEpoch ~/ 1000,
+        if (todayClockInEarned != 0) 'qt': (todayClockInEarned * 100).round(),
+        if (clockInPenaltyPercent != 0) 'qn': clockInPenaltyPercent.round(),
         if (activeInvestment != null)
           'qi': {
             'n': activeInvestment!.name,
-            'a': activeInvestment!.amount,
-            'r': activeInvestment!.dailyROI,
-            'p': activeInvestment!.purchaseDate.toUtc().millisecondsSinceEpoch,
-            't': activeInvestment!.totalEarned,
+            'a': (activeInvestment!.amount * 100).round(),
+            'r': (activeInvestment!.dailyROI * 100).round(),
+            'p': activeInvestment!.purchaseDate.toUtc().millisecondsSinceEpoch ~/ 1000,
+            't': (activeInvestment!.totalEarned * 100).round(),
             'd': activeInvestment!.daysClockedIn,
           },
       };
@@ -164,34 +167,42 @@ class NgmyAccountSnapshot {
   }
 
   static NgmyAccountSnapshot? _fromCompactMap(Map<String, dynamic> map) {
+    // Pre-shrink QR payloads encoded dates as millisecond ISO/epoch values;
+    // the current encoder uses epoch *seconds*. Telling them apart by
+    // magnitude keeps old already-generated QR codes parseable too.
     DateTime? parseDate(dynamic v) {
       if (v == null) return null;
-      if (v is num) return DateTime.fromMillisecondsSinceEpoch(v.toInt(), isUtc: true).toLocal();
+      if (v is num) {
+        final n = v.toInt();
+        final ms = n > 100000000000 ? n : n * 1000;
+        return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toLocal();
+      }
       return DateTime.tryParse(v.toString())?.toLocal();
     }
+    double cents(dynamic v) => (v as num? ?? 0).toDouble() / 100;
     ActiveInvestment? investment;
     final rawInvestment = map['qi'];
     if (rawInvestment is Map) {
       final m = Map<String, dynamic>.from(rawInvestment);
       investment = ActiveInvestment(
         name: (m['n'] ?? '').toString(),
-        amount: (m['a'] as num? ?? 0).toDouble(),
-        dailyROI: (m['r'] as num? ?? 0).toDouble(),
+        amount: cents(m['a']),
+        dailyROI: cents(m['r']),
         purchaseDate: parseDate(m['p']) ?? DateTime.now(),
-        totalEarned: (m['t'] as num? ?? 0).toDouble(),
+        totalEarned: cents(m['t']),
         daysClockedIn: (m['d'] as num? ?? 0).toInt(),
       );
     }
     return NgmyAccountSnapshot(
       email: '',
       username: (map['qu'] ?? 'User').toString(),
-      accountBalance: (map['qb'] as num? ?? 0).toDouble(),
-      totalProfit: (map['qp'] as num? ?? 0).toDouble(),
+      accountBalance: cents(map['qb']),
+      totalProfit: cents(map['qp']),
       isClockedIn: map['qc'] == true,
       clockInStartTime: parseDate(map['qs']),
       lastClockInDate: parseDate(map['ql']),
       lastClockInEarningsDate: parseDate(map['qe']),
-      todayClockInEarned: (map['qt'] as num? ?? 0).toDouble(),
+      todayClockInEarned: cents(map['qt']),
       clockInPenaltyPercent: (map['qn'] as num? ?? 0).toDouble(),
       activeInvestment: investment,
       transactions: const [],

@@ -385,7 +385,7 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                       data: qrPayload,
                       large: true,
                       sizeOverride: qrSize,
-                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      errorCorrectionLevel: QrErrorCorrectLevel.L,
                     ),
                     const SizedBox(height: 18),
                     Text(
