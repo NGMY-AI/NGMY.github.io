@@ -261,17 +261,49 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   }
 
   Widget _buildLocalBottomNavBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
       child: SafeArea(
         top: false,
         child: NgmySculptedBottomNavFrame(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              _navIcon(0, Icons.home_rounded),
-              _navIcon(1, Icons.trending_up_rounded),
-              _navIcon(2, Icons.account_balance_wallet_rounded),
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment(-1 + _idx.toDouble(), 0),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / 3,
+                  child: Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            WorksheetPalette.green.withValues(alpha: isDark ? 0.30 : 0.16),
+                            WorksheetPalette.green.withValues(alpha: isDark ? 0.10 : 0.04),
+                          ],
+                        ),
+                        border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.45 : 0.30), width: 1.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _navIcon(0, Icons.home_rounded),
+                  _navIcon(1, Icons.trending_up_rounded),
+                  _navIcon(2, Icons.account_balance_wallet_rounded),
+                ],
+              ),
             ],
           ),
         ),
@@ -285,6 +317,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           child: InkWell(
             onTap: () => setState(() => _idx = i),
             customBorder: const CircleBorder(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(
