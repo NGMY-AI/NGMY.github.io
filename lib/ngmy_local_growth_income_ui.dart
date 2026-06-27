@@ -250,7 +250,14 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     return Scaffold(
       extendBody: true,
       backgroundColor: bg,
-      body: IndexedStack(index: _idx, children: pages),
+      // Not an IndexedStack on purpose: HomeScreen runs its own per-second
+      // clock-in ticker for as long as it's mounted. Keeping all three tabs
+      // alive let it keep settling/paying out earnings in the background
+      // while the user sat on Invest or Wallet, which looked like money
+      // appearing "for no reason". Building only the active tab tears that
+      // ticker down the moment you leave Home and starts a fresh one (synced
+      // from the saved state) when you come back.
+      body: pages[_idx],
       bottomNavigationBar: Material(
         type: MaterialType.transparency,
         elevation: 0,
