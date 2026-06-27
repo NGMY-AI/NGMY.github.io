@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
+import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_clock_in_investment_dialog.dart';
 import 'ngmy_local_growth_income.dart';
@@ -262,6 +262,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _LocalWalletTab(
         key: const ValueKey('ngmy_local_wallet'),
         user: _user!,
+        realEmail: widget.liveUser.email,
+        config: widget.config,
         onAdd: _onAddTransaction,
         onBackup: _openBackup,
       ),
@@ -362,18 +364,21 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 }
 
 /// Mirrors WalletScreen's look (FloatingTitle, gradient header, Deposit /
-/// Withdraw / History 3-way switch, same presets/fee/minimum) but applies
-/// instantly to the local balance — there's no admin to approve anything
-/// in this local-only copy.
+/// Withdraw / History 3-way switch, same presets/fee/minimum). Deposits use
+/// the same payment proof flow as the main wallet; admin credits via QR scan.
 class _LocalWalletTab extends StatefulWidget {
   const _LocalWalletTab({
     super.key,
     required this.user,
+    required this.realEmail,
+    required this.config,
     required this.onAdd,
     required this.onBackup,
   });
 
   final UserData user;
+  final String realEmail;
+  final AppConfig config;
   final void Function(AppTransaction) onAdd;
   final VoidCallback onBackup;
 
@@ -396,35 +401,45 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _notifyWhatsApp(String message) async {
-    final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}');
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
+  Future<void> _notifyWhatsApp(AppTransaction transaction) async {
+    final message = ngmyLocalDepositWhatsAppMessage(
+      user: widget.user,
+      realEmail: widget.realEmail,
+      transaction: transaction,
+      config: widget.config,
+    );
+    await ngmyOpenAppWhatsApp(widget.config, message);
   }
 
-  void _deposit() {
+  void _submitLocalDeposit(AppTransaction transaction) {
+    widget.onAdd(transaction);
+    unawaited(_notifyWhatsApp(transaction));
+    _toast('Deposit request sent. Finish on WhatsApp — admin will send a QR to credit your local wallet.');
+  }
+
+  void _openDepositPaymentPage(double amount) {
+    NgmyNavigator.push(
+      context,
+      SubmitPaymentPage(
+        user: widget.user,
+        amount: amount,
+        onAdd: _submitLocalDeposit,
+        config: widget.config,
+        requestTitle: 'Submit Local Deposit',
+        successHint:
+            'After you pay on Cash App or Bitcoin, submit here then send the WhatsApp message. '
+            'Admin will verify and send a deposit QR to scan in Backup & Restore.',
+      ),
+    );
+  }
+
+  void _startDeposit() {
     final a = double.tryParse(_amt.text);
     if (a == null || a <= 0) {
-      _toast('Enter an amount to add.');
+      _toast('Enter an amount to deposit.');
       return;
     }
-    widget.onAdd(AppTransaction(
-      id: 'local_dep_${DateTime.now().microsecondsSinceEpoch}',
-      userEmail: widget.user.email,
-      amount: a,
-      type: TransactionType.deposit,
-      method: PaymentMethod.system,
-      sourceDetails: 'Deposit',
-      status: TransactionStatus.approved,
-      timestamp: DateTime.now(),
-    ));
-    _toast('Added \$${formatCurrency(a)} to your balance.');
-    unawaited(_notifyWhatsApp(
-      'NGMY Local Growth Income deposit — ${widget.user.username}: \$${formatCurrency(a)}. Sending proof now.',
-    ));
-    _amt.clear();
-    setState(() {});
+    _openDepositPaymentPage(a);
   }
 
   void _withdraw() {
@@ -454,7 +469,8 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       timestamp: DateTime.now(),
     ));
     _toast('Withdrew \$${formatCurrency(a)}. You receive \$${formatCurrency(receive)} after fee.');
-    unawaited(_notifyWhatsApp(
+    unawaited(ngmyOpenAppWhatsApp(
+      widget.config,
       'NGMY Local Growth Income withdrawal request — ${widget.user.username}: \$${formatCurrency(a)} '
       '(fee \$${formatCurrency(fee)}, you receive \$${formatCurrency(receive)}).',
     ));
@@ -589,13 +605,13 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _view == 0 ? _deposit : _withdraw,
+                        onPressed: _view == 0 ? _startDeposit : _withdraw,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF22C55E),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text(_view == 0 ? 'Add Funds' : 'Withdraw Funds', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        child: Text(_view == 0 ? 'Deposit Funds' : 'Withdraw Funds', style: const TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],

@@ -100,6 +100,7 @@ import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_local_growth_income_ui.dart';
+import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -26554,7 +26555,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(children: [
-      const FloatingTitle(title: 'MY PROFILE'), const SizedBox(height: 30),
+      FloatingTitle(
+        title: 'MY PROFILE',
+        trailing: widget.user.isAdmin
+            ? InkWell(
+                onTap: () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withValues(alpha: isDark ? 0.22 : 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF22C55E), size: 20),
+                ),
+              )
+            : null,
+      ),
+      const SizedBox(height: 30),
       GestureDetector(
         onTap: _profileAvatarUploading
             ? null

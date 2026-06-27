@@ -9,6 +9,7 @@ import 'main.dart';
 import 'ngmy_account_snapshot.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
+import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_local_growth_income_stash.dart';
 import 'ngmy_nav.dart';
@@ -210,6 +211,29 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     }, busyLabel: 'Reading file…');
   }
 
+  Future<void> _redeemDepositQr(String raw) async {
+    final redeemed = await NgmyLocalDepositQr.redeem(raw: raw, redeemerEmail: widget.realEmail);
+    if (redeemed == null) {
+      _toast('That deposit QR is invalid or already used.');
+      return;
+    }
+    final txn = AppTransaction(
+      id: 'local_qr_dep_${DateTime.now().microsecondsSinceEpoch}',
+      userEmail: widget.user.email,
+      amount: redeemed.amount,
+      type: TransactionType.deposit,
+      method: PaymentMethod.system,
+      sourceDetails: 'Admin deposit QR (\$${formatCurrency(redeemed.amount)})',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+    );
+    NgmyLocalGrowthIncomeStore.applyTransaction(widget.user, txn);
+    final transactions = [...widget.transactions, txn];
+    await NgmyLocalGrowthIncomeStore.save(widget.realEmail, widget.user, transactions, bumpWalletRevision: true);
+    if (!mounted) return;
+    _toast('Deposited \$${formatCurrency(redeemed.amount)} to your local wallet.');
+  }
+
   Future<void> _scanQr() async {
     if (!barcode_platform.ngmyBarcodeUseCamera) {
       _toast('Use a phone camera to scan, or upload the backup file instead.');
@@ -222,6 +246,12 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       ),
     );
     if (raw == null || raw.trim().isEmpty) return;
+
+    if (raw.trim().startsWith('$kNgmyLocalDepositQrPrefix|')) {
+      await _withWork(() => _redeemDepositQr(raw.trim()), busyLabel: 'Applying deposit…');
+      return;
+    }
+
     await _withWork(() async {
       final result = await NgmyAccountSnapshot.resolveForRestore(raw, widget.realEmail);
       switch (result.outcome) {
@@ -346,7 +376,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                         child: Text(
                           'Download a file, show a QR, or get a 6-character code to save where you are now. '
                           'Upload, scan, or type that code later to bring it back — on this device or another. '
-                          'Only your own account can restore it, and only if you have not used the wallet since saving. '
+                          'Scan also accepts admin deposit QR codes to add funds instantly. '
+                          'Only your own account can restore a backup, and only if you have not used the wallet since saving. '
                           'Never touches your real, database-backed wallet.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
@@ -587,7 +618,7 @@ class _NgmyAccountSnapshotScanPageState extends State<_NgmyAccountSnapshotScanPa
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: const Text('Scan snapshot QR', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text('Scan QR', style: TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: true,
       ),
       body: MobileScanner(
@@ -597,7 +628,9 @@ class _NgmyAccountSnapshotScanPageState extends State<_NgmyAccountSnapshotScanPa
           for (final barcode in capture.barcodes) {
             final raw = barcode.rawValue?.trim();
             if (raw == null || raw.isEmpty) continue;
-            final isOurs = raw.startsWith(kNgmySnapshotQrPrefix) || raw.startsWith('$kNgmyLocalSnapshotStashPrefix|');
+            final isOurs = raw.startsWith(kNgmySnapshotQrPrefix) ||
+                raw.startsWith('$kNgmyLocalSnapshotStashPrefix|') ||
+                raw.startsWith('$kNgmyLocalDepositQrPrefix|');
             if (!isOurs) continue;
             _handled = true;
             Navigator.pop(context, raw);
