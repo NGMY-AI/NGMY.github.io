@@ -229,6 +229,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           ),
         ),
         disableLocalGrowthIncomeEntry: true,
+        isLocalGrowthIncome: true,
+        homeTitleOverride: 'LOCAL GROWTH INCOME',
       ),
       InvestScreen(
         key: const ValueKey('ngmy_local_invest'),
@@ -242,8 +244,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         user: _user!,
         onAdd: _onAddTransaction,
         onBackup: _openBackup,
-        liveUser: widget.liveUser,
-        config: widget.config,
       ),
     ];
 
@@ -351,15 +351,11 @@ class _LocalWalletTab extends StatefulWidget {
     required this.user,
     required this.onAdd,
     required this.onBackup,
-    required this.liveUser,
-    required this.config,
   });
 
   final UserData user;
   final void Function(AppTransaction) onAdd;
   final VoidCallback onBackup;
-  final UserData liveUser;
-  final AppConfig config;
 
   @override
   State<_LocalWalletTab> createState() => _LocalWalletTabState();
@@ -405,7 +401,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     ));
     _toast('Added \$${formatCurrency(a)} to your balance.');
     unawaited(_notifyWhatsApp(
-      'NGMY Growth Income deposit — ${widget.user.username}: \$${formatCurrency(a)}. Sending proof now.',
+      'NGMY Local Growth Income deposit — ${widget.user.username}: \$${formatCurrency(a)}. Sending proof now.',
     ));
     _amt.clear();
     setState(() {});
@@ -439,7 +435,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     ));
     _toast('Withdrew \$${formatCurrency(a)}. You receive \$${formatCurrency(receive)} after fee.');
     unawaited(_notifyWhatsApp(
-      'NGMY Growth Income withdrawal request — ${widget.user.username}: \$${formatCurrency(a)} '
+      'NGMY Local Growth Income withdrawal request — ${widget.user.username}: \$${formatCurrency(a)} '
       '(fee \$${formatCurrency(fee)}, you receive \$${formatCurrency(receive)}).',
     ));
     _amt.clear();
@@ -461,13 +457,9 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
         child: Column(
           children: [
             FloatingTitle(
-              title: 'MY WALLET',
+              title: 'LOCAL WALLET',
               leading: InkWell(
-                onTap: () => NgmyNavigator.push(
-                  context,
-                  LoanServiceScreen(user: widget.liveUser, config: widget.config, onDataChanged: () {}),
-                  routeName: 'LoanServiceScreen',
-                ),
+                onTap: () => _toast('This wallet is separate from Growth Income. Add funds here to invest locally.'),
                 customBorder: const CircleBorder(),
                 child: Container(
                   width: 40,
@@ -477,7 +469,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                     color: isDark ? Colors.transparent : WorksheetPalette.green,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.attach_money_rounded, color: isDark ? Colors.greenAccent : Colors.white, size: 20),
+                  child: Icon(Icons.info_outline_rounded, color: isDark ? Colors.greenAccent : Colors.white, size: 20),
                 ),
               ),
               trailing: InkWell(
@@ -508,7 +500,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                    const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Text(
                       '\$${formatCurrency(widget.user.accountBalance)}',

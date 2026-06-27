@@ -3,11 +3,15 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
+import 'ngmy_game_session.dart';
 
 /// A second, fully local copy of a user's growth-income numbers (balance,
 /// investment, clock-in streak, wallet history). Never touches Supabase —
 /// the real Growth Income tabs and their database sync are untouched.
 class NgmyLocalGrowthIncomeStore {
+  /// v1 copied the main Growth Income wallet on first open; v2 starts fresh.
+  static const int walletSchemaVersion = 2;
+
   static String _normalize(String email) => email.toLowerCase().trim();
 
   static String _key(String realEmail) => 'ngmy_local_growth_income_${_normalize(realEmail)}';
@@ -19,21 +23,34 @@ class NgmyLocalGrowthIncomeStore {
   /// cause of the balance shown here disagreeing with the local figures.
   static String identityEmailFor(String realEmail) => '${_normalize(realEmail)}+local.ngmy';
 
-  /// Loads the local copy, seeding it once from [liveUserSeed] the first time
-  /// this device opens it. After that the local copy is fully independent.
+  /// Loads the local copy. The first time this device opens it, the wallet
+  /// starts at \$0 with no investment — nothing is copied from the main
+  /// Growth Income account. After that the local copy is fully independent.
   static Future<({UserData user, List<AppTransaction> transactions})> load(String realEmail, UserData liveUserSeed) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key(realEmail));
     if (raw == null || raw.trim().isEmpty) {
-      final seeded = _seedFrom(realEmail, liveUserSeed);
+      final seeded = _freshUser(realEmail, liveUserSeed);
       await save(realEmail, seeded, const []);
+      ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
       return (user: seeded, transactions: <AppTransaction>[]);
     }
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      return (user: _userFromMap(realEmail, map), transactions: _transactionsFromMap(map));
+      final version = (map['walletSchemaVersion'] as num?)?.toInt() ?? 1;
+      var user = _userFromMap(realEmail, map);
+      var transactions = _transactionsFromMap(map);
+      if (version < walletSchemaVersion) {
+        _resetFinancialState(user);
+        transactions = <AppTransaction>[];
+        await save(realEmail, user, transactions);
+      }
+      ngmySeedLiveBalance(user.email, user.accountBalance);
+      return (user: user, transactions: transactions);
     } catch (_) {
-      final seeded = _seedFrom(realEmail, liveUserSeed);
+      final seeded = _freshUser(realEmail, liveUserSeed);
+      await save(realEmail, seeded, const []);
+      ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
       return (user: seeded, transactions: <AppTransaction>[]);
     }
   }
@@ -48,30 +65,28 @@ class NgmyLocalGrowthIncomeStore {
   static Future<void> replace(String realEmail, UserData user, List<AppTransaction> transactions) =>
       save(realEmail, user, transactions);
 
-  static UserData _seedFrom(String realEmail, UserData live) => UserData(
+  static UserData _freshUser(String realEmail, UserData live) => UserData(
         email: identityEmailFor(realEmail),
         username: live.username,
-        accountBalance: live.accountBalance,
-        totalProfit: live.totalProfit,
-        isClockedIn: live.isClockedIn,
-        clockInStartTime: live.clockInStartTime,
-        clockInPenaltyPercent: live.clockInPenaltyPercent,
-        lastClockInDate: live.lastClockInDate,
-        lastClockInEarningsDate: live.lastClockInEarningsDate,
-        todayClockInEarned: live.todayClockInEarned,
-        activeInvestment: live.activeInvestment == null
-            ? null
-            : ActiveInvestment(
-                name: live.activeInvestment!.name,
-                amount: live.activeInvestment!.amount,
-                dailyROI: live.activeInvestment!.dailyROI,
-                purchaseDate: live.activeInvestment!.purchaseDate,
-                totalEarned: live.activeInvestment!.totalEarned,
-                daysClockedIn: live.activeInvestment!.daysClockedIn,
-              ),
       );
 
+  static void _resetFinancialState(UserData user) {
+    user.accountBalance = 0;
+    user.totalProfit = 0;
+    user.isClockedIn = false;
+    user.clockInStartTime = null;
+    user.clockInPenaltyPercent = 0;
+    user.lastClockInDate = null;
+    user.lastClockInEarningsDate = null;
+    user.todayClockInEarned = 0;
+    user.pendingInvestmentName = null;
+    user.pendingInvestmentAmount = null;
+    user.pendingInvestmentRoi = null;
+    user.activeInvestment = null;
+  }
+
   static Map<String, dynamic> _toMap(UserData user, List<AppTransaction> transactions) => {
+        'walletSchemaVersion': walletSchemaVersion,
         'username': user.username,
         'accountBalance': user.accountBalance,
         'totalProfit': user.totalProfit,
@@ -171,6 +186,7 @@ class NgmyLocalGrowthIncomeStore {
   /// applies the transaction's balance effect if approved.
   static void applyTransaction(UserData user, AppTransaction t) {
     ngmyApplyApprovedTransactionToBalance(user, t);
+    ngmySeedLiveBalance(user.email, user.accountBalance);
   }
 
   // --- Local equivalents of main.dart's library-private clock-in helpers ---

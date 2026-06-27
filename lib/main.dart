@@ -966,7 +966,16 @@ List<AppTransaction> _mergeTransactionsWithRemote(
     for (final entry in merged.entries) {
       final decided = ledger[entry.key];
       if (decided == null || decided <= 0 || decided > 2) continue;
-      entry.value.status = TransactionStatus.values[decided];
+      final ledgerStatus = TransactionStatus.values[decided];
+      final txn = entry.value;
+      // Keep cloud-pending wallet requests visible in Admin → Wallet until they
+      // are actually approved/rejected in the transactions table.
+      if (ngmyIsWalletDepositOrWithdraw(txn) &&
+          txn.status == TransactionStatus.pending &&
+          ledgerStatus != TransactionStatus.pending) {
+        continue;
+      }
+      txn.status = ledgerStatus;
     }
   }
   return merged.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -1262,6 +1271,54 @@ Map<String, dynamic> _transactionRowSnakeForCloud(AppTransaction t) {
   };
 }
 
+/// Wallet deposit screenshots are picked as base64 data URLs. Posting that inline
+/// to Supabase often fails (payload too large), so admins never see the request.
+Future<String?> _uploadWalletPaymentProofIfNeeded(AppTransaction t) async {
+  final path = (t.screenshotPath ?? '').trim();
+  if (path.isEmpty) return null;
+  if (path.startsWith('supabase://')) return path;
+  if (!path.startsWith('data:')) return path;
+
+  final comma = path.indexOf(',');
+  if (comma < 0) return null;
+  final header = path.substring(0, comma);
+  final b64 = path.substring(comma + 1);
+  Uint8List bytes;
+  try {
+    bytes = base64Decode(b64);
+  } catch (_) {
+    return null;
+  }
+  if (bytes.isEmpty) return null;
+
+  var mime = 'image/jpeg';
+  if (header.contains(':')) {
+    final typePart = header.split(';').first.split(':');
+    if (typePart.length > 1 && typePart[1].trim().isNotEmpty) {
+      mime = typePart[1].trim();
+    }
+  }
+  final ext = mime.contains('png') ? 'png' : 'jpg';
+  final emailSafe = ngmyNormalizeEmail(t.userEmail).replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
+  final txnSafe = t.id.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  final storagePath = 'wallet-proofs/$emailSafe/$txnSafe.$ext';
+  final uploaded = await _uploadNgmyMediaBytes(bytes: bytes, storagePath: storagePath, contentType: mime);
+  return uploaded.ref;
+}
+
+Future<Map<String, dynamic>> _transactionRowForCloudPrepared(AppTransaction t) async {
+  final row = _transactionRowForCloud(t);
+  if (!ngmyIsWalletDepositOrWithdraw(t)) return row;
+  final proof = await _uploadWalletPaymentProofIfNeeded(t);
+  if (proof != null && proof.isNotEmpty) {
+    row['screenshotPath'] = proof;
+  } else if ((t.screenshotPath ?? '').startsWith('data:')) {
+    // Still sync the pending request — admin can ask user to resend proof if upload failed.
+    row['screenshotPath'] = 'proof_upload_failed';
+  }
+  return row;
+}
+
 Future<bool> _patchTransactionStatusInCloud(AppTransaction t) async {
   final patches = <Map<String, dynamic>>[
     {'status': t.status.index},
@@ -1307,7 +1364,12 @@ Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6
   if (t.status == TransactionStatus.pending) return false;
   for (var i = 0; i < attempts; i++) {
     if (await _patchTransactionStatusInCloud(t)) return true;
-    for (final row in [_transactionRowForCloud(t), _transactionRowSnakeForCloud(t)]) {
+    final camel = await _transactionRowForCloudPrepared(t);
+    final snake = _transactionRowSnakeForCloud(t);
+    if ((snake['screenshot_path'] ?? '').toString().startsWith('data:')) {
+      snake['screenshot_path'] = camel['screenshotPath'];
+    }
+    for (final row in [camel, snake]) {
       final ok = await _safeUpsertTransactionRows([row], requireStatus: true);
       if (ok && await _verifyTransactionStatusInCloud(t)) return true;
     }
@@ -3312,9 +3374,10 @@ Future<bool> ngmyPersistGameCenterConfigNow(AppConfig config) async {
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   if (!await ngmyCanReachCloud()) return;
   try {
+    final row = await _transactionRowForCloudPrepared(t);
     await Supabase.instance.client
         .from('transactions')
-        .upsert(_transactionRowForCloud(t))
+        .upsert(row)
         .timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[txn] fast upsert: $e');
@@ -7718,6 +7781,61 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
   }
 
+  /// Pending deposits/withdrawals only — not capped by the general 10k history window.
+  Future<List<AppTransaction>> _fetchAdminPendingWalletFromCloud({int limit = 500}) async {
+    try {
+      final rows = await supabase
+          .from('transactions')
+          .select()
+          .eq('status', TransactionStatus.pending.index)
+          .inFilter('type', [TransactionType.deposit.index, TransactionType.withdrawal.index])
+          .order('timestamp', ascending: false)
+          .limit(limit)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (rows == null) return const [];
+      return (rows as List)
+          .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+          .where((t) => t.status == TransactionStatus.pending && ngmyIsWalletDepositOrWithdraw(t))
+          .toList();
+    } catch (e) {
+      debugPrint('[admin] pending wallet fetch: $e');
+      return const [];
+    }
+  }
+
+  void _mergePendingWalletRequestsFromCloud(List<AppTransaction> pending) {
+    if (pending.isEmpty) return;
+    var added = 0;
+    final newPendingForAdmin = <AppTransaction>[];
+    for (final tx in pending) {
+      if (tx.id.isEmpty || tx.status != TransactionStatus.pending) continue;
+      final decided = _walletDecisionLedger[tx.id];
+      if (decided != null && decided > 0 && decided <= 2) continue;
+      final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
+      if (idx != -1) {
+        final local = _allTransactions[idx];
+        if (local.status != TransactionStatus.pending) continue;
+        _allTransactions[idx] = _pickPreferredTransaction(local, tx);
+        continue;
+      }
+      _allTransactions.add(tx);
+      added++;
+      newPendingForAdmin.add(tx);
+    }
+    if (newPendingForAdmin.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        for (final tx in newPendingForAdmin) {
+          unawaited(_notifyAdminAboutPendingTransaction(tx));
+        }
+      });
+    }
+    if (added > 0) {
+      NgmyAdminLiveRefresh.notify();
+      unawaited(_persistLocalOnly());
+    }
+  }
+
   /// Flush debounced saves immediately — call on pause/close and after login.
   Future<void> _persistSessionImmediately() async {
     _saveDebounceTimer?.cancel();
@@ -7886,6 +8004,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
         _applyWalletDecisionLedgerToTransactions();
       }
+      final pendingWallet = await _fetchAdminPendingWalletFromCloud();
+      _mergePendingWalletRequestsFromCloud(pendingWallet);
+      _applyWalletDecisionLedgerToTransactions();
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
       if (!lightweight) {
         await _discoverUsersFromCloudActivityIntoAllUsers();
@@ -8980,7 +9101,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
         continue;
       }
-      final ok = await _safeUpsertTransactionRows([_transactionRowForCloud(t)]);
+      final row = await _transactionRowForCloudPrepared(t);
+      final ok = await _safeUpsertTransactionRows([row]);
       if (ok) return true;
       await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
     }
@@ -9102,51 +9224,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       await _refreshWalletDecisionLedger();
       _applyWalletDecisionLedgerToTransactions();
-      final rows = await supabase
-          .from('transactions')
-          .select()
-          .eq('status', TransactionStatus.pending.index)
-          .order('timestamp', ascending: false)
-          .limit(80)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (rows == null || !mounted) return;
-      var added = 0;
-      final newPendingForAdmin = <AppTransaction>[];
-      setState(() {
-        for (final raw in rows as List) {
-          final tx = AppTransaction.fromJson(Map<String, dynamic>.from(raw as Map));
-          final decided = _walletDecisionLedger[tx.id];
-          if (decided != null && decided > 0 && decided <= 2) continue;
-          final idx = _allTransactions.indexWhere((t) => t.id == tx.id);
-          if (idx != -1) {
-            final local = _allTransactions[idx];
-            if (local.status != TransactionStatus.pending) continue;
-            if (tx.status == TransactionStatus.pending &&
-                !tx.timestamp.isAfter(local.timestamp)) {
-              continue;
-            }
-            _allTransactions[idx] = _pickPreferredTransaction(local, tx);
-            continue;
-          }
-          if (tx.status != TransactionStatus.pending) continue;
-          _allTransactions.add(tx);
-          added++;
-          newPendingForAdmin.add(tx);
-        }
-      });
+      final pendingWallet = await _fetchAdminPendingWalletFromCloud();
+      if (mounted) {
+        setState(() => _mergePendingWalletRequestsFromCloud(pendingWallet));
+      } else {
+        _mergePendingWalletRequestsFromCloud(pendingWallet);
+      }
       _applyWalletDecisionLedgerToTransactions();
-      if (newPendingForAdmin.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          for (final tx in newPendingForAdmin) {
-            unawaited(_notifyAdminAboutPendingTransaction(tx));
-          }
-        });
-      }
-      if (added > 0) {
-        NgmyAdminLiveRefresh.notify();
-        unawaited(_persistLocalOnly());
-      }
     } catch (e) {
       debugPrint('[admin] pending txn poll: $e');
     }
@@ -9231,9 +9315,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           syncedTxnIds.add(t.id);
         }
       }
-      final txRows = _transactionsForAdminCloudSync()
-          .map((e) => _transactionRowForCloud(AppTransaction.fromJson(e)))
-          .toList();
+      final txRows = <Map<String, dynamic>>[];
+      for (final e in _transactionsForAdminCloudSync()) {
+        final t = AppTransaction.fromJson(e);
+        txRows.add(await _transactionRowForCloudPrepared(t));
+      }
       if (txRows.isNotEmpty) {
         final ok = await _safeUpsertTransactionRows(
           txRows.map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -15483,7 +15569,9 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenInvest;
   final Widget? homeLeadingOverride;
   final bool disableLocalGrowthIncomeEntry;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false});
+  final bool isLocalGrowthIncome;
+  final String? homeTitleOverride;
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -15607,7 +15695,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           child: Column(
             children: [
               FloatingTitle(
-                title: 'GROWTH INCOME',
+                title: widget.homeTitleOverride ?? 'GROWTH INCOME',
                 onTap: widget.user.isAdmin
                     ? () {
                         unawaited(widget.onRefreshAdminData?.call());
@@ -15797,11 +15885,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 )
               : FittedBox(
                   alignment: Alignment.centerLeft,
-                  child: NgmyLiveBalance(
-                    userEmail: widget.user.email,
-                    fallback: () => widget.user.accountBalance,
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor),
-                  ),
+                  child: widget.isLocalGrowthIncome
+                      ? Text(value, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor))
+                      : NgmyLiveBalance(
+                          userEmail: widget.user.email,
+                          fallback: () => widget.user.accountBalance,
+                          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: valueColor),
+                        ),
                 ),
         ],
       ),
