@@ -26,44 +26,88 @@ class NgmyLocalGrowthIncomeStore {
   /// Loads the local copy. The first time this device opens it, the wallet
   /// starts at \$0 with no investment — nothing is copied from the main
   /// Growth Income account. After that the local copy is fully independent.
-  static Future<({UserData user, List<AppTransaction> transactions})> load(String realEmail, UserData liveUserSeed) async {
+  static Future<({
+    UserData user,
+    List<AppTransaction> transactions,
+    int walletStateRevision,
+  })> load(String realEmail, UserData liveUserSeed) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key(realEmail));
     if (raw == null || raw.trim().isEmpty) {
       final seeded = _freshUser(realEmail, liveUserSeed);
-      await save(realEmail, seeded, const []);
+      await save(realEmail, seeded, const [], walletStateRevision: 0);
       ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
-      return (user: seeded, transactions: <AppTransaction>[]);
+      return (user: seeded, transactions: <AppTransaction>[], walletStateRevision: 0);
     }
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
       final version = (map['walletSchemaVersion'] as num?)?.toInt() ?? 1;
       var user = _userFromMap(realEmail, map);
       var transactions = _transactionsFromMap(map);
+      var revision = _revisionFromMap(map);
       if (version < walletSchemaVersion) {
         _resetFinancialState(user);
         transactions = <AppTransaction>[];
-        await save(realEmail, user, transactions);
+        revision = 0;
+        await save(realEmail, user, transactions, walletStateRevision: revision);
+      } else if (!map.containsKey('walletStateRevision')) {
+        revision = _initialRevisionFromActivity(transactions);
+        await save(realEmail, user, transactions, walletStateRevision: revision);
       }
       ngmySeedLiveBalance(user.email, user.accountBalance);
-      return (user: user, transactions: transactions);
+      return (user: user, transactions: transactions, walletStateRevision: revision);
     } catch (_) {
       final seeded = _freshUser(realEmail, liveUserSeed);
-      await save(realEmail, seeded, const []);
+      await save(realEmail, seeded, const [], walletStateRevision: 0);
       ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
-      return (user: seeded, transactions: <AppTransaction>[]);
+      return (user: seeded, transactions: <AppTransaction>[], walletStateRevision: 0);
     }
   }
 
-  static Future<void> save(String realEmail, UserData user, List<AppTransaction> transactions) async {
+  static int _revisionFromMap(Map<String, dynamic> map) => (map['walletStateRevision'] as num?)?.toInt() ?? 0;
+
+  /// Seeds revision for wallets saved before anti-cheat versioning existed.
+  static int _initialRevisionFromActivity(List<AppTransaction> transactions) {
+    if (transactions.isEmpty) return 0;
+    return transactions.length;
+  }
+
+  static Future<int> readWalletStateRevision(String realEmail) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(realEmail), jsonEncode(_toMap(user, transactions)));
+    final raw = prefs.getString(_key(realEmail));
+    if (raw == null || raw.trim().isEmpty) return 0;
+    try {
+      return _revisionFromMap(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static Future<void> save(
+    String realEmail,
+    UserData user,
+    List<AppTransaction> transactions, {
+    int? walletStateRevision,
+    bool bumpWalletRevision = false,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    var revision = walletStateRevision;
+    if (revision == null) {
+      revision = await readWalletStateRevision(realEmail);
+      if (bumpWalletRevision) revision++;
+    }
+    await prefs.setString(_key(realEmail), jsonEncode(_toMap(user, transactions, walletStateRevision: revision)));
   }
 
   /// Overwrites the local copy outright (used by snapshot restore — safe here
   /// since this state was never database-authoritative).
-  static Future<void> replace(String realEmail, UserData user, List<AppTransaction> transactions) =>
-      save(realEmail, user, transactions);
+  static Future<void> replace(
+    String realEmail,
+    UserData user,
+    List<AppTransaction> transactions, {
+    required int walletStateRevision,
+  }) =>
+      save(realEmail, user, transactions, walletStateRevision: walletStateRevision);
 
   static UserData _freshUser(String realEmail, UserData live) => UserData(
         email: identityEmailFor(realEmail),
@@ -85,8 +129,14 @@ class NgmyLocalGrowthIncomeStore {
     user.activeInvestment = null;
   }
 
-  static Map<String, dynamic> _toMap(UserData user, List<AppTransaction> transactions) => {
+  static Map<String, dynamic> _toMap(
+    UserData user,
+    List<AppTransaction> transactions, {
+    required int walletStateRevision,
+  }) =>
+      {
         'walletSchemaVersion': walletSchemaVersion,
+        'walletStateRevision': walletStateRevision,
         'username': user.username,
         'accountBalance': user.accountBalance,
         'totalProfit': user.totalProfit,
@@ -223,8 +273,10 @@ class NgmyLocalGrowthIncomeStore {
   /// server-scheduled; this runs the equivalent settlement on-device).
   /// Call this once when the local screen loads/resumes, before any other
   /// clock-in logic runs.
-  static void applyDailyRollover(UserData user, List<AppTransaction> transactions) {
+  /// Returns true when a clock-in payout transaction was added.
+  static bool applyDailyRollover(UserData user, List<AppTransaction> transactions) {
     final now = DateTime.now();
+    var addedPayout = false;
     if (user.isClockedIn && user.clockInStartTime != null && !sameCalendarDay(user.clockInStartTime, now)) {
       final earned = user.todayDailyGoal;
       if (earned > 0) {
@@ -245,6 +297,7 @@ class NgmyLocalGrowthIncomeStore {
           user.activeInvestment!.daysClockedIn += 1;
         }
         transactions.add(txn);
+        addedPayout = true;
       }
       user.lastClockInEarningsDate = user.clockInStartTime;
       user.isClockedIn = false;
@@ -254,5 +307,6 @@ class NgmyLocalGrowthIncomeStore {
     if (user.lastClockInEarningsDate != null && !sameCalendarDay(user.lastClockInEarningsDate, now)) {
       user.todayClockInEarned = 0;
     }
+    return addedPayout;
   }
 }

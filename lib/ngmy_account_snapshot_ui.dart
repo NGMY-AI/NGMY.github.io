@@ -24,20 +24,33 @@ Future<void> showNgmyAccountSnapshotPage(
   required String realEmail,
   required UserData user,
   required List<AppTransaction> transactions,
+  required int walletStateRevision,
 }) {
   return NgmyNavigator.push<void>(
     context,
-    NgmyAccountSnapshotPage(realEmail: realEmail, user: user, transactions: transactions),
+    NgmyAccountSnapshotPage(
+      realEmail: realEmail,
+      user: user,
+      transactions: transactions,
+      walletStateRevision: walletStateRevision,
+    ),
     fullscreenDialog: true,
   );
 }
 
 class NgmyAccountSnapshotPage extends StatefulWidget {
-  const NgmyAccountSnapshotPage({super.key, required this.realEmail, required this.user, required this.transactions});
+  const NgmyAccountSnapshotPage({
+    super.key,
+    required this.realEmail,
+    required this.user,
+    required this.transactions,
+    required this.walletStateRevision,
+  });
 
   final String realEmail;
   final UserData user;
   final List<AppTransaction> transactions;
+  final int walletStateRevision;
 
   @override
   State<NgmyAccountSnapshotPage> createState() => _NgmyAccountSnapshotPageState();
@@ -77,6 +90,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         widget.user,
         widget.transactions,
         ownerRealEmail: widget.realEmail,
+        walletStateRevision: widget.walletStateRevision,
       );
       _toast(msg);
     }, busyLabel: 'Preparing download…');
@@ -88,6 +102,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         widget.user,
         widget.transactions,
         ownerRealEmail: widget.realEmail,
+        walletStateRevision: widget.walletStateRevision,
       );
       final stashed = await snapshot.toStashedPayload(ownerEmail: widget.realEmail);
       if (stashed == null) {
@@ -116,6 +131,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         case NgmySnapshotResolveOutcome.notFound:
           _toast('That code didn\'t match anything on your account. Double-check it and try again.');
           return;
+        case NgmySnapshotResolveOutcome.staleBackup:
+          _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
+          return;
         case NgmySnapshotResolveOutcome.found:
           await _confirmRestore(result.snapshot!);
       }
@@ -138,9 +156,16 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     return ngmyPickBackupJsonViaBrowser();
   }
 
+  bool _isStaleBackup(NgmyAccountSnapshot snapshot) =>
+      !NgmyAccountSnapshot.matchesCurrentWalletRevision(snapshot, widget.walletStateRevision);
+
   Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
     if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
       _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
+      return;
+    }
+    if (_isStaleBackup(snapshot)) {
+      _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
       return;
     }
 
@@ -154,7 +179,12 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     if (ok != true) return;
     final restoredUser = snapshot.toUserData(widget.realEmail);
     final transactions = keepsHistory ? widget.transactions : snapshot.transactions;
-    await NgmyLocalGrowthIncomeStore.replace(widget.realEmail, restoredUser, transactions);
+    await NgmyLocalGrowthIncomeStore.replace(
+      widget.realEmail,
+      restoredUser,
+      transactions,
+      walletStateRevision: snapshot.walletStateRevision,
+    );
     if (!mounted) return;
     _toast('Restored your local Growth Income. Go back to see it updated.');
   }
@@ -170,6 +200,10 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       }
       if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
         _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
+        return;
+      }
+      if (_isStaleBackup(snapshot)) {
+        _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
         return;
       }
       await _confirmRestore(snapshot);
@@ -196,6 +230,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           return;
         case NgmySnapshotResolveOutcome.notFound:
           _toast('Could not read that QR code for your account.');
+          return;
+        case NgmySnapshotResolveOutcome.staleBackup:
+          _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
           return;
         case NgmySnapshotResolveOutcome.found:
           await _confirmRestore(result.snapshot!);
@@ -309,7 +346,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                         child: Text(
                           'Download a file, show a QR, or get a 6-character code to save where you are now. '
                           'Upload, scan, or type that code later to bring it back — on this device or another. '
-                          'Only your own account can restore it. Never touches your real, database-backed wallet.',
+                          'Only your own account can restore it, and only if you have not used the wallet since saving. '
+                          'Never touches your real, database-backed wallet.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -721,7 +759,7 @@ class _RestoreSnapshotDialog extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Only backups from this same NGMY account can be restored here.',
+                          'Only backups from this same NGMY account can be restored, and only if you have not used the wallet since saving.',
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.4,

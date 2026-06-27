@@ -42,6 +42,7 @@ class NgmyLocalGrowthIncomeScreen extends StatefulWidget {
 class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScreen> {
   UserData? _user;
   List<AppTransaction> _transactions = [];
+  int _walletStateRevision = 0;
   int _idx = 0;
   bool _investPurchaseInFlight = false;
   bool _loading = true;
@@ -56,20 +57,30 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final loaded = await NgmyLocalGrowthIncomeStore.load(widget.liveUser.email, widget.liveUser);
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
-    NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
+    var revision = loaded.walletStateRevision;
+    final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
     if (!mounted) return;
     setState(() {
       _user = user;
       _transactions = transactions;
+      _walletStateRevision = revision;
       _loading = false;
     });
-    unawaited(_persist());
+    unawaited(_persist(bumpWalletRevision: payoutAdded));
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist({bool bumpWalletRevision = false}) async {
     final user = _user;
     if (user == null) return;
-    await NgmyLocalGrowthIncomeStore.save(widget.liveUser.email, user, _transactions);
+    await NgmyLocalGrowthIncomeStore.save(
+      widget.liveUser.email,
+      user,
+      _transactions,
+      bumpWalletRevision: bumpWalletRevision,
+    );
+    if (bumpWalletRevision) {
+      _walletStateRevision++;
+    }
   }
 
   void _onDataChanged() {
@@ -77,12 +88,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     unawaited(_persist());
   }
 
-  void _onAddTransaction(AppTransaction t) {
+  void _onAddTransaction(AppTransaction t, {bool bumpWalletRevision = true}) {
     final user = _user;
     if (user == null) return;
     NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
     setState(() => _transactions = [..._transactions, t]);
-    unawaited(_persist());
+    unawaited(_persist(bumpWalletRevision: bumpWalletRevision));
   }
 
   Future<void> _onClockIn() async {
@@ -118,16 +129,19 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       user.clockInStartTime = now;
       user.clockInPenaltyPercent = penalty;
     });
-    _onAddTransaction(AppTransaction(
-      id: sessionId,
-      userEmail: user.email,
-      amount: 0,
-      type: TransactionType.reimbursement,
-      method: PaymentMethod.system,
-      sourceDetails: 'Clock-in session started',
-      status: TransactionStatus.approved,
-      timestamp: now,
-    ));
+    _onAddTransaction(
+      AppTransaction(
+        id: sessionId,
+        userEmail: user.email,
+        amount: 0,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Clock-in session started',
+        status: TransactionStatus.approved,
+        timestamp: now,
+      ),
+      bumpWalletRevision: false,
+    );
     _toast('Clock-in started. Earnings settle the next time you open this.');
   }
 
@@ -183,7 +197,13 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   Future<void> _openBackup() async {
     final user = _user;
     if (user == null) return;
-    await showNgmyAccountSnapshotPage(context, realEmail: widget.liveUser.email, user: user, transactions: _transactions);
+    await showNgmyAccountSnapshotPage(
+      context,
+      realEmail: widget.liveUser.email,
+      user: user,
+      transactions: _transactions,
+      walletStateRevision: _walletStateRevision,
+    );
     await _load();
   }
 

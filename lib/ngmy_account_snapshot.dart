@@ -9,7 +9,7 @@ const String kNgmySnapshotMarker = 'ngmyAccountSnapshot';
 const int kNgmySnapshotVersion = 2;
 const String kNgmySnapshotQrPrefix = 'NGMYSNAP1|';
 
-enum NgmySnapshotResolveOutcome { found, notFound, wrongAccount }
+enum NgmySnapshotResolveOutcome { found, notFound, wrongAccount, staleBackup }
 
 /// A full backup of the Growth Income copy behind the home screen's wifi
 /// icon (balance, investment, clock-in state, wallet history). Restoring
@@ -31,6 +31,7 @@ class NgmyAccountSnapshot {
     required this.activeInvestment,
     required this.transactions,
     required this.exportedAt,
+    required this.walletStateRevision,
   });
 
   final String email;
@@ -48,11 +49,15 @@ class NgmyAccountSnapshot {
   final ActiveInvestment? activeInvestment;
   final List<AppTransaction> transactions;
   final DateTime exportedAt;
+  /// Wallet activity counter at export time — restore only works while this
+  /// still matches the live local wallet (prevents replay-after-spend cheats).
+  final int walletStateRevision;
 
   factory NgmyAccountSnapshot.fromUser(
     UserData user,
     List<AppTransaction> transactions, {
     required String ownerRealEmail,
+    required int walletStateRevision,
   }) =>
       NgmyAccountSnapshot(
         email: user.email.trim().toLowerCase(),
@@ -69,6 +74,7 @@ class NgmyAccountSnapshot {
         activeInvestment: user.activeInvestment,
         transactions: transactions,
         exportedAt: DateTime.now(),
+        walletStateRevision: walletStateRevision,
       );
 
   /// True when [snapshot] may be restored into the local Growth Income slot
@@ -98,6 +104,17 @@ class NgmyAccountSnapshot {
     final user = realEmail.trim().isEmpty ? 'your account' : realEmail.trim();
     return 'This backup belongs to another account. You can only restore local Growth Income data for $user.';
   }
+
+  /// Backups may only be restored when no wallet activity happened after export
+  /// (deposits, withdrawals, investments, clock-in payouts, etc.).
+  static bool matchesCurrentWalletRevision(NgmyAccountSnapshot snapshot, int currentRevision) {
+    if (snapshot.walletStateRevision < 0) return false;
+    return snapshot.walletStateRevision == currentRevision;
+  }
+
+  static String staleBackupBlockMessage() =>
+      'This backup is too old. You used or changed your local wallet after it was saved, '
+      'so this file cannot bring money back. Download a new backup only if you have not spent anything since.';
 
   /// Rebuilds a [UserData] from this snapshot, suitable for writing straight
   /// into [NgmyLocalGrowthIncomeStore]. [realEmail] is the signed-in account's
@@ -152,6 +169,7 @@ class NgmyAccountSnapshot {
                 })
             .toList(),
         'exportedAt': exportedAt.toUtc().toIso8601String(),
+        'walletStateRevision': walletStateRevision,
       };
 
   String toJson() => const JsonEncoder.withIndent('  ').convert(toMap());
@@ -266,6 +284,7 @@ class NgmyAccountSnapshot {
       activeInvestment: investment,
       transactions: const [],
       exportedAt: DateTime.now(),
+      walletStateRevision: -1,
     );
   }
 
@@ -327,6 +346,7 @@ class NgmyAccountSnapshot {
       activeInvestment: investment,
       transactions: transactions,
       exportedAt: parseDate(map['exportedAt']) ?? DateTime.now(),
+      walletStateRevision: (map['walletStateRevision'] as num?)?.toInt() ?? -1,
     );
   }
 
@@ -334,8 +354,14 @@ class NgmyAccountSnapshot {
     UserData user,
     List<AppTransaction> transactions, {
     required String ownerRealEmail,
+    required int walletStateRevision,
   }) async {
-    final snapshot = NgmyAccountSnapshot.fromUser(user, transactions, ownerRealEmail: ownerRealEmail);
+    final snapshot = NgmyAccountSnapshot.fromUser(
+      user,
+      transactions,
+      ownerRealEmail: ownerRealEmail,
+      walletStateRevision: walletStateRevision,
+    );
     final safe = snapshot.email.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     final filename = 'ngmy-growth-income-$safe.ngmy.json';
     return downloadNgmyAdvisorSyncJson(snapshot.toJson(), filename);
