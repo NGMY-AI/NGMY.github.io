@@ -248,7 +248,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'This deposit is locked to a verification code from the user\'s payment request.',
+                'Enter the verification code shown on your local deposit request. It must match what admin used for this QR.',
                 style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF64748B), height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -293,20 +293,23 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       _toast('This deposit code was already used.');
       return;
     }
-    if (peek.wrongAccount) {
-      _toast('This deposit is locked to another NGMY account.');
+    if (peek.notConfigured) {
+      _toast('This deposit is not assigned to an account. Ask admin to recreate it with your email and verification code.');
       return;
     }
-    String? verificationCode;
-    if (peek.requiresVerification) {
-      if (!mounted) return;
-      verificationCode = await _showDepositVerificationDialog(context);
-      if (verificationCode == null || verificationCode.trim().isEmpty) return;
+    if (peek.wrongAccount) {
+      _toast('This deposit is for another NGMY account.');
+      return;
     }
+    if (!mounted) return;
+    final verificationCode = await _showDepositVerificationDialog(context);
+    if (verificationCode == null || verificationCode.trim().isEmpty) return;
     final result = await NgmyLocalDepositQr.redeemByCode(
       code: code,
       redeemerEmail: widget.realEmail,
-      verificationCode: verificationCode,
+      verificationCode: verificationCode.trim(),
+      localTransactions: widget.transactions,
+      localUserEmail: widget.user.email,
     );
     await _applyDepositRedeemResult(result);
   }
@@ -321,20 +324,23 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       _toast('This deposit code was already used.');
       return;
     }
-    if (peek.wrongAccount) {
-      _toast('This deposit is locked to another NGMY account.');
+    if (peek.notConfigured) {
+      _toast('This deposit is not assigned to an account. Ask admin to recreate it with your email and verification code.');
       return;
     }
-    String? verificationCode;
-    if (peek.requiresVerification) {
-      if (!mounted) return;
-      verificationCode = await _showDepositVerificationDialog(context);
-      if (verificationCode == null || verificationCode.trim().isEmpty) return;
+    if (peek.wrongAccount) {
+      _toast('This deposit is for another NGMY account.');
+      return;
     }
+    if (!mounted) return;
+    final verificationCode = await _showDepositVerificationDialog(context);
+    if (verificationCode == null || verificationCode.trim().isEmpty) return;
     final result = await NgmyLocalDepositQr.redeem(
       raw: raw,
       redeemerEmail: widget.realEmail,
-      verificationCode: verificationCode,
+      verificationCode: verificationCode.trim(),
+      localTransactions: widget.transactions,
+      localUserEmail: widget.user.email,
     );
     await _applyDepositRedeemResult(result);
   }

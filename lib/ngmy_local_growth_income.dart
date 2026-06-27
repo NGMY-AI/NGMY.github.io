@@ -202,6 +202,7 @@ class NgmyLocalGrowthIncomeStore {
         'type': t.type.name,
         'method': t.method.name,
         'sourceDetails': t.sourceDetails,
+        'verificationCode': t.verificationCode,
         'status': t.status.name,
         'timestamp': t.timestamp.toUtc().toIso8601String(),
       };
@@ -215,6 +216,7 @@ class NgmyLocalGrowthIncomeStore {
         type: TransactionType.values.byName((m['type'] ?? 'reimbursement').toString()),
         method: PaymentMethod.values.byName((m['method'] ?? 'system').toString()),
         sourceDetails: m['sourceDetails'] as String?,
+        verificationCode: m['verificationCode']?.toString(),
         status: TransactionStatus.values.byName((m['status'] ?? 'approved').toString()),
         timestamp: DateTime.tryParse((m['timestamp'] ?? '').toString())?.toLocal() ?? DateTime.now(),
       );
