@@ -98,6 +98,11 @@ class NgmyLocalSnapshotStash {
   }
 
   static Future<String?> consumeToken(String token) async {
+    final loaded = await _consumeTokenWithOwner(token);
+    return loaded?.snapshotJson;
+  }
+
+  static Future<({String snapshotJson, String ownerEmail})?> _consumeTokenWithOwner(String token) async {
     final id = token.trim();
     if (id.isEmpty) return null;
     try {
@@ -111,7 +116,8 @@ class NgmyLocalSnapshotStash {
       if (value is! Map) return null;
       final payloadRaw = (value['payload'] ?? '').toString();
       if (payloadRaw.isEmpty) return null;
-      return utf8.decode(base64Decode(payloadRaw));
+      final ownerEmail = (value['ownerEmail'] ?? '').toString().trim();
+      return (snapshotJson: utf8.decode(base64Decode(payloadRaw)), ownerEmail: ownerEmail);
     } catch (e) {
       debugPrint('[local growth income stash] consume: $e');
       return null;
@@ -119,19 +125,26 @@ class NgmyLocalSnapshotStash {
   }
 
   /// Resolves either a scanned short-QR payload or a typed code to the full
-  /// snapshot JSON text. Returns null if it's neither (caller should fall
-  /// back to parsing [raw] directly, for file uploads or older QR formats).
-  static Future<String?> resolve(String raw) async {
+  /// snapshot JSON text plus the account that created the backup.
+  static Future<({String snapshotJson, String ownerEmail})?> resolveWithOwner(String raw) async {
     final text = raw.trim();
     if (looksLikeCode(text)) {
       final token = await _loadTokenForCode(text);
       if (token == null) return null;
-      return consumeToken(token);
+      return _consumeTokenWithOwner(token);
     }
     if (text.startsWith('$kNgmyLocalSnapshotStashPrefix|')) {
       final token = text.substring(kNgmyLocalSnapshotStashPrefix.length + 1).trim();
-      return consumeToken(token);
+      return _consumeTokenWithOwner(token);
     }
     return null;
+  }
+
+  /// Resolves either a scanned short-QR payload or a typed code to the full
+  /// snapshot JSON text. Returns null if it's neither (caller should fall
+  /// back to parsing [raw] directly, for file uploads or older QR formats).
+  static Future<String?> resolve(String raw) async {
+    final loaded = await resolveWithOwner(raw);
+    return loaded?.snapshotJson;
   }
 }

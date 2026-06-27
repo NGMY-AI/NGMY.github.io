@@ -9,6 +9,8 @@ const String kNgmySnapshotMarker = 'ngmyAccountSnapshot';
 const int kNgmySnapshotVersion = 2;
 const String kNgmySnapshotQrPrefix = 'NGMYSNAP1|';
 
+enum NgmySnapshotResolveOutcome { found, notFound, wrongAccount }
+
 /// A full backup of the Growth Income copy behind the home screen's wifi
 /// icon (balance, investment, clock-in state, wallet history). Restoring
 /// this overwrites that copy — safe to do since it was never tied to the
@@ -16,6 +18,7 @@ const String kNgmySnapshotQrPrefix = 'NGMYSNAP1|';
 class NgmyAccountSnapshot {
   const NgmyAccountSnapshot({
     required this.email,
+    required this.ownerRealEmail,
     required this.username,
     required this.accountBalance,
     required this.totalProfit,
@@ -31,6 +34,8 @@ class NgmyAccountSnapshot {
   });
 
   final String email;
+  /// Signed-in NGMY account email that owns this local Growth Income copy.
+  final String ownerRealEmail;
   final String username;
   final double accountBalance;
   final double totalProfit;
@@ -44,8 +49,14 @@ class NgmyAccountSnapshot {
   final List<AppTransaction> transactions;
   final DateTime exportedAt;
 
-  factory NgmyAccountSnapshot.fromUser(UserData user, List<AppTransaction> transactions) => NgmyAccountSnapshot(
+  factory NgmyAccountSnapshot.fromUser(
+    UserData user,
+    List<AppTransaction> transactions, {
+    required String ownerRealEmail,
+  }) =>
+      NgmyAccountSnapshot(
         email: user.email.trim().toLowerCase(),
+        ownerRealEmail: ownerRealEmail.trim().toLowerCase(),
         username: user.username,
         accountBalance: user.accountBalance,
         totalProfit: user.totalProfit,
@@ -59,6 +70,34 @@ class NgmyAccountSnapshot {
         transactions: transactions,
         exportedAt: DateTime.now(),
       );
+
+  /// True when [snapshot] may be restored into the local Growth Income slot
+  /// for [realEmail]. Blocks cross-account restores (QR, code, file, scan).
+  static bool ownedByRealAccount(
+    NgmyAccountSnapshot snapshot,
+    String realEmail, {
+    String? stashOwnerEmail,
+  }) {
+    final real = realEmail.toLowerCase().trim();
+    if (real.isEmpty) return false;
+
+    final stashOwner = (stashOwnerEmail ?? '').toLowerCase().trim();
+    if (stashOwner.isNotEmpty && stashOwner != real) return false;
+
+    final ownerField = snapshot.ownerRealEmail.toLowerCase().trim();
+    if (ownerField.isNotEmpty && ownerField == real) return true;
+
+    final localIdentity = NgmyLocalGrowthIncomeStore.identityEmailFor(realEmail).toLowerCase();
+    final snapEmail = snapshot.email.toLowerCase().trim();
+    if (snapEmail == real || snapEmail == localIdentity) return true;
+
+    return false;
+  }
+
+  static String ownershipBlockMessage(String realEmail) {
+    final user = realEmail.trim().isEmpty ? 'your account' : realEmail.trim();
+    return 'This backup belongs to another account. You can only restore local Growth Income data for $user.';
+  }
 
   /// Rebuilds a [UserData] from this snapshot, suitable for writing straight
   /// into [NgmyLocalGrowthIncomeStore]. [realEmail] is the signed-in account's
@@ -80,6 +119,7 @@ class NgmyAccountSnapshot {
   Map<String, dynamic> toMap() => {
         kNgmySnapshotMarker: kNgmySnapshotVersion,
         'email': email,
+        'ownerRealEmail': ownerRealEmail,
         'username': username,
         'accountBalance': accountBalance,
         'totalProfit': totalProfit,
@@ -127,19 +167,43 @@ class NgmyAccountSnapshot {
     return NgmyLocalSnapshotStash.create(ownerEmail: ownerEmail, snapshotJson: toJson());
   }
 
-  /// Resolves anything Backup & Restore can receive: a typed 5–6 character
-  /// code, a scanned short-token QR, an uploaded file's full JSON text, or
-  /// (for backward compatibility) an older self-contained compact QR.
-  static Future<NgmyAccountSnapshot?> resolveAny(String raw) async {
-    final stashed = await NgmyLocalSnapshotStash.resolve(raw);
+  /// Resolves anything Backup & Restore can receive. When [realEmail] is set,
+  /// returns null if the snapshot belongs to a different account.
+  static Future<NgmyAccountSnapshot?> resolveAny(String raw, {String? realEmail}) async {
+    final detailed = await resolveForRestore(raw, realEmail ?? '');
+    if (realEmail == null || realEmail.trim().isEmpty) {
+      return detailed.snapshot;
+    }
+    if (detailed.outcome == NgmySnapshotResolveOutcome.wrongAccount) return null;
+    return detailed.snapshot;
+  }
+
+  static Future<({NgmyAccountSnapshot? snapshot, NgmySnapshotResolveOutcome outcome})> resolveForRestore(
+    String raw,
+    String realEmail,
+  ) async {
+    final stashed = await NgmyLocalSnapshotStash.resolveWithOwner(raw);
     if (stashed != null) {
       try {
-        final decoded = jsonDecode(stashed);
-        if (decoded is Map) return fromMap(Map<String, dynamic>.from(decoded));
+        final decoded = jsonDecode(stashed.snapshotJson);
+        if (decoded is Map) {
+          final snapshot = fromMap(Map<String, dynamic>.from(decoded));
+          if (snapshot == null) return (snapshot: null, outcome: NgmySnapshotResolveOutcome.notFound);
+          if (realEmail.trim().isNotEmpty &&
+              !ownedByRealAccount(snapshot, realEmail, stashOwnerEmail: stashed.ownerEmail)) {
+            return (snapshot: null, outcome: NgmySnapshotResolveOutcome.wrongAccount);
+          }
+          return (snapshot: snapshot, outcome: NgmySnapshotResolveOutcome.found);
+        }
       } catch (_) {}
-      return null;
+      return (snapshot: null, outcome: NgmySnapshotResolveOutcome.notFound);
     }
-    return parse(raw);
+    final snapshot = parse(raw);
+    if (snapshot == null) return (snapshot: null, outcome: NgmySnapshotResolveOutcome.notFound);
+    if (realEmail.trim().isNotEmpty && !ownedByRealAccount(snapshot, realEmail)) {
+      return (snapshot: null, outcome: NgmySnapshotResolveOutcome.wrongAccount);
+    }
+    return (snapshot: snapshot, outcome: NgmySnapshotResolveOutcome.found);
   }
 
   static NgmyAccountSnapshot? parse(String raw) {
@@ -189,6 +253,7 @@ class NgmyAccountSnapshot {
     }
     return NgmyAccountSnapshot(
       email: '',
+      ownerRealEmail: '',
       username: (map['qu'] ?? 'User').toString(),
       accountBalance: cents(map['qb']),
       totalProfit: cents(map['qp']),
@@ -249,6 +314,7 @@ class NgmyAccountSnapshot {
 
     return NgmyAccountSnapshot(
       email: (map['email'] ?? '').toString(),
+      ownerRealEmail: (map['ownerRealEmail'] ?? '').toString(),
       username: (map['username'] ?? 'User').toString(),
       accountBalance: (map['accountBalance'] as num? ?? 0).toDouble(),
       totalProfit: (map['totalProfit'] as num? ?? 0).toDouble(),
@@ -264,8 +330,12 @@ class NgmyAccountSnapshot {
     );
   }
 
-  static Future<String> exportToFile(UserData user, List<AppTransaction> transactions) async {
-    final snapshot = NgmyAccountSnapshot.fromUser(user, transactions);
+  static Future<String> exportToFile(
+    UserData user,
+    List<AppTransaction> transactions, {
+    required String ownerRealEmail,
+  }) async {
+    final snapshot = NgmyAccountSnapshot.fromUser(user, transactions, ownerRealEmail: ownerRealEmail);
     final safe = snapshot.email.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     final filename = 'ngmy-growth-income-$safe.ngmy.json';
     return downloadNgmyAdvisorSyncJson(snapshot.toJson(), filename);

@@ -73,14 +73,22 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
 
   Future<void> _exportFile() async {
     await _withWork(() async {
-      final msg = await NgmyAccountSnapshot.exportToFile(widget.user, widget.transactions);
+      final msg = await NgmyAccountSnapshot.exportToFile(
+        widget.user,
+        widget.transactions,
+        ownerRealEmail: widget.realEmail,
+      );
       _toast(msg);
     }, busyLabel: 'Preparing download…');
   }
 
   Future<void> _showQr() async {
     await _withWork(() async {
-      final snapshot = NgmyAccountSnapshot.fromUser(widget.user, widget.transactions);
+      final snapshot = NgmyAccountSnapshot.fromUser(
+        widget.user,
+        widget.transactions,
+        ownerRealEmail: widget.realEmail,
+      );
       final stashed = await snapshot.toStashedPayload(ownerEmail: widget.realEmail);
       if (stashed == null) {
         _toast('Could not create a QR right now. Check your connection and try again.');
@@ -100,12 +108,17 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     final code = await _showEnterCodeDialog(context);
     if (code == null || code.trim().isEmpty) return;
     await _withWork(() async {
-      final snapshot = await NgmyAccountSnapshot.resolveAny(code);
-      if (snapshot == null) {
-        _toast('That code didn\'t match anything. Double-check it and try again.');
-        return;
+      final result = await NgmyAccountSnapshot.resolveForRestore(code, widget.realEmail);
+      switch (result.outcome) {
+        case NgmySnapshotResolveOutcome.wrongAccount:
+          _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
+          return;
+        case NgmySnapshotResolveOutcome.notFound:
+          _toast('That code didn\'t match anything on your account. Double-check it and try again.');
+          return;
+        case NgmySnapshotResolveOutcome.found:
+          await _confirmRestore(result.snapshot!);
       }
-      await _confirmRestore(snapshot);
     }, busyLabel: 'Looking up code…');
   }
 
@@ -126,31 +139,24 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
-    // Only an older, self-contained QR (kept for backward compatibility)
-    // ever arrives with no transaction history — current QR/code restores
-    // and file imports both carry full history via the cloud stash.
+    if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
+      _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
+      return;
+    }
+
     final keepsHistory = snapshot.transactions.isEmpty;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore this snapshot?'),
-        content: Text(
-          'This replaces your balance, investment, and clock-in data '
-          '${keepsHistory ? '(your wallet history stays as-is)' : 'and wallet history'} '
-          'with the saved snapshot from ${snapshot.exportedAt.month}/${snapshot.exportedAt.day}/${snapshot.exportedAt.year}.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Restore')),
-        ],
-      ),
+    final ok = await _showRestoreConfirmDialog(
+      context,
+      snapshot: snapshot,
+      realEmail: widget.realEmail,
+      keepsHistory: keepsHistory,
     );
     if (ok != true) return;
     final restoredUser = snapshot.toUserData(widget.realEmail);
     final transactions = keepsHistory ? widget.transactions : snapshot.transactions;
     await NgmyLocalGrowthIncomeStore.replace(widget.realEmail, restoredUser, transactions);
     if (!mounted) return;
-    _toast('Restored. Go back to see it updated.');
+    _toast('Restored your local Growth Income. Go back to see it updated.');
   }
 
   Future<void> _importFile() async {
@@ -160,6 +166,10 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       final snapshot = NgmyAccountSnapshot.parse(raw);
       if (snapshot == null) {
         _toast('Could not read that backup file.');
+        return;
+      }
+      if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
+        _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
         return;
       }
       await _confirmRestore(snapshot);
@@ -179,12 +189,17 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     );
     if (raw == null || raw.trim().isEmpty) return;
     await _withWork(() async {
-      final snapshot = await NgmyAccountSnapshot.resolveAny(raw);
-      if (snapshot == null) {
-        _toast('Could not read that QR code.');
-        return;
+      final result = await NgmyAccountSnapshot.resolveForRestore(raw, widget.realEmail);
+      switch (result.outcome) {
+        case NgmySnapshotResolveOutcome.wrongAccount:
+          _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
+          return;
+        case NgmySnapshotResolveOutcome.notFound:
+          _toast('Could not read that QR code for your account.');
+          return;
+        case NgmySnapshotResolveOutcome.found:
+          await _confirmRestore(result.snapshot!);
       }
-      await _confirmRestore(snapshot);
     }, busyLabel: 'Loading…');
   }
 
@@ -223,7 +238,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                 Text('Backup & Restore', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 28, color: titleColor, letterSpacing: -0.5)),
                 const SizedBox(height: 8),
                 Text(
-                  'Keep a copy of this growth income on your device, or bring one back.',
+                  'Keep a copy of your local Growth Income on this device, or bring your own backup back. '
+                  'You can only restore data from the same NGMY account — not someone else\'s.',
                   style: TextStyle(fontSize: 13.5, height: 1.4, color: muted, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 28),
@@ -293,7 +309,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                         child: Text(
                           'Download a file, show a QR, or get a 6-character code to save where you are now. '
                           'Upload, scan, or type that code later to bring it back — on this device or another. '
-                          'Never touches your real, database-backed account.',
+                          'Only your own account can restore it. Never touches your real, database-backed wallet.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -486,7 +502,7 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'Scan this QR, or type the code, on another device to restore this growth income there.',
+                      'Scan this QR, or type the code, on another device signed into the same NGMY account.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                     ),
@@ -562,6 +578,228 @@ Future<String?> _showEnterCodeDialog(BuildContext context) {
     barrierColor: Colors.black54,
     builder: (ctx) => const _EnterCodeDialog(),
   );
+}
+
+Future<bool?> _showRestoreConfirmDialog(
+  BuildContext context, {
+  required NgmyAccountSnapshot snapshot,
+  required String realEmail,
+  required bool keepsHistory,
+}) {
+  return showDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black54,
+    builder: (ctx) => _RestoreSnapshotDialog(
+      snapshot: snapshot,
+      realEmail: realEmail,
+      keepsHistory: keepsHistory,
+    ),
+  );
+}
+
+class _RestoreSnapshotDialog extends StatelessWidget {
+  const _RestoreSnapshotDialog({
+    required this.snapshot,
+    required this.realEmail,
+    required this.keepsHistory,
+  });
+
+  final NgmyAccountSnapshot snapshot;
+  final String realEmail;
+  final bool keepsHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final fg = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final border = isDark ? Colors.white24 : const Color(0xFFD1D5DB);
+    final exported = snapshot.exportedAt;
+    final dateLabel = '${exported.month}/${exported.day}/${exported.year}';
+    final investment = snapshot.activeInvestment?.name;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: WorksheetPalette.green.withValues(alpha: 0.16),
+                blurRadius: 36,
+                offset: const Offset(0, 14),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF22C55E), Color(0xFF059669)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6))],
+                  ),
+                  child: const Icon(Icons.restore_rounded, color: Colors.white, size: 30),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Restore local backup?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: fg, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -0.3),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This replaces your local Growth Income wallet on this device.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: muted, fontSize: 13, height: 1.45),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.22)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _RestoreDetailRow(label: 'Account', value: realEmail.trim(), muted: muted, fg: fg),
+                      const SizedBox(height: 10),
+                      _RestoreDetailRow(
+                        label: 'Balance',
+                        value: '\$${formatCurrency(snapshot.accountBalance)}',
+                        muted: muted,
+                        fg: fg,
+                      ),
+                      if (investment != null && investment.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _RestoreDetailRow(label: 'Investment', value: investment, muted: muted, fg: fg),
+                      ],
+                      const SizedBox(height: 10),
+                      _RestoreDetailRow(label: 'Saved on', value: dateLabel, muted: muted, fg: fg),
+                      const SizedBox(height: 10),
+                      _RestoreDetailRow(
+                        label: 'Wallet history',
+                        value: keepsHistory ? 'Keeps current history' : 'Restored from backup',
+                        muted: muted,
+                        fg: fg,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.14 : 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock_outline_rounded, size: 16, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Only backups from this same NGMY account can be restored here.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: fg,
+                          side: BorderSide(color: border),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: WorksheetPalette.green,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Restore now', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RestoreDetailRow extends StatelessWidget {
+  const _RestoreDetailRow({
+    required this.label,
+    required this.value,
+    required this.muted,
+    required this.fg,
+  });
+
+  final String label;
+  final String value;
+  final Color muted;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 92,
+          child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+        ),
+        Expanded(
+          child: Text(value, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: fg, height: 1.35)),
+        ),
+      ],
+    );
+  }
 }
 
 class _EnterCodeDialog extends StatefulWidget {
