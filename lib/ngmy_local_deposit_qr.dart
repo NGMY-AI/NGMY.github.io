@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'main.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_network_resilience.dart';
+import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -15,6 +16,7 @@ import 'ngmy_worksheet_helpers.dart';
 const String kNgmyLocalDepositQrPrefix = 'NGMYLOCALDEP1';
 
 String _stashKey(String token) => 'ngmy_local_deposit_qr_v1_${token.trim()}';
+String _codeKey(String code) => 'ngmy_local_deposit_code_v1_${code.trim().toUpperCase()}';
 
 String _generateToken() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -25,12 +27,33 @@ String _generateToken() {
 /// Admin creates a one-time deposit QR; users scan it in Local Growth Income
 /// backup/restore to credit their local wallet automatically.
 class NgmyLocalDepositQr {
-  static Future<({String qrPayload, double amount})?> create({
+  static String generateCode() {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    final r = Random.secure();
+    return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  static String? normalizeCode(String raw) {
+    final t = raw.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (t.length < 5 || t.length > 6) return null;
+    return t;
+  }
+
+  static bool looksLikeCode(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty || t.length > 6) return false;
+    if (t.contains('|') || t.contains(':') || t.contains('/') || t.contains('.') || t.contains(' ')) return false;
+    if (RegExp(r'^(NGMY|HTTP)', caseSensitive: false).hasMatch(t)) return false;
+    return RegExp(r'^[A-Za-z0-9]{5,6}$').hasMatch(t);
+  }
+
+  static Future<({String qrPayload, String code, double amount})?> create({
     required String adminEmail,
     required double amount,
   }) async {
     if (amount <= 0) return null;
     final token = _generateToken();
+    final code = generateCode();
     final now = DateTime.now().toUtc().toIso8601String();
     try {
       await Supabase.instance.client.from('ngmy_settings').upsert([
@@ -45,11 +68,45 @@ class NgmyLocalDepositQr {
           'updated_at': now,
         },
       ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _codeKey(code),
+          'value': {'token': token, 'updatedAt': now},
+          'updated_at': now,
+        },
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[local deposit qr] create: $e');
       return null;
     }
-    return (qrPayload: '$kNgmyLocalDepositQrPrefix|$token', amount: amount);
+    return (qrPayload: '$kNgmyLocalDepositQrPrefix|$token', code: code, amount: amount);
+  }
+
+  static Future<String?> _loadTokenForCode(String code) async {
+    final normalized = normalizeCode(code);
+    if (normalized == null) return null;
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _codeKey(normalized))
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      final value = row?['value'];
+      if (value is Map) return (value['token'] ?? '').toString().trim();
+    } catch (e) {
+      debugPrint('[local deposit qr] code lookup: $e');
+    }
+    return null;
+  }
+
+  static Future<({double amount, String adminEmail})?> redeemByCode({
+    required String code,
+    required String redeemerEmail,
+  }) async {
+    final token = await _loadTokenForCode(code);
+    if (token == null || token.isEmpty) return null;
+    return redeem(raw: '$kNgmyLocalDepositQrPrefix|$token', redeemerEmail: redeemerEmail);
   }
 
   static Future<({double amount, String adminEmail})?> redeem({
@@ -201,16 +258,70 @@ Future<void> showNgmyAdminLocalDepositQrFlow(
 
   await NgmyNavigator.push<void>(
     context,
-    _NgmyLocalDepositQrPage(qrPayload: created.qrPayload, amount: created.amount),
+    _NgmyLocalDepositQrPage(qrPayload: created.qrPayload, code: created.code, amount: created.amount),
     fullscreenDialog: true,
   );
 }
 
-class _NgmyLocalDepositQrPage extends StatelessWidget {
-  const _NgmyLocalDepositQrPage({required this.qrPayload, required this.amount});
+class _NgmyLocalDepositQrPage extends StatefulWidget {
+  const _NgmyLocalDepositQrPage({required this.qrPayload, required this.code, required this.amount});
 
   final String qrPayload;
+  final String code;
   final double amount;
+
+  @override
+  State<_NgmyLocalDepositQrPage> createState() => _NgmyLocalDepositQrPageState();
+}
+
+class _NgmyLocalDepositQrPageState extends State<_NgmyLocalDepositQrPage> {
+  final GlobalKey _qrCaptureKey = GlobalKey();
+  bool _downloading = false;
+
+  void _copy(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied')));
+  }
+
+  Future<void> _downloadQr() async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    try {
+      final bytes = await NgmyBrandedQrWidget.capturePng(_qrCaptureKey, pixelRatio: 4);
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not capture QR image.')));
+        }
+        return;
+      }
+      final msg = await downloadNgmyQrImage(bytes, 'ngmy_local_deposit_qr.png');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Widget _copyChip({required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: WorksheetPalette.green.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.copy_rounded, size: 14, color: WorksheetPalette.green),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: WorksheetPalette.green, fontWeight: FontWeight.w800, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,56 +343,58 @@ class _NgmyLocalDepositQrPage extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: card,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '\$${formatCurrency(amount)}',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: WorksheetPalette.green),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Local Growth Income deposit', style: TextStyle(fontSize: 13, color: titleColor.withValues(alpha: 0.7))),
-                    const SizedBox(height: 20),
-                    NgmyBrandedQrWidget(data: qrPayload, large: true),
-                    const SizedBox(height: 16),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: qrPayload));
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('QR payload copied')));
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: WorksheetPalette.green.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.copy_rounded, size: 14, color: WorksheetPalette.green),
-                            const SizedBox(width: 6),
-                            Text('Copy code', style: TextStyle(color: WorksheetPalette.green, fontWeight: FontWeight.w800, fontSize: 12)),
-                          ],
+              child: SingleChildScrollView(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '\$${formatCurrency(widget.amount)}',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: WorksheetPalette.green),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('Local Growth Income deposit', style: TextStyle(fontSize: 13, color: titleColor.withValues(alpha: 0.7))),
+                      const SizedBox(height: 20),
+                      NgmyBrandedQrWidget(data: widget.qrPayload, large: true, captureKey: _qrCaptureKey),
+                      const SizedBox(height: 16),
+                      Text('Code: ${widget.code}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: titleColor, letterSpacing: 1.2)),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _copyChip(label: 'Copy 6-digit code', onTap: () => _copy(widget.code, '6-digit code')),
+                          _copyChip(label: 'Copy QR payload', onTap: () => _copy(widget.qrPayload, 'QR payload')),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _downloading ? null : _downloadQr,
+                        icon: _downloading
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.download_rounded, size: 18),
+                        label: Text(_downloading ? 'Saving…' : 'Download QR image'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: WorksheetPalette.green,
+                          side: BorderSide(color: WorksheetPalette.green.withValues(alpha: 0.45)),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Send this QR to the user. They scan it under Local Growth Income → Backup & Restore → Scan QR. '
-                      'Each code works once.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      Text(
+                        'Send the QR image or the 6-digit code to the user. They can scan under Backup & Restore → Scan QR, '
+                        'or type the code under Enter Code. Each deposit works once.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

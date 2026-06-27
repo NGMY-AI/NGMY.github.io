@@ -124,6 +124,13 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     final code = await _showEnterCodeDialog(context);
     if (code == null || code.trim().isEmpty) return;
     await _withWork(() async {
+      if (NgmyLocalDepositQr.looksLikeCode(code)) {
+        final deposit = await NgmyLocalDepositQr.redeemByCode(code: code.trim(), redeemerEmail: widget.realEmail);
+        if (deposit != null) {
+          await _creditLocalDeposit(deposit.amount);
+          return;
+        }
+      }
       final result = await NgmyAccountSnapshot.resolveForRestore(code, widget.realEmail);
       switch (result.outcome) {
         case NgmySnapshotResolveOutcome.wrongAccount:
@@ -211,19 +218,14 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     }, busyLabel: 'Reading file…');
   }
 
-  Future<void> _redeemDepositQr(String raw) async {
-    final redeemed = await NgmyLocalDepositQr.redeem(raw: raw, redeemerEmail: widget.realEmail);
-    if (redeemed == null) {
-      _toast('That deposit QR is invalid or already used.');
-      return;
-    }
+  Future<void> _creditLocalDeposit(double amount) async {
     final txn = AppTransaction(
       id: 'local_qr_dep_${DateTime.now().microsecondsSinceEpoch}',
       userEmail: widget.user.email,
-      amount: redeemed.amount,
+      amount: amount,
       type: TransactionType.deposit,
       method: PaymentMethod.system,
-      sourceDetails: 'Admin deposit QR (\$${formatCurrency(redeemed.amount)})',
+      sourceDetails: 'Admin deposit (\$${formatCurrency(amount)})',
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     );
@@ -231,7 +233,16 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     final transactions = [...widget.transactions, txn];
     await NgmyLocalGrowthIncomeStore.save(widget.realEmail, widget.user, transactions, bumpWalletRevision: true);
     if (!mounted) return;
-    _toast('Deposited \$${formatCurrency(redeemed.amount)} to your local wallet.');
+    _toast('Deposited \$${formatCurrency(amount)} to your local wallet.');
+  }
+
+  Future<void> _redeemDepositQr(String raw) async {
+    final redeemed = await NgmyLocalDepositQr.redeem(raw: raw, redeemerEmail: widget.realEmail);
+    if (redeemed == null) {
+      _toast('That deposit QR is invalid or already used.');
+      return;
+    }
+    await _creditLocalDeposit(redeemed.amount);
   }
 
   Future<void> _scanQr() async {
@@ -376,7 +387,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                         child: Text(
                           'Download a file, show a QR, or get a 6-character code to save where you are now. '
                           'Upload, scan, or type that code later to bring it back — on this device or another. '
-                          'Scan also accepts admin deposit QR codes to add funds instantly. '
+                          'Scan also accepts admin deposit QR codes, or type the admin\'s 6-digit deposit code under Enter Code. '
                           'Only your own account can restore a backup, and only if you have not used the wallet since saving. '
                           'Never touches your real, database-backed wallet.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
