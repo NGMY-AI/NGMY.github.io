@@ -388,11 +388,13 @@ class _LocalWalletTab extends StatefulWidget {
 
 class _LocalWalletTabState extends State<_LocalWalletTab> {
   final TextEditingController _amt = TextEditingController();
+  final TextEditingController _cashAppTag = TextEditingController();
   int _view = 0; // 0: Deposit, 1: Withdraw
 
   @override
   void dispose() {
     _amt.dispose();
+    _cashAppTag.dispose();
     super.dispose();
   }
 
@@ -408,13 +410,19 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       transaction: transaction,
       config: widget.config,
     );
-    await ngmyOpenAppWhatsApp(widget.config, message);
+    await ngmyShareLocalWalletWhatsApp(
+      config: widget.config,
+      message: message,
+      screenshotDataUrl: transaction.screenshotPath,
+      realEmail: widget.realEmail,
+      transactionId: transaction.id,
+    );
   }
 
   void _submitLocalDeposit(AppTransaction transaction) {
     widget.onAdd(transaction);
     unawaited(_notifyWhatsApp(transaction));
-    _toast('Deposit request sent. Finish on WhatsApp — admin will send a QR to credit your local wallet.');
+    _toast('Deposit request sent. Share payment proof on WhatsApp — admin will send a one-time deposit QR.');
   }
 
   void _openDepositPaymentPage(double amount) {
@@ -456,6 +464,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       _toast('Insufficient balance. You have \$${formatCurrency(widget.user.accountBalance)}.');
       return;
     }
+    final tag = ngmyNormalizeCashAppTagForSubmit(_cashAppTag.text);
+    if (tag.isEmpty) {
+      _toast('Enter your Cash App tag so admin knows where to send your money.');
+      return;
+    }
     final fee = a * 0.15;
     final receive = a - fee;
     widget.onAdd(AppTransaction(
@@ -463,18 +476,25 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       userEmail: widget.user.email,
       amount: a,
       type: TransactionType.withdrawal,
-      method: PaymentMethod.system,
-      sourceDetails: 'Withdrawal - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
+      method: PaymentMethod.cashApp,
+      sourceDetails: 'Withdrawal to \$$tag — Fee: \$${formatCurrency(fee)} — You receive: \$${formatCurrency(receive)}',
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     ));
-    _toast('Withdrew \$${formatCurrency(a)}. You receive \$${formatCurrency(receive)} after fee.');
-    unawaited(ngmyOpenAppWhatsApp(
-      widget.config,
-      'NGMY Local Growth Income withdrawal request — ${widget.user.username}: \$${formatCurrency(a)} '
-      '(fee \$${formatCurrency(fee)}, you receive \$${formatCurrency(receive)}).',
+    _toast('Withdrawal request sent on WhatsApp.');
+    unawaited(ngmyShareLocalWalletWhatsApp(
+      config: widget.config,
+      message: ngmyLocalWithdrawWhatsAppMessage(
+        user: widget.user,
+        realEmail: widget.realEmail,
+        amount: a,
+        fee: fee,
+        receive: receive,
+        cashAppTag: tag,
+      ),
     ));
     _amt.clear();
+    _cashAppTag.clear();
     setState(() {});
   }
 
@@ -598,6 +618,24 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                             ),
                           );
                         }).toList(),
+                      ),
+                    ],
+                    if (_view == 1) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        'Your Cash App tag',
+                        style: TextStyle(fontSize: 13, color: titleColor, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _cashAppTag,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: inputBg,
+                          hintText: 'YourCashTag',
+                          prefixText: '\$ ',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: inputBorder)),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 18),

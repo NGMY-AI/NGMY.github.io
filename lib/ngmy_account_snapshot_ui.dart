@@ -125,11 +125,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     if (code == null || code.trim().isEmpty) return;
     await _withWork(() async {
       if (NgmyLocalDepositQr.looksLikeCode(code)) {
-        final deposit = await NgmyLocalDepositQr.redeemByCode(code: code.trim(), redeemerEmail: widget.realEmail);
-        if (deposit != null) {
-          await _creditLocalDeposit(deposit.amount);
-          return;
-        }
+        await _redeemDepositByCode(code.trim());
+        return;
       }
       final result = await NgmyAccountSnapshot.resolveForRestore(code, widget.realEmail);
       switch (result.outcome) {
@@ -236,13 +233,110 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     _toast('Deposited \$${formatCurrency(amount)} to your local wallet.');
   }
 
+  Future<String?> _showDepositVerificationDialog(BuildContext context) {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        final c = TextEditingController();
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF151B28) : Colors.white,
+          title: const Text('Verification code', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This deposit is locked to a verification code from the user\'s payment request.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: c,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  labelText: 'Verification code',
+                  filled: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, c.text.trim()),
+              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+              child: const Text('Apply deposit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _applyDepositRedeemResult(NgmyLocalDepositRedeemResult result) async {
+    if (result.success) {
+      await _creditLocalDeposit(result.amount);
+      return;
+    }
+    _toast(result.errorMessage ?? 'Could not apply deposit.');
+  }
+
+  Future<void> _redeemDepositByCode(String code) async {
+    final peek = await NgmyLocalDepositQr.peekCode(code: code, redeemerEmail: widget.realEmail);
+    if (!peek.found) return;
+    if (peek.alreadyUsed) {
+      _toast('This deposit code was already used.');
+      return;
+    }
+    if (peek.wrongAccount) {
+      _toast('This deposit is locked to another NGMY account.');
+      return;
+    }
+    String? verificationCode;
+    if (peek.requiresVerification) {
+      if (!mounted) return;
+      verificationCode = await _showDepositVerificationDialog(context);
+      if (verificationCode == null || verificationCode.trim().isEmpty) return;
+    }
+    final result = await NgmyLocalDepositQr.redeemByCode(
+      code: code,
+      redeemerEmail: widget.realEmail,
+      verificationCode: verificationCode,
+    );
+    await _applyDepositRedeemResult(result);
+  }
+
   Future<void> _redeemDepositQr(String raw) async {
-    final redeemed = await NgmyLocalDepositQr.redeem(raw: raw, redeemerEmail: widget.realEmail);
-    if (redeemed == null) {
+    final peek = await NgmyLocalDepositQr.peekRaw(raw: raw, redeemerEmail: widget.realEmail);
+    if (!peek.found) {
       _toast('That deposit QR is invalid or already used.');
       return;
     }
-    await _creditLocalDeposit(redeemed.amount);
+    if (peek.alreadyUsed) {
+      _toast('This deposit code was already used.');
+      return;
+    }
+    if (peek.wrongAccount) {
+      _toast('This deposit is locked to another NGMY account.');
+      return;
+    }
+    String? verificationCode;
+    if (peek.requiresVerification) {
+      if (!mounted) return;
+      verificationCode = await _showDepositVerificationDialog(context);
+      if (verificationCode == null || verificationCode.trim().isEmpty) return;
+    }
+    final result = await NgmyLocalDepositQr.redeem(
+      raw: raw,
+      redeemerEmail: widget.realEmail,
+      verificationCode: verificationCode,
+    );
+    await _applyDepositRedeemResult(result);
   }
 
   Future<void> _scanQr() async {

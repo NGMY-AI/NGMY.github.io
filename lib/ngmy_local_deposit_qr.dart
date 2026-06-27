@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,6 +24,42 @@ String _generateToken() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   final r = Random.secure();
   return 'LD${List.generate(10, (_) => chars[r.nextInt(chars.length)]).join()}';
+}
+
+class NgmyLocalDepositPeek {
+  const NgmyLocalDepositPeek({
+    required this.found,
+    required this.alreadyUsed,
+    required this.wrongAccount,
+    required this.requiresVerification,
+    this.amount = 0,
+    this.lockedToEmail = '',
+  });
+
+  final bool found;
+  final bool alreadyUsed;
+  final bool wrongAccount;
+  final bool requiresVerification;
+  final double amount;
+  final String lockedToEmail;
+}
+
+class NgmyLocalDepositRedeemResult {
+  const NgmyLocalDepositRedeemResult._({
+    required this.success,
+    this.amount = 0,
+    this.errorMessage,
+  });
+
+  final bool success;
+  final double amount;
+  final String? errorMessage;
+
+  factory NgmyLocalDepositRedeemResult.ok(double amount) =>
+      NgmyLocalDepositRedeemResult._(success: true, amount: amount);
+
+  factory NgmyLocalDepositRedeemResult.fail(String message) =>
+      NgmyLocalDepositRedeemResult._(success: false, errorMessage: message);
 }
 
 /// Admin creates a one-time deposit QR; users scan it in Local Growth Income
@@ -50,11 +88,15 @@ class NgmyLocalDepositQr {
   static Future<({String qrPayload, String code, double amount})?> create({
     required String adminEmail,
     required double amount,
+    String? lockedToEmail,
+    String? requiredVerificationCode,
   }) async {
     if (amount <= 0) return null;
     final token = _generateToken();
     final code = generateCode();
     final now = DateTime.now().toUtc().toIso8601String();
+    final locked = ngmyNormalizeEmail((lockedToEmail ?? '').trim());
+    final verify = (requiredVerificationCode ?? '').trim();
     try {
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
@@ -62,6 +104,9 @@ class NgmyLocalDepositQr {
           'value': {
             'amount': amount,
             'adminEmail': adminEmail.toLowerCase().trim(),
+            'lockedToEmail': locked,
+            'requiredVerificationCode': verify,
+            'shortCode': code,
             'createdAt': now,
             'redeemedBy': '',
           },
@@ -71,7 +116,7 @@ class NgmyLocalDepositQr {
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': _codeKey(code),
-          'value': {'token': token, 'updatedAt': now},
+          'value': {'token': token, 'updatedAt': now, 'redeemed': false},
           'updated_at': now,
         },
       ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
@@ -80,6 +125,22 @@ class NgmyLocalDepositQr {
       return null;
     }
     return (qrPayload: '$kNgmyLocalDepositQrPrefix|$token', code: code, amount: amount);
+  }
+
+  static Future<Map<String, dynamic>?> _loadStash(String token) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _stashKey(token))
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      final value = row?['value'];
+      if (value is Map) return Map<String, dynamic>.from(value);
+    } catch (e) {
+      debugPrint('[local deposit qr] load: $e');
+    }
+    return null;
   }
 
   static Future<String?> _loadTokenForCode(String code) async {
@@ -93,31 +154,122 @@ class NgmyLocalDepositQr {
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
       final value = row?['value'];
-      if (value is Map) return (value['token'] ?? '').toString().trim();
+      if (value is! Map) return null;
+      if (value['redeemed'] == true) return null;
+      return (value['token'] ?? '').toString().trim();
     } catch (e) {
       debugPrint('[local deposit qr] code lookup: $e');
     }
     return null;
   }
 
-  static Future<({double amount, String adminEmail})?> redeemByCode({
+  static String? _tokenFromRaw(String raw) {
+    final text = raw.trim();
+    if (text.startsWith('$kNgmyLocalDepositQrPrefix|')) {
+      final token = text.substring(kNgmyLocalDepositQrPrefix.length + 1).trim();
+      return token.isEmpty ? null : token;
+    }
+    return null;
+  }
+
+  static NgmyLocalDepositPeek _peekFromStash(Map<String, dynamic> value, String redeemerEmail) {
+    final redeemedBy = (value['redeemedBy'] ?? '').toString().trim();
+    if (redeemedBy.isNotEmpty) {
+      return const NgmyLocalDepositPeek(found: true, alreadyUsed: true, wrongAccount: false, requiresVerification: false);
+    }
+    final locked = ngmyNormalizeEmail((value['lockedToEmail'] ?? '').toString());
+    if (locked.isNotEmpty && locked != ngmyNormalizeEmail(redeemerEmail)) {
+      return NgmyLocalDepositPeek(
+        found: true,
+        alreadyUsed: false,
+        wrongAccount: true,
+        requiresVerification: false,
+        amount: (value['amount'] as num? ?? 0).toDouble(),
+        lockedToEmail: locked,
+      );
+    }
+    final verify = (value['requiredVerificationCode'] ?? '').toString().trim();
+    return NgmyLocalDepositPeek(
+      found: true,
+      alreadyUsed: false,
+      wrongAccount: false,
+      requiresVerification: verify.isNotEmpty,
+      amount: (value['amount'] as num? ?? 0).toDouble(),
+      lockedToEmail: locked,
+    );
+  }
+
+  static Future<NgmyLocalDepositPeek> peekRaw({
+    required String raw,
+    required String redeemerEmail,
+  }) async {
+    final token = _tokenFromRaw(raw);
+    if (token == null) return const NgmyLocalDepositPeek(found: false, alreadyUsed: false, wrongAccount: false, requiresVerification: false);
+    final value = await _loadStash(token);
+    if (value == null) return const NgmyLocalDepositPeek(found: false, alreadyUsed: false, wrongAccount: false, requiresVerification: false);
+    return _peekFromStash(value, redeemerEmail);
+  }
+
+  static Future<NgmyLocalDepositPeek> peekCode({
     required String code,
     required String redeemerEmail,
   }) async {
     final token = await _loadTokenForCode(code);
-    if (token == null || token.isEmpty) return null;
-    return redeem(raw: '$kNgmyLocalDepositQrPrefix|$token', redeemerEmail: redeemerEmail);
+    if (token == null || token.isEmpty) {
+      return const NgmyLocalDepositPeek(found: false, alreadyUsed: false, wrongAccount: false, requiresVerification: false);
+    }
+    final value = await _loadStash(token);
+    if (value == null) return const NgmyLocalDepositPeek(found: false, alreadyUsed: false, wrongAccount: false, requiresVerification: false);
+    return _peekFromStash(value, redeemerEmail);
   }
 
-  static Future<({double amount, String adminEmail})?> redeem({
+  static Future<NgmyLocalDepositRedeemResult> redeemByCode({
+    required String code,
+    required String redeemerEmail,
+    String? verificationCode,
+  }) async {
+    final token = await _loadTokenForCode(code);
+    if (token == null || token.isEmpty) {
+      return NgmyLocalDepositRedeemResult.fail('That deposit code is invalid or already used.');
+    }
+    return redeem(raw: '$kNgmyLocalDepositQrPrefix|$token', redeemerEmail: redeemerEmail, verificationCode: verificationCode);
+  }
+
+  static Future<NgmyLocalDepositRedeemResult> redeem({
     required String raw,
     required String redeemerEmail,
+    String? verificationCode,
   }) async {
-    final text = raw.trim();
-    if (!text.startsWith('$kNgmyLocalDepositQrPrefix|')) return null;
-    final token = text.substring(kNgmyLocalDepositQrPrefix.length + 1).trim();
-    if (token.isEmpty) return null;
+    final token = _tokenFromRaw(raw);
+    if (token == null) return NgmyLocalDepositRedeemResult.fail('Invalid deposit QR.');
 
+    final value = await _loadStash(token);
+    if (value == null) return NgmyLocalDepositRedeemResult.fail('That deposit QR is invalid or already used.');
+
+    final peek = _peekFromStash(value, redeemerEmail);
+    if (peek.alreadyUsed) {
+      return NgmyLocalDepositRedeemResult.fail('This deposit code was already used.');
+    }
+    if (peek.wrongAccount) {
+      return NgmyLocalDepositRedeemResult.fail('This deposit is locked to another NGMY account.');
+    }
+
+    final requiredVerify = (value['requiredVerificationCode'] ?? '').toString().trim();
+    if (requiredVerify.isNotEmpty) {
+      final provided = (verificationCode ?? '').trim();
+      if (provided.isEmpty) {
+        return NgmyLocalDepositRedeemResult.fail('Enter the deposit verification code from your payment request.');
+      }
+      if (provided != requiredVerify) {
+        return NgmyLocalDepositRedeemResult.fail('Verification code does not match this deposit.');
+      }
+    }
+
+    final amount = (value['amount'] as num? ?? 0).toDouble();
+    if (amount <= 0) return NgmyLocalDepositRedeemResult.fail('Invalid deposit amount.');
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final redeemer = ngmyNormalizeEmail(redeemerEmail);
     try {
       final row = await Supabase.instance.client
           .from('ngmy_settings')
@@ -125,34 +277,45 @@ class NgmyLocalDepositQr {
           .eq('key', _stashKey(token))
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is! Map) return null;
+      final latest = row?['value'];
+      if (latest is! Map) return NgmyLocalDepositRedeemResult.fail('Could not apply deposit. Try again.');
+      final latestMap = Map<String, dynamic>.from(latest);
+      if ((latestMap['redeemedBy'] ?? '').toString().trim().isNotEmpty) {
+        return NgmyLocalDepositRedeemResult.fail('This deposit code was already used.');
+      }
+      final locked = ngmyNormalizeEmail((latestMap['lockedToEmail'] ?? '').toString());
+      if (locked.isNotEmpty && locked != redeemer) {
+        return NgmyLocalDepositRedeemResult.fail('This deposit is locked to another NGMY account.');
+      }
 
-      final redeemedBy = (value['redeemedBy'] ?? '').toString().trim();
-      if (redeemedBy.isNotEmpty) return null;
-
-      final amount = (value['amount'] as num? ?? 0).toDouble();
-      if (amount <= 0) return null;
-
-      final adminEmail = (value['adminEmail'] ?? '').toString().trim();
-      final now = DateTime.now().toUtc().toIso8601String();
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': _stashKey(token),
           'value': {
-            ...Map<String, dynamic>.from(value),
-            'redeemedBy': redeemerEmail.toLowerCase().trim(),
+            ...latestMap,
+            'redeemedBy': redeemer,
             'redeemedAt': now,
           },
           'updated_at': now,
         },
       ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
 
-      return (amount: amount, adminEmail: adminEmail);
+      final shortCode = (latestMap['shortCode'] ?? '').toString().trim();
+      if (shortCode.isNotEmpty) {
+        await Supabase.instance.client.from('ngmy_settings').upsert([
+          {
+            'key': _codeKey(shortCode),
+            'value': {'token': token, 'redeemed': true, 'redeemedAt': now},
+            'updated_at': now,
+          },
+        ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      }
     } catch (e) {
       debugPrint('[local deposit qr] redeem: $e');
-      return null;
+      return NgmyLocalDepositRedeemResult.fail('Could not apply deposit. Check connection and try again.');
     }
+
+    return NgmyLocalDepositRedeemResult.ok(amount);
   }
 }
 
@@ -168,6 +331,79 @@ Future<void> ngmyOpenAppWhatsApp(AppConfig config, String message) async {
   try {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } catch (_) {}
+}
+
+Uint8List? _decodeDataUrl(String dataUrl) {
+  final path = dataUrl.trim();
+  if (!path.startsWith('data:') || !path.contains(',')) return null;
+  try {
+    return base64Decode(path.split(',').last);
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<String?> _uploadLocalProofPublicUrl({
+  required String realEmail,
+  required String transactionId,
+  required String screenshotDataUrl,
+}) async {
+  final bytes = _decodeDataUrl(screenshotDataUrl);
+  if (bytes == null || bytes.isEmpty) return null;
+  var mime = 'image/jpeg';
+  if (screenshotDataUrl.contains('image/png')) mime = 'image/png';
+  final ext = mime.contains('png') ? 'png' : 'jpg';
+  final emailSafe = ngmyNormalizeEmail(realEmail).replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
+  final txnSafe = transactionId.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  final storagePath = 'wallet-proofs/local_$emailSafe/$txnSafe.$ext';
+  try {
+    await Supabase.instance.client.storage.from('media').uploadBinary(
+          storagePath,
+          bytes,
+          fileOptions: FileOptions(upsert: true, contentType: mime),
+        ).timeout(kNgmyCloudWriteTimeout);
+    return Supabase.instance.client.storage.from('media').getPublicUrl(storagePath);
+  } catch (e) {
+    debugPrint('[local deposit whatsapp] proof upload: $e');
+    return null;
+  }
+}
+
+Future<void> ngmyShareLocalWalletWhatsApp({
+  required AppConfig config,
+  required String message,
+  String? screenshotDataUrl,
+  String? realEmail,
+  String? transactionId,
+}) async {
+  var fullMessage = message.trim();
+  Uint8List? imageBytes;
+  if (screenshotDataUrl != null && screenshotDataUrl.trim().isNotEmpty) {
+    imageBytes = _decodeDataUrl(screenshotDataUrl);
+    if (realEmail != null && transactionId != null) {
+      final url = await _uploadLocalProofPublicUrl(
+        realEmail: realEmail,
+        transactionId: transactionId,
+        screenshotDataUrl: screenshotDataUrl,
+      );
+      if (url != null && url.isNotEmpty) {
+        fullMessage = '$fullMessage\n\nPayment screenshot: $url';
+      }
+    }
+  }
+
+  if (imageBytes != null && imageBytes.isNotEmpty) {
+    try {
+      await Share.shareXFiles(
+        [XFile.fromData(imageBytes, mimeType: 'image/jpeg', name: 'ngmy_payment.jpg')],
+        text: fullMessage,
+        subject: 'NGMY payment proof',
+      );
+      return;
+    } catch (_) {}
+  }
+
+  await ngmyOpenAppWhatsApp(config, fullMessage);
 }
 
 String ngmyLocalDepositWhatsAppMessage({
@@ -188,43 +424,81 @@ String ngmyLocalDepositWhatsAppMessage({
     ..writeln('Pay to: $payTo ($method)')
     ..writeln('Sender $method: ${handle.isEmpty ? '(see screenshot)' : handle}');
   if (code.isNotEmpty) buf.writeln('Verification code: *$code*');
+  buf.writeln('Payment screenshot attached.');
   buf.writeln('Submitted today via NGMY Local Wallet.');
   return buf.toString();
 }
 
-Future<void> showNgmyAdminLocalDepositQrFlow(
-  BuildContext context, {
-  required String adminEmail,
-}) async {
+String ngmyLocalWithdrawWhatsAppMessage({
+  required UserData user,
+  required String realEmail,
+  required double amount,
+  required double fee,
+  required double receive,
+  required String cashAppTag,
+}) {
+  final tag = cashAppTag.startsWith(r'$') ? cashAppTag : '\$$cashAppTag';
+  return [
+    '*NGMY Local Growth Income — Withdrawal Request*',
+    'User: ${user.username.trim().isEmpty ? 'User' : user.username.trim()}',
+    'Account: $realEmail',
+    'Withdraw amount: *\$${formatCurrency(amount)}*',
+    'Fee (15%): \$${formatCurrency(fee)}',
+    'Send to user: *\$${formatCurrency(receive)}*',
+    'Cash App tag: *$tag*',
+    'Send payment to this Cash App tag.',
+  ].join('\n');
+}
+
+Future<({double amount, String? lockedToEmail, String? verificationCode})?> showNgmyAdminLocalDepositCreateDialog(
+  BuildContext context,
+) async {
   final amountC = TextEditingController();
-  final amount = await showDialog<double>(
+  final emailC = TextEditingController();
+  final verifyC = TextEditingController();
+  final result = await showDialog<({double amount, String? lockedToEmail, String? verificationCode})>(
     context: context,
     builder: (ctx) {
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      InputDecoration field(String label, {String? hint}) => InputDecoration(
+            labelText: label,
+            hintText: hint,
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          );
       return AlertDialog(
         backgroundColor: isDark ? const Color(0xFF151B28) : Colors.white,
         title: const Text('Local deposit QR', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter the amount to credit when a user scans this QR in Local Growth Income → Backup & Restore.',
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF64748B), height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountC,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Amount (\$)',
-                prefixText: '\$ ',
-                filled: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'One-time deposit for Local Growth Income. Optionally lock to one user email and/or their deposit verification code.',
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF64748B), height: 1.4),
               ),
-              autofocus: true,
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: field('Amount (\$)', hint: '50.00').copyWith(prefixText: '\$ '),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailC,
+                keyboardType: TextInputType.emailAddress,
+                decoration: field('User email (optional)', hint: 'user@gmail.com'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: verifyC,
+                keyboardType: TextInputType.number,
+                decoration: field('Verification code (optional)', hint: 'From user deposit request'),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -235,7 +509,11 @@ Future<void> showNgmyAdminLocalDepositQrFlow(
                 ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
                 return;
               }
-              Navigator.pop(ctx, a);
+              Navigator.pop(ctx, (
+                amount: a,
+                lockedToEmail: emailC.text.trim().isEmpty ? null : emailC.text.trim(),
+                verificationCode: verifyC.text.trim().isEmpty ? null : verifyC.text.trim(),
+              ));
             },
             style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
             child: const Text('Generate QR'),
@@ -245,9 +523,24 @@ Future<void> showNgmyAdminLocalDepositQrFlow(
     },
   );
   amountC.dispose();
-  if (amount == null || amount <= 0 || !context.mounted) return;
+  emailC.dispose();
+  verifyC.dispose();
+  return result;
+}
 
-  final created = await NgmyLocalDepositQr.create(adminEmail: adminEmail, amount: amount);
+Future<void> showNgmyAdminLocalDepositQrFlow(
+  BuildContext context, {
+  required String adminEmail,
+}) async {
+  final input = await showNgmyAdminLocalDepositCreateDialog(context);
+  if (input == null || input.amount <= 0 || !context.mounted) return;
+
+  final created = await NgmyLocalDepositQr.create(
+    adminEmail: adminEmail,
+    amount: input.amount,
+    lockedToEmail: input.lockedToEmail,
+    requiredVerificationCode: input.verificationCode,
+  );
   if (!context.mounted) return;
   if (created == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -258,17 +551,31 @@ Future<void> showNgmyAdminLocalDepositQrFlow(
 
   await NgmyNavigator.push<void>(
     context,
-    _NgmyLocalDepositQrPage(qrPayload: created.qrPayload, code: created.code, amount: created.amount),
+    _NgmyLocalDepositQrPage(
+      qrPayload: created.qrPayload,
+      code: created.code,
+      amount: created.amount,
+      lockedToEmail: input.lockedToEmail,
+      verificationCode: input.verificationCode,
+    ),
     fullscreenDialog: true,
   );
 }
 
 class _NgmyLocalDepositQrPage extends StatefulWidget {
-  const _NgmyLocalDepositQrPage({required this.qrPayload, required this.code, required this.amount});
+  const _NgmyLocalDepositQrPage({
+    required this.qrPayload,
+    required this.code,
+    required this.amount,
+    this.lockedToEmail,
+    this.verificationCode,
+  });
 
   final String qrPayload;
   final String code;
   final double amount;
+  final String? lockedToEmail;
+  final String? verificationCode;
 
   @override
   State<_NgmyLocalDepositQrPage> createState() => _NgmyLocalDepositQrPageState();
@@ -329,6 +636,8 @@ class _NgmyLocalDepositQrPageState extends State<_NgmyLocalDepositQrPage> {
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
     final card = isDark ? const Color(0xFF151B28) : Colors.white;
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final locked = (widget.lockedToEmail ?? '').trim();
+    final verify = (widget.verificationCode ?? '').trim();
 
     return Scaffold(
       backgroundColor: bg,
@@ -359,7 +668,15 @@ class _NgmyLocalDepositQrPageState extends State<_NgmyLocalDepositQrPage> {
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: WorksheetPalette.green),
                       ),
                       const SizedBox(height: 6),
-                      Text('Local Growth Income deposit', style: TextStyle(fontSize: 13, color: titleColor.withValues(alpha: 0.7))),
+                      Text('One-time local deposit', style: TextStyle(fontSize: 13, color: titleColor.withValues(alpha: 0.7))),
+                      if (locked.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text('Locked to: $locked', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: titleColor.withValues(alpha: 0.75))),
+                      ],
+                      if (verify.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('Needs verification code: $verify', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: titleColor.withValues(alpha: 0.75))),
+                      ],
                       const SizedBox(height: 20),
                       NgmyBrandedQrWidget(data: widget.qrPayload, large: true, captureKey: _qrCaptureKey),
                       const SizedBox(height: 16),
@@ -388,8 +705,8 @@ class _NgmyLocalDepositQrPageState extends State<_NgmyLocalDepositQrPage> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'Send the QR image or the 6-digit code to the user. They can scan under Backup & Restore → Scan QR, '
-                        'or type the code under Enter Code. Each deposit works once.',
+                        'Send the QR or 6-digit code to the user. They redeem under Backup & Restore. '
+                        'Works once only — for the locked account/verification code if you set them.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF64748B), height: 1.4),
                       ),
