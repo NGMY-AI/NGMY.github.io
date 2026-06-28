@@ -20865,7 +20865,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
             _menuFrame('Help Center', Icons.support_agent_rounded, const Color(0xFF00B4D8), () => unawaited(_openHelpCenterAdmin(isDark)), isDark),
-            _menuFrame('Live Support', Icons.visibility_rounded, const Color(0xFFDC2626), _openLiveSupportAdmin, isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -20939,10 +20938,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _openHelpCenterAdmin(bool isDark) async {
     _showHelpCenterAdmin(isDark);
     unawaited(_refreshManagementInBackground());
-  }
-
-  void _openLiveSupportAdmin() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyLiveHelpScreen()));
   }
 
   void _showHelpCenterAdmin(bool isDark) {
@@ -26958,7 +26953,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(width: 10),
             const Expanded(child: Text('Need help? Get a code so support can see your screen and guide you.', style: TextStyle(fontWeight: FontWeight.w600))),
             FilledButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyLiveHelpScreen())),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyGetHelpScreen())),
               child: const Text('Open'),
             ),
           ],

@@ -215,32 +215,33 @@ class _NgmyStrokePainter extends CustomPainter {
   bool shouldRepaint(covariant _NgmyStrokePainter oldDelegate) => true;
 }
 
-// ---------------- Shared entry screen ----------------
+// ---------------- Entry screens ----------------
+// Split so regular users only ever see "Get Help" (ask for support) and only
+// admins can reach "Give Help" (view a user's screen) — kept as two separate
+// screens rather than one tabbed screen so each role only ever sees its own.
 
-class NgmyLiveHelpScreen extends StatefulWidget {
-  const NgmyLiveHelpScreen({super.key});
-
-  @override
-  State<NgmyLiveHelpScreen> createState() => _NgmyLiveHelpScreenState();
-}
-
-class _NgmyLiveHelpScreenState extends State<NgmyLiveHelpScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this);
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+/// Any signed-in user: generate a code/QR to ask for help.
+class NgmyGetHelpScreen extends StatelessWidget {
+  const NgmyGetHelpScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live Help'),
-        bottom: TabBar(controller: _tabs, tabs: const [Tab(text: 'Get Help'), Tab(text: 'Give Help')]),
-      ),
-      body: TabBarView(controller: _tabs, children: const [_GetHelpTab(), _GiveHelpTab()]),
+      appBar: AppBar(title: const Text('Get Help')),
+      body: const _GetHelpTab(),
+    );
+  }
+}
+
+/// Admin only: enter/scan a code to view a user's screen and help them.
+class NgmyGiveHelpScreen extends StatelessWidget {
+  const NgmyGiveHelpScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Give Help')),
+      body: const _GiveHelpTab(),
     );
   }
 }

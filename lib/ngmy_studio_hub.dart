@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_hub_tools_bridge.dart';
+import 'ngmy_live_support.dart';
 import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_qr_generator.dart';
@@ -152,6 +153,16 @@ class NgmyCreatorHubTab extends StatelessWidget {
         subtitle: 'Disassemble cars & learn parts',
         onTap: () => showNgmyMechanicStudio(context: context),
       ),
+      // Admin-only: regular users can only ask for help (Profile > Live Help);
+      // only an admin can view a user's screen and guide them.
+      if (user?.isAdmin == true)
+        _CreatorTool(
+          icon: Icons.visibility_rounded,
+          colors: const [Color(0xFFDC2626), Color(0xFF991B1B)],
+          title: 'Give Help',
+          subtitle: 'Enter a user\'s code to view & guide',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyGiveHelpScreen())),
+        ),
     ];
 
     return Scaffold(
