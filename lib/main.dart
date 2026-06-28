@@ -8719,6 +8719,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_startBackgroundServicesWhenReady());
       _scheduleAutoThemeTick();
+      _showPendingOAuthErrorIfAny();
     });
     unawaited(_loadData());
     unawaited(_probeOfflineAtLaunch());
@@ -8730,6 +8731,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     ngmyRegisterPageHiddenHandler(() {
       unawaited(_persistSessionImmediately());
     });
+  }
+
+  void _showPendingOAuthErrorIfAny() {
+    final err = ngmyLastOAuthError;
+    if (err == null || err.isEmpty) return;
+    ngmyLastOAuthError = null;
+    final context = ngmyRootNavigatorKey.currentContext;
+    if (context == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err), duration: const Duration(seconds: 6)),
+    );
   }
 
   Future<void> _probeOfflineAtLaunch() async {

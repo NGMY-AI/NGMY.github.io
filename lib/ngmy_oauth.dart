@@ -15,6 +15,11 @@ const String kNgmyOAuthLegacyRedirectUrl = 'https://ngmy-ai.github.io/NGMY.githu
 String? _cachedGoogleClientId;
 bool _supabaseAuthInitialized = false;
 
+/// Set when an OAuth callback (Google/GitHub) comes back with an error or
+/// fails to exchange — surfaced once to the user by the UI after launch,
+/// since the failure happens on a fresh page load with no widget tree yet.
+String? ngmyLastOAuthError;
+
 bool _isLocalDevHost(String host) {
   final h = host.toLowerCase();
   return h == 'localhost' || h == '127.0.0.1' || h.endsWith('.local');
@@ -90,12 +95,31 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
 
   try {
     await ngmyEnsureSupabaseAuthInitialized();
+    // supabase_flutter's own detectSessionInUri handler (run inside
+    // ngmyEnsureSupabaseAuthInitialized's Supabase.initialize call) may have
+    // already exchanged this one-time code/token. Exchanging it again here
+    // would only fail (code/verifier already consumed) and mask real errors.
+    if (Supabase.instance.client.auth.currentSession != null) {
+      ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
+      return;
+    }
+    if (hasError) {
+      final desc = uri.queryParameters['error_description'] ?? uri.queryParameters['error'] ?? '';
+      ngmyLastOAuthError = desc.isNotEmpty
+          ? 'Login failed: ${desc.replaceAll('+', ' ')}'
+          : 'Login failed or was cancelled.';
+      ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
+      return;
+    }
     await Supabase.instance.client.auth.getSessionFromUrl(uri);
     ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
   } catch (e) {
     debugPrint('[ngmy_oauth] session recovery failed: $e');
     try {
       if (Supabase.instance.client.auth.currentSession != null) {
+        ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
+      } else {
+        ngmyLastOAuthError = 'Login failed: $e';
         ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       }
     } catch (_) {}
