@@ -19,6 +19,8 @@ import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_playback.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_doc_share_my_code.dart';
+import 'ngmy_doc_share_my_code_ui.dart';
 import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_qr_download.dart';
@@ -311,10 +313,15 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _refresh() async {
+    final inboxCount = await NgmyDocShareMyCode.pullInbox(recipientEmail: widget.email);
     final items = await NgmyDocShareStore.list(widget.email);
     if (!mounted) return;
     setState(() => _items = items.reversed.toList());
+    if (inboxCount > 0) {
+      _toast('Received $inboxCount file(s) via My Code.');
+    }
     unawaited(_backfillShareMetadata(_items));
+    unawaited(NgmyDocShareMyCode.ensureMyCode(widget.email));
   }
 
   Future<void> _backfillShareMetadata(List<NgmyDocShareItem> items) async {
@@ -750,6 +757,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'qr'),
                   ),
                   _DocShareMenuTile(
+                    icon: Icons.forward_to_inbox_rounded,
+                    label: 'Send to My Code',
+                    subtitle: 'Send this file to someone\'s personal code',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'send_my_code'),
+                  ),
+                  _DocShareMenuTile(
                     icon: Icons.north_east_rounded,
                     label: 'NGMY Transfer · Send',
                     subtitle: '6-digit number code · big files & videos',
@@ -784,6 +798,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_viewItem(item));
       case 'qr':
         unawaited(_showQrForOne(item));
+      case 'send_my_code':
+        unawaited(_openSendToMyCode(items: [item]));
       case 'transfer_send':
         unawaited(_openNgmyTransferSend(item));
       case 'save':
@@ -816,7 +832,57 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     return code;
   }
 
+  Future<void> _openMyCode() async {
+    await openNgmyDocShareMyCodePage(context, email: widget.email);
+  }
+
+  Future<void> _openSendToMyCode({String? preselectedCode, List<NgmyDocShareItem>? items}) async {
+    List<NgmyDocShareItem> batch = items ?? [];
+    if (batch.isEmpty && _selected.isNotEmpty) {
+      batch = _items.where((e) => _selected.contains(e.id)).toList();
+    }
+    if (batch.isEmpty) {
+      final picked = await FilePicker.platform.pickFiles(withData: true, allowMultiple: true);
+      if (picked == null || picked.files.isEmpty) return;
+      await _withWork(() async {
+        for (final f in picked.files) {
+          final bytes = f.bytes;
+          if (bytes == null || bytes.isEmpty) continue;
+          final saved = await NgmyDocShareStore.addBytes(
+            email: widget.email,
+            name: f.name,
+            mime: f.extension != null ? 'application/${f.extension}' : 'application/octet-stream',
+            bytes: bytes,
+          );
+          if (saved != null) batch.add(saved);
+        }
+      }, label: 'Preparing…');
+      if (batch.isEmpty) {
+        _toast('No files selected.');
+        return;
+      }
+    }
+    final ok = await openNgmyDocShareSendToMyCodePage(
+      context,
+      senderEmail: widget.email,
+      items: batch,
+      preselectedCode: preselectedCode,
+    );
+    if (!mounted) return;
+    if (ok) _toast('Document sent to their Doc Share.');
+  }
+
   Future<void> _importScanPayload(String scan) async {
+    if (NgmyDocShareMyCode.isQrPayload(scan)) {
+      final code = NgmyDocShareMyCode.parseQrPayload(scan);
+      if (code != null) {
+        await _openSendToMyCode(preselectedCode: code);
+      } else {
+        _toast('Invalid My Code QR.');
+      }
+      return;
+    }
+
     if (RegExp(r'^\d{6}$').hasMatch(scan.trim())) {
       await _receiveNgmyTransferCode(scan.trim());
       return;
@@ -863,6 +929,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
 
     await _withWork(() async {
+      if (NgmyDocShareMyCode.looksLikeMyCode(scan)) {
+        final recipient = await NgmyDocShareMyCode.resolveRecipientEmail(scan);
+        if (recipient != null && recipient != widget.email.trim().toLowerCase()) {
+          await _openSendToMyCode(preselectedCode: NgmyDocShareMyCode.normalizeInput(scan));
+          return;
+        }
+      }
+
       final imported = await NgmyDocShareSync.importFromScan(
         recipientEmail: widget.email,
         raw: scan,
@@ -983,6 +1057,21 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                   Text('Doc Share options', style: TextStyle(color: c.fg, fontWeight: FontWeight.w900, fontSize: 16)),
                   const SizedBox(height: 14),
                   _DocShareMenuTile(
+                    icon: Icons.badge_rounded,
+                    label: 'My Code',
+                    subtitle: 'Your personal code & QR — others send docs to you',
+                    accent: true,
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'my_code'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.forward_to_inbox_rounded,
+                    label: 'Send to My Code',
+                    subtitle: 'Enter someone\'s 5-digit code + letter',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'send_my_code'),
+                  ),
+                  _DocShareMenuTile(
                     icon: Icons.south_west_rounded,
                     label: 'NGMY Transfer · Receive',
                     subtitle: 'Enter sender\'s 6-digit number code',
@@ -1006,6 +1095,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'my_code':
+        unawaited(_openMyCode());
+      case 'send_my_code':
+        unawaited(_openSendToMyCode());
       case 'transfer_receive':
         unawaited(_openNgmyTransferReceive());
       case 'import':

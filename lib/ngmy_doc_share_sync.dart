@@ -441,6 +441,7 @@ class NgmyDocShareSync {
   static Future<String> exportBundleFile({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
+    String? deliveryVia,
   }) async {
     final files = <Map<String, dynamic>>[];
     for (final item in items) {
@@ -458,6 +459,7 @@ class NgmyDocShareSync {
       'version': 1,
       'ownerEmail': _norm(ownerEmail),
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      if (deliveryVia != null && deliveryVia.isNotEmpty) 'deliveryVia': deliveryVia,
       'files': files,
     });
   }
@@ -473,6 +475,8 @@ class NgmyDocShareSync {
       final files = decoded['files'];
       if (files is! List) return null;
       final owner = (decoded['ownerEmail'] ?? '').toString();
+      final via = (decoded['deliveryVia'] ?? '').toString();
+      final note = via == 'myCode' ? 'Received via My Code' : 'Received via QR';
       final imported = <NgmyDocShareItem>[];
       for (final raw in files) {
         if (raw is! Map) continue;
@@ -487,7 +491,7 @@ class NgmyDocShareSync {
           mime: mime,
           bytes: bytes,
           fromSender: owner.isNotEmpty ? owner : null,
-          note: 'Received via QR',
+          note: note,
         );
         if (saved != null) imported.add(saved);
       }
