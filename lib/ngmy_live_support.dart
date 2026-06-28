@@ -1,15 +1,20 @@
 // Live Help: consent-based, view-only screen sharing paired by a short code
-// or QR code instead of picking a user from any list. Nothing is written to
-// any database table — pairing and frames travel only over an ephemeral
-// Supabase Realtime broadcast channel keyed by the code, which holds no
-// history once both sides disconnect.
+// or QR code instead of picking a user from any list. Pairing and the live
+// frame/draw data travel through one tiny row in the `live_help_codes` table
+// (Supabase Postgres Changes realtime) that is deleted the moment the
+// session ends or is cancelled — it never accumulates history. A pure
+// broadcast-channel version of this was tried first but proved unreliable
+// for pairing between two real devices in production, so this uses the same
+// table-backed realtime mechanism already proven reliable elsewhere in the
+// app.
 //
 // Roles: an admin creates the code/QR and ends up viewing; whoever enters or
-// scans that code ends up sharing their own screen to get help. The viewer
-// can draw on the live view (arrows/circles) to point at things; those marks
-// are mirrored back onto the sharer's actual screen. The viewer never
-// controls, taps, or types on the other device — only the NGMY app's own UI
-// is ever captured, never the OS screen or other apps.
+// scans that code ends up sharing their own screen to get help, instantly
+// (no waiting list — the code is single-use and claims the row atomically).
+// The viewer can draw on the live view (arrows/circles) to point at things;
+// those marks are mirrored back onto the sharer's actual screen. The viewer
+// never controls, taps, or types on the other device — only the NGMY app's
+// own UI is ever captured, never the OS screen or other apps.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -70,11 +75,55 @@ Widget _ngmyLiveHelpDebugPanel() {
   );
 }
 
-String _ngmyLiveHelpChannelName(String code) => 'ngmy-livehelp-$code';
+const String _kLiveHelpTable = 'live_help_codes';
+
+String _ngmyLiveHelpRowChannelName(String code) => 'ngmy-lh-row-$code';
 
 String ngmyGenerateLiveHelpCode() {
   final rnd = Random();
   return (1000 + rnd.nextInt(9000)).toString(); // 4 digits, never more than 5
+}
+
+SupabaseClient get _ngmyLsClient => Supabase.instance.client;
+
+String _nowIso() => DateTime.now().toIso8601String();
+
+/// Carries the single realtime channel watching one code's row, plus the
+/// latest row data — shared between whichever screens need to react to it,
+/// since a channel's postgres-changes filters must be registered once,
+/// before `subscribe()`, and can't be added again afterwards.
+class _LiveHelpRowWatcher {
+  final RealtimeChannel channel;
+  final ValueNotifier<Map<String, dynamic>?> row = ValueNotifier(null);
+  _LiveHelpRowWatcher(this.channel);
+}
+
+void _applyDrawPayload(dynamic raw) {
+  Map<String, dynamic>? dp;
+  if (raw is String && raw.isNotEmpty) {
+    try {
+      dp = jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return;
+    }
+  } else if (raw is Map<String, dynamic>) {
+    dp = raw;
+  }
+  if (dp == null) return;
+  final op = (dp['op'] ?? '').toString();
+  if (op == 'clear') {
+    ngmyLiveHelpStrokes.value = {};
+    return;
+  }
+  if (op == 'draw') {
+    final id = (dp['id'] ?? '').toString();
+    final pts = dp['pts'];
+    if (id.isEmpty || pts is! List) return;
+    final points = pts.whereType<List>().map((p) => Offset((p[0] as num).toDouble(), (p[1] as num).toDouble())).toList();
+    final next = Map<String, List<Offset>>.from(ngmyLiveHelpStrokes.value);
+    next[id] = points;
+    ngmyLiveHelpStrokes.value = next;
+  }
 }
 
 class _ActiveShare {
@@ -86,14 +135,12 @@ class _ActiveShare {
 
 _ActiveShare? _ngmyActiveShare;
 
-/// Non-null while this device is actively broadcasting its screen.
+/// True while this device is actively sharing its screen.
 final ValueNotifier<bool> ngmyIsSharingLiveHelp = ValueNotifier(false);
 
 /// Normalized (0..1) stroke points the remote viewer has drawn, mirrored
 /// onto this device's own screen as an overlay while sharing.
 final ValueNotifier<Map<String, List<Offset>>> ngmyLiveHelpStrokes = ValueNotifier({});
-
-SupabaseClient get _ngmyLsClient => Supabase.instance.client;
 
 Future<void> _captureAndSendFrame() async {
   final share = _ngmyActiveShare;
@@ -106,31 +153,33 @@ Future<void> _captureAndSendFrame() async {
     image.dispose();
     if (bytes == null) return;
     final b64 = base64Encode(bytes.buffer.asUint8List());
-    // Stay well under the realtime broadcast payload limit — skip an
-    // oversized frame rather than risk the channel erroring out.
+    // Stay well under a safe row/payload size — skip an oversized frame
+    // rather than risk the update or the realtime delivery failing.
     if (b64.length > 260000) return;
-    await share.channel.sendBroadcastMessage(event: 'frame', payload: {'data': b64});
+    await _ngmyLsClient.from(_kLiveHelpTable).update({'frame_data': b64, 'updated_at': _nowIso()}).eq('code', share.code);
   } catch (e) {
-    debugPrint('[live_help] frame capture failed: $e');
+    debugPrint('[live_help] frame send failed: $e');
   }
 }
 
-void _attachSharerSideListeners(RealtimeChannel channel) {
-  channel
-      .onBroadcast(
-        event: 'draw',
-        callback: (payload) {
-          final id = (payload['id'] ?? '').toString();
-          final raw = payload['points'];
-          if (id.isEmpty || raw is! List) return;
-          final pts = raw.whereType<List>().map((p) => Offset((p[0] as num).toDouble(), (p[1] as num).toDouble())).toList();
-          final next = Map<String, List<Offset>>.from(ngmyLiveHelpStrokes.value);
-          next[id] = pts;
-          ngmyLiveHelpStrokes.value = next;
-        },
-      )
-      .onBroadcast(event: 'draw_clear', callback: (_) => ngmyLiveHelpStrokes.value = {})
-      .onBroadcast(event: 'end', callback: (_) => unawaited(ngmyStopSharingLiveHelp(notifyChannel: false)));
+/// Registers the row-watching callback a sharer needs (end-of-session +
+/// incoming draw points) on [channel] — must be called before `subscribe()`.
+void _attachSharerRowListener(RealtimeChannel channel, String code) {
+  channel.onPostgresChanges(
+    event: PostgresChangeEvent.update,
+    schema: 'public',
+    table: _kLiveHelpTable,
+    filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'code', value: code),
+    callback: (payload) {
+      final rec = payload.newRecord;
+      final status = (rec['status'] ?? '').toString();
+      if (status == 'ended') {
+        unawaited(ngmyStopSharingLiveHelp(notifyRow: false));
+        return;
+      }
+      _applyDrawPayload(rec['draw_points']);
+    },
+  );
 }
 
 /// Called once the sharer has explicitly confirmed sharing their screen.
@@ -138,22 +187,28 @@ void ngmyStartSharingLiveHelp(String code, RealtimeChannel channel) {
   _ngmyActiveShare = _ActiveShare(code, channel);
   ngmyIsSharingLiveHelp.value = true;
   _ngmyActiveShare!.frameTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _captureAndSendFrame());
+  unawaited(_captureAndSendFrame());
 }
 
-Future<void> ngmyStopSharingLiveHelp({bool notifyChannel = true}) async {
+Future<void> ngmyStopSharingLiveHelp({bool notifyRow = true}) async {
   final share = _ngmyActiveShare;
   _ngmyActiveShare = null;
   ngmyIsSharingLiveHelp.value = false;
   ngmyLiveHelpStrokes.value = {};
   share?.frameTimer?.cancel();
-  if (notifyChannel) {
+  if (share != null) {
+    if (notifyRow) {
+      try {
+        await _ngmyLsClient.from(_kLiveHelpTable).update({'status': 'ended', 'updated_at': _nowIso()}).eq('code', share.code);
+      } catch (_) {}
+    }
     try {
-      await share?.channel.sendBroadcastMessage(event: 'end', payload: const {});
+      await _ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', share.code);
+    } catch (_) {}
+    try {
+      await share.channel.unsubscribe();
     } catch (_) {}
   }
-  try {
-    await share?.channel.unsubscribe();
-  } catch (_) {}
 }
 
 /// Persistent banner + drawn-guidance overlay shown on the sharer's device.
@@ -242,7 +297,7 @@ class _NgmyStrokePainter extends CustomPainter {
 // ---------------- Single entry screen, role-adaptive ----------------
 // Everyone sees the same "Give Help" button. An admin opening it creates a
 // code/QR and ends up viewing; anyone else opening it enters/scans a code
-// and ends up sharing their own screen to get help.
+// and ends up sharing their own screen — instantly, no waiting list.
 
 class NgmyGiveHelpScreen extends StatelessWidget {
   final bool isAdmin;
@@ -267,58 +322,86 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
   String? _code;
   RealtimeChannel? _channel;
   bool _paired = false;
-
-  @override
-  void dispose() {
-    _setupTimeout?.cancel();
-    if (!_paired) {
-      try {
-        _channel?.unsubscribe();
-      } catch (_) {}
-    }
-    super.dispose();
-  }
-
   bool _settingUp = false;
   bool _ready = false;
   String? _error;
   Timer? _setupTimeout;
 
-  void _start() {
+  @override
+  void dispose() {
+    _setupTimeout?.cancel();
+    if (!_paired) {
+      final code = _code;
+      try {
+        _channel?.unsubscribe();
+      } catch (_) {}
+      if (code != null) {
+        unawaited(_ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', code));
+      }
+    }
+    super.dispose();
+  }
+
+  Future<void> _start() async {
     ngmyLiveHelpDebugLog.value = [];
     final code = ngmyGenerateLiveHelpCode();
-    final topic = _ngmyLiveHelpChannelName(code);
+    final topic = _ngmyLiveHelpRowChannelName(code);
     _lsLog('HOST: creating code $code (topic $topic)');
     final channel = _ngmyLsClient.channel(topic);
-    channel.onBroadcast(
-      event: 'join',
-      callback: (_) {
-        _lsLog('HOST: received join — sending accept');
-        if (_paired) return;
-        _paired = true;
-        channel.sendBroadcastMessage(event: 'accept', payload: const {});
-        if (!mounted) return;
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: code, hostChannel: channel)))
-            .then((_) {
-          if (mounted) {
-            setState(() {
-              _code = null;
-              _channel = null;
-              _paired = false;
-            });
-          }
-        });
+    final watcher = _LiveHelpRowWatcher(channel);
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: _kLiveHelpTable,
+      filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'code', value: code),
+      callback: (payload) {
+        final rec = payload.newRecord;
+        watcher.row.value = rec;
+        final status = (rec['status'] ?? '').toString();
+        if (status == 'claimed' && !_paired) {
+          _paired = true;
+          _lsLog('HOST: row claimed — opening viewer');
+          if (!mounted) return;
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: code, watcher: watcher)))
+              .then((_) {
+            if (mounted) {
+              setState(() {
+                _code = null;
+                _channel = null;
+                _paired = false;
+              });
+            }
+          });
+        }
       },
     );
-    // Don't show the code until the channel has actually finished joining —
-    // otherwise a fast scan/entry can send 'join' before this side is really
-    // listening, and that broadcast is lost for good (no replay/queueing).
-    channel.subscribe((status, error) {
+    // Don't show the code until the channel has actually finished joining and
+    // the row exists — otherwise a fast scan/entry can try to claim a row
+    // that isn't there yet.
+    channel.subscribe((status, error) async {
       _lsLog('HOST: subscribe status=$status${error != null ? ' error=$error' : ''}');
       if (!mounted) return;
       if (status == RealtimeSubscribeStatus.subscribed) {
+        try {
+          await _ngmyLsClient.from(_kLiveHelpTable).insert({'code': code, 'status': 'waiting'});
+        } catch (e) {
+          _lsLog('HOST: row insert failed: $e');
+          if (!mounted) return;
+          _setupTimeout?.cancel();
+          try {
+            channel.unsubscribe();
+          } catch (_) {}
+          setState(() {
+            _error = 'Could not start — try again.';
+            _code = null;
+            _settingUp = false;
+            _channel = null;
+          });
+          return;
+        }
         _setupTimeout?.cancel();
+        if (!mounted) return;
         setState(() {
           _ready = true;
           _settingUp = false;
@@ -358,9 +441,13 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
 
   void _cancel() {
     _setupTimeout?.cancel();
+    final code = _code;
     try {
       _channel?.unsubscribe();
     } catch (_) {}
+    if (code != null) {
+      unawaited(_ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', code));
+    }
     setState(() {
       _code = null;
       _channel = null;
@@ -395,7 +482,7 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
                 Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
               ],
               const SizedBox(height: 20),
-              FilledButton(onPressed: _start, child: const Text('Create Code')),
+              FilledButton(onPressed: () => unawaited(_start()), child: const Text('Create Code')),
             ],
           ),
         ),
@@ -425,7 +512,7 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
             const SizedBox(height: 18),
             QrImageView(data: _code!, size: 200),
             const SizedBox(height: 20),
-            const Text('Waiting for the user to connect...'),
+            const Text('This connects automatically the moment the user enters or scans it.'),
             const SizedBox(height: 16),
             OutlinedButton(onPressed: _cancel, child: const Text('Cancel')),
           ],
@@ -448,13 +535,11 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
   String? _error;
   MobileScannerController? _scanCam;
   RealtimeChannel? _channel;
-  Timer? _timeout;
 
   @override
   void dispose() {
     _codeC.dispose();
     _scanCam?.dispose();
-    _timeout?.cancel();
     if (!ngmyIsSharingLiveHelp.value) {
       try {
         _channel?.unsubscribe();
@@ -471,53 +556,46 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
       return;
     }
     ngmyLiveHelpDebugLog.value = [];
-    try {
-      _channel?.unsubscribe();
-    } catch (_) {}
     setState(() {
       _connecting = true;
       _error = null;
     });
-    final topic = _ngmyLiveHelpChannelName(c);
-    _lsLog('JOIN: connecting with code $c (topic $topic)');
-    final channel = _ngmyLsClient.channel(topic);
-    _channel = channel;
-    channel.onBroadcast(
-      event: 'accept',
-      callback: (_) {
-        _lsLog('JOIN: received accept');
-        _timeout?.cancel();
-        if (mounted) unawaited(_confirmAndShare(c, channel));
-      },
-    );
-    channel.subscribe((status, error) {
-      _lsLog('JOIN: subscribe status=$status${error != null ? ' error=$error' : ''}');
-      if (!mounted) return;
-      if (status == RealtimeSubscribeStatus.subscribed) {
-        _lsLog('JOIN: sending join');
-        channel.sendBroadcastMessage(event: 'join', payload: const {});
-      } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.timedOut) {
-        _timeout?.cancel();
+    _lsLog('JOIN: claiming code $c');
+    try {
+      // Atomic claim: only succeeds once, for whoever gets here first — the
+      // code is single-use, so this is what makes the connection automatic
+      // and instant instead of a waiting list.
+      final rows = await _ngmyLsClient
+          .from(_kLiveHelpTable)
+          .update({'status': 'claimed', 'updated_at': _nowIso()})
+          .eq('code', c)
+          .eq('status', 'waiting')
+          .select();
+      if (rows.isEmpty) {
+        _lsLog('JOIN: code not available to claim');
+        if (!mounted) return;
         setState(() {
           _connecting = false;
-          _error = 'Connection error — check your internet and try again.';
+          _error = 'That code is invalid or already used. Ask support for a fresh one.';
         });
-        try {
-          channel.unsubscribe();
-        } catch (_) {}
+        return;
       }
-    });
-    _timeout = Timer(const Duration(seconds: 45), () {
+      _lsLog('JOIN: claimed — opening session');
+      final topic = _ngmyLiveHelpRowChannelName(c);
+      final channel = _ngmyLsClient.channel(topic);
+      _attachSharerRowListener(channel, c);
+      channel.subscribe();
+      _channel = channel;
       if (!mounted) return;
-      _lsLog('JOIN: timed out after 45s waiting for accept');
+      unawaited(_confirmAndShare(c, channel));
+    } catch (e) {
+      _lsLog('JOIN: claim failed: $e');
+      if (!mounted) return;
       setState(() {
         _connecting = false;
-        _error = 'No one responded to that code. Ask support for a fresh one.';
+        _error = 'Connection error — check your internet and try again.';
       });
-      try {
-        channel.unsubscribe();
-      } catch (_) {}
-    });
+    }
   }
 
   Future<void> _confirmAndShare(String code, RealtimeChannel channel) async {
@@ -539,13 +617,14 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
       try {
         channel.unsubscribe();
       } catch (_) {}
+      unawaited(_ngmyLsClient.from(_kLiveHelpTable).update({'status': 'ended', 'updated_at': _nowIso()}).eq('code', code));
+      unawaited(_ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', code));
       setState(() {
         _connecting = false;
         _channel = null;
       });
       return;
     }
-    _attachSharerSideListeners(channel);
     ngmyStartSharingLiveHelp(code, channel);
     setState(() => _connecting = false);
   }
@@ -667,12 +746,14 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
   }
 }
 
-/// Admin-side viewer, always reusing the channel already paired by
-/// [_CreateCodeViewState] — never sends 'join' itself.
+/// Admin-side viewer. Reuses the row watcher already set up by
+/// [_CreateCodeViewState] — a channel's postgres-changes filters can only be
+/// registered once, before its single `subscribe()` call, so this screen
+/// reacts to the same watcher instead of creating its own subscription.
 class NgmyLiveSupportViewerScreen extends StatefulWidget {
   final String code;
-  final RealtimeChannel hostChannel;
-  const NgmyLiveSupportViewerScreen({super.key, required this.code, required this.hostChannel});
+  final _LiveHelpRowWatcher watcher;
+  const NgmyLiveSupportViewerScreen({super.key, required this.code, required this.watcher});
 
   @override
   State<NgmyLiveSupportViewerScreen> createState() => _NgmyLiveSupportViewerScreenState();
@@ -680,6 +761,7 @@ class NgmyLiveSupportViewerScreen extends StatefulWidget {
 
 class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScreen> {
   Uint8List? _latestFrame;
+  String? _lastFrameData;
   double _aspect = 9 / 16;
   bool _ended = false;
 
@@ -688,31 +770,31 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
   String? _activeStrokeId;
   DateTime _lastSent = DateTime.fromMillisecondsSinceEpoch(0);
 
-  RealtimeChannel get _channel => widget.hostChannel;
+  RealtimeChannel get _channel => widget.watcher.channel;
 
   @override
   void initState() {
     super.initState();
-    _channel
-        .onBroadcast(
-          event: 'frame',
-          callback: (payload) {
-            final data = payload['data'];
-            if (data is! String) return;
-            try {
-              final bytes = base64Decode(data);
-              unawaited(_updateAspect(bytes));
-              if (!mounted) return;
-              setState(() => _latestFrame = bytes);
-            } catch (_) {}
-          },
-        )
-        .onBroadcast(
-          event: 'end',
-          callback: (_) {
-            if (mounted) setState(() => _ended = true);
-          },
-        );
+    widget.watcher.row.addListener(_onRow);
+  }
+
+  void _onRow() {
+    final rec = widget.watcher.row.value;
+    if (rec == null) return;
+    final status = (rec['status'] ?? '').toString();
+    if (status == 'ended') {
+      if (mounted && !_ended) setState(() => _ended = true);
+      return;
+    }
+    final data = rec['frame_data'];
+    if (data is String && data.isNotEmpty && data != _lastFrameData) {
+      _lastFrameData = data;
+      try {
+        final bytes = base64Decode(data);
+        unawaited(_updateAspect(bytes));
+        if (mounted) setState(() => _latestFrame = bytes);
+      } catch (_) {}
+    }
   }
 
   Future<void> _updateAspect(Uint8List bytes) async {
@@ -728,9 +810,11 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
 
   @override
   void dispose() {
+    widget.watcher.row.removeListener(_onRow);
     if (!_ended) {
-      unawaited(_channel.sendBroadcastMessage(event: 'end', payload: const {}));
+      unawaited(_ngmyLsClient.from(_kLiveHelpTable).update({'status': 'ended', 'updated_at': _nowIso()}).eq('code', widget.code));
     }
+    unawaited(_ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', widget.code));
     try {
       _channel.unsubscribe();
     } catch (_) {}
@@ -742,10 +826,10 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
     if (id == null) return;
     final pts = _strokes[id];
     if (pts == null) return;
-    unawaited(_channel.sendBroadcastMessage(
-      event: 'draw',
-      payload: {'id': id, 'points': pts.map((p) => [p.dx, p.dy]).toList()},
-    ));
+    unawaited(_ngmyLsClient.from(_kLiveHelpTable).update({
+      'draw_points': {'op': 'draw', 'id': id, 'pts': pts.map((p) => [p.dx, p.dy]).toList()},
+      'updated_at': _nowIso(),
+    }).eq('code', widget.code));
   }
 
   void _onPanStart(DragStartDetails d) {
@@ -784,12 +868,18 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
 
   void _clearDrawing() {
     setState(() => _strokes.clear());
-    unawaited(_channel.sendBroadcastMessage(event: 'draw_clear', payload: const {}));
+    unawaited(_ngmyLsClient.from(_kLiveHelpTable).update({
+      'draw_points': {'op': 'clear'},
+      'updated_at': _nowIso(),
+    }).eq('code', widget.code));
   }
 
   Future<void> _end() async {
     _ended = true;
-    await _channel.sendBroadcastMessage(event: 'end', payload: const {});
+    try {
+      await _ngmyLsClient.from(_kLiveHelpTable).update({'status': 'ended', 'updated_at': _nowIso()}).eq('code', widget.code);
+      await _ngmyLsClient.from(_kLiveHelpTable).delete().eq('code', widget.code);
+    } catch (_) {}
     if (mounted) Navigator.of(context).pop();
   }
 
