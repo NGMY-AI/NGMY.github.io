@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_studio_colors.dart';
-import 'ngmy_virtual_device_browser.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_preview.dart';
 import 'ngmy_virtual_device_media_view.dart';
@@ -791,9 +790,13 @@ class NgmyVirtualDeviceDetailScreen extends StatefulWidget {
 }
 
 class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailScreen> {
-  NgmyVirtualDeviceBrowserControls? _browser;
   var _tab = 0;
   var _powerOn = true;
+
+  Future<void> _pasteLink() => showNgmyVirtualDeviceLinkSearch(
+        context,
+        deviceCount: NgmyVirtualDevicePlayback.deviceCount,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -890,9 +893,8 @@ class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailS
                                 device: widget.device,
                                 powerOn: _powerOn,
                                 tab: _tab,
-                                browser: _browser,
                                 playUrl: media?.playUrl,
-                                onBrowserReady: (c) => _browser = c,
+                                onPasteLink: () => unawaited(_pasteLink()),
                                 onTab: (i) => setState(() => _tab = i),
                                 onPowerToggle: () => setState(() => _powerOn = !_powerOn),
                               ),
@@ -918,8 +920,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
     required this.device,
     required this.powerOn,
     required this.tab,
-    required this.browser,
-    required this.onBrowserReady,
+    required this.onPasteLink,
     required this.onTab,
     required this.onPowerToggle,
     this.playUrl,
@@ -929,8 +930,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
   final NgmyVirtualDeviceIdentity device;
   final bool powerOn;
   final int tab;
-  final NgmyVirtualDeviceBrowserControls? browser;
-  final void Function(NgmyVirtualDeviceBrowserControls controls) onBrowserReady;
+  final VoidCallback onPasteLink;
   final void Function(int index) onTab;
   final VoidCallback onPowerToggle;
   final String? playUrl;
@@ -971,11 +971,10 @@ class _VirtualPhoneFrame extends StatelessWidget {
                                 viewKey: '${device.id}_full',
                                 playUrl: playUrl!,
                               )
-                            : NgmyVirtualDeviceBrowser(key: ValueKey(device.id), onReady: onBrowserReady))
+                            : _NoVideoYetPanel(onPasteLink: onPasteLink))
                         : _DeviceInfoPanel(device: device))
                     : const _PowerOffScreen(),
               ),
-              if (powerOn && tab == 0 && (playUrl == null || playUrl!.isEmpty)) _BrowserToolbar(controls: browser),
               _VirtualHomeBar(
                 tab: tab,
                 powerOn: powerOn,
@@ -1045,35 +1044,41 @@ class _VirtualStatusBar extends StatelessWidget {
   }
 }
 
-class _BrowserToolbar extends StatelessWidget {
-  const _BrowserToolbar({required this.controls});
+class _NoVideoYetPanel extends StatelessWidget {
+  const _NoVideoYetPanel({required this.onPasteLink});
 
-  final NgmyVirtualDeviceBrowserControls? controls;
+  final VoidCallback onPasteLink;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF1F2937),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _tool(Icons.arrow_back_rounded, () async => await controls?.goBack()),
-          _tool(Icons.arrow_forward_rounded, () async => await controls?.goForward()),
-          _tool(Icons.home_rounded, () async => await controls?.goHome()),
-          _tool(Icons.refresh_rounded, () async => await controls?.reload()),
-        ],
+      width: double.infinity,
+      color: const Color(0xFF0F0F0F),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.smart_display_outlined, color: Colors.white.withValues(alpha: 0.35), size: 40),
+            const SizedBox(height: 10),
+            Text(
+              'No video yet',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap search above to paste a link',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: onPasteLink,
+              style: OutlinedButton.styleFrom(foregroundColor: kNgmyStudioHubAccent, side: BorderSide(color: kNgmyStudioHubAccent.withValues(alpha: 0.5))),
+              icon: const Icon(Icons.search_rounded, size: 16),
+              label: const Text('Paste a link'),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _tool(IconData icon, Future<void> Function()? tap) {
-    return IconButton(
-      visualDensity: VisualDensity.compact,
-      iconSize: 20,
-      color: Colors.white70,
-      onPressed: controls == null || tap == null ? null : () => unawaited(tap()),
-      icon: Icon(icon),
     );
   }
 }

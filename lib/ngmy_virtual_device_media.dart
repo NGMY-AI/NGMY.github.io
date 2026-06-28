@@ -36,9 +36,12 @@ class NgmyVirtualDeviceMedia {
 
     final ytId = _youtubeId(lower);
     if (ytId != null) {
+      // youtube.com/watch (even on m.youtube.com) sends X-Frame-Options:
+      // SAMEORIGIN, so browsers refuse to show it in our iframe at all.
+      // Only the dedicated /embed/ endpoint is allowed to be framed.
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        playUrl: 'https://m.youtube.com/watch?v=$ytId',
+        playUrl: 'https://www.youtube.com/embed/$ytId?autoplay=1&playsinline=1&rel=0&modestbranding=1',
         platform: NgmyVirtualMediaPlatform.youtube,
         label: 'YouTube',
         previewImageUrl: 'https://img.youtube.com/vi/$ytId/hqdefault.jpg',
