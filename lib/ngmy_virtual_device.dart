@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'dart:convert';
 import 'dart:math';
 
@@ -9,7 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_virtual_device_browser.dart';
 
-const String _kPrefsPrefix = 'ngmy_virtual_device_v1_';
+const String _kFleetPrefsPrefix = 'ngmy_virtual_device_fleet_v2_';
+const String _kLegacyPrefsPrefix = 'ngmy_virtual_device_v1_';
+const int kNgmyDefaultVirtualDeviceCount = 20;
+const int kNgmyVirtualDeviceGridColumns = 4;
 
 void showNgmyVirtualDevice({
   required BuildContext context,
@@ -18,13 +20,15 @@ void showNgmyVirtualDevice({
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       fullscreenDialog: true,
-      builder: (_) => NgmyVirtualDeviceScreen(userEmail: userEmail ?? ''),
+      builder: (_) => NgmyVirtualDeviceFleetScreen(userEmail: userEmail ?? ''),
     ),
   );
 }
 
 class NgmyVirtualDeviceIdentity {
   NgmyVirtualDeviceIdentity({
+    required this.id,
+    required this.label,
     required this.serialNumber,
     required this.modelName,
     required this.deviceId,
@@ -40,6 +44,8 @@ class NgmyVirtualDeviceIdentity {
     required this.createdAt,
   });
 
+  final String id;
+  final String label;
   final String serialNumber;
   final String modelName;
   final String deviceId;
@@ -57,6 +63,8 @@ class NgmyVirtualDeviceIdentity {
   String get locationLabel => '$virtualCity, $virtualCountry';
 
   Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
         'serialNumber': serialNumber,
         'modelName': modelName,
         'deviceId': deviceId,
@@ -74,6 +82,8 @@ class NgmyVirtualDeviceIdentity {
 
   factory NgmyVirtualDeviceIdentity.fromJson(Map<String, dynamic> json) {
     return NgmyVirtualDeviceIdentity(
+      id: (json['id'] ?? '').toString(),
+      label: (json['label'] ?? 'Virtual Device').toString(),
       serialNumber: (json['serialNumber'] ?? '').toString(),
       modelName: (json['modelName'] ?? 'NGMY Virtual Phone').toString(),
       deviceId: (json['deviceId'] ?? '').toString(),
@@ -92,66 +102,154 @@ class NgmyVirtualDeviceIdentity {
 }
 
 class NgmyVirtualDeviceStore {
-  static String _key(String email) => '$_kPrefsPrefix${email.trim().toLowerCase()}';
+  static String _fleetKey(String email) => '$_kFleetPrefsPrefix${email.trim().toLowerCase()}';
 
-  static Future<NgmyVirtualDeviceIdentity> loadOrCreate(String userEmail) async {
+  static Future<List<NgmyVirtualDeviceIdentity>> loadFleet(String userEmail) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = _key(userEmail);
+    final key = _fleetKey(userEmail);
     final raw = prefs.getString(key);
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          return NgmyVirtualDeviceIdentity.fromJson(Map<String, dynamic>.from(decoded));
+        if (decoded is List && decoded.isNotEmpty) {
+          final fleet = decoded
+              .whereType<Map>()
+              .map((e) => NgmyVirtualDeviceIdentity.fromJson(Map<String, dynamic>.from(e)))
+              .where((d) => d.id.isNotEmpty && d.serialNumber.isNotEmpty)
+              .toList();
+          if (fleet.length >= kNgmyDefaultVirtualDeviceCount) return fleet;
+          final topped = _topUpFleet(fleet);
+          await _saveFleet(userEmail, topped);
+          return topped;
         }
       } catch (_) {}
     }
-    final created = _generate();
-    await prefs.setString(key, jsonEncode(created.toJson()));
-    return created;
+
+    final legacy = prefs.getString('$_kLegacyPrefsPrefix${userEmail.trim().toLowerCase()}');
+    if (legacy != null && legacy.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(legacy);
+        if (decoded is Map) {
+          final one = NgmyVirtualDeviceIdentity.fromJson(Map<String, dynamic>.from(decoded));
+          final fleet = _topUpFleet([one]);
+          await _saveFleet(userEmail, fleet);
+          return fleet;
+        }
+      } catch (_) {}
+    }
+
+    final fleet = _createDefaultFleet();
+    await _saveFleet(userEmail, fleet);
+    return fleet;
   }
 
-  static Future<NgmyVirtualDeviceIdentity> factoryReset(String userEmail) async {
-    final prefs = await SharedPreferences.getInstance();
-    final created = _generate();
-    await prefs.setString(_key(userEmail), jsonEncode(created.toJson()));
-    return created;
-  }
-
-  static Future<NgmyVirtualDeviceIdentity> relocate(String userEmail, NgmyVirtualDeviceIdentity current) async {
-    final spot = _randomLocation();
-    final next = NgmyVirtualDeviceIdentity(
-      serialNumber: current.serialNumber,
-      modelName: current.modelName,
-      deviceId: current.deviceId,
-      macAddress: current.macAddress,
-      imei: current.imei,
-      osName: current.osName,
-      osVersion: current.osVersion,
-      virtualCity: spot.$1,
-      virtualCountry: spot.$2,
-      virtualLat: spot.$3,
-      virtualLng: spot.$4,
-      timezone: spot.$5,
-      createdAt: current.createdAt,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(userEmail), jsonEncode(next.toJson()));
+  static List<NgmyVirtualDeviceIdentity> _topUpFleet(List<NgmyVirtualDeviceIdentity> existing) {
+    final usedSerials = existing.map((e) => e.serialNumber).toSet();
+    final usedImeis = existing.map((e) => e.imei).toSet();
+    final usedMacs = existing.map((e) => e.macAddress).toSet();
+    final usedLocations = existing.map((e) => e.timezone).toSet();
+    final next = List<NgmyVirtualDeviceIdentity>.from(existing);
+    var slot = existing.length;
+    while (next.length < kNgmyDefaultVirtualDeviceCount) {
+      next.add(_generateUnique(slot: slot, usedSerials: usedSerials, usedImeis: usedImeis, usedMacs: usedMacs, usedTimezones: usedLocations));
+      slot++;
+    }
     return next;
   }
 
-  static NgmyVirtualDeviceIdentity _generate() {
+  static Future<NgmyVirtualDeviceIdentity> addDevice(String userEmail) async {
+    final fleet = await loadFleet(userEmail);
+    final usedSerials = fleet.map((e) => e.serialNumber).toSet();
+    final usedImeis = fleet.map((e) => e.imei).toSet();
+    final usedMacs = fleet.map((e) => e.macAddress).toSet();
+    final usedTimezones = fleet.map((e) => e.timezone).toSet();
+    final device = _generateUnique(
+      slot: fleet.length,
+      usedSerials: usedSerials,
+      usedImeis: usedImeis,
+      usedMacs: usedMacs,
+      usedTimezones: usedTimezones,
+    );
+    fleet.add(device);
+    await _saveFleet(userEmail, fleet);
+    return device;
+  }
+
+  static Future<void> _saveFleet(String userEmail, List<NgmyVirtualDeviceIdentity> fleet) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_fleetKey(userEmail), jsonEncode(fleet.map((e) => e.toJson()).toList()));
+  }
+
+  static List<NgmyVirtualDeviceIdentity> _createDefaultFleet() {
+    final usedSerials = <String>{};
+    final usedImeis = <String>{};
+    final usedMacs = <String>{};
+    final usedTimezones = <String>{};
+    return List.generate(
+      kNgmyDefaultVirtualDeviceCount,
+      (i) => _generateUnique(
+        slot: i,
+        usedSerials: usedSerials,
+        usedImeis: usedImeis,
+        usedMacs: usedMacs,
+        usedTimezones: usedTimezones,
+        locationIndex: i,
+      ),
+    );
+  }
+
+  static NgmyVirtualDeviceIdentity _generateUnique({
+    required int slot,
+    required Set<String> usedSerials,
+    required Set<String> usedImeis,
+    required Set<String> usedMacs,
+    required Set<String> usedTimezones,
+    int? locationIndex,
+  }) {
     final r = Random.secure();
-    final serial = List.generate(4, (_) => r.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join();
-    final spot = _randomLocation();
+    var spot = _kLocationPool[(locationIndex ?? slot) % _kLocationPool.length];
+    var serial = '';
+    var imei = '';
+    var mac = '';
+
+    for (var attempt = 0; attempt < 64; attempt++) {
+      final idx = (locationIndex ?? slot + attempt) % _kLocationPool.length;
+      final candidate = _kLocationPool[idx];
+      if (usedTimezones.contains(candidate.$5) && usedTimezones.length < _kLocationPool.length) {
+        continue;
+      }
+      spot = candidate;
+
+      final serialRaw = List.generate(4, (_) => r.nextInt(256))
+          .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+          .join();
+      serial = 'VND-${serialRaw.substring(0, 4)}-${serialRaw.substring(4, 8)}';
+      imei = List.generate(15, (_) => r.nextInt(10)).join();
+      mac = List.generate(6, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join(':').toUpperCase();
+
+      if (!usedSerials.contains(serial) && !usedImeis.contains(imei) && !usedMacs.contains(mac)) {
+        break;
+      }
+    }
+
+    usedSerials.add(serial);
+    usedImeis.add(imei);
+    usedMacs.add(mac);
+    usedTimezones.add(spot.$5);
+
+    final model = _kModelPool[slot % _kModelPool.length];
+    final os = _kOsPool[slot % _kOsPool.length];
+
     return NgmyVirtualDeviceIdentity(
-      serialNumber: 'VND-${serial.substring(0, 4)}-${serial.substring(4, 8)}',
-      modelName: 'NGMY Virtual Phone ${_modelVariants[r.nextInt(_modelVariants.length)]}',
+      id: 'vd_${DateTime.now().microsecondsSinceEpoch}_${slot}_${r.nextInt(99999)}',
+      label: 'Device ${(slot + 1).toString().padLeft(2, '0')}',
+      serialNumber: serial,
+      modelName: model,
       deviceId: _hex(r, 16),
-      macAddress: '${_hex(r, 1)}:${_hex(r, 1)}:${_hex(r, 1)}:${_hex(r, 1)}:${_hex(r, 1)}:${_hex(r, 1)}'.toUpperCase(),
-      imei: List.generate(15, (_) => r.nextInt(10)).join(),
-      osName: 'NGMY OS',
-      osVersion: '${r.nextInt(3) + 12}.${r.nextInt(5)}.${r.nextInt(9)}',
+      macAddress: mac,
+      imei: imei,
+      osName: os.$1,
+      osVersion: os.$2,
       virtualCity: spot.$1,
       virtualCountry: spot.$2,
       virtualLat: spot.$3,
@@ -165,40 +263,89 @@ class NgmyVirtualDeviceStore {
     return List.generate(pairs, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
-  static const _modelVariants = ['Air', 'Pro', 'Lite', 'Max', 'Mini'];
+  static const _kModelPool = [
+    'NGMY Virtual Phone Air',
+    'NGMY Virtual Phone Pro',
+    'NGMY Virtual Phone Lite',
+    'NGMY Virtual Phone Max',
+    'NGMY Virtual Tab Mini',
+    'NGMY Virtual Phone Ultra',
+    'NGMY Virtual Phone Neo',
+    'NGMY Virtual Phone Edge',
+    'NGMY Virtual Phone Flex',
+    'NGMY Virtual Phone Core',
+    'NGMY Virtual Phone Nova',
+    'NGMY Virtual Phone Pulse',
+    'NGMY Virtual Phone Apex',
+    'NGMY Virtual Phone Zen',
+    'NGMY Virtual Phone Spark',
+    'NGMY Virtual Phone Wave',
+    'NGMY Virtual Phone Orbit',
+    'NGMY Virtual Phone Prism',
+    'NGMY Virtual Phone Flux',
+    'NGMY Virtual Phone Echo',
+  ];
 
-  static (String, String, double, double, String) _randomLocation() {
-    const spots = [
-      ('Tokyo', 'Japan', 35.6762, 139.6503, 'Asia/Tokyo'),
-      ('London', 'United Kingdom', 51.5074, -0.1278, 'Europe/London'),
-      ('New York', 'United States', 40.7128, -74.0060, 'America/New_York'),
-      ('Paris', 'France', 48.8566, 2.3522, 'Europe/Paris'),
-      ('Sydney', 'Australia', -33.8688, 151.2093, 'Australia/Sydney'),
-      ('Dubai', 'UAE', 25.2048, 55.2708, 'Asia/Dubai'),
-      ('Toronto', 'Canada', 43.6532, -79.3832, 'America/Toronto'),
-      ('Berlin', 'Germany', 52.5200, 13.4050, 'Europe/Berlin'),
-      ('Seoul', 'South Korea', 37.5665, 126.9780, 'Asia/Seoul'),
-      ('São Paulo', 'Brazil', -23.5505, -46.6333, 'America/Sao_Paulo'),
-    ];
-    return spots[Random.secure().nextInt(spots.length)];
-  }
+  static const _kOsPool = [
+    ('NGMY OS', '14.2.1'),
+    ('VirtualDroid', '13.8.4'),
+    ('NGMY OS', '15.0.0'),
+    ('VirtualDroid', '14.1.2'),
+    ('NGMY Tab OS', '12.9.7'),
+    ('NGMY OS', '13.5.3'),
+    ('VirtualDroid', '15.2.0'),
+    ('NGMY OS', '14.8.1'),
+    ('NGMY Tab OS', '13.2.4'),
+    ('VirtualDroid', '12.6.9'),
+    ('NGMY OS', '16.0.1'),
+    ('VirtualDroid', '14.9.0'),
+    ('NGMY Tab OS', '14.0.3'),
+    ('NGMY OS', '13.1.8'),
+    ('VirtualDroid', '13.4.5'),
+    ('NGMY OS', '15.3.2'),
+    ('NGMY Tab OS', '12.4.1'),
+    ('VirtualDroid', '16.1.0'),
+    ('NGMY OS', '14.4.6'),
+    ('VirtualDroid', '15.0.8'),
+  ];
+
+  static const _kLocationPool = [
+    ('Tokyo', 'Japan', 35.6762, 139.6503, 'Asia/Tokyo'),
+    ('London', 'United Kingdom', 51.5074, -0.1278, 'Europe/London'),
+    ('New York', 'United States', 40.7128, -74.0060, 'America/New_York'),
+    ('Paris', 'France', 48.8566, 2.3522, 'Europe/Paris'),
+    ('Sydney', 'Australia', -33.8688, 151.2093, 'Australia/Sydney'),
+    ('Dubai', 'UAE', 25.2048, 55.2708, 'Asia/Dubai'),
+    ('Toronto', 'Canada', 43.6532, -79.3832, 'America/Toronto'),
+    ('Berlin', 'Germany', 52.5200, 13.4050, 'Europe/Berlin'),
+    ('Seoul', 'South Korea', 37.5665, 126.9780, 'Asia/Seoul'),
+    ('São Paulo', 'Brazil', -23.5505, -46.6333, 'America/Sao_Paulo'),
+    ('Mumbai', 'India', 19.0760, 72.8777, 'Asia/Kolkata'),
+    ('Lagos', 'Nigeria', 6.5244, 3.3792, 'Africa/Lagos'),
+    ('Mexico City', 'Mexico', 19.4326, -99.1332, 'America/Mexico_City'),
+    ('Singapore', 'Singapore', 1.3521, 103.8198, 'Asia/Singapore'),
+    ('Amsterdam', 'Netherlands', 52.3676, 4.9041, 'Europe/Amsterdam'),
+    ('Cairo', 'Egypt', 30.0444, 31.2357, 'Africa/Cairo'),
+    ('Stockholm', 'Sweden', 59.3293, 18.0686, 'Europe/Stockholm'),
+    ('Bangkok', 'Thailand', 13.7563, 100.5018, 'Asia/Bangkok'),
+    ('Johannesburg', 'South Africa', -26.2041, 28.0473, 'Africa/Johannesburg'),
+    ('Hong Kong', 'Hong Kong', 22.3193, 114.1694, 'Asia/Hong_Kong'),
+  ];
 }
 
-class NgmyVirtualDeviceScreen extends StatefulWidget {
-  const NgmyVirtualDeviceScreen({super.key, required this.userEmail});
+/// Grid of 20 unique virtual phones — tap one to open YouTube on that device.
+class NgmyVirtualDeviceFleetScreen extends StatefulWidget {
+  const NgmyVirtualDeviceFleetScreen({super.key, required this.userEmail});
 
   final String userEmail;
 
   @override
-  State<NgmyVirtualDeviceScreen> createState() => _NgmyVirtualDeviceScreenState();
+  State<NgmyVirtualDeviceFleetScreen> createState() => _NgmyVirtualDeviceFleetScreenState();
 }
 
-class _NgmyVirtualDeviceScreenState extends State<NgmyVirtualDeviceScreen> {
-  NgmyVirtualDeviceIdentity? _device;
-  NgmyVirtualDeviceBrowserControls? _browser;
-  var _tab = 0;
+class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScreen> {
+  List<NgmyVirtualDeviceIdentity> _fleet = [];
   var _loading = true;
-  var _powerOn = true;
 
   @override
   void initState() {
@@ -207,48 +354,33 @@ class _NgmyVirtualDeviceScreenState extends State<NgmyVirtualDeviceScreen> {
   }
 
   Future<void> _boot() async {
-    final d = await NgmyVirtualDeviceStore.loadOrCreate(widget.userEmail);
+    final fleet = await NgmyVirtualDeviceStore.loadFleet(widget.userEmail);
     if (!mounted) return;
     setState(() {
-      _device = d;
+      _fleet = fleet;
       _loading = false;
     });
   }
 
-  Future<void> _factoryReset() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New virtual device?'),
-        content: const Text(
-          'This wipes the current virtual phone and creates a brand-new one with a new serial number and location.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Create new')),
-        ],
+  Future<void> _addDevice() async {
+    setState(() => _loading = true);
+    final device = await NgmyVirtualDeviceStore.addDevice(widget.userEmail);
+    if (!mounted) return;
+    setState(() {
+      _fleet = [..._fleet, device];
+      _loading = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added ${device.label} · ${device.serialNumber}')),
+    );
+  }
+
+  void _openDevice(NgmyVirtualDeviceIdentity device) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NgmyVirtualDeviceDetailScreen(device: device),
       ),
     );
-    if (ok != true || !mounted) return;
-    setState(() => _loading = true);
-    final d = await NgmyVirtualDeviceStore.factoryReset(widget.userEmail);
-    if (!mounted) return;
-    setState(() {
-      _device = d;
-      _loading = false;
-      _tab = 0;
-      _powerOn = true;
-    });
-    await _browser?.goHome();
-  }
-
-  Future<void> _relocate() async {
-    final current = _device;
-    if (current == null) return;
-    final d = await NgmyVirtualDeviceStore.relocate(widget.userEmail, current);
-    if (!mounted) return;
-    setState(() => _device = d);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Virtual location → ${d.locationLabel}')));
   }
 
   @override
@@ -259,56 +391,251 @@ class _NgmyVirtualDeviceScreenState extends State<NgmyVirtualDeviceScreen> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        title: const Text('Virtual Device'),
-        actions: [
-          IconButton(
-            tooltip: 'Relocate device',
-            onPressed: _device == null ? null : () => unawaited(_relocate()),
-            icon: const Icon(Icons.public_rounded),
-          ),
-          IconButton(
-            tooltip: 'New device',
-            onPressed: _device == null ? null : () => unawaited(_factoryReset()),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
+        title: Text('Virtual Devices (${_fleet.length})'),
       ),
-      body: _loading || _device == null
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _loading ? null : () => unawaited(_addDevice()),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add device'),
+        backgroundColor: kNgmyStudioHubAccent,
+      ),
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final phoneW = constraints.maxWidth.clamp(280.0, 420.0);
-                return Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Text(
+                      '${_fleet.length} separate virtual phones — each with its own serial, location, and timezone. '
+                      'Not your iPhone. Tap any phone to watch YouTube on that device.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 88),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: kNgmyVirtualDeviceGridColumns,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 0.52,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final device = _fleet[index];
+                        return _MiniVirtualPhoneCard(
+                          device: device,
+                          onTap: () => _openDevice(device),
+                        );
+                      },
+                      childCount: _fleet.length,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _MiniVirtualPhoneCard extends StatelessWidget {
+  const _MiniVirtualPhoneCard({required this.device, required this.onTap});
+
+  final NgmyVirtualDeviceIdentity device;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kNgmyStudioHubAccent.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ColoredBox(
+                    color: Colors.black,
                     child: Column(
                       children: [
-                        Text(
-                          'Watch on a separate virtual phone — not on your real device.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-                            fontSize: 13,
-                            height: 1.4,
+                        _MiniStatusBar(device: device),
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            color: const Color(0xFF0F0F0F),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.play_circle_filled_rounded, color: Colors.red.shade600, size: 22),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'YouTube',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        _VirtualPhoneFrame(
-                          width: phoneW,
-                          device: _device!,
-                          powerOn: _powerOn,
-                          tab: _tab,
-                          browser: _browser,
-                          onBrowserReady: (c) => _browser = c,
-                          onTab: (i) => setState(() => _tab = i),
-                          onPowerToggle: () => setState(() => _powerOn = !_powerOn),
+                        Container(
+                          color: const Color(0xFF111827),
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.touch_app_rounded, size: 9, color: kNgmyStudioHubAccent.withValues(alpha: 0.85)),
+                              const SizedBox(width: 3),
+                              Text('Tap', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 7)),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              device.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              device.virtualCity,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 8, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
+            ),
+            Text(
+              device.serialNumber,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 7, color: kNgmyStudioHubAccent.withValues(alpha: 0.85), letterSpacing: 0.2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStatusBar extends StatelessWidget {
+  const _MiniStatusBar({required this.device});
+
+  final NgmyVirtualDeviceIdentity device;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF111827),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              device.serialNumber.split('-').last,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 5.5),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Icon(Icons.wifi_rounded, size: 7, color: Colors.white.withValues(alpha: 0.45)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen single virtual device — YouTube browser loads only when opened.
+class NgmyVirtualDeviceDetailScreen extends StatefulWidget {
+  const NgmyVirtualDeviceDetailScreen({super.key, required this.device});
+
+  final NgmyVirtualDeviceIdentity device;
+
+  @override
+  State<NgmyVirtualDeviceDetailScreen> createState() => _NgmyVirtualDeviceDetailScreenState();
+}
+
+class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailScreen> {
+  NgmyVirtualDeviceBrowserControls? _browser;
+  var _tab = 0;
+  var _powerOn = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF1F5F9);
+
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        title: Text('${widget.device.label} · ${widget.device.serialNumber}'),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final phoneW = constraints.maxWidth.clamp(280.0, 420.0);
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: Column(
+                children: [
+                  Text(
+                    '${widget.device.locationLabel} · ${widget.device.timezone}\n'
+                    'Separate from your real phone — unique serial & identity.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _VirtualPhoneFrame(
+                    width: phoneW,
+                    device: widget.device,
+                    powerOn: _powerOn,
+                    tab: _tab,
+                    browser: _browser,
+                    onBrowserReady: (c) => _browser = c,
+                    onTab: (i) => setState(() => _tab = i),
+                    onPowerToggle: () => setState(() => _powerOn = !_powerOn),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -364,7 +691,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
               Expanded(
                 child: powerOn
                     ? (tab == 0
-                        ? NgmyVirtualDeviceBrowser(onReady: onBrowserReady)
+                        ? NgmyVirtualDeviceBrowser(key: ValueKey(device.id), onReady: onBrowserReady)
                         : _DeviceInfoPanel(device: device))
                     : const _PowerOffScreen(),
               ),
@@ -403,6 +730,8 @@ class _VirtualStatusBar extends StatelessWidget {
             children: [
               Text(clock, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
               const Spacer(),
+              Text(device.label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9)),
+              const SizedBox(width: 6),
               const Icon(Icons.signal_cellular_alt_rounded, color: Colors.white70, size: 14),
               const SizedBox(width: 4),
               const Icon(Icons.wifi_rounded, color: Colors.white70, size: 14),
@@ -564,10 +893,10 @@ class _DeviceInfoPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('This is a standalone virtual device', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+        Text(device.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
         const SizedBox(height: 4),
         Text(
-          'Browsing and video playback happen inside this phone — separate from your real device.',
+          'Independent virtual hardware — not linked to your iPhone or real device.',
           style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 10, height: 1.35),
         ),
         const SizedBox(height: 12),

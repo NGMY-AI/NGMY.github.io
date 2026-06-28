@@ -157,7 +157,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         icon: Icons.smartphone_rounded,
         colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1)],
         title: 'Virtual Device',
-        subtitle: 'Separate phone with serial # — watch YouTube here',
+        subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
         onTap: () => showNgmyVirtualDevice(context: context, userEmail: userEmail),
       ),
     ];
