@@ -225,6 +225,7 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
 
   @override
   void dispose() {
+    _setupTimeout?.cancel();
     if (!_paired) {
       try {
         _channel?.unsubscribe();
@@ -233,45 +234,87 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
     super.dispose();
   }
 
+  bool _settingUp = false;
+  bool _ready = false;
+  String? _error;
+  Timer? _setupTimeout;
+
   void _start() {
     final code = ngmyGenerateLiveHelpCode();
     final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(code));
-    channel
-        .onBroadcast(
-          event: 'join',
-          callback: (_) {
-            if (_paired) return;
-            _paired = true;
-            channel.sendBroadcastMessage(event: 'accept', payload: const {});
-            if (!mounted) return;
-            Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: code, hostChannel: channel)))
-                .then((_) {
-              if (mounted) {
-                setState(() {
-                  _code = null;
-                  _channel = null;
-                  _paired = false;
-                });
-              }
+    channel.onBroadcast(
+      event: 'join',
+      callback: (_) {
+        if (_paired) return;
+        _paired = true;
+        channel.sendBroadcastMessage(event: 'accept', payload: const {});
+        if (!mounted) return;
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: code, hostChannel: channel)))
+            .then((_) {
+          if (mounted) {
+            setState(() {
+              _code = null;
+              _channel = null;
+              _paired = false;
             });
-          },
-        )
-        .subscribe();
+          }
+        });
+      },
+    );
+    // Don't show the code until the channel has actually finished joining —
+    // otherwise a fast scan/entry can send 'join' before this side is really
+    // listening, and that broadcast is lost for good (no replay/queueing).
+    channel.subscribe((status, error) {
+      if (!mounted) return;
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        _setupTimeout?.cancel();
+        setState(() {
+          _ready = true;
+          _settingUp = false;
+        });
+      } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.timedOut) {
+        _setupTimeout?.cancel();
+        setState(() {
+          _error = 'Could not start — check your connection and try again.';
+          _code = null;
+          _settingUp = false;
+          _channel = null;
+        });
+      }
+    });
+    _setupTimeout = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _ready) return;
+      try {
+        channel.unsubscribe();
+      } catch (_) {}
+      setState(() {
+        _error = 'Taking too long to connect — check your internet and try again.';
+        _code = null;
+        _settingUp = false;
+        _channel = null;
+      });
+    });
     setState(() {
       _code = code;
       _channel = channel;
       _paired = false;
+      _ready = false;
+      _settingUp = true;
+      _error = null;
     });
   }
 
   void _cancel() {
+    _setupTimeout?.cancel();
     try {
       _channel?.unsubscribe();
     } catch (_) {}
     setState(() {
       _code = null;
       _channel = null;
+      _ready = false;
+      _settingUp = false;
     });
   }
 
@@ -287,10 +330,26 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
               const Icon(Icons.qr_code_2_rounded, size: 56),
               const SizedBox(height: 16),
               const Text('Create a code so a user can connect and share their screen with you.', textAlign: TextAlign.center),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+              ],
               const SizedBox(height: 20),
               FilledButton(onPressed: _start, child: const Text('Create Code')),
             ],
           ),
+        ),
+      );
+    }
+    if (_settingUp) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Setting up...'),
+          ],
         ),
       );
     }
@@ -345,28 +404,41 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
   }
 
   Future<void> _connect(String code) async {
+    if (_connecting) return;
     final c = code.trim();
     if (c.length < 3 || c.length > 4 || int.tryParse(c) == null) {
       setState(() => _error = 'Enter the code support gave you.');
       return;
     }
+    try {
+      _channel?.unsubscribe();
+    } catch (_) {}
     setState(() {
       _connecting = true;
       _error = null;
     });
     final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(c));
     _channel = channel;
-    channel
-        .onBroadcast(
-          event: 'accept',
-          callback: (_) {
-            _timeout?.cancel();
-            if (mounted) unawaited(_confirmAndShare(c, channel));
-          },
-        )
-        .subscribe((status, _) {
+    channel.onBroadcast(
+      event: 'accept',
+      callback: (_) {
+        _timeout?.cancel();
+        if (mounted) unawaited(_confirmAndShare(c, channel));
+      },
+    );
+    channel.subscribe((status, error) {
+      if (!mounted) return;
       if (status == RealtimeSubscribeStatus.subscribed) {
         channel.sendBroadcastMessage(event: 'join', payload: const {});
+      } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.timedOut) {
+        _timeout?.cancel();
+        setState(() {
+          _connecting = false;
+          _error = 'Connection error — check your internet and try again.';
+        });
+        try {
+          channel.unsubscribe();
+        } catch (_) {}
       }
     });
     _timeout = Timer(const Duration(seconds: 45), () {
