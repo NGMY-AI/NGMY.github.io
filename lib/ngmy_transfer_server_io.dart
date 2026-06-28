@@ -88,6 +88,8 @@ class NgmyTransferServer {
 
     for (final item in items) {
       if (item.sizeBytes <= 0) return null;
+      final local = await NgmyDocShareStore.localFileForItem(ownerEmail, item);
+      if (local != null) continue;
       final probe = await NgmyDocShareStore.readByteRange(ownerEmail, item, 0, 1);
       if (probe == null || probe.isEmpty) return null;
     }

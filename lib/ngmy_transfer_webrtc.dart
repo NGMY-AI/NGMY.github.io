@@ -3,17 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_transfer_p2p_web.dart' as p2p;
 
-/// Fast peer transfer — optimized 1 MiB chunks, ~1.8s ICE cap (AirDrop-style on same Wi‑Fi).
+/// Fast peer transfer — 1 MiB chunks, direct signal rows, TURN fallback.
 class NgmyTransferWebRtc {
   static bool get isSupported => kIsWeb;
 
   static Future<({String offerToken})?> startSend({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
+    void Function(int sentBytes, int totalBytes)? onBytes,
   }) async {
     if (!kIsWeb || items.isEmpty) return null;
     await stopSend();
-    final token = await p2p.createTransferOffer(ownerEmail: ownerEmail, items: items);
+    final token = await p2p.createTransferOffer(
+      ownerEmail: ownerEmail,
+      items: items,
+      onBytes: onBytes,
+    );
     if (token == null || token.isEmpty) return null;
     return (offerToken: token);
   }

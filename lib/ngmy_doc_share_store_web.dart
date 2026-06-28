@@ -324,13 +324,41 @@ class NgmyDocShareStore {
 
   static void clearTransferReadCache() => _transferReadCache.clear();
 
+  static Future<void> preloadForTransfer(String email, List<NgmyDocShareItem> items) async {
+    for (final item in items) {
+      if (_webFiles[item.id] != null) continue;
+      final key = _bytesPrefsKey(email, item.id);
+      if (_transferReadCache.containsKey(key) || _memoryBlobs.containsKey(key)) continue;
+      unawaited(() async {
+        final blob = await _loadBlob(key);
+        if (blob != null && blob.length <= 180 * 1024 * 1024) {
+          _transferReadCache[key] = blob;
+        }
+      }());
+    }
+  }
+
   static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
-    final bytes = await readBytes(email, item);
-    if (bytes == null || bytes.isEmpty) return;
+    final webFile = _webFiles[item.id];
+    if (webFile != null) {
+      const step = 1048576;
+      final size = webFile.size.round();
+      for (var start = 0; start < size; start += step) {
+        final end = start + step < size ? start + step : size;
+        final chunk = await readByteRange(email, item, start, end);
+        if (chunk != null && chunk.isNotEmpty) yield chunk;
+      }
+      return;
+    }
+    final key = _bytesPrefsKey(email, item.id);
+    var all = _transferReadCache[key] ?? _memoryBlobs[key];
+    all ??= await _loadBlob(key);
+    if (all == null || all.isEmpty) return;
+    if (all.length <= 180 * 1024 * 1024) _transferReadCache[key] = all;
     const step = 1048576;
-    for (var i = 0; i < bytes.length; i += step) {
-      final end = (i + step < bytes.length) ? i + step : bytes.length;
-      yield Uint8List.sublistView(bytes, i, end);
+    for (var i = 0; i < all.length; i += step) {
+      final end = (i + step < all.length) ? i + step : all.length;
+      yield Uint8List.sublistView(all, i, end);
     }
   }
 

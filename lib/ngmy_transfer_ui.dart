@@ -7,7 +7,6 @@ import 'ngmy_doc_share_models.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_transfer.dart';
 import 'ngmy_transfer_constants.dart';
-import 'ngmy_transfer_server.dart';
 import 'ngmy_transfer_webrtc.dart';
 
 /// Opens Send directly for the given file(s) — from the ⋮ menu only.
@@ -55,6 +54,7 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
   var _starting = false;
   var _receiverConnected = false;
   String _status = 'Tap Start transfer below.';
+  double? _byteProgress;
   Timer? _webrtcPoll;
 
   @override
@@ -80,7 +80,17 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
           setState(() {
             _filesSent = sent;
             _receiverConnected = true;
-            _status = 'Sending file $sent of $total…';
+            _status = 'Sent file $sent of $total';
+            _byteProgress = 1;
+          });
+        }
+      },
+      onSendBytes: (sent, total) {
+        if (mounted && total > 0) {
+          setState(() {
+            _receiverConnected = true;
+            _byteProgress = sent / total;
+            _status = sent >= total ? 'Finishing…' : 'Sending video… ${((sent / total) * 100).round()}%';
           });
         }
       },
@@ -106,7 +116,7 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
 
     if (session.mode == NgmyTransferMode.webrtc) {
       _webrtcPoll?.cancel();
-      _webrtcPoll = Timer.periodic(const Duration(milliseconds: 350), (_) async {
+      _webrtcPoll = Timer.periodic(const Duration(milliseconds: 200), (_) async {
         if (!mounted || _session == null) return;
         final linked = await NgmyTransferWebRtc.applyAnswerWhenReady(_session!.offerToken!);
         if (linked && mounted) {
@@ -209,10 +219,10 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
               ),
               const SizedBox(height: 16),
               Text(_status, textAlign: TextAlign.center, style: TextStyle(color: muted, height: 1.4)),
-              if (_receiverConnected || _filesSent > 0) ...[
+              if (_receiverConnected || _filesSent > 0 || _byteProgress != null) ...[
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
-                  value: session.fileCount == 0 ? null : _filesSent / session.fileCount,
+                  value: _byteProgress ?? (session.fileCount == 0 ? null : _filesSent / session.fileCount),
                   backgroundColor: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
                   color: kNgmyStudioHubAccent,
                 ),

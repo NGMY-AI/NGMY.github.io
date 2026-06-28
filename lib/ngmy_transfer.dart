@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_store.dart';
 import 'ngmy_transfer_download.dart';
 import 'ngmy_transfer_rendezvous.dart';
 import 'ngmy_transfer_server.dart';
@@ -39,26 +42,31 @@ class NgmyTransfer {
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
     void Function(int sent, int total)? onFileComplete,
+    void Function(int sentBytes, int totalBytes)? onSendBytes,
   }) async {
     if (items.isEmpty) return null;
 
     await stopSend();
+    unawaited(NgmyDocShareStore.preloadForTransfer(ownerEmail, items));
 
     final transferKey = NgmyTransferRendezvous.generateTransferKey();
-    final code = await NgmyTransferRendezvous.generateUniqueCode();
-    if (code == null) return null;
-
-    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
-    final manifest = _fileManifest(items);
 
     if (NgmyTransferServer.isSupported) {
-      final started = await NgmyTransferServer.start(
+      final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+      final manifest = _fileManifest(items);
+      final codeFuture = NgmyTransferRendezvous.generateUniqueCode();
+      final startedFuture = NgmyTransferServer.start(
         ownerEmail: ownerEmail,
         transferKey: transferKey,
         items: items,
         onFileComplete: onFileComplete,
       );
-      if (started == null) return null;
+      final code = await codeFuture;
+      final started = await startedFuture;
+      if (code == null || started == null) {
+        await NgmyTransferServer.stop();
+        return null;
+      }
 
       final lanFiles = NgmyTransferServer.manifestFiles();
       final published = await NgmyTransferRendezvous.publish(
@@ -100,8 +108,21 @@ class NgmyTransfer {
     }
 
     if (NgmyTransferWebRtc.isSupported) {
-      final web = await NgmyTransferWebRtc.startSend(ownerEmail: ownerEmail, items: items);
-      if (web == null) return null;
+      final codeFuture = NgmyTransferRendezvous.generateUniqueCode();
+      final webFuture = NgmyTransferWebRtc.startSend(
+        ownerEmail: ownerEmail,
+        items: items,
+        onBytes: onSendBytes,
+      );
+      final code = await codeFuture;
+      final web = await webFuture;
+      if (code == null || web == null) {
+        await NgmyTransferWebRtc.stopSend();
+        return null;
+      }
+
+      final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+      final manifest = _fileManifest(items);
 
       final published = await NgmyTransferRendezvous.publish(
         code: code,

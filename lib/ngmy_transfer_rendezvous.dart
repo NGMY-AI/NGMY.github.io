@@ -16,8 +16,9 @@ class NgmyTransferRendezvous {
 
   static Future<String?> generateUniqueCode() async {
     final r = Random.secure();
-    for (var attempt = 0; attempt < 24; attempt++) {
+    for (var attempt = 0; attempt < 6; attempt++) {
       final code = (100000 + r.nextInt(900000)).toString();
+      if (attempt < 2) return code;
       final existing = await lookup(code);
       if (existing == null) return code;
     }

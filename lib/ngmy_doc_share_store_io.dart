@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -67,7 +68,12 @@ Future<void> _patchStashToken(String email, String itemId, String stashToken) as
   await _writeIndex(email, items);
 }
 
-Future<File?> _fileForId(Directory root, String id) async {
+Future<File?> _fileForId(Directory root, String id, {String? nameHint}) async {
+  if (nameHint != null && nameHint.trim().isNotEmpty) {
+    final ext = _safeExt(nameHint);
+    final direct = File('${root.path}/$id.$ext');
+    if (await direct.exists()) return direct;
+  }
   await for (final entity in root.list()) {
     if (entity is File && entity.uri.pathSegments.last.startsWith('$id.')) {
       return entity;
@@ -235,7 +241,7 @@ class NgmyDocShareStore {
 
   static Future<Uint8List?> readBytes(String email, NgmyDocShareItem item) async {
     final root = await _userDir(email);
-    final f = await _fileForId(root, item.id);
+    final f = await _fileForId(root, item.id, nameHint: item.name);
     if (f == null) return null;
     return f.readAsBytes();
   }
@@ -243,7 +249,7 @@ class NgmyDocShareStore {
   static Future<Uint8List?> readByteRange(String email, NgmyDocShareItem item, int start, int end) async {
     if (end <= start) return Uint8List(0);
     final root = await _userDir(email);
-    final f = await _fileForId(root, item.id);
+    final f = await _fileForId(root, item.id, nameHint: item.name);
     if (f == null) return null;
     final len = await f.length();
     if (start >= len) return null;
@@ -360,9 +366,17 @@ class NgmyDocShareStore {
 
   static void clearTransferReadCache() {}
 
+  static Future<void> preloadForTransfer(String email, List<NgmyDocShareItem> items) async {
+    for (final item in items) {
+      final f = await localFileForItem(email, item);
+      if (f != null) continue;
+      unawaited(readByteRange(email, item, 0, 1));
+    }
+  }
+
   static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
     final root = await _userDir(email);
-    final f = await _fileForId(root, item.id);
+    final f = await _fileForId(root, item.id, nameHint: item.name);
     if (f == null || !await f.exists()) return;
     await for (final chunk in f.openRead()) {
       if (chunk.isEmpty) continue;
@@ -443,7 +457,7 @@ class NgmyDocShareStore {
 
   static Future<String?> filePath(String email, NgmyDocShareItem item) async {
     final root = await _userDir(email);
-    final f = await _fileForId(root, item.id);
+    final f = await _fileForId(root, item.id, nameHint: item.name);
     return f?.path;
   }
 
