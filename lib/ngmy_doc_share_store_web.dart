@@ -42,6 +42,7 @@ const int _prefsMaxBytes = 512 * 1024; // legacy small-file prefs only; IndexedD
 
 final Map<String, Uint8List> _memoryBlobs = {};
 final Map<String, html.File> _webFiles = {};
+final Map<String, Uint8List> _transferReadCache = {};
 
 Future<void> _persistBlob(String key, Uint8List bytes) async {
   if (bytes.isEmpty) return;
@@ -193,7 +194,14 @@ class NgmyDocShareStore {
       reader.readAsArrayBuffer(slice);
       return done.future.timeout(const Duration(minutes: 30), onTimeout: () => null);
     }
-    final all = await readBytes(email, item);
+    final cacheKey = _bytesPrefsKey(email, item.id);
+    var all = _transferReadCache[cacheKey] ?? _memoryBlobs[cacheKey];
+    if (all == null) {
+      all = await readBytes(email, item);
+      if (all != null && all.length <= 180 * 1024 * 1024) {
+        _transferReadCache[cacheKey] = all;
+      }
+    }
     if (all == null || start >= all.length) return null;
     final safeEnd = end > all.length ? all.length : end;
     return Uint8List.sublistView(all, start, safeEnd);
@@ -310,6 +318,20 @@ class NgmyDocShareStore {
       fromSender: fromSender,
     );
     return id;
+  }
+
+  static Future<void> prepareDiskReceive(int id) async {}
+
+  static void clearTransferReadCache() => _transferReadCache.clear();
+
+  static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
+    final bytes = await readBytes(email, item);
+    if (bytes == null || bytes.isEmpty) return;
+    const step = 1048576;
+    for (var i = 0; i < bytes.length; i += step) {
+      final end = (i + step < bytes.length) ? i + step : bytes.length;
+      yield Uint8List.sublistView(bytes, i, end);
+    }
   }
 
   static Future<bool> writeDiskReceive(int id, List<int> bytes) async {

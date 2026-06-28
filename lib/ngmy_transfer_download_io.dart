@@ -16,19 +16,22 @@ class NgmyTransferDownload {
     required Uri manifestUri,
     required String transferKey,
   }) async {
-    for (var attempt = 0; attempt < 5; attempt++) {
+    for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final request = await _client.getUrl(manifestUri);
         request.headers.set(kNgmyTransferKeyHeader, transferKey);
-        request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-Transfer/1');
-        final response = await request.close().timeout(const Duration(seconds: 20));
+        request.headers.set(HttpHeaders.userAgentHeader, 'NGMY-Transfer/2');
+        request.headers.set(HttpHeaders.connectionHeader, 'keep-alive');
+        final response = await request.close().timeout(const Duration(seconds: 4));
         if (response.statusCode != HttpStatus.ok) continue;
         final body = await response.transform(utf8.decoder).join();
         final decoded = jsonDecode(body);
         return decoded is Map<String, dynamic> ? decoded : null;
       } catch (e) {
         debugPrint('[ngmy transfer manifest] attempt $attempt: $e');
-        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+        if (attempt < 2) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
       }
     }
     return null;

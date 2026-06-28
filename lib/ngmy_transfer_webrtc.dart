@@ -1,13 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import 'ngmy_doc_share_models.dart';
-import 'ngmy_doc_share_webrtc_web.dart' as webrtc;
+import 'ngmy_transfer_p2p_web.dart' as p2p;
 
-/// WebRTC fallback for web send; receive works on phone + web when sender uses web/WebRTC.
+/// Fast peer transfer — optimized 1 MiB chunks, ~1.8s ICE cap (AirDrop-style on same Wi‑Fi).
 class NgmyTransferWebRtc {
   static bool get isSupported => kIsWeb;
-
-  static String? _offerToken;
 
   static Future<({String offerToken})?> startSend({
     required String ownerEmail,
@@ -15,26 +13,15 @@ class NgmyTransferWebRtc {
   }) async {
     if (!kIsWeb || items.isEmpty) return null;
     await stopSend();
-    final qr = await webrtc.createShortOfferQr(ownerEmail: ownerEmail, items: items);
-    if (qr == null) return null;
-    const prefix = 'NGMYDOCSYNC3|';
-    if (!qr.startsWith(prefix)) return null;
-    final token = qr.substring(prefix.length).trim();
-    if (token.isEmpty) return null;
-    _offerToken = token;
+    final token = await p2p.createTransferOffer(ownerEmail: ownerEmail, items: items);
+    if (token == null || token.isEmpty) return null;
     return (offerToken: token);
   }
 
-  static Future<void> stopSend() async {
-    _offerToken = null;
-    await webrtc.stopWebRtc();
-  }
+  static Future<void> stopSend() => p2p.stopTransferP2p();
 
   static Future<bool> applyAnswerWhenReady(String offerToken) async {
-    final answerQr = await webrtc.pollAnswerForOffer(offerToken);
-    if (answerQr == null) return false;
-    await webrtc.applyAnswerQr(answerQr);
-    return true;
+    return p2p.applyTransferAnswer(offerToken);
   }
 
   static Future<List<NgmyDocShareItem>> receive({
@@ -42,26 +29,29 @@ class NgmyTransferWebRtc {
     required String offerToken,
     void Function(int received, int total)? onProgress,
     void Function(String status)? onStatus,
+    void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
   }) async {
-    onStatus?.call('Connecting peer link…');
-    final raw = 'NGMYDOCSYNC3|$offerToken';
-    final session = await webrtc.beginReceiveOffer(
-      raw: raw,
+    onStatus?.call('Connecting…');
+    final session = await p2p.beginTransferReceive(
+      offerToken: offerToken,
       recipientEmail: recipientEmail,
       onProgress: onProgress,
+      onBytes: onBytes == null
+          ? null
+          : (fileIndex, receivedBytes, totalBytes) {
+              onBytes('file', receivedBytes, totalBytes);
+            },
     );
     if (session == null) {
       onStatus?.call('Could not connect. Sender must tap Start transfer and keep that screen open.');
       return [];
     }
 
-    onStatus?.call('Link ready — receiving…');
-
-    // Kick sender side: poll applies answer on sender; receiver waits for bytes.
+    onStatus?.call('Receiving…');
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(
-        const Duration(minutes: 3),
+        const Duration(minutes: 15),
         onTimeout: () => <NgmyDocShareItem>[],
       );
     } catch (_) {
@@ -69,7 +59,7 @@ class NgmyTransferWebRtc {
     }
 
     if (imported.isEmpty) {
-      onStatus?.call('Transfer timed out or failed. Same Wi‑Fi helps. Sender must stay on Send screen.');
+      onStatus?.call('Transfer failed or timed out. Same Wi‑Fi and keep both screens open.');
     } else {
       onStatus?.call('Received ${imported.length} file(s).');
     }

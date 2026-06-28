@@ -333,6 +333,43 @@ class NgmyDocShareStore {
     return id;
   }
 
+  static Future<void> prepareDiskReceive(int id) async {
+    final rx = _diskReceives[id];
+    if (rx == null || rx.sink != null) return;
+    try {
+      final itemId = _newId();
+      final item = NgmyDocShareItem(
+        id: itemId,
+        name: rx.name.trim().isEmpty ? 'file' : rx.name.trim(),
+        mime: rx.mime.trim().isEmpty ? 'application/octet-stream' : rx.mime.trim(),
+        sizeBytes: 0,
+        createdAt: DateTime.now().toUtc().toIso8601String(),
+        note: rx.note,
+        fromSender: rx.fromSender,
+      );
+      final root = await _userDir(rx.email);
+      final ext = _safeExt(item.name);
+      final out = File('${root.path}/$itemId.$ext');
+      rx.item = item;
+      rx.file = out;
+      rx.sink = out.openWrite();
+    } catch (e) {
+      debugPrint('[doc share disk receive] prepare: $e');
+    }
+  }
+
+  static void clearTransferReadCache() {}
+
+  static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
+    final root = await _userDir(email);
+    final f = await _fileForId(root, item.id);
+    if (f == null || !await f.exists()) return;
+    await for (final chunk in f.openRead()) {
+      if (chunk.isEmpty) continue;
+      yield Uint8List.fromList(chunk);
+    }
+  }
+
   static Future<bool> writeDiskReceive(int id, List<int> bytes) async {
     final rx = _diskReceives[id];
     if (rx == null || bytes.isEmpty) return false;

@@ -223,7 +223,7 @@ class NgmyTransfer {
     if (mode == 'webrtc') {
       final offerToken = (row['offerToken'] ?? '').toString();
       if (offerToken.isEmpty) {
-        onStatus?.call('Session not ready. Sender must tap Send again.');
+        onStatus?.call('Session not ready. Sender must tap Start transfer again.');
         return [];
       }
       return NgmyTransferWebRtc.receive(
@@ -231,6 +231,7 @@ class NgmyTransfer {
         offerToken: offerToken,
         onProgress: onProgress,
         onStatus: onStatus,
+        onBytes: onBytes,
       );
     }
 
@@ -253,9 +254,9 @@ class NgmyTransfer {
         transferKey: transferKey,
       );
       if (manifest != null) break;
-      onStatus?.call('Connecting on Wi‑Fi… (${attempt + 1}/4)');
+      onStatus?.call('Connecting on Wi‑Fi…');
       if (attempt < 3) {
-        await Future<void>.delayed(const Duration(milliseconds: 800));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
       }
     }
     if (manifest == null) {
