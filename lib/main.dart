@@ -7942,7 +7942,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final email = authUser?.email?.toLowerCase().trim();
       if (email == null || email.isEmpty) return;
       final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
-      await _signInOrCreateFromGoogle(email, fullName: fullName);
+      await _signInOrCreateFromOAuth(email, fullName: fullName);
       await _persistSessionImmediately();
     } catch (e) {
       debugPrint('[session] supabase auth restore: $e');
@@ -9045,12 +9045,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<String?> _startOAuthSignIn(OAuthProvider provider) async {
+  Future<String?> _startOAuthSignIn(OAuthProvider provider, {String? emailHint}) async {
     await _clearLoggedOutFlag();
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       return _startDesktopOAuthSignIn(provider);
     }
-    return ngmyStartOAuthSignIn(provider);
+    return ngmyStartOAuthSignIn(provider, emailHint: emailHint);
   }
 
   String _appConfigSig(AppConfig c) => jsonEncode(c.toJson());
@@ -10707,10 +10707,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final email = authUser?.email?.toLowerCase().trim();
     if (email == null || email.isEmpty) return;
     final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
-    await _signInOrCreateFromGoogle(email, fullName: fullName);
+    await _signInOrCreateFromOAuth(email, fullName: fullName);
   }
 
-  Future<void> _signInOrCreateFromGoogle(String email, {String fullName = ''}) async {
+  Future<void> _signInOrCreateFromOAuth(String email, {String fullName = ''}) async {
     final emailNorm = email.toLowerCase().trim();
     if (emailNorm.isEmpty) return;
     if (_userExplicitlyLoggedOut || await ngmyReadUserLoggedOutFlag()) {
@@ -12696,8 +12696,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,
-                onGoogleLogin: () => _startOAuthSignIn(OAuthProvider.google),
-                onGithubLogin: () => _startOAuthSignIn(OAuthProvider.github),
+                onGoogleLogin: (emailHint) => _startOAuthSignIn(OAuthProvider.google, emailHint: emailHint),
+                onGithubLogin: (emailHint) => _startOAuthSignIn(OAuthProvider.github, emailHint: emailHint),
                 onResetPasswordByEmail: (email, newHash) async {
                   final emailNorm = email.toLowerCase().trim();
                   debugPrint('[ResetPW] Starting reset for $emailNorm');
@@ -13072,8 +13072,8 @@ class AuthScreen extends StatefulWidget {
   final List<UserData> allUsers;
   final AppConfig config;
   final Future<void> Function(String, String, String, String, bool) onAuthComplete;
-  final Future<String?> Function() onGoogleLogin;
-  final Future<String?> Function() onGithubLogin;
+  final Future<String?> Function(String emailHint) onGoogleLogin;
+  final Future<String?> Function(String emailHint) onGithubLogin;
   final Future<bool> Function(String email, String newPasswordHash) onResetPasswordByEmail;
   const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onGithubLogin, required this.onResetPasswordByEmail, required this.config});
   @override State<AuthScreen> createState() => _AuthScreenState();
@@ -13309,10 +13309,33 @@ class _AuthScreenState extends State<AuthScreen> {
           }
           setLocal(() => isLoading = true);
           try {
-            await Supabase.instance.client.auth.signInWithOtp(
-              email: email,
-              shouldCreateUser: true,
-            );
+            await ngmyWaitForSupabaseReady();
+            final existsInApp = widget.allUsers.any((u) => u.email.toLowerCase().trim() == email);
+            Map<String, dynamic>? row;
+            try {
+              row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
+            } catch (_) {}
+            final oauthLinked = row != null &&
+                (row['isAppLoginAccount'] == true || row['is_app_login_account'] == true);
+            var shouldCreateUser = !existsInApp && row == null;
+            if (oauthLinked || existsInApp || row != null) {
+              shouldCreateUser = false;
+            }
+            try {
+              await Supabase.instance.client.auth.signInWithOtp(
+                email: email,
+                shouldCreateUser: shouldCreateUser,
+              );
+            } catch (otpErr) {
+              if (!shouldCreateUser) {
+                await Supabase.instance.client.auth.signInWithOtp(
+                  email: email,
+                  shouldCreateUser: true,
+                );
+              } else {
+                rethrow;
+              }
+            }
             setLocal(() {
               isLoading = false;
               step = 2;
@@ -13555,7 +13578,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ? null
                     : () async {
                         setState(() => _oauthBusy = true);
-                        final err = await widget.onGoogleLogin();
+                        final err = await widget.onGoogleLogin(_e.text.toLowerCase().trim());
                         if (!mounted) return;
                         setState(() => _oauthBusy = false);
                         if (err == null) return;
@@ -13575,7 +13598,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ? null
                     : () async {
                         setState(() => _oauthBusy = true);
-                        final err = await widget.onGithubLogin();
+                        final err = await widget.onGithubLogin(_e.text.toLowerCase().trim());
                         if (!mounted) return;
                         setState(() => _oauthBusy = false);
                         if (err == null) return;

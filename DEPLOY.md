@@ -84,7 +84,17 @@ cd C:\Users\appbu\StudioProjects\ngmy
 supabase functions deploy ngmy-ai-chat --project-ref gvufllqqxjnpicmkxzcg
 ```
 
-Without this function, the helper may fail in the browser even with a valid API key.
+Without `ngmy-ai-chat`, the helper may fail in the browser even with a valid API key.
+
+**OAuth same-email login (Google + GitHub + email):** run once in SQL Editor:
+
+`supabase/ngmy_auth_reconcile.sql`
+
+Optional Edge Function fallback (Supabase CLI):
+
+```powershell
+supabase functions deploy ngmy-auth-reconcile --project-ref gvufllqqxjnpicmkxzcg
+```
 
 **Game Center timers / dice (required for admin settings to sync to all users):**
 

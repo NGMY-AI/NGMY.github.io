@@ -20,6 +20,65 @@ bool _supabaseAuthInitialized = false;
 /// since the failure happens on a fresh page load with no widget tree yet.
 String? ngmyLastOAuthError;
 
+bool ngmyIsMultipleAccountsOAuthError(String? message) {
+  if (message == null || message.isEmpty) return false;
+  final lower = message.toLowerCase();
+  return lower.contains('multiple accounts') ||
+      lower.contains('same email address') ||
+      lower.contains('linking domain');
+}
+
+String ngmyMultipleAccountsOAuthHelp(String? emailHint) {
+  final email = (emailHint ?? '').trim();
+  if (email.isNotEmpty) {
+    return 'We linked your sign-in methods for $email. Tap Google or GitHub again to continue.';
+  }
+  return 'Your Google and GitHub accounts use the same email. Enter your Gmail above, then tap Google or GitHub again.';
+}
+
+/// Removes duplicate Supabase Auth rows for [email] so OAuth providers share one account.
+Future<bool> ngmyReconcileAuthAccountsByEmail(String email) async {
+  final normalized = email.toLowerCase().trim();
+  if (normalized.isEmpty || !normalized.contains('@')) return false;
+  try {
+    await ngmyEnsureSupabaseAuthInitialized();
+    final client = Supabase.instance.client;
+
+    try {
+      final rpc = await client.rpc(
+        'ngmy_reconcile_auth_by_email',
+        params: {'p_email': normalized},
+      );
+      if (rpc is Map) {
+        final merged = (rpc['merged'] as num?)?.toInt() ?? 0;
+        debugPrint('[ngmy_oauth] reconcile rpc merged=$merged for $normalized');
+        return rpc['ok'] == true || merged > 0;
+      }
+    } catch (rpcErr) {
+      debugPrint('[ngmy_oauth] reconcile rpc failed, trying edge function: $rpcErr');
+    }
+
+    final res = await client.functions.invoke(
+      'ngmy-auth-reconcile',
+      body: {'email': normalized},
+    );
+    if (res.status != 200) {
+      debugPrint('[ngmy_oauth] reconcile ${res.status}: ${res.data}');
+      return false;
+    }
+    final data = res.data;
+    if (data is Map) {
+      final merged = (data['merged'] as num?)?.toInt() ?? 0;
+      debugPrint('[ngmy_oauth] reconcile merged=$merged for $normalized');
+      return merged > 0 || data['ok'] == true;
+    }
+    return true;
+  } catch (e) {
+    debugPrint('[ngmy_oauth] reconcile failed: $e');
+    return false;
+  }
+}
+
 bool _isLocalDevHost(String host) {
   final h = host.toLowerCase();
   return h == 'localhost' || h == '127.0.0.1' || h.endsWith('.local');
@@ -100,29 +159,94 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
     // already exchanged this one-time code/token. Exchanging it again here
     // would only fail (code/verifier already consumed) and mask real errors.
     if (Supabase.instance.client.auth.currentSession != null) {
+      ngmyOAuthTakeEmailHint();
+      ngmyOAuthTakeProviderHint();
       ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       return;
     }
     if (hasError) {
       final desc = uri.queryParameters['error_description'] ?? uri.queryParameters['error'] ?? '';
-      ngmyLastOAuthError = desc.isNotEmpty
-          ? 'Login failed: ${desc.replaceAll('+', ' ')}'
-          : 'Login failed or was cancelled.';
+      final decoded = desc.isNotEmpty ? desc.replaceAll('+', ' ') : '';
+      if (ngmyIsMultipleAccountsOAuthError(decoded)) {
+        final hint = ngmyOAuthPeekEmailHint() ?? ngmyOAuthTakeEmailHint();
+        final providerName = ngmyOAuthTakeProviderHint();
+        if (hint != null && hint.isNotEmpty) {
+          await ngmyReconcileAuthAccountsByEmail(hint);
+          final provider = _oauthProviderFromName(providerName);
+          if (provider != null) {
+            ngmyOAuthStoreEmailHint(hint);
+            ngmyOAuthStoreProviderHint(provider.name);
+            final retryErr = await _signInWithOAuthRedirect(provider, emailHint: hint);
+            if (retryErr != null) {
+              ngmyLastOAuthError = retryErr;
+            }
+            ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
+            return;
+          }
+          ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
+        } else {
+          ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(null);
+        }
+      } else {
+        ngmyLastOAuthError = decoded.isNotEmpty ? 'Login failed: $decoded' : 'Login failed or was cancelled.';
+      }
+      ngmyOAuthTakeEmailHint();
+      ngmyOAuthTakeProviderHint();
       ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       return;
     }
     await Supabase.instance.client.auth.getSessionFromUrl(uri);
+    ngmyOAuthTakeEmailHint();
+    ngmyOAuthTakeProviderHint();
     ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
   } catch (e) {
     debugPrint('[ngmy_oauth] session recovery failed: $e');
     try {
       if (Supabase.instance.client.auth.currentSession != null) {
+        ngmyOAuthTakeEmailHint();
+        ngmyOAuthTakeProviderHint();
         ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       } else {
-        ngmyLastOAuthError = 'Login failed: $e';
+        final errText = e.toString();
+        if (ngmyIsMultipleAccountsOAuthError(errText)) {
+          final hint = ngmyOAuthPeekEmailHint() ?? ngmyOAuthTakeEmailHint();
+          final providerName = ngmyOAuthTakeProviderHint();
+          if (hint != null && hint.isNotEmpty) {
+            await ngmyReconcileAuthAccountsByEmail(hint);
+            final provider = _oauthProviderFromName(providerName);
+            if (provider != null) {
+              ngmyOAuthStoreEmailHint(hint);
+              ngmyOAuthStoreProviderHint(provider.name);
+              final retryErr = await _signInWithOAuthRedirect(provider, emailHint: hint);
+              if (retryErr != null) {
+                ngmyLastOAuthError = retryErr;
+              }
+              ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
+              return;
+            }
+            ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
+          } else {
+            ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(null);
+          }
+        } else {
+          ngmyLastOAuthError = 'Login failed: $e';
+        }
+        ngmyOAuthTakeEmailHint();
+        ngmyOAuthTakeProviderHint();
         ngmyOAuthCleanBrowserUrl(ngmyOAuthCleanTargetUrl());
       }
     } catch (_) {}
+  }
+}
+
+OAuthProvider? _oauthProviderFromName(String? name) {
+  switch ((name ?? '').trim().toLowerCase()) {
+    case 'google':
+      return OAuthProvider.google;
+    case 'github':
+      return OAuthProvider.github;
+    default:
+      return null;
   }
 }
 
@@ -188,16 +312,19 @@ Future<String?> _signInWithGoogleIdToken() async {
   if (clientId == null) {
     return 'Could not start Google login. Check Supabase Google provider settings.';
   }
+  GoogleSignInAccount? account;
+  GoogleSignInAuthentication? googleAuth;
+  String? idToken;
   try {
     final googleSignIn = GoogleSignIn(
       clientId: clientId,
       scopes: const ['email', 'profile', 'openid'],
     );
     await googleSignIn.signOut();
-    final account = await googleSignIn.signIn();
+    account = await googleSignIn.signIn();
     if (account == null) return null;
-    final googleAuth = await account.authentication;
-    final idToken = googleAuth.idToken;
+    googleAuth = await account.authentication;
+    idToken = googleAuth.idToken;
     if (idToken == null || idToken.isEmpty) {
       return 'Google login failed: no ID token returned.';
     }
@@ -209,12 +336,36 @@ Future<String?> _signInWithGoogleIdToken() async {
     return null;
   } catch (e) {
     debugPrint('[ngmy_oauth] google id token sign-in: $e');
+    final errText = e.toString();
+    if (ngmyIsMultipleAccountsOAuthError(errText)) {
+      final email = account?.email.toLowerCase().trim();
+      if (email != null && email.isNotEmpty && idToken != null && googleAuth != null) {
+        await ngmyReconcileAuthAccountsByEmail(email);
+        try {
+          await Supabase.instance.client.auth.signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: idToken,
+            accessToken: googleAuth.accessToken,
+          );
+          return null;
+        } catch (_) {
+          return ngmyMultipleAccountsOAuthHelp(email);
+        }
+      }
+      return ngmyMultipleAccountsOAuthHelp(null);
+    }
     return 'Google login failed: $e';
   }
 }
 
-Future<String?> _signInWithOAuthRedirect(OAuthProvider provider) async {
+Future<String?> _signInWithOAuthRedirect(OAuthProvider provider, {String? emailHint}) async {
   await ngmyEnsureSupabaseAuthInitialized();
+  final hint = emailHint?.toLowerCase().trim();
+  if (hint != null && hint.isNotEmpty && hint.contains('@')) {
+    ngmyOAuthStoreEmailHint(hint);
+    await ngmyReconcileAuthAccountsByEmail(hint);
+  }
+  ngmyOAuthStoreProviderHint(provider.name);
   final redirectTo = ngmyOAuthRedirectUrl();
   debugPrint('[ngmy_oauth] ${provider.name} host=${ngmyWebHostname()} redirect_to=$redirectTo');
   try {
@@ -250,9 +401,9 @@ String _oauthSetupError(OAuthProvider provider, Object e) {
       'Error: $e';
 }
 
-Future<String?> ngmyStartOAuthSignIn(OAuthProvider provider) async {
+Future<String?> ngmyStartOAuthSignIn(OAuthProvider provider, {String? emailHint}) async {
   if (kIsWeb) {
-    return _signInWithOAuthRedirect(provider);
+    return _signInWithOAuthRedirect(provider, emailHint: emailHint);
   }
   if (provider == OAuthProvider.google) {
     await ngmyEnsureSupabaseAuthInitialized();
@@ -260,5 +411,5 @@ Future<String?> ngmyStartOAuthSignIn(OAuthProvider provider) async {
     if (googleErr == null) return null;
     debugPrint('[ngmy_oauth] Google ID token path failed, trying redirect: $googleErr');
   }
-  return _signInWithOAuthRedirect(provider);
+  return _signInWithOAuthRedirect(provider, emailHint: emailHint);
 }
