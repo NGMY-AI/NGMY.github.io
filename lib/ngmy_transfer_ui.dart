@@ -7,6 +7,8 @@ import 'ngmy_doc_share_models.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_transfer.dart';
 import 'ngmy_transfer_constants.dart';
+import 'ngmy_transfer_server.dart';
+import 'ngmy_transfer_webrtc.dart';
 
 /// Opens Send directly for the given file(s) — from the ⋮ menu only.
 Future<void> openNgmyTransferSend(
@@ -104,8 +106,15 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
 
     if (session.mode == NgmyTransferMode.webrtc) {
       _webrtcPoll?.cancel();
-      _webrtcPoll = Timer.periodic(const Duration(seconds: 2), (_) async {
-        await NgmyTransfer.pollWebRtcAnswerIfNeeded(session);
+      _webrtcPoll = Timer.periodic(const Duration(milliseconds: 350), (_) async {
+        if (!mounted || _session == null) return;
+        final linked = await NgmyTransferWebRtc.applyAnswerWhenReady(_session!.offerToken!);
+        if (linked && mounted) {
+          setState(() {
+            _receiverConnected = true;
+            _status = 'Receiver connected — sending…';
+          });
+        }
       });
     }
   }

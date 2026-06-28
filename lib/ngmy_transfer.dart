@@ -165,6 +165,22 @@ class NgmyTransfer {
     await NgmyTransferWebRtc.applyAnswerWhenReady(token);
   }
 
+  /// Poll until receiver connects or [maxWait] elapses (web/WebRTC send).
+  static Future<bool> waitForWebRtcReceiver(
+    NgmyTransferSendSession session, {
+    Duration maxWait = const Duration(seconds: 45),
+  }) async {
+    if (session.mode != NgmyTransferMode.webrtc) return true;
+    final token = session.offerToken;
+    if (token == null || token.isEmpty) return false;
+    final deadline = DateTime.now().add(maxWait);
+    while (DateTime.now().isBefore(deadline)) {
+      if (await NgmyTransferWebRtc.applyAnswerWhenReady(token)) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+    }
+    return false;
+  }
+
   static Future<List<NgmyDocShareItem>> receiveByCode({
     required String recipientEmail,
     required String code,
@@ -178,12 +194,14 @@ class NgmyTransfer {
       return [];
     }
 
-    onStatus?.call('Looking up session…');
+    onStatus?.call('Looking up code…');
     Map<String, dynamic>? row;
-    for (var attempt = 0; attempt < 8; attempt++) {
+    for (var attempt = 0; attempt < 4; attempt++) {
       row = await NgmyTransferRendezvous.lookup(normalized);
       if (row != null) break;
-      await Future<void>.delayed(Duration(milliseconds: 600 + attempt * 400));
+      if (attempt < 3) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
     }
     if (row == null) {
       onStatus?.call('Code not found. Check the 6-digit number and ask sender to keep Send open.');
@@ -229,14 +247,16 @@ class NgmyTransfer {
     onStatus?.call('Connecting on Wi‑Fi…');
 
     Map<String, dynamic>? manifest;
-    for (var attempt = 0; attempt < 6; attempt++) {
+    for (var attempt = 0; attempt < 4; attempt++) {
       manifest = await NgmyTransferDownload.fetchManifest(
         manifestUri: manifestUri,
         transferKey: transferKey,
       );
       if (manifest != null) break;
-      onStatus?.call('Connecting… same Wi‑Fi or hotspot (${attempt + 1}/6)');
-      await Future<void>.delayed(const Duration(seconds: 2));
+      onStatus?.call('Connecting on Wi‑Fi… (${attempt + 1}/4)');
+      if (attempt < 3) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+      }
     }
     if (manifest == null) {
       onStatus?.call(

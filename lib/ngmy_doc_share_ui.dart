@@ -758,13 +758,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'transfer_send'),
                   ),
                   _DocShareMenuTile(
-                    icon: Icons.south_west_rounded,
-                    label: 'NGMY Transfer · Receive',
-                    subtitle: 'Enter sender\'s 6-digit code',
-                    colors: c,
-                    onTap: () => Navigator.pop(ctx, 'transfer_receive'),
-                  ),
-                  _DocShareMenuTile(
                     icon: Icons.download_rounded,
                     label: 'Download / save',
                     colors: c,
@@ -793,8 +786,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_showQrForOne(item));
       case 'transfer_send':
         unawaited(_openNgmyTransferSend(item));
-      case 'transfer_receive':
-        unawaited(_openNgmyTransferReceive());
       case 'save':
         unawaited(_saveItem(item));
       case 'delete':
@@ -959,6 +950,69 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     await _refresh();
   }
 
+  Future<void> _showTopMenu() async {
+    final c = _docShareColors(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: kNgmyStudioHubAccent.withValues(alpha: 0.35))),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: c.muted.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  Text('Doc Share options', style: TextStyle(color: c.fg, fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 14),
+                  _DocShareMenuTile(
+                    icon: Icons.south_west_rounded,
+                    label: 'NGMY Transfer · Receive',
+                    subtitle: 'Enter sender\'s 6-digit number code',
+                    accent: true,
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'transfer_receive'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.upload_file_rounded,
+                    label: 'Import backup',
+                    subtitle: '.ngmydoc file from another device',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'import'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'transfer_receive':
+        unawaited(_openNgmyTransferReceive());
+      case 'import':
+        unawaited(_importBackupFile());
+    }
+  }
+
   IconData _iconFor(NgmyDocShareItem item) {
     if (item.isVideo) return Icons.videocam_rounded;
     if (item.isImage) return Icons.image_rounded;
@@ -992,18 +1046,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
             ),
           IconButton(tooltip: 'Scan QR', onPressed: _working ? null : _scanQr, icon: const Icon(Icons.qr_code_scanner_rounded)),
           IconButton(tooltip: 'Upload files', onPressed: _working ? null : _pickUpload, icon: const Icon(Icons.add_rounded)),
-          PopupMenuButton<String>(
-            tooltip: 'More',
+          IconButton(
+            tooltip: 'More options',
+            onPressed: _working ? null : () => unawaited(_showTopMenu()),
             icon: const Icon(Icons.more_vert_rounded),
-            onSelected: (v) {
-              if (v == 'import') unawaited(_importBackupFile());
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'import',
-                child: Text('Import backup (.ngmydoc)'),
-              ),
-            ],
           ),
         ],
       ),

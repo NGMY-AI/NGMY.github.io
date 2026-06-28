@@ -274,7 +274,7 @@ Future<({String answerQr, Future<List<NgmyDocShareItem>> transfer})?> beginRecei
       email: recipientEmail,
       name: name,
       mime: mime,
-      note: 'Received via QR',
+      note: 'NGMY Transfer',
     );
   }
 
