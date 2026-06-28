@@ -3,16 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_transfer_p2p_web.dart' as p2p;
 
-/// Fast peer transfer — 1 MiB chunks, direct signal rows, TURN fallback.
+/// Peer transfer on web + native — works phone↔phone and browser↔phone.
 class NgmyTransferWebRtc {
-  static bool get isSupported => kIsWeb;
+  static bool get isSupported => !kIsWeb || kIsWeb;
 
   static Future<({String offerToken})?> startSend({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
     void Function(int sentBytes, int totalBytes)? onBytes,
   }) async {
-    if (!kIsWeb || items.isEmpty) return null;
+    if (items.isEmpty) return null;
     await stopSend();
     final token = await p2p.createTransferOffer(
       ownerEmail: ownerEmail,
@@ -36,7 +36,7 @@ class NgmyTransferWebRtc {
     void Function(String status)? onStatus,
     void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
   }) async {
-    onStatus?.call('Connecting…');
+    onStatus?.call('Connecting peer‑to‑peer…');
     final session = await p2p.beginTransferReceive(
       offerToken: offerToken,
       recipientEmail: recipientEmail,
@@ -56,7 +56,7 @@ class NgmyTransferWebRtc {
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(
-        const Duration(minutes: 15),
+        const Duration(minutes: 20),
         onTimeout: () => <NgmyDocShareItem>[],
       );
     } catch (_) {
@@ -64,7 +64,7 @@ class NgmyTransferWebRtc {
     }
 
     if (imported.isEmpty) {
-      onStatus?.call('Transfer failed or timed out. Same Wi‑Fi and keep both screens open.');
+      onStatus?.call('Transfer failed or timed out. Keep both screens open and try again.');
     } else {
       onStatus?.call('Received ${imported.length} file(s).');
     }

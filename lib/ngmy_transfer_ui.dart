@@ -100,7 +100,8 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
     if (session == null) {
       setState(() {
         _starting = false;
-        _error = 'Could not start. Check your connection and try again.';
+        _error =
+            'Could not start transfer. Check internet connection, then tap Start transfer again.';
         _status = '';
       });
       return;
@@ -109,15 +110,15 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
     setState(() {
       _starting = false;
       _session = session;
-      _status = session.mode == NgmyTransferMode.webrtc
-          ? 'Waiting for receiver to enter this 6-digit code…'
+      _status = session.hasWebRtc
+          ? 'Share this 6-digit code — receiver opens ⋮ → NGMY Transfer → Receive'
           : 'Waiting on same Wi‑Fi — receiver enters the code below…';
     });
 
-    if (session.mode == NgmyTransferMode.webrtc) {
+    if (session.hasWebRtc) {
       _webrtcPoll?.cancel();
-      _webrtcPoll = Timer.periodic(const Duration(milliseconds: 200), (_) async {
-        if (!mounted || _session == null) return;
+      _webrtcPoll = Timer.periodic(const Duration(milliseconds: 250), (_) async {
+        if (!mounted || _session == null || !_session!.hasWebRtc) return;
         final linked = await NgmyTransferWebRtc.applyAnswerWhenReady(_session!.offerToken!);
         if (linked && mounted) {
           setState(() {

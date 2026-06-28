@@ -6,6 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_doc_share_webrtc_stash.dart';
 import 'ngmy_transfer_signal.dart';
 
 const int _kMaxBufferedBytes = 6 * 1024 * 1024;
@@ -14,18 +15,7 @@ const Map<String, dynamic> _rtcConfig = {
   'iceServers': [
     {'urls': 'stun:stun.l.google.com:19302'},
     {'urls': 'stun:stun1.l.google.com:19302'},
-    {
-      'urls': 'turn:openrelay.metered.ca:80',
-      'username': 'openrelayproject',
-      'credential': 'openrelayproject',
-    },
-    {
-      'urls': 'turn:openrelay.metered.ca:443',
-      'username': 'openrelayproject',
-      'credential': 'openrelayproject',
-    },
   ],
-  'iceCandidatePoolSize': 4,
 };
 
 RTCPeerConnection? _txPc;
@@ -43,6 +33,7 @@ Future<void> stopTransferP2p() async {
   _txBytesCallback = null;
   if (token != null) {
     unawaited(NgmyTransferSignal.clear(token));
+    unawaited(NgmyDocShareWebRtcStash.clear(token));
   }
   await _txChannel?.close();
   await _txPc?.close();
@@ -56,7 +47,7 @@ Future<void> stopTransferP2p() async {
   NgmyDocShareStore.clearTransferReadCache();
 }
 
-Future<void> _waitIceBrief(RTCPeerConnection pc) async {
+Future<void> _waitIceGathering(RTCPeerConnection pc) async {
   if (pc.iceGatheringState == RTCIceGatheringState.RTCIceGatheringStateComplete) return;
   final c = Completer<void>();
   pc.onIceGatheringState = (state) {
@@ -64,12 +55,29 @@ Future<void> _waitIceBrief(RTCPeerConnection pc) async {
       c.complete();
     }
   };
-  await c.future.timeout(const Duration(milliseconds: 600), onTimeout: () {});
+  await c.future.timeout(const Duration(seconds: 10), onTimeout: () {});
+}
+
+Future<String?> _loadOfferJson(String token) async {
+  final fast = await NgmyTransferSignal.consumeOffer(token);
+  if (fast != null && fast.trim().isNotEmpty) return fast;
+  return NgmyDocShareWebRtcStash.consumeOffer(token);
+}
+
+Future<String?> _pollAnswerJson(String token) async {
+  final fast = await NgmyTransferSignal.pollAnswer(token);
+  if (fast != null && fast.trim().isNotEmpty) return fast;
+  return NgmyDocShareWebRtcStash.pollAnswer(token);
+}
+
+Future<bool> _stashAnswerJson(String token, String answerJson) async {
+  if (await NgmyTransferSignal.stashAnswer(token, answerJson)) return true;
+  return NgmyDocShareWebRtcStash.stashAnswer(token, answerJson);
 }
 
 Future<void> _sendBinary(RTCDataChannel channel, Uint8List chunk) async {
   while ((channel.bufferedAmount ?? 0) > _kMaxBufferedBytes) {
-    await Future<void>.delayed(const Duration(milliseconds: 2));
+    await Future<void>.delayed(const Duration(milliseconds: 4));
   }
   channel.send(RTCDataChannelMessage.fromBinary(chunk));
 }
@@ -91,22 +99,17 @@ Future<String?> createTransferOffer({
   final token = NgmyTransferSignal.generateToken();
   final pc = await createPeerConnection(_rtcConfig);
   _txPc = pc;
-  final channel = await pc.createDataChannel(
-    'ngmytransfer',
-    RTCDataChannelInit()
-      ..ordered = true
-      ..maxRetransmits = 64,
-  );
+  final channel = await pc.createDataChannel('ngmytransfer', RTCDataChannelInit());
   _txChannel = channel;
   channel.onDataChannelState = (state) {
     if (state == RTCDataChannelState.RTCDataChannelOpen) {
-      unawaited(_pushFilesFast(channel));
+      unawaited(_pushFiles(channel));
     }
   };
 
-  final offer = await pc.createOffer({'offerToReceiveAudio': false, 'offerToReceiveVideo': false});
+  final offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  await _waitIceBrief(pc);
+  await _waitIceGathering(pc);
 
   final sdp = (await pc.getLocalDescription())?.sdp?.trim() ?? '';
   if (sdp.isEmpty) {
@@ -127,7 +130,7 @@ Future<String?> createTransferOffer({
 
 Future<bool> applyTransferAnswer(String offerToken) async {
   if (_txAnswerApplied) return true;
-  final answerJson = await NgmyTransferSignal.pollAnswer(offerToken);
+  final answerJson = await _pollAnswerJson(offerToken);
   if (answerJson == null || _txPc == null) return false;
   try {
     final decoded = jsonDecode(answerJson);
@@ -143,7 +146,7 @@ Future<bool> applyTransferAnswer(String offerToken) async {
   }
 }
 
-Future<void> _pushFilesFast(RTCDataChannel channel) async {
+Future<void> _pushFiles(RTCDataChannel channel) async {
   final email = _txOwnerEmail;
   if (email == null) return;
   try {
@@ -164,6 +167,11 @@ Future<void> _pushFilesFast(RTCDataChannel channel) async {
         sent += chunk.length;
         _txBytesCallback?.call(sent, size);
       }
+      if (sent <= 0 && size > 0) {
+        debugPrint('[ngmy transfer p2p] no bytes read for ${item.name}');
+        channel.send(RTCDataChannelMessage(jsonEncode({'type': 'error', 'msg': 'read failed'})));
+        return;
+      }
     }
     channel.send(RTCDataChannelMessage(jsonEncode({'type': 'done'})));
   } catch (e) {
@@ -179,7 +187,7 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   void Function(int received, int total)? onProgress,
   void Function(int fileIndex, int receivedBytes, int totalBytes)? onBytes,
 }) async {
-  final jsonText = await NgmyTransferSignal.consumeOffer(offerToken);
+  final jsonText = await _loadOfferJson(offerToken);
   if (jsonText == null) return null;
 
   final decoded = jsonDecode(jsonText);
@@ -227,7 +235,7 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
         }
         return;
       }
-      unawaited(() async {
+      unawaited(Future<void>(() async {
         try {
           final data = jsonDecode(msg.text);
           if (data is! Map) return;
@@ -250,24 +258,27 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
           } else if (type == 'done') {
             await finalizeCurrentFile();
             if (!done.isCompleted) done.complete(imported);
+          } else if (type == 'error') {
+            if (!done.isCompleted) done.complete(imported);
           }
         } catch (e) {
           debugPrint('[ngmy transfer p2p] recv: $e');
           if (!done.isCompleted) done.complete(imported);
         }
-      }());
+      }));
     };
   };
 
   await pc.setRemoteDescription(RTCSessionDescription(offerSdp, 'offer'));
   final answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
-  await _waitIceBrief(pc);
+  await _waitIceGathering(pc);
 
   final answerSdp = (await pc.getLocalDescription())?.sdp?.trim() ?? '';
   if (answerSdp.isEmpty) return null;
 
-  await NgmyTransferSignal.stashAnswer(offerToken, jsonEncode({'s': answerSdp}));
+  final answerOk = await _stashAnswerJson(offerToken, jsonEncode({'s': answerSdp}));
+  if (!answerOk) return null;
 
   return (transfer: done.future);
 }

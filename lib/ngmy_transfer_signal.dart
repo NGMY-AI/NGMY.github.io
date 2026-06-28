@@ -9,7 +9,6 @@ import 'ngmy_network_resilience.dart';
 /// One row per transfer token — fast poll (no giant signals map).
 const String kNgmyTransferSignalPrefix = 'WT';
 const String _kRowPrefix = 'ngmy_transfer_signal_v1_';
-const Duration _kSignalTimeout = Duration(seconds: 4);
 
 class NgmyTransferSignal {
   static String _rowKey(String token) => '$_kRowPrefix${token.trim()}';
@@ -25,7 +24,6 @@ class NgmyTransferSignal {
     required String ownerEmail,
     required String innerJson,
   }) async {
-    if (!await ngmyCanReachCloud()) return null;
     final json = innerJson.trim();
     if (json.isEmpty) return null;
     final id = token.trim();
@@ -43,7 +41,7 @@ class NgmyTransferSignal {
           },
           'updated_at': now.toIso8601String(),
         },
-      ], onConflict: 'key').timeout(_kSignalTimeout);
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
       return id;
     } catch (e) {
       debugPrint('[ngmy transfer signal] stash offer: $e');
@@ -54,14 +52,13 @@ class NgmyTransferSignal {
   static Future<String?> consumeOffer(String token) async {
     final id = token.trim();
     if (id.isEmpty) return null;
-    if (!await ngmyCanReachCloud()) return null;
     try {
       final row = await Supabase.instance.client
           .from('ngmy_settings')
           .select()
           .eq('key', _rowKey(id))
           .maybeSingle()
-          .timeout(_kSignalTimeout);
+          .timeout(kNgmyCloudLoadTimeout);
       if (row == null) return null;
       final value = row['value'];
       if (value is! Map) return null;
@@ -77,29 +74,42 @@ class NgmyTransferSignal {
   static Future<bool> stashAnswer(String token, String answerJson) async {
     final id = token.trim();
     if (id.isEmpty || answerJson.trim().isEmpty) return false;
-    if (!await ngmyCanReachCloud()) return false;
     try {
       final row = await Supabase.instance.client
           .from('ngmy_settings')
           .select()
           .eq('key', _rowKey(id))
           .maybeSingle()
-          .timeout(_kSignalTimeout);
-      if (row == null) return false;
+          .timeout(kNgmyCloudLoadTimeout);
+      final now = DateTime.now().toUtc();
+      final answerB64 = base64Encode(utf8.encode(answerJson.trim()));
+      if (row == null) {
+        await Supabase.instance.client.from('ngmy_settings').upsert([
+          {
+            'key': _rowKey(id),
+            'value': {
+              'token': id,
+              'answer': answerB64,
+              'answerAt': now.toIso8601String(),
+            },
+            'updated_at': now.toIso8601String(),
+          },
+        ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+        return true;
+      }
       final value = row['value'];
       if (value is! Map) return false;
-      final now = DateTime.now().toUtc();
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': _rowKey(id),
           'value': {
             ...Map<String, dynamic>.from(value),
-            'answer': base64Encode(utf8.encode(answerJson.trim())),
+            'answer': answerB64,
             'answerAt': now.toIso8601String(),
           },
           'updated_at': now.toIso8601String(),
         },
-      ], onConflict: 'key').timeout(_kSignalTimeout);
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       debugPrint('[ngmy transfer signal] stash answer: $e');
@@ -110,14 +120,13 @@ class NgmyTransferSignal {
   static Future<String?> pollAnswer(String token) async {
     final id = token.trim();
     if (id.isEmpty) return null;
-    if (!await ngmyCanReachCloud()) return null;
     try {
       final row = await Supabase.instance.client
           .from('ngmy_settings')
           .select()
           .eq('key', _rowKey(id))
           .maybeSingle()
-          .timeout(_kSignalTimeout);
+          .timeout(kNgmyCloudLoadTimeout);
       if (row == null) return null;
       final value = row['value'];
       if (value is! Map) return null;
@@ -138,7 +147,7 @@ class NgmyTransferSignal {
           .from('ngmy_settings')
           .delete()
           .eq('key', _rowKey(id))
-          .timeout(_kSignalTimeout);
+          .timeout(kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[ngmy transfer signal] clear: $e');
     }

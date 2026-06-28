@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_transfer_download.dart';
@@ -7,7 +9,7 @@ import 'ngmy_transfer_rendezvous.dart';
 import 'ngmy_transfer_server.dart';
 import 'ngmy_transfer_webrtc.dart';
 
-enum NgmyTransferMode { lan, webrtc }
+enum NgmyTransferMode { hybrid, lan, webrtc }
 
 class NgmyTransferSendSession {
   NgmyTransferSendSession({
@@ -27,6 +29,8 @@ class NgmyTransferSendSession {
   final String? offerToken;
 
   void Function(int sent, int total)? onFileComplete;
+
+  bool get hasWebRtc => offerToken != null && offerToken!.isNotEmpty;
 }
 
 class NgmyTransfer {
@@ -38,6 +42,7 @@ class NgmyTransfer {
       .map((e) => {'id': e.id, 'name': e.name, 'mime': e.mime, 'sizeBytes': e.sizeBytes})
       .toList();
 
+  /// Start send — always creates a WebRTC session; native also starts LAN when possible.
   static Future<NgmyTransferSendSession?> startSend({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
@@ -50,122 +55,78 @@ class NgmyTransfer {
     unawaited(NgmyDocShareStore.preloadForTransfer(ownerEmail, items));
 
     final transferKey = NgmyTransferRendezvous.generateTransferKey();
+    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+    final manifest = _fileManifest(items);
 
-    if (NgmyTransferServer.isSupported) {
-      final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
-      final manifest = _fileManifest(items);
-      final codeFuture = NgmyTransferRendezvous.generateUniqueCode();
-      final startedFuture = NgmyTransferServer.start(
-        ownerEmail: ownerEmail,
-        transferKey: transferKey,
-        items: items,
-        onFileComplete: onFileComplete,
-      );
-      final code = await codeFuture;
-      final started = await startedFuture;
-      if (code == null || started == null) {
-        await NgmyTransferServer.stop();
-        return null;
-      }
+    final codeFuture = NgmyTransferRendezvous.generateUniqueCode();
+    final webrtcFuture = NgmyTransferWebRtc.startSend(
+      ownerEmail: ownerEmail,
+      items: items,
+      onBytes: onSendBytes,
+    );
+    final lanFuture = NgmyTransferServer.isSupported
+        ? NgmyTransferServer.start(
+            ownerEmail: ownerEmail,
+            transferKey: transferKey,
+            items: items,
+            onFileComplete: onFileComplete,
+          )
+        : Future<({String host, int port, String sessionId})?>.value(null);
 
-      final lanFiles = NgmyTransferServer.manifestFiles();
-      final published = await NgmyTransferRendezvous.publish(
-        code: code,
-        transferKey: transferKey,
-        ownerEmail: ownerEmail,
-        host: started.host,
-        port: started.port,
-        sessionId: started.sessionId,
-        files: lanFiles.isNotEmpty ? lanFiles : manifest,
-        mode: 'lan',
-      );
-      if (!published) {
-        await NgmyTransferServer.stop();
-        return null;
-      }
+    final code = await codeFuture;
+    final web = await webrtcFuture;
+    final lan = await lanFuture;
 
-      NgmyTransferRendezvous.startHeartbeat(
-        code: code,
-        transferKey: transferKey,
-        ownerEmail: ownerEmail,
-        host: started.host,
-        port: started.port,
-        sessionId: started.sessionId,
-        files: lanFiles.isNotEmpty ? lanFiles : manifest,
-        mode: 'lan',
-      );
-
-      final session = NgmyTransferSendSession(
-        code: code,
-        transferKey: transferKey,
-        fileCount: items.length,
-        totalBytes: totalBytes,
-        mode: NgmyTransferMode.lan,
-      );
-      session.onFileComplete = onFileComplete;
-      _activeSend = session;
-      return session;
+    if (code == null || web == null) {
+      await NgmyTransferServer.stop();
+      await NgmyTransferWebRtc.stopSend();
+      return null;
     }
 
-    if (NgmyTransferWebRtc.isSupported) {
-      final codeFuture = NgmyTransferRendezvous.generateUniqueCode();
-      final webFuture = NgmyTransferWebRtc.startSend(
-        ownerEmail: ownerEmail,
-        items: items,
-        onBytes: onSendBytes,
-      );
-      final code = await codeFuture;
-      final web = await webFuture;
-      if (code == null || web == null) {
-        await NgmyTransferWebRtc.stopSend();
-        return null;
-      }
+    final lanFiles = lan != null ? NgmyTransferServer.manifestFiles() : <Map<String, dynamic>>[];
+    final mode = lan != null ? 'hybrid' : 'webrtc';
+    final sessionMode = lan != null ? NgmyTransferMode.hybrid : NgmyTransferMode.webrtc;
 
-      final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
-      final manifest = _fileManifest(items);
-
-      final published = await NgmyTransferRendezvous.publish(
-        code: code,
-        transferKey: transferKey,
-        ownerEmail: ownerEmail,
-        host: '',
-        port: 0,
-        sessionId: '',
-        files: manifest,
-        mode: 'webrtc',
-        offerToken: web.offerToken,
-      );
-      if (!published) {
-        await NgmyTransferWebRtc.stopSend();
-        return null;
-      }
-
-      NgmyTransferRendezvous.startHeartbeat(
-        code: code,
-        transferKey: transferKey,
-        ownerEmail: ownerEmail,
-        host: '',
-        port: 0,
-        sessionId: '',
-        files: manifest,
-        mode: 'webrtc',
-        offerToken: web.offerToken,
-      );
-
-      final session = NgmyTransferSendSession(
-        code: code,
-        transferKey: transferKey,
-        fileCount: items.length,
-        totalBytes: totalBytes,
-        mode: NgmyTransferMode.webrtc,
-        offerToken: web.offerToken,
-      );
-      session.onFileComplete = onFileComplete;
-      _activeSend = session;
-      return session;
+    final published = await NgmyTransferRendezvous.publish(
+      code: code,
+      transferKey: transferKey,
+      ownerEmail: ownerEmail,
+      host: lan?.host ?? '',
+      port: lan?.port ?? 0,
+      sessionId: lan?.sessionId ?? '',
+      files: lanFiles.isNotEmpty ? lanFiles : manifest,
+      mode: mode,
+      offerToken: web.offerToken,
+    );
+    if (!published) {
+      await NgmyTransferServer.stop();
+      await NgmyTransferWebRtc.stopSend();
+      return null;
     }
 
-    return null;
+    NgmyTransferRendezvous.startHeartbeat(
+      code: code,
+      transferKey: transferKey,
+      ownerEmail: ownerEmail,
+      host: lan?.host ?? '',
+      port: lan?.port ?? 0,
+      sessionId: lan?.sessionId ?? '',
+      files: lanFiles.isNotEmpty ? lanFiles : manifest,
+      mode: mode,
+      offerToken: web.offerToken,
+    );
+
+    final session = NgmyTransferSendSession(
+      code: code,
+      transferKey: transferKey,
+      fileCount: items.length,
+      totalBytes: totalBytes,
+      mode: sessionMode,
+      offerToken: web.offerToken,
+    );
+    session.onFileComplete = onFileComplete;
+    _activeSend = session;
+    return session;
   }
 
   static Future<void> stopSend() async {
@@ -179,25 +140,16 @@ class NgmyTransfer {
     }
   }
 
-  static Future<void> pollWebRtcAnswerIfNeeded(NgmyTransferSendSession session) async {
-    if (session.mode != NgmyTransferMode.webrtc) return;
-    final token = session.offerToken;
-    if (token == null || token.isEmpty) return;
-    await NgmyTransferWebRtc.applyAnswerWhenReady(token);
-  }
-
-  /// Poll until receiver connects or [maxWait] elapses (web/WebRTC send).
   static Future<bool> waitForWebRtcReceiver(
     NgmyTransferSendSession session, {
-    Duration maxWait = const Duration(seconds: 45),
+    Duration maxWait = const Duration(seconds: 60),
   }) async {
-    if (session.mode != NgmyTransferMode.webrtc) return true;
-    final token = session.offerToken;
-    if (token == null || token.isEmpty) return false;
+    if (!session.hasWebRtc) return true;
+    final token = session.offerToken!;
     final deadline = DateTime.now().add(maxWait);
     while (DateTime.now().isBefore(deadline)) {
       if (await NgmyTransferWebRtc.applyAnswerWhenReady(token)) return true;
-      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await Future<void>.delayed(const Duration(milliseconds: 250));
     }
     return false;
   }
@@ -217,11 +169,11 @@ class NgmyTransfer {
 
     onStatus?.call('Looking up code…');
     Map<String, dynamic>? row;
-    for (var attempt = 0; attempt < 4; attempt++) {
+    for (var attempt = 0; attempt < 6; attempt++) {
       row = await NgmyTransferRendezvous.lookup(normalized);
       if (row != null) break;
-      if (attempt < 3) {
-        await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (attempt < 5) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
       }
     }
     if (row == null) {
@@ -229,8 +181,9 @@ class NgmyTransfer {
       return [];
     }
 
-    final mode = (row['mode'] ?? 'lan').toString().toLowerCase();
+    final mode = (row['mode'] ?? 'webrtc').toString().toLowerCase();
     final ownerEmail = (row['ownerEmail'] ?? '').toString();
+    final offerToken = (row['offerToken'] ?? '').toString();
 
     final expiresRaw = (row['expiresAt'] ?? '').toString();
     if (expiresRaw.isNotEmpty) {
@@ -241,19 +194,44 @@ class NgmyTransfer {
       }
     }
 
-    if (mode == 'webrtc') {
-      final offerToken = (row['offerToken'] ?? '').toString();
-      if (offerToken.isEmpty) {
-        onStatus?.call('Session not ready. Sender must tap Start transfer again.');
-        return [];
-      }
-      return NgmyTransferWebRtc.receive(
+    // WebRTC first — works browser↔phone, phone↔phone, any network.
+    if (offerToken.isNotEmpty) {
+      final imported = await NgmyTransferWebRtc.receive(
         recipientEmail: recipientEmail,
         offerToken: offerToken,
         onProgress: onProgress,
         onStatus: onStatus,
         onBytes: onBytes,
       );
+      if (imported.isNotEmpty) return imported;
+      if (mode == 'webrtc' || kIsWeb) {
+        return imported;
+      }
+      onStatus?.call('Peer transfer failed — trying direct Wi‑Fi…');
+    }
+
+    // LAN fallback — native app receiver on same Wi‑Fi as sender.
+    return _receiveViaLan(
+      row: row,
+      recipientEmail: recipientEmail,
+      ownerEmail: ownerEmail,
+      onProgress: onProgress,
+      onBytes: onBytes,
+      onStatus: onStatus,
+    );
+  }
+
+  static Future<List<NgmyDocShareItem>> _receiveViaLan({
+    required Map<String, dynamic> row,
+    required String recipientEmail,
+    required String ownerEmail,
+    void Function(int received, int total)? onProgress,
+    void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
+    void Function(String status)? onStatus,
+  }) async {
+    if (kIsWeb) {
+      onStatus?.call('Could not connect. Use the NGMY app on your phone to receive, or both use ngmy.org.');
+      return [];
     }
 
     final transferKey = (row['transferKey'] ?? '').toString();
@@ -261,7 +239,7 @@ class NgmyTransfer {
     final port = (row['port'] as num?)?.toInt() ?? 0;
     final sessionId = (row['sessionId'] ?? '').toString();
     if (transferKey.isEmpty || host.isEmpty || port <= 0 || sessionId.isEmpty) {
-      onStatus?.call('Session incomplete. Sender must restart NGMY Transfer Send.');
+      onStatus?.call('Could not connect. Sender must tap Start transfer and keep that screen open.');
       return [];
     }
 
@@ -269,14 +247,13 @@ class NgmyTransfer {
     onStatus?.call('Connecting on Wi‑Fi…');
 
     Map<String, dynamic>? manifest;
-    for (var attempt = 0; attempt < 4; attempt++) {
+    for (var attempt = 0; attempt < 5; attempt++) {
       manifest = await NgmyTransferDownload.fetchManifest(
         manifestUri: manifestUri,
         transferKey: transferKey,
       );
       if (manifest != null) break;
-      onStatus?.call('Connecting on Wi‑Fi…');
-      if (attempt < 3) {
+      if (attempt < 4) {
         await Future<void>.delayed(const Duration(milliseconds: 400));
       }
     }
@@ -293,7 +270,7 @@ class NgmyTransfer {
       return [];
     }
 
-    onStatus?.call('Receiving ${files.length} file(s)…');
+    onStatus?.call('Receiving ${files.length} file(s) on Wi‑Fi…');
     final imported = await NgmyTransferDownload.pullAll(
       recipientEmail: recipientEmail,
       manifestUri: manifestUri,
@@ -305,7 +282,7 @@ class NgmyTransfer {
     );
 
     if (imported.isEmpty) {
-      onStatus?.call('Transfer failed. Keep both devices on the same network and try again.');
+      onStatus?.call('Transfer failed. Same Wi‑Fi and keep both screens open.');
     } else {
       onStatus?.call('Received ${imported.length} file(s).');
     }
