@@ -25,6 +25,51 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Wrap the app shell's root content in this so frames can be captured.
 final GlobalKey ngmyLiveSupportRepaintKey = GlobalKey();
 
+/// On-screen diagnostic trail for the handshake — shown directly in the UI
+/// (not just debugPrint) so a non-technical user can read/screenshot it.
+final ValueNotifier<List<String>> ngmyLiveHelpDebugLog = ValueNotifier(<String>[]);
+
+void _lsLog(String msg) {
+  final ts = DateTime.now().toIso8601String().substring(11, 19);
+  final next = List<String>.from(ngmyLiveHelpDebugLog.value)..add('$ts  $msg');
+  if (next.length > 40) next.removeAt(0);
+  ngmyLiveHelpDebugLog.value = next;
+  debugPrint('[live_help] $msg');
+}
+
+Widget _ngmyLiveHelpDebugPanel() {
+  return ValueListenableBuilder<List<String>>(
+    valueListenable: ngmyLiveHelpDebugLog,
+    builder: (context, lines, _) {
+      if (lines.isEmpty) return const SizedBox.shrink();
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.all(10),
+        constraints: const BoxConstraints(maxHeight: 160),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Connection log (for support diagnosis):', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  lines.join('\n'),
+                  style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 String _ngmyLiveHelpChannelName(String code) => 'ngmy-livehelp-$code';
 
 String ngmyGenerateLiveHelpCode() {
@@ -240,11 +285,15 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
   Timer? _setupTimeout;
 
   void _start() {
+    ngmyLiveHelpDebugLog.value = [];
     final code = ngmyGenerateLiveHelpCode();
-    final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(code));
+    final topic = _ngmyLiveHelpChannelName(code);
+    _lsLog('HOST: creating code $code (topic $topic)');
+    final channel = _ngmyLsClient.channel(topic);
     channel.onBroadcast(
       event: 'join',
       callback: (_) {
+        _lsLog('HOST: received join — sending accept');
         if (_paired) return;
         _paired = true;
         channel.sendBroadcastMessage(event: 'accept', payload: const {});
@@ -266,6 +315,7 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
     // otherwise a fast scan/entry can send 'join' before this side is really
     // listening, and that broadcast is lost for good (no replay/queueing).
     channel.subscribe((status, error) {
+      _lsLog('HOST: subscribe status=$status${error != null ? ' error=$error' : ''}');
       if (!mounted) return;
       if (status == RealtimeSubscribeStatus.subscribed) {
         _setupTimeout?.cancel();
@@ -285,6 +335,7 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
     });
     _setupTimeout = Timer(const Duration(seconds: 12), () {
       if (!mounted || _ready) return;
+      _lsLog('HOST: setup timed out after 12s waiting for subscribed status');
       try {
         channel.unsubscribe();
       } catch (_) {}
@@ -320,6 +371,15 @@ class _CreateCodeViewState extends State<_CreateCodeView> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: _content()),
+        _ngmyLiveHelpDebugPanel(),
+      ],
+    );
+  }
+
+  Widget _content() {
     if (_code == null) {
       return Center(
         child: Padding(
@@ -410,6 +470,7 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
       setState(() => _error = 'Enter the code support gave you.');
       return;
     }
+    ngmyLiveHelpDebugLog.value = [];
     try {
       _channel?.unsubscribe();
     } catch (_) {}
@@ -417,18 +478,23 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
       _connecting = true;
       _error = null;
     });
-    final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(c));
+    final topic = _ngmyLiveHelpChannelName(c);
+    _lsLog('JOIN: connecting with code $c (topic $topic)');
+    final channel = _ngmyLsClient.channel(topic);
     _channel = channel;
     channel.onBroadcast(
       event: 'accept',
       callback: (_) {
+        _lsLog('JOIN: received accept');
         _timeout?.cancel();
         if (mounted) unawaited(_confirmAndShare(c, channel));
       },
     );
     channel.subscribe((status, error) {
+      _lsLog('JOIN: subscribe status=$status${error != null ? ' error=$error' : ''}');
       if (!mounted) return;
       if (status == RealtimeSubscribeStatus.subscribed) {
+        _lsLog('JOIN: sending join');
         channel.sendBroadcastMessage(event: 'join', payload: const {});
       } else if (status == RealtimeSubscribeStatus.channelError || status == RealtimeSubscribeStatus.timedOut) {
         _timeout?.cancel();
@@ -443,6 +509,7 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
     });
     _timeout = Timer(const Duration(seconds: 45), () {
       if (!mounted) return;
+      _lsLog('JOIN: timed out after 45s waiting for accept');
       setState(() {
         _connecting = false;
         _error = 'No one responded to that code. Ask support for a fresh one.';
@@ -504,6 +571,15 @@ class _EnterCodeViewState extends State<_EnterCodeView> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: _content()),
+        _ngmyLiveHelpDebugPanel(),
+      ],
+    );
+  }
+
+  Widget _content() {
     return ValueListenableBuilder<bool>(
       valueListenable: ngmyIsSharingLiveHelp,
       builder: (context, sharing, _) {
