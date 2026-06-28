@@ -9,6 +9,7 @@ import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_virtual_device_browser.dart';
 import 'ngmy_virtual_device_media.dart';
+import 'ngmy_virtual_device_media_preview.dart';
 import 'ngmy_virtual_device_media_view.dart';
 
 const String _kFleetPrefsPrefix = 'ngmy_virtual_device_fleet_v2_';
@@ -87,6 +88,9 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
     );
     return;
   }
+  // Wait for dialog dismiss before mounting the single shared player (avoids mobile tab crashes).
+  await Future<void>.delayed(const Duration(milliseconds: 150));
+  if (!context.mounted) return;
   NgmyVirtualDevicePlayback.active.value = target;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('Playing ${target.label} on all $deviceCount devices')),
@@ -551,7 +555,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Now playing ${media.label} on all devices',
+                                                'Now playing ${media.label} on all ${_fleet.length} devices',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
@@ -562,8 +566,26 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                           ],
                                         ),
                                       ),
+                                    if (media != null) ...[
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: AspectRatio(
+                                          aspectRatio: 16 / 9,
+                                          child: RepaintBoundary(
+                                            child: NgmyVirtualDeviceMediaView(
+                                              key: ValueKey('fleet_master_${media.embedUrl}'),
+                                              viewKey: 'fleet_master',
+                                              embedUrl: media.embedUrl,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                    ],
                                     Text(
-                                      '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
+                                      media != null
+                                          ? 'All ${_fleet.length} phones below mirror this video. Tap any phone for full screen.'
+                                          : '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
                                       style: TextStyle(
                                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
                                         fontSize: 13,
@@ -588,7 +610,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     final device = _fleet[index];
                                     return _MiniVirtualPhoneCard(
                                       device: device,
-                                      embedUrl: media?.embedUrl,
+                                      media: media,
                                       onTap: () => _openDevice(device),
                                     );
                                   },
@@ -618,12 +640,12 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
   const _MiniVirtualPhoneCard({
     required this.device,
     required this.onTap,
-    this.embedUrl,
+    this.media,
   });
 
   final NgmyVirtualDeviceIdentity device;
   final VoidCallback onTap;
-  final String? embedUrl;
+  final NgmyVirtualMediaTarget? media;
 
   @override
   Widget build(BuildContext context) {
@@ -661,11 +683,10 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
                       children: [
                         _MiniStatusBar(device: device),
                         Expanded(
-                          child: embedUrl != null && embedUrl!.isNotEmpty
-                              ? NgmyVirtualDeviceMediaView(
-                                  key: ValueKey('${device.id}_$embedUrl'),
-                                  viewKey: device.id,
-                                  embedUrl: embedUrl!,
+                          child: media != null
+                              ? NgmyVirtualDeviceMediaPreview(
+                                  key: ValueKey('${device.id}_${media!.embedUrl}'),
+                                  media: media!,
                                   compact: true,
                                 )
                               : Container(

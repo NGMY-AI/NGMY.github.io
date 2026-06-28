@@ -8,12 +8,15 @@ class NgmyVirtualMediaTarget {
     required this.embedUrl,
     required this.platform,
     required this.label,
+    this.previewImageUrl,
   });
 
   final String originalUrl;
   final String embedUrl;
   final NgmyVirtualMediaPlatform platform;
   final String label;
+  /// Static thumbnail for grid previews (no heavy embed per device).
+  final String? previewImageUrl;
 }
 
 /// Shared playback — one pasted link plays on every virtual device.
@@ -35,9 +38,10 @@ class NgmyVirtualDeviceMedia {
     if (ytId != null) {
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        embedUrl: 'https://www.youtube.com/embed/$ytId?autoplay=1&playsinline=1&rel=0&modestbranding=1',
+        embedUrl: 'https://www.youtube.com/embed/$ytId?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1',
         platform: NgmyVirtualMediaPlatform.youtube,
         label: 'YouTube',
+        previewImageUrl: 'https://img.youtube.com/vi/$ytId/hqdefault.jpg',
       );
     }
 
