@@ -3,17 +3,17 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
-/// Single shared embed player (web). Do not mount dozens of these at once.
+/// Single shared player (web iframe). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
   const NgmyVirtualDeviceMediaView({
     super.key,
     required this.viewKey,
-    required this.embedUrl,
+    required this.playUrl,
     this.compact = false,
   });
 
   final String viewKey;
-  final String embedUrl;
+  final String playUrl;
   final bool compact;
 
   @override
@@ -33,14 +33,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     try {
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
         _frame = html.IFrameElement()
-          ..src = widget.embedUrl
+          ..src = widget.playUrl
           ..style.border = 'none'
           ..style.width = '100%'
           ..style.height = '100%'
           ..allowFullscreen = true
+          ..setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
           ..setAttribute(
             'allow',
-            'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+            'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
           );
         _frame!.onLoad.listen((_) {
           if (mounted) setState(() => _loading = false);
@@ -64,12 +65,12 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   @override
   void didUpdateWidget(covariant NgmyVirtualDeviceMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.embedUrl != widget.embedUrl && _frame != null) {
+    if (oldWidget.playUrl != widget.playUrl && _frame != null) {
       setState(() {
         _loading = true;
         _failed = false;
       });
-      _frame!.src = widget.embedUrl;
+      _frame!.src = widget.playUrl;
     }
   }
 

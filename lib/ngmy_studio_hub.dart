@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_studio_colors.dart';
@@ -8,7 +10,7 @@ import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
-import 'ngmy_virtual_device.dart';
+import 'ngmy_virtual_device_launcher.dart';
 import 'ngmy_ai_client.dart';
 
 export 'ngmy_studio_colors.dart';
@@ -158,7 +160,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1)],
         title: 'Virtual Device',
         subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
-        onTap: () => showNgmyVirtualDevice(context: context, userEmail: userEmail),
+        onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
       ),
     ];
 

@@ -44,7 +44,7 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'YouTube, TikTok, or Instagram — plays on all $deviceCount devices.',
+              'YouTube, TikTok, Instagram, or Facebook — plays on all $deviceCount devices.',
               style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
             ),
             const SizedBox(height: 14),
@@ -84,7 +84,7 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
   final target = NgmyVirtualDeviceMedia.parse(pasted);
   if (target == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not read that link. Paste a YouTube, TikTok, or Instagram URL.')),
+      const SnackBar(content: Text('Could not read that link. Paste a YouTube, TikTok, Instagram, or Facebook URL.')),
     );
     return;
   }
@@ -573,9 +573,9 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                             aspectRatio: 16 / 9,
                                             child: RepaintBoundary(
                                               child: NgmyVirtualDeviceMediaView(
-                                                key: ValueKey('fleet_master_${media.embedUrl}'),
+                                                key: ValueKey('fleet_master_${media.playUrl}'),
                                                 viewKey: 'fleet_master',
-                                                embedUrl: media.embedUrl,
+                                                playUrl: media.playUrl,
                                               ),
                                             ),
                                           ),
@@ -686,7 +686,7 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
                         Expanded(
                           child: media != null
                               ? NgmyVirtualDeviceMediaPreview(
-                                  key: ValueKey('${device.id}_${media!.embedUrl}'),
+                                  key: ValueKey('${device.id}_${media!.playUrl}'),
                                   media: media!,
                                   compact: true,
                                 )
@@ -891,7 +891,7 @@ class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailS
                                 powerOn: _powerOn,
                                 tab: _tab,
                                 browser: _browser,
-                                embedUrl: media?.embedUrl,
+                                playUrl: media?.playUrl,
                                 onBrowserReady: (c) => _browser = c,
                                 onTab: (i) => setState(() => _tab = i),
                                 onPowerToggle: () => setState(() => _powerOn = !_powerOn),
@@ -922,7 +922,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
     required this.onBrowserReady,
     required this.onTab,
     required this.onPowerToggle,
-    this.embedUrl,
+    this.playUrl,
   });
 
   final double width;
@@ -933,7 +933,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
   final void Function(NgmyVirtualDeviceBrowserControls controls) onBrowserReady;
   final void Function(int index) onTab;
   final VoidCallback onPowerToggle;
-  final String? embedUrl;
+  final String? playUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -965,17 +965,17 @@ class _VirtualPhoneFrame extends StatelessWidget {
               Expanded(
                 child: powerOn
                     ? (tab == 0
-                        ? (embedUrl != null && embedUrl!.isNotEmpty
+                        ? (playUrl != null && playUrl!.isNotEmpty
                             ? NgmyVirtualDeviceMediaView(
-                                key: ValueKey('${device.id}_full_$embedUrl'),
+                                key: ValueKey('${device.id}_full_$playUrl'),
                                 viewKey: '${device.id}_full',
-                                embedUrl: embedUrl!,
+                                playUrl: playUrl!,
                               )
                             : NgmyVirtualDeviceBrowser(key: ValueKey(device.id), onReady: onBrowserReady))
                         : _DeviceInfoPanel(device: device))
                     : const _PowerOffScreen(),
               ),
-              if (powerOn && tab == 0 && (embedUrl == null || embedUrl!.isEmpty)) _BrowserToolbar(controls: browser),
+              if (powerOn && tab == 0 && (playUrl == null || playUrl!.isEmpty)) _BrowserToolbar(controls: browser),
               _VirtualHomeBar(
                 tab: tab,
                 powerOn: powerOn,

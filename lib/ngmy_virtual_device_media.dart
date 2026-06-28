@@ -1,18 +1,19 @@
 import 'package:flutter/foundation.dart';
 
-enum NgmyVirtualMediaPlatform { youtube, tiktok, instagram, other }
+enum NgmyVirtualMediaPlatform { youtube, tiktok, instagram, facebook, other }
 
 class NgmyVirtualMediaTarget {
   const NgmyVirtualMediaTarget({
     required this.originalUrl,
-    required this.embedUrl,
+    required this.playUrl,
     required this.platform,
     required this.label,
     this.previewImageUrl,
   });
 
   final String originalUrl;
-  final String embedUrl;
+  /// URL loaded in the single shared player (mobile-friendly when possible).
+  final String playUrl;
   final NgmyVirtualMediaPlatform platform;
   final String label;
   final String? previewImageUrl;
@@ -37,7 +38,7 @@ class NgmyVirtualDeviceMedia {
     if (ytId != null) {
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        embedUrl: 'https://www.youtube.com/embed/$ytId?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1',
+        playUrl: 'https://m.youtube.com/watch?v=$ytId',
         platform: NgmyVirtualMediaPlatform.youtube,
         label: 'YouTube',
         previewImageUrl: 'https://img.youtube.com/vi/$ytId/hqdefault.jpg',
@@ -48,35 +49,70 @@ class NgmyVirtualDeviceMedia {
     if (ttId != null) {
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        embedUrl: 'https://www.tiktok.com/embed/v2/$ttId',
+        playUrl: 'https://www.tiktok.com/player/v1/$ttId?music_info=0&description=0',
         platform: NgmyVirtualMediaPlatform.tiktok,
         label: 'TikTok',
       );
     }
 
-    final igCode = _instagramCode(lower);
-    if (igCode != null) {
-      return NgmyVirtualMediaTarget(
-        originalUrl: url,
-        embedUrl: 'https://www.instagram.com/p/$igCode/embed/captioned',
-        platform: NgmyVirtualMediaPlatform.instagram,
-        label: 'Instagram',
-      );
-    }
+    final ig = _instagramTarget(url, lower);
+    if (ig != null) return ig;
+
+    final fb = _facebookTarget(url, lower);
+    if (fb != null) return fb;
 
     if (lower.contains('tiktok.com') ||
         lower.contains('instagram.com') ||
+        lower.contains('facebook.com') ||
+        lower.contains('fb.watch') ||
         lower.contains('youtube.com') ||
         lower.contains('youtu.be')) {
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        embedUrl: url,
+        playUrl: url,
         platform: NgmyVirtualMediaPlatform.other,
         label: 'Video',
       );
     }
 
     return null;
+  }
+
+  static NgmyVirtualMediaTarget? _instagramTarget(String url, String lower) {
+    final reel = RegExp(r'instagram\.com/reel/([a-zA-Z0-9_-]+)').firstMatch(lower);
+    if (reel != null) {
+      final code = reel.group(1)!;
+      return NgmyVirtualMediaTarget(
+        originalUrl: url,
+        playUrl: 'https://www.instagram.com/reel/$code/embed/captioned/?cr=1&v=14',
+        platform: NgmyVirtualMediaPlatform.instagram,
+        label: 'Instagram',
+      );
+    }
+    final post = RegExp(r'instagram\.com/(?:p|tv)/([a-zA-Z0-9_-]+)').firstMatch(lower);
+    if (post != null) {
+      final code = post.group(1)!;
+      return NgmyVirtualMediaTarget(
+        originalUrl: url,
+        playUrl: 'https://www.instagram.com/p/$code/embed/captioned/?cr=1&v=14',
+        platform: NgmyVirtualMediaPlatform.instagram,
+        label: 'Instagram',
+      );
+    }
+    return null;
+  }
+
+  static NgmyVirtualMediaTarget? _facebookTarget(String url, String lower) {
+    if (!lower.contains('facebook.com') && !lower.contains('fb.watch') && !lower.contains('fb.com')) {
+      return null;
+    }
+    final encoded = Uri.encodeComponent(url);
+    return NgmyVirtualMediaTarget(
+      originalUrl: url,
+      playUrl: 'https://www.facebook.com/plugins/video.php?href=$encoded&show_text=false&width=734',
+      platform: NgmyVirtualMediaPlatform.facebook,
+      label: 'Facebook',
+    );
   }
 
   static String? _youtubeId(String url) {
@@ -90,9 +126,5 @@ class NgmyVirtualDeviceMedia {
     final m = RegExp(r'tiktok\.com/@[^/]+/video/(\d+)').firstMatch(url);
     if (m != null) return m.group(1);
     return RegExp(r'tiktok\.com/t/(\w+)').firstMatch(url)?.group(1);
-  }
-
-  static String? _instagramCode(String url) {
-    return RegExp(r'instagram\.com/(?:reel|p|tv)/([a-zA-Z0-9_-]+)').firstMatch(url)?.group(1);
   }
 }

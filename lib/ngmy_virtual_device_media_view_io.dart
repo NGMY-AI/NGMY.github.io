@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-/// Single shared embed player (native). Do not mount dozens of these at once.
+/// Single shared player (native WebView). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
   const NgmyVirtualDeviceMediaView({
     super.key,
     required this.viewKey,
-    required this.embedUrl,
+    required this.playUrl,
     this.compact = false,
   });
 
   final String viewKey;
-  final String embedUrl;
+  final String playUrl;
   final bool compact;
 
   @override
@@ -38,15 +38,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
           },
         ),
       )
-      ..loadRequest(Uri.parse(widget.embedUrl));
+      ..loadRequest(Uri.parse(widget.playUrl));
   }
 
   @override
   void didUpdateWidget(covariant NgmyVirtualDeviceMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.embedUrl != widget.embedUrl) {
+    if (oldWidget.playUrl != widget.playUrl) {
       setState(() => _loading = true);
-      _controller.loadRequest(Uri.parse(widget.embedUrl));
+      _controller.loadRequest(Uri.parse(widget.playUrl));
     }
   }
 

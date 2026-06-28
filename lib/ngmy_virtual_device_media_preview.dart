@@ -154,6 +154,7 @@ class _PlatformFallback extends StatelessWidget {
       NgmyVirtualMediaPlatform.youtube => (<Color>[const Color(0xFF1A1A1A), const Color(0xFF3D0A0A)], Icons.play_circle_fill_rounded),
       NgmyVirtualMediaPlatform.tiktok => (<Color>[const Color(0xFF0F0F0F), const Color(0xFF102028)], Icons.music_note_rounded),
       NgmyVirtualMediaPlatform.instagram => (<Color>[const Color(0xFF4A1A6B), const Color(0xFF1A2744)], Icons.camera_alt_rounded),
+      NgmyVirtualMediaPlatform.facebook => (<Color>[const Color(0xFF0F172A), const Color(0xFF1E3A8A)], Icons.facebook_rounded),
       NgmyVirtualMediaPlatform.other => (<Color>[const Color(0xFF111827), const Color(0xFF1E293B)], Icons.videocam_rounded),
     };
     return Container(
