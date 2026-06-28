@@ -25,6 +25,8 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
+import 'ngmy_transfer.dart';
+import 'ngmy_transfer_ui.dart';
 
 ({Color bg, Color card, Color fg, Color muted, Color border}) _docShareColors(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -684,6 +686,26 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _showQrForOne(NgmyDocShareItem item) => _showQrForItems([item]);
 
+  Future<void> _openNgmyTransfer({List<NgmyDocShareItem>? batch}) async {
+    final List<NgmyDocShareItem> items;
+    if (batch != null && batch.isNotEmpty) {
+      items = batch;
+    } else {
+      final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
+      items = _items.where((e) => ids.contains(e.id)).toList();
+    }
+    if (items.isEmpty) {
+      _toast('Add files first, then use NGMY Transfer.');
+      return;
+    }
+    await openNgmyTransferFromDocShare(
+      context,
+      email: widget.email,
+      items: items,
+      onReceived: () => unawaited(_refresh()),
+    );
+  }
+
   Future<void> _exportBundle() async {
     final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
     final batch = _items.where((e) => ids.contains(e.id)).toList();
@@ -708,6 +730,11 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _importScanPayload(String scan) async {
+    if (RegExp(r'^\d{6}$').hasMatch(scan.trim())) {
+      await _receiveNgmyTransferCode(scan.trim());
+      return;
+    }
+
     if (scan.startsWith('NGMYDOCSYNC3|') || scan.startsWith('NGMYDOCSYNC3|z|')) {
       await _withWork(() async {
         final session = await NgmyDocShareSync.beginWebRtcReceive(
@@ -774,6 +801,25 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }, label: 'Receiving…');
   }
 
+  Future<void> _receiveNgmyTransferCode(String code) async {
+    await _withWork(() async {
+      final imported = await NgmyTransfer.receiveByCode(
+        recipientEmail: widget.email,
+        code: code,
+        onProgress: (r, t) {
+          if (mounted) setState(() => _status = 'Receiving $r of $t…');
+        },
+      );
+      if (!mounted) return;
+      if (imported.isEmpty) {
+        _toast('NGMY Transfer failed. Same Wi‑Fi or hotspot, and sender must keep Send screen open.');
+        return;
+      }
+      await _refresh();
+      _toast('Received ${imported.length} file(s) via NGMY Transfer.');
+    }, label: 'NGMY Transfer…');
+  }
+
   Future<void> _scanQr() async {
     if (!barcode_platform.ngmyBarcodeUseCamera) {
       final code = await _promptEnterShortCode(context);
@@ -782,9 +828,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       return;
     }
     final raw = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _DocShareScanPage()),
+      MaterialPageRoute(builder: (_) => _DocShareScanPage(email: widget.email)),
     );
     if (raw == null || raw.isEmpty) return;
+    if (raw == 'transfer:done') {
+      await _refresh();
+      return;
+    }
     await _importScanPayload(raw.trim());
   }
 
@@ -873,21 +923,39 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
           if (_items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: _working ? null : _showQrForSelection,
-                      icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-                      label: Text(_selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})'),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _working ? null : _showQrForSelection,
+                          icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                          label: Text(_selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _working ? null : _exportBundle,
+                          icon: const Icon(Icons.ios_share_rounded, size: 18),
+                          label: const Text('Export'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _working ? null : _exportBundle,
-                      icon: const Icon(Icons.ios_share_rounded, size: 18),
-                      label: const Text('Export'),
+                      onPressed: _working ? null : () => unawaited(_openNgmyTransfer()),
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                      label: const Text('NGMY Transfer'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kNgmyStudioHubAccent,
+                        side: BorderSide(color: kNgmyStudioHubAccent.withValues(alpha: 0.55)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
                 ],
@@ -985,12 +1053,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                                 onSelected: (v) {
                                   if (v == 'view') unawaited(_viewItem(item));
                                   if (v == 'qr') unawaited(_showQrForOne(item));
+                                  if (v == 'transfer') unawaited(_openNgmyTransfer(batch: [item]));
                                   if (v == 'save') unawaited(_saveItem(item));
                                   if (v == 'delete') unawaited(_deleteItem(item));
                                 },
                                 itemBuilder: (_) => [
                                   const PopupMenuItem(value: 'view', child: Text('View')),
                                   const PopupMenuItem(value: 'qr', child: Text('Share via QR')),
+                                  const PopupMenuItem(value: 'transfer', child: Text('NGMY Transfer')),
                                   const PopupMenuItem(value: 'save', child: Text('Download / save')),
                                   const PopupMenuItem(value: 'delete', child: Text('Delete')),
                                 ],
@@ -1854,7 +1924,9 @@ class _DocShareAnswerScanPageState extends State<_DocShareAnswerScanPage> {
 }
 
 class _DocShareScanPage extends StatefulWidget {
-  const _DocShareScanPage();
+  const _DocShareScanPage({required this.email});
+
+  final String email;
 
   @override
   State<_DocShareScanPage> createState() => _DocShareScanPageState();
@@ -1931,6 +2003,21 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.swap_horiz_rounded),
+            tooltip: 'NGMY Transfer code',
+            onPressed: () async {
+              final result = await Navigator.of(context).push<bool>(
+                MaterialPageRoute<bool>(
+                  builder: (_) => NgmyTransferReceivePage(
+                    email: widget.email,
+                    onReceived: () {},
+                  ),
+                ),
+              );
+              if (result == true && mounted) Navigator.pop(context, 'transfer:done');
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.pin_rounded),
             tooltip: 'Enter 6-digit code',
