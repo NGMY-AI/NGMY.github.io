@@ -26063,7 +26063,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _referralInputC = TextEditingController();
-  bool _linkingGithubAccount = false;
   ImageProvider? _profileAvatar;
   String _profileAvatarPath = '';
   bool _profileAvatarUploading = false;
@@ -26141,34 +26140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (path == _profileAvatarPath) return;
     _profileAvatarPath = path;
     _profileAvatar = ngmyCachedProfileImage(path.isEmpty ? null : path);
-  }
-
-  bool get _hasLinkedGithub {
-    final identities = Supabase.instance.client.auth.currentUser?.identities;
-    if (identities == null) return false;
-    return identities.any((i) => i.provider == 'github');
-  }
-
-  // Linking while already signed in bypasses Supabase's automatic-linking
-  // safety check, which otherwise blocks a fresh "Sign in with GitHub" on an
-  // account that already has a password identity.
-  Future<void> _connectGithubAccount() async {
-    if (_linkingGithubAccount) return;
-    setState(() => _linkingGithubAccount = true);
-    try {
-      await ngmyEnsureSupabaseAuthInitialized();
-      await Supabase.instance.client.auth.linkIdentity(
-        OAuthProvider.github,
-        redirectTo: ngmyOAuthRedirectUrl(),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not connect GitHub: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _linkingGithubAccount = false);
-    }
   }
 
   @override
@@ -26968,36 +26939,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ]), const SizedBox(height: 15),
-      _box(context, 'Connected Logins', [
-        Row(
-          children: [
-            const Icon(Icons.code_rounded, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _hasLinkedGithub ? 'GitHub connected' : 'GitHub not connected',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (_hasLinkedGithub)
-              const Icon(Icons.check_circle, color: Color(0xFF10B981))
-            else
-              OutlinedButton(
-                onPressed: _linkingGithubAccount ? null : _connectGithubAccount,
-                child: _linkingGithubAccount
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Connect'),
-              ),
-          ],
-        ),
-        if (!_hasLinkedGithub) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Connect once here so "Sign in with GitHub" works on the login screen next time.',
-            style: TextStyle(fontSize: 11, color: softText),
-          ),
-        ],
       ]), const SizedBox(height: 15),
       _box(context, 'My Prizes', [
         Row(
