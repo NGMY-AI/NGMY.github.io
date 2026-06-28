@@ -5,12 +5,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_virtual_device_browser.dart';
-import 'ngmy_virtual_device_media.dart';
-import 'ngmy_virtual_device_media_preview.dart';
-import 'ngmy_virtual_device_media_view.dart';
 
 const String _kFleetPrefsPrefix = 'ngmy_virtual_device_fleet_v2_';
 const String _kLegacyPrefsPrefix = 'ngmy_virtual_device_v1_';
@@ -26,74 +22,6 @@ void showNgmyVirtualDevice({
       fullscreenDialog: true,
       builder: (_) => NgmyVirtualDeviceFleetScreen(userEmail: userEmail ?? ''),
     ),
-  );
-}
-
-Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int deviceCount}) async {
-  final controller = TextEditingController(
-    text: NgmyVirtualDevicePlayback.active.value?.originalUrl ?? '',
-  );
-  final pasted = await showDialog<String>(
-    context: context,
-    builder: (ctx) {
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      return AlertDialog(
-        title: const Text('Paste video link'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'YouTube, TikTok, or Instagram — plays on all $deviceCount devices at once.',
-              style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'https://youtube.com/watch?v=…',
-                filled: true,
-                fillColor: isDark ? const Color(0xFF151B28) : const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              NgmyVirtualDevicePlayback.clear();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Clear'),
-          ),
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
-            child: const Text('Play on all devices'),
-          ),
-        ],
-      );
-    },
-  );
-  controller.dispose();
-  if (!context.mounted || pasted == null || pasted.isEmpty) return;
-  final target = NgmyVirtualDeviceMedia.parse(pasted);
-  if (target == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not read that link. Paste a YouTube, TikTok, or Instagram URL.')),
-    );
-    return;
-  }
-  // Wait for dialog dismiss before mounting the single shared player (avoids mobile tab crashes).
-  await Future<void>.delayed(const Duration(milliseconds: 150));
-  if (!context.mounted) return;
-  NgmyVirtualDevicePlayback.active.value = target;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Playing ${target.label} on all $deviceCount devices')),
   );
 }
 
@@ -425,12 +353,6 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
     unawaited(_boot());
   }
 
-  @override
-  void dispose() {
-    NgmyVirtualDevicePlayback.clear();
-    super.dispose();
-  }
-
   Future<void> _boot() async {
     final fleet = await NgmyVirtualDeviceStore.loadFleet(widget.userEmail);
     if (!mounted) return;
@@ -438,7 +360,6 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
       _fleet = fleet;
       _loading = false;
     });
-    NgmyVirtualDevicePlayback.deviceCount = fleet.length;
   }
 
   Future<void> _addDevice() async {
@@ -449,7 +370,6 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
       _fleet = [..._fleet, device];
       _loading = false;
     });
-    NgmyVirtualDevicePlayback.deviceCount = _fleet.length;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Added ${device.label} · ${device.serialNumber}')),
     );
@@ -463,8 +383,6 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
     );
   }
 
-  Future<void> _openLinkSearch() => showNgmyVirtualDeviceLinkSearch(context, deviceCount: _fleet.length);
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -472,159 +390,8 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
 
     return Scaffold(
       backgroundColor: bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 15, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: NgmySculptedBottomNavFrame(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                _loading ? 'Virtual Devices' : 'Virtual Devices (${_fleet.length})',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  letterSpacing: 0.2,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _openLinkSearch,
-                              customBorder: const CircleBorder(),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Icon(
-                                  Icons.search_rounded,
-                                  size: NgmyBottomNavMetrics.sideIconSize,
-                                  color: kNgmyStudioHubAccent,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ValueListenableBuilder<NgmyVirtualMediaTarget?>(
-                      valueListenable: NgmyVirtualDevicePlayback.active,
-                      builder: (context, media, _) {
-                        return CustomScrollView(
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (media != null)
-                                      Container(
-                                        width: double.infinity,
-                                        margin: const EdgeInsets.only(bottom: 10),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: kNgmyStudioHubAccent.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.35)),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.play_circle_fill_rounded, color: kNgmyStudioHubAccent, size: 18),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'Now playing ${media.label} on all ${_fleet.length} devices',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    if (media != null) ...[
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: AspectRatio(
-                                          aspectRatio: 16 / 9,
-                                          child: RepaintBoundary(
-                                            child: NgmyVirtualDeviceMediaView(
-                                              key: ValueKey('fleet_master_${media.embedUrl}'),
-                                              viewKey: 'fleet_master',
-                                              embedUrl: media.embedUrl,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                    ],
-                                    Text(
-                                      media != null
-                                          ? 'All ${_fleet.length} phones below mirror this video. Tap any phone for full screen.'
-                                          : '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-                                        fontSize: 13,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(10, 0, 10, 88),
-                              sliver: SliverGrid(
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: kNgmyVirtualDeviceGridColumns,
-                                  mainAxisSpacing: 10,
-                                  crossAxisSpacing: 8,
-                                  childAspectRatio: 0.52,
-                                ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final device = _fleet[index];
-                                    return _MiniVirtualPhoneCard(
-                                      device: device,
-                                      media: media,
-                                      onTap: () => _openDevice(device),
-                                    );
-                                  },
-                                  childCount: _fleet.length,
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+      appBar: AppBar(
+        title: Text('Virtual Devices (${_fleet.length})'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _loading ? null : () => unawaited(_addDevice()),
@@ -632,20 +399,56 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
         label: const Text('Add device'),
         backgroundColor: kNgmyStudioHubAccent,
       ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Text(
+                      '${_fleet.length} separate virtual phones — each with its own serial, location, and timezone. '
+                      'Not your iPhone. Tap any phone to watch YouTube on that device.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 88),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: kNgmyVirtualDeviceGridColumns,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 0.52,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final device = _fleet[index];
+                        return _MiniVirtualPhoneCard(
+                          device: device,
+                          onTap: () => _openDevice(device),
+                        );
+                      },
+                      childCount: _fleet.length,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
 
 class _MiniVirtualPhoneCard extends StatelessWidget {
-  const _MiniVirtualPhoneCard({
-    required this.device,
-    required this.onTap,
-    this.media,
-  });
+  const _MiniVirtualPhoneCard({required this.device, required this.onTap});
 
   final NgmyVirtualDeviceIdentity device;
   final VoidCallback onTap;
-  final NgmyVirtualMediaTarget? media;
 
   @override
   Widget build(BuildContext context) {
@@ -683,27 +486,21 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
                       children: [
                         _MiniStatusBar(device: device),
                         Expanded(
-                          child: media != null
-                              ? NgmyVirtualDeviceMediaPreview(
-                                  key: ValueKey('${device.id}_${media!.embedUrl}'),
-                                  media: media!,
-                                  compact: true,
-                                )
-                              : Container(
-                                  width: double.infinity,
-                                  color: const Color(0xFF0F0F0F),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.play_circle_filled_rounded, color: Colors.red.shade600, size: 22),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'YouTube',
-                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w700),
-                                      ),
-                                    ],
-                                  ),
+                          child: Container(
+                            width: double.infinity,
+                            color: const Color(0xFF0F0F0F),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.play_circle_filled_rounded, color: Colors.red.shade600, size: 22),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'YouTube',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w700),
                                 ),
+                              ],
+                            ),
+                          ),
                         ),
                         Container(
                           color: const Color(0xFF111827),
@@ -801,111 +598,43 @@ class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailS
 
     return Scaffold(
       backgroundColor: bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 15, 8),
-              child: Row(
+      appBar: AppBar(
+        title: Text('${widget.device.label} · ${widget.device.serialNumber}'),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final phoneW = constraints.maxWidth.clamp(280.0, 420.0);
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: Column(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: NgmySculptedBottomNavFrame(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                '${widget.device.label} · ${widget.device.serialNumber}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                  letterSpacing: 0.2,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => unawaited(
-                                showNgmyVirtualDeviceLinkSearch(
-                                  context,
-                                  deviceCount: NgmyVirtualDevicePlayback.deviceCount,
-                                ),
-                              ),
-                              customBorder: const CircleBorder(),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Icon(
-                                  Icons.search_rounded,
-                                  size: NgmyBottomNavMetrics.sideIconSize,
-                                  color: kNgmyStudioHubAccent,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  Text(
+                    '${widget.device.locationLabel} · ${widget.device.timezone}\n'
+                    'Separate from your real phone — unique serial & identity.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                      fontSize: 12,
+                      height: 1.4,
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  _VirtualPhoneFrame(
+                    width: phoneW,
+                    device: widget.device,
+                    powerOn: _powerOn,
+                    tab: _tab,
+                    browser: _browser,
+                    onBrowserReady: (c) => _browser = c,
+                    onTab: (i) => setState(() => _tab = i),
+                    onPowerToggle: () => setState(() => _powerOn = !_powerOn),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: ValueListenableBuilder<NgmyVirtualMediaTarget?>(
-                valueListenable: NgmyVirtualDevicePlayback.active,
-                builder: (context, media, _) {
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final phoneW = constraints.maxWidth.clamp(280.0, 420.0);
-                      return Center(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          child: Column(
-                            children: [
-                              Text(
-                                media != null
-                                    ? 'Playing ${media.label} on this device · ${widget.device.locationLabel}'
-                                    : '${widget.device.locationLabel} · ${widget.device.timezone}\n'
-                                        'Separate from your real phone — unique serial & identity.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-                                  fontSize: 12,
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _VirtualPhoneFrame(
-                                width: phoneW,
-                                device: widget.device,
-                                powerOn: _powerOn,
-                                tab: _tab,
-                                browser: _browser,
-                                embedUrl: media?.embedUrl,
-                                onBrowserReady: (c) => _browser = c,
-                                onTab: (i) => setState(() => _tab = i),
-                                onPowerToggle: () => setState(() => _powerOn = !_powerOn),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -921,7 +650,6 @@ class _VirtualPhoneFrame extends StatelessWidget {
     required this.onBrowserReady,
     required this.onTab,
     required this.onPowerToggle,
-    this.embedUrl,
   });
 
   final double width;
@@ -932,7 +660,6 @@ class _VirtualPhoneFrame extends StatelessWidget {
   final void Function(NgmyVirtualDeviceBrowserControls controls) onBrowserReady;
   final void Function(int index) onTab;
   final VoidCallback onPowerToggle;
-  final String? embedUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -964,17 +691,11 @@ class _VirtualPhoneFrame extends StatelessWidget {
               Expanded(
                 child: powerOn
                     ? (tab == 0
-                        ? (embedUrl != null && embedUrl!.isNotEmpty
-                            ? NgmyVirtualDeviceMediaView(
-                                key: ValueKey('${device.id}_full_$embedUrl'),
-                                viewKey: '${device.id}_full',
-                                embedUrl: embedUrl!,
-                              )
-                            : NgmyVirtualDeviceBrowser(key: ValueKey(device.id), onReady: onBrowserReady))
+                        ? NgmyVirtualDeviceBrowser(key: ValueKey(device.id), onReady: onBrowserReady)
                         : _DeviceInfoPanel(device: device))
                     : const _PowerOffScreen(),
               ),
-              if (powerOn && tab == 0 && (embedUrl == null || embedUrl!.isEmpty)) _BrowserToolbar(controls: browser),
+              if (powerOn && tab == 0) _BrowserToolbar(controls: browser),
               _VirtualHomeBar(
                 tab: tab,
                 powerOn: powerOn,
