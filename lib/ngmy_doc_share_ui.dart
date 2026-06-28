@@ -686,24 +686,120 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _showQrForOne(NgmyDocShareItem item) => _showQrForItems([item]);
 
-  Future<void> _openNgmyTransfer({List<NgmyDocShareItem>? batch}) async {
-    final List<NgmyDocShareItem> items;
-    if (batch != null && batch.isNotEmpty) {
-      items = batch;
-    } else {
-      final ids = _selected.isEmpty ? _items.map((e) => e.id).toSet() : _selected;
-      items = _items.where((e) => ids.contains(e.id)).toList();
-    }
-    if (items.isEmpty) {
-      _toast('Add files first, then use NGMY Transfer.');
-      return;
-    }
-    await openNgmyTransferFromDocShare(
+  Future<void> _openNgmyTransferSend(NgmyDocShareItem item) async {
+    await openNgmyTransferSend(context, email: widget.email, items: [item]);
+  }
+
+  Future<void> _openNgmyTransferReceive() async {
+    await openNgmyTransferReceive(
       context,
       email: widget.email,
-      items: items,
       onReceived: () => unawaited(_refresh()),
     );
+  }
+
+  Future<void> _showItemMenu(NgmyDocShareItem item) async {
+    final c = _docShareColors(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: kNgmyStudioHubAccent.withValues(alpha: 0.35))),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: c.muted.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.fg, fontWeight: FontWeight.w900, fontSize: 15),
+                  ),
+                  Text(item.sizeLabel, style: TextStyle(color: c.muted, fontSize: 12)),
+                  const SizedBox(height: 14),
+                  _DocShareMenuTile(
+                    icon: item.isVideo ? Icons.play_circle_fill_rounded : Icons.visibility_rounded,
+                    label: item.isVideo ? 'Play video' : 'View',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'view'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.qr_code_2_rounded,
+                    label: 'Share via QR',
+                    subtitle: 'Letters/numbers QR code',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'qr'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.north_east_rounded,
+                    label: 'NGMY Transfer · Send',
+                    subtitle: '6-digit number code · big files & videos',
+                    accent: true,
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'transfer_send'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.south_west_rounded,
+                    label: 'NGMY Transfer · Receive',
+                    subtitle: 'Enter sender\'s 6-digit code',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'transfer_receive'),
+                  ),
+                  _DocShareMenuTile(
+                    icon: Icons.download_rounded,
+                    label: 'Download / save',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'save'),
+                  ),
+                  const SizedBox(height: 6),
+                  _DocShareMenuTile(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete',
+                    destructive: true,
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'delete'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'view':
+        unawaited(_viewItem(item));
+      case 'qr':
+        unawaited(_showQrForOne(item));
+      case 'transfer_send':
+        unawaited(_openNgmyTransferSend(item));
+      case 'transfer_receive':
+        unawaited(_openNgmyTransferReceive());
+      case 'save':
+        unawaited(_saveItem(item));
+      case 'delete':
+        unawaited(_deleteItem(item));
+    }
   }
 
   Future<void> _exportBundle() async {
@@ -923,39 +1019,21 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
           if (_items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: _working ? null : _showQrForSelection,
-                          icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-                          label: Text(_selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _working ? null : _exportBundle,
-                          icon: const Icon(Icons.ios_share_rounded, size: 18),
-                          label: const Text('Export'),
-                        ),
-                      ),
-                    ],
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: _working ? null : _showQrForSelection,
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                      label: Text(_selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})'),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
+                  const SizedBox(width: 10),
+                  Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _working ? null : () => unawaited(_openNgmyTransfer()),
-                      icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                      label: const Text('NGMY Transfer'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kNgmyStudioHubAccent,
-                        side: BorderSide(color: kNgmyStudioHubAccent.withValues(alpha: 0.55)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                      onPressed: _working ? null : _exportBundle,
+                      icon: const Icon(Icons.ios_share_rounded, size: 18),
+                      label: const Text('Export'),
                     ),
                   ),
                 ],
@@ -1018,7 +1096,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · Code ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
+                                  '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · QR ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
                                   style: TextStyle(color: c.muted, fontSize: 11),
                                 ),
                               ),
@@ -1027,7 +1105,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                  tooltip: 'Copy 6-digit code',
+                                  tooltip: 'Copy QR share code',
                                   icon: Icon(Icons.copy_rounded, size: 16, color: c.muted),
                                   onPressed: () => unawaited(_copyShortCode(item)),
                                 ),
@@ -1048,22 +1126,13 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                                     }
                                   }),
                                 ),
-                              PopupMenuButton<String>(
-                                icon: Icon(Icons.more_vert_rounded, color: c.muted),
-                                onSelected: (v) {
-                                  if (v == 'view') unawaited(_viewItem(item));
-                                  if (v == 'qr') unawaited(_showQrForOne(item));
-                                  if (v == 'transfer') unawaited(_openNgmyTransfer(batch: [item]));
-                                  if (v == 'save') unawaited(_saveItem(item));
-                                  if (v == 'delete') unawaited(_deleteItem(item));
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(value: 'view', child: Text('View')),
-                                  const PopupMenuItem(value: 'qr', child: Text('Share via QR')),
-                                  const PopupMenuItem(value: 'transfer', child: Text('NGMY Transfer')),
-                                  const PopupMenuItem(value: 'save', child: Text('Download / save')),
-                                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                                ],
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                tooltip: 'Options',
+                                icon: Icon(Icons.more_horiz_rounded, color: c.muted),
+                                onPressed: _working ? null : () => unawaited(_showItemMenu(item)),
                               ),
                             ],
                           ),
@@ -2004,23 +2073,8 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.swap_horiz_rounded),
-            tooltip: 'NGMY Transfer code',
-            onPressed: () async {
-              final result = await Navigator.of(context).push<bool>(
-                MaterialPageRoute<bool>(
-                  builder: (_) => NgmyTransferReceivePage(
-                    email: widget.email,
-                    onReceived: () {},
-                  ),
-                ),
-              );
-              if (result == true && mounted) Navigator.pop(context, 'transfer:done');
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.pin_rounded),
-            tooltip: 'Enter 6-digit code',
+            tooltip: 'Enter QR share code',
             onPressed: _enterShortCode,
           ),
           IconButton(
@@ -2066,6 +2120,79 @@ class _DocShareScanPageState extends State<_DocShareScanPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DocShareMenuTile extends StatelessWidget {
+  const _DocShareMenuTile({
+    required this.icon,
+    required this.label,
+    required this.colors,
+    required this.onTap,
+    this.subtitle,
+    this.accent = false,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final ({Color bg, Color card, Color fg, Color muted, Color border}) colors;
+  final VoidCallback onTap;
+  final bool accent;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = destructive
+        ? Colors.red.shade400
+        : accent
+            ? kNgmyStudioHubAccent
+            : colors.fg.withValues(alpha: 0.85);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent
+                      ? kNgmyStudioHubAccent.withValues(alpha: 0.12)
+                      : colors.bg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: destructive ? Colors.red.shade400 : colors.fg,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(subtitle!, style: TextStyle(color: colors.muted, fontSize: 11, height: 1.3)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: colors.muted, size: 22),
+            ],
+          ),
+        ),
       ),
     );
   }

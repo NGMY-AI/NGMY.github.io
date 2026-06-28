@@ -51,6 +51,8 @@ class NgmyTransferRendezvous {
     required int port,
     required String sessionId,
     required List<Map<String, dynamic>> files,
+    String mode = 'lan',
+    String? offerToken,
   }) async {
     final normalized = _normalizeCode(code);
     if (normalized == null || transferKey.trim().isEmpty) return false;
@@ -66,6 +68,8 @@ class NgmyTransferRendezvous {
             'host': host.trim(),
             'port': port,
             'sessionId': sessionId.trim(),
+            'mode': mode,
+            if (offerToken != null && offerToken.trim().isNotEmpty) 'offerToken': offerToken.trim(),
             'files': files,
             'fileCount': files.length,
             'expiresAt': now.add(const Duration(hours: 2)).toIso8601String(),
@@ -89,6 +93,8 @@ class NgmyTransferRendezvous {
     required int port,
     required String sessionId,
     required List<Map<String, dynamic>> files,
+    String mode = 'lan',
+    String? offerToken,
   }) {
     stopHeartbeat();
     _heartbeat = Timer.periodic(const Duration(seconds: 12), (_) {
@@ -100,6 +106,8 @@ class NgmyTransferRendezvous {
         port: port,
         sessionId: sessionId,
         files: files,
+        mode: mode,
+        offerToken: offerToken,
       ));
     });
   }
