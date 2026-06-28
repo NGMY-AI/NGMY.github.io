@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_studio_colors.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_hub_tools_bridge.dart';
@@ -10,8 +11,7 @@ import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device.dart';
 import 'ngmy_ai_client.dart';
 
-const Color kNgmyStudioHubAccent = Color(0xFF7C3AED);
-const Color kNgmyStudioHubAccent2 = Color(0xFF00B25A);
+export 'ngmy_studio_colors.dart';
 
 /// Bottom-nav icon for the Creator Toolkit tab.
 class NgmyStudioHubNavIcon extends StatelessWidget {
