@@ -153,15 +153,15 @@ class NgmyCreatorHubTab extends StatelessWidget {
         subtitle: 'Disassemble cars & learn parts',
         onTap: () => showNgmyMechanicStudio(context: context),
       ),
-      // Admin-only: regular users can only ask for help (Profile > Live Help);
-      // only an admin can view a user's screen and guide them.
-      if (user?.isAdmin == true)
-        _CreatorTool(
-          icon: Icons.visibility_rounded,
-          colors: const [Color(0xFFDC2626), Color(0xFF991B1B)],
-          title: 'Give Help',
-          subtitle: 'Enter a user\'s code to view & guide',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyGiveHelpScreen())),
+      // Visible to everyone — but only an admin can create a code (and end up
+      // viewing); anyone else who opens this enters/scans a code and ends up
+      // sharing their own screen so the admin can guide them.
+      _CreatorTool(
+        icon: Icons.visibility_rounded,
+        colors: const [Color(0xFFDC2626), Color(0xFF991B1B)],
+        title: 'Give Help',
+        subtitle: user?.isAdmin == true ? 'Create a code for a user to connect' : 'Enter a code to get help',
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NgmyGiveHelpScreen(isAdmin: user?.isAdmin == true))),
         ),
     ];
 

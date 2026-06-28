@@ -26946,19 +26946,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ]), const SizedBox(height: 15),
-      _box(context, 'Live Help', [
-        Row(
-          children: [
-            const Icon(Icons.support_agent_rounded, size: 20),
-            const SizedBox(width: 10),
-            const Expanded(child: Text('Need help? Get a code so support can see your screen and guide you.', style: TextStyle(fontWeight: FontWeight.w600))),
-            FilledButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyGetHelpScreen())),
-              child: const Text('Open'),
-            ),
-          ],
-        ),
-      ]), const SizedBox(height: 15),
       _box(context, 'My Prizes', [
         Row(
           children: [

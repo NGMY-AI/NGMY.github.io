@@ -4,10 +4,12 @@
 // Supabase Realtime broadcast channel keyed by the code, which holds no
 // history once both sides disconnect.
 //
-// The helper can draw on the live view (arrows/circles) to point at things;
-// those marks are mirrored back onto the other person's actual screen. The
-// helper never controls, taps, or types on the other device — only the
-// NGMY app's own UI is ever captured, never the OS screen or other apps.
+// Roles: an admin creates the code/QR and ends up viewing; whoever enters or
+// scans that code ends up sharing their own screen to get help. The viewer
+// can draw on the live view (arrows/circles) to point at things; those marks
+// are mirrored back onto the sharer's actual screen. The viewer never
+// controls, taps, or types on the other device — only the NGMY app's own UI
+// is ever captured, never the OS screen or other apps.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -42,7 +44,7 @@ _ActiveShare? _ngmyActiveShare;
 /// Non-null while this device is actively broadcasting its screen.
 final ValueNotifier<bool> ngmyIsSharingLiveHelp = ValueNotifier(false);
 
-/// Normalized (0..1) stroke points the remote helper has drawn, mirrored
+/// Normalized (0..1) stroke points the remote viewer has drawn, mirrored
 /// onto this device's own screen as an overlay while sharing.
 final ValueNotifier<Map<String, List<Offset>>> ngmyLiveHelpStrokes = ValueNotifier({});
 
@@ -68,21 +70,8 @@ Future<void> _captureAndSendFrame() async {
   }
 }
 
-/// Starts waiting on [code] for a helper to join. Calls [onJoinRequest] when
-/// someone scans/enters the code — the caller decides whether to accept.
-RealtimeChannel ngmyStartLiveHelpHost({
-  required String code,
-  required void Function() onJoinRequest,
-}) {
-  final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(code));
+void _attachSharerSideListeners(RealtimeChannel channel) {
   channel
-      .onBroadcast(
-        event: 'join',
-        callback: (payload) {
-          if (ngmyIsSharingLiveHelp.value) return; // already paired — ignore further joins
-          onJoinRequest();
-        },
-      )
       .onBroadcast(
         event: 'draw',
         callback: (payload) {
@@ -95,38 +84,28 @@ RealtimeChannel ngmyStartLiveHelpHost({
           ngmyLiveHelpStrokes.value = next;
         },
       )
-      .onBroadcast(
-        event: 'draw_clear',
-        callback: (_) => ngmyLiveHelpStrokes.value = {},
-      )
-      .onBroadcast(
-        event: 'end',
-        callback: (_) => ngmyStopLiveHelpHost(),
-      )
-      .subscribe();
-  return channel;
+      .onBroadcast(event: 'draw_clear', callback: (_) => ngmyLiveHelpStrokes.value = {})
+      .onBroadcast(event: 'end', callback: (_) => unawaited(ngmyStopSharingLiveHelp(notifyChannel: false)));
 }
 
-void ngmyAcceptLiveHelpJoin(String code, RealtimeChannel channel) {
-  channel.sendBroadcastMessage(event: 'accept', payload: const {});
+/// Called once the sharer has explicitly confirmed sharing their screen.
+void ngmyStartSharingLiveHelp(String code, RealtimeChannel channel) {
   _ngmyActiveShare = _ActiveShare(code, channel);
   ngmyIsSharingLiveHelp.value = true;
   _ngmyActiveShare!.frameTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _captureAndSendFrame());
 }
 
-void ngmyDeclineLiveHelpJoin(RealtimeChannel channel) {
-  channel.sendBroadcastMessage(event: 'decline', payload: const {});
-}
-
-Future<void> ngmyStopLiveHelpHost() async {
+Future<void> ngmyStopSharingLiveHelp({bool notifyChannel = true}) async {
   final share = _ngmyActiveShare;
   _ngmyActiveShare = null;
   ngmyIsSharingLiveHelp.value = false;
   ngmyLiveHelpStrokes.value = {};
   share?.frameTimer?.cancel();
-  try {
-    await share?.channel.sendBroadcastMessage(event: 'end', payload: const {});
-  } catch (_) {}
+  if (notifyChannel) {
+    try {
+      await share?.channel.sendBroadcastMessage(event: 'end', payload: const {});
+    } catch (_) {}
+  }
   try {
     await share?.channel.unsubscribe();
   } catch (_) {}
@@ -169,7 +148,7 @@ Widget ngmyLiveSupportBannerOverlay() {
                         ),
                       ),
                       TextButton(
-                        onPressed: () => unawaited(ngmyStopLiveHelpHost()),
+                        onPressed: () => unawaited(ngmyStopSharingLiveHelp()),
                         style: TextButton.styleFrom(foregroundColor: Colors.white, backgroundColor: Colors.white.withValues(alpha: 0.18)),
                         child: const Text('End'),
                       ),
@@ -215,96 +194,240 @@ class _NgmyStrokePainter extends CustomPainter {
   bool shouldRepaint(covariant _NgmyStrokePainter oldDelegate) => true;
 }
 
-// ---------------- Entry screens ----------------
-// Split so regular users only ever see "Get Help" (ask for support) and only
-// admins can reach "Give Help" (view a user's screen) — kept as two separate
-// screens rather than one tabbed screen so each role only ever sees its own.
+// ---------------- Single entry screen, role-adaptive ----------------
+// Everyone sees the same "Give Help" button. An admin opening it creates a
+// code/QR and ends up viewing; anyone else opening it enters/scans a code
+// and ends up sharing their own screen to get help.
 
-/// Any signed-in user: generate a code/QR to ask for help.
-class NgmyGetHelpScreen extends StatelessWidget {
-  const NgmyGetHelpScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Get Help')),
-      body: const _GetHelpTab(),
-    );
-  }
-}
-
-/// Admin only: enter/scan a code to view a user's screen and help them.
 class NgmyGiveHelpScreen extends StatelessWidget {
-  const NgmyGiveHelpScreen({super.key});
+  final bool isAdmin;
+  const NgmyGiveHelpScreen({super.key, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Give Help')),
-      body: const _GiveHelpTab(),
+      body: isAdmin ? const _CreateCodeView() : const _EnterCodeView(),
     );
   }
 }
 
-class _GetHelpTab extends StatefulWidget {
-  const _GetHelpTab();
+class _CreateCodeView extends StatefulWidget {
+  const _CreateCodeView();
   @override
-  State<_GetHelpTab> createState() => _GetHelpTabState();
+  State<_CreateCodeView> createState() => _CreateCodeViewState();
 }
 
-class _GetHelpTabState extends State<_GetHelpTab> {
+class _CreateCodeViewState extends State<_CreateCodeView> {
   String? _code;
-  RealtimeChannel? _hostChannel;
+  RealtimeChannel? _channel;
+  bool _paired = false;
 
   @override
   void dispose() {
-    if (_hostChannel != null && !ngmyIsSharingLiveHelp.value) {
-      _hostChannel!.unsubscribe();
+    if (!_paired) {
+      try {
+        _channel?.unsubscribe();
+      } catch (_) {}
     }
     super.dispose();
   }
 
   void _start() {
     final code = ngmyGenerateLiveHelpCode();
-    setState(() => _code = code);
-    _hostChannel = ngmyStartLiveHelpHost(
-      code: code,
-      onJoinRequest: () => unawaited(_showJoinPrompt(code)),
-    );
+    final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(code));
+    channel
+        .onBroadcast(
+          event: 'join',
+          callback: (_) {
+            if (_paired) return;
+            _paired = true;
+            channel.sendBroadcastMessage(event: 'accept', payload: const {});
+            if (!mounted) return;
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: code, hostChannel: channel)))
+                .then((_) {
+              if (mounted) {
+                setState(() {
+                  _code = null;
+                  _channel = null;
+                  _paired = false;
+                });
+              }
+            });
+          },
+        )
+        .subscribe();
+    setState(() {
+      _code = code;
+      _channel = channel;
+      _paired = false;
+    });
   }
 
-  Future<void> _showJoinPrompt(String code) async {
-    final channel = _hostChannel;
-    if (channel == null || !mounted) return;
-    final accept = await showDialog<bool>(
+  void _cancel() {
+    try {
+      _channel?.unsubscribe();
+    } catch (_) {}
+    setState(() {
+      _code = null;
+      _channel = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_code == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.qr_code_2_rounded, size: 56),
+              const SizedBox(height: 16),
+              const Text('Create a code so a user can connect and share their screen with you.', textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: _start, child: const Text('Create Code')),
+            ],
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Give this code to the user, or let them scan the QR:', textAlign: TextAlign.center),
+            const SizedBox(height: 18),
+            Text(_code!, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 6)),
+            const SizedBox(height: 18),
+            QrImageView(data: _code!, size: 200),
+            const SizedBox(height: 20),
+            const Text('Waiting for the user to connect...'),
+            const SizedBox(height: 16),
+            OutlinedButton(onPressed: _cancel, child: const Text('Cancel')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EnterCodeView extends StatefulWidget {
+  const _EnterCodeView();
+  @override
+  State<_EnterCodeView> createState() => _EnterCodeViewState();
+}
+
+class _EnterCodeViewState extends State<_EnterCodeView> {
+  final TextEditingController _codeC = TextEditingController();
+  bool _scanning = false;
+  bool _connecting = false;
+  String? _error;
+  MobileScannerController? _scanCam;
+  RealtimeChannel? _channel;
+  Timer? _timeout;
+
+  @override
+  void dispose() {
+    _codeC.dispose();
+    _scanCam?.dispose();
+    _timeout?.cancel();
+    if (!ngmyIsSharingLiveHelp.value) {
+      try {
+        _channel?.unsubscribe();
+      } catch (_) {}
+    }
+    super.dispose();
+  }
+
+  Future<void> _connect(String code) async {
+    final c = code.trim();
+    if (c.length < 3 || c.length > 4 || int.tryParse(c) == null) {
+      setState(() => _error = 'Enter the code support gave you.');
+      return;
+    }
+    setState(() {
+      _connecting = true;
+      _error = null;
+    });
+    final channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(c));
+    _channel = channel;
+    channel
+        .onBroadcast(
+          event: 'accept',
+          callback: (_) {
+            _timeout?.cancel();
+            if (mounted) unawaited(_confirmAndShare(c, channel));
+          },
+        )
+        .subscribe((status, _) {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        channel.sendBroadcastMessage(event: 'join', payload: const {});
+      }
+    });
+    _timeout = Timer(const Duration(seconds: 45), () {
+      if (!mounted) return;
+      setState(() {
+        _connecting = false;
+        _error = 'No one responded to that code. Ask support for a fresh one.';
+      });
+      try {
+        channel.unsubscribe();
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _confirmAndShare(String code, RealtimeChannel channel) async {
+    final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Screen view request'),
-        content: const Text('NGMY Support wants to view your current screen to help you. '
-            'They can only see your screen inside this app — nothing else on your device — and they can draw on it to point things out. You can end it anytime.'),
+        title: const Text('Share your screen?'),
+        content: const Text('Support will see your current NGMY screen and can draw on it to point things out. '
+            'They can only see inside this app — nothing else on your device — and you can end it anytime.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Decline')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Allow')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Share Screen')),
         ],
       ),
     );
     if (!mounted) return;
-    if (accept == true) {
-      ngmyAcceptLiveHelpJoin(code, channel);
-      setState(() {});
-    } else {
-      ngmyDeclineLiveHelpJoin(channel);
+    if (ok != true) {
+      try {
+        channel.unsubscribe();
+      } catch (_) {}
+      setState(() {
+        _connecting = false;
+        _channel = null;
+      });
+      return;
     }
+    _attachSharerSideListeners(channel);
+    ngmyStartSharingLiveHelp(code, channel);
+    setState(() => _connecting = false);
   }
 
   void _stop() {
-    unawaited(ngmyStopLiveHelpHost());
-    try {
-      _hostChannel?.unsubscribe();
-    } catch (_) {}
-    _hostChannel = null;
-    setState(() => _code = null);
+    unawaited(ngmyStopSharingLiveHelp());
+    setState(() {
+      _channel = null;
+      _codeC.clear();
+    });
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    for (final b in capture.barcodes) {
+      final v = (b.rawValue ?? '').trim();
+      if (v.isNotEmpty) {
+        setState(() => _scanning = false);
+        unawaited(_connect(v));
+        return;
+      }
+    }
   }
 
   @override
@@ -331,21 +454,20 @@ class _GetHelpTabState extends State<_GetHelpTab> {
             ),
           );
         }
-        if (_code == null) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.support_agent_rounded, size: 56),
-                  const SizedBox(height: 16),
-                  const Text('Get a code to share with support so they can see your screen and guide you.', textAlign: TextAlign.center),
-                  const SizedBox(height: 20),
-                  FilledButton(onPressed: _start, child: const Text('Generate Code')),
-                ],
+        if (_scanning) {
+          _scanCam ??= MobileScannerController(detectionSpeed: DetectionSpeed.normal);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              MobileScanner(controller: _scanCam, onDetect: _onDetect),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: SafeArea(
+                  child: IconButton.filled(onPressed: () => setState(() => _scanning = false), icon: const Icon(Icons.close_rounded)),
+                ),
               ),
-            ),
+            ],
           );
         }
         return Center(
@@ -354,15 +476,40 @@ class _GetHelpTabState extends State<_GetHelpTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Give this code to support, or let them scan the QR:', textAlign: TextAlign.center),
-                const SizedBox(height: 18),
-                Text(_code!, style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 6)),
-                const SizedBox(height: 18),
-                QrImageView(data: _code!, size: 200),
-                const SizedBox(height: 20),
-                const Text('Waiting for support to connect...'),
+                const Icon(Icons.qr_code_scanner_rounded, size: 56),
                 const SizedBox(height: 16),
-                OutlinedButton(onPressed: _stop, child: const Text('Cancel')),
+                const Text('Enter the code support gave you, or scan their QR.', textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: 200,
+                  child: TextField(
+                    controller: _codeC,
+                    enabled: !_connecting,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 6),
+                    decoration: const InputDecoration(counterText: '', border: OutlineInputBorder()),
+                    onSubmitted: _connect,
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _connecting ? null : () => _connect(_codeC.text),
+                  child: _connecting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Connect'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _connecting ? null : () => setState(() => _scanning = true),
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Scan QR instead'),
+                ),
               ],
             ),
           ),
@@ -372,168 +519,52 @@ class _GetHelpTabState extends State<_GetHelpTab> {
   }
 }
 
-class _GiveHelpTab extends StatefulWidget {
-  const _GiveHelpTab();
-  @override
-  State<_GiveHelpTab> createState() => _GiveHelpTabState();
-}
-
-class _GiveHelpTabState extends State<_GiveHelpTab> {
-  final TextEditingController _codeC = TextEditingController();
-  bool _scanning = false;
-  MobileScannerController? _scanCam;
-
-  @override
-  void dispose() {
-    _codeC.dispose();
-    _scanCam?.dispose();
-    super.dispose();
-  }
-
-  void _connect(String code) {
-    final c = code.trim();
-    if (c.length < 3 || c.length > 4 || int.tryParse(c) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter the code support gave you.')));
-      return;
-    }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => NgmyLiveSupportViewerScreen(code: c)));
-  }
-
-  void _onDetect(BarcodeCapture capture) {
-    for (final b in capture.barcodes) {
-      final v = (b.rawValue ?? '').trim();
-      if (v.isNotEmpty) {
-        setState(() => _scanning = false);
-        _connect(v);
-        return;
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_scanning) {
-      _scanCam ??= MobileScannerController(detectionSpeed: DetectionSpeed.normal);
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          MobileScanner(controller: _scanCam, onDetect: _onDetect),
-          Positioned(
-            top: 16,
-            left: 16,
-            child: SafeArea(
-              child: IconButton.filled(
-                onPressed: () => setState(() => _scanning = false),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.qr_code_scanner_rounded, size: 56),
-            const SizedBox(height: 16),
-            const Text('Enter the code the user gave you, or scan their QR.', textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: 200,
-              child: TextField(
-                controller: _codeC,
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 6),
-                decoration: const InputDecoration(counterText: '', border: OutlineInputBorder()),
-                onSubmitted: _connect,
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: () => _connect(_codeC.text), child: const Text('Connect')),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _scanning = true),
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Scan QR instead'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+/// Admin-side viewer, always reusing the channel already paired by
+/// [_CreateCodeViewState] — never sends 'join' itself.
 class NgmyLiveSupportViewerScreen extends StatefulWidget {
   final String code;
-  const NgmyLiveSupportViewerScreen({super.key, required this.code});
+  final RealtimeChannel hostChannel;
+  const NgmyLiveSupportViewerScreen({super.key, required this.code, required this.hostChannel});
 
   @override
   State<NgmyLiveSupportViewerScreen> createState() => _NgmyLiveSupportViewerScreenState();
 }
 
 class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScreen> {
-  RealtimeChannel? _channel;
   Uint8List? _latestFrame;
   double _aspect = 9 / 16;
-  bool _connected = false;
   bool _ended = false;
-  bool _timedOut = false;
-  Timer? _joinTimeout;
 
   final GlobalKey _stageKey = GlobalKey();
   final Map<String, List<Offset>> _strokes = {};
   String? _activeStrokeId;
   DateTime _lastSent = DateTime.fromMillisecondsSinceEpoch(0);
 
+  RealtimeChannel get _channel => widget.hostChannel;
+
   @override
   void initState() {
     super.initState();
-    _channel = _ngmyLsClient.channel(_ngmyLiveHelpChannelName(widget.code))
-      ..onBroadcast(
-        event: 'accept',
-        callback: (_) {
-          _joinTimeout?.cancel();
-          if (mounted) setState(() => _connected = true);
-        },
-      ).onBroadcast(
-        event: 'decline',
-        callback: (_) {
-          _joinTimeout?.cancel();
-          if (mounted) setState(() => _ended = true);
-        },
-      ).onBroadcast(
-        event: 'frame',
-        callback: (payload) {
-          final data = payload['data'];
-          if (data is! String) return;
-          try {
-            final bytes = base64Decode(data);
-            unawaited(_updateAspect(bytes));
-            if (!mounted) return;
-            setState(() => _latestFrame = bytes);
-          } catch (_) {}
-        },
-      ).onBroadcast(
-        event: 'end',
-        callback: (_) {
-          if (mounted) setState(() => _ended = true);
-        },
-      ).subscribe(
-        (status, _) {
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            _channel?.sendBroadcastMessage(event: 'join', payload: const {});
-          }
-        },
-      );
-    _joinTimeout = Timer(const Duration(seconds: 45), () {
-      if (!mounted || _connected) return;
-      setState(() => _timedOut = true);
-    });
+    _channel
+        .onBroadcast(
+          event: 'frame',
+          callback: (payload) {
+            final data = payload['data'];
+            if (data is! String) return;
+            try {
+              final bytes = base64Decode(data);
+              unawaited(_updateAspect(bytes));
+              if (!mounted) return;
+              setState(() => _latestFrame = bytes);
+            } catch (_) {}
+          },
+        )
+        .onBroadcast(
+          event: 'end',
+          callback: (_) {
+            if (mounted) setState(() => _ended = true);
+          },
+        );
   }
 
   Future<void> _updateAspect(Uint8List bytes) async {
@@ -549,12 +580,11 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
 
   @override
   void dispose() {
-    _joinTimeout?.cancel();
-    if (_connected && !_ended) {
-      unawaited(_channel?.sendBroadcastMessage(event: 'end', payload: const {}));
+    if (!_ended) {
+      unawaited(_channel.sendBroadcastMessage(event: 'end', payload: const {}));
     }
     try {
-      _channel?.unsubscribe();
+      _channel.unsubscribe();
     } catch (_) {}
     super.dispose();
   }
@@ -564,7 +594,7 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
     if (id == null) return;
     final pts = _strokes[id];
     if (pts == null) return;
-    unawaited(_channel?.sendBroadcastMessage(
+    unawaited(_channel.sendBroadcastMessage(
       event: 'draw',
       payload: {'id': id, 'points': pts.map((p) => [p.dx, p.dy]).toList()},
     ));
@@ -606,11 +636,12 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
 
   void _clearDrawing() {
     setState(() => _strokes.clear());
-    unawaited(_channel?.sendBroadcastMessage(event: 'draw_clear', payload: const {}));
+    unawaited(_channel.sendBroadcastMessage(event: 'draw_clear', payload: const {}));
   }
 
   Future<void> _end() async {
-    await _channel?.sendBroadcastMessage(event: 'end', payload: const {});
+    _ended = true;
+    await _channel.sendBroadcastMessage(event: 'end', payload: const {});
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -627,13 +658,10 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
                 children: [
                   IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.arrow_back, color: Colors.white)),
                   Expanded(
-                    child: Text(
-                      _connected ? 'Viewing — code ${widget.code}' : 'Connecting to ${widget.code}...',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                    ),
+                    child: Text('Viewing — code ${widget.code}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
-                  if (_connected) IconButton(onPressed: _clearDrawing, icon: const Icon(Icons.layers_clear_rounded, color: Colors.white), tooltip: 'Clear drawing'),
-                  if (_connected) IconButton(onPressed: _end, icon: const Icon(Icons.stop_circle_outlined, color: Colors.white), tooltip: 'End session'),
+                  IconButton(onPressed: _clearDrawing, icon: const Icon(Icons.layers_clear_rounded, color: Colors.white), tooltip: 'Clear drawing'),
+                  IconButton(onPressed: _end, icon: const Icon(Icons.stop_circle_outlined, color: Colors.white), tooltip: 'End session'),
                 ],
               ),
             ),
@@ -647,21 +675,6 @@ class _NgmyLiveSupportViewerScreenState extends State<NgmyLiveSupportViewerScree
   Widget _body() {
     if (_ended) {
       return const Center(child: Text('Session ended.', style: TextStyle(color: Colors.white)));
-    }
-    if (_timedOut && !_connected) {
-      return const Center(child: Text('No one responded to that code.', style: TextStyle(color: Colors.white)));
-    }
-    if (!_connected) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text('Waiting for the user to accept...', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-      );
     }
     if (_latestFrame == null) {
       return const Center(
