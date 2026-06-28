@@ -170,12 +170,16 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
       if (ngmyIsMultipleAccountsOAuthError(decoded)) {
         final hint = ngmyOAuthPeekEmailHint() ?? ngmyOAuthTakeEmailHint();
         final providerName = ngmyOAuthTakeProviderHint();
-        if (hint != null && hint.isNotEmpty) {
-          await ngmyReconcileAuthAccountsByEmail(hint);
+        final alreadyRetried = ngmyOAuthTakeRetryFlag();
+        if (hint != null && hint.isNotEmpty && !alreadyRetried) {
+          final merged = await ngmyReconcileAuthAccountsByEmail(hint);
           final provider = _oauthProviderFromName(providerName);
-          if (provider != null) {
+          // Only auto-redirect again if the merge actually succeeded — otherwise
+          // retrying just hits the same conflict and bounces the user forever.
+          if (merged && provider != null) {
             ngmyOAuthStoreEmailHint(hint);
             ngmyOAuthStoreProviderHint(provider.name);
+            ngmyOAuthStoreRetryFlag();
             final retryErr = await _signInWithOAuthRedirect(provider, emailHint: hint);
             if (retryErr != null) {
               ngmyLastOAuthError = retryErr;
@@ -185,7 +189,7 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
           }
           ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
         } else {
-          ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(null);
+          ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
         }
       } else {
         ngmyLastOAuthError = decoded.isNotEmpty ? 'Login failed: $decoded' : 'Login failed or was cancelled.';
@@ -211,12 +215,14 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
         if (ngmyIsMultipleAccountsOAuthError(errText)) {
           final hint = ngmyOAuthPeekEmailHint() ?? ngmyOAuthTakeEmailHint();
           final providerName = ngmyOAuthTakeProviderHint();
-          if (hint != null && hint.isNotEmpty) {
-            await ngmyReconcileAuthAccountsByEmail(hint);
+          final alreadyRetried = ngmyOAuthTakeRetryFlag();
+          if (hint != null && hint.isNotEmpty && !alreadyRetried) {
+            final merged = await ngmyReconcileAuthAccountsByEmail(hint);
             final provider = _oauthProviderFromName(providerName);
-            if (provider != null) {
+            if (merged && provider != null) {
               ngmyOAuthStoreEmailHint(hint);
               ngmyOAuthStoreProviderHint(provider.name);
+              ngmyOAuthStoreRetryFlag();
               final retryErr = await _signInWithOAuthRedirect(provider, emailHint: hint);
               if (retryErr != null) {
                 ngmyLastOAuthError = retryErr;
@@ -226,7 +232,7 @@ Future<void> ngmyRecoverOAuthSessionIfNeeded() async {
             }
             ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
           } else {
-            ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(null);
+            ngmyLastOAuthError = ngmyMultipleAccountsOAuthHelp(hint);
           }
         } else {
           ngmyLastOAuthError = 'Login failed: $e';

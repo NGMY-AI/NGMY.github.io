@@ -11,3 +11,7 @@ String? ngmyOAuthTakeEmailHint() => null;
 void ngmyOAuthStoreProviderHint(String provider) {}
 
 String? ngmyOAuthTakeProviderHint() => null;
+
+void ngmyOAuthStoreRetryFlag() {}
+
+bool ngmyOAuthTakeRetryFlag() => false;

@@ -42,3 +42,13 @@ String? ngmyOAuthTakeProviderHint() {
   if (v == null || v.trim().isEmpty) return null;
   return v.trim().toLowerCase();
 }
+
+void ngmyOAuthStoreRetryFlag() {
+  html.window.sessionStorage['ngmy_oauth_merge_retry'] = '1';
+}
+
+bool ngmyOAuthTakeRetryFlag() {
+  final had = html.window.sessionStorage['ngmy_oauth_merge_retry'] != null;
+  html.window.sessionStorage.remove('ngmy_oauth_merge_retry');
+  return had;
+}
