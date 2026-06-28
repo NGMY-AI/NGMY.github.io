@@ -96,6 +96,7 @@ import 'ngmy_document_scan_payments.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_oauth.dart';
+import 'ngmy_live_support.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
@@ -8713,6 +8714,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       );
     };
     NgmyNavigator.install();
+    ngmyInstallLiveSupportConsentListener(() => ngmyRootNavigatorKey.currentContext ?? context);
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
@@ -10766,11 +10768,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _appSyncChannel?.unsubscribe();
       } catch (_) {}
       _appSyncChannel = null;
+      ngmyStopListeningForLiveSupportRequests();
       return;
     }
     try {
       _appSyncChannel?.unsubscribe();
       final sessionEmail = (_currentUser?.email ?? '').trim();
+      if (sessionEmail.isNotEmpty) ngmyListenForLiveSupportRequests(sessionEmail);
       if (sessionEmail.isEmpty) {
         _appSyncChannel = null;
         return;
@@ -12690,7 +12694,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (child != null) _materialAppShellChild = child;
           final body = child ?? _materialAppShellChild;
           if (body == null) return ColoredBox(color: shellBg);
-          return body;
+          return Stack(
+            children: [
+              RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: body),
+              ngmyLiveSupportBannerOverlay(),
+            ],
+          );
         },
         home: _currentUser == null
             ? AuthScreen(
@@ -20859,6 +20868,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
             _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
             _menuFrame('Help Center', Icons.support_agent_rounded, const Color(0xFF00B4D8), () => unawaited(_openHelpCenterAdmin(isDark)), isDark),
+            _menuFrame('Live Support', Icons.visibility_rounded, const Color(0xFFDC2626), _openLiveSupportAdmin, isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -20932,6 +20942,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _openHelpCenterAdmin(bool isDark) async {
     _showHelpCenterAdmin(isDark);
     unawaited(_refreshManagementInBackground());
+  }
+
+  void _openLiveSupportAdmin() {
+    final adminEmail = widget.user.email.trim();
+    final adminName = widget.user.username.trim();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => NgmyLiveSupportAdminScreen(
+        users: widget.allUsers.where((u) => u.email.toLowerCase().trim() != adminEmail.toLowerCase()).map((u) => (email: u.email, username: u.username)).toList(),
+        adminEmail: adminEmail,
+        adminName: adminName,
+      ),
+    ));
   }
 
   void _showHelpCenterAdmin(bool isDark) {
