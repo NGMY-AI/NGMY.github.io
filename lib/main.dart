@@ -8714,7 +8714,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       );
     };
     NgmyNavigator.install();
-    ngmyInstallLiveSupportConsentListener(() => ngmyRootNavigatorKey.currentContext ?? context);
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
@@ -10768,13 +10767,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _appSyncChannel?.unsubscribe();
       } catch (_) {}
       _appSyncChannel = null;
-      ngmyStopListeningForLiveSupportRequests();
       return;
     }
     try {
       _appSyncChannel?.unsubscribe();
       final sessionEmail = (_currentUser?.email ?? '').trim();
-      if (sessionEmail.isNotEmpty) ngmyListenForLiveSupportRequests(sessionEmail);
       if (sessionEmail.isEmpty) {
         _appSyncChannel = null;
         return;
@@ -20945,15 +20942,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _openLiveSupportAdmin() {
-    final adminEmail = widget.user.email.trim();
-    final adminName = widget.user.username.trim();
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => NgmyLiveSupportAdminScreen(
-        users: widget.allUsers.where((u) => u.email.toLowerCase().trim() != adminEmail.toLowerCase()).map((u) => (email: u.email, username: u.username)).toList(),
-        adminEmail: adminEmail,
-        adminName: adminName,
-      ),
-    ));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyLiveHelpScreen()));
   }
 
   void _showHelpCenterAdmin(bool isDark) {
@@ -26960,6 +26949,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
+        ),
+      ]), const SizedBox(height: 15),
+      _box(context, 'Live Help', [
+        Row(
+          children: [
+            const Icon(Icons.support_agent_rounded, size: 20),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Need help? Get a code so support can see your screen and guide you.', style: TextStyle(fontWeight: FontWeight.w600))),
+            FilledButton(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NgmyLiveHelpScreen())),
+              child: const Text('Open'),
+            ),
+          ],
         ),
       ]), const SizedBox(height: 15),
       _box(context, 'My Prizes', [
