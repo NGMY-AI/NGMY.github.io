@@ -91,14 +91,48 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     return controller;
   }
 
+  bool _isMutedUrl(String url) => url.contains('mute=1');
+
   void _load(String url) {
     setState(() {
       _loading = true;
       _failed = false;
     });
-    if (widget.useEmbedHtml && _shouldUseEmbedHtml(url)) {
+
+    if (!widget.useEmbedHtml) {
+      _controller.loadRequest(Uri.parse(url));
+      return;
+    }
+
+    final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
+    if (ytId != null) {
+      if (widget.notifyOnEnd) {
+        _controller.loadHtmlString(
+          NgmyVirtualDeviceEmbed.youtubePlayerHtml(
+            ytId,
+            muted: _isMutedUrl(url),
+            notifyOnEnd: true,
+          ),
+          baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
+        );
+      } else {
+        _controller.loadHtmlString(
+          NgmyVirtualDeviceEmbed.genericIframeHtml(
+            NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: _isMutedUrl(url)),
+          ),
+          baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
+        );
+      }
+      return;
+    }
+
+    if (_needsEmbedHtml(url)) {
       _controller.loadHtmlString(
-        NgmyVirtualDeviceEmbed.iframeHtml(url, notifyOnEnd: widget.notifyOnEnd),
+        NgmyVirtualDeviceEmbed.iframeHtml(
+          url,
+          notifyOnEnd: widget.notifyOnEnd,
+          muted: _isMutedUrl(url),
+        ),
         baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
       );
     } else {
@@ -106,11 +140,9 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     }
   }
 
-  bool _shouldUseEmbedHtml(String url) {
+  bool _needsEmbedHtml(String url) {
     final lower = url.toLowerCase();
-    return lower.contains('youtube') ||
-        lower.contains('youtu.be') ||
-        lower.contains('tiktok.com/player') ||
+    return lower.contains('tiktok.com/player') ||
         lower.contains('instagram.com') ||
         lower.contains('facebook.com/plugins');
   }

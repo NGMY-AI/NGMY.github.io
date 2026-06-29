@@ -33,26 +33,47 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   var _loading = true;
   var _failed = false;
 
-  bool _shouldUseEmbedHtml(String url) {
-    if (!widget.useEmbedHtml) return false;
-    final lower = url.toLowerCase();
-    return lower.contains('youtube') ||
-        lower.contains('youtu.be') ||
-        lower.contains('tiktok.com/player') ||
-        lower.contains('instagram.com') ||
-        lower.contains('facebook.com/plugins');
-  }
+  bool _isMutedUrl(String url) => url.contains('mute=1');
 
   void _applySrc(html.IFrameElement frame, String url) {
-    if (_shouldUseEmbedHtml(url)) {
+    final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
+    if (ytId != null && widget.useEmbedHtml) {
+      if (widget.notifyOnEnd) {
+        frame
+          ..removeAttribute('src')
+          ..srcdoc = NgmyVirtualDeviceEmbed.youtubePlayerHtml(
+            ytId,
+            muted: _isMutedUrl(url),
+            notifyOnEnd: true,
+          );
+      } else {
+        frame
+          ..removeAttribute('srcdoc')
+          ..src = NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: _isMutedUrl(url));
+      }
+      return;
+    }
+
+    if (widget.useEmbedHtml && _needsEmbedHtml(url)) {
       frame
         ..removeAttribute('src')
-        ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(url, notifyOnEnd: widget.notifyOnEnd);
+        ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(
+          url,
+          notifyOnEnd: widget.notifyOnEnd,
+          muted: _isMutedUrl(url),
+        );
     } else {
       frame
         ..removeAttribute('srcdoc')
         ..src = url;
     }
+  }
+
+  bool _needsEmbedHtml(String url) {
+    final lower = url.toLowerCase();
+    return lower.contains('tiktok.com/player') ||
+        lower.contains('instagram.com') ||
+        lower.contains('facebook.com/plugins');
   }
 
   @override

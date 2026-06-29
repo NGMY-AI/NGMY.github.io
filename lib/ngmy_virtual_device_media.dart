@@ -62,7 +62,7 @@ class NgmyVirtualDeviceMedia {
       // Use youtube-nocookie + HTML iframe wrapper for reliable mobile WebView playback.
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        playUrl: NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId),
+        playUrl: NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: false),
         platform: NgmyVirtualMediaPlatform.youtube,
         label: 'YouTube',
         previewImageUrl: 'https://img.youtube.com/vi/$ytId/hqdefault.jpg',

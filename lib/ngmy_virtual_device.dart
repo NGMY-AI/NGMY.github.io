@@ -36,50 +36,181 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
   final controller = TextEditingController(
     text: NgmyVirtualDevicePlayback.active.value?.originalUrl ?? '',
   );
-  final pasted = await showDialog<String>(
+  final pasted = await showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (ctx) {
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      return AlertDialog(
-        title: const Text('Paste video link'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'YouTube, TikTok, Instagram, or Facebook — 4 devices play at a time, then rotates through all $deviceCount.',
-              style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
+      final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottom),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [const Color(0xFF151B28), const Color(0xFF0F172A)]
+                  : [Colors.white, const Color(0xFFF8FAFC)],
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'https://youtube.com/watch?v=…',
-                filled: true,
-                fillColor: isDark ? const Color(0xFF151B28) : const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            boxShadow: [
+              BoxShadow(
+                color: kNgmyStudioHubAccent.withValues(alpha: 0.22),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
               ),
+            ],
+            border: Border.all(
+              color: isDark ? Colors.white12 : kNgmyStudioHubAccent.withValues(alpha: 0.18),
             ),
-          ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        kNgmyStudioHubAccent.withValues(alpha: isDark ? 0.35 : 0.14),
+                        kNgmyStudioHubAccent2.withValues(alpha: isDark ? 0.18 : 0.08),
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: kNgmyStudioHubAccent.withValues(alpha: 0.18),
+                          border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.45)),
+                        ),
+                        child: const Icon(Icons.play_circle_fill_rounded, color: kNgmyStudioHubAccent, size: 26),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Paste video link',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '4 phones play at a time · rotates through all $deviceCount',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close_rounded, color: isDark ? Colors.white54 : Colors.black45),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _NgmyVdPlatformChip(label: 'YouTube', icon: Icons.smart_display_rounded, isDark: isDark),
+                          _NgmyVdPlatformChip(label: 'TikTok', icon: Icons.music_note_rounded, isDark: isDark),
+                          _NgmyVdPlatformChip(label: 'Instagram', icon: Icons.camera_alt_rounded, isDark: isDark),
+                          _NgmyVdPlatformChip(label: 'Facebook', icon: Icons.facebook_rounded, isDark: isDark),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: controller,
+                        autofocus: true,
+                        maxLines: 3,
+                        minLines: 2,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'https://youtube.com/watch?v=…',
+                          hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          prefixIcon: Icon(Icons.link_rounded, color: kNgmyStudioHubAccent.withValues(alpha: 0.85)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: kNgmyStudioHubAccent, width: 1.6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          NgmyVirtualDeviceFleetPlayback.stop();
+                          NgmyVirtualDevicePlayback.clear();
+                          Navigator.pop(ctx);
+                        },
+                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                        label: const Text('Stop'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDark ? Colors.white60 : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text('Cancel', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                        label: const Text('Play fleet'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: kNgmyStudioHubAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              NgmyVirtualDeviceFleetPlayback.stop();
-              NgmyVirtualDevicePlayback.clear();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Clear'),
-          ),
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
-            child: const Text('Play on all devices'),
-          ),
-        ],
       );
     },
   );
@@ -100,6 +231,45 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('Playing ${target.label} — 4 devices at a time across $deviceCount phones')),
   );
+}
+
+class _NgmyVdPlatformChip extends StatelessWidget {
+  const _NgmyVdPlatformChip({
+    required this.label,
+    required this.icon,
+    required this.isDark,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kNgmyStudioHubAccent.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: kNgmyStudioHubAccent),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class NgmyVirtualDeviceIdentity {
