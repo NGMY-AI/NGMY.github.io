@@ -14343,26 +14343,20 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
   }
 }
 
-/// Keeps home mounted and paints full-screen without tab-stack overlays (admin iOS PWA).
-class _NgmyHomeTabHost extends StatefulWidget {
-  const _NgmyHomeTabHost({required this.child});
+/// Full-height home shell — avoids Stack/SizedBox.expand collapse on iOS Safari PWA.
+class _NgmyHomeScaffold extends StatelessWidget {
+  const _NgmyHomeScaffold({required this.child});
 
   final Widget child;
 
   @override
-  State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
-}
-
-class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
   Widget build(BuildContext context) {
-    super.build(context);
-    return ColoredBox(
+    return Material(
       color: Theme.of(context).scaffoldBackgroundColor,
-      child: SizedBox.expand(child: widget.child),
+      child: SafeArea(
+        bottom: false,
+        child: child,
+      ),
     );
   }
 }
@@ -14524,6 +14518,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int? _sortedTxCacheLen;
   List<AppTransaction>? _userClockInTxCache;
   int? _userClockInTxSourceLen;
+  final GlobalKey _homeTabKey = GlobalKey(debugLabel: 'ngmy_home_tab');
   final Set<int> _visitedTabs = {0};
   bool _warmingTxCache = false;
 
@@ -14599,6 +14594,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _runScheduledPopups() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final mountedAt = _mainShellMountedAt;
+      if (widget.user.isAdmin &&
+          mountedAt != null &&
+          DateTime.now().difference(mountedAt) < const Duration(seconds: 12)) {
+        Future<void>.delayed(const Duration(seconds: 12), () {
+          if (!mounted) return;
+          NgmyPopupOrchestrator.handleAppOpen(
+            context,
+            popupsRaw: widget.config.ngmyPopups,
+            videoPopupsRaw: widget.config.ngmyVideoPopups,
+            userEmail: widget.user.email,
+          );
+        });
+        return;
+      }
       NgmyPopupOrchestrator.handleAppOpen(
         context,
         popupsRaw: widget.config.ngmyPopups,
@@ -15045,11 +15055,62 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget _buildHomeTab(List<AppTransaction> sorted) {
-    return HomeScreen(
-      key: ValueKey<String>('ngmy_home_${widget.user.email.toLowerCase().trim()}'),
-      user: widget.user,
-      onClockIn: () async {
+  List<UserData> _homeUsersForDisplay() {
+    if (!widget.user.isAdmin || widget.allUsers.length <= 100) return widget.allUsers;
+    final keys = <String>{widget.user.email.toLowerCase().trim()};
+    for (final t in _homeTransactionsForDisplay()) {
+      keys.add(t.userEmail.toLowerCase().trim());
+    }
+    return widget.allUsers
+        .where((u) => keys.contains(u.email.toLowerCase().trim()))
+        .toList(growable: false);
+  }
+
+  Widget _buildHomeTabWidget() {
+    return _NgmyHomeScaffold(
+      child: HomeScreen(
+        key: _homeTabKey,
+        user: widget.user,
+        onClockIn: () => unawaited(_homeOnClockIn()),
+        allTransactions: _homeTransactionsForDisplay(),
+        onProcess: widget.onProcessTransaction,
+        allUsers: _homeUsersForDisplay(),
+        globalPlans: widget.globalPlans,
+        onAddPlan: widget.onAddPlan,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
+        config: widget.config,
+        allMedia: widget.allMedia,
+        allAnnouncements: widget.allAnnouncements,
+        onAddAnnouncement: widget.onAddAnnouncement,
+        onDeleteAnnouncement: widget.onDeleteAnnouncement,
+        onClearAllAnnouncements: widget.onClearAllAnnouncements,
+        onSaveLegalContent: widget.onSaveLegalContent,
+        onSavePopups: widget.onSavePopups,
+        onUploadPopupVideo: widget.onUploadPopupVideo,
+        onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
+        onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
+        onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
+        onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
+        onRefreshAdminData: widget.onRefreshAdminData,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPushUserToCloud: widget.onPushUserToCloud,
+        onSaveWalletPayments: widget.onSaveWalletPayments,
+        onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
+        onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
+        onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
+        onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
+        onPersistManagementConfig: widget.onPersistManagementConfig,
+        onRefreshManagementData: widget.onRefreshManagementData,
+        onRefreshAdminMedia: widget.onRefreshAdminMedia,
+        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+        onOpenInvest: () => setState(() => _idx = 1),
+        onOpenAdminDashboard: widget.user.isAdmin ? _openAdminDashboardFromHome : null,
+      ),
+    );
+  }
+
+  Future<void> _homeOnClockIn() async {
         final now = DateTime.now();
         _ngmyApplyMidnightClockReset(widget.user);
         final onTrial = widget.user.isOnFreeTrial;
@@ -15132,45 +15193,48 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             await _showClockInConfirmedDialog();
           }
         }
-      },
-      allTransactions: sorted,
-      onProcess: widget.onProcessTransaction,
-      allUsers: widget.allUsers,
-      globalPlans: widget.globalPlans,
-      onAddPlan: widget.onAddPlan,
-      onAddTransaction: widget.onAddTransaction,
-      onDataChanged: widget.onDataChanged,
-      config: widget.config,
-      allMedia: widget.allMedia,
-      allAnnouncements: widget.allAnnouncements,
-      onAddAnnouncement: widget.onAddAnnouncement,
-      onDeleteAnnouncement: widget.onDeleteAnnouncement,
-      onClearAllAnnouncements: widget.onClearAllAnnouncements,
-      onSaveLegalContent: widget.onSaveLegalContent,
-      onSavePopups: widget.onSavePopups,
-      onUploadPopupVideo: widget.onUploadPopupVideo,
-      onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
-      onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
-      onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
-      onMarkAnnouncementsRead: widget.onMarkAnnouncementsRead,
-      onRefreshAdminData: widget.onRefreshAdminData,
-      onDeleteMedia: widget.onDeleteMedia,
-      onPushUserToCloud: widget.onPushUserToCloud,
-      onSaveWalletPayments: widget.onSaveWalletPayments,
-      onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
-      onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
-      onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
-      onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
-      onPersistManagementConfig: widget.onPersistManagementConfig,
-      onRefreshManagementData: widget.onRefreshManagementData,
-      onRefreshAdminMedia: widget.onRefreshAdminMedia,
-      onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
-      onOpenInvest: () => setState(() => _idx = 1),
-    );
   }
 
-  Widget _buildHomeTabWidget() {
-    return _NgmyHomeTabHost(child: _buildHomeTab(_homeTransactionsForDisplay()));
+  Future<void> _openAdminDashboardFromHome() async {
+    unawaited(widget.onRefreshAdminData?.call());
+    await NgmyNavigator.push(
+      context,
+      AdminDashboard(
+        user: widget.user,
+        allTransactions: widget.allTransactions,
+        onProcess: widget.onProcessTransaction,
+        allUsers: widget.allUsers,
+        globalPlans: widget.globalPlans,
+        onAddPlan: widget.onAddPlan,
+        onAddTransaction: widget.onAddTransaction,
+        onDataChanged: widget.onDataChanged,
+        config: widget.config,
+        allMedia: widget.allMedia,
+        allAnnouncements: widget.allAnnouncements,
+        onAddAnnouncement: widget.onAddAnnouncement,
+        onDeleteAnnouncement: widget.onDeleteAnnouncement,
+        onClearAllAnnouncements: widget.onClearAllAnnouncements,
+        onSaveLegalContent: widget.onSaveLegalContent,
+        onSavePopups: widget.onSavePopups,
+        onUploadPopupVideo: widget.onUploadPopupVideo,
+        onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
+        onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
+        onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
+        onRefreshAdminData: widget.onRefreshAdminData,
+        onDeleteMedia: widget.onDeleteMedia,
+        onPushUserToCloud: widget.onPushUserToCloud,
+        onSaveWalletPayments: widget.onSaveWalletPayments,
+        onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
+        onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
+        onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
+        onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
+        onPersistManagementConfig: widget.onPersistManagementConfig,
+        onRefreshManagementData: widget.onRefreshManagementData,
+        onRefreshAdminMedia: widget.onRefreshAdminMedia,
+        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+      ),
+      routeName: 'AdminDashboard',
+    );
   }
 
   void _ensureTabContentBuilders(List<AppTransaction> sorted) {
@@ -15428,12 +15492,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           builder: (context, sharing, _) {
             if (_idx == 0) {
               final home = _buildHomeTabWidget();
+              if (!sharing) return home;
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  sharing
-                      ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: home)
-                      : home,
+                  Positioned.fill(
+                    child: RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: home),
+                  ),
                   ngmyLiveSupportBannerOverlay(),
                 ],
               );
@@ -15632,11 +15697,12 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final VoidCallback? onOpenInvest;
+  final VoidCallback? onOpenAdminDashboard;
   final Widget? homeLeadingOverride;
   final bool disableLocalGrowthIncomeEntry;
   final bool isLocalGrowthIncome;
   final String? homeTitleOverride;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -15648,8 +15714,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _heavySectionsReady = true;
   bool _clockUiReady = true;
   DateTime? _homeMountedAt;
-  int _liveCacheTxnLen = -1;
-  List<AppTransaction> _liveCacheShown = const [];
 
   Future<void> _openNewsHub() async {
     await NgmyNavigator.push(
@@ -15727,7 +15791,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         oldWidget.user.username != widget.user.username ||
         oldWidget.user.crownBadge != widget.user.crownBadge ||
         oldWidget.allTransactions.length != widget.allTransactions.length) {
-      _liveCacheTxnLen = -1;
       if (mounted) setState(() {});
     }
   }
@@ -15744,59 +15807,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final isLight = Theme.of(context).brightness == Brightness.light;
     return ColoredBox(
       color: bg,
-      child: SizedBox.expand(
-        child: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
+      child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FloatingTitle(
                 title: widget.homeTitleOverride ?? 'GROWTH INCOME',
-                onTap: widget.user.isAdmin
-                    ? () {
-                        unawaited(widget.onRefreshAdminData?.call());
-                        NgmyNavigator.push(
-                          context,
-                          AdminDashboard(
-                            user: widget.user,
-                            allTransactions: widget.allTransactions,
-                            onProcess: widget.onProcess,
-                            allUsers: widget.allUsers,
-                            globalPlans: widget.globalPlans,
-                            onAddPlan: widget.onAddPlan,
-                            onAddTransaction: widget.onAddTransaction,
-                            onDataChanged: widget.onDataChanged,
-                            config: widget.config,
-                            allMedia: widget.allMedia,
-                            allAnnouncements: widget.allAnnouncements,
-                            onAddAnnouncement: widget.onAddAnnouncement,
-                            onDeleteAnnouncement: widget.onDeleteAnnouncement,
-                            onClearAllAnnouncements: widget.onClearAllAnnouncements,
-                            onSaveLegalContent: widget.onSaveLegalContent,
-                            onSavePopups: widget.onSavePopups,
-                            onUploadPopupVideo: widget.onUploadPopupVideo,
-                            onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
-                            onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
-                            onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
-                            onRefreshAdminData: widget.onRefreshAdminData,
-                            onDeleteMedia: widget.onDeleteMedia,
-                            onPushUserToCloud: widget.onPushUserToCloud,
-                            onSaveWalletPayments: widget.onSaveWalletPayments,
-                            onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
-                            onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
-                            onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
-                            onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
-                            onPersistManagementConfig: widget.onPersistManagementConfig,
-                            onRefreshManagementData: widget.onRefreshManagementData,
-                            onRefreshAdminMedia: widget.onRefreshAdminMedia,
-                            onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
-                          ),
-                          routeName: 'AdminDashboard',
-                        );
-                      }
-                    : null,
+                onTap: widget.onOpenAdminDashboard,
                 leading: widget.homeLeadingOverride ??
                     InkWell(
                       onTap: () => NgmyNavigator.push(
@@ -15883,8 +15901,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
         ),
-        ),
-      ),
     );
   }
 
@@ -16949,9 +16965,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   List<AppTransaction> _liveShown() {
-    if (_liveCacheTxnLen == widget.allTransactions.length) {
-      return _liveCacheShown;
-    }
     AppTransaction? first;
     AppTransaction? second;
     AppTransaction? third;
@@ -16977,14 +16990,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       consider(t);
     }
 
-    final shown = <AppTransaction>[
+    return <AppTransaction>[
       if (first != null) first!,
       if (second != null) second!,
       if (third != null) third!,
     ];
-    _liveCacheTxnLen = widget.allTransactions.length;
-    _liveCacheShown = shown;
-    return shown;
   }
 
   Widget _live(BuildContext ctx) {
