@@ -14389,12 +14389,7 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
   }
 
   void _schedulePrefetch() {
-    if (_content != null || !mounted) return;
-    final delayMs = 60 + widget.tabIndex * 100;
-    Future<void>.delayed(Duration(milliseconds: delayMs), () {
-      if (!mounted || _content != null) return;
-      setState(() => _content = widget.buildContent());
-    });
+    // Do not mount wallet/invest tabs in the background — breaks home on admin iOS PWA.
   }
 
   @override
@@ -14834,7 +14829,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       if (!mounted) return;
       _tabPagesKey = null;
       _tabContentBuilders = null;
-      setState(() {});
+      // Home tab does not use tab builders — skip rebuild while admin is on home.
+      if (_idx != 0) setState(() {});
     });
   }
 
@@ -15121,50 +15117,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     );
   }
 
-  List<Widget> _buildOtherTabSlots(List<AppTransaction> sorted, {required int activeIndex, required String cacheKey}) {
-    return List.generate(6, (i) {
-      final tabIndex = i + 1;
-      if (!_visitedTabs.contains(tabIndex) && activeIndex != tabIndex) {
-        return SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_$tabIndex'));
-      }
-      return _NgmyLazyTabSlot(
-        key: ValueKey<String>('ngmy_tab_${tabIndex}_$cacheKey'),
-        tabIndex: tabIndex,
-        activeIndex: activeIndex,
-        buildContent: _tabContentBuilders![tabIndex]!,
-      );
-    });
-  }
-
   Widget _buildHomeTabWidget() {
-    return _buildHomeTab(_sortedTransactions().take(120).toList());
+    final len = widget.allTransactions.length;
+    if (_sortedTxCache != null && _sortedTxCacheLen == len) {
+      final cache = _sortedTxCache!;
+      final slice = cache.length <= 120 ? cache : cache.sublist(0, 120);
+      return _buildHomeTab(slice);
+    }
+    if (len > 0) {
+      return _buildHomeTab(widget.allTransactions.take(120).toList());
+    }
+    return _buildHomeTab(const []);
   }
 
-  /// Home-only users get home alone — no overlay layers (iOS PWA blank fix).
-  Widget _buildMainTabBody(List<AppTransaction> sorted) {
-    final homeOnly = _idx == 0 && _visitedTabs.length == 1 && _visitedTabs.contains(0);
-    final home = _buildHomeTabWidget();
-    if (homeOnly) {
-      return SizedBox.expand(child: home);
-    }
-    return IndexedStack(
-      index: _idx,
-      sizing: StackFit.expand,
-      children: [
-        home,
-        ..._buildOtherTabPages(sorted, activeIndex: _idx),
-      ],
-    );
-  }
-
-  List<Widget> _buildOtherTabPages(List<AppTransaction> sorted, {required int activeIndex}) {
-    final needsOtherTabs = activeIndex != 0 || _visitedTabs.length > 1;
-    if (!needsOtherTabs) {
-      return List.generate(
-        6,
-        (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_${i + 1}')),
-      );
-    }
+  void _ensureTabContentBuilders(List<AppTransaction> sorted) {
     final inv = widget.user.activeInvestment;
     final invSig = inv == null
         ? 'none'
@@ -15174,9 +15140,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
         '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
-    if (_tabContentBuilders != null && _tabPagesKey == cacheKey) {
-      return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
-    }
+    if (_tabContentBuilders != null && _tabPagesKey == cacheKey) return;
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
       1: () => InvestScreen(
@@ -15326,7 +15290,28 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         onPersistUserToCloud: widget.onPersistUserToCloud,
       ),
     };
-    return _buildOtherTabSlots(sorted, activeIndex: activeIndex, cacheKey: cacheKey);
+  }
+
+  /// On home: render only HomeScreen (no IndexedStack overlays — admin iOS PWA fix).
+  Widget _buildMainTabBody(List<AppTransaction> sorted) {
+    final home = SizedBox.expand(child: _buildHomeTabWidget());
+    if (_idx == 0) return home;
+    _ensureTabContentBuilders(sorted);
+    final builder = _tabContentBuilders![_idx];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(offstage: true, child: home),
+        Positioned.fill(
+          child: _NgmyLazyTabSlot(
+            key: ValueKey<String>('ngmy_tab_active_$_idx'),
+            tabIndex: _idx,
+            activeIndex: _idx,
+            buildContent: builder!,
+          ),
+        ),
+      ],
+    );
   }
 
   Future<String?> _resolveUserPhoneFromCloud() async {
@@ -15378,7 +15363,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shellBg = Theme.of(context).scaffoldBackgroundColor;
-    final sorted = _idx == 0 ? const <AppTransaction>[] : _sortedTransactions();
+    final sorted = _sortedTransactions();
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
