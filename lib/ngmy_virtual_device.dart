@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_virtual_device_media.dart';
-import 'ngmy_virtual_device_media_preview.dart';
 import 'ngmy_virtual_device_media_view.dart';
 
 const String _kFleetPrefsPrefix = 'ngmy_virtual_device_fleet_v2_';
@@ -572,9 +571,10 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                             aspectRatio: 16 / 9,
                                             child: RepaintBoundary(
                                               child: NgmyVirtualDeviceMediaView(
-                                                key: ValueKey('fleet_master_${media.playUrl}'),
+                                                key: ValueKey('fleet_master_${media.playUrlAudible}'),
                                                 viewKey: 'fleet_master',
-                                                playUrl: media.playUrl,
+                                                playUrl: media.playUrlAudible,
+                                                useEmbedHtml: media.usesEmbedHtml,
                                               ),
                                             ),
                                           ),
@@ -615,6 +615,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     );
                                   },
                                   childCount: _fleet.length,
+                                  addAutomaticKeepAlives: false,
                                 ),
                               ),
                             ),
@@ -684,10 +685,12 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
                         _MiniStatusBar(device: device),
                         Expanded(
                           child: media != null
-                              ? NgmyVirtualDeviceMediaPreview(
-                                  key: ValueKey('${device.id}_${media!.playUrl}'),
-                                  media: media!,
+                              ? NgmyVirtualDeviceMediaView(
+                                  key: ValueKey('${device.id}_${media!.playUrlMuted}'),
+                                  viewKey: '${device.id}_mini',
+                                  playUrl: media!.playUrlMuted,
                                   compact: true,
+                                  useEmbedHtml: media!.usesEmbedHtml,
                                 )
                               : Container(
                                   width: double.infinity,
@@ -893,7 +896,7 @@ class _NgmyVirtualDeviceDetailScreenState extends State<NgmyVirtualDeviceDetailS
                                 device: widget.device,
                                 powerOn: _powerOn,
                                 tab: _tab,
-                                playUrl: media?.playUrl,
+                                media: media,
                                 onPasteLink: () => unawaited(_pasteLink()),
                                 onTab: (i) => setState(() => _tab = i),
                                 onPowerToggle: () => setState(() => _powerOn = !_powerOn),
@@ -923,7 +926,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
     required this.onPasteLink,
     required this.onTab,
     required this.onPowerToggle,
-    this.playUrl,
+    this.media,
   });
 
   final double width;
@@ -933,7 +936,7 @@ class _VirtualPhoneFrame extends StatelessWidget {
   final VoidCallback onPasteLink;
   final void Function(int index) onTab;
   final VoidCallback onPowerToggle;
-  final String? playUrl;
+  final NgmyVirtualMediaTarget? media;
 
   @override
   Widget build(BuildContext context) {
@@ -964,12 +967,13 @@ class _VirtualPhoneFrame extends StatelessWidget {
               _VirtualStatusBar(device: device, powerOn: powerOn),
               Expanded(
                 child: powerOn
-                    ? (tab == 0
-                        ? (playUrl != null && playUrl!.isNotEmpty
+                        ? (tab == 0
+                        ? (media != null
                             ? NgmyVirtualDeviceMediaView(
-                                key: ValueKey('${device.id}_full_$playUrl'),
+                                key: ValueKey('${device.id}_full_${media!.playUrlAudible}'),
                                 viewKey: '${device.id}_full',
-                                playUrl: playUrl!,
+                                playUrl: media!.playUrlAudible,
+                                useEmbedHtml: media!.usesEmbedHtml,
                               )
                             : _NoVideoYetPanel(onPasteLink: onPasteLink))
                         : _DeviceInfoPanel(device: device))

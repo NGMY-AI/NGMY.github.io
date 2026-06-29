@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'ngmy_virtual_device_embed.dart';
+
 enum NgmyVirtualMediaPlatform { youtube, tiktok, instagram, facebook, other }
 
 class NgmyVirtualMediaTarget {
@@ -9,6 +11,7 @@ class NgmyVirtualMediaTarget {
     required this.platform,
     required this.label,
     this.previewImageUrl,
+    this.youtubeVideoId,
   });
 
   final String originalUrl;
@@ -17,6 +20,25 @@ class NgmyVirtualMediaTarget {
   final NgmyVirtualMediaPlatform platform;
   final String label;
   final String? previewImageUrl;
+  final String? youtubeVideoId;
+
+  /// Master player (with sound). Grid mirrors use [playUrlMuted].
+  String get playUrlAudible => playUrl;
+
+  /// Muted autoplay for grid mirrors — avoids 20+ overlapping audio streams.
+  String get playUrlMuted {
+    final id = youtubeVideoId;
+    if (id != null && id.isNotEmpty) {
+      return NgmyVirtualDeviceEmbed.youtubeEmbedUrl(id, muted: true);
+    }
+    return playUrl;
+  }
+
+  bool get usesEmbedHtml =>
+      platform == NgmyVirtualMediaPlatform.youtube ||
+      platform == NgmyVirtualMediaPlatform.tiktok ||
+      platform == NgmyVirtualMediaPlatform.instagram ||
+      platform == NgmyVirtualMediaPlatform.facebook;
 }
 
 /// Shared playback — one pasted link, one real player; grid uses lightweight previews.
@@ -36,15 +58,15 @@ class NgmyVirtualDeviceMedia {
 
     final ytId = _youtubeId(lower);
     if (ytId != null) {
-      // youtube.com/watch (even on m.youtube.com) sends X-Frame-Options:
-      // SAMEORIGIN, so browsers refuse to show it in our iframe at all.
-      // Only the dedicated /embed/ endpoint is allowed to be framed.
+      // youtube.com/watch sends X-Frame-Options: SAMEORIGIN — only /embed/ works.
+      // Use youtube-nocookie + HTML iframe wrapper for reliable mobile WebView playback.
       return NgmyVirtualMediaTarget(
         originalUrl: url,
-        playUrl: 'https://www.youtube.com/embed/$ytId?autoplay=1&playsinline=1&rel=0&modestbranding=1',
+        playUrl: NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId),
         platform: NgmyVirtualMediaPlatform.youtube,
         label: 'YouTube',
         previewImageUrl: 'https://img.youtube.com/vi/$ytId/hqdefault.jpg',
+        youtubeVideoId: ytId,
       );
     }
 
@@ -120,7 +142,7 @@ class NgmyVirtualDeviceMedia {
 
   static String? _youtubeId(String url) {
     final watch = RegExp(
-      r'(?:youtube\.com/watch\?(?:[^&]*&)*v=|youtu\.be/|youtube\.com/shorts/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+      r'(?:youtube\.com/watch\?(?:[^&]*&)*v=|youtu\.be/|youtube\.com/shorts/|youtube\.com/embed/|youtube\.com/live/)([a-zA-Z0-9_-]{11})',
     );
     return watch.firstMatch(url)?.group(1);
   }

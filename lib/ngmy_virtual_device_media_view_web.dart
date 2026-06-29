@@ -3,6 +3,8 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_virtual_device_embed.dart';
+
 /// Single shared player (web iframe). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
   const NgmyVirtualDeviceMediaView({
@@ -10,11 +12,13 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     required this.viewKey,
     required this.playUrl,
     this.compact = false,
+    this.useEmbedHtml = true,
   });
 
   final String viewKey;
   final String playUrl;
   final bool compact;
+  final bool useEmbedHtml;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -26,6 +30,28 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   var _loading = true;
   var _failed = false;
 
+  bool _shouldUseEmbedHtml(String url) {
+    if (!widget.useEmbedHtml) return false;
+    final lower = url.toLowerCase();
+    return lower.contains('youtube') ||
+        lower.contains('youtu.be') ||
+        lower.contains('tiktok.com/player') ||
+        lower.contains('instagram.com') ||
+        lower.contains('facebook.com/plugins');
+  }
+
+  void _applySrc(html.IFrameElement frame, String url) {
+    if (_shouldUseEmbedHtml(url)) {
+      frame
+        ..removeAttribute('src')
+        ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(url);
+    } else {
+      frame
+        ..removeAttribute('srcdoc')
+        ..src = url;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +59,6 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     try {
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
         _frame = html.IFrameElement()
-          ..src = widget.playUrl
           ..style.border = 'none'
           ..style.width = '100%'
           ..style.height = '100%'
@@ -43,6 +68,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
             'allow',
             'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
           );
+        _applySrc(_frame!, widget.playUrl);
         _frame!.onLoad.listen((_) {
           if (mounted) setState(() => _loading = false);
         });
@@ -70,7 +96,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
         _loading = true;
         _failed = false;
       });
-      _frame!.src = widget.playUrl;
+      _applySrc(_frame!, widget.playUrl);
     }
   }
 
