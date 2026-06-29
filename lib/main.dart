@@ -7520,6 +7520,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   UserData? _currentUser;
   bool _launchCacheHydrated = false;
   bool _appOffline = false;
+  Widget? _materialAppShellChild;
   Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
@@ -12683,13 +12684,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
-          if (child == null) {
+          // MaterialApp's builder can pass a null child for a single transient
+          // frame (theme/locale resolution at startup). Reusing the last good
+          // child instead of a placeholder avoids that frame ever being visible
+          // — showing a placeholder here regressed into a gray screen that
+          // could get stuck if nothing else triggered a follow-up rebuild.
+          if (child != null) _materialAppShellChild = child;
+          final body = child ?? _materialAppShellChild;
+          if (body == null) {
             return const ColoredBox(
               color: Color(0xFFF1F5F9),
               child: Center(child: CircularProgressIndicator()),
             );
           }
-          return child;
+          return body;
         },
         home: _currentUser == null
             ? AuthScreen(
