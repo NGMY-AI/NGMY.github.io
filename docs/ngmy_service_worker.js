@@ -1,4 +1,4 @@
-﻿/* NGMY PWA â€” cache-first shell so the app opens offline after one online visit. */
+/* NGMY PWA — cache-first shell so the app opens offline after one online visit. */
 'use strict';
 
 const CACHE_PREFIX = 'ngmy-pwa-';
@@ -7,9 +7,9 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260628212830';
+const CACHE_NAME = CACHE_PREFIX + '20260629181458';
 
-const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/fonts/Roboto-Bold.ttf','./assets/assets/fonts/Roboto-Light.ttf','./assets/assets/fonts/Roboto-Medium.ttf','./assets/assets/fonts/Roboto-Regular.ttf','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/packages/flutter_map/lib/assets/flutter_map_logo.png','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./main.dart.js_1.part.js','./manifest.json','./og-share.png','./version.json'];
+const PRECACHE_URLS = ["./", "./.last_build_id", "./.nojekyll", "./404.html", "./CNAME", "./assets/AssetManifest.bin", "./assets/AssetManifest.bin.json", "./assets/FontManifest.json", "./assets/NOTICES", "./assets/assets/fonts/Roboto-Bold.ttf", "./assets/assets/fonts/Roboto-Light.ttf", "./assets/assets/fonts/Roboto-Medium.ttf", "./assets/assets/fonts/Roboto-Regular.ttf", "./assets/assets/sounds/README.md", "./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3", "./assets/assets/sounds/income_cash.mp3", "./assets/assets/video_studio/yt_news_desk.png", "./assets/assets/video_studio/yt_studio_curved.png", "./assets/fonts/MaterialIcons-Regular.otf", "./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf", "./assets/packages/flutter_map/lib/assets/flutter_map_logo.png", "./assets/shaders/ink_sparkle.frag", "./assets/shaders/stretch_effect.frag", "./canvaskit/canvaskit.js", "./canvaskit/canvaskit.js.symbols", "./canvaskit/canvaskit.wasm", "./canvaskit/chromium/canvaskit.js", "./canvaskit/chromium/canvaskit.js.symbols", "./canvaskit/chromium/canvaskit.wasm", "./canvaskit/experimental_webparagraph/canvaskit.js", "./canvaskit/experimental_webparagraph/canvaskit.js.symbols", "./canvaskit/experimental_webparagraph/canvaskit.wasm", "./canvaskit/skwasm.js", "./canvaskit/skwasm.js.symbols", "./canvaskit/skwasm.wasm", "./canvaskit/skwasm_heavy.js", "./canvaskit/skwasm_heavy.js.symbols", "./canvaskit/skwasm_heavy.wasm", "./canvaskit/wimp.js", "./canvaskit/wimp.js.symbols", "./canvaskit/wimp.wasm", "./favicon.png", "./flutter.js", "./flutter_bootstrap.js", "./icons/Icon-192.png", "./icons/Icon-512.png", "./icons/Icon-maskable-192.png", "./icons/Icon-maskable-512.png", "./index.html", "./main.dart.js", "./main.dart.js_1.part.js", "./manifest.json", "./og-share.png", "./version.json"];
 
 const CRITICAL_OFFLINE_URLS = [
   './',
@@ -172,7 +172,7 @@ self.addEventListener('fetch', (event) => {
       const shellAsset =
         isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
 
-      // Cache-first for shell assets â€” required for iOS offline (onLine is unreliable).
+      // Cache-first for shell assets — required for iOS offline (onLine is unreliable).
       if (shellAsset && cached) {
         if (self.navigator.onLine) {
           event.waitUntil(
@@ -196,7 +196,7 @@ self.addEventListener('fetch', (event) => {
             || await cache.match('canvaskit/canvaskit.js');
           if (alt) return alt;
         }
-        return new Response('Offline â€” asset not cached: ' + url.pathname, {
+        return new Response('Offline — asset not cached: ' + url.pathname, {
           status: 503,
           statusText: 'Offline cache miss',
         });
@@ -274,4 +274,3 @@ self.addEventListener('notificationclick', (event) => {
     })(),
   );
 });
-

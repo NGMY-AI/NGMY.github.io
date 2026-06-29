@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html>
 
@@ -42,7 +42,7 @@
       var slug = ngmyExtractGuestAppSlug();
       if (slug) {
         try { sessionStorage.setItem("ngmy_guest_app_slug", slug); } catch (e) {}
-        try { document.title = "Loading appâ€¦"; } catch (e2) {}
+        try { document.title = "Loading app…"; } catch (e2) {}
       } else {
         try { sessionStorage.removeItem("ngmy_guest_app_slug"); } catch (e3) {}
       }
@@ -351,7 +351,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260628212830";
+      var CURRENT = "20260629181458";
 
       function showError(msg) {
 
@@ -365,7 +365,7 @@
 
         if (err) err.style.display = "flex";
 
-        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps â€” try mobile data or home internet.";
+        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps — try mobile data or home internet.";
 
       }
 
@@ -384,7 +384,7 @@
 
         var prev = localStorage.getItem(KEY);
 
-        // New deploy: let the service worker swap caches on activate â€” do not wipe
+        // New deploy: let the service worker swap caches on activate — do not wipe
         // storage here or offline cold start breaks before the new shell is cached.
 
         try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
@@ -408,7 +408,7 @@
 
   <script>
     (function () {
-      var deployId = '20260628212830';
+      var deployId = '20260629181458';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -426,7 +426,7 @@
       ];
 
       function showBootstrapError(hint) {
-        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login â€” try home internet or cellular data.';
+        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login — try home internet or cellular data.';
         window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
       }
 
