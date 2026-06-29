@@ -484,9 +484,7 @@ void main() async {
       return;
     }
     final app = NGMYApp(launchBootstrap: launchBootstrap);
-    runApp(
-      kIsWeb ? ExcludeSemantics(child: NgmyWebViewportGuard(child: app)) : app,
-    );
+    runApp(NgmyWebViewportGuard(child: app));
   }, (e, st) {
     debugPrint('[zone] $e\n$st');
   });
@@ -14338,6 +14336,29 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
 }
 
 /// Builds bottom-nav tab content lazily so unvisited tabs do not block the home screen.
+/// Keeps tab content mounted without [IndexedStack] — iOS PWA can paint a blank
+/// shell after cloud sync rebuilds when tabs are stacked with [IndexedStack].
+class _NgmyTabLayer extends StatelessWidget {
+  const _NgmyTabLayer({super.key, required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Offstage(
+      offstage: !visible,
+      child: TickerMode(
+        enabled: visible,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
     super.key,
@@ -14420,7 +14441,7 @@ class _NgmyHomeTabHost extends StatefulWidget {
   State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
 }
 
-class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver, NgmyBalanceListener {
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   @override
   bool get wantKeepAlive => true;
 
@@ -14447,10 +14468,12 @@ class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAl
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return KeyedSubtree(
+    return RepaintBoundary(
       key: const ValueKey('ngmy_home_tab_host'),
-      child: widget.main._buildHomeTab(
-        widget.main._sortedTransactions().take(120).toList(),
+      child: SizedBox.expand(
+        child: widget.main._buildHomeTab(
+          widget.main._sortedTransactions().take(120).toList(),
+        ),
       ),
     );
   }
@@ -14767,6 +14790,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _sortedTxCacheLen = null;
       _warmTransactionCacheAfterFrame();
+    }
+    final mountedAt = _mainShellMountedAt;
+    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 12)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) WidgetsBinding.instance.scheduleForcedFrame();
+      });
     }
     if (oldWidget.user.username != widget.user.username ||
         oldWidget.user.crownBadge != widget.user.crownBadge ||
@@ -15161,13 +15190,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     return List.generate(6, (i) {
       final tabIndex = i + 1;
       if (!_visitedTabs.contains(tabIndex) && activeIndex != tabIndex) {
-        return SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_$tabIndex'));
+        return _NgmyTabLayer(
+          key: ValueKey<String>('ngmy_tab_empty_$tabIndex'),
+          visible: false,
+          child: const SizedBox.shrink(),
+        );
       }
-      return _NgmyLazyTabSlot(
-        key: ValueKey<String>('ngmy_tab_${tabIndex}_$cacheKey'),
-        tabIndex: tabIndex,
-        activeIndex: activeIndex,
-        buildContent: _tabContentBuilders![tabIndex]!,
+      return _NgmyTabLayer(
+        key: ValueKey<String>('ngmy_tab_layer_$tabIndex'),
+        visible: activeIndex == tabIndex,
+        child: _NgmyLazyTabSlot(
+          key: ValueKey<String>('ngmy_tab_${tabIndex}_$cacheKey'),
+          tabIndex: tabIndex,
+          activeIndex: activeIndex,
+          buildContent: _tabContentBuilders![tabIndex]!,
+        ),
       );
     });
   }
@@ -15177,7 +15214,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     if (!needsOtherTabs) {
       return List.generate(
         6,
-        (i) => SizedBox.shrink(key: ValueKey<String>('ngmy_tab_empty_${i + 1}')),
+        (i) => _NgmyTabLayer(
+          key: ValueKey<String>('ngmy_tab_empty_${i + 1}'),
+          visible: false,
+          child: const SizedBox.shrink(),
+        ),
       );
     }
     final inv = widget.user.activeInvestment;
@@ -15436,13 +15477,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
                 Positioned.fill(
                   child: ColoredBox(
                     color: shellBg,
-                    child: IndexedStack(
-                      index: _idx,
-                      sizing: StackFit.expand,
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        KeyedSubtree(
-                          key: const ValueKey('ngmy_tab_home'),
-                          child: _homeTabHost,
+                        _NgmyTabLayer(
+                          key: const ValueKey('ngmy_tab_home_layer'),
+                          visible: _idx == 0,
+                          child: KeyedSubtree(
+                            key: const ValueKey('ngmy_tab_home'),
+                            child: _homeTabHost,
+                          ),
                         ),
                         ..._buildOtherTabPages(sorted, activeIndex: _idx),
                       ],
