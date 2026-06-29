@@ -4,6 +4,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 import 'ngmy_virtual_device_embed.dart';
+import 'ngmy_virtual_device_fleet_playback.dart';
 
 /// Single shared player (native WebView). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
@@ -13,13 +14,14 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     required this.playUrl,
     this.compact = false,
     this.useEmbedHtml = true,
+    this.notifyOnEnd = false,
   });
 
   final String viewKey;
   final String playUrl;
   final bool compact;
-  /// When true, wraps the URL in an HTML iframe (required for YouTube on mobile).
   final bool useEmbedHtml;
+  final bool notifyOnEnd;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -70,6 +72,17 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
         ),
       );
 
+    if (widget.notifyOnEnd) {
+      controller.addJavaScriptChannel(
+        'NgmyVideoEnded',
+        onMessageReceived: (msg) {
+          if (msg.message == NgmyVirtualDeviceEmbed.videoEndedMessage) {
+            NgmyVirtualDeviceFleetPlayback.onVideoEnded();
+          }
+        },
+      );
+    }
+
     final platform = controller.platform;
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
@@ -85,7 +98,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     });
     if (widget.useEmbedHtml && _shouldUseEmbedHtml(url)) {
       _controller.loadHtmlString(
-        NgmyVirtualDeviceEmbed.iframeHtml(url),
+        NgmyVirtualDeviceEmbed.iframeHtml(url, notifyOnEnd: widget.notifyOnEnd),
         baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
       );
     } else {
@@ -105,7 +118,9 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   @override
   void didUpdateWidget(covariant NgmyVirtualDeviceMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.playUrl != widget.playUrl || oldWidget.useEmbedHtml != widget.useEmbedHtml) {
+    if (oldWidget.playUrl != widget.playUrl ||
+        oldWidget.useEmbedHtml != widget.useEmbedHtml ||
+        oldWidget.notifyOnEnd != widget.notifyOnEnd) {
       _load(widget.playUrl);
     }
   }

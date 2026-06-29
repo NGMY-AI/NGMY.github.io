@@ -4,6 +4,7 @@ import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 
 import 'ngmy_virtual_device_embed.dart';
+import 'ngmy_virtual_device_fleet_playback.dart';
 
 /// Single shared player (web iframe). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
@@ -13,12 +14,14 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     required this.playUrl,
     this.compact = false,
     this.useEmbedHtml = true,
+    this.notifyOnEnd = false,
   });
 
   final String viewKey;
   final String playUrl;
   final bool compact;
   final bool useEmbedHtml;
+  final bool notifyOnEnd;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -44,7 +47,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     if (_shouldUseEmbedHtml(url)) {
       frame
         ..removeAttribute('src')
-        ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(url);
+        ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(url, notifyOnEnd: widget.notifyOnEnd);
     } else {
       frame
         ..removeAttribute('srcdoc')
@@ -133,4 +136,14 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
       ],
     );
   }
+}
+
+/// Listens for YouTube ENDED postMessage from grid/master iframe embeds (web only).
+void ngmyVirtualDeviceListenForVideoEnded(void Function() onEnded) {
+  html.window.onMessage.listen((event) {
+    final data = event.data?.toString() ?? '';
+    if (data == NgmyVirtualDeviceEmbed.videoEndedMessage) {
+      onEnded();
+    }
+  });
 }

@@ -7522,7 +7522,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   UserData? _currentUser;
   bool _launchCacheHydrated = false;
   bool _appOffline = false;
-  Widget? _materialAppShellChild;
   Timer? _startupRebuildDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
@@ -8693,7 +8692,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final nextSig = _computeAppShellSig();
       if (nextSig == _appShellSig) return;
       _appShellSig = nextSig;
-      setState(() {});
+      if (_currentUser != null) {
+        setState(() {});
+      }
     });
   }
 
@@ -12684,32 +12685,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
-          final shellBg = Theme.of(context).scaffoldBackgroundColor;
-          if (child != null) _materialAppShellChild = child;
-          final body = child ?? _materialAppShellChild;
-          if (body == null) {
-            return ColoredBox(
-              color: shellBg,
-              child: const Center(child: CircularProgressIndicator()),
+          if (child == null) {
+            return const ColoredBox(
+              color: Color(0xFFF1F5F9),
+              child: Center(child: CircularProgressIndicator()),
             );
           }
-          // RepaintBoundary around the full shell blanks iOS Safari/PWA after cloud
-          // sync rebuilds — only mount it while Live Help screen sharing is active.
-          return ValueListenableBuilder<bool>(
-            valueListenable: ngmyIsSharingLiveHelp,
-            builder: (context, sharing, _) {
-              final shell = sharing
-                  ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: body)
-                  : body;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  shell,
-                  ngmyLiveSupportBannerOverlay(),
-                ],
-              );
-            },
-          );
+          return child;
         },
         home: _currentUser == null
             ? AuthScreen(
@@ -14438,7 +14420,10 @@ class _NgmyHomeTabHost extends StatefulWidget {
   State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
 }
 
-class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingObserver, NgmyBalanceListener {
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver, NgmyBalanceListener {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -14461,9 +14446,12 @@ class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingO
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return KeyedSubtree(
       key: const ValueKey('ngmy_home_tab_host'),
-      child: widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay()),
+      child: widget.main._buildHomeTab(
+        widget.main._sortedTransactions().take(120).toList(),
+      ),
     );
   }
 }
@@ -15432,33 +15420,45 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           child: Scaffold(
         extendBody: true,
         backgroundColor: shellBg,
-        body: Stack(
-          children: [
-            if (!isDark)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.of(context).padding.top,
-                child: ColoredBox(color: shellBg),
-              ),
-            Positioned.fill(
-              child: ColoredBox(
-                color: shellBg,
-                child: IndexedStack(
-                  index: _idx,
-                  sizing: StackFit.expand,
-                  children: [
-                    KeyedSubtree(
-                      key: const ValueKey('ngmy_tab_home'),
-                      child: _homeTabHost,
+        body: ValueListenableBuilder<bool>(
+          valueListenable: ngmyIsSharingLiveHelp,
+          builder: (context, sharing, _) {
+            final tabs = Stack(
+              children: [
+                if (!isDark)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: MediaQuery.of(context).padding.top,
+                    child: ColoredBox(color: shellBg),
+                  ),
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: shellBg,
+                    child: IndexedStack(
+                      index: _idx,
+                      sizing: StackFit.expand,
+                      children: [
+                        KeyedSubtree(
+                          key: const ValueKey('ngmy_tab_home'),
+                          child: _homeTabHost,
+                        ),
+                        ..._buildOtherTabPages(sorted, activeIndex: _idx),
+                      ],
                     ),
-                    ..._buildOtherTabPages(sorted, activeIndex: _idx),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                sharing ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: tabs) : tabs,
+                ngmyLiveSupportBannerOverlay(),
+              ],
+            );
+          },
         ),
         bottomNavigationBar: Material(
           type: MaterialType.transparency,

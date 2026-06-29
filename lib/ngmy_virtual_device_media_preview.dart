@@ -9,10 +9,14 @@ class NgmyVirtualDeviceMediaPreview extends StatefulWidget {
     super.key,
     required this.media,
     this.compact = true,
+    this.queued = false,
+    this.batchLabel,
   });
 
   final NgmyVirtualMediaTarget media;
   final bool compact;
+  final bool queued;
+  final String? batchLabel;
 
   @override
   State<NgmyVirtualDeviceMediaPreview> createState() => _NgmyVirtualDeviceMediaPreviewState();
@@ -65,31 +69,33 @@ class _NgmyVirtualDeviceMediaPreviewState extends State<NgmyVirtualDeviceMediaPr
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: compact ? 3 : 6, vertical: compact ? 1 : 3),
             decoration: BoxDecoration(
-              color: Colors.red.shade600,
+              color: widget.queued ? Colors.white.withValues(alpha: 0.22) : Colors.red.shade600,
               borderRadius: BorderRadius.circular(compact ? 4 : 6),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: compact ? 3 : 5,
-                  height: compact ? 3 : 5,
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                ),
-                SizedBox(width: compact ? 2 : 4),
-                Text(
-                  'LIVE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: compact ? 5 : 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ],
+            child: Text(
+              widget.queued ? 'WAIT' : 'LIVE',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: compact ? 5 : 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.4,
+              ),
             ),
           ),
         ),
+        if (widget.batchLabel != null)
+          Positioned(
+            left: compact ? 3 : 8,
+            top: compact ? 3 : 8,
+            child: Text(
+              widget.batchLabel!,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.75),
+                fontSize: compact ? 5 : 9,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
         Positioned(
           left: compact ? 3 : 8,
           bottom: compact ? 3 : 8,

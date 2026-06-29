@@ -2,13 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_studio_colors.dart';
+import 'ngmy_virtual_device_fleet_playback.dart';
 import 'ngmy_virtual_device_media.dart';
+import 'ngmy_virtual_device_media_preview.dart';
 import 'ngmy_virtual_device_media_view.dart';
+import 'ngmy_virtual_device_media_view_end_stub.dart'
+    if (dart.library.html) 'ngmy_virtual_device_media_view_web.dart' as vd_end;
 
 const String _kFleetPrefsPrefix = 'ngmy_virtual_device_fleet_v2_';
 const String _kLegacyPrefsPrefix = 'ngmy_virtual_device_v1_';
@@ -42,7 +47,7 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'YouTube, TikTok, Instagram, or Facebook — plays on all $deviceCount devices.',
+              'YouTube, TikTok, Instagram, or Facebook — 4 devices play at a time, then rotates through all $deviceCount.',
               style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
             ),
             const SizedBox(height: 14),
@@ -62,6 +67,7 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
         actions: [
           TextButton(
             onPressed: () {
+              NgmyVirtualDeviceFleetPlayback.stop();
               NgmyVirtualDevicePlayback.clear();
               Navigator.pop(ctx);
             },
@@ -88,9 +94,11 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
   }
   await Future<void>.delayed(const Duration(milliseconds: 150));
   if (!context.mounted) return;
+  NgmyVirtualDeviceFleetPlayback.syncDeviceCount(deviceCount);
   NgmyVirtualDevicePlayback.active.value = target;
+  NgmyVirtualDeviceFleetPlayback.startForMedia(target);
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Playing ${target.label} on all $deviceCount devices')),
+    SnackBar(content: Text('Playing ${target.label} — 4 devices at a time across $deviceCount phones')),
   );
 }
 
@@ -419,11 +427,25 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
   @override
   void initState() {
     super.initState();
+    NgmyVirtualDeviceFleetPlayback.batchStart.addListener(_onBatchChanged);
+    if (kIsWeb) {
+      vd_end.ngmyVirtualDeviceListenForVideoEnded(_onFleetVideoEnded);
+    }
     unawaited(_boot());
+  }
+
+  void _onBatchChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onFleetVideoEnded() {
+    NgmyVirtualDeviceFleetPlayback.onVideoEnded();
   }
 
   @override
   void dispose() {
+    NgmyVirtualDeviceFleetPlayback.batchStart.removeListener(_onBatchChanged);
+    NgmyVirtualDeviceFleetPlayback.stop();
     NgmyVirtualDevicePlayback.clear();
     super.dispose();
   }
@@ -528,6 +550,9 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                   : ValueListenableBuilder<NgmyVirtualMediaTarget?>(
                       valueListenable: NgmyVirtualDevicePlayback.active,
                       builder: (context, media, _) {
+                        return ValueListenableBuilder<int>(
+                          valueListenable: NgmyVirtualDeviceFleetPlayback.batchStart,
+                          builder: (context, batchStart, _) {
                         final showMasterPlayer = media != null && (ModalRoute.of(context)?.isCurrent ?? true);
                         return CustomScrollView(
                           slivers: [
@@ -553,7 +578,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Now playing ${media.label} on all ${_fleet.length} devices',
+                                                'Now playing ${media.label} · ${NgmyVirtualDeviceFleetPlayback.activeRangeLabel(_fleet.length)} (4 at a time)',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
@@ -569,13 +594,12 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                           borderRadius: BorderRadius.circular(16),
                                           child: AspectRatio(
                                             aspectRatio: 16 / 9,
-                                            child: RepaintBoundary(
-                                              child: NgmyVirtualDeviceMediaView(
-                                                key: ValueKey('fleet_master_${media.playUrlAudible}'),
-                                                viewKey: 'fleet_master',
-                                                playUrl: media.playUrlAudible,
-                                                useEmbedHtml: media.usesEmbedHtml,
-                                              ),
+                                            child: NgmyVirtualDeviceMediaView(
+                                              key: ValueKey('fleet_master_${media.playUrlAudible}_$batchStart'),
+                                              viewKey: 'fleet_master',
+                                              playUrl: media.playUrlAudible,
+                                              useEmbedHtml: media.usesEmbedHtml,
+                                              notifyOnEnd: true,
                                             ),
                                           ),
                                         ),
@@ -584,7 +608,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     ],
                                     Text(
                                       media != null
-                                          ? 'All ${_fleet.length} phones below mirror this video. Tap any phone for full screen.'
+                                          ? 'Only 4 phones play at once. When the video ends, the next 4 start — then loops through all ${_fleet.length}.'
                                           : '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
                                       style: TextStyle(
                                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
@@ -610,6 +634,8 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     final device = _fleet[index];
                                     return _MiniVirtualPhoneCard(
                                       device: device,
+                                      deviceIndex: index,
+                                      fleetSize: _fleet.length,
                                       media: media,
                                       onTap: () => _openDevice(device),
                                     );
@@ -620,6 +646,8 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                               ),
                             ),
                           ],
+                        );
+                          },
                         );
                       },
                     ),
@@ -640,13 +668,36 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
 class _MiniVirtualPhoneCard extends StatelessWidget {
   const _MiniVirtualPhoneCard({
     required this.device,
+    required this.deviceIndex,
+    required this.fleetSize,
     required this.onTap,
     this.media,
   });
 
   final NgmyVirtualDeviceIdentity device;
+  final int deviceIndex;
+  final int fleetSize;
   final VoidCallback onTap;
   final NgmyVirtualMediaTarget? media;
+
+  Widget _miniScreenContent(NgmyVirtualMediaTarget media) {
+    final batch = NgmyVirtualDeviceFleetPlayback.batchStart.value;
+    if (NgmyVirtualDeviceFleetPlayback.isActiveSlot(deviceIndex)) {
+      return NgmyVirtualDeviceMediaView(
+        key: ValueKey('${device.id}_${media.playUrlMuted}_$batch'),
+        viewKey: '${device.id}_mini',
+        playUrl: media.playUrlMuted,
+        compact: true,
+        useEmbedHtml: media.usesEmbedHtml,
+      );
+    }
+    return NgmyVirtualDeviceMediaPreview(
+      media: media,
+      compact: true,
+      queued: true,
+      batchLabel: NgmyVirtualDeviceFleetPlayback.batchLabel(deviceIndex, fleetSize),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -685,13 +736,7 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
                         _MiniStatusBar(device: device),
                         Expanded(
                           child: media != null
-                              ? NgmyVirtualDeviceMediaView(
-                                  key: ValueKey('${device.id}_${media!.playUrlMuted}'),
-                                  viewKey: '${device.id}_mini',
-                                  playUrl: media!.playUrlMuted,
-                                  compact: true,
-                                  useEmbedHtml: media!.usesEmbedHtml,
-                                )
+                              ? _miniScreenContent(media!)
                               : Container(
                                   width: double.infinity,
                                   color: const Color(0xFF0F0F0F),
