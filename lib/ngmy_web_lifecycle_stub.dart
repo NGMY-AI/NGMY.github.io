@@ -3,3 +3,6 @@ void ngmyRegisterPageHiddenHandler(void Function() onHidden) {}
 
 /// Registers a callback when the page becomes visible again (non-web: no-op).
 void ngmyRegisterPageVisibleHandler(void Function() onVisible) {}
+
+/// Removes a previously registered visible handler (non-web: no-op).
+void ngmyUnregisterPageVisibleHandler(void Function() onVisible) {}

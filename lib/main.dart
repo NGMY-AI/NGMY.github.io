@@ -8980,10 +8980,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _setThemeMode(ThemeMode mode) async {
     if (!mounted) return;
-    setState(() {
-      _themeMode = mode;
-      _materialAppShellChild = null;
-    });
+    setState(() => _themeMode = mode);
     _applySystemUiForMode(_effectiveThemeMode);
     final p = await SharedPreferences.getInstance();
     await p.setString('theme_mode', mode.name);
@@ -12690,12 +12687,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final shellBg = Theme.of(context).scaffoldBackgroundColor;
           if (child != null) _materialAppShellChild = child;
           final body = child ?? _materialAppShellChild;
-          if (body == null) return ColoredBox(color: shellBg);
-          return Stack(
-            children: [
-              RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: body),
-              ngmyLiveSupportBannerOverlay(),
-            ],
+          if (body == null) {
+            return ColoredBox(
+              color: shellBg,
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          }
+          // RepaintBoundary around the full shell blanks iOS Safari/PWA after cloud
+          // sync rebuilds — only mount it while Live Help screen sharing is active.
+          return ValueListenableBuilder<bool>(
+            valueListenable: ngmyIsSharingLiveHelp,
+            builder: (context, sharing, _) {
+              final shell = sharing
+                  ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: body)
+                  : body;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  shell,
+                  ngmyLiveSupportBannerOverlay(),
+                ],
+              );
+            },
           );
         },
         home: _currentUser == null
@@ -14430,19 +14443,12 @@ class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingO
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ngmyRegisterPageVisibleHandler(_onPageVisible);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  void _onPageVisible() {
-    if (!mounted) return;
-    WidgetsBinding.instance.scheduleForcedFrame();
-    setState(() {});
   }
 
   @override
@@ -14455,7 +14461,10 @@ class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with WidgetsBindingO
 
   @override
   Widget build(BuildContext context) {
-    return widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay());
+    return KeyedSubtree(
+      key: const ValueKey('ngmy_home_tab_host'),
+      child: widget.main._buildHomeTab(widget.main._homeTransactionsForDisplay()),
+    );
   }
 }
 
@@ -14882,6 +14891,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
 
   void _onShellVisibleAgain() {
     if (!mounted) return;
+    final mountedAt = _mainShellMountedAt;
+    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 4)) {
+      return;
+    }
     WidgetsBinding.instance.scheduleForcedFrame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
@@ -15023,6 +15036,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ngmyUnregisterPageVisibleHandler(_onShellVisibleAgain);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminTabRefreshDebounce?.cancel();
     _t?.cancel();
@@ -15435,7 +15449,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
                   index: _idx,
                   sizing: StackFit.expand,
                   children: [
-                    _homeTabHost,
+                    KeyedSubtree(
+                      key: const ValueKey('ngmy_tab_home'),
+                      child: _homeTabHost,
+                    ),
                     ..._buildOtherTabPages(sorted, activeIndex: _idx),
                   ],
                 ),
@@ -15674,21 +15691,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ngmyRegisterPageVisibleHandler(_onWebPageVisibleAgain);
     _homeMountedAt = DateTime.now();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 10));
     _smokeRot = Tween<double>(begin: 0, end: 2 * math.pi).animate(_smokeCtrl);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
-    });
-  }
-
-  void _onWebPageVisibleAgain() {
-    if (!mounted) return;
-    WidgetsBinding.instance.scheduleForcedFrame();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
     });
   }
 

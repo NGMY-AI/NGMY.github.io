@@ -187,7 +187,10 @@ void ngmyStartSharingLiveHelp(String code, RealtimeChannel channel) {
   _ngmyActiveShare = _ActiveShare(code, channel);
   ngmyIsSharingLiveHelp.value = true;
   _ngmyActiveShare!.frameTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _captureAndSendFrame());
-  unawaited(_captureAndSendFrame());
+  // Wait for RepaintBoundary to mount after ngmyIsSharingLiveHelp flips true.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_captureAndSendFrame());
+  });
 }
 
 Future<void> ngmyStopSharingLiveHelp({bool notifyRow = true}) async {
