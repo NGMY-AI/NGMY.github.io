@@ -14343,6 +14343,30 @@ class _ClockInWindowClosedDialogState extends State<_ClockInWindowClosedDialog> 
   }
 }
 
+/// Keeps home mounted and paints full-screen without tab-stack overlays (admin iOS PWA).
+class _NgmyHomeTabHost extends StatefulWidget {
+  const _NgmyHomeTabHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_NgmyHomeTabHost> createState() => _NgmyHomeTabHostState();
+}
+
+class _NgmyHomeTabHostState extends State<_NgmyHomeTabHost> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SizedBox.expand(child: widget.child),
+    );
+  }
+}
+
 /// Builds bottom-nav tab content lazily so unvisited tabs do not block the home screen.
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
@@ -14487,7 +14511,7 @@ class NgmyAdminLiveRefresh {
   }
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, NgmyBalanceListener {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
   bool _offline = false;
   bool _investPurchaseInFlight = false;
@@ -14498,8 +14522,29 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   String? _tabPagesKey;
   List<AppTransaction>? _sortedTxCache;
   int? _sortedTxCacheLen;
+  List<AppTransaction>? _userClockInTxCache;
+  int? _userClockInTxSourceLen;
   final Set<int> _visitedTabs = {0};
   bool _warmingTxCache = false;
+
+  List<AppTransaction> _userClockInTransactions() {
+    final len = widget.allTransactions.length;
+    if (_userClockInTxCache != null && _userClockInTxSourceLen == len) {
+      return _userClockInTxCache!;
+    }
+    final key = widget.user.email.toLowerCase().trim();
+    _userClockInTxCache = widget.allTransactions
+        .where((t) => t.userEmail.toLowerCase().trim() == key)
+        .toList(growable: false);
+    _userClockInTxSourceLen = len;
+    return _userClockInTxCache!;
+  }
+
+  void _invalidateTransactionCaches() {
+    _sortedTxCacheLen = null;
+    _userClockInTxCache = null;
+    _userClockInTxSourceLen = null;
+  }
 
   List<AppTransaction> _sortedTransactions() {
     final len = widget.allTransactions.length;
@@ -14519,7 +14564,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
         _sortedTxCache = sorted;
         _sortedTxCacheLen = snapLen;
-        setState(() {});
+        if (_idx != 0 && mounted) setState(() {});
       });
       return _sortedTxCache!;
     }
@@ -14530,11 +14575,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
 
   List<AppTransaction> _homeTransactionsForDisplay() {
     final len = widget.allTransactions.length;
+    if (len == 0) return const [];
     if (_sortedTxCache != null && _sortedTxCacheLen == len) {
       final cache = _sortedTxCache!;
       return cache.length <= 120 ? cache : cache.sublist(0, 120);
     }
-    return const [];
+    return widget.allTransactions.take(120).toList(growable: false);
   }
 
   void _warmTransactionCacheAfterFrame() {
@@ -14546,7 +14592,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       if (!mounted) return;
       if (_sortedTxCache != null && _sortedTxCacheLen == widget.allTransactions.length) return;
       _sortedTransactions();
-      if (mounted) setState(() {});
+      if (_idx != 0 && mounted) setState(() {});
     });
   }
 
@@ -14715,12 +14761,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       _tabContentBuilders = null;
       _sortedTxCache = null;
       _sortedTxCacheLen = null;
+      _userClockInTxCache = null;
+      _userClockInTxSourceLen = null;
       _visitedTabs
         ..clear()
         ..add(0);
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
-      _sortedTxCacheLen = null;
-      _warmTransactionCacheAfterFrame();
+      _invalidateTransactionCaches();
+      if (_idx != 0) {
+        _warmTransactionCacheAfterFrame();
+      }
     }
     final mountedAt = _mainShellMountedAt;
     if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 12)) {
@@ -14839,14 +14889,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   }
 
   void _onShellVisibleAgain() {
-    if (!mounted) return;
+    if (!mounted || _idx == 0) return;
     final mountedAt = _mainShellMountedAt;
     if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 4)) {
       return;
     }
     WidgetsBinding.instance.scheduleForcedFrame();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
+      if (mounted && _idx != 0) setState(() {});
     });
   }
 
@@ -14868,7 +14918,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     NgmyPopupOrchestrator.resolveVideoUrl = _resolveSupabaseStorageUrlResilient;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+      final userTx = _userClockInTransactions();
+      _ngmyReconcileClockInSession(widget.user, userTx);
       _evaluateClockInMissPolicy();
     });
     _refreshOnlineStatus();
@@ -14880,12 +14931,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
+      final userTx = _userClockInTransactions();
       final wasClockedIn = widget.user.isClockedIn;
-      _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+      _ngmyReconcileClockInSession(widget.user, userTx);
       if (!wasClockedIn && widget.user.isClockedIn) setState(() {});
       final now = DateTime.now();
       if (widget.user.isClockedIn) {
-        if (_ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now) ||
+        if (_ngmyHasClockInPayoutForDay(widget.user.email, userTx, now) ||
             _ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
           widget.user.isClockedIn = false;
           widget.user.clockInStartTime = null;
@@ -14916,7 +14968,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
 
         if (completed) {
           final payoutId = _ngmyClockInTransactionId(widget.user.email, now);
-          final alreadyPaid = _ngmyHasClockInPayoutForDay(widget.user.email, widget.allTransactions, now);
+          final alreadyPaid = _ngmyHasClockInPayoutForDay(widget.user.email, userTx, now);
           if (earned > 0 && !alreadyPaid) {
             ngmyPlayIncomeSoundForAmount(
               beneficiaryEmail: widget.user.email,
@@ -14952,8 +15004,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
       if (_ngmyIsPastNoon(now)) {
         final crown = widget.user.crownBadge.trim().toLowerCase();
         if ((crown == 'king' || crown == 'queen') &&
-            !_ngmyHasCrownPayForDay(widget.user.email, widget.allTransactions, now)) {
-          _ngmyTryCrownDailyPayAtNoon(widget.user, widget.allTransactions, widget.onAddTransaction);
+            !_ngmyHasCrownPayForDay(widget.user.email, userTx, now)) {
+          _ngmyTryCrownDailyPayAtNoon(widget.user, userTx, widget.onAddTransaction);
           widget.onDataChanged();
         }
       }
@@ -15017,9 +15069,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
           );
           return;
         }
-        _ngmyReconcileClockInSession(widget.user, widget.allTransactions);
+        _ngmyReconcileClockInSession(widget.user, _userClockInTransactions());
         final activeElsewhere =
-            _ngmyActiveClockInStartFromTransactions(widget.user.email, widget.allTransactions);
+            _ngmyActiveClockInStartFromTransactions(widget.user.email, _userClockInTransactions());
         if (widget.user.isClockedIn || activeElsewhere != null) {
           if (!widget.user.isClockedIn && activeElsewhere != null) {
             setState(() {
@@ -15118,16 +15170,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   }
 
   Widget _buildHomeTabWidget() {
-    final len = widget.allTransactions.length;
-    if (_sortedTxCache != null && _sortedTxCacheLen == len) {
-      final cache = _sortedTxCache!;
-      final slice = cache.length <= 120 ? cache : cache.sublist(0, 120);
-      return _buildHomeTab(slice);
-    }
-    if (len > 0) {
-      return _buildHomeTab(widget.allTransactions.take(120).toList());
-    }
-    return _buildHomeTab(const []);
+    return _NgmyHomeTabHost(child: _buildHomeTab(_homeTransactionsForDisplay()));
   }
 
   void _ensureTabContentBuilders(List<AppTransaction> sorted) {
@@ -15292,25 +15335,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
     };
   }
 
-  /// On home: render only HomeScreen (no IndexedStack overlays — admin iOS PWA fix).
+  /// Non-home tabs only — home renders directly from [MainScreen.build].
   Widget _buildMainTabBody(List<AppTransaction> sorted) {
-    final home = SizedBox.expand(child: _buildHomeTabWidget());
-    if (_idx == 0) return home;
+    assert(_idx != 0);
     _ensureTabContentBuilders(sorted);
     final builder = _tabContentBuilders![_idx];
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Offstage(offstage: true, child: home),
-        Positioned.fill(
-          child: _NgmyLazyTabSlot(
-            key: ValueKey<String>('ngmy_tab_active_$_idx'),
-            tabIndex: _idx,
-            activeIndex: _idx,
-            buildContent: builder!,
-          ),
-        ),
-      ],
+    return _NgmyLazyTabSlot(
+      key: ValueKey<String>('ngmy_tab_active_$_idx'),
+      tabIndex: _idx,
+      activeIndex: _idx,
+      buildContent: builder!,
     );
   }
 
@@ -15363,7 +15397,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shellBg = Theme.of(context).scaffoldBackgroundColor;
-    final sorted = _sortedTransactions();
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -15393,6 +15426,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver, Ng
         body: ValueListenableBuilder<bool>(
           valueListenable: ngmyIsSharingLiveHelp,
           builder: (context, sharing, _) {
+            if (_idx == 0) {
+              final home = _buildHomeTabWidget();
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  sharing
+                      ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: home)
+                      : home,
+                  ngmyLiveSupportBannerOverlay(),
+                ],
+              );
+            }
+            final sorted = _sortedTransactions();
             final tabs = Stack(
               children: [
                 if (!isDark)
