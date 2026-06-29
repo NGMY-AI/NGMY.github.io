@@ -401,7 +401,7 @@ class NgmyAppSocialBlueprints {
         'bottomNav': [
           {'icon': 'home', 'label': 'Home', 'target': 'home'},
           {'icon': 'list', 'label': 'Listings', 'target': 'listings'},
-          {'icon': 'add', 'label': 'Sell', 'target': 'add_sale'},
+          {'icon': 'add', 'label': 'List', 'target': 'add_listing'},
           {'icon': 'profile', 'label': 'Refer', 'target': 'referral'},
           {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
         ],
@@ -425,10 +425,10 @@ class NgmyAppSocialBlueprints {
                 },
                 {
                   'type': 'menuGrid',
+                  'style': 'pulse',
                   'items': [
                     {'icon': 'add', 'label': 'Add listing', 'target': 'add_listing'},
                     {'icon': 'list', 'label': 'My listings', 'target': 'listings'},
-                    {'icon': 'sales', 'label': 'Record a sale', 'target': 'add_sale'},
                     {'icon': 'history', 'label': 'Sales history', 'target': 'sales'},
                     {'icon': 'share', 'label': 'Referral link', 'target': 'referral'},
                     {'icon': 'wallet', 'label': 'Withdraw', 'target': 'withdraw'},
@@ -471,24 +471,15 @@ class NgmyAppSocialBlueprints {
               'addTarget': 'add_listing',
               'addLabel': 'Add listing',
               'allowDelete': true,
-            },
-          },
-        ),
-        NgmyAppScreen(
-          id: 'add_sale',
-          title: 'Record a sale',
-          kind: NgmyAppScreenKind.custom,
-          data: {
-            'layout': {
-              'type': 'form',
-              'collection': 'sales',
-              'submitLabel': 'Record sale',
-              'successMessage': 'Sale recorded — nice work!',
-              'navigateAfter': 'sales',
-              'fields': [
-                {'id': 'item', 'label': 'Item sold', 'type': 'text'},
-                {'id': 'amount', 'label': 'Sale amount (\$)', 'type': 'number'},
-                {'id': 'buyer', 'label': 'Buyer (optional)', 'type': 'text'},
+              'itemActions': [
+                {
+                  'label': 'Mark sold',
+                  'targetCollection': 'sales',
+                  'copyFields': {'title': 'item', 'price': 'amount'},
+                  'extraFields': {},
+                  'removeSource': true,
+                  'successMessage': 'Sale recorded — nice work!',
+                },
               ],
             },
           },
@@ -513,9 +504,7 @@ class NgmyAppSocialBlueprints {
                   'collection': 'sales',
                   'titleField': 'item',
                   'subtitleField': 'amount',
-                  'emptyText': 'No sales yet — record one to see it here.',
-                  'addTarget': 'add_sale',
-                  'addLabel': 'Record a sale',
+                  'emptyText': 'No sales yet — mark a listing as sold to record earnings.',
                   'allowDelete': true,
                 },
               ],

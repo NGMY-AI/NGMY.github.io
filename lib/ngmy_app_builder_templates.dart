@@ -374,10 +374,9 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
         'children': [
           {'type': 'text', 'text': 'Your earnings', 'style': 'title'},
           {'type': 'stat', 'collection': 'sales', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total earned'},
-          {'type': 'menuGrid', 'items': [
+          {'type': 'menuGrid', 'style': 'pulse', 'items': [
             {'icon': 'add', 'label': 'Add listing', 'target': 'add_listing'},
             {'icon': 'list', 'label': 'My listings', 'target': 'listings'},
-            {'icon': 'sales', 'label': 'Record a sale', 'target': 'add_sale'},
             {'icon': 'history', 'label': 'Sales history', 'target': 'sales'},
             {'icon': 'share', 'label': 'Referral link', 'target': 'referral'},
             {'icon': 'wallet', 'label': 'Withdraw', 'target': 'withdraw'},
@@ -406,19 +405,11 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
           },
         ],
       }),
-      _custom('add_sale', 'Record a sale', {
-        'type': 'form', 'collection': 'sales', 'submitLabel': 'Record sale', 'successMessage': 'Sale recorded — nice work!', 'navigateAfter': 'sales',
-        'fields': [
-          {'id': 'item', 'label': 'Item sold', 'type': 'text'},
-          {'id': 'amount', 'label': 'Sale amount (\$)', 'type': 'number'},
-          {'id': 'buyer', 'label': 'Buyer (optional)', 'type': 'text'},
-        ],
-      }),
       _custom('sales', 'Sales history', {
         'type': 'column',
         'children': [
           {'type': 'stat', 'collection': 'sales', 'sumField': 'amount', 'prefix': '\$', 'label': 'Total earned'},
-          {'type': 'dataList', 'collection': 'sales', 'titleField': 'item', 'subtitleField': 'amount', 'emptyText': 'No sales yet.', 'addTarget': 'add_sale', 'addLabel': 'Record a sale', 'allowDelete': true},
+          {'type': 'dataList', 'collection': 'sales', 'titleField': 'item', 'subtitleField': 'amount', 'emptyText': 'No sales yet — mark a listing as sold to record earnings.', 'allowDelete': true},
         ],
       }),
       _custom('referral', 'Referral link', {
@@ -442,7 +433,7 @@ final List<NgmyAppTemplate> kNgmyAppTemplates = [
       'bottomNav': [
         {'icon': 'home', 'label': 'Home', 'target': 'home'},
         {'icon': 'list', 'label': 'Listings', 'target': 'listings'},
-        {'icon': 'add', 'label': 'Sell', 'target': 'add_sale'},
+        {'icon': 'add', 'label': 'List', 'target': 'add_listing'},
         {'icon': 'profile', 'label': 'Refer', 'target': 'referral'},
         {'icon': 'settings', 'label': 'Settings', 'target': 'settings'},
       ],

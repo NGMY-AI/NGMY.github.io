@@ -568,7 +568,8 @@ class _NgmyAppScreenEditorPageState extends State<NgmyAppScreenEditorPage> {
       case 'menuGrid':
         final items = w['items'];
         final n = items is List ? items.length : 0;
-        return 'Menu · $n items';
+        final style = (w['style'] ?? 'classic').toString();
+        return style == 'classic' ? 'Menu · $n items' : 'Menu · $n items · $style';
       case 'switch':
         return (w['label'] ?? 'Switch').toString();
       case 'hero':
@@ -1320,7 +1321,8 @@ class _WidgetEditorSheetState extends State<_WidgetEditorSheet> {
         ];
       case 'menuGrid':
         return [
-          _dropdown('Columns', (_w['columns'] ?? 2).toString(), const ['2', '3'], (v) => _set('columns', int.tryParse(v) ?? 2)),
+          _dropdown('Style', (_w['style'] ?? 'classic').toString(), const ['classic', 'neon', 'hologram', 'pulse'], (v) => _set('style', v)),
+          _dropdown('Columns', (_w['columns'] ?? 2).toString(), const ['2', '3', '4'], (v) => _set('columns', int.tryParse(v) ?? 2)),
           const SizedBox(height: 8),
           Text('Menu items', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade700)),
           _MenuItemsEditor(
@@ -1621,6 +1623,12 @@ class _MenuItemsEditor extends StatefulWidget {
 }
 
 class _MenuItemsEditorState extends State<_MenuItemsEditor> {
+  static const _iconOptions = [
+    'add', 'calendar', 'cart', 'chat', 'earnings', 'fitness', 'food', 'history',
+    'home', 'info', 'list', 'mail', 'menu', 'music', 'person', 'phone', 'referral',
+    'sales', 'settings', 'share', 'shop', 'star', 'venue', 'video', 'wallet', 'withdraw',
+  ];
+
   late List<Map<String, dynamic>> _items;
 
   @override
@@ -1635,6 +1643,14 @@ class _MenuItemsEditorState extends State<_MenuItemsEditor> {
   }
 
   void _sync() => widget.onChanged(_items);
+
+  String _itemTarget(Map<String, dynamic> item) =>
+      (item['target'] ?? item['targetScreenId'] ?? '').toString();
+
+  String _itemIcon(Map<String, dynamic> item) {
+    final icon = (item['icon'] ?? 'menu').toString().toLowerCase();
+    return _iconOptions.contains(icon) ? icon : 'menu';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1656,15 +1672,59 @@ class _MenuItemsEditorState extends State<_MenuItemsEditor> {
                     },
                   ),
                   const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'Emoji (optional)',
+                            hintText: 'e.g. 🛒',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          controller: TextEditingController(text: (_items[i]['emoji'] ?? '').toString()),
+                          onChanged: (v) {
+                            if (v.trim().isEmpty) {
+                              _items[i].remove('emoji');
+                            } else {
+                              _items[i]['emoji'] = v.trim();
+                            }
+                            _sync();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _itemIcon(_items[i]),
+                          decoration: const InputDecoration(labelText: 'Icon', border: OutlineInputBorder()),
+                          items: [
+                            for (final icon in _iconOptions)
+                              DropdownMenuItem(value: icon, child: Text(icon)),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _items[i]['icon'] = v);
+                              _sync();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: widget.screens.any((s) => s.id == (_items[i]['target'] ?? '').toString())
-                        ? (_items[i]['target'] ?? '').toString()
+                    value: widget.screens.any((s) => s.id == _itemTarget(_items[i]))
+                        ? _itemTarget(_items[i])
                         : widget.screens.firstOrNull?.id,
                     decoration: const InputDecoration(labelText: 'Opens screen', border: OutlineInputBorder()),
                     items: [for (final s in widget.screens) DropdownMenuItem(value: s.id, child: Text(s.title))],
                     onChanged: (v) {
                       if (v != null) {
-                        setState(() => _items[i]['target'] = v);
+                        setState(() {
+                          _items[i]['target'] = v;
+                          _items[i].remove('targetScreenId');
+                        });
                         _sync();
                       }
                     },

@@ -187,7 +187,7 @@ User: $userMessage
       return NgmyAppBuilderCopilotResult(message: reply.error ?? 'AI returned an empty reply. Try again.');
     }
     final email = ownerEmail.isNotEmpty ? ownerEmail : (project?.ownerEmail ?? '');
-    return _parseCopilotReply(text, project, email);
+    return _maybeUpgradeGenericDemo(_parseCopilotReply(text, project, email), userMessage, project, email);
   } catch (e) {
     debugPrint('[app builder copilot] $e');
     return NgmyAppBuilderCopilotResult(message: 'AI error: $e');
@@ -595,6 +595,37 @@ bool _looksLikeBuildRequest(String message) {
     'convert this', 'change this into', 'change it into',
   ];
   return verbs.any((v) => q.contains(v));
+}
+
+/// When AI returns a cookie-cutter hero+menuGrid demo for TikTok/maps/money apps,
+/// swap in the proper blueprint so the home menu actually matches the request.
+NgmyAppBuilderCopilotResult _maybeUpgradeGenericDemo(
+  NgmyAppBuilderCopilotResult result,
+  String userMessage,
+  NgmyAppProject? base,
+  String ownerEmail,
+) {
+  final updated = result.updatedProject;
+  if (updated == null) return result;
+  final blueprintKind = NgmyAppSocialBlueprints.detectKind(userMessage);
+  if (blueprintKind == null || !NgmyAppSocialBlueprints.looksLikeGenericDemo(updated)) return result;
+  final built = NgmyAppSocialBlueprints.build(blueprintKind, ownerEmail: ownerEmail, name: updated.name);
+  if (built == null) return result;
+  final merged = built.copyWith(
+    id: updated.id,
+    status: updated.status,
+    slug: updated.slug,
+    publicUrl: updated.publicUrl,
+    publishedAt: updated.publishedAt,
+    reviewNote: updated.reviewNote,
+    database: updated.database,
+    customCode: updated.customCode,
+  );
+  final label = NgmyAppSocialBlueprints.label(blueprintKind);
+  final note = result.message.trim().isEmpty
+      ? 'Upgraded the generic home menu to a proper $label layout — check Preview.'
+      : '${result.message.trim()}\n\n(Upgraded the generic home menu to a proper $label layout.)';
+  return NgmyAppBuilderCopilotResult(message: note, updatedProject: merged);
 }
 
 String? _extractJson(String raw) {
