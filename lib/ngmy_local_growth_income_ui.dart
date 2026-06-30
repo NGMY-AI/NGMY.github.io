@@ -6,10 +6,8 @@ import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
-import 'ngmy_clock_in_investment_dialog.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
-import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// Entry point for the wifi-icon button on the home screen: a second,
@@ -46,11 +44,22 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   int _idx = 0;
   bool _investPurchaseInFlight = false;
   bool _loading = true;
+  Timer? _autoClockInTimer;
 
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+    // No Clock In button anywhere in this UI anymore — keep checking while
+    // this page is open so the daily session starts itself the moment the
+    // user becomes eligible (active plan, weekday, window open).
+    _autoClockInTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_onClockIn()));
+  }
+
+  @override
+  void dispose() {
+    _autoClockInTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -67,6 +76,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _loading = false;
     });
     unawaited(_persist(bumpWalletRevision: payoutAdded));
+    unawaited(_onClockIn());
   }
 
   Future<void> _persist({bool bumpWalletRevision = false}) async {
@@ -96,32 +106,20 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     unawaited(_persist(bumpWalletRevision: bumpWalletRevision));
   }
 
+  /// There is no Clock In button in this UI anymore — silently starts the
+  /// day's earning session once the user has an active plan, it's a
+  /// weekday, and the window is open. No-ops otherwise; safe to call often.
   Future<void> _onClockIn() async {
     final user = _user;
     if (user == null) return;
     final now = DateTime.now();
     NgmyLocalGrowthIncomeStore.applyDailyRollover(user, _transactions);
 
-    if (user.activeInvestment == null) {
-      await NgmyClockInInvestmentDialog.show(context, onGoToInvest: () => setState(() => _idx = 1));
-      return;
-    }
-    if (NgmyLocalGrowthIncomeStore.isWeekend(now)) {
-      await NgmyWeekendClockOverlay.show(context);
-      return;
-    }
-    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now)) {
-      _toast('You already earned today\'s clock-in payout. Check back tomorrow.');
-      return;
-    }
-    if (user.isClockedIn) {
-      _toast('Your clock-in session is already running.');
-      return;
-    }
-    if (!NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now)) {
-      _toast('Clock-in window has closed for today (opens again at midnight).');
-      return;
-    }
+    if (user.activeInvestment == null) return;
+    if (NgmyLocalGrowthIncomeStore.isWeekend(now)) return;
+    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now)) return;
+    if (user.isClockedIn) return;
+    if (!NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now)) return;
     final penalty = NgmyLocalGrowthIncomeStore.latePenaltyPercent(now);
     final sessionId = 'local_clockin_start_${user.email}_${now.millisecondsSinceEpoch}';
     setState(() {
@@ -136,13 +134,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         amount: 0,
         type: TransactionType.reimbursement,
         method: PaymentMethod.system,
-        sourceDetails: 'Clock-in session started',
+        sourceDetails: 'Clock-in session started (auto)',
         status: TransactionStatus.approved,
         timestamp: now,
       ),
       bumpWalletRevision: false,
     );
-    _toast('Clock-in started. Earnings settle the next time you open this.');
   }
 
   void _onInvest(String name, double price, double roi, double cost) {

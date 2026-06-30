@@ -15131,6 +15131,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       final userTx = _userClockInTransactions();
       _ngmyReconcileClockInSession(widget.user, userTx);
       _evaluateClockInMissPolicy();
+      unawaited(_autoAttemptClockIn());
     });
     _refreshOnlineStatus();
     _runScheduledPopups();
@@ -15205,6 +15206,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
           }
         }
+      } else {
+        // No clock-in button on Home anymore — start the day's earning
+        // session automatically the moment the user becomes eligible.
+        unawaited(_autoAttemptClockIn());
       }
       _missPolicyCounter++;
       if (_missPolicyCounter >= 60) {
@@ -15271,7 +15276,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       child: HomeScreen(
         key: _homeTabKey,
         user: widget.user,
-        onClockIn: () => unawaited(_homeOnClockIn()),
+        onClockIn: () => unawaited(_autoAttemptClockIn()),
         allTransactions: _homeTransactionsForDisplay(),
         onProcess: widget.onProcessTransaction,
         allUsers: _homeUsersForDisplay(),
@@ -15310,89 +15315,60 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _homeOnClockIn() async {
-        final now = DateTime.now();
-        _ngmyApplyMidnightClockReset(widget.user);
-        final onTrial = widget.user.isOnFreeTrial;
-        if (!onTrial && widget.user.activeInvestment == null) {
-          await NgmyClockInInvestmentDialog.show(context, onGoToInvest: () => setState(() => _idx = 1));
-          return;
-        }
-        if (!kNgmySuppressClockInPopups && !onTrial && _ngmyIsWeekend(now)) {
-          await NgmyWeekendClockOverlay.show(context);
-          return;
-        }
-        if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) {
-          _showOfficialNotice(
-            title: 'Already Earned Today',
-            message: 'You have already earned today\'s clock-in payout. Check back tomorrow after midnight.',
-            isError: true,
-          );
-          return;
-        }
-        _ngmyReconcileClockInSession(widget.user, _userClockInTransactions());
-        final activeElsewhere =
-            _ngmyActiveClockInStartFromTransactions(widget.user.email, _userClockInTransactions());
-        if (widget.user.isClockedIn || activeElsewhere != null) {
-          if (!widget.user.isClockedIn && activeElsewhere != null) {
-            setState(() {
-              widget.user.isClockedIn = true;
-              widget.user.clockInStartTime = activeElsewhere;
-            });
-            unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
-            widget.onDataChanged();
-          }
-          _showOfficialNotice(
-            title: 'Session Active',
-            message: 'Your clock-in session is already running on another device.',
-            isError: true,
-          );
-          return;
-        }
-        if (!onTrial && !_ngmyIsClockInWindowOpen(now)) {
-          await _ClockInWindowClosedDialog.show(context);
-          return;
-        }
-        final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
-        final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
-        setState(() {
-          widget.user.isClockedIn = true;
-          widget.user.clockInStartTime = now;
-          widget.user.clockInPenaltyPercent = penalty;
-        });
-        widget.onAddTransaction(AppTransaction(
-          id: sessionId,
-          userEmail: widget.user.email,
-          amount: 0,
-          type: TransactionType.reimbursement,
-          method: PaymentMethod.system,
-          sourceDetails: 'Clock-in session started',
-          status: TransactionStatus.approved,
-          timestamp: now,
-        ));
-        if (!kNgmySuppressClockInPopups) {
-          unawaited(ngmyInAppNotify?.call(
-            title: 'Clock-in started',
-            body: onTrial
-                ? 'Free trial session running — earnings accrue until payout.'
-                : 'Session active until 12:00 PM. Earnings show in Today and Transaction History.',
-            tag: 'clockin_start_$sessionId',
-          ) ?? Future.value());
-        }
-        unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
-        widget.onDataChanged();
-        if (kNgmyShowClockInConfirmDialog) {
-          if (!onTrial && _ngmyShowLateClockUi(now)) {
-            await _showLateClockInDialog(
-              penalty,
-              now,
-              fullDaily: widget.user.fullDailyEarningsBeforePenalty,
-              todayCap: widget.user.todayDailyGoal,
-            );
-          } else {
-            await _showClockInConfirmedDialog();
-          }
-        }
+  /// There is no Clock In button anywhere anymore — this silently starts the
+  /// day's earning session the moment a user becomes eligible (has an active
+  /// investment or free trial, it's a weekday, the window is open, and they
+  /// haven't already been paid today). Safe to call as often as needed; it
+  /// no-ops once a session is already running or already paid for the day.
+  Future<void> _autoAttemptClockIn() async {
+    final now = DateTime.now();
+    _ngmyApplyMidnightClockReset(widget.user);
+    final onTrial = widget.user.isOnFreeTrial;
+    if (!onTrial && widget.user.activeInvestment == null) return;
+    if (!onTrial && _ngmyIsWeekend(now)) return;
+    if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) return;
+    _ngmyReconcileClockInSession(widget.user, _userClockInTransactions());
+    if (widget.user.isClockedIn) return;
+    final activeElsewhere =
+        _ngmyActiveClockInStartFromTransactions(widget.user.email, _userClockInTransactions());
+    if (activeElsewhere != null) {
+      setState(() {
+        widget.user.isClockedIn = true;
+        widget.user.clockInStartTime = activeElsewhere;
+      });
+      unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
+      widget.onDataChanged();
+      return;
+    }
+    if (!onTrial && !_ngmyIsClockInWindowOpen(now)) return;
+    final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
+    final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
+    setState(() {
+      widget.user.isClockedIn = true;
+      widget.user.clockInStartTime = now;
+      widget.user.clockInPenaltyPercent = penalty;
+    });
+    widget.onAddTransaction(AppTransaction(
+      id: sessionId,
+      userEmail: widget.user.email,
+      amount: 0,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Clock-in session started (auto)',
+      status: TransactionStatus.approved,
+      timestamp: now,
+    ));
+    if (!kNgmySuppressClockInPopups) {
+      unawaited(ngmyInAppNotify?.call(
+        title: 'Earning started',
+        body: onTrial
+            ? 'Free trial session running — earnings accrue until payout.'
+            : 'Today\'s earning session is active. Earnings show in Today and Transaction History.',
+        tag: 'clockin_start_$sessionId',
+      ) ?? Future.value());
+    }
+    unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
+    widget.onDataChanged();
   }
 
   Future<void> _openAdminDashboardFromHome() async {
