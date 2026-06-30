@@ -15887,8 +15887,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late AnimationController _smokeCtrl;
   int _unreadNewsCount = 0;
   DateTime? _homeMountedAt;
+  final TextEditingController _assistantInputCtrl = TextEditingController();
 
-  Future<void> _openNewsHub() async {
+  Future<void> _openNewsHub({String? initialQuery}) async {
     await NgmyNavigator.push(
       context,
       AnnouncementScreen(
@@ -15899,6 +15900,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onPostToNews: (_) {},
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
+        initialQuery: initialQuery,
         liveAppKnowledge: () => NgmyAppKnowledge.build(
           viewer: {
             'email': widget.user.email,
@@ -15957,7 +15959,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     WidgetsBinding.instance.removeObserver(this);
     if (_smokeCtrl.isAnimating) _smokeCtrl.stop();
     _smokeCtrl.dispose();
+    _assistantInputCtrl.dispose();
     super.dispose();
+  }
+
+  void _askAssistant() {
+    final text = _assistantInputCtrl.text.trim();
+    _assistantInputCtrl.clear();
+    unawaited(_openNewsHub(initialQuery: text.isEmpty ? null : text));
+  }
+
+  Future<void> _openLocalGrowthFromHome() async {
+    if (widget.disableLocalGrowthIncomeEntry) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are already in Local Growth — use the back arrow to return to the main app.')),
+      );
+      return;
+    }
+    await showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans);
   }
 
   @override Widget build(BuildContext context) {
@@ -15965,35 +15984,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
     return ColoredBox(
       color: bg,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              Positioned.fill(child: _homePastelBackdrop(isLight)),
-              SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: math.max(0, constraints.maxHeight - _ngmyBottomNavScrollPadding(context))),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildAiHomeHeader(isLight),
-                      if (widget.user.isOnFreeTrial) ...[
-                        const SizedBox(height: 12),
-                        _buildFreeTrialGlassBanner(isLight),
-                      ],
-                      const SizedBox(height: 18),
-                      _buildAiHeroCard(isLight),
-                      const SizedBox(height: 16),
-                      _buildAiActionGrid(isLight),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      child: Stack(
+        children: [
+          Positioned.fill(child: _homePastelBackdrop(isLight)),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildAiHomeHeader(isLight),
+                if (widget.user.isOnFreeTrial) ...[
+                  const SizedBox(height: 12),
+                  _buildFreeTrialGlassBanner(isLight),
+                ],
+                const SizedBox(height: 18),
+                Expanded(child: _buildAiHeroCard(isLight)),
+                const SizedBox(height: 16),
+                _buildAiActionGrid(isLight),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -16110,7 +16121,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         ),
         const SizedBox(width: 10),
-        _roundGlassButton(icon: Icons.forum_rounded, tooltip: 'NGMY Helper', onTap: _openNewsHub),
+        _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
       ],
     );
   }
@@ -16159,14 +16170,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildAiHeroCard(bool isLight) {
     final name = widget.user.username.trim().isEmpty ? 'human' : widget.user.username.trim();
     return _glassPanel(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             widget.isLocalGrowthIncome ? 'Local AI Assistant' : 'AI Assistant',
+            textAlign: TextAlign.center,
             style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontWeight: FontWeight.w700, fontSize: 12),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             'Hello there, $name.\nHow can I assist you?',
             textAlign: TextAlign.center,
@@ -16177,11 +16190,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 18),
-          _aiOrb(),
-          const SizedBox(height: 18),
+          const Spacer(),
+          Center(child: _aiOrb()),
+          const Spacer(),
+          Text(
+            'Ask anything, or ask me to make a song.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
           Container(
-            height: 54,
+            constraints: const BoxConstraints(minHeight: 54),
             padding: const EdgeInsets.only(left: 18, right: 6),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(isLight ? 0.76 : 0.10),
@@ -16191,13 +16210,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Ask NGMY Assistant',
-                    style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontWeight: FontWeight.w700),
+                  child: TextField(
+                    controller: _assistantInputCtrl,
+                    minLines: 1,
+                    maxLines: 3,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _askAssistant(),
+                    style: TextStyle(color: isLight ? const Color(0xFF171633) : Colors.white, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      hintText: 'Ask NGMY Assistant…',
+                      hintStyle: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontWeight: FontWeight.w700),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
                 InkWell(
-                  onTap: _openNewsHub,
+                  onTap: _askAssistant,
                   customBorder: const CircleBorder(),
                   child: Container(
                     width: 44,
@@ -16206,7 +16236,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       shape: BoxShape.circle,
                       gradient: LinearGradient(colors: [Color(0xFF67E8F9), Color(0xFF8B5CF6)]),
                     ),
-                    child: const Icon(Icons.mic_rounded, color: Colors.white),
+                    child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                   ),
                 ),
               ],
@@ -16258,41 +16288,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildAiActionGrid(bool isLight) {
-    return Row(
-      children: [
-        Expanded(
-          child: _aiMiniAction(
-            widget.isLocalGrowthIncome ? 'Local Active' : 'Local Growth',
-            widget.disableLocalGrowthIncomeEntry ? 'Offline mode is on' : 'Open offline income',
-            Icons.wifi_tethering_rounded,
-            widget.disableLocalGrowthIncomeEntry
-                ? null
-                : () => showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: _aiMiniAction('Game Center', 'Play & earn points', Icons.sports_esports_rounded, _openGameCenter)),
-        const SizedBox(width: 10),
-        Expanded(child: _aiMiniAction('Ask Helper', 'Chat with NGMY AI', Icons.forum_rounded, _openNewsHub)),
-      ],
-    );
-  }
-
-  Widget _aiMiniAction(String title, String subtitle, IconData icon, VoidCallback? onTap) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
     return InkWell(
-      onTap: onTap,
+      onTap: widget.disableLocalGrowthIncomeEntry
+          ? null
+          : () => showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans),
       borderRadius: BorderRadius.circular(18),
       child: _glassPanel(
         radius: 18,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
           children: [
-            Icon(icon, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 22),
-            const SizedBox(height: 7),
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-            const SizedBox(height: 2),
-            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isLight ? const Color(0xFF7C8798) : Colors.white54, fontSize: 10)),
+            Icon(Icons.wifi_tethering_rounded, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.isLocalGrowthIncome ? 'Local Active' : 'Local Growth',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                  ),
+                  Text(
+                    widget.disableLocalGrowthIncomeEntry ? 'Offline mode is on' : 'Open offline income',
+                    style: TextStyle(color: isLight ? const Color(0xFF7C8798) : Colors.white54, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: isLight ? const Color(0xFF7C8798) : Colors.white54, size: 20),
           ],
         ),
       ),
@@ -42825,6 +42849,7 @@ class AnnouncementScreen extends StatefulWidget {
   final String Function()? liveAppKnowledge;
   final Function(AppTransaction)? onAddTransaction;
   final VoidCallback? onDataChanged;
+  final String? initialQuery;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -42837,6 +42862,7 @@ class AnnouncementScreen extends StatefulWidget {
     this.liveAppKnowledge,
     this.onAddTransaction,
     this.onDataChanged,
+    this.initialQuery,
   });
 
   @override
@@ -42919,6 +42945,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       _refreshGeminiKeyFromCloud();
       _refreshHelperQuota();
     });
+    final initialQuery = widget.initialQuery?.trim() ?? '';
+    if (initialQuery.isNotEmpty) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        setState(() => _activeTab = 0);
+        _sendQuickPrompt(initialQuery);
+      });
+    }
   }
 
   Future<void> _loadHelperKb() async {
