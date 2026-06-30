@@ -44,21 +44,15 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   int _idx = 0;
   bool _investPurchaseInFlight = false;
   bool _loading = true;
-  Timer? _autoClockInTimer;
 
   @override
   void initState() {
     super.initState();
     unawaited(_load());
-    // No Clock In button anywhere in this UI anymore — keep checking while
-    // this page is open so the daily session starts itself the moment the
-    // user becomes eligible (active plan, weekday, window open).
-    _autoClockInTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_onClockIn()));
   }
 
   @override
   void dispose() {
-    _autoClockInTimer?.cancel();
     super.dispose();
   }
 
@@ -76,7 +70,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _loading = false;
     });
     unawaited(_persist(bumpWalletRevision: payoutAdded));
-    unawaited(_onClockIn());
   }
 
   Future<void> _persist({bool bumpWalletRevision = false}) async {
@@ -104,42 +97,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
     setState(() => _transactions = [..._transactions, t]);
     unawaited(_persist(bumpWalletRevision: bumpWalletRevision));
-  }
-
-  /// There is no Clock In button in this UI anymore — silently starts the
-  /// day's earning session once the user has an active plan, it's a
-  /// weekday, and the window is open. No-ops otherwise; safe to call often.
-  Future<void> _onClockIn() async {
-    final user = _user;
-    if (user == null) return;
-    final now = DateTime.now();
-    NgmyLocalGrowthIncomeStore.applyDailyRollover(user, _transactions);
-
-    if (user.activeInvestment == null) return;
-    if (NgmyLocalGrowthIncomeStore.isWeekend(now)) return;
-    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now)) return;
-    if (user.isClockedIn) return;
-    if (!NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now)) return;
-    final penalty = NgmyLocalGrowthIncomeStore.latePenaltyPercent(now);
-    final sessionId = 'local_clockin_start_${user.email}_${now.millisecondsSinceEpoch}';
-    setState(() {
-      user.isClockedIn = true;
-      user.clockInStartTime = now;
-      user.clockInPenaltyPercent = penalty;
-    });
-    _onAddTransaction(
-      AppTransaction(
-        id: sessionId,
-        userEmail: user.email,
-        amount: 0,
-        type: TransactionType.reimbursement,
-        method: PaymentMethod.system,
-        sourceDetails: 'Clock-in session started (auto)',
-        status: TransactionStatus.approved,
-        timestamp: now,
-      ),
-      bumpWalletRevision: false,
-    );
   }
 
   void _onInvest(String name, double price, double roi, double cost) {
@@ -204,6 +161,72 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     await _load();
   }
 
+  Future<void> _openHelper() async {
+    final user = _user;
+    if (user == null) return;
+    await NgmyNavigator.push(
+      context,
+      AnnouncementScreen(
+        user: user,
+        allUsers: [user],
+        announcements: const [],
+        config: widget.config,
+        onPostToNews: (_) {},
+        onAddTransaction: _onAddTransaction,
+        onDataChanged: _onDataChanged,
+      ),
+    );
+  }
+
+  Future<void> _manualClockIn() async {
+    final user = _user;
+    if (user == null) return;
+    final now = DateTime.now();
+    final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, _transactions);
+    if (payoutAdded) {
+      await _persist(bumpWalletRevision: true);
+    }
+    if (user.activeInvestment == null) {
+      _toast('Choose an investment plan first, then come back to clock in.');
+      setState(() => _idx = 1);
+      return;
+    }
+    if (NgmyLocalGrowthIncomeStore.isWeekend(now)) {
+      _toast('Clock-in opens Monday through Friday.');
+      return;
+    }
+    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now)) {
+      _toast('Today has already been completed. Come back tomorrow.');
+      return;
+    }
+    if (user.isClockedIn) {
+      _toast('You are already clocked in for today.');
+      return;
+    }
+    final penalty = NgmyLocalGrowthIncomeStore.latePenaltyPercent(now);
+    final sessionId = 'local_clockin_manual_${user.email}_${now.millisecondsSinceEpoch}';
+    setState(() {
+      user.isClockedIn = true;
+      user.clockInStartTime = now;
+      user.lastClockInDate = now;
+      user.clockInPenaltyPercent = penalty;
+    });
+    _onAddTransaction(
+      AppTransaction(
+        id: sessionId,
+        userEmail: user.email,
+        amount: 0,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Clock-in session started (local)',
+        status: TransactionStatus.approved,
+        timestamp: now,
+      ),
+      bumpWalletRevision: false,
+    );
+    _toast('Clock-in started. Keep Local Growth active for today.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -219,35 +242,15 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final sorted = List<AppTransaction>.from(_transactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     final pages = <Widget>[
-      HomeScreen(
+      _LocalGrowthHomeTab(
         key: const ValueKey('ngmy_local_home'),
         user: _user!,
-        onClockIn: _onClockIn,
-        allTransactions: sorted,
-        onProcess: (_, _) async {},
-        allUsers: [_user!],
-        globalPlans: widget.plans,
-        onAddPlan: (_) {},
-        onAddTransaction: _onAddTransaction,
-        onDataChanged: _onDataChanged,
-        config: widget.config,
-        allMedia: const [],
-        allAnnouncements: const [],
-        onAddAnnouncement: (_) {},
-        onDeleteAnnouncement: (_) {},
-        onClearAllAnnouncements: () {},
+        transactions: sorted,
+        onClockIn: _manualClockIn,
         onOpenInvest: () => setState(() => _idx = 1),
-        homeLeadingOverride: InkWell(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Colors.transparent, shape: BoxShape.circle),
-            child: Icon(Icons.arrow_back_ios_new_rounded, color: WorksheetPalette.green, size: 20),
-          ),
-        ),
-        disableLocalGrowthIncomeEntry: true,
-        isLocalGrowthIncome: true,
-        homeTitleOverride: 'LOCAL GROWTH INCOME',
+        onOpenWallet: () => setState(() => _idx = 2),
+        onBack: () => NgmyNavigator.pop(context),
+        onOpenHelper: _openHelper,
       ),
       InvestScreen(
         key: const ValueKey('ngmy_local_invest'),
@@ -390,6 +393,301 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           ),
         ),
       );
+}
+
+class _LocalGrowthHomeTab extends StatelessWidget {
+  const _LocalGrowthHomeTab({
+    super.key,
+    required this.user,
+    required this.transactions,
+    required this.onClockIn,
+    required this.onOpenInvest,
+    required this.onOpenWallet,
+    required this.onBack,
+    required this.onOpenHelper,
+  });
+
+  final UserData user;
+  final List<AppTransaction> transactions;
+  final Future<void> Function() onClockIn;
+  final VoidCallback onOpenInvest;
+  final VoidCallback onOpenWallet;
+  final VoidCallback onBack;
+  final VoidCallback onOpenHelper;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final recent = transactions.take(5).toList();
+    final active = user.activeInvestment;
+    final clockedIn = user.isClockedIn;
+    final dailyGoal = user.todayDailyGoal;
+
+    return ColoredBox(
+      color: bg,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 26),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FloatingTitle(
+              title: 'LOCAL GROWTH INCOME',
+              leading: _roundIcon(
+                context,
+                icon: Icons.arrow_back_ios_new_rounded,
+                onTap: onBack,
+                isDark: isDark,
+              ),
+              trailing: _roundIcon(
+                context,
+                icon: Icons.forum_rounded,
+                onTap: onOpenHelper,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0EA5E9), Color(0xFF22C55E)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.26), blurRadius: 24, offset: const Offset(0, 12))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    '\$${formatCurrency(user.accountBalance)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.8),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: _statPill('Today Goal', '\$${formatCurrency(dailyGoal)}')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _statPill('Total Profit', '\$${formatCurrency(user.totalProfit)}')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _sectionCard(
+              isDark: isDark,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(clockedIn ? Icons.verified_rounded : Icons.touch_app_rounded, color: WorksheetPalette.green),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          clockedIn ? 'Clocked in for today' : 'Daily Clock In',
+                          style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 18),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    active == null
+                        ? 'Choose a local investment plan first, then clock in here to start earning.'
+                        : clockedIn
+                            ? 'Your local earning session is active. Payout settles into your local wallet on the next day.'
+                            : 'Tap the button below to start today’s local earning session.',
+                    style: TextStyle(color: muted, height: 1.35, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: clockedIn ? null : onClockIn,
+                      icon: Icon(clockedIn ? Icons.check_circle_rounded : Icons.login_rounded),
+                      label: Text(clockedIn ? 'Already Clocked In' : 'Clock In Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: WorksheetPalette.green,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: WorksheetPalette.green.withValues(alpha: 0.35),
+                        disabledForegroundColor: Colors.white70,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _quickCard(
+                    context,
+                    isDark: isDark,
+                    icon: Icons.trending_up_rounded,
+                    title: active?.name ?? 'No Plan Yet',
+                    subtitle: active == null ? 'Open Investment' : '\$${formatCurrency(active.amount)} active',
+                    onTap: onOpenInvest,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _quickCard(
+                    context,
+                    isDark: isDark,
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: 'My Wallet',
+                    subtitle: 'Deposit / Withdraw',
+                    onTap: onOpenWallet,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _sectionCard(
+              isDark: isDark,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Recent Local Activity', style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 12),
+                  if (recent.isEmpty)
+                    Text('No local activity yet. Deposit, invest, or clock in to begin.', style: TextStyle(color: muted, fontWeight: FontWeight.w600))
+                  else
+                    ...recent.map((t) => _activityRow(context, t, isDark: isDark)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roundIcon(BuildContext context, {required IconData icon, required VoidCallback onTap, required bool isDark}) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111827) : Colors.white,
+          border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.35 : 0.18)),
+        ),
+        child: Icon(icon, color: WorksheetPalette.green, size: 20),
+      ),
+    );
+  }
+
+  Widget _statPill(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionCard({required bool isDark, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111827) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE5E7EB)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.07), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _quickCard(
+    BuildContext context, {
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: _sectionCard(
+        isDark: isDark,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: WorksheetPalette.green, size: 24),
+            const SizedBox(height: 10),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 12, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _activityRow(BuildContext context, AppTransaction t, {required bool isDark}) {
+    final isDebit = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove;
+    final color = isDebit ? Colors.redAccent : WorksheetPalette.green;
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.14)),
+            child: Icon(isDebit ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : t.type.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontWeight: FontWeight.w800)),
+                Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          Text(
+            '${isDebit ? '-' : '+'}\$${formatCurrency(t.amount)}',
+            style: TextStyle(color: color, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Mirrors WalletScreen's look (FloatingTitle, gradient header, Deposit /
