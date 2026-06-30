@@ -16243,7 +16243,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  widget.homeTitleOverride ?? 'GROWTH INCOME',
+                  widget.homeTitleOverride ?? 'NGMY AI HOME',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,

@@ -178,6 +178,23 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     );
   }
 
+  Future<void> _openGameCenter() async {
+    final user = _user;
+    if (user == null) return;
+    await NgmyNavigator.push(
+      context,
+      GameCenterScreen(
+        user: user,
+        config: widget.config,
+        allTransactions: _transactions,
+        onAddTransaction: _onAddTransaction,
+        onDataChanged: _onDataChanged,
+        onGoToInvest: () => setState(() => _idx = 1),
+      ),
+      routeName: 'LocalGrowthGameCenter',
+    );
+  }
+
   Future<void> _manualClockIn() async {
     final user = _user;
     if (user == null) return;
@@ -251,6 +268,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         onOpenWallet: () => setState(() => _idx = 2),
         onBack: () => NgmyNavigator.pop(context),
         onOpenHelper: _openHelper,
+        onOpenGameCenter: _openGameCenter,
       ),
       InvestScreen(
         key: const ValueKey('ngmy_local_invest'),
@@ -306,6 +324,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
   Widget _buildLocalBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const glassGreen = Color(0xFF2EF6A3);
     const ball = NgmyBottomNavMetrics.localSelectionBall;
     const itemW = NgmyBottomNavMetrics.localNavItemWidth;
     const gap = NgmyBottomNavMetrics.localNavItemGap;
@@ -339,11 +358,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                WorksheetPalette.green.withValues(alpha: isDark ? 0.30 : 0.16),
-                                WorksheetPalette.green.withValues(alpha: isDark ? 0.10 : 0.04),
+                                glassGreen.withValues(alpha: isDark ? 0.34 : 0.20),
+                                const Color(0xFF10B981).withValues(alpha: isDark ? 0.16 : 0.06),
                               ],
                             ),
-                            border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.45 : 0.30), width: 1.2),
+                            border: Border.all(color: glassGreen.withValues(alpha: isDark ? 0.50 : 0.34), width: 1.2),
+                            boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.18), blurRadius: 14)],
                           ),
                         ),
                       ),
@@ -383,7 +403,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
               child: Center(
                 child: Icon(
                   icon,
-                  color: _idx == i ? Theme.of(context).colorScheme.primary : Colors.grey,
+                  color: _idx == i ? const Color(0xFF2EF6A3) : Colors.grey,
                   size: NgmyBottomNavMetrics.sideIconSize,
                 ),
               ),
@@ -403,6 +423,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     required this.onOpenWallet,
     required this.onBack,
     required this.onOpenHelper,
+    required this.onOpenGameCenter,
   });
 
   final UserData user;
@@ -412,6 +433,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   final VoidCallback onOpenWallet;
   final VoidCallback onBack;
   final VoidCallback onOpenHelper;
+  final VoidCallback onOpenGameCenter;
 
   @override
   Widget build(BuildContext context) {
@@ -419,6 +441,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     const bg = Color(0xFF101010);
     final card = isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1C1C1E);
     final muted = Colors.white.withValues(alpha: 0.58);
+    const glassGreen = Color(0xFF2EF6A3);
     final recent = transactions.take(5).toList();
     final active = user.activeInvestment;
     final clockedIn = user.isClockedIn;
@@ -427,7 +450,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     return ColoredBox(
       color: bg,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 132),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -446,16 +469,16 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 isDark: true,
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: _topMetricCard(
                     icon: Icons.trending_up_rounded,
-                    iconColor: WorksheetPalette.green,
+                    iconColor: glassGreen,
                     title: 'Today',
                     value: '\$${formatCurrency(user.todayClockInEarned)}',
-                    valueColor: WorksheetPalette.green,
+                    valueColor: glassGreen,
                     card: card,
                     onTap: () => unawaited(onClockIn()),
                   ),
@@ -463,7 +486,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _topMetricCard(
-                    icon: Icons.videogame_asset_rounded,
+                    icon: Icons.account_balance_wallet_rounded,
                     iconColor: const Color(0xFF6366F1),
                     title: 'Balance',
                     value: '\$${formatCurrency(user.accountBalance)}',
@@ -474,17 +497,18 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
             _clockInShowcase(
               context,
               card: card,
               dailyGoal: dailyGoal,
               clockedIn: clockedIn,
               hasPlan: active != null,
+              green: glassGreen,
             ),
-            const SizedBox(height: 42),
-            _networkStatus(card: card),
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
+            _networkStatus(card: card, green: glassGreen),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(child: _smallTotalBox('Total Profit', '\$${formatCurrency(user.totalProfit)}', card: card)),
@@ -492,9 +516,9 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 Expanded(child: _smallTotalBox('Total Investment', '\$${formatCurrency(active?.amount ?? 0)}', card: card, onTap: onOpenInvest)),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               decoration: BoxDecoration(
                 color: card,
                 borderRadius: BorderRadius.circular(26),
@@ -508,7 +532,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(color: WorksheetPalette.green, shape: BoxShape.circle),
+                        decoration: const BoxDecoration(color: glassGreen, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 10),
                       Text('LIVE ACTIVITY', style: TextStyle(color: muted, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1)),
@@ -536,15 +560,23 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       onTap: onTap,
       customBorder: const CircleBorder(),
       child: Container(
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDark ? const Color(0xFF111827) : Colors.white,
-          border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.35 : 0.18)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF2EF6A3).withValues(alpha: 0.24),
+              const Color(0xFF0F172A).withValues(alpha: 0.72),
+            ],
+          ),
+          border: Border.all(color: const Color(0xFF2EF6A3).withValues(alpha: 0.38)),
+          boxShadow: [BoxShadow(color: const Color(0xFF2EF6A3).withValues(alpha: 0.18), blurRadius: 16)],
         ),
-        child: Icon(icon, color: WorksheetPalette.green, size: 20),
+        child: Icon(icon, color: const Color(0xFF2EF6A3), size: 19),
       ),
     );
   }
@@ -559,8 +591,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     VoidCallback? onTap,
   }) {
     final content = Container(
-      height: 100,
-      padding: const EdgeInsets.all(16),
+      height: 88,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(14),
@@ -572,17 +604,25 @@ class _LocalGrowthHomeTab extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: Colors.white, size: 18),
+                width: 29,
+                height: 29,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [iconColor.withValues(alpha: 0.95), iconColor.withValues(alpha: 0.55)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.22), blurRadius: 12)],
+                ),
+                child: Icon(icon, color: Colors.white, size: 17),
               ),
-              const SizedBox(width: 10),
-              Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w800, fontSize: 13)),
+              const SizedBox(width: 9),
+              Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w800, fontSize: 12)),
             ],
           ),
           const Spacer(),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 23)),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 20)),
         ],
       ),
     );
@@ -596,14 +636,15 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     required double dailyGoal,
     required bool clockedIn,
     required bool hasPlan,
+    required Color green,
   }) {
     final status = clockedIn ? 'ACTIVE' : 'CLOSED';
-    final glow = clockedIn ? WorksheetPalette.green : Colors.white;
+    final glow = clockedIn ? green : Colors.white;
     return InkWell(
       onTap: clockedIn ? null : () => unawaited(onClockIn()),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 276,
+        height: 232,
         decoration: BoxDecoration(
           color: card,
           borderRadius: BorderRadius.circular(24),
@@ -613,23 +654,30 @@ class _LocalGrowthHomeTab extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Positioned(
-              top: 15,
+              top: 13,
               left: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
                 decoration: BoxDecoration(
-                  color: WorksheetPalette.green.withValues(alpha: 0.88),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      green.withValues(alpha: 0.92),
+                      const Color(0xFF10B981).withValues(alpha: 0.72),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
-                  boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.55), blurRadius: 14)],
+                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.46), blurRadius: 16)],
                 ),
-                child: const Text('CARS VIDEO GAMES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.7)),
+                child: const Text('CARS VIDEO GAMES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7)),
               ),
             ),
             Center(
               child: Container(
-                width: 164,
-                height: 164,
+                width: 146,
+                height: 146,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
@@ -642,8 +690,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 ),
                 child: Center(
                   child: Container(
-                    width: 124,
-                    height: 124,
+                    width: 110,
+                    height: 110,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: const Color(0xFF4B4D4C).withValues(alpha: 0.70),
@@ -653,11 +701,11 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.78), size: 46),
-                        const SizedBox(height: 5),
+                        Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.78), size: 40),
+                        const SizedBox(height: 4),
                         Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 9, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 5),
-                        Text('\$${formatCurrency(dailyGoal)}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 4),
+                        Text('\$${formatCurrency(dailyGoal)}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                         Text(hasPlan ? status : 'NO PLAN', style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 9, fontWeight: FontWeight.w900)),
                       ],
                     ),
@@ -671,55 +719,68 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     );
   }
 
-  Widget _networkStatus({required Color card}) {
+  Widget _networkStatus({required Color card, required Color green}) {
     return Container(
-      height: 84,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.18), blurRadius: 22)],
+        boxShadow: [BoxShadow(color: green.withValues(alpha: 0.14), blurRadius: 20)],
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: WorksheetPalette.green.withValues(alpha: 0.72),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [green.withValues(alpha: 0.92), const Color(0xFF047857).withValues(alpha: 0.65)],
+              ),
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.52), blurRadius: 18)],
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+              boxShadow: [BoxShadow(color: green.withValues(alpha: 0.44), blurRadius: 18)],
             ),
-            child: const Icon(Icons.wifi_rounded, color: Colors.white, size: 28),
+            child: const Icon(Icons.wifi_rounded, color: Colors.white, size: 25),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-                Text('Real-time statistics', style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontWeight: FontWeight.w600)),
+                const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                Text('Real-time statistics', style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: WorksheetPalette.green.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-              boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.50), blurRadius: 16)],
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.sports_esports_rounded, color: Colors.white, size: 15),
-                SizedBox(width: 6),
-                Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-                SizedBox(width: 8),
-                Icon(Icons.flash_on_rounded, color: Colors.white, size: 14),
-              ],
+          InkWell(
+            onTap: onOpenGameCenter,
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [green.withValues(alpha: 0.88), const Color(0xFF16A34A).withValues(alpha: 0.70)],
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+                boxShadow: [BoxShadow(color: green.withValues(alpha: 0.46), blurRadius: 16)],
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.sports_esports_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 6),
+                  Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                  SizedBox(width: 7),
+                  Icon(Icons.flash_on_rounded, color: Colors.white, size: 13),
+                ],
+              ),
             ),
           ),
         ],
@@ -729,8 +790,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
 
   Widget _smallTotalBox(String title, String value, {required Color card, VoidCallback? onTap}) {
     final content = Container(
-      height: 88,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+      height: 76,
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(18),
@@ -739,9 +800,9 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontSize: 12, fontWeight: FontWeight.w800)),
+          Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontSize: 11, fontWeight: FontWeight.w800)),
           const Spacer(),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -755,22 +816,22 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 31,
+            height: 31,
             alignment: Alignment.center,
             decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.14)),
-            child: Icon(isDebit ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 18),
+            child: Icon(isDebit ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 16),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : t.type.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontWeight: FontWeight.w800)),
+                Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : t.type.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w800)),
                 Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
