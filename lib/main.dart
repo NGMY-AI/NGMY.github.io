@@ -15888,8 +15888,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _unreadNewsCount = 0;
   DateTime? _homeMountedAt;
   final TextEditingController _assistantInputCtrl = TextEditingController();
+  final ScrollController _assistantScrollCtrl = ScrollController();
+  final List<Map<String, dynamic>> _assistantMessages = [];
+  bool _assistantTyping = false;
+  bool _assistantMemoryLoaded = false;
 
-  Future<void> _openNewsHub({String? initialQuery}) async {
+  Future<void> _openNewsHub({String? initialQuery, int initialTab = 0}) async {
     await NgmyNavigator.push(
       context,
       AnnouncementScreen(
@@ -15901,6 +15905,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         onAddTransaction: widget.onAddTransaction,
         onDataChanged: widget.onDataChanged,
         initialQuery: initialQuery,
+        initialTab: initialTab,
         liveAppKnowledge: () => NgmyAppKnowledge.build(
           viewer: {
             'email': widget.user.email,
@@ -15928,6 +15933,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!mounted) return;
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
+    unawaited(_loadAssistantMemory());
+  }
+
+  Future<void> _loadAssistantMemory() async {
+    final mem = await NgmyAiMemoryStore.load(widget.user.email);
+    if (!mounted) return;
+    setState(() {
+      _assistantMessages
+        ..clear()
+        ..addAll(mem);
+      _assistantMemoryLoaded = true;
+    });
+    _scrollAssistantToBottom(jump: true);
   }
 
   @override
@@ -15960,13 +15978,120 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (_smokeCtrl.isAnimating) _smokeCtrl.stop();
     _smokeCtrl.dispose();
     _assistantInputCtrl.dispose();
+    _assistantScrollCtrl.dispose();
     super.dispose();
   }
 
-  void _askAssistant() {
+  void _scrollAssistantToBottom({bool jump = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_assistantScrollCtrl.hasClients) return;
+      final target = _assistantScrollCtrl.position.maxScrollExtent;
+      if (jump) {
+        _assistantScrollCtrl.jumpTo(target);
+      } else {
+        _assistantScrollCtrl.animateTo(target, duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
+      }
+    });
+  }
+
+  /// Inline chat right on the Home card — answers in place instead of
+  /// navigating to the full NGMY Helper screen. Uses the same Gemini
+  /// credentials + shared local memory as NGMY Helper so context carries over.
+  Future<void> _askAssistant() async {
     final text = _assistantInputCtrl.text.trim();
+    if (text.isEmpty || _assistantTyping) return;
     _assistantInputCtrl.clear();
-    unawaited(_openNewsHub(initialQuery: text.isEmpty ? null : text));
+
+    if (!widget.user.isAdmin) {
+      final limit = widget.config.ngmyHelperDailyMessageLimit;
+      if (limit > 0) {
+        final allowed = await NgmyHelperAiLimit.tryConsume(widget.user.email, limit);
+        if (!allowed) {
+          if (!mounted) return;
+          setState(() {
+            _assistantMessages.add({
+              'role': 'ai',
+              'text': "You've used today's free questions. Open NGMY Helper to browse the knowledge base, or come back tomorrow for more free questions.",
+              'at': DateTime.now().toUtc().toIso8601String(),
+            });
+          });
+          _scrollAssistantToBottom();
+          return;
+        }
+      }
+    }
+
+    setState(() {
+      _assistantMessages.add({'role': 'user', 'text': text, 'at': DateTime.now().toUtc().toIso8601String()});
+      _assistantTyping = true;
+    });
+    unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: text));
+    _scrollAssistantToBottom();
+
+    try {
+      var apiKey = widget.config.geminiApiKey.trim();
+      if (apiKey.isEmpty) {
+        apiKey = await _fetchRemoteGeminiApiKey();
+        if (apiKey.isNotEmpty && mounted) setState(() => widget.config.geminiApiKey = apiKey);
+      }
+      if (apiKey.isEmpty) {
+        final err = ngmyAiHelperFailureMessage(apiKey: '');
+        if (!mounted) return;
+        setState(() {
+          _assistantMessages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
+          _assistantTyping = false;
+        });
+        unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: err));
+        _scrollAssistantToBottom();
+        return;
+      }
+
+      final creds = ngmyParseAiCredentials(apiKey);
+      final liveDb = NgmyAppKnowledge.build(
+        viewer: {
+          'email': widget.user.email,
+          'username': widget.user.username,
+          'isAdmin': widget.user.isAdmin,
+          'accountBalance': widget.user.accountBalance,
+        },
+        config: widget.config.toJson(),
+        transactions: widget.allTransactions.take(100).map((e) => e.toJson()).toList(),
+        investmentPlans: widget.globalPlans.map((e) => e.toJson()).toList(),
+        announcements: const [],
+        mediaPostCount: 0,
+        userCount: widget.allUsers.length,
+      );
+      final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '\n$liveDb\n'
+          '${NgmyAiMemoryStore.transcriptForPrompt(_assistantMessages)}\n'
+          '\nUser: $text';
+      final aiResult = await ngmyAiGenerateWithCredentials(creds, prompt);
+      if (!mounted) return;
+      final rawReply = (aiResult.text != null && aiResult.text!.isNotEmpty)
+          ? aiResult.text!
+          : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: aiResult.error);
+      final reply = NgmyAiMemoryStore.sanitizeHelperReply(rawReply);
+      setState(() {
+        _assistantMessages.add({'role': 'ai', 'text': reply, 'at': DateTime.now().toUtc().toIso8601String()});
+        _assistantTyping = false;
+      });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
+      _scrollAssistantToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      final err = ngmyAiHelperFailureMessage(apiKey: widget.config.geminiApiKey, lastError: e.toString());
+      setState(() {
+        _assistantMessages.add({'role': 'ai', 'text': err, 'at': DateTime.now().toUtc().toIso8601String()});
+        _assistantTyping = false;
+      });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: err));
+      _scrollAssistantToBottom();
+    }
+  }
+
+  void _clearAssistantChat() {
+    setState(() => _assistantMessages.clear());
+    unawaited(NgmyAiMemoryStore.saveAll(widget.user.email, const []));
   }
 
   Future<void> _openLocalGrowthFromHome() async {
@@ -15984,27 +16109,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
     return ColoredBox(
       color: bg,
-      child: Stack(
-        children: [
-          Positioned.fill(child: _homePastelBackdrop(isLight)),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Force a definite height for the Column below so the Expanded hero
+          // card below can never hit "unbounded height" — that previously
+          // caused the whole screen to render blank with the bottom nav
+          // bar mis-positioned on some embedding contexts (Local Growth).
+          final h = constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : (MediaQuery.of(context).size.height - _ngmyBottomNavScrollPadding(context));
+          return SizedBox(
+            height: h,
+            width: double.infinity,
+            child: Stack(
               children: [
-                _buildAiHomeHeader(isLight),
-                if (widget.user.isOnFreeTrial) ...[
-                  const SizedBox(height: 12),
-                  _buildFreeTrialGlassBanner(isLight),
-                ],
-                const SizedBox(height: 18),
-                Expanded(child: _buildAiHeroCard(isLight)),
-                const SizedBox(height: 16),
-                _buildAiActionGrid(isLight),
+                Positioned.fill(child: _homePastelBackdrop(isLight)),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildAiHomeHeader(isLight),
+                      if (widget.user.isOnFreeTrial) ...[
+                        const SizedBox(height: 12),
+                        _buildFreeTrialGlassBanner(isLight),
+                      ],
+                      const SizedBox(height: 16),
+                      Expanded(child: _buildAiHeroCard(isLight)),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -16169,34 +16307,68 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildAiHeroCard(bool isLight) {
     final name = widget.user.username.trim().isEmpty ? 'human' : widget.user.username.trim();
+    final hasChat = _assistantMessages.isNotEmpty;
     return _glassPanel(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            widget.isLocalGrowthIncome ? 'Local AI Assistant' : 'AI Assistant',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontWeight: FontWeight.w700, fontSize: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                widget.isLocalGrowthIncome ? 'Local AI Assistant' : 'AI Assistant',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+              if (hasChat) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _clearAssistantChat,
+                  customBorder: const CircleBorder(),
+                  child: Icon(Icons.refresh_rounded, size: 16, color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9)),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Hello there, $name.\nHow can I assist you?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isLight ? const Color(0xFF171633) : Colors.white,
-              fontSize: 26,
-              height: 1.12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const Spacer(),
-          Center(child: _aiOrb()),
-          const Spacer(),
-          Text(
-            'Ask anything, or ask me to make a song.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
+          const SizedBox(height: 8),
+          Expanded(
+            child: hasChat
+                ? ListView.builder(
+                    controller: _assistantScrollCtrl,
+                    padding: const EdgeInsets.only(top: 4, bottom: 4),
+                    itemCount: _assistantMessages.length + (_assistantTyping ? 1 : 0),
+                    itemBuilder: (context, i) {
+                      if (i >= _assistantMessages.length) return _assistantTypingBubble(isLight);
+                      final m = _assistantMessages[i];
+                      return _assistantBubble(isLight, role: (m['role'] ?? 'ai').toString(), text: (m['text'] ?? '').toString());
+                    },
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Hello there, $name.\nHow can I assist you?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: isLight ? const Color(0xFF171633) : Colors.white,
+                            fontSize: 26,
+                            height: 1.12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _aiOrb(),
+                        const SizedBox(height: 22),
+                        Text(
+                          _assistantMemoryLoaded ? 'Ask anything, or ask me to make a song.' : 'Restoring your conversation…',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
           const SizedBox(height: 10),
           Container(
@@ -16226,6 +16398,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
+                Tooltip(
+                  message: 'Create a song with NGMY Helper',
+                  child: InkWell(
+                    onTap: () => unawaited(_openNewsHub(initialTab: 1)),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(isLight ? 0.55 : 0.10),
+                        border: Border.all(color: Colors.white.withOpacity(isLight ? 0.7 : 0.16)),
+                      ),
+                      child: Icon(Icons.music_note_rounded, color: isLight ? const Color(0xFF8B5CF6) : const Color(0xFFC4B5FD), size: 19),
+                    ),
+                  ),
+                ),
                 InkWell(
                   onTap: _askAssistant,
                   customBorder: const CircleBorder(),
@@ -16243,6 +16433,73 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _assistantBubble(bool isLight, {required String role, required String text}) {
+    final isUser = role == 'user';
+    final bubbleColor = isUser
+        ? const Color(0xFF8B5CF6).withOpacity(isLight ? 0.14 : 0.26)
+        : Colors.white.withOpacity(isLight ? 0.70 : 0.08);
+    final textColor = isLight ? const Color(0xFF171633) : Colors.white;
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUser ? 16 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 16),
+          ),
+          border: Border.all(color: Colors.white.withOpacity(isLight ? 0.6 : 0.12)),
+        ),
+        child: Text(text, style: TextStyle(color: textColor, fontSize: 13.5, height: 1.32, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  Widget _assistantTypingBubble(bool isLight) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(isLight ? 0.70 : 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(isLight ? 0.6 : 0.12)),
+        ),
+        child: SizedBox(
+          width: 30,
+          height: 14,
+          child: AnimatedBuilder(
+            animation: _smokeCtrl,
+            builder: (context, _) {
+              final t = _smokeCtrl.value;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(3, (i) {
+                  final phase = (t * 3 + i / 3) % 1.0;
+                  final scale = 0.5 + 0.5 * math.sin(phase * 2 * math.pi).abs();
+                  return Opacity(
+                    opacity: 0.4 + 0.6 * scale,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: isLight ? const Color(0xFF8B5CF6) : const Color(0xFF67E8F9)),
+                    ),
+                  );
+                }),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -16284,42 +16541,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         );
       },
-    );
-  }
-
-  Widget _buildAiActionGrid(bool isLight) {
-    return InkWell(
-      onTap: widget.disableLocalGrowthIncomeEntry
-          ? null
-          : () => showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans),
-      borderRadius: BorderRadius.circular(18),
-      child: _glassPanel(
-        radius: 18,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(Icons.wifi_tethering_rounded, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.isLocalGrowthIncome ? 'Local Active' : 'Local Growth',
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                  ),
-                  Text(
-                    widget.disableLocalGrowthIncomeEntry ? 'Offline mode is on' : 'Open offline income',
-                    style: TextStyle(color: isLight ? const Color(0xFF7C8798) : Colors.white54, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: isLight ? const Color(0xFF7C8798) : Colors.white54, size: 20),
-          ],
-        ),
-      ),
     );
   }
 
@@ -42850,6 +43071,7 @@ class AnnouncementScreen extends StatefulWidget {
   final Function(AppTransaction)? onAddTransaction;
   final VoidCallback? onDataChanged;
   final String? initialQuery;
+  final int initialTab;
   const AnnouncementScreen({
     super.key,
     required this.user,
@@ -42863,6 +43085,7 @@ class AnnouncementScreen extends StatefulWidget {
     this.onAddTransaction,
     this.onDataChanged,
     this.initialQuery,
+    this.initialTab = 0,
   });
 
   @override
@@ -42870,7 +43093,7 @@ class AnnouncementScreen extends StatefulWidget {
 }
 
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
-  int _activeTab = 0; // 0: Chat, 1: Music
+  late int _activeTab; // 0: Chat, 1: Music
   late final PageController _hubPageController;
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _chatController = TextEditingController();
@@ -42930,7 +43153,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   @override
   void initState() {
     super.initState();
-    _hubPageController = PageController(initialPage: 0);
+    _activeTab = widget.initialTab;
+    _hubPageController = PageController(initialPage: _activeTab);
     _newsClosedForUsers = widget.config.ngmyChatClosed;
     _newsItems = List<Announcement>.from(widget.announcements);
     for (final a in _newsItems) {
