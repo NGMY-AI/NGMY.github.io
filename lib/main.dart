@@ -16398,24 +16398,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
                 ),
-                Tooltip(
-                  message: 'Create a song with NGMY Helper',
-                  child: InkWell(
-                    onTap: () => unawaited(_openNewsHub(initialTab: 1)),
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      margin: const EdgeInsets.only(right: 4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(isLight ? 0.55 : 0.10),
-                        border: Border.all(color: Colors.white.withOpacity(isLight ? 0.7 : 0.16)),
-                      ),
-                      child: Icon(Icons.music_note_rounded, color: isLight ? const Color(0xFF8B5CF6) : const Color(0xFFC4B5FD), size: 19),
-                    ),
-                  ),
-                ),
                 InkWell(
                   onTap: _askAssistant,
                   customBorder: const CircleBorder(),

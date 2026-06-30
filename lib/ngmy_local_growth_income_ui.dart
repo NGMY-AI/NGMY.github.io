@@ -667,7 +667,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       onTap: clockedIn ? null : () => unawaited(onClockIn()),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 286,
+        height: 332,
         decoration: BoxDecoration(
           color: card,
           borderRadius: BorderRadius.circular(24),
@@ -721,8 +721,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 final stopB = (stopA + 0.03).clamp(0.08, 0.99);
                 return Center(
                   child: Container(
-                    width: 190 + pulse * 8,
-                    height: 190 + pulse * 8,
+                    width: 224 + pulse * 10,
+                    height: 224 + pulse * 10,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: SweepGradient(
@@ -744,8 +744,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                     ),
                     child: Center(
                       child: Container(
-                        width: 144,
-                        height: 144,
+                        width: 164,
+                        height: 164,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: const Color(0xFF4B4D4C).withValues(alpha: 0.78),
@@ -756,14 +756,14 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: 54,
+                              height: 54,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: LinearGradient(colors: [green.withValues(alpha: 0.34), Colors.white.withValues(alpha: 0.10)]),
                                 border: Border.all(color: green.withValues(alpha: 0.36)),
                               ),
-                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.86), size: 30),
+                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.86), size: 34),
                             ),
                             const SizedBox(height: 7),
                             Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 9, fontWeight: FontWeight.w800)),
@@ -775,7 +775,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                               builder: (context, value, _) {
                                 return Text(
                                   '\$${formatCurrency(value)}',
-                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 23, fontWeight: FontWeight.w900),
+                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 26, fontWeight: FontWeight.w900),
                                 );
                               },
                             ),
@@ -1058,17 +1058,20 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC);
-    final inputBorder = isDark ? const Color(0xFF2B3440) : const Color(0xFFD1D5DB);
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    const bg = Color(0xFF101010);
+    const cardBg = Color(0xFF1C1C1E);
+    const glassGreen = Color(0xFF2EF6A3);
+    final inputBg = Colors.white.withValues(alpha: 0.06);
+    final inputBorder = Colors.white.withValues(alpha: 0.10);
 
-    return SafeArea(
-      bottom: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+    return ColoredBox(
+      color: bg,
+      child: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 126),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             FloatingTitle(
               title: 'LOCAL WALLET',
@@ -1080,10 +1083,16 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.transparent : WorksheetPalette.green,
                     shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [glassGreen.withValues(alpha: 0.24), const Color(0xFF0F172A).withValues(alpha: 0.72)],
+                    ),
+                    border: Border.all(color: glassGreen.withValues(alpha: 0.38)),
+                    boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.18), blurRadius: 16)],
                   ),
-                  child: Icon(Icons.info_outline_rounded, color: isDark ? Colors.greenAccent : Colors.white, size: 20),
+                  child: const Icon(Icons.info_outline_rounded, color: glassGreen, size: 20),
                 ),
               ),
               trailing: InkWell(
@@ -1094,34 +1103,63 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: WorksheetPalette.green.withValues(alpha: isDark ? 0.22 : 0.12),
                     shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [glassGreen.withValues(alpha: 0.24), const Color(0xFF0F172A).withValues(alpha: 0.72)],
+                    ),
+                    border: Border.all(color: glassGreen.withValues(alpha: 0.38)),
+                    boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.18), blurRadius: 16)],
                   ),
-                  child: Icon(Icons.save_alt_rounded, color: WorksheetPalette.green, size: 18),
+                  child: const Icon(Icons.save_alt_rounded, color: glassGreen, size: 18),
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
-              height: 140,
+              height: 154,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)]),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))],
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [cardBg, const Color(0xFF064E3B).withValues(alpha: 0.86), cardBg],
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.16), blurRadius: 26, offset: const Offset(0, 12))],
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [glassGreen.withValues(alpha: 0.82), const Color(0xFF16A34A).withValues(alpha: 0.56)]),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                      boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.28), blurRadius: 20)],
+                    ),
+                    child: const Icon(Icons.account_balance_rounded, color: Colors.white, size: 30),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                        const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 6),
                     Text(
                       '\$${formatCurrency(widget.user.accountBalance)}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32, letterSpacing: -0.5),
                     ),
                   ],
                 ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 18),
@@ -1137,24 +1175,28 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: cardBg,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4))],
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 8))],
                 ),
                 child: Column(
                   children: [
                     Text(
                       _view == 0 ? 'Deposit Amount' : 'Withdrawal Amount',
-                      style: TextStyle(fontSize: 13, color: titleColor, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _amt,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: inputBg,
                         hintText: '\$ 0.00',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: inputBorder)),
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontWeight: FontWeight.w700),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: inputBorder)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: glassGreen.withValues(alpha: 0.55))),
                       ),
                     ),
                     if (_view == 0) ...[
@@ -1172,7 +1214,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: inputBorder),
                               ),
-                              child: Text('\$$v', style: TextStyle(fontWeight: FontWeight.w700, color: titleColor)),
+                              child: Text('\$$v', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
                             ),
                           );
                         }).toList(),
@@ -1182,17 +1224,21 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                       const SizedBox(height: 14),
                       Text(
                         'Your Cash App tag',
-                        style: TextStyle(fontSize: 13, color: titleColor, fontWeight: FontWeight.w600),
+                        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _cashAppTag,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: inputBg,
                           hintText: 'YourCashTag',
                           prefixText: '\$ ',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: inputBorder)),
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontWeight: FontWeight.w700),
+                          prefixStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: inputBorder)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: glassGreen.withValues(alpha: 0.55))),
                         ),
                       ),
                     ],
@@ -1203,11 +1249,12 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                       child: ElevatedButton(
                         onPressed: _view == 0 ? _startDeposit : _withdraw,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF22C55E),
+                          backgroundColor: glassGreen,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shadowColor: glassGreen.withValues(alpha: 0.35),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: Text(_view == 0 ? 'Deposit Funds' : 'Withdraw Funds', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        child: Text(_view == 0 ? 'Deposit Funds' : 'Withdraw Funds', style: const TextStyle(fontWeight: FontWeight.w900)),
                       ),
                     ),
                   ],
@@ -1215,25 +1262,31 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
               ),
           ],
         ),
+        ),
       ),
     );
   }
 
   Widget _viewTab(String label, int v) {
     final selected = _view == v;
+    const glassGreen = Color(0xFF2EF6A3);
     return GestureDetector(
       onTap: () => setState(() => _view = v),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? WorksheetPalette.green.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? WorksheetPalette.green : Colors.grey.withValues(alpha: 0.3)),
+          gradient: selected
+              ? LinearGradient(colors: [glassGreen.withValues(alpha: 0.22), const Color(0xFF047857).withValues(alpha: 0.18)])
+              : null,
+          color: selected ? null : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? glassGreen.withValues(alpha: 0.48) : Colors.white.withValues(alpha: 0.10)),
+          boxShadow: selected ? [BoxShadow(color: glassGreen.withValues(alpha: 0.14), blurRadius: 14)] : null,
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w700, color: selected ? WorksheetPalette.green : Colors.grey),
+          style: TextStyle(fontWeight: FontWeight.w900, color: selected ? glassGreen : Colors.white60),
         ),
       ),
     );
