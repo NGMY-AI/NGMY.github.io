@@ -266,25 +266,39 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       ),
     ];
 
-    return Scaffold(
-      extendBody: false,
-      backgroundColor: bg,
-      // Not an IndexedStack on purpose: HomeScreen runs its own per-second
-      // clock-in ticker for as long as it's mounted. Keeping all three tabs
-      // alive let it keep settling/paying out earnings in the background
-      // while the user sat on Invest or Wallet, which looked like money
-      // appearing "for no reason". Building only the active tab tears that
-      // ticker down the moment you leave Home and starts a fresh one (synced
-      // from the saved state) when you come back.
-      body: SafeArea(
-        bottom: false,
-        child: pages[_idx],
-      ),
-      bottomNavigationBar: Material(
-        type: MaterialType.transparency,
-        elevation: 0,
-        color: Colors.transparent,
-        child: _buildLocalBottomNavBar(),
+    final media = MediaQuery.of(context);
+    final navSpace = NgmyBottomNavMetrics.localBarHeight + media.padding.bottom + 22;
+
+    // Draw the local shell ourselves instead of relying on Scaffold's
+    // bottomNavigationBar. On iOS PWA/web this route was occasionally getting
+    // a loose height during transition, which made only the nav render in the
+    // middle of a black page. This pins the tabs and menu to the full viewport.
+    return Material(
+      color: bg,
+      child: SizedBox(
+        width: double.infinity,
+        height: media.size.height,
+        child: Stack(
+          children: [
+            Positioned.fill(child: ColoredBox(color: bg)),
+            Positioned.fill(
+              bottom: navSpace,
+              // Not an IndexedStack on purpose: HomeScreen runs its own ticker
+              // while mounted. Building only the active tab tears that ticker
+              // down the moment the user leaves Home.
+              child: SafeArea(
+                bottom: false,
+                child: pages[_idx],
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildLocalBottomNavBar(),
+            ),
+          ],
+        ),
       ),
     );
   }
