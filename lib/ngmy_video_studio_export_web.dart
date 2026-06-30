@@ -24,7 +24,7 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 720;
+const _mobileExportMaxEdgePx = 480;
 
 bool _ngmyExportCancelled = false;
 
@@ -569,7 +569,7 @@ double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int 
 }
 
 int _exportFps() {
-  if (_ngmyIsMobileBrowser()) return 24;
+  if (_ngmyIsMobileBrowser()) return 12;
   return _exportCanvasFps;
 }
 
@@ -954,7 +954,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 7500000 : (_ngmyIsMobileBrowser() ? 9000000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 2500000 : (_ngmyIsMobileBrowser() ? 3000000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1535,10 +1535,12 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       // useDedicatedAudio check races this and falls back to unmuting the
       // staged (visible) video for audio, which browsers often block from
       // autoplaying without a fresh tap, freezing playback at "Starting…".
-      try {
-        await _ensureExportAudioElement(primaryVideo).timeout(const Duration(seconds: 10));
-      } catch (e) {
-        debugPrint('[studio export] dedicated audio element warm-up: $e');
+      if (!_ngmyIsMobileBrowser()) {
+        try {
+          await _ensureExportAudioElement(primaryVideo).timeout(const Duration(seconds: 10));
+        } catch (e) {
+          debugPrint('[studio export] dedicated audio element warm-up: $e');
+        }
       }
     }
     for (var i = 0; i < 6; i++) {
@@ -1613,12 +1615,9 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     // Only mime type and audio-track presence vary across attempts.
     final plans = _ngmyIsMobileBrowser()
         ? [
-            // Mobile browsers often block hidden audio playback. Get a good
-            // template video first, then try audio if the browser allows it.
+            // Mobile Safari is memory-sensitive. Use one video-only attempt so
+            // template export saves instead of crashing during audio retries.
             (mime: primaryMime, audio: false),
-            (mime: primaryMime, audio: true),
-            (mime: fallbackMime, audio: false),
-            (mime: fallbackMime, audio: true),
           ]
         : [
             (mime: primaryMime, audio: true),

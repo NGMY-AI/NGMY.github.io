@@ -14361,6 +14361,206 @@ class _NgmyHomeScaffold extends StatelessWidget {
   }
 }
 
+class _NgmyAdminSafeHome extends StatelessWidget {
+  const _NgmyAdminSafeHome({
+    required this.user,
+    required this.onClockIn,
+    required this.onOpenDashboard,
+    required this.onOpenTab,
+  });
+
+  final UserData user;
+  final VoidCallback onClockIn;
+  final VoidCallback onOpenDashboard;
+  final ValueChanged<int> onOpenTab;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final card = Theme.of(context).cardColor;
+    final title = user.username.trim().isEmpty ? 'ADMIN' : user.username.trim().toUpperCase();
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF00B25A),
+                ),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'GROWTH INCOME',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Admin Dashboard',
+                onPressed: onOpenDashboard,
+                icon: const Icon(Icons.dashboard_customize_rounded, color: Color(0xFF00B25A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: isLight ? const Color(0xFF64748B) : Colors.white60,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _AdminHomeCard(
+                  label: 'Today',
+                  value: '\$${formatCurrency(user.displayedTodayEarnings)}',
+                  icon: Icons.trending_up_rounded,
+                  color: const Color(0xFF16A34A),
+                  cardColor: card,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _AdminHomeCard(
+                  label: 'Balance',
+                  value: '\$${formatCurrency(user.accountBalance)}',
+                  icon: Icons.account_balance_wallet_rounded,
+                  color: const Color(0xFF2563EB),
+                  cardColor: card,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFF00B25A).withOpacity(isLight ? 0.18 : 0.32)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isLight ? 0.06 : 0.18), blurRadius: 12, offset: const Offset(0, 5))],
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.verified_user_rounded, color: Color(0xFF00B25A), size: 42),
+                const SizedBox(height: 10),
+                const Text('Admin Home Ready', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                Text(
+                  'Your admin account is loaded. Use the dashboard or bottom menu without the gray screen.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: isLight ? Colors.black54 : Colors.white60, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onOpenDashboard,
+                    icon: const Icon(Icons.admin_panel_settings_rounded),
+                    label: const Text('Open Admin Dashboard'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B25A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _AdminQuickAction(label: 'Invest', icon: Icons.trending_up_rounded, onTap: () => onOpenTab(1)),
+              _AdminQuickAction(label: 'Wallet', icon: Icons.account_balance_wallet_rounded, onTap: () => onOpenTab(2)),
+              _AdminQuickAction(label: 'NGMY Hub', icon: Icons.auto_awesome_rounded, onTap: () => onOpenTab(3)),
+              _AdminQuickAction(label: 'Profile', icon: Icons.person_rounded, onTap: () => onOpenTab(6)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: onClockIn,
+            icon: const Icon(Icons.bolt_rounded),
+            label: const Text('Clock In'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminHomeCard extends StatelessWidget {
+  const _AdminHomeCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.cardColor,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color cardColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 10),
+          Text(label, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.65), fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          FittedBox(
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 20)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminQuickAction extends StatelessWidget {
+  const _AdminQuickAction({required this.label, required this.icon, required this.onTap});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: Icon(icon, size: 18, color: const Color(0xFF00B25A)),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      onPressed: onTap,
+    );
+  }
+}
+
 /// Builds bottom-nav tab content lazily so unvisited tabs do not block the home screen.
 class _NgmyLazyTabSlot extends StatefulWidget {
   const _NgmyLazyTabSlot({
@@ -15067,6 +15267,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeTabWidget() {
+    if (widget.user.isAdmin) {
+      return _NgmyHomeScaffold(
+        child: _NgmyAdminSafeHome(
+          user: widget.user,
+          onClockIn: () => unawaited(_homeOnClockIn()),
+          onOpenDashboard: _openAdminDashboardFromHome,
+          onOpenTab: (i) => setState(() {
+            _idx = i;
+            _visitedTabs.add(i);
+          }),
+        ),
+      );
+    }
     return _NgmyHomeScaffold(
       child: HomeScreen(
         key: _homeTabKey,
