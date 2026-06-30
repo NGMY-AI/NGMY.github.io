@@ -16003,104 +16003,413 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   @override Widget build(BuildContext context) {
-    final bg = Theme.of(context).scaffoldBackgroundColor;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
     return ColoredBox(
       color: bg,
-      child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
             children: [
-              FloatingTitle(
-                title: widget.homeTitleOverride ?? 'GROWTH INCOME',
-                onTap: widget.onOpenAdminDashboard,
-                leading: widget.homeLeadingOverride ??
-                    InkWell(
-                      onTap: () => NgmyNavigator.push(
-                        context,
-                        LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
-                        routeName: 'LoanServiceScreen',
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: isLight ? const Color(0xFF00B25A) : Colors.transparent, shape: BoxShape.circle),
-                        child: Icon(Icons.attach_money_rounded, color: isLight ? Colors.white : Colors.greenAccent, size: 20),
-                      ),
-                    ),
-                trailing: IconButton(
-                  tooltip: 'NGMY Helper',
-                  icon: Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00B25A).withOpacity(isLight ? 0.14 : 0.22),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF00B25A).withOpacity(0.45)),
-                    ),
-                    child: const Icon(Icons.forum_rounded, color: Color(0xFF00B25A), size: 20),
-                  ),
-                  onPressed: _openNewsHub,
-                ),
-              ),
-              if (widget.user.isOnFreeTrial) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [const Color(0xFF22C55E).withOpacity(isLight ? 0.14 : 0.22), const Color(0xFF059669).withOpacity(isLight ? 0.08 : 0.16)]),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.45)),
-                  ),
-                  child: Row(
+              Positioned.fill(child: _homePastelBackdrop(isLight)),
+              SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: math.max(0, constraints.maxHeight - _ngmyBottomNavScrollPadding(context))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.card_giftcard_rounded, color: Color(0xFF15803D), size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'FREE TRIAL ACTIVE — \$${formatCurrency(widget.user.freeTrialDailyAmount)}/day · clock in anytime · 1 min payout · no withdraw fee',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isLight ? const Color(0xFF14532D) : const Color(0xFFBBF7D0), height: 1.3),
-                        ),
+                      _buildAiHomeHeader(isLight),
+                      if (widget.user.isOnFreeTrial) ...[
+                        const SizedBox(height: 12),
+                        _buildFreeTrialGlassBanner(isLight),
+                      ],
+                      const SizedBox(height: 18),
+                      _buildAiHeroCard(isLight),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(child: _money(context, label: 'Today', value: '\$${formatCurrency(widget.user.displayedTodayEarnings)}', isToday: true)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _money(context, label: 'Balance', value: '\$${formatCurrency(widget.user.accountBalance)}', isToday: false)),
+                        ],
                       ),
+                      const SizedBox(height: 16),
+                      _clockUiReady ? _buildClockInFrame(isLight) : _buildClockShellQuick(isLight),
+                      const SizedBox(height: 16),
+                      _buildAiActionGrid(isLight),
+                      if (_heavySectionsReady) ...[
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
+                            const SizedBox(width: 12),
+                            Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _live(context),
+                      ],
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _money(context, label: 'Today', value: '\$${formatCurrency(widget.user.displayedTodayEarnings)}', isToday: true)),
-                  const SizedBox(width: 15),
-                  Expanded(child: _money(context, label: 'Balance', value: '\$${formatCurrency(widget.user.accountBalance)}', isToday: false)),
-                ],
               ),
-              const SizedBox(height: 30),
-              _clockUiReady ? _buildClockInFrame(isLight) : _buildClockShellQuick(isLight),
-              const SizedBox(height: 40),
-              if (_heavySectionsReady) ...[
-                _status(context),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
-                    const SizedBox(width: 15),
-                    Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _live(context),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(child: _info(context, 'Total Profit', '\$${formatCurrency(widget.user.totalProfit + widget.user.unpaidTodayEarnings)}')),
-                    const SizedBox(width: 15),
-                    Expanded(child: _info(context, 'Total Investment', '\$${formatCurrency(widget.user.totalInvestmentAmount)}')),
-                  ],
-                ),
-              ],
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _homePastelBackdrop(bool isLight) {
+    final baseColors = isLight
+        ? const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)]
+        : const [Color(0xFF0B1020), Color(0xFF111827), Color(0xFF201336)];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: baseColors,
+        ),
+      ),
+      child: Stack(
+        children: [
+          _pastelOrb(top: 48, left: -26, size: 118, colors: const [Color(0xFF8EEBFF), Color(0xFFE3B3FF)]),
+          _pastelOrb(top: 82, right: -18, size: 96, colors: const [Color(0xFFFFD7B8), Color(0xFFFFA7DD)]),
+          _pastelOrb(top: 250, left: 18, size: 76, colors: const [Color(0xFFD8F8A9), Color(0xFF8FE7FF)]),
+          _pastelOrb(top: 360, right: 22, size: 112, colors: const [Color(0xFFC4B5FD), Color(0xFF67E8F9)]),
+        ],
+      ),
+    );
+  }
+
+  Widget _pastelOrb({
+    double? top,
+    double? left,
+    double? right,
+    required double size,
+    required List<Color> colors,
+  }) {
+    return Positioned(
+      top: top,
+      left: left,
+      right: right,
+      child: IgnorePointer(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(colors: [colors.first.withOpacity(0.40), colors.last.withOpacity(0.18), Colors.transparent]),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _glassPanel({
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.all(16),
+    double radius = 28,
+  }) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final panel = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: (isLight ? Colors.white : const Color(0xFF111827)).withOpacity(isLight ? 0.72 : 0.70),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withOpacity(isLight ? 0.72 : 0.18), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF8B5CF6).withOpacity(isLight ? 0.10 : 0.18), blurRadius: 24, offset: const Offset(0, 12)),
+          BoxShadow(color: Colors.white.withOpacity(isLight ? 0.58 : 0.05), blurRadius: 8, offset: const Offset(-3, -4)),
+        ],
+      ),
+      child: child,
+    );
+    if (ngmyPreferLightGraphics) return panel;
+    return ngmyClipBackdrop(borderRadius: BorderRadius.circular(radius), sigma: 16, child: panel);
+  }
+
+  Widget _buildAiHomeHeader(bool isLight) {
+    return Row(
+      children: [
+        widget.homeLeadingOverride ??
+            _roundGlassButton(
+              icon: Icons.attach_money_rounded,
+              tooltip: 'Loan Service',
+              onTap: () => NgmyNavigator.push(
+                context,
+                LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                routeName: 'LoanServiceScreen',
+              ),
+            ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: GestureDetector(
+            onTap: widget.onOpenAdminDashboard,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.isLocalGrowthIncome ? 'Local Growth' : 'NGMY Assistant',
+                  style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.homeTitleOverride ?? 'GROWTH INCOME',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isLight ? const Color(0xFF171633) : Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        _roundGlassButton(icon: Icons.forum_rounded, tooltip: 'NGMY Helper', onTap: _openNewsHub),
+      ],
+    );
+  }
+
+  Widget _roundGlassButton({required IconData icon, required String tooltip, required VoidCallback onTap}) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(isLight ? 0.68 : 0.10),
+            border: Border.all(color: Colors.white.withOpacity(isLight ? 0.8 : 0.20)),
+            boxShadow: [BoxShadow(color: const Color(0xFF60A5FA).withOpacity(0.16), blurRadius: 14, offset: const Offset(0, 6))],
+          ),
+          child: Icon(icon, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 21),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFreeTrialGlassBanner(bool isLight) {
+    return _glassPanel(
+      radius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.card_giftcard_rounded, color: Color(0xFF8B5CF6), size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'FREE TRIAL ACTIVE — \$${formatCurrency(widget.user.freeTrialDailyAmount)}/day · clock in anytime · 1 min payout · no withdraw fee',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isLight ? const Color(0xFF4C1D95) : const Color(0xFFE9D5FF), height: 1.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiHeroCard(bool isLight) {
+    final name = widget.user.username.trim().isEmpty ? 'human' : widget.user.username.trim();
+    return _glassPanel(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      child: Column(
+        children: [
+          Text(
+            widget.isLocalGrowthIncome ? 'Local AI Assistant' : 'AI Assistant',
+            style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hello there, $name.\nHow can I assist you?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isLight ? const Color(0xFF171633) : Colors.white,
+              fontSize: 26,
+              height: 1.12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _aiOrb(),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(child: _aiPromptCard('Clock in', widget.user.isClockedIn ? 'Your earning session is active' : 'Start today\'s earning session', Icons.bolt_rounded, widget.onClockIn)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _aiPromptCard(
+                  widget.isLocalGrowthIncome ? 'Main app' : 'Local growth',
+                  widget.isLocalGrowthIncome ? 'Back stays on the top-left button' : 'Open your offline income wallet',
+                  Icons.wifi_rounded,
+                  widget.disableLocalGrowthIncomeEntry
+                      ? null
+                      : () => showNgmyLocalGrowthIncomePage(
+                            context,
+                            liveUser: widget.user,
+                            config: widget.config,
+                            plans: widget.globalPlans,
+                          ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 54,
+            padding: const EdgeInsets.only(left: 18, right: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(isLight ? 0.76 : 0.10),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withOpacity(isLight ? 0.84 : 0.16)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Ask NGMY Assistant',
+                    style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                InkWell(
+                  onTap: _openNewsHub,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [Color(0xFF67E8F9), Color(0xFF8B5CF6)]),
+                    ),
+                    child: const Icon(Icons.mic_rounded, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aiOrb() {
+    return AnimatedBuilder(
+      animation: _smokeCtrl,
+      builder: (context, _) {
+        final t = _smokeCtrl.value;
+        return Container(
+          width: 112,
+          height: 112,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: SweepGradient(
+              transform: GradientRotation(t * 2 * math.pi),
+              colors: const [
+                Color(0xFF9AE6FF),
+                Color(0xFFBCA7FF),
+                Color(0xFFFF9ED8),
+                Color(0xFF8EF6D6),
+                Color(0xFF9AE6FF),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF8B5CF6).withOpacity(0.22), blurRadius: 22, offset: const Offset(0, 8)),
+              BoxShadow(color: Colors.white.withOpacity(0.72), blurRadius: 12, offset: const Offset(-4, -5)),
+            ],
+          ),
+          child: Center(
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [Colors.white.withOpacity(0.62), Colors.white.withOpacity(0.08)]),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _aiPromptCard(String title, String subtitle, IconData icon, VoidCallback? onTap) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 108),
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(isLight ? 0.68 : 0.10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(isLight ? 0.78 : 0.16)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isLight ? const Color(0xFF111827) : Colors.white, fontWeight: FontWeight.w900)),
+                ),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF8B5CF6).withOpacity(0.16)),
+                  child: Icon(icon, color: const Color(0xFF8B5CF6), size: 17),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: isLight ? const Color(0xFF7C8798) : Colors.white60, fontSize: 12, height: 1.25)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiActionGrid(bool isLight) {
+    return Row(
+      children: [
+        Expanded(child: _aiMiniAction('Invest', 'Choose a plan', Icons.trending_up_rounded, widget.onOpenInvest)),
+        const SizedBox(width: 10),
+        Expanded(child: _aiMiniAction('Network', 'Local income', Icons.wifi_tethering_rounded, widget.disableLocalGrowthIncomeEntry ? null : () => showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans))),
+        const SizedBox(width: 10),
+        Expanded(child: _aiMiniAction('Games', 'Earn points', Icons.sports_esports_rounded, _openGameCenter)),
+      ],
+    );
+  }
+
+  Widget _aiMiniAction(String title, String subtitle, IconData icon, VoidCallback? onTap) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: _glassPanel(
+        radius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: Column(
+          children: [
+            Icon(icon, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 22),
+            const SizedBox(height: 7),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isLight ? const Color(0xFF7C8798) : Colors.white54, fontSize: 10)),
+          ],
+        ),
+      ),
     );
   }
 

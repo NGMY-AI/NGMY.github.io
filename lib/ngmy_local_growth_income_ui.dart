@@ -270,7 +270,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     ];
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       backgroundColor: bg,
       // Not an IndexedStack on purpose: HomeScreen runs its own per-second
       // clock-in ticker for as long as it's mounted. Keeping all three tabs
@@ -279,7 +279,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       // appearing "for no reason". Building only the active tab tears that
       // ticker down the moment you leave Home and starts a fresh one (synced
       // from the saved state) when you come back.
-      body: pages[_idx],
+      body: SafeArea(
+        bottom: false,
+        child: pages[_idx],
+      ),
       bottomNavigationBar: Material(
         type: MaterialType.transparency,
         elevation: 0,
