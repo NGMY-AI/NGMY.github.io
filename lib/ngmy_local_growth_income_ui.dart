@@ -667,7 +667,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       onTap: clockedIn ? null : () => unawaited(onClockIn()),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 332,
+        height: 370,
         decoration: BoxDecoration(
           color: card,
           borderRadius: BorderRadius.circular(24),
@@ -721,8 +721,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 final stopB = (stopA + 0.03).clamp(0.08, 0.99);
                 return Center(
                   child: Container(
-                    width: 224 + pulse * 10,
-                    height: 224 + pulse * 10,
+                    width: 252 + pulse * 12,
+                    height: 252 + pulse * 12,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: SweepGradient(
@@ -744,30 +744,44 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                     ),
                     child: Center(
                       child: Container(
-                        width: 164,
-                        height: 164,
+                        width: 188,
+                        height: 188,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF4B4D4C).withValues(alpha: 0.78),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 2),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.48), blurRadius: 20, offset: const Offset(0, 8))],
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFF5B5F58).withValues(alpha: 0.94),
+                              const Color(0xFF222625).withValues(alpha: 0.96),
+                              const Color(0xFF111315).withValues(alpha: 0.98),
+                            ],
+                          ),
+                          border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.24), width: 2.2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.52), blurRadius: 24, offset: const Offset(0, 10)),
+                            BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.12), blurRadius: 18),
+                          ],
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              width: 54,
-                              height: 54,
+                              width: 60,
+                              height: 60,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: LinearGradient(colors: [green.withValues(alpha: 0.34), Colors.white.withValues(alpha: 0.10)]),
-                                border: Border.all(color: green.withValues(alpha: 0.36)),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [green.withValues(alpha: 0.45), const Color(0xFF064E3B).withValues(alpha: 0.58), Colors.white.withValues(alpha: 0.10)],
+                                ),
+                                border: Border.all(color: green.withValues(alpha: 0.42)),
+                                boxShadow: [BoxShadow(color: green.withValues(alpha: 0.18), blurRadius: 14)],
                               ),
-                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.86), size: 34),
+                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.88), size: 38),
                             ),
-                            const SizedBox(height: 7),
-                            Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 9, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 5),
+                            const SizedBox(height: 10),
+                            Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.74), fontSize: 10, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 6),
                             TweenAnimationBuilder<double>(
                               tween: Tween<double>(begin: 0, end: live),
                               duration: const Duration(milliseconds: 650),
@@ -775,7 +789,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                               builder: (context, value, _) {
                                 return Text(
                                   '\$${formatCurrency(value)}',
-                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 26, fontWeight: FontWeight.w900),
+                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 30, fontWeight: FontWeight.w900),
                                 );
                               },
                             ),
@@ -1131,11 +1145,13 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.16), blurRadius: 26, offset: const Offset(0, 12))],
               ),
-              child: Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 58,
-                    height: 58,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(colors: [glassGreen.withValues(alpha: 0.82), const Color(0xFF16A34A).withValues(alpha: 0.56)]),
@@ -1144,20 +1160,13 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                     ),
                     child: const Icon(Icons.account_balance_rounded, color: Colors.white, size: 30),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                        const Text('Local Balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    Text(
-                      '\$${formatCurrency(widget.user.accountBalance)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32, letterSpacing: -0.5),
-                    ),
-                  ],
-                ),
+                  const SizedBox(height: 10),
+                  const Text('Local Balance', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text(
+                    '\$${formatCurrency(widget.user.accountBalance)}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32, letterSpacing: -0.5),
                   ),
                 ],
               ),
@@ -1249,9 +1258,9 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                       child: ElevatedButton(
                         onPressed: _view == 0 ? _startDeposit : _withdraw,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: glassGreen,
+                          backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
-                          shadowColor: glassGreen.withValues(alpha: 0.35),
+                          shadowColor: const Color(0xFF059669).withValues(alpha: 0.42),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                         child: Text(_view == 0 ? 'Deposit Funds' : 'Withdraw Funds', style: const TextStyle(fontWeight: FontWeight.w900)),
