@@ -353,7 +353,7 @@ Future<html.VideoElement?> _ensureExportAudioElement(html.VideoElement source) a
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
   try {
-    await el.play().timeout(const Duration(seconds: 3));
+    await el.play().timeout(const Duration(milliseconds: 900));
     el.pause();
     el.currentTime = 0;
   } catch (_) {}
@@ -371,7 +371,7 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
       audio.currentTime = t;
     }
     if (playing) {
-      if (audio.paused) await _playVideoForRecord(audio);
+      if (audio.paused) unawaited(_playVideoForRecord(audio));
     } else {
       audio.pause();
     }
@@ -533,25 +533,30 @@ DateTime _exportAttemptDeadline(double durationSec) {
   return DateTime.now().add(Duration(seconds: math.min(budget, _exportWallCapSec.ceil())));
 }
 
-Future<void> _playVideoForRecord(html.VideoElement v) async {
-  for (var attempt = 0; attempt < 4; attempt++) {
+Future<bool> _playVideoForRecord(html.VideoElement v) async {
+  final timeout = Duration(milliseconds: _ngmyIsMobileBrowser() ? 900 : 1200);
+  for (var attempt = 0; attempt < 3; attempt++) {
     try {
-      await v.play().timeout(const Duration(seconds: 8));
-      if (!v.paused) return;
+      await v.play().timeout(timeout);
+      if (!v.paused) return true;
     } catch (e) {
       debugPrint('[studio export] play for record attempt ${attempt + 1}: $e');
     }
-    await Future<void>.delayed(Duration(milliseconds: 120 * (attempt + 1)));
+    await Future<void>.delayed(Duration(milliseconds: 80 * (attempt + 1)));
   }
+  return !v.paused;
 }
 
 Future<bool> _waitForPlaybackStart(html.VideoElement? primary, {double minTime = 0.05}) async {
   if (primary == null) return false;
-  for (var i = 0; i < 100; i++) {
+  final deadline = DateTime.now().add(Duration(milliseconds: _ngmyIsMobileBrowser() ? 2600 : 3200));
+  if (primary.paused) {
+    await _playVideoForRecord(primary);
+  }
+  while (DateTime.now().isBefore(deadline)) {
     if (primary.ended) return false;
     if (primary.currentTime >= minTime && !primary.paused) return true;
-    if (primary.paused) await _playVideoForRecord(primary);
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await Future<void>.delayed(const Duration(milliseconds: 70));
   }
   return primary.currentTime >= minTime * 0.5;
 }
@@ -1046,6 +1051,11 @@ Future<List<html.Blob>> _recordCanvasExport({
   final playbackReady = await _waitForPlaybackStart(primary);
   if (!playbackReady) {
     debugPrint('[studio export] playback did not start before recording');
+    try {
+      js_util.callMethod(recorder, 'requestData', const []);
+    } catch (_) {}
+    await _stopRecorderDrain(recorder, done);
+    return const [];
   }
   await _awaitVideoFramePulse(videoList);
   paintFrame();
