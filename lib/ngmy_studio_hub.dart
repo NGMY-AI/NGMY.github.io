@@ -6,8 +6,11 @@ import 'ngmy_studio_colors.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_hub_tools_bridge.dart';
+import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
+import 'ngmy_price_calculator_panel.dart';
+import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
@@ -90,7 +93,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
             context: context,
             user: user ?? _HubGuestUser(userEmail),
             config: config,
-            onCharge: onCharge ?? (_, __) async => false,
+            onCharge: onCharge ?? (amount, description) async => false,
             onDataChanged: onDataChanged ?? () {},
             onPersistConfig: onPersistConfig ?? () async => false,
           );
@@ -101,7 +104,13 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF16A34A), Color(0xFF065F46)],
         title: 'Quote Calc',
         subtitle: 'Invoices, rates & estimates',
-        onTap: () => NgmyHubToolBridge.invokeOrSnack(context, NgmyHubToolBridge.openPickTwo, 'Quote Calc'),
+        onTap: () {
+          if (NgmyHubToolBridge.openPickTwo != null) {
+            NgmyHubToolBridge.openPickTwo!();
+            return;
+          }
+          showNgmyStandaloneQuoteCalc(context);
+        },
       ),
       _CreatorTool(
         icon: Icons.qr_code_2_rounded,
@@ -316,6 +325,193 @@ class _CreatorToolCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
                   fontSize: 10.5,
                   height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void showNgmyStandaloneQuoteCalc(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    barrierColor: Colors.black87,
+    builder: (_) => const _StandaloneQuoteCalcDialog(),
+  );
+}
+
+class _StandaloneQuoteCalcDialog extends StatefulWidget {
+  const _StandaloneQuoteCalcDialog();
+
+  @override
+  State<_StandaloneQuoteCalcDialog> createState() => _StandaloneQuoteCalcDialogState();
+}
+
+class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> {
+  final _cityC = TextEditingController();
+  final _stateC = TextEditingController();
+  final _serviceC = TextEditingController();
+  final _othersPriceC = TextEditingController();
+  final _myPriceC = TextEditingController();
+
+  bool _triFast = false;
+  bool _triCheap = true;
+  bool _triGood = true;
+  int _triDropCursor = 0;
+  double _discount = 0;
+
+  @override
+  void dispose() {
+    _cityC.dispose();
+    _stateC.dispose();
+    _serviceC.dispose();
+    _othersPriceC.dispose();
+    _myPriceC.dispose();
+    super.dispose();
+  }
+
+  double _num(String raw) => double.tryParse(raw.trim()) ?? 0;
+
+  void _triangleSetOn(String key, bool on) {
+    switch (key) {
+      case 'fast':
+        _triFast = on;
+      case 'cheap':
+        _triCheap = on;
+      case 'good':
+        _triGood = on;
+    }
+  }
+
+  String _nextTriangleDrop(Set<String> candidates) {
+    const order = ['fast', 'cheap', 'good'];
+    for (var i = 0; i < order.length; i++) {
+      final idx = (_triDropCursor + i) % order.length;
+      final key = order[idx];
+      if (candidates.contains(key)) {
+        _triDropCursor = (idx + 1) % order.length;
+        return key;
+      }
+    }
+    return candidates.first;
+  }
+
+  void _setTriangleOption(String key, bool value) {
+    setState(() {
+      if (!value) {
+        _triangleSetOn(key, false);
+        return;
+      }
+      final onKeys = <String>{
+        if (_triFast) 'fast',
+        if (_triCheap) 'cheap',
+        if (_triGood) 'good',
+      };
+      if (onKeys.length >= 2 && !onKeys.contains(key)) {
+        final dropCandidates = onKeys.difference({key});
+        if (dropCandidates.isNotEmpty) {
+          _triangleSetOn(dropCandidates.length == 1 ? dropCandidates.first : _nextTriangleDrop(dropCandidates), false);
+        }
+      }
+      _triangleSetOn(key, true);
+    });
+  }
+
+  String _triangleResult() {
+    if (_triCheap && _triGood) return 'Cheap + Good = Not Fast — quality at low cost takes time.';
+    if (_triFast && _triGood) return 'Fast + Good = Not Cheap — speed with quality costs more.';
+    if (_triFast && _triCheap) return 'Fast + Cheap = Not Good — quick and affordable, but quality suffers.';
+    return 'Pick any 2 options. The 3rd one turns off automatically.';
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final others = _num(_othersPriceC.text);
+    final mine = _num(_myPriceC.text);
+    final netMine = mine - (mine * (_discount / 100));
+    final discountAmt = mine - netMine;
+    final belowMarket = others - netMine;
+    final city = _cityC.text.trim();
+    final service = _serviceC.text.trim();
+    final showPriceResult = mine > 0 || others > 0;
+    final dialogW = MediaQuery.of(context).size.width > 480 ? 400.0 : MediaQuery.of(context).size.width - 28;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      backgroundColor: const Color(0xFF091323),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: SizedBox(
+        width: dialogW,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      gradient: const LinearGradient(colors: [Color(0xFF16A34A), Color(0xFF065F46)]),
+                    ),
+                    child: const Icon(Icons.request_quote_rounded, color: Colors.white, size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Quote Calc', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 0.3)),
+                  const Spacer(),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              NgmyIronTrianglePanel(
+                triFast: _triFast,
+                triCheap: _triCheap,
+                triGood: _triGood,
+                resultText: _triangleResult(),
+                onToggle: _setTriangleOption,
+              ),
+              const SizedBox(height: 14),
+              NgmyPriceCalculatorPanel(
+                cityController: _cityC,
+                stateController: _stateC,
+                serviceController: _serviceC,
+                othersPriceController: _othersPriceC,
+                myPriceController: _myPriceC,
+                discount: _discount,
+                onDiscountChanged: (v) => setState(() => _discount = v),
+                onFieldChanged: () => setState(() {}),
+                city: city,
+                service: service,
+                others: others,
+                mine: mine,
+                netMine: netMine,
+                discountAmt: discountAmt,
+                belowMarket: belowMarket,
+                showPriceResult: showPriceResult,
+                onEstimateTap: () => _toast('Repair Estimate opens from NGMY Hub. Quote Calc is ready here.'),
+                onInvoiceTap: () => _toast('Invoice tools open from NGMY Hub. Quote Calc is ready here.'),
+                onScanTap: () => openNgmyPriceProductScanner(
+                  context,
+                  onApplyPrice: (name, price, type) {
+                    if (name.isNotEmpty) _serviceC.text = name;
+                    if (type.isNotEmpty && _serviceC.text.trim().isEmpty) _serviceC.text = type;
+                    if (price > 0) _myPriceC.text = price.toStringAsFixed(2);
+                    setState(() {});
+                  },
                 ),
               ),
             ],

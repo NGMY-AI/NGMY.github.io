@@ -291,56 +291,71 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
   Widget _buildLocalBottomNavBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const ball = NgmyBottomNavMetrics.localSelectionBall;
+    const itemW = NgmyBottomNavMetrics.localNavItemWidth;
+    const gap = NgmyBottomNavMetrics.localNavItemGap;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: SafeArea(
         top: false,
-        child: NgmySculptedBottomNavFrame(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedAlign(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment(-1 + _idx.toDouble(), 0),
-                child: FractionallySizedBox(
-                  widthFactor: 1 / 3,
-                  child: Center(
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            WorksheetPalette.green.withValues(alpha: isDark ? 0.30 : 0.16),
-                            WorksheetPalette.green.withValues(alpha: isDark ? 0.10 : 0.04),
-                          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: NgmyBottomNavMetrics.localNavMaxWidth),
+            child: NgmySculptedBottomNavFrame(
+              barHeight: NgmyBottomNavMetrics.localBarHeight,
+              borderRadius: 24,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedAlign(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment(-1 + _idx.toDouble(), 0),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / 3,
+                      child: Center(
+                        child: Container(
+                          width: ball,
+                          height: ball,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                WorksheetPalette.green.withValues(alpha: isDark ? 0.30 : 0.16),
+                                WorksheetPalette.green.withValues(alpha: isDark ? 0.10 : 0.04),
+                              ],
+                            ),
+                            border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.45 : 0.30), width: 1.2),
+                          ),
                         ),
-                        border: Border.all(color: WorksheetPalette.green.withValues(alpha: isDark ? 0.45 : 0.30), width: 1.2),
                       ),
                     ),
                   ),
-                ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _navIcon(0, Icons.home_rounded),
-                  _navIcon(1, Icons.trending_up_rounded),
-                  _navIcon(2, Icons.account_balance_wallet_rounded),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      _navIcon(0, Icons.home_rounded, itemW),
+                      SizedBox(width: gap),
+                      _navIcon(1, Icons.trending_up_rounded, itemW),
+                      SizedBox(width: gap),
+                      _navIcon(2, Icons.account_balance_wallet_rounded, itemW),
+                    ],
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _navIcon(int i, IconData icon) => Expanded(
+  Widget _navIcon(int i, IconData icon, double width) => SizedBox(
+        width: width,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -349,7 +364,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
             child: SizedBox(
-              height: NgmyBottomNavMetrics.barHeight,
+              height: NgmyBottomNavMetrics.localBarHeight,
               child: Center(
                 child: Icon(
                   icon,

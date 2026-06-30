@@ -14,6 +14,13 @@ class NgmyBottomNavMetrics {
   static const centerButtonSize = 56.0;
   static const centerLogoSize = 38.0;
 
+  /// Compact pill for Local Growth Income (3 tabs, tighter layout).
+  static const localBarHeight = 52.0;
+  static const localSelectionBall = 36.0;
+  static const localNavMaxWidth = 248.0;
+  static const localNavItemWidth = 52.0;
+  static const localNavItemGap = 6.0;
+
   static double get frameHeight => barHeight;
 }
 
@@ -22,9 +29,13 @@ class NgmySculptedBottomNavFrame extends StatefulWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
     required this.child,
+    this.barHeight,
+    this.borderRadius,
   });
 
   final Widget child;
+  final double? barHeight;
+  final double? borderRadius;
 
   @override
   State<NgmySculptedBottomNavFrame> createState() => _NgmySculptedBottomNavFrameState();
@@ -53,15 +64,19 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
     final card = theme.cardColor;
     final borderNeutral = isDark ? Colors.white : Colors.black;
 
+    final height = widget.barHeight ?? NgmyBottomNavMetrics.barHeight;
+    final radius = widget.borderRadius ?? 30.0;
+    final outerRadius = radius + 2;
+
     return SizedBox(
-      height: NgmyBottomNavMetrics.barHeight,
+      height: height,
       child: AnimatedBuilder(
         animation: _glassCtrl,
         builder: (context, child) {
           final shimmer = (math.sin(_glassCtrl.value * 2 * math.pi) + 1) / 2;
           final glassPanel = Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(radius),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -118,7 +133,7 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
           return Container(
             padding: const EdgeInsets.all(1.4),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(32),
+              borderRadius: BorderRadius.circular(outerRadius),
               gradient: SweepGradient(
                 colors: [
                   borderNeutral.withValues(alpha: 0.02),
@@ -131,7 +146,7 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
               ),
             ),
             child: ngmyClipBackdrop(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(radius),
               sigma: 20,
               child: glassPanel,
             ),

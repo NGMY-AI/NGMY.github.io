@@ -24,7 +24,7 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 1080;
+const _mobileExportMaxEdgePx = 720;
 
 bool _ngmyExportCancelled = false;
 
@@ -591,12 +591,17 @@ List<String> _recorderMimeCandidates() {
           'video/mp4',
         ]
       : [
+          // Prefer MP4 when supported. Phone/gallery apps handle MP4 duration
+          // metadata much more reliably than WebM, avoiding fast/slow playback.
+          'video/mp4;codecs=avc1,mp4a',
+          'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+          'video/mp4;codecs=h264,aac',
+          'video/mp4',
           'video/webm;codecs=vp9,opus',
           'video/webm;codecs=vp8,opus',
           'video/webm;codecs=vp9',
           'video/webm;codecs=vp8',
           'video/webm',
-          'video/mp4',
         ];
   for (final m in candidates) {
     if (html.MediaRecorder.isTypeSupported(m)) out.add(m);
@@ -875,10 +880,13 @@ String? _pickRecorderMimeType() {
     return 'video/mp4';
   }
   for (final m in [
+    'video/mp4;codecs=avc1,mp4a',
+    'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
     'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp9,opus',
     'video/webm',
-    'video/mp4',
   ]) {
     if (html.MediaRecorder.isTypeSupported(m)) return m;
   }
@@ -1007,7 +1015,9 @@ Future<List<html.Blob>> _recordCanvasExport({
   final deadline = _exportDeadlineFor(durationSec);
   final attemptDeadline = _exportAttemptDeadline(durationSec);
   final wallStart = DateTime.now();
-  final wallEnd = wallStart.add(Duration(milliseconds: durationMs + 2000));
+  final wallEnd = wallStart.add(
+    Duration(milliseconds: (durationMs * 1.35).ceil() + 4000),
+  );
   // Real elapsed time with no playback progress, not a tick count — a tick
   // count assumes each loop iteration costs a certain amount of wall time,
   // which broke once per-frame work got cheaper/more expensive elsewhere
@@ -1088,7 +1098,7 @@ Future<List<html.Blob>> _recordCanvasExport({
         (primary.ended || primary.currentTime >= durationSec - 0.05);
     if (ended ||
         t >= durationSec - 0.04 ||
-        wallMs >= durationMs ||
+        (primary == null && wallMs >= durationMs) ||
         (wallMs - lastProgressWallMs) > stallLimitMs) {
       break;
     }
