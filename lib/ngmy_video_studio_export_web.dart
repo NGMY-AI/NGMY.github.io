@@ -1051,11 +1051,6 @@ Future<List<html.Blob>> _recordCanvasExport({
   final playbackReady = await _waitForPlaybackStart(primary);
   if (!playbackReady) {
     debugPrint('[studio export] playback did not start before recording');
-    try {
-      js_util.callMethod(recorder, 'requestData', const []);
-    } catch (_) {}
-    await _stopRecorderDrain(recorder, done);
-    return const [];
   }
   await _awaitVideoFramePulse(videoList);
   paintFrame();
@@ -1130,7 +1125,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   await _stopRecorderDrain(recorder, done);
   if (_exportWasCancelled) return const [];
   final minRecorded = math.min(0.85, durationSec * 0.15);
-  if (abortedFrozen || maxRecordedSec < minRecorded) {
+  if ((abortedFrozen || maxRecordedSec < minRecorded) && chunks.isEmpty) {
     debugPrint(
       '[studio export] rejected recording: maxTime=$maxRecordedSec need=$minRecorded frozen=$abortedFrozen',
     );
@@ -1616,11 +1611,20 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     // Real-time playback recording — wall-clock time spent recording always
     // equals the clip's actual length, so output duration is always correct.
     // Only mime type and audio-track presence vary across attempts.
-    final plans = [
-      (mime: primaryMime, audio: true),
-      (mime: fallbackMime, audio: true),
-      (mime: primaryMime, audio: false),
-    ];
+    final plans = _ngmyIsMobileBrowser()
+        ? [
+            // Mobile browsers often block hidden audio playback. Get a good
+            // template video first, then try audio if the browser allows it.
+            (mime: primaryMime, audio: false),
+            (mime: primaryMime, audio: true),
+            (mime: fallbackMime, audio: false),
+            (mime: fallbackMime, audio: true),
+          ]
+        : [
+            (mime: primaryMime, audio: true),
+            (mime: fallbackMime, audio: true),
+            (mime: primaryMime, audio: false),
+          ];
 
     List<html.Blob>? silentFallbackChunks;
     String? silentFallbackMime;
@@ -1647,14 +1651,12 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         mimeType = plan.mime;
         break;
       }
-      if (!_ngmyIsMobileBrowser()) {
-        silentFallbackChunks ??= result.chunks;
-        silentFallbackMime ??= plan.mime;
-      }
+      silentFallbackChunks ??= result.chunks;
+      silentFallbackMime ??= plan.mime;
       debugPrint('[studio export] video ok, no audio yet — mime=${plan.mime}');
     }
 
-    if (chunks.isEmpty && silentFallbackChunks != null && !_ngmyIsMobileBrowser()) {
+    if (chunks.isEmpty && silentFallbackChunks != null) {
       chunks = silentFallbackChunks;
       mimeType = silentFallbackMime;
     }
