@@ -15267,19 +15267,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeTabWidget() {
-    if (widget.user.isAdmin) {
-      return _NgmyHomeScaffold(
-        child: _NgmyAdminSafeHome(
-          user: widget.user,
-          onClockIn: () => unawaited(_homeOnClockIn()),
-          onOpenDashboard: _openAdminDashboardFromHome,
-          onOpenTab: (i) => setState(() {
-            _idx = i;
-            _visitedTabs.add(i);
-          }),
-        ),
-      );
-    }
     return _NgmyHomeScaffold(
       child: HomeScreen(
         key: _homeTabKey,

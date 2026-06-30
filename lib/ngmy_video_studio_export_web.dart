@@ -24,7 +24,7 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 480;
+const _mobileExportMaxEdgePx = 720;
 
 bool _ngmyExportCancelled = false;
 
@@ -293,6 +293,7 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
       h = (h * scale).round();
     }
   }
+  final keepVisibleForIosDecode = _ngmyIsAppleMobileBrowser();
   v
     ..style.position = 'fixed'
     ..style.left = '0'
@@ -300,18 +301,21 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.width = '${w}px'
     ..style.height = '${h}px'
     ..style.objectFit = 'cover'
-    ..style.opacity = _ngmyIsAppleMobileBrowser() ? '0.12' : '0.03'
+    ..style.opacity = keepVisibleForIosDecode ? '0.02' : '0.03'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
-  // Stays sized/positioned "in viewport" (needed so iOS doesn't pause/freeze it),
-  // but visually clipped to a 1px speck — captureStream()/drawImage() read the
-  // decoded frame buffer, not the painted pixels, so clipping doesn't affect
-  // recording. Without this it shows through as a faint moving "shadow" video
-  // over the whole app during export.
-  v.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
-  v.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
+  // iOS Safari can freeze videos that are clipped to a 1px speck while canvas
+  // is drawing from them. Keep the element barely visible there so decode keeps
+  // advancing; other browsers still get the tiny clipped staging.
+  if (!keepVisibleForIosDecode) {
+    v.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
+    v.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
+  } else {
+    v.style.removeProperty('clip');
+    v.style.removeProperty('clip-path');
+  }
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
@@ -569,7 +573,7 @@ double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int 
 }
 
 int _exportFps() {
-  if (_ngmyIsMobileBrowser()) return 12;
+  if (_ngmyIsMobileBrowser()) return 24;
   return _exportCanvasFps;
 }
 
@@ -954,7 +958,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 2500000 : (_ngmyIsMobileBrowser() ? 3000000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 4500000 : (_ngmyIsMobileBrowser() ? 5500000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1125,7 +1129,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   await _stopRecorderDrain(recorder, done);
   if (_exportWasCancelled) return const [];
   final minRecorded = math.min(0.85, durationSec * 0.15);
-  if ((abortedFrozen || maxRecordedSec < minRecorded) && chunks.isEmpty) {
+  if (abortedFrozen || maxRecordedSec < minRecorded) {
     debugPrint(
       '[studio export] rejected recording: maxTime=$maxRecordedSec need=$minRecorded frozen=$abortedFrozen',
     );
@@ -1618,6 +1622,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
             // Mobile Safari is memory-sensitive. Use one video-only attempt so
             // template export saves instead of crashing during audio retries.
             (mime: primaryMime, audio: false),
+            if (fallbackMime != primaryMime) (mime: fallbackMime, audio: false),
           ]
         : [
             (mime: primaryMime, audio: true),
