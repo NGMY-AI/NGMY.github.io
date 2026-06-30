@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -435,6 +436,24 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   final VoidCallback onOpenHelper;
   final VoidCallback onOpenGameCenter;
 
+  double _liveEarningsAt(DateTime now) {
+    final goal = user.todayDailyGoal;
+    if (goal <= 0) return 0;
+    final start = user.clockInStartTime;
+    if (!user.isClockedIn || start == null) {
+      return user.todayClockInEarned.clamp(0, goal).toDouble();
+    }
+    final noon = DateTime(start.year, start.month, start.day, 12);
+    if (!noon.isAfter(start)) return goal;
+    if (!now.isAfter(start)) return user.todayClockInEarned.clamp(0, goal).toDouble();
+    if (!now.isBefore(noon)) return goal;
+    final totalMs = noon.difference(start).inMilliseconds;
+    if (totalMs <= 0) return goal;
+    final elapsedMs = now.difference(start).inMilliseconds.clamp(0, totalMs);
+    final live = goal * (elapsedMs / totalMs);
+    return live.clamp(user.todayClockInEarned, goal).toDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -473,20 +492,24 @@ class _LocalGrowthHomeTab extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _topMetricCard(
-                    icon: Icons.trending_up_rounded,
-                    iconColor: glassGreen,
-                    title: 'Today',
-                    value: '\$${formatCurrency(user.todayClockInEarned)}',
-                    valueColor: glassGreen,
-                    card: card,
-                    onTap: () => unawaited(onClockIn()),
+                  child: StreamBuilder<DateTime>(
+                    stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+                    initialData: DateTime.now(),
+                    builder: (context, snapshot) => _topMetricCard(
+                      icon: Icons.trending_up_rounded,
+                      iconColor: glassGreen,
+                      title: 'Today',
+                      value: '\$${formatCurrency(_liveEarningsAt(snapshot.data ?? DateTime.now()))}',
+                      valueColor: glassGreen,
+                      card: card,
+                      onTap: () => unawaited(onClockIn()),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: _topMetricCard(
-                    icon: Icons.account_balance_wallet_rounded,
+                    icon: Icons.account_balance_rounded,
                     iconColor: const Color(0xFF6366F1),
                     title: 'Balance',
                     value: '\$${formatCurrency(user.accountBalance)}',
@@ -644,7 +667,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       onTap: clockedIn ? null : () => unawaited(onClockIn()),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 232,
+        height: 286,
         decoration: BoxDecoration(
           color: card,
           borderRadius: BorderRadius.circular(24),
@@ -657,61 +680,113 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               top: 13,
               left: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(13),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      green.withValues(alpha: 0.92),
-                      const Color(0xFF10B981).withValues(alpha: 0.72),
+                      Colors.white.withValues(alpha: 0.25),
+                      green.withValues(alpha: 0.28),
+                      Colors.white.withValues(alpha: 0.08),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
-                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.46), blurRadius: 16)],
+                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.38), blurRadius: 18)],
                 ),
-                child: const Text('CARS VIDEO GAMES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
+                  ),
+                  child: const Text('CARS VIDEO GAMES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7)),
+                ),
               ),
             ),
-            Center(
-              child: Container(
-                width: 146,
-                height: 146,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      glow.withValues(alpha: clockedIn ? 0.28 : 0.20),
-                      Colors.white.withValues(alpha: 0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Center(
+            StreamBuilder<DateTime>(
+              stream: Stream.periodic(const Duration(milliseconds: 850), (_) => DateTime.now()),
+              initialData: DateTime.now(),
+              builder: (context, snapshot) {
+                final now = snapshot.data ?? DateTime.now();
+                final live = _liveEarningsAt(now);
+                final progress = dailyGoal <= 0 ? 0.0 : (live / dailyGoal).clamp(0.0, 1.0);
+                final pulse = clockedIn ? 0.5 + 0.5 * math.sin(now.millisecondsSinceEpoch / 360) : 0.25;
+                final stopA = progress.clamp(0.05, 0.96);
+                final stopB = (stopA + 0.03).clamp(0.08, 0.99);
+                return Center(
                   child: Container(
-                    width: 110,
-                    height: 110,
+                    width: 190 + pulse * 8,
+                    height: 190 + pulse * 8,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF4B4D4C).withValues(alpha: 0.70),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.14), width: 2),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.78), size: 40),
-                        const SizedBox(height: 4),
-                        Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 9, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 4),
-                        Text('\$${formatCurrency(dailyGoal)}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                        Text(hasPlan ? status : 'NO PLAN', style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 9, fontWeight: FontWeight.w900)),
+                      gradient: SweepGradient(
+                        startAngle: -math.pi / 2,
+                        endAngle: math.pi * 1.5,
+                        colors: [
+                          const Color(0xFFFFD166).withValues(alpha: 0.95),
+                          const Color(0xFFFFF2A6).withValues(alpha: 0.88),
+                          glow.withValues(alpha: clockedIn ? 0.55 : 0.20),
+                          Colors.white.withValues(alpha: 0.10),
+                          const Color(0xFFFFD166).withValues(alpha: 0.95),
+                        ],
+                        stops: [0, stopA, stopB, 0.99, 1],
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.24 + pulse * 0.20), blurRadius: 34, spreadRadius: 1),
+                        BoxShadow(color: green.withValues(alpha: clockedIn ? 0.20 : 0.08), blurRadius: 30),
                       ],
                     ),
+                    child: Center(
+                      child: Container(
+                        width: 144,
+                        height: 144,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF4B4D4C).withValues(alpha: 0.78),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 2),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.48), blurRadius: 20, offset: const Offset(0, 8))],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(colors: [green.withValues(alpha: 0.34), Colors.white.withValues(alpha: 0.10)]),
+                                border: Border.all(color: green.withValues(alpha: 0.36)),
+                              ),
+                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.86), size: 30),
+                            ),
+                            const SizedBox(height: 7),
+                            Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 9, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 5),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: 0, end: live),
+                              duration: const Duration(milliseconds: 650),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, value, _) {
+                                return Text(
+                                  '\$${formatCurrency(value)}',
+                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 23, fontWeight: FontWeight.w900),
+                                );
+                              },
+                            ),
+                            Text(hasPlan ? status : 'NO PLAN', style: TextStyle(color: Colors.white.withValues(alpha: 0.80), fontSize: 9, fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
