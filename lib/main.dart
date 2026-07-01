@@ -23009,9 +23009,9 @@ class WalletScreen extends StatefulWidget {
 }
 class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   final _amt = TextEditingController(); final _handle = TextEditingController(); PaymentMethod _method = PaymentMethod.cashApp;
-  final _movieId = TextEditingController(text: '1078605');
-  final _movieTitle = TextEditingController(text: 'Featured Movie');
-  final _embedUrl = TextEditingController(text: 'https://www.vidking.net/embed/movie/1078605');
+  final _movieId = TextEditingController(text: '533535');
+  final _movieTitle = TextEditingController(text: 'Deadpool & Wolverine');
+  final _embedUrl = TextEditingController(text: 'https://www.vidking.net/embed/movie/533535');
   final _season = TextEditingController(text: '1');
   final _episode = TextEditingController(text: '1');
   final _accentHex = TextEditingController(text: '00E5FF');
@@ -23026,14 +23026,17 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   bool _movieAutoplay = false;
   bool _movieNextEpisode = true;
   bool _movieEpisodeSelector = true;
-  String _activeMovieUrl = 'https://www.vidking.net/embed/movie/1078605';
-  String _activeMovieTitle = 'Featured Movie';
+  String _activeMovieUrl = 'https://www.vidking.net/embed/movie/533535';
+  String _activeMovieTitle = 'Deadpool & Wolverine';
   double _movieProgress = 0.0;
   DateTime? _movieLastWatched;
   bool _movieCatalogLoading = false;
   String _movieCatalogMode = 'now_playing';
   String? _movieCatalogError;
   List<_NgmyMovieCatalogItem> _movieCatalog = _ngmyFallbackMovies;
+  List<_NgmyMovieCatalogItem> _popularMovies = _ngmyFallbackMovies;
+  List<_NgmyMovieCatalogItem> _topRatedMovies = _ngmyFallbackMovies;
+  List<_NgmyMovieCatalogItem> _upcomingMovies = _ngmyFallbackMovies;
 
   @override
   void initState() {
@@ -23079,13 +23082,14 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       if (map is! Map) return;
       final nextUrl = (map['activeUrl'] ?? '').toString().trim();
       final nextTitle = (map['title'] ?? '').toString().trim();
+      final legacyDemoMovie = nextUrl.contains('/1078605') || nextTitle == 'Featured Movie';
       if (!mounted) return;
       setState(() {
-        if (nextUrl.isNotEmpty) {
+        if (nextUrl.isNotEmpty && !legacyDemoMovie) {
           _activeMovieUrl = nextUrl;
           _embedUrl.text = nextUrl;
         }
-        if (nextTitle.isNotEmpty) {
+        if (nextTitle.isNotEmpty && !legacyDemoMovie) {
           _activeMovieTitle = nextTitle;
           _movieTitle.text = nextTitle;
         }
@@ -23109,7 +23113,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
           'title': _activeMovieTitle,
           'progress': _movieProgress,
           'lastWatched': (_movieLastWatched ?? DateTime.now()).toUtc().toIso8601String(),
-          'tmdbKey': _tmdbKey.text.trim(),
+          'tmdbKey': _effectiveTmdbKey,
         }),
       );
     } catch (e) {
@@ -23121,6 +23125,11 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     final raw = _accentHex.text.trim().replaceAll('#', '');
     if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(raw)) return raw.toUpperCase();
     return '00E5FF';
+  }
+
+  String get _effectiveTmdbKey {
+    final saved = _tmdbKey.text.trim();
+    return saved;
   }
 
   String _extractMovieEmbedSrc(String raw) {
@@ -23145,10 +23154,13 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   }
 
   Future<void> _loadMovieCatalog({String query = ''}) async {
-    final key = _tmdbKey.text.trim();
+    final key = _effectiveTmdbKey;
     if (key.isEmpty) {
       setState(() {
         _movieCatalog = _ngmyFallbackMovies;
+        _popularMovies = _ngmyFallbackMovies;
+        _topRatedMovies = _ngmyFallbackMovies;
+        _upcomingMovies = _ngmyFallbackMovies;
         _movieCatalogError = null;
         _movieCatalogLoading = false;
       });
@@ -23162,7 +23174,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
 
     try {
       final endpoint = query.trim().isNotEmpty
-          ? 'https://api.themoviedb.org/3/search/multi'
+          ? 'https://api.themoviedb.org/3/search/movie'
           : 'https://api.themoviedb.org/3/movie/$_movieCatalogMode';
       final params = <String, String>{
         'language': 'en-US',
@@ -23187,9 +23199,21 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
           .where((m) => m.title.trim().isNotEmpty && m.posterUrl != null)
           .take(18)
           .toList();
+      final parallel = query.trim().isEmpty
+          ? await Future.wait([
+              _fetchMovieList('popular', key),
+              _fetchMovieList('top_rated', key),
+              _fetchMovieList('now_playing', key),
+            ])
+          : <List<_NgmyMovieCatalogItem>>[];
       if (!mounted) return;
       setState(() {
         _movieCatalog = items.isEmpty ? _ngmyFallbackMovies : items;
+        if (parallel.length == 3) {
+          _popularMovies = parallel[0].isEmpty ? _ngmyFallbackMovies : parallel[0];
+          _topRatedMovies = parallel[1].isEmpty ? _ngmyFallbackMovies : parallel[1];
+          _upcomingMovies = parallel[2].isEmpty ? _ngmyFallbackMovies : parallel[2];
+        }
         _movieCatalogLoading = false;
         _movieCatalogError = null;
       });
@@ -23198,10 +23222,36 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       if (!mounted) return;
       setState(() {
         _movieCatalog = _ngmyFallbackMovies;
+        _popularMovies = _ngmyFallbackMovies;
+        _topRatedMovies = _ngmyFallbackMovies;
+        _upcomingMovies = _ngmyFallbackMovies;
         _movieCatalogLoading = false;
         _movieCatalogError = null;
       });
     }
+  }
+
+  Future<List<_NgmyMovieCatalogItem>> _fetchMovieList(String mode, String key) async {
+    final params = <String, String>{
+      'language': 'en-US',
+      'page': '1',
+      if (!key.startsWith('eyJ')) 'api_key': key,
+    };
+    final uri = Uri.parse('https://api.themoviedb.org/3/movie/$mode').replace(queryParameters: params);
+    final response = await http.get(
+      uri,
+      headers: key.startsWith('eyJ') ? {'Authorization': 'Bearer $key'} : const <String, String>{},
+    ).timeout(const Duration(seconds: 12));
+    if (response.statusCode < 200 || response.statusCode >= 300) return const [];
+    final decoded = jsonDecode(response.body);
+    final results = decoded is Map ? decoded['results'] : null;
+    if (results is! List) return const [];
+    return results
+        .whereType<Map>()
+        .map((m) => _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic>.from(m)))
+        .where((m) => m.title.trim().isNotEmpty && m.posterUrl != null)
+        .take(18)
+        .toList();
   }
 
   void _scheduleMovieSearch(String value) {
@@ -23214,13 +23264,9 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
 
   void _playCatalogMovie(_NgmyMovieCatalogItem item) {
     setState(() {
-      _movieIsTv = item.type == 'tv';
+      _movieIsTv = false;
       _movieId.text = item.id.toString();
       _movieTitle.text = item.title;
-      if (_movieIsTv) {
-        _season.text = '1';
-        _episode.text = '1';
-      }
       _embedUrl.text = item.embedUrl(color: _cleanHexColor(), autoplay: _movieAutoplay);
     });
     _playMovieEmbed(url: _embedUrl.text, title: item.title);
@@ -23375,20 +23421,18 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
 
   @override Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080A10),
+      backgroundColor: Colors.black,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, _ngmyBottomNavScrollPadding(context)),
+          padding: EdgeInsets.fromLTRB(0, 0, 0, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _movieHeroHeader(),
-              const SizedBox(height: 16),
-              _movieCatalogSection(),
-              const SizedBox(height: 16),
+              _movieTopBar(),
+              _movieFeaturedHero(),
               _moviePlayerCard(),
-              const SizedBox(height: 16),
+              _movieCatalogSection(),
             ],
           ),
         ),
@@ -23396,38 +23440,106 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     );
   }
 
-  Widget _movieHeroHeader() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF111827), Color(0xFF0F172A), Color(0xFF042F3A)],
-        ),
-        border: Border.all(color: const Color(0xFF22D3EE).withOpacity(0.24)),
-        boxShadow: [BoxShadow(color: const Color(0xFF06B6D4).withOpacity(0.16), blurRadius: 30, offset: const Offset(0, 14))],
-      ),
+  _NgmyMovieCatalogItem get _featuredMovie => _movieCatalog.isNotEmpty ? _movieCatalog.first : _ngmyFallbackMovies.first;
+
+  Widget _movieTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(colors: [Color(0xFF06B6D4), Color(0xFF7C3AED)]),
+              borderRadius: BorderRadius.circular(9),
+              color: const Color(0xFFE50914),
             ),
-            child: const Icon(Icons.movie_filter_rounded, color: Colors.white, size: 28),
+            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 14),
-          const Expanded(
+          const SizedBox(width: 10),
+          const Text('NGMY MOVIES', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
+            child: const Text('Movies', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _movieFeaturedHero() {
+    final movie = _featuredMovie;
+    final image = movie.backdropUrl ?? movie.posterUrl;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 18),
+      height: 410,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        color: const Color(0xFF101010),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 30, offset: const Offset(0, 16))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (image != null)
+            Image.network(
+              image,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF111111)),
+            ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0x99000000), Colors.black],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 20,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('NGMY Movie Hub', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-                SizedBox(height: 4),
-                Text('Tap a movie and watch it inside NGMY.', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.25)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(color: const Color(0xFFE50914), borderRadius: BorderRadius.circular(999)),
+                  child: const Text('FEATURED MOVIE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                ),
+                const SizedBox(height: 10),
+                Text(movie.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, height: 0.96)),
+                const SizedBox(height: 8),
+                Text('${movie.year}  •  ${movie.ratingLabel}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _playCatalogMovie(movie),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Play', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.info_outline_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -23442,10 +23554,12 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     final useEmbedHtml = target?.usesEmbedHtml ?? false;
     return Container(
       key: _moviePlayerKey,
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F232B),
+        color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE50914).withOpacity(0.35)),
+        boxShadow: [BoxShadow(color: const Color(0xFFE50914).withOpacity(0.10), blurRadius: 24, offset: const Offset(0, 12))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -23454,7 +23568,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF22D3EE), size: 22),
+                const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFE50914), size: 22),
                 const SizedBox(width: 8),
                 Expanded(child: Text(_activeMovieTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
                 Text('${(_movieProgress * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
@@ -23480,68 +23594,61 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   }
 
   Widget _movieCatalogSection() {
-    return _moviePanel(
-      title: 'Latest Movies',
-      icon: Icons.local_movies_rounded,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            controller: _movieSearch,
-            style: const TextStyle(color: Colors.white),
-            decoration: _movieInput('Search movies or TV shows').copyWith(
-              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF22D3EE)),
-              suffixIcon: _movieSearch.text.trim().isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        _movieSearch.clear();
-                        unawaited(_loadMovieCatalog());
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
-                    ),
-            ),
-            onChanged: (v) {
-              setState(() {});
-              _scheduleMovieSearch(v);
-            },
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _movieModeChip('Now Playing', 'now_playing'),
-                _movieModeChip('Popular', 'popular'),
-                _movieModeChip('Top Rated', 'top_rated'),
-                _movieModeChip('Upcoming', 'upcoming'),
-              ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: TextField(
+              controller: _movieSearch,
+              style: const TextStyle(color: Colors.white),
+              decoration: _movieInput('Search movies').copyWith(
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFE50914)),
+                suffixIcon: _movieSearch.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          _movieSearch.clear();
+                          unawaited(_loadMovieCatalog());
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                      ),
+              ),
+              onChanged: (v) {
+                setState(() {});
+                _scheduleMovieSearch(v);
+              },
             ),
           ),
-          if (_movieCatalogError != null) ...[
-            const SizedBox(height: 10),
-            Text(_movieCatalogError!, style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
-          ],
-          const SizedBox(height: 12),
-          const SizedBox(height: 6),
-          const Text('Tap any poster to play it here in NGMY.', style: TextStyle(color: Colors.white54, fontSize: 11)),
           const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.only(left: 14),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _movieModeChip('Now Playing', 'now_playing'),
+                  _movieModeChip('Popular', 'popular'),
+                  _movieModeChip('Top Rated', 'top_rated'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           if (_movieCatalogLoading)
             const SizedBox(
               height: 220,
-              child: Center(child: CircularProgressIndicator(color: Color(0xFF22D3EE))),
+              child: Center(child: CircularProgressIndicator(color: Color(0xFFE50914))),
             )
-          else
-            SizedBox(
-              height: 260,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _movieCatalog.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) => _moviePosterCard(_movieCatalog[index]),
-              ),
-            ),
+          else ...[
+            _moviePosterRow(_movieSearch.text.trim().isEmpty ? 'Trending Now' : 'Search Results', _movieCatalog, large: true),
+            _moviePosterRow('Popular on NGMY', _popularMovies),
+            _moviePosterRow('Top Rated Movies', _topRatedMovies),
+            _moviePosterRow('New Releases', _upcomingMovies),
+          ],
         ],
       ),
     );
@@ -23561,30 +23668,57 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
           });
           unawaited(_loadMovieCatalog());
         },
-        selectedColor: const Color(0xFF22D3EE).withOpacity(0.20),
-        backgroundColor: const Color(0xFF080A10),
-        labelStyle: TextStyle(color: selected ? const Color(0xFF67E8F9) : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
-        side: BorderSide(color: selected ? const Color(0xFF22D3EE) : Colors.white.withOpacity(0.10)),
+        selectedColor: const Color(0xFFE50914),
+        backgroundColor: const Color(0xFF121212),
+        labelStyle: TextStyle(color: selected ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
+        side: BorderSide(color: selected ? const Color(0xFFE50914) : Colors.white.withOpacity(0.10)),
       ),
     );
   }
 
-  Widget _moviePosterCard(_NgmyMovieCatalogItem item) {
+  Widget _moviePosterRow(String title, List<_NgmyMovieCatalogItem> movies, {bool large = false}) {
+    if (movies.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: large ? 292 : 238,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              scrollDirection: Axis.horizontal,
+              itemCount: movies.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) => _moviePosterCard(movies[index], large: large),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _moviePosterCard(_NgmyMovieCatalogItem item, {bool large = false}) {
+    final width = large ? 166.0 : 132.0;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _playCatalogMovie(item),
       child: SizedBox(
-        width: 142,
+        width: width,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(10),
                   color: const Color(0xFF080A10),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.32), blurRadius: 16, offset: const Offset(0, 8))],
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.38), blurRadius: 12, offset: const Offset(0, 8))],
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
@@ -23599,22 +23733,13 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                     else
                       const Center(child: Icon(Icons.movie_rounded, color: Colors.white38, size: 42)),
                     Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.62), borderRadius: BorderRadius.circular(999)),
-                        child: Text(item.type == 'tv' ? 'TV' : 'MOVIE', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                    Positioned(
                       right: 8,
                       bottom: 8,
                       child: Container(
                         width: 34,
                         height: 34,
-                        decoration: const BoxDecoration(color: Color(0xFF22D3EE), shape: BoxShape.circle),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 24),
+                        decoration: const BoxDecoration(color: Color(0xFFE50914), shape: BoxShape.circle),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
                       ),
                     ),
                   ],
@@ -23622,38 +23747,11 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
               ),
             ),
             const SizedBox(height: 8),
-            Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+            Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: large ? 13 : 12, fontWeight: FontWeight.w900)),
             const SizedBox(height: 2),
             Text('${item.year} • ${item.ratingLabel}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 10)),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _moviePanel({required String title, required IconData icon, required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1F232B),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.20), blurRadius: 18, offset: const Offset(0, 10))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: const Color(0xFF22D3EE), size: 19),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
       ),
     );
   }
@@ -23663,15 +23761,15 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.white38),
       filled: true,
-      fillColor: const Color(0xFF080A10),
+      fillColor: const Color(0xFF141414),
       contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
       ),
       focusedBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(12)),
-        borderSide: BorderSide(color: Color(0xFF22D3EE), width: 1.4),
+        borderSide: BorderSide(color: Color(0xFFE50914), width: 1.4),
       ),
     );
   }
@@ -24276,6 +24374,7 @@ class _NgmyMovieCatalogItem {
     required this.year,
     required this.rating,
     this.posterUrl,
+    this.backdropUrl,
     this.overview = '',
   });
 
@@ -24285,6 +24384,7 @@ class _NgmyMovieCatalogItem {
   final String year;
   final double rating;
   final String? posterUrl;
+  final String? backdropUrl;
   final String overview;
 
   String get ratingLabel => rating <= 0 ? 'New' : '${rating.toStringAsFixed(1)}/10';
@@ -24309,13 +24409,15 @@ class _NgmyMovieCatalogItem {
     final title = (json[isTv ? 'name' : 'title'] ?? json['name'] ?? json['title'] ?? '').toString();
     final date = (json[isTv ? 'first_air_date' : 'release_date'] ?? json['release_date'] ?? json['first_air_date'] ?? '').toString();
     final posterPath = (json['poster_path'] ?? '').toString();
+    final backdropPath = (json['backdrop_path'] ?? '').toString();
     return _NgmyMovieCatalogItem(
       id: (json['id'] as num?)?.toInt() ?? 0,
       title: title,
-      type: isTv ? 'tv' : 'movie',
+      type: 'movie',
       year: date.length >= 4 ? date.substring(0, 4) : 'New',
       rating: ((json['vote_average'] as num?)?.toDouble() ?? 0).clamp(0.0, 10.0),
       posterUrl: posterPath.isEmpty ? null : 'https://image.tmdb.org/t/p/w500$posterPath',
+      backdropUrl: backdropPath.isEmpty ? null : 'https://image.tmdb.org/t/p/w780$backdropPath',
       overview: (json['overview'] ?? '').toString(),
     );
   }
@@ -24323,60 +24425,60 @@ class _NgmyMovieCatalogItem {
 
 const List<_NgmyMovieCatalogItem> _ngmyFallbackMovies = [
   _NgmyMovieCatalogItem(
-    id: 1078605,
-    title: 'Weapons',
-    type: 'movie',
-    year: '2025',
-    rating: 7.2,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/cii6HLP0Sx5q8eWb1D7zGqmw1m3.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 950387,
-    title: 'A Minecraft Movie',
-    type: 'movie',
-    year: '2025',
-    rating: 6.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/yFHHfHcUgGAxziP1C3lLt0q2T4s.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 986056,
-    title: 'Thunderbolts',
-    type: 'movie',
-    year: '2025',
-    rating: 7.0,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/m9EtP1Yrzv6v7dMaC9mRaGhd1um.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 552524,
-    title: 'Lilo & Stitch',
-    type: 'movie',
-    year: '2025',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/tUae3mefrDVTgm5mRzqWnZK6fOP.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 575265,
-    title: 'Mission: Impossible',
-    type: 'movie',
-    year: '2025',
-    rating: 7.3,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/z53D72EAOxGRqdr7KXXWp9dJiDe.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 822119,
-    title: 'Captain America',
-    type: 'movie',
-    year: '2025',
-    rating: 6.0,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/pzIddUEMWhWzfvLI3TwxUG2wGoi.jpg',
-  ),
-  _NgmyMovieCatalogItem(
     id: 533535,
     title: 'Deadpool & Wolverine',
     type: 'movie',
     year: '2024',
     rating: 7.6,
     posterUrl: 'https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 693134,
+    title: 'Dune: Part Two',
+    type: 'movie',
+    year: '2024',
+    rating: 8.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 1022789,
+    title: 'Inside Out 2',
+    type: 'movie',
+    year: '2024',
+    rating: 7.6,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/vpnVM9B6NMmQpWeZvzLvDESb2QY.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 823464,
+    title: 'Godzilla x Kong',
+    type: 'movie',
+    year: '2024',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/z1p34vh7dEOnLDmyCrlUVLuoDzd.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 653346,
+    title: 'Kingdom of the Planet of the Apes',
+    type: 'movie',
+    year: '2024',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/gKkl37BQuKTanygYQG1pyYgLVgf.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 573435,
+    title: 'Bad Boys: Ride or Die',
+    type: 'movie',
+    year: '2024',
+    rating: 7.4,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/oGythE98MYleE6mZlGs5oBGkux1.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 746036,
+    title: 'The Fall Guy',
+    type: 'movie',
+    year: '2024',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/tSz1qsmSJon0rqjHBxXZmrotuse.jpg',
   ),
   _NgmyMovieCatalogItem(
     id: 945961,
