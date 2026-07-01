@@ -59,8 +59,19 @@ class NgmyAccountSnapshotPage extends StatefulWidget {
 
 class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   static const Color _accent = WorksheetPalette.green;
+  late UserData _user;
+  late List<AppTransaction> _transactions;
+  late int _walletStateRevision;
   bool _working = false;
   String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    _transactions = List<AppTransaction>.from(widget.transactions);
+    _walletStateRevision = widget.walletStateRevision;
+  }
 
   void _toast(String msg) {
     if (!mounted) return;
@@ -85,13 +96,42 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     }
   }
 
+  Future<void> _refreshLocalState() async {
+    final loaded = await NgmyLocalGrowthIncomeStore.load(widget.realEmail, _user);
+    if (!mounted) return;
+    setState(() {
+      _user = loaded.user;
+      _transactions = List<AppTransaction>.from(loaded.transactions);
+      _walletStateRevision = loaded.walletStateRevision;
+    });
+  }
+
+  NgmyAccountSnapshot _currentSnapshot() {
+    return NgmyAccountSnapshot.fromUser(
+      _user,
+      _transactions,
+      ownerRealEmail: widget.realEmail,
+      walletStateRevision: _walletStateRevision,
+    );
+  }
+
+  Future<({String qrPayload, String code})?> _createLiveQrBackup() async {
+    await _refreshLocalState();
+    if (!mounted) return null;
+    return NgmyLocalSnapshotStash.createLive(
+      ownerEmail: widget.realEmail,
+      snapshotJson: _currentSnapshot().toJson(),
+    );
+  }
+
   Future<void> _exportFile() async {
     await _withWork(() async {
+      await _refreshLocalState();
       final msg = await NgmyAccountSnapshot.exportToFile(
-        widget.user,
-        widget.transactions,
+        _user,
+        _transactions,
         ownerRealEmail: widget.realEmail,
-        walletStateRevision: widget.walletStateRevision,
+        walletStateRevision: _walletStateRevision,
       );
       _toast(msg);
     }, busyLabel: 'Preparing download…');
@@ -99,13 +139,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
 
   Future<void> _showQr() async {
     await _withWork(() async {
-      final snapshot = NgmyAccountSnapshot.fromUser(
-        widget.user,
-        widget.transactions,
-        ownerRealEmail: widget.realEmail,
-        walletStateRevision: widget.walletStateRevision,
-      );
-      final stashed = await snapshot.toStashedPayload(ownerEmail: widget.realEmail);
+      final stashed = await _createLiveQrBackup();
       if (stashed == null) {
         _toast('Could not create a QR right now. Check your connection and try again.');
         return;
@@ -114,7 +148,12 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
-          builder: (_) => _NgmyAccountSnapshotQrPage(qrPayload: stashed.qrPayload, code: stashed.code),
+          builder: (_) => _NgmyAccountSnapshotQrPage(
+            qrPayload: stashed.qrPayload,
+            code: stashed.code,
+            realEmail: widget.realEmail,
+            seedUser: _user,
+          ),
         ),
       );
     }, busyLabel: 'Creating QR code…');
@@ -125,8 +164,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     if (code == null || code.trim().isEmpty) return;
     await _withWork(() async {
       if (NgmyLocalDepositQr.looksLikeCode(code)) {
-        await _redeemDepositByCode(code.trim());
-        return;
+        final handledDeposit = await _redeemDepositByCode(code.trim());
+        if (handledDeposit) return;
       }
       final result = await NgmyAccountSnapshot.resolveForRestore(code, widget.realEmail);
       switch (result.outcome) {
@@ -138,6 +177,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           return;
         case NgmySnapshotResolveOutcome.staleBackup:
           _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
+          return;
+        case NgmySnapshotResolveOutcome.foundLive:
+          await _confirmRestore(result.snapshot!, allowLiveRestore: true);
           return;
         case NgmySnapshotResolveOutcome.found:
           await _confirmRestore(result.snapshot!);
@@ -162,14 +204,16 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   bool _isStaleBackup(NgmyAccountSnapshot snapshot) =>
-      !NgmyAccountSnapshot.matchesCurrentWalletRevision(snapshot, widget.walletStateRevision);
+      !NgmyAccountSnapshot.matchesCurrentWalletRevision(snapshot, _walletStateRevision);
 
-  Future<void> _confirmRestore(NgmyAccountSnapshot snapshot) async {
+  Future<void> _confirmRestore(NgmyAccountSnapshot snapshot, {bool allowLiveRestore = false}) async {
+    await _refreshLocalState();
+    if (!mounted) return;
     if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
       _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
       return;
     }
-    if (_isStaleBackup(snapshot)) {
+    if (!allowLiveRestore && _isStaleBackup(snapshot)) {
       _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
       return;
     }
@@ -183,7 +227,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     );
     if (ok != true) return;
     final restoredUser = snapshot.toUserData(widget.realEmail);
-    final transactions = keepsHistory ? widget.transactions : snapshot.transactions;
+    final transactions = keepsHistory ? _transactions : snapshot.transactions;
     await NgmyLocalGrowthIncomeStore.replace(
       widget.realEmail,
       restoredUser,
@@ -191,6 +235,11 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       walletStateRevision: snapshot.walletStateRevision,
     );
     if (!mounted) return;
+    setState(() {
+      _user = restoredUser;
+      _transactions = List<AppTransaction>.from(transactions);
+      _walletStateRevision = snapshot.walletStateRevision;
+    });
     _toast('Restored your local Growth Income. Go back to see it updated.');
   }
 
@@ -207,10 +256,6 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
         return;
       }
-      if (_isStaleBackup(snapshot)) {
-        _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
-        return;
-      }
       await _confirmRestore(snapshot);
     }, busyLabel: 'Reading file…');
   }
@@ -218,7 +263,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   Future<void> _creditLocalDeposit(double amount) async {
     final txn = AppTransaction(
       id: 'local_qr_dep_${DateTime.now().microsecondsSinceEpoch}',
-      userEmail: widget.user.email,
+      userEmail: _user.email,
       amount: amount,
       type: TransactionType.deposit,
       method: PaymentMethod.system,
@@ -226,9 +271,10 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       status: TransactionStatus.approved,
       timestamp: DateTime.now(),
     );
-    NgmyLocalGrowthIncomeStore.applyTransaction(widget.user, txn);
-    final transactions = [...widget.transactions, txn];
-    await NgmyLocalGrowthIncomeStore.save(widget.realEmail, widget.user, transactions, bumpWalletRevision: true);
+    NgmyLocalGrowthIncomeStore.applyTransaction(_user, txn);
+    final transactions = [..._transactions, txn];
+    await NgmyLocalGrowthIncomeStore.save(widget.realEmail, _user, transactions, bumpWalletRevision: true);
+    await _refreshLocalState();
     if (!mounted) return;
     _toast('Deposited \$${formatCurrency(amount)} to your local wallet.');
   }
@@ -286,35 +332,40 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     _toast(result.errorMessage ?? 'Could not apply deposit.');
   }
 
-  Future<void> _redeemDepositByCode(String code) async {
+  Future<bool> _redeemDepositByCode(String code) async {
+    await _refreshLocalState();
+    if (!mounted) return true;
     final peek = await NgmyLocalDepositQr.peekCode(code: code, redeemerEmail: widget.realEmail);
-    if (!peek.found) return;
+    if (!peek.found) return false;
     if (peek.alreadyUsed) {
       _toast('This deposit code was already used.');
-      return;
+      return true;
     }
     if (peek.notConfigured) {
       _toast('This deposit is not assigned to an account. Ask admin to recreate it with your email and verification code.');
-      return;
+      return true;
     }
     if (peek.wrongAccount) {
       _toast('This deposit is for another NGMY account.');
-      return;
+      return true;
     }
-    if (!mounted) return;
+    if (!mounted) return true;
     final verificationCode = await _showDepositVerificationDialog(context);
-    if (verificationCode == null || verificationCode.trim().isEmpty) return;
+    if (verificationCode == null || verificationCode.trim().isEmpty) return true;
     final result = await NgmyLocalDepositQr.redeemByCode(
       code: code,
       redeemerEmail: widget.realEmail,
       verificationCode: verificationCode.trim(),
-      localTransactions: widget.transactions,
-      localUserEmail: widget.user.email,
+      localTransactions: _transactions,
+      localUserEmail: _user.email,
     );
     await _applyDepositRedeemResult(result);
+    return true;
   }
 
   Future<void> _redeemDepositQr(String raw) async {
+    await _refreshLocalState();
+    if (!mounted) return;
     final peek = await NgmyLocalDepositQr.peekRaw(raw: raw, redeemerEmail: widget.realEmail);
     if (!peek.found) {
       _toast('That deposit QR is invalid or already used.');
@@ -339,8 +390,8 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       raw: raw,
       redeemerEmail: widget.realEmail,
       verificationCode: verificationCode.trim(),
-      localTransactions: widget.transactions,
-      localUserEmail: widget.user.email,
+      localTransactions: _transactions,
+      localUserEmail: _user.email,
     );
     await _applyDepositRedeemResult(result);
   }
@@ -366,6 +417,9 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
     await _withWork(() async {
       final result = await NgmyAccountSnapshot.resolveForRestore(raw, widget.realEmail);
       switch (result.outcome) {
+        case NgmySnapshotResolveOutcome.foundLive:
+          await _confirmRestore(result.snapshot!, allowLiveRestore: true);
+          return;
         case NgmySnapshotResolveOutcome.wrongAccount:
           _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
           return;
@@ -616,11 +670,58 @@ class _SnapshotWideCard extends StatelessWidget {
   }
 }
 
-class _NgmyAccountSnapshotQrPage extends StatelessWidget {
-  const _NgmyAccountSnapshotQrPage({required this.qrPayload, required this.code});
+class _NgmyAccountSnapshotQrPage extends StatefulWidget {
+  const _NgmyAccountSnapshotQrPage({
+    required this.qrPayload,
+    required this.code,
+    required this.realEmail,
+    required this.seedUser,
+  });
 
   final String qrPayload;
   final String code;
+  final String realEmail;
+  final UserData seedUser;
+
+  @override
+  State<_NgmyAccountSnapshotQrPage> createState() => _NgmyAccountSnapshotQrPageState();
+}
+
+class _NgmyAccountSnapshotQrPageState extends State<_NgmyAccountSnapshotQrPage> {
+  late String _qrPayload = widget.qrPayload;
+  late String _code = widget.code;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_refreshLiveQr()));
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshLiveQr() async {
+    final loaded = await NgmyLocalGrowthIncomeStore.load(widget.realEmail, widget.seedUser);
+    final snapshot = NgmyAccountSnapshot.fromUser(
+      loaded.user,
+      loaded.transactions,
+      ownerRealEmail: widget.realEmail,
+      walletStateRevision: loaded.walletStateRevision,
+    );
+    final updated = await NgmyLocalSnapshotStash.createLive(
+      ownerEmail: widget.realEmail,
+      snapshotJson: snapshot.toJson(),
+    );
+    if (!mounted || updated == null) return;
+    setState(() {
+      _qrPayload = updated.qrPayload;
+      _code = updated.code;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -654,14 +755,14 @@ class _NgmyAccountSnapshotQrPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 8),
-                    NgmyBrandedQrWidget(data: qrPayload, large: true),
+                    NgmyBrandedQrWidget(data: _qrPayload, large: true),
                     const SizedBox(height: 18),
-                    Text('Code: $code', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
+                    Text('Code: $_code', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: () {
-                        Clipboard.setData(ClipboardData(text: code));
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Code $code copied')));
+                        Clipboard.setData(ClipboardData(text: _code));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Code $_code copied')));
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
@@ -741,6 +842,7 @@ class _NgmyAccountSnapshotScanPageState extends State<_NgmyAccountSnapshotScanPa
             if (raw == null || raw.isEmpty) continue;
             final isOurs = raw.startsWith(kNgmySnapshotQrPrefix) ||
                 raw.startsWith('$kNgmyLocalSnapshotStashPrefix|') ||
+                raw.startsWith('$kNgmyLocalSnapshotLivePrefix|') ||
                 raw.startsWith('$kNgmyLocalDepositQrPrefix|');
             if (!isOurs) continue;
             _handled = true;

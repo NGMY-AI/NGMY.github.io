@@ -24054,7 +24054,9 @@ class _InvestScreenState extends State<InvestScreen> {
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 20),
+      const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 16),
+      _essentialStudio(context),
+      const SizedBox(height: 22),
       if (user.activeInvestment != null) ...[
         const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 15),
@@ -24068,6 +24070,289 @@ class _InvestScreenState extends State<InvestScreen> {
       ),
     );
   }
+
+  Widget _essentialStudio(BuildContext ctx) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final name = widget.user.username.trim().isEmpty ? 'NGMY Member' : widget.user.username.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF08111F), Color(0xFF13233E), Color(0xFF2E1065), Color(0xFF0F766E)]
+              : const [Color(0xFFE0F2FE), Color(0xFFEDE9FE), Color(0xFFDCFCE7), Color(0xFFFFFFFF)],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.76), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: isDark ? 0.18 : 0.22), blurRadius: 28, offset: const Offset(0, 14)),
+          BoxShadow(color: const Color(0xFFA855F7).withValues(alpha: isDark ? 0.12 : 0.14), blurRadius: 18, offset: const Offset(-8, -6)),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(right: -30, top: -34, child: _essentialGlow(const Color(0xFF22D3EE), 118)),
+          Positioned(left: -28, bottom: -38, child: _essentialGlow(const Color(0xFFA855F7), 96)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6), Color(0xFF10B981)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.28), blurRadius: 18)],
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('NGMY ESSENTIAL', style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0E7490), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                        const SizedBox(height: 3),
+                        Text('Daily Creator Studio', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 21, letterSpacing: -0.5)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Build useful things fast, $name: professional email signatures, cool iMessage-style texts, and daily music/fun ideas.',
+                style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF334155), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _essentialToolCard(
+                      ctx,
+                      icon: Icons.draw_rounded,
+                      title: 'Email Signature',
+                      subtitle: 'Copy clean pro blocks',
+                      colors: const [Color(0xFF06B6D4), Color(0xFF2563EB)],
+                      onTap: () => _openEssentialTool(ctx, 'signature'),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: _essentialToolCard(
+                      ctx,
+                      icon: Icons.chat_bubble_rounded,
+                      title: 'iMessage Text',
+                      subtitle: 'Cool daily replies',
+                      colors: const [Color(0xFFA855F7), Color(0xFFEC4899)],
+                      onTap: () => _openEssentialTool(ctx, 'text'),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: _essentialToolCard(
+                      ctx,
+                      icon: Icons.music_note_rounded,
+                      title: 'Music Fun',
+                      subtitle: 'Vibes to create',
+                      colors: const [Color(0xFF10B981), Color(0xFF84CC16)],
+                      onTap: () => _openEssentialTool(ctx, 'music'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _essentialGlow(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0.08), Colors.transparent]),
+        ),
+      ),
+    );
+  }
+
+  Widget _essentialToolCard(
+    BuildContext ctx, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.32)),
+            boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.28), blurRadius: 14, offset: const Offset(0, 8))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const Spacer(),
+              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, height: 1.05)),
+              const SizedBox(height: 4),
+              Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontWeight: FontWeight.w700, fontSize: 9.5, height: 1.15)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openEssentialTool(BuildContext ctx, String kind) {
+    final name = widget.user.username.trim().isEmpty ? 'NGMY Member' : widget.user.username.trim();
+    final email = widget.user.email.trim().isEmpty ? 'your@email.com' : widget.user.email.trim();
+    late final String title;
+    late final IconData icon;
+    late final List<Color> colors;
+    late final List<String> items;
+    if (kind == 'signature') {
+      title = 'Email Signature Kit';
+      icon = Icons.draw_rounded;
+      colors = const [Color(0xFF06B6D4), Color(0xFF2563EB)];
+      items = [
+        '$name\nNGMY Member\nBuilding daily with NGMY\nEmail: $email\nSent with NGMY Essential',
+        '$name | Digital Creator\nGrowth Income Member\nNGMY: Next Generation - Make Yours\nEmail: $email',
+        '$name\nProfessional Signature\nCreate. Grow. Connect.\nPowered by NGMY AI Home',
+      ];
+    } else if (kind == 'text') {
+      title = 'iMessage Text Builder';
+      icon = Icons.chat_bubble_rounded;
+      colors = const [Color(0xFFA855F7), Color(0xFFEC4899)];
+      items = [
+        'I am locked in right now. Give me a few and I will send you the clean version.',
+        'That sounds good. Let me check everything and I will get back to you with a solid answer.',
+        'I like the idea. Let us make it simple, clear, and actually useful.',
+        'Today is a build day. I am focused on making progress, not just talking about it.',
+      ];
+    } else {
+      title = 'Music & Fun Prompts';
+      icon = Icons.music_note_rounded;
+      colors = const [Color(0xFF10B981), Color(0xFF84CC16)];
+      items = [
+        'Create a smooth motivational song about building your future every day.',
+        'Make an upbeat Afro-futuristic hook for NGMY: Next Generation - Make Yours.',
+        'Write a short daily vibe: calm beat, confident voice, money-growth energy.',
+        'Fun challenge: send one positive message, make one idea, and play one song that keeps you moving.',
+      ];
+    }
+    _showEssentialSheet(ctx, title: title, icon: icon, colors: colors, items: items);
+  }
+
+  Future<void> _showEssentialSheet(
+    BuildContext ctx, {
+    required String title,
+    required IconData icon,
+    required List<Color> colors,
+    required List<String> items,
+  }) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    return showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0B1020) : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: colors.first.withValues(alpha: 0.38)),
+              boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.25), blurRadius: 28, offset: const Offset(0, 14))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), gradient: LinearGradient(colors: colors)),
+                      child: Icon(icon, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(title, style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 20))),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ...items.map((item) => _essentialCopyTile(sheetCtx, item: item, colors: colors, isDark: isDark)),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _essentialCopyTile(BuildContext ctx, {required String item, required List<Color> colors, required bool isDark}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.first.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(item, style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.86) : const Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 12.5, height: 1.35)),
+          ),
+          const SizedBox(width: 10),
+          InkWell(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: item));
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+            },
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: colors)),
+              child: const Icon(Icons.copy_rounded, color: Colors.white, size: 17),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _cardChip({bool platinum = false, bool leader = false}) => Container(
     width: leader ? 56 : 40,
     height: leader ? 42 : 30,

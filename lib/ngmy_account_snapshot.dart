@@ -9,7 +9,7 @@ const String kNgmySnapshotMarker = 'ngmyAccountSnapshot';
 const int kNgmySnapshotVersion = 2;
 const String kNgmySnapshotQrPrefix = 'NGMYSNAP1|';
 
-enum NgmySnapshotResolveOutcome { found, notFound, wrongAccount, staleBackup }
+enum NgmySnapshotResolveOutcome { found, foundLive, notFound, wrongAccount, staleBackup }
 
 /// A full backup of the Growth Income copy behind the home screen's wifi
 /// icon (balance, investment, clock-in state, wallet history). Restoring
@@ -211,7 +211,7 @@ class NgmyAccountSnapshot {
               !ownedByRealAccount(snapshot, realEmail, stashOwnerEmail: stashed.ownerEmail)) {
             return (snapshot: null, outcome: NgmySnapshotResolveOutcome.wrongAccount);
           }
-          return (snapshot: snapshot, outcome: NgmySnapshotResolveOutcome.found);
+          return (snapshot: snapshot, outcome: stashed.isLive ? NgmySnapshotResolveOutcome.foundLive : NgmySnapshotResolveOutcome.found);
         }
       } catch (_) {}
       return (snapshot: null, outcome: NgmySnapshotResolveOutcome.notFound);
