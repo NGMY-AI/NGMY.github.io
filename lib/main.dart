@@ -24558,7 +24558,7 @@ class _InvestScreenState extends State<InvestScreen> {
 
     String shareText() {
       final text = messageCtrl.text.trim().isEmpty ? 'Your message' : messageCtrl.text.trim();
-      return '$text\n\nSent with NGMY Essential ${styleNames[selectedStyle]}';
+      return text;
     }
 
     Future<void> shareMessageCard(BuildContext sheetCtx) async {
@@ -24566,9 +24566,8 @@ class _InvestScreenState extends State<InvestScreen> {
         final bytes = await _captureEssentialGif(messageCardKey);
         final msg = await shareNgmyBytes(
           bytes,
-          'ngmy_animated_text_${DateTime.now().millisecondsSinceEpoch}.gif',
+          'ngmy_message_${DateTime.now().millisecondsSinceEpoch}.gif',
           mimeType: 'image/gif',
-          title: 'NGMY animated text',
         );
         if (sheetCtx.mounted) {
           ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text(msg)));
@@ -24684,7 +24683,7 @@ class _InvestScreenState extends State<InvestScreen> {
                               onPressed: () => unawaited(shareMessageCard(sheetCtx)),
                               style: FilledButton.styleFrom(backgroundColor: colors[1]),
                               icon: const Icon(Icons.ios_share_rounded),
-                              label: const Text('Share Image'),
+                              label: const Text('Share GIF'),
                             ),
                           ),
                         ],
@@ -24712,9 +24711,9 @@ class _InvestScreenState extends State<InvestScreen> {
       builder: (context, snapshot) {
         final tick = snapshot.data ?? 0;
         final pulse = 0.5 + (0.5 * math.sin(tick * 0.85));
-        final tilt = (pulse - 0.5) * 0.18;
-        final radius = 24.0 + pulse * 10;
-        final shadow = 18.0 + pulse * 22;
+        final tilt = (pulse - 0.5) * 0.07;
+        final radius = 26.0 + pulse * 4;
+        final shadow = 16.0 + pulse * 12;
         final isGold = styleIndex == 2;
         return TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: 0, end: pulse),
@@ -24749,48 +24748,22 @@ class _InvestScreenState extends State<InvestScreen> {
                 ),
                 child: Stack(
                   children: [
-                    Positioned(right: -18, top: -20, child: _messageOrb(colors[2], 84 + value * 24)),
-                    Positioned(left: -16, bottom: -22, child: _messageOrb(colors[0], 68 + value * 16)),
+                    Positioned(right: -16, top: -18, child: _messageOrb(colors[2], 78 + value * 10)),
+                    Positioned(left: -14, bottom: -20, child: _messageOrb(colors[0], 64 + value * 8)),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              styleIndex == 3 ? Icons.auto_awesome_rounded : Icons.bubble_chart_rounded,
-                              color: Colors.white.withValues(alpha: 0.92),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(_messageStyleLabel(styleIndex),
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.3)),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
                         Text(
                           text,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
-                            fontSize: 22 + value * 1.5,
+                            fontSize: 23 + value * 0.6,
                             height: 1.08,
                             letterSpacing: styleIndex == 0 ? -0.4 : 0,
                             shadows: [
-                              Shadow(color: Colors.black.withValues(alpha: 0.24), blurRadius: 10, offset: const Offset(0, 3)),
+                              Shadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.20),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-                            ),
-                            child: const Text('Share to iMessage', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
                           ),
                         ),
                       ],
@@ -24818,27 +24791,6 @@ class _InvestScreenState extends State<InvestScreen> {
     );
   }
 
-  String _messageStyleLabel(int styleIndex) {
-    switch (styleIndex) {
-      case 0:
-        return '3D MESSAGE';
-      case 1:
-        return 'GLASS WAVE';
-      case 2:
-        return 'GOLD PULSE';
-      case 3:
-        return 'COSMIC BUBBLE';
-      case 4:
-        return 'LAVA POP';
-      case 5:
-        return 'OCEAN SPIN';
-      case 6:
-        return 'CANDY GLOW';
-      default:
-        return 'MATRIX BEAM';
-    }
-  }
-
   Future<Uint8List> _captureEssentialPng(GlobalKey key) async {
     await Future.delayed(const Duration(milliseconds: 120));
     await WidgetsBinding.instance.endOfFrame;
@@ -24852,18 +24804,18 @@ class _InvestScreenState extends State<InvestScreen> {
 
   Future<Uint8List> _captureEssentialGif(GlobalKey key) async {
     final frames = <({int width, int height, Uint8List rgba})>[];
-    for (var i = 0; i < 10; i++) {
-      await Future.delayed(const Duration(milliseconds: 120));
+    for (var i = 0; i < 12; i++) {
+      await Future.delayed(const Duration(milliseconds: 100));
       await WidgetsBinding.instance.endOfFrame;
       final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) throw Exception('Preview is not ready yet.');
-      final image = await boundary.toImage(pixelRatio: 1.35);
+      final image = await boundary.toImage(pixelRatio: 2.35);
       final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       if (data == null) throw Exception('Could not create animation frame.');
       frames.add((width: image.width, height: image.height, rgba: data.buffer.asUint8List()));
       image.dispose();
     }
-    return _encodeEssentialGif(frames, delayCs: 12);
+    return _encodeEssentialGif(frames, delayCs: 10);
   }
 
   Uint8List _encodeEssentialGif(List<({int width, int height, Uint8List rgba})> frames, {required int delayCs}) {
