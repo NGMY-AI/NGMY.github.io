@@ -100,6 +100,7 @@ import 'ngmy_live_support.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_share_image.dart';
 import 'ngmy_local_growth_income_ui.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_studio_hub.dart';
@@ -24262,13 +24263,13 @@ class _InvestScreenState extends State<InvestScreen> {
     final messageCtrl = TextEditingController(text: 'Hello,\n\nI wanted to send you this quick update.\n\nThank you.');
     final titleCtrl = TextEditingController(text: 'NGMY Member');
     final brandCtrl = TextEditingController(text: 'NGMY Essential');
-    final logoCtrl = TextEditingController();
+    final emailCardKey = GlobalKey();
+    Uint8List? logoBytes;
     const colors = [Color(0xFF06B6D4), Color(0xFF2563EB)];
 
     String emailText() {
       final brand = brandCtrl.text.trim().isEmpty ? 'NGMY Essential' : brandCtrl.text.trim();
       final title = titleCtrl.text.trim().isEmpty ? 'NGMY Member' : titleCtrl.text.trim();
-      final logo = logoCtrl.text.trim();
       return [
         messageCtrl.text.trim(),
         '',
@@ -24277,24 +24278,40 @@ class _InvestScreenState extends State<InvestScreen> {
         senderName,
         title,
         senderEmail,
-        if (logo.isNotEmpty) 'Logo: $logo',
         'Created with NGMY Essential',
         '------------------------------',
       ].join('\n');
     }
 
-    Future<void> openCompose(BuildContext sheetCtx) async {
-      final uri = Uri(
-        scheme: 'mailto',
-        path: toCtrl.text.trim(),
-        queryParameters: {
-          'subject': subjectCtrl.text.trim(),
-          'body': emailText(),
-        },
-      );
-      final opened = await launchUrl(uri);
-      if (!opened && sheetCtx.mounted) {
-        ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Could not open email compose on this device.')));
+    Future<void> pickLogo(void Function(void Function()) setSheet, BuildContext sheetCtx) async {
+      try {
+        final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 900);
+        if (file == null) return;
+        final bytes = await _readMediaPickerBytes(file);
+        setSheet(() => logoBytes = bytes);
+      } catch (e) {
+        if (sheetCtx.mounted) {
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text('Logo upload failed: $e')));
+        }
+      }
+    }
+
+    Future<void> shareEmailCard(BuildContext sheetCtx) async {
+      try {
+        final bytes = await _captureEssentialPng(emailCardKey);
+        final msg = await shareNgmyPngBytes(
+          bytes,
+          'ngmy_email_card_${DateTime.now().millisecondsSinceEpoch}.png',
+          title: 'NGMY email card',
+          text: emailText(),
+        );
+        if (sheetCtx.mounted) {
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text(msg)));
+        }
+      } catch (e) {
+        if (sheetCtx.mounted) {
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+        }
       }
     }
 
@@ -24308,7 +24325,6 @@ class _InvestScreenState extends State<InvestScreen> {
         final muted = isDark ? Colors.white70 : const Color(0xFF475569);
         return StatefulBuilder(
           builder: (context, setSheet) {
-            final logo = logoCtrl.text.trim();
             final brand = brandCtrl.text.trim().isEmpty ? 'NGMY Essential' : brandCtrl.text.trim();
             final brandInitials = brand.substring(0, math.min(2, brand.length)).toUpperCase();
             final title = titleCtrl.text.trim().isEmpty ? 'NGMY Member' : titleCtrl.text.trim();
@@ -24363,70 +24379,104 @@ class _InvestScreenState extends State<InvestScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      _emailComposerField(logoCtrl, label: 'Logo image URL (optional)', hint: 'https://...', onChanged: () => setSheet(() {})),
+                      InkWell(
+                        onTap: () => unawaited(pickLogo(setSheet, sheetCtx)),
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.07) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: colors.first.withValues(alpha: 0.28)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), gradient: const LinearGradient(colors: colors)),
+                                child: logoBytes == null ? const Icon(Icons.add_photo_alternate_rounded, color: Colors.white) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.memory(logoBytes!, fit: BoxFit.cover)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  logoBytes == null ? 'Upload logo from your phone' : 'Logo uploaded. Tap to change it.',
+                                  style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       Text('Live Email Frame', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 14)),
                       const SizedBox(height: 10),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: isDark
-                                ? const [Color(0xFF0B1220), Color(0xFF102A43), Color(0xFF0F172A)]
-                                : const [Color(0xFFFFFFFF), Color(0xFFE0F2FE), Color(0xFFF8FAFC)],
+                      RepaintBoundary(
+                        key: emailCardKey,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isDark
+                                  ? const [Color(0xFF0B1220), Color(0xFF102A43), Color(0xFF0F172A)]
+                                  : const [Color(0xFFFFFFFF), Color(0xFFE0F2FE), Color(0xFFF8FAFC)],
+                            ),
+                            border: Border.all(color: colors.first.withValues(alpha: 0.32)),
                           ),
-                          border: Border.all(color: colors.first.withValues(alpha: 0.32)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(18),
-                                  child: Container(
-                                    width: 58,
-                                    height: 58,
-                                    decoration: BoxDecoration(gradient: const LinearGradient(colors: colors), borderRadius: BorderRadius.circular(18)),
-                                    child: logo.startsWith('http')
-                                        ? Image.network(logo, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.business_rounded, color: Colors.white, size: 30))
-                                        : Center(child: Text(brandInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Container(
+                                      width: 62,
+                                      height: 62,
+                                      decoration: BoxDecoration(gradient: const LinearGradient(colors: colors), borderRadius: BorderRadius.circular(18)),
+                                      child: logoBytes != null
+                                          ? Image.memory(logoBytes!, fit: BoxFit.cover)
+                                          : Center(child: Text(brandInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(brand, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 17)),
-                                      const SizedBox(height: 3),
-                                      Text(subjectCtrl.text.trim().isEmpty ? 'Email subject preview' : subjectCtrl.text.trim(), style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
-                                    ],
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(brand, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 18)),
+                                        const SizedBox(height: 3),
+                                        Text(subjectCtrl.text.trim().isEmpty ? 'Email subject preview' : subjectCtrl.text.trim(), style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.78),
-                                borderRadius: BorderRadius.circular(18),
+                                ],
                               ),
-                              child: Text(messageCtrl.text.trim().isEmpty ? 'Your email message will appear here.' : messageCtrl.text.trim(), style: TextStyle(color: fg, fontSize: 13, height: 1.45, fontWeight: FontWeight.w600)),
-                            ),
-                            const SizedBox(height: 14),
-                            Container(height: 1, color: colors.first.withValues(alpha: 0.28)),
-                            const SizedBox(height: 12),
-                            Text(senderName, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15)),
-                            const SizedBox(height: 2),
-                            Text('$title • $senderEmail', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
-                          ],
+                              const SizedBox(height: 14),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.78),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Text(messageCtrl.text.trim().isEmpty ? 'Your email message will appear here.' : messageCtrl.text.trim(), style: TextStyle(color: fg, fontSize: 13, height: 1.45, fontWeight: FontWeight.w600)),
+                              ),
+                              const SizedBox(height: 14),
+                              Container(height: 1, color: colors.first.withValues(alpha: 0.28)),
+                              const SizedBox(height: 12),
+                              Text(senderName, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15)),
+                              const SizedBox(height: 2),
+                              Text('$title - $senderEmail', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                              const SizedBox(height: 8),
+                              Text('Created with NGMY Essential', style: TextStyle(color: colors.first, fontWeight: FontWeight.w900, fontSize: 11)),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -24445,10 +24495,10 @@ class _InvestScreenState extends State<InvestScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: () => unawaited(openCompose(sheetCtx)),
+                              onPressed: () => unawaited(shareEmailCard(sheetCtx)),
                               style: FilledButton.styleFrom(backgroundColor: colors.last),
-                              icon: const Icon(Icons.send_rounded),
-                              label: const Text('Compose'),
+                              icon: const Icon(Icons.ios_share_rounded),
+                              label: const Text('Share Card'),
                             ),
                           ),
                         ],
@@ -24467,7 +24517,6 @@ class _InvestScreenState extends State<InvestScreen> {
       messageCtrl.dispose();
       titleCtrl.dispose();
       brandCtrl.dispose();
-      logoCtrl.dispose();
     });
   }
 
@@ -24494,18 +24543,43 @@ class _InvestScreenState extends State<InvestScreen> {
 
   Future<void> _showAnimatedMessageComposer(BuildContext ctx) {
     final messageCtrl = TextEditingController(text: 'I am locked in right now. Give me a few and I will send you the clean version.');
-    const styleNames = ['Neon 3D', 'Glass Wave', 'Gold Pulse', 'Cosmic Bubble'];
+    final messageCardKey = GlobalKey();
+    const styleNames = ['Neon 3D', 'Glass Wave', 'Gold Pulse', 'Cosmic Bubble', 'Lava Pop', 'Ocean Spin', 'Candy Glow', 'Matrix Beam'];
     const palettes = [
       [Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF06B6D4)],
       [Color(0xFF06B6D4), Color(0xFF2563EB), Color(0xFFE0F2FE)],
       [Color(0xFFFFD166), Color(0xFFF59E0B), Color(0xFF7C2D12)],
       [Color(0xFF111827), Color(0xFF7C3AED), Color(0xFF22D3EE)],
+      [Color(0xFFFF3B30), Color(0xFFFF7A00), Color(0xFFFFD60A)],
+      [Color(0xFF0EA5E9), Color(0xFF14B8A6), Color(0xFFECFEFF)],
+      [Color(0xFFFF5DA2), Color(0xFF8B5CF6), Color(0xFFFFE4F2)],
+      [Color(0xFF052E16), Color(0xFF22C55E), Color(0xFFBBF7D0)],
     ];
     var selectedStyle = 0;
 
     String shareText() {
       final text = messageCtrl.text.trim().isEmpty ? 'Your message' : messageCtrl.text.trim();
       return '$text\n\nSent with NGMY Essential ${styleNames[selectedStyle]}';
+    }
+
+    Future<void> shareMessageCard(BuildContext sheetCtx) async {
+      try {
+        final bytes = await _captureEssentialPng(messageCardKey);
+        final msg = await shareNgmyPngBytes(
+          bytes,
+          'ngmy_animated_text_${DateTime.now().millisecondsSinceEpoch}.png',
+          title: 'NGMY animated text',
+          text: shareText(),
+        );
+        if (sheetCtx.mounted) {
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text(msg)));
+        }
+      } catch (e) {
+        if (sheetCtx.mounted) {
+          await Share.share(shareText(), subject: 'NGMY animated text');
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Shared as text because the image was not ready.')));
+        }
+      }
     }
 
     return showModalBottomSheet<void>(
@@ -24589,7 +24663,10 @@ class _InvestScreenState extends State<InvestScreen> {
                       const SizedBox(height: 16),
                       Text('Animated Preview', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 14)),
                       const SizedBox(height: 10),
-                      _animatedMessagePreview(text: text, colors: colors, styleIndex: selectedStyle, isDark: isDark),
+                      RepaintBoundary(
+                        key: messageCardKey,
+                        child: _animatedMessagePreview(text: text, colors: colors, styleIndex: selectedStyle, isDark: isDark),
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -24606,10 +24683,10 @@ class _InvestScreenState extends State<InvestScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: () => Share.share(shareText(), subject: 'NGMY animated text'),
+                              onPressed: () => unawaited(shareMessageCard(sheetCtx)),
                               style: FilledButton.styleFrom(backgroundColor: colors[1]),
                               icon: const Icon(Icons.ios_share_rounded),
-                              label: const Text('Share'),
+                              label: const Text('Share Image'),
                             ),
                           ),
                         ],
@@ -24687,7 +24764,7 @@ class _InvestScreenState extends State<InvestScreen> {
                               size: 20,
                             ),
                             const SizedBox(width: 8),
-                            Text(styleIndex == 0 ? '3D MESSAGE' : styleIndex == 1 ? 'GLASS WAVE' : styleIndex == 2 ? 'GOLD PULSE' : 'COSMIC BUBBLE',
+                            Text(_messageStyleLabel(styleIndex),
                                 style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.3)),
                           ],
                         ),
@@ -24741,6 +24818,38 @@ class _InvestScreenState extends State<InvestScreen> {
         ),
       ),
     );
+  }
+
+  String _messageStyleLabel(int styleIndex) {
+    switch (styleIndex) {
+      case 0:
+        return '3D MESSAGE';
+      case 1:
+        return 'GLASS WAVE';
+      case 2:
+        return 'GOLD PULSE';
+      case 3:
+        return 'COSMIC BUBBLE';
+      case 4:
+        return 'LAVA POP';
+      case 5:
+        return 'OCEAN SPIN';
+      case 6:
+        return 'CANDY GLOW';
+      default:
+        return 'MATRIX BEAM';
+    }
+  }
+
+  Future<Uint8List> _captureEssentialPng(GlobalKey key) async {
+    await Future.delayed(const Duration(milliseconds: 120));
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) throw Exception('Preview is not ready yet.');
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+    if (bytes == null || bytes.isEmpty) throw Exception('Could not create image.');
+    return bytes;
   }
 
   Future<void> _showEssentialSheet(
