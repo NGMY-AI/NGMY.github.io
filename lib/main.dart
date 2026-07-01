@@ -24992,33 +24992,337 @@ class InvestScreen extends StatefulWidget {
 }
 
 class _InvestScreenState extends State<InvestScreen> {
+  static const String _alphaVantageKey = 'EWBJQBP572GSBOBK';
+  static const List<String> _defaultSymbols = ['SPY', 'AAPL', 'TSLA', 'NVDA'];
+
+  final _symbolCtrl = TextEditingController(text: 'AAPL');
+  final List<_NgmyMarketQuote> _quotes = [];
+  bool _marketLoading = false;
+  String? _marketError;
+  DateTime? _marketUpdatedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadMarketQuotes(_defaultSymbols));
+  }
+
+  @override
+  void dispose() {
+    _symbolCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMarketQuotes(List<String> symbols) async {
+    final cleanSymbols = symbols
+        .map((s) => s.trim().toUpperCase())
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .take(5)
+        .toList();
+    if (cleanSymbols.isEmpty) return;
+    setState(() {
+      _marketLoading = true;
+      _marketError = null;
+    });
+    try {
+      final loaded = <_NgmyMarketQuote>[];
+      for (final symbol in cleanSymbols) {
+        final quote = await _fetchMarketQuote(symbol);
+        if (quote != null) loaded.add(quote);
+      }
+      if (!mounted) return;
+      setState(() {
+        if (loaded.isNotEmpty) {
+          _quotes
+            ..clear()
+            ..addAll(loaded);
+          _marketUpdatedAt = DateTime.now();
+        }
+        _marketError = loaded.isEmpty ? 'No market quote came back. Try a different symbol.' : null;
+        _marketLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _marketError = 'Market data could not load right now.';
+        _marketLoading = false;
+      });
+    }
+  }
+
+  Future<_NgmyMarketQuote?> _fetchMarketQuote(String symbol) async {
+    final uri = Uri.https('www.alphavantage.co', '/query', {
+      'function': 'GLOBAL_QUOTE',
+      'symbol': symbol,
+      'apikey': _alphaVantageKey,
+    });
+    final res = await http.get(uri).timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200) return null;
+    final data = jsonDecode(res.body);
+    if (data is! Map<String, dynamic>) return null;
+    final raw = data['Global Quote'];
+    if (raw is! Map) return null;
+    return _NgmyMarketQuote.fromAlpha(Map<String, dynamic>.from(raw));
+  }
+
+  void _searchMarketSymbol() {
+    final symbol = _symbolCtrl.text.trim().toUpperCase();
+    if (symbol.isEmpty) return;
+    unawaited(_loadMarketQuotes([symbol, ..._defaultSymbols.where((s) => s != symbol)]));
+  }
+
   @override Widget build(BuildContext context) {
-    final user = widget.user;
-    final plans = widget.plans;
-    final onInvest = widget.onInvest;
     final bottomPad = _ngmyBottomNavScrollPadding(context);
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFF05070C),
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPad),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const FloatingTitle(title: 'INVESTMENT PLANS'), const SizedBox(height: 16),
-      _essentialStudio(context),
-      const SizedBox(height: 22),
-      if (user.activeInvestment != null) ...[
-        const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-        const SizedBox(height: 15),
-        _activeCard(context, user.activeInvestment!, user),
-        const SizedBox(height: 30),
-      ],
-      const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)), const SizedBox(height: 15),
-      ...plans.map((p) => _planRow(context, p)),
+            _marketHero(),
+            const SizedBox(height: 16),
+            _marketSearchCard(),
+            const SizedBox(height: 16),
+            _marketOverview(),
+            const SizedBox(height: 16),
+            _marketQuoteGrid(),
+            const SizedBox(height: 12),
+            Text(
+              'Market data by Alpha Vantage. Quotes may be delayed. This is informational, not financial advice.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.42), fontSize: 11, height: 1.35),
+            ),
           ]),
         ),
       ),
     );
+  }
+
+  Widget _marketHero() {
+    final top = _quotes.isNotEmpty ? _quotes.first : null;
+    final updated = _marketUpdatedAt == null ? 'Loading live market data' : 'Updated ${_marketTimestamp(_marketUpdatedAt!)}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0B1020), Color(0xFF111827), Color(0xFF064E3B)],
+        ),
+        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.28)),
+        boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.16), blurRadius: 30, offset: const Offset(0, 16))],
+      ),
+      child: Stack(
+        children: [
+          Positioned(right: -26, top: -28, child: Icon(Icons.show_chart_rounded, color: Colors.white.withValues(alpha: 0.08), size: 150)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(color: const Color(0xFF22C55E), borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.candlestick_chart_rounded, color: Colors.black, size: 28),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('NGMY MARKET HUB', style: TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1)),
+                        SizedBox(height: 2),
+                        Text('Live Trading Dashboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(top?.symbol ?? 'LIVE', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 13)),
+              const SizedBox(height: 4),
+              Text(top == null ? '--' : '\$${top.price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 42, height: 1.0)),
+              const SizedBox(height: 8),
+              if (top != null) _marketChangePill(top) else const SizedBox(height: 28),
+              const SizedBox(height: 12),
+              Text(updated, style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 11, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _marketSearchCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1020),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _symbolCtrl,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: 'Search stock symbol, ex: AAPL',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF22C55E)),
+                filled: true,
+                fillColor: const Color(0xFF05070C),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
+              onSubmitted: (_) => _searchMarketSymbol(),
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: _marketLoading ? null : _searchMarketSymbol,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: _marketLoading
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                : const Icon(Icons.arrow_forward_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _marketOverview() {
+    final gainers = _quotes.where((q) => q.change >= 0).length;
+    final losers = _quotes.where((q) => q.change < 0).length;
+    return Row(
+      children: [
+        Expanded(child: _marketMiniStat('Watching', '${_quotes.length}', Icons.remove_red_eye_rounded, const Color(0xFF38BDF8))),
+        const SizedBox(width: 10),
+        Expanded(child: _marketMiniStat('Green', '$gainers', Icons.trending_up_rounded, const Color(0xFF22C55E))),
+        const SizedBox(width: 10),
+        Expanded(child: _marketMiniStat('Red', '$losers', Icons.trending_down_rounded, const Color(0xFFEF4444))),
+      ],
+    );
+  }
+
+  Widget _marketMiniStat(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1020),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 10),
+          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontWeight: FontWeight.w700, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _marketQuoteGrid() {
+    if (_marketError != null && _quotes.isEmpty) {
+      return _marketEmptyState(_marketError!);
+    }
+    if (_marketLoading && _quotes.isEmpty) {
+      return const SizedBox(height: 260, child: Center(child: CircularProgressIndicator(color: Color(0xFF22C55E))));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Live Watchlist', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 12),
+        ..._quotes.map(_marketQuoteCard),
+      ],
+    );
+  }
+
+  Widget _marketQuoteCard(_NgmyMarketQuote quote) {
+    final positive = quote.change >= 0;
+    final color = positive ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1020),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
+            child: Icon(positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(quote.symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                const SizedBox(height: 3),
+                Text('Open \$${quote.open.toStringAsFixed(2)} • Vol ${quote.volumeLabel}', style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontWeight: FontWeight.w700, fontSize: 11)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('\$${quote.price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+              const SizedBox(height: 5),
+              _marketChangePill(quote),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _marketChangePill(_NgmyMarketQuote quote) {
+    final positive = quote.change >= 0;
+    final color = positive ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(999)),
+      child: Text(
+        '${positive ? '+' : ''}${quote.change.toStringAsFixed(2)} (${quote.changePercent})',
+        style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
+      ),
+    );
+  }
+
+  Widget _marketEmptyState(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(color: const Color(0xFF0B1020), borderRadius: BorderRadius.circular(22)),
+      child: Text(message, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  String _marketTimestamp(DateTime date) {
+    final d = date.isUtc ? date.toLocal() : date;
+    final hour12 = d.hour == 0 ? 12 : (d.hour > 12 ? d.hour - 12 : d.hour);
+    final minute = d.minute.toString().padLeft(2, '0');
+    final ampm = d.hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $ampm';
   }
 
   Widget _essentialStudio(BuildContext ctx) {
@@ -27417,6 +27721,44 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NgmyMarketQuote {
+  const _NgmyMarketQuote({
+    required this.symbol,
+    required this.open,
+    required this.price,
+    required this.change,
+    required this.changePercent,
+    required this.volume,
+  });
+
+  final String symbol;
+  final double open;
+  final double price;
+  final double change;
+  final String changePercent;
+  final int volume;
+
+  String get volumeLabel {
+    if (volume >= 1000000000) return '${(volume / 1000000000).toStringAsFixed(1)}B';
+    if (volume >= 1000000) return '${(volume / 1000000).toStringAsFixed(1)}M';
+    if (volume >= 1000) return '${(volume / 1000).toStringAsFixed(1)}K';
+    return volume.toString();
+  }
+
+  factory _NgmyMarketQuote.fromAlpha(Map<String, dynamic> json) {
+    double parseDouble(String key) => double.tryParse((json[key] ?? '0').toString().replaceAll('%', '')) ?? 0;
+    int parseInt(String key) => int.tryParse((json[key] ?? '0').toString()) ?? 0;
+    return _NgmyMarketQuote(
+      symbol: (json['01. symbol'] ?? '').toString().trim().toUpperCase(),
+      open: parseDouble('02. open'),
+      price: parseDouble('05. price'),
+      volume: parseInt('06. volume'),
+      change: parseDouble('09. change'),
+      changePercent: (json['10. change percent'] ?? '0%').toString(),
     );
   }
 }
