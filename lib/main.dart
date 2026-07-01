@@ -23017,6 +23017,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   final _accentHex = TextEditingController(text: '00E5FF');
   final _movieSearch = TextEditingController();
   final _tmdbKey = TextEditingController();
+  final _moviePlayerKey = GlobalKey();
   int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
   _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
   Timer? _handleSaveDebounce;
@@ -23030,7 +23031,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   double _movieProgress = 0.0;
   DateTime? _movieLastWatched;
   bool _movieCatalogLoading = false;
-  bool _showMovieProviderSetup = false;
   String _movieCatalogMode = 'now_playing';
   String? _movieCatalogError;
   List<_NgmyMovieCatalogItem> _movieCatalog = _ngmyFallbackMovies;
@@ -23130,31 +23130,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     return (match?.group(1) ?? text).trim();
   }
 
-  String _generatedMovieUrl() {
-    final id = _movieId.text.trim().isEmpty ? '1078605' : _movieId.text.trim();
-    final color = _cleanHexColor();
-    final params = <String>[
-      'color=$color',
-      if (_movieAutoplay) 'autoPlay=true',
-      if (_movieIsTv && _movieNextEpisode) 'nextEpisode=true',
-      if (_movieIsTv && _movieEpisodeSelector) 'episodeSelector=true',
-    ];
-    final path = _movieIsTv
-        ? '/embed/tv/$id/${_season.text.trim().isEmpty ? '1' : _season.text.trim()}/${_episode.text.trim().isEmpty ? '1' : _episode.text.trim()}'
-        : '/embed/movie/$id';
-    return 'https://www.vidking.net$path${params.isEmpty ? '' : '?${params.join('&')}'}';
-  }
-
-  String _activeMovieHtml() =>
-      '<iframe src="$_activeMovieUrl" width="100%" height="600" frameborder="0" allowfullscreen></iframe>';
-
-  void _generateMovieEmbed() {
-    final url = _generatedMovieUrl();
-    setState(() {
-      _embedUrl.text = url;
-    });
-  }
-
   void _playMovieEmbed({String? url, String? title}) {
     final nextUrl = _extractMovieEmbedSrc(url ?? _embedUrl.text);
     if (nextUrl.isEmpty) {
@@ -23174,7 +23149,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     if (key.isEmpty) {
       setState(() {
         _movieCatalog = _ngmyFallbackMovies;
-        _movieCatalogError = 'Add a TMDB catalog key to load live latest movies. Showing built-in featured movies for now.';
+        _movieCatalogError = null;
         _movieCatalogLoading = false;
       });
       return;
@@ -23216,7 +23191,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       setState(() {
         _movieCatalog = items.isEmpty ? _ngmyFallbackMovies : items;
         _movieCatalogLoading = false;
-        _movieCatalogError = items.isEmpty ? 'No movies found. Showing built-in featured movies.' : null;
+        _movieCatalogError = null;
       });
     } catch (e) {
       debugPrint('[movie hub] catalog: $e');
@@ -23224,15 +23199,9 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       setState(() {
         _movieCatalog = _ngmyFallbackMovies;
         _movieCatalogLoading = false;
-        _movieCatalogError = 'Could not load the live catalog. Showing built-in featured movies.';
+        _movieCatalogError = null;
       });
     }
-  }
-
-  void _saveMovieProviderKey() {
-    unawaited(_saveMovieHubState());
-    unawaited(_loadMovieCatalog(query: _movieSearch.text));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Movie catalog key saved.')));
   }
 
   void _scheduleMovieSearch(String value) {
@@ -23255,6 +23224,12 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       _embedUrl.text = item.embedUrl(color: _cleanHexColor(), autoplay: _movieAutoplay);
     });
     _playMovieEmbed(url: _embedUrl.text, title: item.title);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _moviePlayerKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+      }
+    });
   }
 
   void _saveMovieProgress(double value) {
@@ -23414,15 +23389,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
               const SizedBox(height: 16),
               _moviePlayerCard(),
               const SizedBox(height: 16),
-              _movieGeneratedCodeCard(),
-              const SizedBox(height: 16),
-              _movieBuilderCard(),
-              const SizedBox(height: 16),
-              _movieApiCards(),
-              const SizedBox(height: 16),
-              _movieProgressCard(),
-              const SizedBox(height: 16),
-              _movieLegalNote(),
             ],
           ),
         ),
@@ -23461,7 +23427,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
               children: [
                 Text('NGMY Movie Hub', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
                 SizedBox(height: 4),
-                Text('Build embed players, preview streams, and save watch progress.', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.25)),
+                Text('Tap a movie and watch it inside NGMY.', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.25)),
               ],
             ),
           ),
@@ -23475,6 +23441,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     final playUrl = target?.playUrl ?? _activeMovieUrl;
     final useEmbedHtml = target?.usesEmbedHtml ?? false;
     return Container(
+      key: _moviePlayerKey,
       decoration: BoxDecoration(
         color: const Color(0xFF1F232B),
         borderRadius: BorderRadius.circular(24),
@@ -23503,6 +23470,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
                 viewKey: 'wallet_movie_${_activeMovieUrl.hashCode}',
                 playUrl: playUrl,
                 useEmbedHtml: useEmbedHtml,
+                lockNavigation: true,
               ),
             ),
           ),
@@ -23556,37 +23524,8 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             Text(_movieCatalogError!, style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
           ],
           const SizedBox(height: 12),
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 180),
-            crossFadeState: _showMovieProviderSetup ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            firstChild: Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => setState(() => _showMovieProviderSetup = true),
-                icon: const Icon(Icons.vpn_key_rounded, size: 16),
-                label: const Text('Add live catalog API key'),
-                style: TextButton.styleFrom(foregroundColor: const Color(0xFF22D3EE)),
-              ),
-            ),
-            secondChild: Column(
-              children: [
-                TextField(
-                  controller: _tmdbKey,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _movieInput('TMDB API key or read access token'),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: _movieMiniButton('Save key', Icons.save_rounded, _saveMovieProviderKey)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _movieMiniButton('Hide setup', Icons.keyboard_arrow_up_rounded, () => setState(() => _showMovieProviderSetup = false))),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 6),
+          const Text('Tap any poster to play it here in NGMY.', style: TextStyle(color: Colors.white54, fontSize: 11)),
           const SizedBox(height: 14),
           if (_movieCatalogLoading)
             const SizedBox(
@@ -23692,147 +23631,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     );
   }
 
-  Widget _movieGeneratedCodeCard() {
-    return _moviePanel(
-      title: 'Generated Code',
-      icon: Icons.code_rounded,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Generated URL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-          const SizedBox(height: 8),
-          _movieCodeBox(_activeMovieUrl, copyLabel: 'Copy URL'),
-          const SizedBox(height: 14),
-          const Text('HTML Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-          const SizedBox(height: 8),
-          _movieCodeBox(_activeMovieHtml(), copyLabel: 'Copy HTML'),
-        ],
-      ),
-    );
-  }
-
-  Widget _movieBuilderCard() {
-    return _moviePanel(
-      title: 'Movie / TV Builder',
-      icon: Icons.tune_rounded,
-      child: Column(
-        children: [
-          TextField(controller: _movieTitle, style: const TextStyle(color: Colors.white), decoration: _movieInput('Title label')),
-          const SizedBox(height: 10),
-          TextField(controller: _embedUrl, style: const TextStyle(color: Colors.white), decoration: _movieInput('Paste embed URL or iframe HTML')),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _movieMiniButton('Play pasted', Icons.play_arrow_rounded, () => _playMovieEmbed())),
-              const SizedBox(width: 10),
-              Expanded(child: _movieMiniButton('Use generated', Icons.auto_fix_high_rounded, () {
-                _generateMovieEmbed();
-                _playMovieEmbed();
-              })),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _movieToggle('Movie', !_movieIsTv, () => setState(() => _movieIsTv = false))),
-              const SizedBox(width: 10),
-              Expanded(child: _movieToggle('TV Series', _movieIsTv, () => setState(() => _movieIsTv = true))),
-            ],
-          ),
-          const SizedBox(height: 10),
-          TextField(controller: _movieId, style: const TextStyle(color: Colors.white), decoration: _movieInput(_movieIsTv ? 'TMDB show ID' : 'TMDB movie ID')),
-          if (_movieIsTv) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(child: TextField(controller: _season, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _movieInput('Season'))),
-                const SizedBox(width: 10),
-                Expanded(child: TextField(controller: _episode, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _movieInput('Episode'))),
-              ],
-            ),
-          ],
-          const SizedBox(height: 10),
-          TextField(controller: _accentHex, style: const TextStyle(color: Colors.white), decoration: _movieInput('Primary color hex, ex: 00E5FF')),
-          const SizedBox(height: 10),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _movieAutoplay,
-            onChanged: (v) => setState(() => _movieAutoplay = v),
-            title: const Text('Autoplay', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            activeColor: const Color(0xFF22D3EE),
-          ),
-          if (_movieIsTv)
-            Row(
-              children: [
-                Expanded(child: CheckboxListTile(contentPadding: EdgeInsets.zero, value: _movieNextEpisode, onChanged: (v) => setState(() => _movieNextEpisode = v ?? true), title: const Text('Next Episode', style: TextStyle(color: Colors.white70, fontSize: 12)))),
-                Expanded(child: CheckboxListTile(contentPadding: EdgeInsets.zero, value: _movieEpisodeSelector, onChanged: (v) => setState(() => _movieEpisodeSelector = v ?? true), title: const Text('Episode Selector', style: TextStyle(color: Colors.white70, fontSize: 12)))),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _movieApiCards() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: _movieRouteCard('Movies', '/embed/movie/{tmdbId}', 'Replace {tmdbId} with a TMDB movie ID')),
-            const SizedBox(width: 12),
-            Expanded(child: _movieRouteCard('TV Series', '/embed/tv/{tmdbId}/{season}/{episode}', 'Show ID, season number, episode number')),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _moviePanel(
-          title: 'URL Parameters',
-          icon: Icons.link_rounded,
-          child: Column(
-            children: const [
-              _MovieParamRow('color', 'string', 'Primary color hex'),
-              _MovieParamRow('autoPlay', 'boolean', 'Enable autoplay'),
-              _MovieParamRow('nextEpisode', 'boolean', 'Show next episode button'),
-              _MovieParamRow('episodeSelector', 'boolean', 'Enable TV episode menu'),
-              _MovieParamRow('progress', 'number', 'Start time in seconds'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _movieProgressCard() {
-    final label = _movieLastWatched == null ? 'No saved watch yet' : 'Last watched ${_historyTimestamp(_movieLastWatched!)}';
-    return _moviePanel(
-      title: 'Watch Progress Tracking',
-      icon: Icons.timeline_rounded,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          const SizedBox(height: 12),
-          Slider(
-            value: _movieProgress,
-            onChanged: _saveMovieProgress,
-            activeColor: const Color(0xFF22D3EE),
-            inactiveColor: Colors.white12,
-          ),
-          Text('${(_movieProgress * 100).round()}% watched for $_activeMovieTitle', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-          const SizedBox(height: 12),
-          _movieCodeBox('Event data: timeupdate, play, pause, ended, seeked', copyLabel: 'Copy Events'),
-        ],
-      ),
-    );
-  }
-
-  Widget _movieLegalNote() {
-    return Text(
-      'Use this player only with movies, trailers, streams, or embeds you own, license, or are allowed to show.',
-      textAlign: TextAlign.center,
-      style: TextStyle(color: Colors.white.withOpacity(0.38), fontSize: 11, height: 1.3),
-    );
-  }
-
   Widget _moviePanel({required String title, required IconData icon, required Widget child}) {
     return Container(
       width: double.infinity,
@@ -23860,38 +23658,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     );
   }
 
-  Widget _movieCodeBox(String value, {required String copyLabel}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF080A10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SelectableText(
-              value,
-              style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 11, height: 1.35, fontFamily: 'monospace'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: value));
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$copyLabel copied')));
-            },
-            icon: const Icon(Icons.copy_rounded, size: 14),
-            label: const Text('Copy', style: TextStyle(fontSize: 11)),
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFF22D3EE), padding: EdgeInsets.zero),
-          ),
-        ],
-      ),
-    );
-  }
-
   InputDecoration _movieInput(String hint) {
     return InputDecoration(
       hintText: hint,
@@ -23906,58 +23672,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       focusedBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(12)),
         borderSide: BorderSide(color: Color(0xFF22D3EE), width: 1.4),
-      ),
-    );
-  }
-
-  Widget _movieMiniButton(String label, IconData icon, VoidCallback onTap) {
-    return FilledButton.icon(
-      onPressed: onTap,
-      style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFF0891B2),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-      ),
-      icon: Icon(icon, size: 17),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-    );
-  }
-
-  Widget _movieToggle(String label, bool selected, VoidCallback onTap) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF22D3EE).withOpacity(0.18) : const Color(0xFF080A10),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? const Color(0xFF22D3EE) : Colors.white.withOpacity(0.10)),
-        ),
-        child: Center(child: Text(label, style: TextStyle(color: selected ? const Color(0xFF67E8F9) : Colors.white70, fontWeight: FontWeight.w900))),
-      ),
-    );
-  }
-
-  Widget _movieRouteCard(String title, String route, String caption) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1F232B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
-          const SizedBox(height: 10),
-          _movieCodeBox(route, copyLabel: 'Route'),
-          const SizedBox(height: 8),
-          Text(caption, style: const TextStyle(color: Colors.white54, fontSize: 10, height: 1.25)),
-        ],
       ),
     );
   }
@@ -24551,31 +24265,6 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     final minute = d.minute.toString().padLeft(2, '0');
     final ampm = d.hour >= 12 ? 'PM' : 'AM';
     return '${monthNames[d.month - 1]} ${d.day} ${d.year}, $hour12:$minute $ampm';
-  }
-}
-
-class _MovieParamRow extends StatelessWidget {
-  const _MovieParamRow(this.parameter, this.type, this.description);
-
-  final String parameter;
-  final String type;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: 96, child: Text(parameter, style: const TextStyle(color: Color(0xFF22D3EE), fontWeight: FontWeight.w800, fontSize: 11))),
-          SizedBox(width: 72, child: Text(type, style: const TextStyle(color: Colors.white60, fontSize: 11))),
-          Expanded(child: Text(description, style: const TextStyle(color: Colors.white70, fontSize: 11))),
-        ],
-      ),
-    );
   }
 }
 

@@ -15,6 +15,7 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     this.compact = false,
     this.useEmbedHtml = true,
     this.notifyOnEnd = false,
+    this.lockNavigation = false,
   });
 
   final String viewKey;
@@ -22,6 +23,7 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
   final bool compact;
   final bool useEmbedHtml;
   final bool notifyOnEnd;
+  final bool lockNavigation;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -55,6 +57,17 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
       ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            if (widget.lockNavigation && request.isMainFrame) {
+              final initial = Uri.tryParse(widget.playUrl);
+              final next = Uri.tryParse(request.url);
+              if (initial != null && next != null && initial.host.isNotEmpty && next.host.isNotEmpty && initial.host != next.host) {
+                debugPrint('[movie hub] blocked external player navigation: ${request.url}');
+                return NavigationDecision.prevent;
+              }
+            }
+            return NavigationDecision.navigate;
+          },
           onPageStarted: (_) {
             if (mounted) setState(() => _loading = true);
           },
