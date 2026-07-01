@@ -15311,6 +15311,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshAdminMedia: widget.onRefreshAdminMedia,
         onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
         onOpenInvest: () => setState(() => _idx = 1),
+        onOpenMainTab: (idx) => setState(() {
+          _idx = idx;
+          _visitedTabs.add(idx);
+          if (idx == 5) _visitedTabs.add(3);
+        }),
         onOpenAdminDashboard: widget.user.isAdmin ? _openAdminDashboardFromHome : null,
       ),
     );
@@ -15874,12 +15879,13 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final VoidCallback? onOpenInvest;
+  final ValueChanged<int>? onOpenMainTab;
   final VoidCallback? onOpenAdminDashboard;
   final Widget? homeLeadingOverride;
   final bool disableLocalGrowthIncomeEntry;
   final bool isLocalGrowthIncome;
   final String? homeTitleOverride;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenMainTab, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -16003,6 +16009,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (text.isEmpty || _assistantTyping) return;
     _assistantInputCtrl.clear();
 
+    if (await _tryRunAssistantAppControl(text)) return;
+
     if (!widget.user.isAdmin) {
       final limit = widget.config.ngmyHelperDailyMessageLimit;
       if (limit > 0) {
@@ -16093,6 +16101,68 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _clearAssistantChat() {
     setState(() => _assistantMessages.clear());
     unawaited(NgmyAiMemoryStore.saveAll(widget.user.email, const []));
+  }
+
+  Future<bool> _tryRunAssistantAppControl(String text) async {
+    final lower = text.toLowerCase();
+    Future<void> logAndReply(String reply) async {
+      setState(() {
+        _assistantMessages.add({'role': 'user', 'text': text, 'at': DateTime.now().toUtc().toIso8601String()});
+        _assistantMessages.add({'role': 'ai', 'text': reply, 'at': DateTime.now().toUtc().toIso8601String()});
+      });
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: text));
+      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
+      _scrollAssistantToBottom();
+    }
+
+    bool saysAny(Iterable<String> words) => words.any(lower.contains);
+
+    if (saysAny(const ['open wallet', 'go to wallet', 'show wallet', 'my wallet', 'deposit', 'withdraw'])) {
+      await logAndReply('Opening Wallet now. You can deposit, withdraw, and review your balance history there.');
+      widget.onOpenMainTab?.call(2);
+      return true;
+    }
+    if (saysAny(const ['open invest', 'go to invest', 'investment', 'plans', 'buy plan'])) {
+      await logAndReply('Opening Investment Plans now. Choose a plan or review your active investment there.');
+      widget.onOpenMainTab?.call(1);
+      return true;
+    }
+    if (saysAny(const ['creator', 'toolkit', 'studio tools', 'qr generator', 'doc share', 'quote calc'])) {
+      await logAndReply('Opening Creator Toolkit now. You can use Doc Share, QR Generator, Quote Calc, and studio tools there.');
+      widget.onOpenMainTab?.call(5);
+      return true;
+    }
+    if (saysAny(const ['profile', 'account settings', 'my account'])) {
+      await logAndReply('Opening Profile now. You can manage your account and app settings there.');
+      widget.onOpenMainTab?.call(6);
+      return true;
+    }
+    if (saysAny(const ['media', 'advisors', 'communicate', 'community'])) {
+      await logAndReply('Opening the Media and Advisors area now.');
+      widget.onOpenMainTab?.call(4);
+      return true;
+    }
+    if (saysAny(const ['ngmy hub', 'open hub', 'main hub', 'market', 'store'])) {
+      await logAndReply('Opening NGMY Hub now.');
+      widget.onOpenMainTab?.call(3);
+      return true;
+    }
+    if (saysAny(const ['local growth', 'local income', 'growth income'])) {
+      await logAndReply('Opening Local Growth Income now.');
+      unawaited(_openLocalGrowthFromHome());
+      return true;
+    }
+    if (saysAny(const ['music ai', 'make a song', 'songwriter', 'song writing'])) {
+      await logAndReply('Opening Music AI now. Tell it the song idea, mood, and style you want.');
+      unawaited(_openNewsHub(initialTab: 1));
+      return true;
+    }
+    if (widget.user.isAdmin && saysAny(const ['admin', 'dashboard', 'admin panel', 'control panel'])) {
+      await logAndReply('Opening Admin Dashboard now.');
+      widget.onOpenAdminDashboard?.call();
+      return true;
+    }
+    return false;
   }
 
   Future<void> _openLocalGrowthFromHome() async {
@@ -16363,7 +16433,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _aiOrb(),
                         const SizedBox(height: 22),
                         Text(
-                          _assistantMemoryLoaded ? 'Ask anything, or ask me to make a song.' : 'Restoring your conversation…',
+                          _assistantMemoryLoaded ? 'Ask anything, or say open wallet, open invest, or open local growth.' : 'Restoring your conversation…',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
@@ -16371,6 +16441,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ),
           ),
+          const SizedBox(height: 10),
+          _assistantControlRail(isLight),
           const SizedBox(height: 10),
           Container(
             constraints: const BoxConstraints(minHeight: 54),
@@ -16416,6 +16488,40 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _assistantControlRail(bool isLight) {
+    final controls = <({String label, IconData icon, String command})>[
+      (label: 'Wallet', icon: Icons.account_balance_wallet_rounded, command: 'open wallet'),
+      (label: 'Invest', icon: Icons.trending_up_rounded, command: 'open investment plans'),
+      (label: 'Creator', icon: Icons.dashboard_customize_rounded, command: 'open creator toolkit'),
+      (label: 'Local Growth', icon: Icons.savings_rounded, command: 'open local growth'),
+      (label: 'Music AI', icon: Icons.music_note_rounded, command: 'open music ai'),
+      if (widget.user.isAdmin) (label: 'Admin', icon: Icons.admin_panel_settings_rounded, command: 'open admin dashboard'),
+    ];
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: controls.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final c = controls[i];
+          return ActionChip(
+            avatar: Icon(c.icon, size: 16, color: isLight ? const Color(0xFF6D28D9) : const Color(0xFF67E8F9)),
+            label: Text(c.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+            backgroundColor: Colors.white.withOpacity(isLight ? 0.72 : 0.10),
+            side: BorderSide(color: const Color(0xFF8B5CF6).withOpacity(isLight ? 0.24 : 0.34)),
+            onPressed: _assistantTyping
+                ? null
+                : () {
+                    _assistantInputCtrl.text = c.command;
+                    unawaited(_askAssistant());
+                  },
+          );
+        },
       ),
     );
   }
