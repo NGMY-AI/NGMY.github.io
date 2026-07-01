@@ -16446,8 +16446,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
           ),
           const SizedBox(height: 10),
-          _assistantPhoneAppRail(isLight),
-          const SizedBox(height: 10),
           Container(
             constraints: const BoxConstraints(minHeight: 54),
             padding: const EdgeInsets.only(left: 18, right: 6),
@@ -16492,40 +16490,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _assistantPhoneAppRail(bool isLight) {
-    final controls = <({String label, IconData icon, String command})>[
-      (label: 'Call', icon: Icons.phone_rounded, command: 'Call Mom'),
-      (label: 'Messages', icon: Icons.sms_rounded, command: 'Text Sarah I am on my way'),
-      (label: 'WhatsApp', icon: Icons.chat_rounded, command: 'WhatsApp John saying hello'),
-      (label: 'Calendar', icon: Icons.calendar_month_rounded, command: 'Add dentist Friday at 3pm to my calendar'),
-      (label: 'Maps', icon: Icons.map_rounded, command: 'Open Maps to the nearest gas station'),
-      (label: 'Mail', icon: Icons.email_rounded, command: 'Email support about my order'),
-    ];
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: controls.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final c = controls[i];
-          return ActionChip(
-            avatar: Icon(c.icon, size: 16, color: isLight ? const Color(0xFF6D28D9) : const Color(0xFF67E8F9)),
-            label: Text(c.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-            backgroundColor: Colors.white.withOpacity(isLight ? 0.72 : 0.10),
-            side: BorderSide(color: const Color(0xFF8B5CF6).withOpacity(isLight ? 0.24 : 0.34)),
-            onPressed: _assistantTyping
-                ? null
-                : () {
-                    _assistantInputCtrl.text = c.command;
-                    unawaited(_askAssistant());
-                  },
-          );
-        },
       ),
     );
   }

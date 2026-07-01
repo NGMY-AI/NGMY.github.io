@@ -22,6 +22,10 @@ const List<({String id, String label, String example})> kNgmyPhoneConnectedApps 
   (id: 'sms', label: 'iMessage / Messages', example: 'Text Sarah I am on my way'),
   (id: 'whatsapp', label: 'WhatsApp', example: 'WhatsApp John saying hello'),
   (id: 'email', label: 'Mail', example: 'Email support about my order'),
+  (id: 'messenger', label: 'Messenger', example: 'Open Messenger to my friend'),
+  (id: 'facebook', label: 'Facebook', example: 'Open my Facebook'),
+  (id: 'instagram', label: 'Instagram', example: 'Open Instagram'),
+  (id: 'telegram', label: 'Telegram', example: 'Open Telegram'),
   (id: 'browser', label: 'Safari / Chrome', example: 'Open ngmy.org'),
 ];
 
@@ -53,6 +57,10 @@ Action types (JSON array):
 - whatsapp — name OR phone, body (optional)
 - maps — query or address
 - email — to (email or name if in contacts), subject, body
+- messenger — url OR username OR page; opens Messenger/Facebook chat when a public link/username is known
+- facebook — url OR username OR page; opens Facebook page/profile/feed when a public link/username is known
+- instagram — url OR username; opens Instagram profile/app when a public link/username is known
+- telegram — url OR username; opens Telegram when a public link/username is known
 - open_url — url
 
 Rules:
@@ -61,6 +69,7 @@ Rules:
 - REQUIRED calendar block for any meeting/appointment request.
 - REQUIRED alarm block when user says wake me, set alarm, wake up at, or needs alarm before work/shift/meeting.
 - start/end must be valid ISO datetimes in local timezone.
+- You cannot read private Facebook/Instagram/Messenger activity from the phone app. If asked to read activity, explain that Meta requires official account authorization/API approval, then offer to open the app/link or analyze content the user shares.
 ''';
 }
 
@@ -79,6 +88,10 @@ class NgmyPhoneAction {
         'sms' => 'Send Text',
         'whatsapp' => 'WhatsApp',
         'email' => 'Send Email',
+        'messenger' => 'Open Messenger',
+        'facebook' => 'Open Facebook',
+        'instagram' => 'Open Instagram',
+        'telegram' => 'Open Telegram',
         'open_url' => 'Open Link',
         _ => 'Run',
       };
@@ -91,6 +104,10 @@ class NgmyPhoneAction {
         'sms' => Icons.sms_rounded,
         'whatsapp' => Icons.chat_rounded,
         'email' => Icons.email_rounded,
+        'messenger' => Icons.forum_rounded,
+        'facebook' => Icons.facebook_rounded,
+        'instagram' => Icons.camera_alt_rounded,
+        'telegram' => Icons.send_rounded,
         'open_url' => Icons.open_in_new_rounded,
         _ => Icons.phonelink_rounded,
       };
@@ -123,6 +140,11 @@ class NgmyPhoneAction {
         return phone;
       case 'email':
         return fields['to'] ?? fields['subject'] ?? 'Email';
+      case 'messenger':
+      case 'facebook':
+      case 'instagram':
+      case 'telegram':
+        return fields['username'] ?? fields['page'] ?? fields['url'] ?? label;
       case 'open_url':
         final url = fields['url'] ?? '';
         return url.length > 42 ? '${url.substring(0, 39)}…' : url;
@@ -186,7 +208,7 @@ class NgmyPhoneAction {
     if (actions.isNotEmpty) return (text: text, actions: actions);
   }
 
-  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|maps|call|sms|whatsapp|email|open_url)"[\s\S]*?\}\s*\])');
+  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|messenger|facebook|instagram|telegram|open_url)"[\s\S]*?\}\s*\])');
   final looseMatch = loose.firstMatch(raw);
   if (looseMatch != null) {
     text = raw.replaceFirst(loose, '').trim();
@@ -281,7 +303,11 @@ bool _needsConfirmation(NgmyPhoneAction action) {
       action.type == 'call' ||
       action.type == 'sms' ||
       action.type == 'whatsapp' ||
-      action.type == 'email';
+      action.type == 'email' ||
+      action.type == 'messenger' ||
+      action.type == 'facebook' ||
+      action.type == 'instagram' ||
+      action.type == 'telegram';
 }
 
 Future<String?> ngmyRunPhoneAction(
@@ -310,6 +336,14 @@ Future<String?> ngmyRunPhoneAction(
       return _runWhatsApp(action);
     case 'email':
       return _runEmail(action);
+    case 'messenger':
+      return _runMessenger(action);
+    case 'facebook':
+      return _runFacebook(action);
+    case 'instagram':
+      return _runInstagram(action);
+    case 'telegram':
+      return _runTelegram(action);
     case 'open_url':
       return _runOpenUrl(action);
     default:
@@ -455,6 +489,81 @@ Future<String?> _runEmail(NgmyPhoneAction action) async {
   final uri = Uri(scheme: 'mailto', path: to, queryParameters: params.isEmpty ? null : params);
   final ok = await _launchExternal(uri);
   return ok ? 'Opening Mail…' : 'Could not open Mail.';
+}
+
+String _cleanHandle(String raw) => raw.trim().replaceFirst(RegExp(r'^@+'), '').trim();
+
+Future<String?> _runMessenger(NgmyPhoneAction action) async {
+  final url = (action.fields['url'] ?? '').trim();
+  final username = _cleanHandle(action.fields['username'] ?? action.fields['page'] ?? '');
+  final candidates = <Uri>[];
+  if (url.isNotEmpty) {
+    candidates.add(Uri.parse(url.startsWith('http') ? url : 'https://$url'));
+  }
+  if (username.isNotEmpty) {
+    candidates.add(Uri.parse('fb-messenger://user-thread/$username'));
+    candidates.add(Uri.parse('https://m.me/$username'));
+  }
+  candidates.add(Uri.parse('https://www.messenger.com/'));
+  for (final uri in candidates) {
+    if (await _launchExternal(uri)) return 'Opening Messenger…';
+  }
+  return 'Could not open Messenger.';
+}
+
+Future<String?> _runFacebook(NgmyPhoneAction action) async {
+  final url = (action.fields['url'] ?? '').trim();
+  final username = _cleanHandle(action.fields['username'] ?? action.fields['page'] ?? '');
+  final candidates = <Uri>[];
+  if (url.isNotEmpty) {
+    candidates.add(Uri.parse(url.startsWith('http') ? url : 'https://$url'));
+  }
+  if (username.isNotEmpty) {
+    candidates.add(Uri.parse('fb://profile/$username'));
+    candidates.add(Uri.parse('https://www.facebook.com/$username'));
+  }
+  candidates.add(Uri.parse('fb://feed'));
+  candidates.add(Uri.parse('https://www.facebook.com/'));
+  for (final uri in candidates) {
+    if (await _launchExternal(uri)) return 'Opening Facebook…';
+  }
+  return 'Could not open Facebook.';
+}
+
+Future<String?> _runInstagram(NgmyPhoneAction action) async {
+  final url = (action.fields['url'] ?? '').trim();
+  final username = _cleanHandle(action.fields['username'] ?? '');
+  final candidates = <Uri>[];
+  if (url.isNotEmpty) {
+    candidates.add(Uri.parse(url.startsWith('http') ? url : 'https://$url'));
+  }
+  if (username.isNotEmpty) {
+    candidates.add(Uri.parse('instagram://user?username=$username'));
+    candidates.add(Uri.parse('https://www.instagram.com/$username/'));
+  }
+  candidates.add(Uri.parse('https://www.instagram.com/'));
+  for (final uri in candidates) {
+    if (await _launchExternal(uri)) return 'Opening Instagram…';
+  }
+  return 'Could not open Instagram.';
+}
+
+Future<String?> _runTelegram(NgmyPhoneAction action) async {
+  final url = (action.fields['url'] ?? '').trim();
+  final username = _cleanHandle(action.fields['username'] ?? '');
+  final candidates = <Uri>[];
+  if (url.isNotEmpty) {
+    candidates.add(Uri.parse(url.startsWith('http') ? url : 'https://$url'));
+  }
+  if (username.isNotEmpty) {
+    candidates.add(Uri.parse('tg://resolve?domain=$username'));
+    candidates.add(Uri.parse('https://t.me/$username'));
+  }
+  candidates.add(Uri.parse('https://web.telegram.org/'));
+  for (final uri in candidates) {
+    if (await _launchExternal(uri)) return 'Opening Telegram…';
+  }
+  return 'Could not open Telegram.';
 }
 
 Future<String?> _runOpenUrl(NgmyPhoneAction action) async {
