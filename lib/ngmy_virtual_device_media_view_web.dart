@@ -94,12 +94,6 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
             'allow',
             'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
           );
-        if (widget.lockNavigation) {
-          _frame!.setAttribute(
-            'sandbox',
-            'allow-scripts allow-same-origin allow-forms allow-presentation allow-downloads',
-          );
-        }
         _applySrc(_frame!, widget.playUrl);
         _frame!.onLoad.listen((_) {
           if (mounted) setState(() => _loading = false);

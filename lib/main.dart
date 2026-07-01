@@ -23034,9 +23034,9 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   String _movieCatalogMode = 'now_playing';
   String? _movieCatalogError;
   List<_NgmyMovieCatalogItem> _movieCatalog = _ngmyFallbackMovies;
-  List<_NgmyMovieCatalogItem> _popularMovies = _ngmyFallbackMovies;
-  List<_NgmyMovieCatalogItem> _topRatedMovies = _ngmyFallbackMovies;
-  List<_NgmyMovieCatalogItem> _upcomingMovies = _ngmyFallbackMovies;
+  List<_NgmyMovieCatalogItem> _popularMovies = _ngmyPopularFallbackMovies;
+  List<_NgmyMovieCatalogItem> _topRatedMovies = _ngmyTopRatedFallbackMovies;
+  List<_NgmyMovieCatalogItem> _upcomingMovies = _ngmyNewReleaseFallbackMovies;
 
   @override
   void initState() {
@@ -23155,12 +23155,18 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
 
   Future<void> _loadMovieCatalog({String query = ''}) async {
     final key = _effectiveTmdbKey;
+    final localQuery = query.trim().toLowerCase();
+    List<_NgmyMovieCatalogItem> localSearch() {
+      if (localQuery.isEmpty) return _ngmyFallbackMovies;
+      final all = _ngmyAllFallbackMovies.where((m) => m.title.toLowerCase().contains(localQuery)).toList();
+      return all.isEmpty ? _ngmyFallbackMovies : all;
+    }
     if (key.isEmpty) {
       setState(() {
-        _movieCatalog = _ngmyFallbackMovies;
-        _popularMovies = _ngmyFallbackMovies;
-        _topRatedMovies = _ngmyFallbackMovies;
-        _upcomingMovies = _ngmyFallbackMovies;
+        _movieCatalog = localSearch();
+        _popularMovies = _ngmyPopularFallbackMovies;
+        _topRatedMovies = _ngmyTopRatedFallbackMovies;
+        _upcomingMovies = _ngmyNewReleaseFallbackMovies;
         _movieCatalogError = null;
         _movieCatalogLoading = false;
       });
@@ -23221,10 +23227,10 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       debugPrint('[movie hub] catalog: $e');
       if (!mounted) return;
       setState(() {
-        _movieCatalog = _ngmyFallbackMovies;
-        _popularMovies = _ngmyFallbackMovies;
-        _topRatedMovies = _ngmyFallbackMovies;
-        _upcomingMovies = _ngmyFallbackMovies;
+        _movieCatalog = localSearch();
+        _popularMovies = _ngmyPopularFallbackMovies;
+        _topRatedMovies = _ngmyTopRatedFallbackMovies;
+        _upcomingMovies = _ngmyNewReleaseFallbackMovies;
         _movieCatalogLoading = false;
         _movieCatalogError = null;
       });
@@ -24488,6 +24494,166 @@ const List<_NgmyMovieCatalogItem> _ngmyFallbackMovies = [
     rating: 7.2,
     posterUrl: 'https://image.tmdb.org/t/p/w500/b33nnKl1GSFbao4l3fZDDqsMx0F.jpg',
   ),
+];
+
+const List<_NgmyMovieCatalogItem> _ngmyPopularFallbackMovies = [
+  _NgmyMovieCatalogItem(
+    id: 872585,
+    title: 'Oppenheimer',
+    type: 'movie',
+    year: '2023',
+    rating: 8.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 346698,
+    title: 'Barbie',
+    type: 'movie',
+    year: '2023',
+    rating: 7.0,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 866398,
+    title: 'The Beekeeper',
+    type: 'movie',
+    year: '2024',
+    rating: 7.3,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/A7EByudX0eOzlkQ2FIbogzyazm2.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 1011985,
+    title: 'Kung Fu Panda 4',
+    type: 'movie',
+    year: '2024',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/kDp1vUBnMpe8ak4rjgl3cLELqjU.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 786892,
+    title: 'Furiosa',
+    type: 'movie',
+    year: '2024',
+    rating: 7.5,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/iADOJ8Zymht2JPMoy3R7xceZprc.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 929590,
+    title: 'Civil War',
+    type: 'movie',
+    year: '2024',
+    rating: 6.9,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/sh7Rg8Er3tFcN9BpKIPOMvALgZd.jpg',
+  ),
+];
+
+const List<_NgmyMovieCatalogItem> _ngmyTopRatedFallbackMovies = [
+  _NgmyMovieCatalogItem(
+    id: 278,
+    title: 'The Shawshank Redemption',
+    type: 'movie',
+    year: '1994',
+    rating: 8.7,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/9cqNxx0GxF0bflZmeSMuL5tnGzr.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 238,
+    title: 'The Godfather',
+    type: 'movie',
+    year: '1972',
+    rating: 8.7,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 155,
+    title: 'The Dark Knight',
+    type: 'movie',
+    year: '2008',
+    rating: 8.5,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 496243,
+    title: 'Parasite',
+    type: 'movie',
+    year: '2019',
+    rating: 8.5,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 129,
+    title: 'Spirited Away',
+    type: 'movie',
+    year: '2001',
+    rating: 8.5,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 680,
+    title: 'Pulp Fiction',
+    type: 'movie',
+    year: '1994',
+    rating: 8.5,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg',
+  ),
+];
+
+const List<_NgmyMovieCatalogItem> _ngmyNewReleaseFallbackMovies = [
+  _NgmyMovieCatalogItem(
+    id: 519182,
+    title: 'Despicable Me 4',
+    type: 'movie',
+    year: '2024',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/wWba3TaojhK7NdycRhoQpsG0FaH.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 718821,
+    title: 'Twisters',
+    type: 'movie',
+    year: '2024',
+    rating: 7.0,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/pjnD08FlMAIXsfOLKQbvmO0f0MD.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 558449,
+    title: 'Gladiator II',
+    type: 'movie',
+    year: '2024',
+    rating: 6.8,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 402431,
+    title: 'Wicked',
+    type: 'movie',
+    year: '2024',
+    rating: 7.3,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/xDGbZ0JJ3mYaGKy4Nzd9Kph6M9L.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 1034541,
+    title: 'Terrifier 3',
+    type: 'movie',
+    year: '2024',
+    rating: 6.9,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/l1175hgL5DoXnqeZQCcU3eZIdhX.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 1184918,
+    title: 'The Wild Robot',
+    type: 'movie',
+    year: '2024',
+    rating: 8.4,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/wTnV3PCVW5O92JMrFvvrRcV39RU.jpg',
+  ),
+];
+
+const List<_NgmyMovieCatalogItem> _ngmyAllFallbackMovies = [
+  ..._ngmyFallbackMovies,
+  ..._ngmyPopularFallbackMovies,
+  ..._ngmyTopRatedFallbackMovies,
+  ..._ngmyNewReleaseFallbackMovies,
 ];
 
 // --- NEW SUBMIT PAYMENT PAGE ---
