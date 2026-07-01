@@ -24303,7 +24303,6 @@ class _InvestScreenState extends State<InvestScreen> {
           bytes,
           'ngmy_email_card_${DateTime.now().millisecondsSinceEpoch}.png',
           title: 'NGMY email card',
-          text: emailText(),
         );
         if (sheetCtx.mounted) {
           ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text(msg)));
@@ -24564,20 +24563,19 @@ class _InvestScreenState extends State<InvestScreen> {
 
     Future<void> shareMessageCard(BuildContext sheetCtx) async {
       try {
-        final bytes = await _captureEssentialPng(messageCardKey);
-        final msg = await shareNgmyPngBytes(
+        final bytes = await _captureEssentialGif(messageCardKey);
+        final msg = await shareNgmyBytes(
           bytes,
-          'ngmy_animated_text_${DateTime.now().millisecondsSinceEpoch}.png',
+          'ngmy_animated_text_${DateTime.now().millisecondsSinceEpoch}.gif',
+          mimeType: 'image/gif',
           title: 'NGMY animated text',
-          text: shareText(),
         );
         if (sheetCtx.mounted) {
           ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text(msg)));
         }
       } catch (e) {
         if (sheetCtx.mounted) {
-          await Share.share(shareText(), subject: 'NGMY animated text');
-          ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Shared as text because the image was not ready.')));
+          ScaffoldMessenger.of(sheetCtx).showSnackBar(SnackBar(content: Text('Animated share failed: $e')));
         }
       }
     }
@@ -24850,6 +24848,132 @@ class _InvestScreenState extends State<InvestScreen> {
     final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
     if (bytes == null || bytes.isEmpty) throw Exception('Could not create image.');
     return bytes;
+  }
+
+  Future<Uint8List> _captureEssentialGif(GlobalKey key) async {
+    final frames = <({int width, int height, Uint8List rgba})>[];
+    for (var i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Preview is not ready yet.');
+      final image = await boundary.toImage(pixelRatio: 1.35);
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (data == null) throw Exception('Could not create animation frame.');
+      frames.add((width: image.width, height: image.height, rgba: data.buffer.asUint8List()));
+      image.dispose();
+    }
+    return _encodeEssentialGif(frames, delayCs: 12);
+  }
+
+  Uint8List _encodeEssentialGif(List<({int width, int height, Uint8List rgba})> frames, {required int delayCs}) {
+    if (frames.isEmpty) throw Exception('No animation frames were created.');
+    final width = frames.first.width;
+    final height = frames.first.height;
+    final out = <int>[];
+    void byte(int v) => out.add(v & 0xFF);
+    void word(int v) {
+      byte(v);
+      byte(v >> 8);
+    }
+
+    out.addAll('GIF89a'.codeUnits);
+    word(width);
+    word(height);
+    byte(0xF7);
+    byte(0);
+    byte(0);
+    out.addAll(_essentialGifPalette());
+    out.addAll([0x21, 0xFF, 0x0B, ...'NETSCAPE2.0'.codeUnits, 0x03, 0x01, 0x00, 0x00, 0x00]);
+
+    for (final frame in frames) {
+      if (frame.width != width || frame.height != height) continue;
+      final indexed = _essentialGifIndexedPixels(frame.rgba);
+      out.addAll([0x21, 0xF9, 0x04, 0x00]);
+      word(delayCs);
+      out.addAll([0x00, 0x00, 0x2C]);
+      word(0);
+      word(0);
+      word(width);
+      word(height);
+      byte(0x00);
+      byte(8);
+      final lzw = _essentialGifLzw(indexed);
+      for (var i = 0; i < lzw.length; i += 255) {
+        final end = math.min(i + 255, lzw.length);
+        byte(end - i);
+        out.addAll(lzw.sublist(i, end));
+      }
+      byte(0);
+    }
+    byte(0x3B);
+    return Uint8List.fromList(out);
+  }
+
+  List<int> _essentialGifPalette() {
+    final palette = <int>[];
+    const levels = [0, 51, 102, 153, 204, 255];
+    for (final r in levels) {
+      for (final g in levels) {
+        for (final b in levels) {
+          palette.addAll([r, g, b]);
+        }
+      }
+    }
+    for (var i = 0; i < 40; i++) {
+      final v = (i * 255 / 39).round();
+      palette.addAll([v, v, v]);
+    }
+    while (palette.length < 256 * 3) {
+      palette.addAll([0, 0, 0]);
+    }
+    return palette.take(256 * 3).toList();
+  }
+
+  Uint8List _essentialGifIndexedPixels(Uint8List rgba) {
+    final out = Uint8List(rgba.length ~/ 4);
+    for (var i = 0, p = 0; i < rgba.length; i += 4, p++) {
+      final a = rgba[i + 3];
+      final r = a < 20 ? 255 : rgba[i];
+      final g = a < 20 ? 255 : rgba[i + 1];
+      final b = a < 20 ? 255 : rgba[i + 2];
+      final ri = (r * 5 / 255).round().clamp(0, 5);
+      final gi = (g * 5 / 255).round().clamp(0, 5);
+      final bi = (b * 5 / 255).round().clamp(0, 5);
+      out[p] = (ri * 36 + gi * 6 + bi).toInt();
+    }
+    return out;
+  }
+
+  List<int> _essentialGifLzw(Uint8List pixels) {
+    const clear = 256;
+    const end = 257;
+    final out = <int>[];
+    var buffer = 0;
+    var bits = 0;
+    void code(int value) {
+      buffer |= value << bits;
+      bits += 9;
+      while (bits >= 8) {
+        out.add(buffer & 0xFF);
+        buffer >>= 8;
+        bits -= 8;
+      }
+    }
+
+    code(clear);
+    var sinceClear = 0;
+    for (final px in pixels) {
+      code(px);
+      sinceClear++;
+      if (sinceClear >= 240) {
+        code(clear);
+        sinceClear = 0;
+      }
+    }
+    code(end);
+    if (bits > 0) out.add(buffer & 0xFF);
+    return out;
   }
 
   Future<void> _showEssentialSheet(

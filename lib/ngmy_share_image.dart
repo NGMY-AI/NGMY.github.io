@@ -10,3 +10,13 @@ Future<String> shareNgmyPngBytes(
 }) {
   return impl.shareNgmyPngBytes(bytes, filename, title: title, text: text);
 }
+
+Future<String> shareNgmyBytes(
+  Uint8List bytes,
+  String filename, {
+  required String mimeType,
+  String? title,
+  String? text,
+}) {
+  return impl.shareNgmyBytes(bytes, filename, mimeType: mimeType, title: title, text: text);
+}
