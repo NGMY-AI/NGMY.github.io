@@ -15311,11 +15311,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshAdminMedia: widget.onRefreshAdminMedia,
         onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
         onOpenInvest: () => setState(() => _idx = 1),
-        onOpenMainTab: (idx) => setState(() {
-          _idx = idx;
-          _visitedTabs.add(idx);
-          if (idx == 5) _visitedTabs.add(3);
-        }),
         onOpenAdminDashboard: widget.user.isAdmin ? _openAdminDashboardFromHome : null,
       ),
     );
@@ -15879,13 +15874,12 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final VoidCallback? onOpenInvest;
-  final ValueChanged<int>? onOpenMainTab;
   final VoidCallback? onOpenAdminDashboard;
   final Widget? homeLeadingOverride;
   final bool disableLocalGrowthIncomeEntry;
   final bool isLocalGrowthIncome;
   final String? homeTitleOverride;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenMainTab, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -16009,8 +16003,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (text.isEmpty || _assistantTyping) return;
     _assistantInputCtrl.clear();
 
-    if (await _tryRunAssistantAppControl(text)) return;
-
     if (!widget.user.isAdmin) {
       final limit = widget.config.ngmyHelperDailyMessageLimit;
       if (limit > 0) {
@@ -16055,6 +16047,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         return;
       }
 
+      if (ngmyUserGrantsHelperAccess(text)) {
+        await NgmyHelperPermissionStore.grantAll(widget.user.email);
+      }
+      final ngmyUserMaps = ngmyUsersToContactMaps(widget.allUsers);
+      final contacts = await NgmyPhoneContactsStore.ensureHydrated(widget.user.email, ngmyUsers: ngmyUserMaps);
+      final phoneCtx = ngmyHelperPhoneIntegrationContext(
+        contactsDirectory: NgmyPhoneContactsStore.directoryForAi(contacts),
+      );
       final creds = ngmyParseAiCredentials(apiKey);
       final liveDb = NgmyAppKnowledge.build(
         viewer: {
@@ -16071,6 +16071,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         userCount: widget.allUsers.length,
       );
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
+          '\n$phoneCtx\n'
           '\n$liveDb\n'
           '${NgmyAiMemoryStore.transcriptForPrompt(_assistantMessages)}\n'
           '\nUser: $text';
@@ -16079,12 +16080,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final rawReply = (aiResult.text != null && aiResult.text!.isNotEmpty)
           ? aiResult.text!
           : ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: aiResult.error);
-      final reply = NgmyAiMemoryStore.sanitizeHelperReply(rawReply);
+      final parsed = ngmyParseHelperPhoneActions(rawReply);
+      var phoneActions = parsed.actions;
+      if (phoneActions.isEmpty) {
+        phoneActions = [
+          ...ngmyInferAlarmActionsFromUserMessage(text),
+          ...ngmyInferCalendarActionsFromUserMessage(text),
+          ...ngmyInferContactActionsFromUserMessage(text),
+        ];
+      }
+      phoneActions = await ngmyResolvePhoneActionsByName(
+        context: context,
+        userEmail: widget.user.email,
+        actions: phoneActions,
+        ngmyUsers: ngmyUserMaps,
+      );
+      final reply = NgmyAiMemoryStore.sanitizeHelperReply(parsed.text.isNotEmpty ? parsed.text : rawReply);
       setState(() {
-        _assistantMessages.add({'role': 'ai', 'text': reply, 'at': DateTime.now().toUtc().toIso8601String()});
+        _assistantMessages.add({
+          'role': 'ai',
+          'text': reply,
+          'at': DateTime.now().toUtc().toIso8601String(),
+          if (phoneActions.isNotEmpty) 'phoneActions': phoneActions.map(_phoneActionToJson).toList(),
+        });
         _assistantTyping = false;
       });
       unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
+      if (phoneActions.isNotEmpty && mounted) {
+        unawaited(_runHomePhoneActions(phoneActions));
+      }
       _scrollAssistantToBottom();
     } catch (e) {
       if (!mounted) return;
@@ -16103,66 +16127,41 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     unawaited(NgmyAiMemoryStore.saveAll(widget.user.email, const []));
   }
 
-  Future<bool> _tryRunAssistantAppControl(String text) async {
-    final lower = text.toLowerCase();
-    Future<void> logAndReply(String reply) async {
-      setState(() {
-        _assistantMessages.add({'role': 'user', 'text': text, 'at': DateTime.now().toUtc().toIso8601String()});
-        _assistantMessages.add({'role': 'ai', 'text': reply, 'at': DateTime.now().toUtc().toIso8601String()});
-      });
-      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'user', text: text));
-      unawaited(NgmyAiMemoryStore.append(widget.user.email, role: 'ai', text: reply));
-      _scrollAssistantToBottom();
-    }
+  Map<String, dynamic> _phoneActionToJson(NgmyPhoneAction action) => {
+        'type': action.type,
+        ...action.fields,
+      };
 
-    bool saysAny(Iterable<String> words) => words.any(lower.contains);
+  List<NgmyPhoneAction> _phoneActionsFromAssistantMessage(Map<String, dynamic> m) {
+    final raw = m['phoneActions'];
+    if (raw is! List) return const [];
+    final out = <NgmyPhoneAction>[];
+    for (final item in raw) {
+      if (item is Map) {
+        final action = NgmyPhoneAction.fromJson(Map<String, dynamic>.from(item));
+        if (action != null) out.add(action);
+      }
+    }
+    return out;
+  }
 
-    if (saysAny(const ['open wallet', 'go to wallet', 'show wallet', 'my wallet', 'deposit', 'withdraw'])) {
-      await logAndReply('Opening Wallet now. You can deposit, withdraw, and review your balance history there.');
-      widget.onOpenMainTab?.call(2);
-      return true;
+  Future<void> _runHomePhoneActions(List<NgmyPhoneAction> actions) async {
+    for (final action in actions) {
+      if (!mounted) return;
+      final result = await ngmyRunPhoneAction(
+        action,
+        context: context,
+        userEmail: widget.user.email,
+      );
+      if (!mounted || result == null) continue;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+      );
     }
-    if (saysAny(const ['open invest', 'go to invest', 'investment', 'plans', 'buy plan'])) {
-      await logAndReply('Opening Investment Plans now. Choose a plan or review your active investment there.');
-      widget.onOpenMainTab?.call(1);
-      return true;
-    }
-    if (saysAny(const ['creator', 'toolkit', 'studio tools', 'qr generator', 'doc share', 'quote calc'])) {
-      await logAndReply('Opening Creator Toolkit now. You can use Doc Share, QR Generator, Quote Calc, and studio tools there.');
-      widget.onOpenMainTab?.call(5);
-      return true;
-    }
-    if (saysAny(const ['profile', 'account settings', 'my account'])) {
-      await logAndReply('Opening Profile now. You can manage your account and app settings there.');
-      widget.onOpenMainTab?.call(6);
-      return true;
-    }
-    if (saysAny(const ['media', 'advisors', 'communicate', 'community'])) {
-      await logAndReply('Opening the Media and Advisors area now.');
-      widget.onOpenMainTab?.call(4);
-      return true;
-    }
-    if (saysAny(const ['ngmy hub', 'open hub', 'main hub', 'market', 'store'])) {
-      await logAndReply('Opening NGMY Hub now.');
-      widget.onOpenMainTab?.call(3);
-      return true;
-    }
-    if (saysAny(const ['local growth', 'local income', 'growth income'])) {
-      await logAndReply('Opening Local Growth Income now.');
-      unawaited(_openLocalGrowthFromHome());
-      return true;
-    }
-    if (saysAny(const ['music ai', 'make a song', 'songwriter', 'song writing'])) {
-      await logAndReply('Opening Music AI now. Tell it the song idea, mood, and style you want.');
-      unawaited(_openNewsHub(initialTab: 1));
-      return true;
-    }
-    if (widget.user.isAdmin && saysAny(const ['admin', 'dashboard', 'admin panel', 'control panel'])) {
-      await logAndReply('Opening Admin Dashboard now.');
-      widget.onOpenAdminDashboard?.call();
-      return true;
-    }
-    return false;
+  }
+
+  Future<void> _tapHomePhoneAction(NgmyPhoneAction action) async {
+    await _runHomePhoneActions([action]);
   }
 
   Future<void> _openLocalGrowthFromHome() async {
@@ -16412,7 +16411,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     itemBuilder: (context, i) {
                       if (i >= _assistantMessages.length) return _assistantTypingBubble(isLight);
                       final m = _assistantMessages[i];
-                      return _assistantBubble(isLight, role: (m['role'] ?? 'ai').toString(), text: (m['text'] ?? '').toString());
+                      return _assistantBubble(
+                        isLight,
+                        role: (m['role'] ?? 'ai').toString(),
+                        text: (m['text'] ?? '').toString(),
+                        actions: _phoneActionsFromAssistantMessage(m),
+                      );
                     },
                   )
                 : Center(
@@ -16433,7 +16437,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _aiOrb(),
                         const SizedBox(height: 22),
                         Text(
-                          _assistantMemoryLoaded ? 'Ask anything, or say open wallet, open invest, or open local growth.' : 'Restoring your conversation…',
+                          _assistantMemoryLoaded ? 'Ask me to text, call, email, map, or add Calendar events on your iPhone.' : 'Restoring your conversation…',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: isLight ? const Color(0xFF8794A8) : Colors.white54, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
@@ -16442,7 +16446,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
           ),
           const SizedBox(height: 10),
-          _assistantControlRail(isLight),
+          _assistantPhoneAppRail(isLight),
           const SizedBox(height: 10),
           Container(
             constraints: const BoxConstraints(minHeight: 54),
@@ -16492,14 +16496,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _assistantControlRail(bool isLight) {
+  Widget _assistantPhoneAppRail(bool isLight) {
     final controls = <({String label, IconData icon, String command})>[
-      (label: 'Wallet', icon: Icons.account_balance_wallet_rounded, command: 'open wallet'),
-      (label: 'Invest', icon: Icons.trending_up_rounded, command: 'open investment plans'),
-      (label: 'Creator', icon: Icons.dashboard_customize_rounded, command: 'open creator toolkit'),
-      (label: 'Local Growth', icon: Icons.savings_rounded, command: 'open local growth'),
-      (label: 'Music AI', icon: Icons.music_note_rounded, command: 'open music ai'),
-      if (widget.user.isAdmin) (label: 'Admin', icon: Icons.admin_panel_settings_rounded, command: 'open admin dashboard'),
+      (label: 'Call', icon: Icons.phone_rounded, command: 'Call Mom'),
+      (label: 'Messages', icon: Icons.sms_rounded, command: 'Text Sarah I am on my way'),
+      (label: 'WhatsApp', icon: Icons.chat_rounded, command: 'WhatsApp John saying hello'),
+      (label: 'Calendar', icon: Icons.calendar_month_rounded, command: 'Add dentist Friday at 3pm to my calendar'),
+      (label: 'Maps', icon: Icons.map_rounded, command: 'Open Maps to the nearest gas station'),
+      (label: 'Mail', icon: Icons.email_rounded, command: 'Email support about my order'),
     ];
     return SizedBox(
       height: 38,
@@ -16526,7 +16530,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _assistantBubble(bool isLight, {required String role, required String text}) {
+  Widget _assistantBubble(
+    bool isLight, {
+    required String role,
+    required String text,
+    List<NgmyPhoneAction> actions = const [],
+  }) {
     final isUser = role == 'user';
     final bubbleColor = isUser
         ? const Color(0xFF8B5CF6).withOpacity(isLight ? 0.14 : 0.26)
@@ -16548,7 +16557,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           border: Border.all(color: Colors.white.withOpacity(isLight ? 0.6 : 0.12)),
         ),
-        child: Text(text, style: TextStyle(color: textColor, fontSize: 13.5, height: 1.32, fontWeight: FontWeight.w600)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(text, style: TextStyle(color: textColor, fontSize: 13.5, height: 1.32, fontWeight: FontWeight.w600)),
+            if (!isUser && actions.isNotEmpty)
+              ngmyPhoneActionChips(
+                actions: actions,
+                isDark: !isLight,
+                onTap: _tapHomePhoneAction,
+              ),
+          ],
+        ),
       ),
     );
   }
