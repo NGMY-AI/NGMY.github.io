@@ -24237,24 +24237,11 @@ class _InvestScreenState extends State<InvestScreen> {
     late final List<Color> colors;
     late final List<String> items;
     if (kind == 'signature') {
-      title = 'Email Signature Kit';
-      icon = Icons.draw_rounded;
-      colors = const [Color(0xFF06B6D4), Color(0xFF2563EB)];
-      items = [
-        '$name\nNGMY Member\nBuilding daily with NGMY\nEmail: $email\nSent with NGMY Essential',
-        '$name | Digital Creator\nGrowth Income Member\nNGMY: Next Generation - Make Yours\nEmail: $email',
-        '$name\nProfessional Signature\nCreate. Grow. Connect.\nPowered by NGMY AI Home',
-      ];
+      _showEmailComposer(ctx, senderName: name, senderEmail: email);
+      return;
     } else if (kind == 'text') {
-      title = 'iMessage Text Builder';
-      icon = Icons.chat_bubble_rounded;
-      colors = const [Color(0xFFA855F7), Color(0xFFEC4899)];
-      items = [
-        'I am locked in right now. Give me a few and I will send you the clean version.',
-        'That sounds good. Let me check everything and I will get back to you with a solid answer.',
-        'I like the idea. Let us make it simple, clear, and actually useful.',
-        'Today is a build day. I am focused on making progress, not just talking about it.',
-      ];
+      _showAnimatedMessageComposer(ctx);
+      return;
     } else {
       title = 'Music & Fun Prompts';
       icon = Icons.music_note_rounded;
@@ -24267,6 +24254,493 @@ class _InvestScreenState extends State<InvestScreen> {
       ];
     }
     _showEssentialSheet(ctx, title: title, icon: icon, colors: colors, items: items);
+  }
+
+  Future<void> _showEmailComposer(BuildContext ctx, {required String senderName, required String senderEmail}) {
+    final toCtrl = TextEditingController();
+    final subjectCtrl = TextEditingController(text: 'Quick update from $senderName');
+    final messageCtrl = TextEditingController(text: 'Hello,\n\nI wanted to send you this quick update.\n\nThank you.');
+    final titleCtrl = TextEditingController(text: 'NGMY Member');
+    final brandCtrl = TextEditingController(text: 'NGMY Essential');
+    final logoCtrl = TextEditingController();
+    const colors = [Color(0xFF06B6D4), Color(0xFF2563EB)];
+
+    String emailText() {
+      final brand = brandCtrl.text.trim().isEmpty ? 'NGMY Essential' : brandCtrl.text.trim();
+      final title = titleCtrl.text.trim().isEmpty ? 'NGMY Member' : titleCtrl.text.trim();
+      final logo = logoCtrl.text.trim();
+      return [
+        messageCtrl.text.trim(),
+        '',
+        '------------------------------',
+        brand,
+        senderName,
+        title,
+        senderEmail,
+        if (logo.isNotEmpty) 'Logo: $logo',
+        'Created with NGMY Essential',
+        '------------------------------',
+      ].join('\n');
+    }
+
+    Future<void> openCompose(BuildContext sheetCtx) async {
+      final uri = Uri(
+        scheme: 'mailto',
+        path: toCtrl.text.trim(),
+        queryParameters: {
+          'subject': subjectCtrl.text.trim(),
+          'body': emailText(),
+        },
+      );
+      final opened = await launchUrl(uri);
+      if (!opened && sheetCtx.mounted) {
+        ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Could not open email compose on this device.')));
+      }
+    }
+
+    return showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final isDark = Theme.of(sheetCtx).brightness == Brightness.dark;
+        final fg = isDark ? Colors.white : const Color(0xFF0F172A);
+        final muted = isDark ? Colors.white70 : const Color(0xFF475569);
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            final logo = logoCtrl.text.trim();
+            final brand = brandCtrl.text.trim().isEmpty ? 'NGMY Essential' : brandCtrl.text.trim();
+            final brandInitials = brand.substring(0, math.min(2, brand.length)).toUpperCase();
+            final title = titleCtrl.text.trim().isEmpty ? 'NGMY Member' : titleCtrl.text.trim();
+            return SafeArea(
+              child: Container(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetCtx).size.height * 0.92),
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF07111F) : Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: colors.first.withValues(alpha: 0.36)),
+                  boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.30), blurRadius: 34, offset: const Offset(0, 16))],
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), gradient: const LinearGradient(colors: colors)),
+                            child: const Icon(Icons.alternate_email_rounded, color: Colors.white, size: 25),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Email Signature Kit', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 21)),
+                                const SizedBox(height: 3),
+                                Text('Create a framed email with logo, subject, message, and signature.', style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _emailComposerField(toCtrl, label: 'Send to', hint: 'client@email.com', onChanged: () => setSheet(() {})),
+                      const SizedBox(height: 10),
+                      _emailComposerField(subjectCtrl, label: 'Subject', hint: 'Email subject', onChanged: () => setSheet(() {})),
+                      const SizedBox(height: 10),
+                      _emailComposerField(messageCtrl, label: 'Email message', hint: 'Write your email...', maxLines: 5, onChanged: () => setSheet(() {})),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: _emailComposerField(brandCtrl, label: 'Brand / logo name', hint: 'Your brand', onChanged: () => setSheet(() {}))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _emailComposerField(titleCtrl, label: 'Your title', hint: 'Founder / Creator', onChanged: () => setSheet(() {}))),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _emailComposerField(logoCtrl, label: 'Logo image URL (optional)', hint: 'https://...', onChanged: () => setSheet(() {})),
+                      const SizedBox(height: 16),
+                      Text('Live Email Frame', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 14)),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDark
+                                ? const [Color(0xFF0B1220), Color(0xFF102A43), Color(0xFF0F172A)]
+                                : const [Color(0xFFFFFFFF), Color(0xFFE0F2FE), Color(0xFFF8FAFC)],
+                          ),
+                          border: Border.all(color: colors.first.withValues(alpha: 0.32)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Container(
+                                    width: 58,
+                                    height: 58,
+                                    decoration: BoxDecoration(gradient: const LinearGradient(colors: colors), borderRadius: BorderRadius.circular(18)),
+                                    child: logo.startsWith('http')
+                                        ? Image.network(logo, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const Icon(Icons.business_rounded, color: Colors.white, size: 30))
+                                        : Center(child: Text(brandInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(brand, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 17)),
+                                      const SizedBox(height: 3),
+                                      Text(subjectCtrl.text.trim().isEmpty ? 'Email subject preview' : subjectCtrl.text.trim(), style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.78),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Text(messageCtrl.text.trim().isEmpty ? 'Your email message will appear here.' : messageCtrl.text.trim(), style: TextStyle(color: fg, fontSize: 13, height: 1.45, fontWeight: FontWeight.w600)),
+                            ),
+                            const SizedBox(height: 14),
+                            Container(height: 1, color: colors.first.withValues(alpha: 0.28)),
+                            const SizedBox(height: 12),
+                            Text(senderName, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15)),
+                            const SizedBox(height: 2),
+                            Text('$title • $senderEmail', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: emailText()));
+                                ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Email design copied')));
+                              },
+                              icon: const Icon(Icons.copy_rounded),
+                              label: const Text('Copy'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => unawaited(openCompose(sheetCtx)),
+                              style: FilledButton.styleFrom(backgroundColor: colors.last),
+                              icon: const Icon(Icons.send_rounded),
+                              label: const Text('Compose'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      toCtrl.dispose();
+      subjectCtrl.dispose();
+      messageCtrl.dispose();
+      titleCtrl.dispose();
+      brandCtrl.dispose();
+      logoCtrl.dispose();
+    });
+  }
+
+  Widget _emailComposerField(
+    TextEditingController controller, {
+    required String label,
+    required String hint,
+    int maxLines = 1,
+    required VoidCallback onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      onChanged: (_) => onChanged(),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.08),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
+  Future<void> _showAnimatedMessageComposer(BuildContext ctx) {
+    final messageCtrl = TextEditingController(text: 'I am locked in right now. Give me a few and I will send you the clean version.');
+    const styleNames = ['Neon 3D', 'Glass Wave', 'Gold Pulse', 'Cosmic Bubble'];
+    const palettes = [
+      [Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF06B6D4)],
+      [Color(0xFF06B6D4), Color(0xFF2563EB), Color(0xFFE0F2FE)],
+      [Color(0xFFFFD166), Color(0xFFF59E0B), Color(0xFF7C2D12)],
+      [Color(0xFF111827), Color(0xFF7C3AED), Color(0xFF22D3EE)],
+    ];
+    var selectedStyle = 0;
+
+    String shareText() {
+      final text = messageCtrl.text.trim().isEmpty ? 'Your message' : messageCtrl.text.trim();
+      return '$text\n\nSent with NGMY Essential ${styleNames[selectedStyle]}';
+    }
+
+    return showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final isDark = Theme.of(sheetCtx).brightness == Brightness.dark;
+        final fg = isDark ? Colors.white : const Color(0xFF0F172A);
+        final muted = isDark ? Colors.white70 : const Color(0xFF475569);
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            final colors = palettes[selectedStyle];
+            final text = messageCtrl.text.trim().isEmpty ? 'Type your message and watch the animation take shape.' : messageCtrl.text.trim();
+            return SafeArea(
+              child: Container(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetCtx).size.height * 0.92),
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF070A16) : Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: colors[1].withValues(alpha: 0.36)),
+                  boxShadow: [BoxShadow(color: colors[1].withValues(alpha: 0.28), blurRadius: 36, offset: const Offset(0, 16))],
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), gradient: LinearGradient(colors: colors)),
+                            child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Animated iMessage Text', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 21)),
+                                const SizedBox(height: 3),
+                                Text('Type a message, choose a motion style, then share it through iMessage.', style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: messageCtrl,
+                        minLines: 3,
+                        maxLines: 5,
+                        onChanged: (_) => setSheet(() {}),
+                        decoration: InputDecoration(
+                          labelText: 'Your animated message',
+                          hintText: 'Type something cool...',
+                          filled: true,
+                          fillColor: isDark ? Colors.white.withValues(alpha: 0.07) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: List.generate(styleNames.length, (i) {
+                          final selected = selectedStyle == i;
+                          return ChoiceChip(
+                            selected: selected,
+                            label: Text(styleNames[i]),
+                            onSelected: (_) => setSheet(() => selectedStyle = i),
+                            selectedColor: palettes[i][1].withValues(alpha: 0.26),
+                            labelStyle: TextStyle(color: selected ? fg : muted, fontWeight: FontWeight.w800),
+                            side: BorderSide(color: palettes[i][1].withValues(alpha: selected ? 0.72 : 0.24)),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Animated Preview', style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 14)),
+                      const SizedBox(height: 10),
+                      _animatedMessagePreview(text: text, colors: colors, styleIndex: selectedStyle, isDark: isDark),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: shareText()));
+                                ScaffoldMessenger.of(sheetCtx).showSnackBar(const SnackBar(content: Text('Animated text copied')));
+                              },
+                              icon: const Icon(Icons.copy_rounded),
+                              label: const Text('Copy'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => Share.share(shareText(), subject: 'NGMY animated text'),
+                              style: FilledButton.styleFrom(backgroundColor: colors[1]),
+                              icon: const Icon(Icons.ios_share_rounded),
+                              label: const Text('Share'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(messageCtrl.dispose);
+  }
+
+  Widget _animatedMessagePreview({
+    required String text,
+    required List<Color> colors,
+    required int styleIndex,
+    required bool isDark,
+  }) {
+    return StreamBuilder<int>(
+      stream: Stream.periodic(const Duration(milliseconds: 900), (tick) => tick),
+      initialData: 0,
+      builder: (context, snapshot) {
+        final tick = snapshot.data ?? 0;
+        final pulse = 0.5 + (0.5 * math.sin(tick * 0.85));
+        final tilt = (pulse - 0.5) * 0.18;
+        final radius = 24.0 + pulse * 10;
+        final shadow = 18.0 + pulse * 22;
+        final isGold = styleIndex == 2;
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: pulse),
+          duration: const Duration(milliseconds: 820),
+          curve: Curves.easeInOutCubic,
+          builder: (context, value, _) {
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY(styleIndex == 0 ? tilt : 0)
+                ..rotateZ(styleIndex == 1 ? tilt * 0.45 : 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(radius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colors[0].withValues(alpha: 0.92),
+                      colors[1].withValues(alpha: 0.86),
+                      colors[2].withValues(alpha: isGold ? 0.72 : 0.82),
+                    ],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.34 + value * 0.26), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(color: colors[1].withValues(alpha: 0.26 + value * 0.24), blurRadius: shadow, offset: Offset(0, 10 + value * 5)),
+                    BoxShadow(color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.30), blurRadius: 10, offset: const Offset(-4, -4)),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(right: -18, top: -20, child: _messageOrb(colors[2], 84 + value * 24)),
+                    Positioned(left: -16, bottom: -22, child: _messageOrb(colors[0], 68 + value * 16)),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              styleIndex == 3 ? Icons.auto_awesome_rounded : Icons.bubble_chart_rounded,
+                              color: Colors.white.withValues(alpha: 0.92),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(styleIndex == 0 ? '3D MESSAGE' : styleIndex == 1 ? 'GLASS WAVE' : styleIndex == 2 ? 'GOLD PULSE' : 'COSMIC BUBBLE',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.3)),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          text,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22 + value * 1.5,
+                            height: 1.08,
+                            letterSpacing: styleIndex == 0 ? -0.4 : 0,
+                            shadows: [
+                              Shadow(color: Colors.black.withValues(alpha: 0.24), blurRadius: 10, offset: const Offset(0, 3)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.20),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+                            ),
+                            child: const Text('Share to iMessage', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _messageOrb(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [Colors.white.withValues(alpha: 0.32), color.withValues(alpha: 0.12), Colors.transparent]),
+        ),
+      ),
+    );
   }
 
   Future<void> _showEssentialSheet(
