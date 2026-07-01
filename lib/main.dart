@@ -23015,9 +23015,12 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   final _season = TextEditingController(text: '1');
   final _episode = TextEditingController(text: '1');
   final _accentHex = TextEditingController(text: '00E5FF');
+  final _movieSearch = TextEditingController();
+  final _tmdbKey = TextEditingController();
   int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
   _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
   Timer? _handleSaveDebounce;
+  Timer? _movieSearchDebounce;
   bool _movieIsTv = false;
   bool _movieAutoplay = false;
   bool _movieNextEpisode = true;
@@ -23026,12 +23029,18 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
   String _activeMovieTitle = 'Featured Movie';
   double _movieProgress = 0.0;
   DateTime? _movieLastWatched;
+  bool _movieCatalogLoading = false;
+  bool _showMovieProviderSetup = false;
+  String _movieCatalogMode = 'now_playing';
+  String? _movieCatalogError;
+  List<_NgmyMovieCatalogItem> _movieCatalog = _ngmyFallbackMovies;
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadSavedWithdrawHandles());
     unawaited(_loadMovieHubState());
+    unawaited(_loadMovieCatalog());
   }
 
   @override
@@ -23054,11 +23063,13 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
     _season.dispose();
     _episode.dispose();
     _accentHex.dispose();
+    _movieSearch.dispose();
+    _tmdbKey.dispose();
+    _movieSearchDebounce?.cancel();
     super.dispose();
   }
 
   String get _moviePrefsKey => 'ngmy_movie_hub_${widget.user.email.toLowerCase().trim()}';
-
   Future<void> _loadMovieHubState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -23080,7 +23091,9 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
         }
         _movieProgress = ((map['progress'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0);
         _movieLastWatched = DateTime.tryParse((map['lastWatched'] ?? '').toString());
+        _tmdbKey.text = (map['tmdbKey'] ?? '').toString().trim();
       });
+      unawaited(_loadMovieCatalog(query: _movieSearch.text));
     } catch (e) {
       debugPrint('[movie hub] load: $e');
     }
@@ -23096,6 +23109,7 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
           'title': _activeMovieTitle,
           'progress': _movieProgress,
           'lastWatched': (_movieLastWatched ?? DateTime.now()).toUtc().toIso8601String(),
+          'tmdbKey': _tmdbKey.text.trim(),
         }),
       );
     } catch (e) {
@@ -23153,6 +23167,94 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
       _movieLastWatched = DateTime.now();
     });
     unawaited(_saveMovieHubState());
+  }
+
+  Future<void> _loadMovieCatalog({String query = ''}) async {
+    final key = _tmdbKey.text.trim();
+    if (key.isEmpty) {
+      setState(() {
+        _movieCatalog = _ngmyFallbackMovies;
+        _movieCatalogError = 'Add a TMDB catalog key to load live latest movies. Showing built-in featured movies for now.';
+        _movieCatalogLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _movieCatalogLoading = true;
+      _movieCatalogError = null;
+    });
+
+    try {
+      final endpoint = query.trim().isNotEmpty
+          ? 'https://api.themoviedb.org/3/search/multi'
+          : 'https://api.themoviedb.org/3/movie/$_movieCatalogMode';
+      final params = <String, String>{
+        'language': 'en-US',
+        'page': '1',
+        if (query.trim().isNotEmpty) 'query': query.trim(),
+        if (!key.startsWith('eyJ')) 'api_key': key,
+      };
+      final uri = Uri.parse(endpoint).replace(queryParameters: params);
+      final response = await http.get(
+        uri,
+        headers: key.startsWith('eyJ') ? {'Authorization': 'Bearer $key'} : const <String, String>{},
+      ).timeout(const Duration(seconds: 12));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('TMDB returned ${response.statusCode}');
+      }
+      final decoded = jsonDecode(response.body);
+      final results = decoded is Map ? decoded['results'] : null;
+      if (results is! List) throw Exception('TMDB response missing results');
+      final items = results
+          .whereType<Map>()
+          .map((m) => _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic>.from(m)))
+          .where((m) => m.title.trim().isNotEmpty && m.posterUrl != null)
+          .take(18)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _movieCatalog = items.isEmpty ? _ngmyFallbackMovies : items;
+        _movieCatalogLoading = false;
+        _movieCatalogError = items.isEmpty ? 'No movies found. Showing built-in featured movies.' : null;
+      });
+    } catch (e) {
+      debugPrint('[movie hub] catalog: $e');
+      if (!mounted) return;
+      setState(() {
+        _movieCatalog = _ngmyFallbackMovies;
+        _movieCatalogLoading = false;
+        _movieCatalogError = 'Could not load the live catalog. Showing built-in featured movies.';
+      });
+    }
+  }
+
+  void _saveMovieProviderKey() {
+    unawaited(_saveMovieHubState());
+    unawaited(_loadMovieCatalog(query: _movieSearch.text));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Movie catalog key saved.')));
+  }
+
+  void _scheduleMovieSearch(String value) {
+    _movieSearchDebounce?.cancel();
+    _movieSearchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      unawaited(_loadMovieCatalog(query: value));
+    });
+  }
+
+  void _playCatalogMovie(_NgmyMovieCatalogItem item) {
+    setState(() {
+      _movieIsTv = item.type == 'tv';
+      _movieId.text = item.id.toString();
+      _movieTitle.text = item.title;
+      if (_movieIsTv) {
+        _season.text = '1';
+        _episode.text = '1';
+      }
+      _embedUrl.text = item.embedUrl(color: _cleanHexColor(), autoplay: _movieAutoplay);
+    });
+    _playMovieEmbed(url: _embedUrl.text, title: item.title);
   }
 
   void _saveMovieProgress(double value) {
@@ -23308,6 +23410,8 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             children: [
               _movieHeroHeader(),
               const SizedBox(height: 16),
+              _movieCatalogSection(),
+              const SizedBox(height: 16),
               _moviePlayerCard(),
               const SizedBox(height: 16),
               _movieGeneratedCodeCard(),
@@ -23403,6 +23507,187 @@ class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _movieCatalogSection() {
+    return _moviePanel(
+      title: 'Latest Movies',
+      icon: Icons.local_movies_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _movieSearch,
+            style: const TextStyle(color: Colors.white),
+            decoration: _movieInput('Search movies or TV shows').copyWith(
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF22D3EE)),
+              suffixIcon: _movieSearch.text.trim().isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        _movieSearch.clear();
+                        unawaited(_loadMovieCatalog());
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                    ),
+            ),
+            onChanged: (v) {
+              setState(() {});
+              _scheduleMovieSearch(v);
+            },
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _movieModeChip('Now Playing', 'now_playing'),
+                _movieModeChip('Popular', 'popular'),
+                _movieModeChip('Top Rated', 'top_rated'),
+                _movieModeChip('Upcoming', 'upcoming'),
+              ],
+            ),
+          ),
+          if (_movieCatalogError != null) ...[
+            const SizedBox(height: 10),
+            Text(_movieCatalogError!, style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
+          ],
+          const SizedBox(height: 12),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 180),
+            crossFadeState: _showMovieProviderSetup ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _showMovieProviderSetup = true),
+                icon: const Icon(Icons.vpn_key_rounded, size: 16),
+                label: const Text('Add live catalog API key'),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFF22D3EE)),
+              ),
+            ),
+            secondChild: Column(
+              children: [
+                TextField(
+                  controller: _tmdbKey,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _movieInput('TMDB API key or read access token'),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _movieMiniButton('Save key', Icons.save_rounded, _saveMovieProviderKey)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _movieMiniButton('Hide setup', Icons.keyboard_arrow_up_rounded, () => setState(() => _showMovieProviderSetup = false))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_movieCatalogLoading)
+            const SizedBox(
+              height: 220,
+              child: Center(child: CircularProgressIndicator(color: Color(0xFF22D3EE))),
+            )
+          else
+            SizedBox(
+              height: 260,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _movieCatalog.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) => _moviePosterCard(_movieCatalog[index]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _movieModeChip(String label, String mode) {
+    final selected = _movieCatalogMode == mode && _movieSearch.text.trim().isEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        selected: selected,
+        label: Text(label),
+        onSelected: (_) {
+          setState(() {
+            _movieSearch.clear();
+            _movieCatalogMode = mode;
+          });
+          unawaited(_loadMovieCatalog());
+        },
+        selectedColor: const Color(0xFF22D3EE).withOpacity(0.20),
+        backgroundColor: const Color(0xFF080A10),
+        labelStyle: TextStyle(color: selected ? const Color(0xFF67E8F9) : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
+        side: BorderSide(color: selected ? const Color(0xFF22D3EE) : Colors.white.withOpacity(0.10)),
+      ),
+    );
+  }
+
+  Widget _moviePosterCard(_NgmyMovieCatalogItem item) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => _playCatalogMovie(item),
+      child: SizedBox(
+        width: 142,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFF080A10),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.32), blurRadius: 16, offset: const Offset(0, 8))],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (item.posterUrl != null)
+                      Image.network(
+                        item.posterUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.movie_rounded, color: Colors.white38, size: 42)),
+                      )
+                    else
+                      const Center(child: Icon(Icons.movie_rounded, color: Colors.white38, size: 42)),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.62), borderRadius: BorderRadius.circular(999)),
+                        child: Text(item.type == 'tv' ? 'TV' : 'MOVIE', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: const BoxDecoration(color: Color(0xFF22D3EE), shape: BoxShape.circle),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 24),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            Text('${item.year} • ${item.ratingLabel}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          ],
+        ),
       ),
     );
   }
@@ -24293,6 +24578,126 @@ class _MovieParamRow extends StatelessWidget {
     );
   }
 }
+
+class _NgmyMovieCatalogItem {
+  const _NgmyMovieCatalogItem({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.year,
+    required this.rating,
+    this.posterUrl,
+    this.overview = '',
+  });
+
+  final int id;
+  final String title;
+  final String type;
+  final String year;
+  final double rating;
+  final String? posterUrl;
+  final String overview;
+
+  String get ratingLabel => rating <= 0 ? 'New' : '${rating.toStringAsFixed(1)}/10';
+
+  String embedUrl({
+    required String color,
+    required bool autoplay,
+  }) {
+    final params = <String>[
+      'color=$color',
+      if (autoplay) 'autoPlay=true',
+      if (type == 'tv') 'nextEpisode=true',
+      if (type == 'tv') 'episodeSelector=true',
+    ];
+    final path = type == 'tv' ? '/embed/tv/$id/1/1' : '/embed/movie/$id';
+    return 'https://www.vidking.net$path${params.isEmpty ? '' : '?${params.join('&')}'}';
+  }
+
+  factory _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic> json) {
+    final mediaType = (json['media_type'] ?? '').toString();
+    final isTv = mediaType == 'tv' || json.containsKey('first_air_date');
+    final title = (json[isTv ? 'name' : 'title'] ?? json['name'] ?? json['title'] ?? '').toString();
+    final date = (json[isTv ? 'first_air_date' : 'release_date'] ?? json['release_date'] ?? json['first_air_date'] ?? '').toString();
+    final posterPath = (json['poster_path'] ?? '').toString();
+    return _NgmyMovieCatalogItem(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      title: title,
+      type: isTv ? 'tv' : 'movie',
+      year: date.length >= 4 ? date.substring(0, 4) : 'New',
+      rating: ((json['vote_average'] as num?)?.toDouble() ?? 0).clamp(0.0, 10.0),
+      posterUrl: posterPath.isEmpty ? null : 'https://image.tmdb.org/t/p/w500$posterPath',
+      overview: (json['overview'] ?? '').toString(),
+    );
+  }
+}
+
+const List<_NgmyMovieCatalogItem> _ngmyFallbackMovies = [
+  _NgmyMovieCatalogItem(
+    id: 1078605,
+    title: 'Weapons',
+    type: 'movie',
+    year: '2025',
+    rating: 7.2,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/cii6HLP0Sx5q8eWb1D7zGqmw1m3.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 950387,
+    title: 'A Minecraft Movie',
+    type: 'movie',
+    year: '2025',
+    rating: 6.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/yFHHfHcUgGAxziP1C3lLt0q2T4s.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 986056,
+    title: 'Thunderbolts',
+    type: 'movie',
+    year: '2025',
+    rating: 7.0,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/m9EtP1Yrzv6v7dMaC9mRaGhd1um.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 552524,
+    title: 'Lilo & Stitch',
+    type: 'movie',
+    year: '2025',
+    rating: 7.1,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/tUae3mefrDVTgm5mRzqWnZK6fOP.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 575265,
+    title: 'Mission: Impossible',
+    type: 'movie',
+    year: '2025',
+    rating: 7.3,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/z53D72EAOxGRqdr7KXXWp9dJiDe.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 822119,
+    title: 'Captain America',
+    type: 'movie',
+    year: '2025',
+    rating: 6.0,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/pzIddUEMWhWzfvLI3TwxUG2wGoi.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 533535,
+    title: 'Deadpool & Wolverine',
+    type: 'movie',
+    year: '2024',
+    rating: 7.6,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg',
+  ),
+  _NgmyMovieCatalogItem(
+    id: 945961,
+    title: 'Alien: Romulus',
+    type: 'movie',
+    year: '2024',
+    rating: 7.2,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/b33nnKl1GSFbao4l3fZDDqsMx0F.jpg',
+  ),
+];
 
 // --- NEW SUBMIT PAYMENT PAGE ---
 
