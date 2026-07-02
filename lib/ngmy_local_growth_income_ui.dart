@@ -11,6 +11,16 @@ import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_helpers.dart';
 
+String _ngmyLocalProfileDisplayName(UserData live) {
+  final full = live.fullName?.trim();
+  if (full != null && full.isNotEmpty) return full;
+  final name = live.username.trim();
+  if (name.isNotEmpty && name.toLowerCase() != 'user') return name;
+  final email = live.email.trim();
+  if (email.contains('@')) return email.split('@').first;
+  return 'Member';
+}
+
 /// Entry point for the wifi-icon button on the home screen: a second,
 /// fully local copy of Growth Income (Home / Invest / Wallet) that never
 /// touches Supabase. The real Growth Income tabs are untouched.
@@ -263,6 +273,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _LocalGrowthHomeTab(
         key: const ValueKey('ngmy_local_home'),
         user: _user!,
+        profileDisplayName: _ngmyLocalProfileDisplayName(widget.liveUser),
         transactions: sorted,
         onClockIn: _manualClockIn,
         onOpenInvest: () => setState(() => _idx = 1),
@@ -327,8 +338,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const glassGreen = Color(0xFF2EF6A3);
     const ball = NgmyBottomNavMetrics.localSelectionBall;
-    const itemW = NgmyBottomNavMetrics.localNavItemWidth;
-    const gap = NgmyBottomNavMetrics.localNavItemGap;
+    const barHeight = NgmyBottomNavMetrics.localBarHeight;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
       child: SafeArea(
@@ -337,22 +347,24 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: NgmyBottomNavMetrics.localNavMaxWidth),
             child: NgmySculptedBottomNavFrame(
-              barHeight: NgmyBottomNavMetrics.localBarHeight,
+              barHeight: barHeight,
               borderRadius: 24,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedAlign(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment(-1 + _idx.toDouble(), 0),
-                    child: FractionallySizedBox(
-                      widthFactor: 1 / 3,
-                      child: Center(
-                        child: Container(
-                          width: ball,
-                          height: ball,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final tabW = constraints.maxWidth / 3;
+                  final ballLeft = _idx * tabW + (tabW - ball) / 2;
+                  final ballTop = (barHeight - ball) / 2;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                        left: ballLeft,
+                        top: ballTop,
+                        width: ball,
+                        height: ball,
+                        child: DecoratedBox(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -368,20 +380,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      _navIcon(0, Icons.home_rounded, itemW),
-                      SizedBox(width: gap),
-                      _navIcon(1, Icons.trending_up_rounded, itemW),
-                      SizedBox(width: gap),
-                      _navIcon(2, Icons.account_balance_wallet_rounded, itemW),
+                      Row(
+                        children: [
+                          _navIcon(0, Icons.home_rounded),
+                          _navIcon(1, Icons.trending_up_rounded),
+                          _navIcon(2, Icons.account_balance_wallet_rounded),
+                        ],
+                      ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
@@ -390,8 +398,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     );
   }
 
-  Widget _navIcon(int i, IconData icon, double width) => SizedBox(
-        width: width,
+  Widget _navIcon(int i, IconData icon) => Expanded(
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -418,6 +425,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   const _LocalGrowthHomeTab({
     super.key,
     required this.user,
+    required this.profileDisplayName,
     required this.transactions,
     required this.onClockIn,
     required this.onOpenInvest,
@@ -428,6 +436,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   });
 
   final UserData user;
+  final String profileDisplayName;
   final List<AppTransaction> transactions;
   final Future<void> Function() onClockIn;
   final VoidCallback onOpenInvest;
@@ -521,13 +530,15 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 22),
-            _clockInShowcase(
-              context,
-              card: card,
+            _LocalClockInShowcase(
+              profileDisplayName: profileDisplayName,
               dailyGoal: dailyGoal,
               clockedIn: clockedIn,
               hasPlan: active != null,
               green: glassGreen,
+              card: card,
+              liveEarningsAt: _liveEarningsAt,
+              onClockIn: onClockIn,
             ),
             const SizedBox(height: 24),
             _networkStatus(card: card, green: glassGreen),
@@ -651,161 +662,6 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     );
     if (onTap == null) return content;
     return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: content);
-  }
-
-  Widget _clockInShowcase(
-    BuildContext context, {
-    required Color card,
-    required double dailyGoal,
-    required bool clockedIn,
-    required bool hasPlan,
-    required Color green,
-  }) {
-    final status = clockedIn ? 'ACTIVE' : 'CLOSED';
-    final glow = clockedIn ? green : Colors.white;
-    return InkWell(
-      onTap: clockedIn ? null : () => unawaited(onClockIn()),
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        height: 370,
-        decoration: BoxDecoration(
-          color: card,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: 13,
-              left: 12,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(13),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.25),
-                      green.withValues(alpha: 0.28),
-                      Colors.white.withValues(alpha: 0.08),
-                    ],
-                  ),
-                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.38), blurRadius: 18)],
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
-                  ),
-                  child: const Text('CARS VIDEO GAMES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7)),
-                ),
-              ),
-            ),
-            StreamBuilder<DateTime>(
-              stream: Stream.periodic(const Duration(milliseconds: 850), (_) => DateTime.now()),
-              initialData: DateTime.now(),
-              builder: (context, snapshot) {
-                final now = snapshot.data ?? DateTime.now();
-                final live = _liveEarningsAt(now);
-                final progress = dailyGoal <= 0 ? 0.0 : (live / dailyGoal).clamp(0.0, 1.0);
-                final pulse = clockedIn ? 0.5 + 0.5 * math.sin(now.millisecondsSinceEpoch / 360) : 0.25;
-                final stopA = progress.clamp(0.05, 0.96);
-                final stopB = (stopA + 0.03).clamp(0.08, 0.99);
-                return Center(
-                  child: Container(
-                    width: 252 + pulse * 12,
-                    height: 252 + pulse * 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: SweepGradient(
-                        startAngle: -math.pi / 2,
-                        endAngle: math.pi * 1.5,
-                        colors: [
-                          const Color(0xFFFFD166).withValues(alpha: 0.95),
-                          const Color(0xFFFFF2A6).withValues(alpha: 0.88),
-                          glow.withValues(alpha: clockedIn ? 0.55 : 0.20),
-                          Colors.white.withValues(alpha: 0.10),
-                          const Color(0xFFFFD166).withValues(alpha: 0.95),
-                        ],
-                        stops: [0, stopA, stopB, 0.99, 1],
-                      ),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.24 + pulse * 0.20), blurRadius: 34, spreadRadius: 1),
-                        BoxShadow(color: green.withValues(alpha: clockedIn ? 0.20 : 0.08), blurRadius: 30),
-                      ],
-                    ),
-                    child: Center(
-                      child: Container(
-                        width: 188,
-                        height: 188,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFF5B5F58).withValues(alpha: 0.94),
-                              const Color(0xFF222625).withValues(alpha: 0.96),
-                              const Color(0xFF111315).withValues(alpha: 0.98),
-                            ],
-                          ),
-                          border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.24), width: 2.2),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.52), blurRadius: 24, offset: const Offset(0, 10)),
-                            BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.12), blurRadius: 18),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [green.withValues(alpha: 0.45), const Color(0xFF064E3B).withValues(alpha: 0.58), Colors.white.withValues(alpha: 0.10)],
-                                ),
-                                border: Border.all(color: green.withValues(alpha: 0.42)),
-                                boxShadow: [BoxShadow(color: green.withValues(alpha: 0.18), blurRadius: 14)],
-                              ),
-                              child: Icon(Icons.phone_iphone_rounded, color: Colors.white.withValues(alpha: 0.88), size: 38),
-                            ),
-                            const SizedBox(height: 10),
-                            Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.74), fontSize: 10, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 6),
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0, end: live),
-                              duration: const Duration(milliseconds: 650),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, _) {
-                                return Text(
-                                  '\$${formatCurrency(value)}',
-                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 30, fontWeight: FontWeight.w900),
-                                );
-                              },
-                            ),
-                            Text(hasPlan ? status : 'NO PLAN', style: TextStyle(color: Colors.white.withValues(alpha: 0.80), fontSize: 9, fontWeight: FontWeight.w900)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _networkStatus({required Color card, required Color green}) {
@@ -933,6 +789,277 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LocalClockInShowcase extends StatefulWidget {
+  const _LocalClockInShowcase({
+    required this.profileDisplayName,
+    required this.dailyGoal,
+    required this.clockedIn,
+    required this.hasPlan,
+    required this.green,
+    required this.card,
+    required this.liveEarningsAt,
+    required this.onClockIn,
+  });
+
+  final String profileDisplayName;
+  final double dailyGoal;
+  final bool clockedIn;
+  final bool hasPlan;
+  final Color green;
+  final Color card;
+  final double Function(DateTime now) liveEarningsAt;
+  final Future<void> Function() onClockIn;
+
+  @override
+  State<_LocalClockInShowcase> createState() => _LocalClockInShowcaseState();
+}
+
+class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with TickerProviderStateMixin {
+  late final AnimationController _spinCtrl;
+  late final AnimationController _glowCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
+    _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _spinCtrl.dispose();
+    _glowCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.clockedIn ? 'ACTIVE' : 'CLOSED';
+    final name = widget.profileDisplayName.trim().isEmpty ? 'Member' : widget.profileDisplayName.trim().toUpperCase();
+
+    return InkWell(
+      onTap: widget.clockedIn ? null : () => unawaited(widget.onClockIn()),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        height: 370,
+        decoration: BoxDecoration(
+          color: widget.card,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: 13,
+              left: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(13),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.25),
+                      widget.green.withValues(alpha: 0.28),
+                      Colors.white.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.38), blurRadius: 18)],
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [widget.green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
+                  ),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7),
+                  ),
+                ),
+              ),
+            ),
+            StreamBuilder<DateTime>(
+              stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+              initialData: DateTime.now(),
+              builder: (context, snapshot) {
+                final now = snapshot.data ?? DateTime.now();
+                final live = widget.liveEarningsAt(now);
+                final progress = widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0);
+                return AnimatedBuilder(
+                  animation: Listenable.merge([_spinCtrl, _glowCtrl]),
+                  builder: (context, _) {
+                    final glow = 0.72 + _glowCtrl.value * 0.28;
+                    return Center(
+                      child: SizedBox(
+                        width: 258,
+                        height: 258,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CustomPaint(
+                              size: const Size(258, 258),
+                              painter: _ClockInRingPainter(
+                                progress: progress,
+                                spin: _spinCtrl.value,
+                                clockedIn: widget.clockedIn,
+                                accent: widget.green,
+                                glowStrength: glow,
+                              ),
+                            ),
+                            Container(
+                              width: 188,
+                              height: 188,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    const Color(0xFF3A403D).withValues(alpha: 0.96),
+                                    const Color(0xFF1A1D1B).withValues(alpha: 0.98),
+                                    const Color(0xFF0E1011),
+                                  ],
+                                ),
+                                border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.30), width: 2),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10)),
+                                  BoxShadow(color: widget.green.withValues(alpha: widget.clockedIn ? 0.14 : 0.06), blurRadius: 24),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 56,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          widget.green.withValues(alpha: 0.50),
+                                          const Color(0xFF064E3B).withValues(alpha: 0.62),
+                                        ],
+                                      ),
+                                      border: Border.all(color: widget.green.withValues(alpha: 0.40)),
+                                    ),
+                                    child: Icon(Icons.savings_rounded, color: Colors.white.withValues(alpha: 0.92), size: 30),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 10, fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 6),
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(begin: live, end: live),
+                                    duration: const Duration(milliseconds: 900),
+                                    curve: Curves.easeOutCubic,
+                                    builder: (context, value, _) => Text(
+                                      '\$${formatCurrency(value)}',
+                                      style: const TextStyle(color: Color(0xFFFFD166), fontSize: 30, fontWeight: FontWeight.w900),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.hasPlan ? status : 'NO PLAN',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClockInRingPainter extends CustomPainter {
+  _ClockInRingPainter({
+    required this.progress,
+    required this.spin,
+    required this.clockedIn,
+    required this.accent,
+    required this.glowStrength,
+  });
+
+  final double progress;
+  final double spin;
+  final bool clockedIn;
+  final Color accent;
+  final double glowStrength;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 8;
+    const stroke = 11.0;
+
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: 0.08);
+    canvas.drawCircle(center, radius, track);
+
+    if (progress > 0.01) {
+      final arcRect = Rect.fromCircle(center: center, radius: radius);
+      final sweep = progress.clamp(0.0, 1.0) * math.pi * 2;
+      final progressPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          startAngle: -math.pi / 2,
+          endAngle: math.pi * 1.5,
+          colors: [
+            const Color(0xFFFFD166),
+            const Color(0xFFFFF3B0),
+            accent.withValues(alpha: 0.95),
+            const Color(0xFFFFD166),
+          ],
+        ).createShader(arcRect);
+      canvas.drawArc(arcRect, -math.pi / 2, sweep, false, progressPaint);
+    }
+
+    if (clockedIn) {
+      final highlightRect = Rect.fromCircle(center: center, radius: radius);
+      final highlightSweep = math.pi / 5;
+      final highlightPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: 0.16 + glowStrength * 0.12);
+      canvas.drawArc(highlightRect, spin * math.pi * 2, highlightSweep, false, highlightPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClockInRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.spin != spin ||
+      oldDelegate.clockedIn != clockedIn ||
+      oldDelegate.glowStrength != glowStrength;
 }
 
 /// Mirrors WalletScreen's look (FloatingTitle, gradient header, Deposit /

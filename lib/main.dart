@@ -17250,12 +17250,27 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     );
   }
 
+  Color _gameCenterShellBg(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shellBg = _gameCenterShellBg(context);
+    final headerBg = isDark ? const Color(0xFF151B28).withValues(alpha: 0.94) : Colors.white.withValues(alpha: 0.94);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final bannerBg = isDark ? const Color(0xFF151B28) : Colors.white;
+    final bannerBorder = isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0);
+    final bannerText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final bannerSub = isDark ? Colors.white70 : const Color(0xFF64748B);
+    final receiptBtnBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
     if (!_gateChecked) {
       return ngmyGameScreenShell(
-        backgroundColor: const Color(0xFF2B1454),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+        backgroundColor: shellBg,
+        child: Center(child: CircularProgressIndicator(color: isDark ? Colors.white : const Color(0xFF22C55E))),
       );
     }
     if (_showInvestmentGate) {
@@ -17268,7 +17283,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
         _exitGameCenter();
       },
       child: ngmyGameScreenShell(
-        backgroundColor: const Color(0xFF2B1454),
+        backgroundColor: shellBg,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -17284,14 +17299,21 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-                    decoration: BoxDecoration(color: const Color(0xFF5C3B8A), borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                      color: bannerBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: bannerBorder),
+                      boxShadow: [
+                        if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                      ],
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             '🎮  All Games\nWin real money playing skill games!',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                            style: TextStyle(color: bannerText, fontWeight: FontWeight.w700, height: 1.35),
                           ),
                         ),
                         ListenableBuilder(
@@ -17302,7 +17324,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                               builder: (context, snap) {
                                 final count = snap.data ?? 0;
                                 return Material(
-                                  color: const Color(0xFF4A2F75),
+                                  color: receiptBtnBg,
                                   borderRadius: BorderRadius.circular(12),
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
@@ -17324,7 +17346,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                                         isLabelVisible: count > 0,
                                         label: Text(count > kNgmyGameNotificationMax ? '$kNgmyGameNotificationMax' : '$count'),
                                         backgroundColor: Colors.orange,
-                                        child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 26),
+                                        child: Icon(Icons.receipt_long_rounded, color: bannerText, size: 26),
                                       ),
                                     ),
                                   ),
@@ -17354,30 +17376,29 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                     height: 60,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface.withOpacity(0.78),
+                      color: headerBg,
                       borderRadius: BorderRadius.circular(35),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.08),
                           blurRadius: 15,
                           offset: const Offset(0, 5),
                         ),
                       ],
-                      border: Border.all(color: Colors.white.withOpacity(0.10)),
+                      border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                          color: Colors.white,
+                          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: titleColor),
                           onPressed: _exitGameCenter,
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Center(
                             child: Text(
                               'GAME CENTER',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: titleColor,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 15,
                                 letterSpacing: 1,
