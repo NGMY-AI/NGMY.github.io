@@ -23,7 +23,7 @@ List<NgmyPhoneAction> ngmyInferOpenToolActionsFromUserMessage(String userText) {
     tool = 'quote_calc';
   } else if (RegExp(r'\b(doc share|share file|upload file)\b').hasMatch(lower)) {
     tool = 'doc_share';
-  } else if (RegExp(r'\b(spark lounge|fun games|love match|riddles|fortune|confidence quote)\b').hasMatch(lower)) {
+  } else if (RegExp(r'\b(play zone|fun games|fun break|love match|riddles|fortune|confidence quote)\b').hasMatch(lower)) {
     tool = 'spark_lounge';
   } else if (RegExp(r'\b(creator toolkit|tool hub|studio hub)\b').hasMatch(lower)) {
     return const [];

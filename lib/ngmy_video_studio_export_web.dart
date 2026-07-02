@@ -589,7 +589,7 @@ Future<void> _syncExportVideosToWallClock(
   final lag = target - primary.currentTime;
   if (lag.isNaN || lag.isInfinite) return;
 
-  if (lag > 0.35) {
+  if (lag > 0.18) {
     final maxT = primary.duration.isFinite && primary.duration > 0
         ? math.max(0.0, primary.duration - 0.04)
         : target;
@@ -599,8 +599,8 @@ Future<void> _syncExportVideosToWallClock(
       v.playbackRate = 1.0;
       v.currentTime = seekT;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  } else if (lag > 0.12) {
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+  } else if (lag > 0.08) {
     primary.playbackRate = (1.0 + lag * 0.55).clamp(1.0, 1.45);
   } else {
     primary.playbackRate = 1.0;
@@ -1153,7 +1153,7 @@ Future<List<html.Blob>> _recordCanvasExport({
     if (useDedicatedAudio && tick % 12 == 0) {
       await _syncExportAudioPlayback(primary, playing: true);
     }
-    if (tick % 5 == 0) {
+    if (tick % 2 == 0) {
       final wallSecNow = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
       await _syncExportVideosToWallClock(videoList, primary, wallSecNow, durationSec);
     }
@@ -1168,24 +1168,26 @@ Future<List<html.Blob>> _recordCanvasExport({
       break;
     }
     if (wallMs >= startupGraceMs) {
-      if ((wallSec - lastT).abs() >= 0.006) {
-        lastT = wallSec;
+      if ((t - lastT).abs() >= 0.006) {
+        lastT = t;
         lastProgressWallMs = wallMs;
       }
     } else {
-      lastT = wallSec;
+      lastT = t;
       lastProgressWallMs = wallMs;
     }
 
-    final p = _exportProgress(durationSec, wallSec, wallMs, durationMs);
+    final p = _exportProgress(durationSec, t, wallMs, durationMs);
     onProgress(p, _ngmyRecordingStatus(p));
 
     final ended = primary != null &&
         (primary.ended || primary.currentTime >= durationSec - 0.05);
-    if (wallSec >= durationSec - 0.025 ||
-        ended ||
+    final maxWallMs = (durationMs * 1.45).ceil() + 6000;
+    if (ended ||
+        t >= durationSec - 0.04 ||
         (primary == null && wallMs >= durationMs) ||
-        (wallMs - lastProgressWallMs) > stallLimitMs) {
+        (wallMs - lastProgressWallMs) > stallLimitMs ||
+        wallMs >= maxWallMs) {
       break;
     }
   }
@@ -1276,11 +1278,8 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
     final t = (frame / totalFrames) * durationSec;
     for (final v in videoList) {
       final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.04) : t;
-      v.pause();
-      v.playbackRate = 1.0;
-      v.currentTime = t.clamp(0.0, maxT);
+      await _seekVideoTo(v, t.clamp(0.0, maxT), fast: false);
     }
-    await Future<void>.delayed(const Duration(milliseconds: 6));
     paintFrame();
     await _awaitWallTime(wallStart, slotEndMs);
 

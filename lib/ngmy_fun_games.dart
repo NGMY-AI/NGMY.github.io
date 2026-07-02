@@ -12,7 +12,7 @@ import 'ngmy_fun_games_popups.dart';
 import 'ngmy_love_content.dart';
 import 'ngmy_love_popups.dart';
 
-/// Spark Lounge — love match, confidence, brain teasers & fortune (Creator Toolkit).
+/// Play Zone — love match, confidence, brain teasers & fortune (Creator Toolkit).
 void showNgmyFunGamesDialog(BuildContext context, {String? userEmail}) {
   showDialog<void>(
     context: context,
@@ -274,7 +274,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Spark Lounge', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                Text('Play Zone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                 Text('Entertainment Hub', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),

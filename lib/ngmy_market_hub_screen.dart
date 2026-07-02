@@ -4,7 +4,7 @@ import 'ngmy_business_card_studio.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_item_reminder_storage.dart';
-import 'ngmy_tech_exclusive.dart';
+import 'ngmy_daily_tools.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -85,33 +85,33 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
-              title: 'Phantom Handshake',
-              subtitle: 'NGMY-only · one-time pairing codes · 5 min expiry',
+              title: 'Key Fob Vault',
+              subtitle: 'Car info · spare key · dealer & locksmith — lost-key ready',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF020617), Color(0xFF0E7490), Color(0xFF164E63)],
-              accent: const Color(0xFF22D3EE),
-              preview: _TechThumbPreview(icon: Icons.link_rounded, accent: Color(0xFF22D3EE), label: 'PAIR • 8 DIGIT'),
-              onTap: () => showNgmyPhantomHandshakeDialog(context),
+              gradient: const [Color(0xFF0C1929), Color(0xFF1E3A5F), Color(0xFF0E4D6E)],
+              accent: const Color(0xFF38BDF8),
+              preview: _DailyThumbPreview(icon: Icons.key_rounded, accent: Color(0xFF38BDF8), label: 'MY KEY FOB'),
+              onTap: () => showNgmyKeyFobVaultDialog(context, userEmail: widget.userEmail),
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
-              title: 'Cipher Drop',
-              subtitle: 'Encrypt secrets on-device · zero server · passphrase key',
+              title: 'Park My Car',
+              subtitle: 'GPS pin · garage level · open in Maps when you forget',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF022C22), Color(0xFF064E3B), Color(0xFF14532D)],
-              accent: const Color(0xFF10B981),
-              preview: _TechThumbPreview(icon: Icons.enhanced_encryption_rounded, accent: Color(0xFF10B981), label: 'AES-LOCAL'),
-              onTap: () => showNgmyCipherDropDialog(context),
+              accent: const Color(0xFF34D399),
+              preview: _DailyThumbPreview(icon: Icons.local_parking_rounded, accent: Color(0xFF34D399), label: 'SAVE SPOT'),
+              onTap: () => showNgmyParkMyCarDialog(context, userEmail: widget.userEmail),
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
-              title: 'Signal Ghost',
-              subtitle: 'Passive device trace · fingerprint · NGMY recon lens',
+              title: 'Roadside Ready',
+              subtitle: 'Insurance · AAA · emergency — one tap to call',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF1C0A00), Color(0xFF7C2D12), Color(0xFF431407)],
-              accent: const Color(0xFFF97316),
-              preview: _TechThumbPreview(icon: Icons.radar_rounded, accent: Color(0xFFF97316), label: 'GHOST SCAN'),
-              onTap: () => showNgmySignalGhostDialog(context),
+              gradient: const [Color(0xFF1C1400), Color(0xFF713F12), Color(0xFF422006)],
+              accent: const Color(0xFFFBBF24),
+              preview: _DailyThumbPreview(icon: Icons.car_crash_rounded, accent: Color(0xFFFBBF24), label: 'BREAKDOWN'),
+              onTap: () => showNgmyRoadsideReadyDialog(context, userEmail: widget.userEmail),
             ),
           ],
         ),
@@ -281,8 +281,8 @@ class _ReminderThumbPreview extends StatelessWidget {
   }
 }
 
-class _TechThumbPreview extends StatelessWidget {
-  const _TechThumbPreview({required this.icon, required this.accent, required this.label});
+class _DailyThumbPreview extends StatelessWidget {
+  const _DailyThumbPreview({required this.icon, required this.accent, required this.label});
 
   final IconData icon;
   final Color accent;

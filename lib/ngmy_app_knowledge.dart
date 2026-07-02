@@ -26,7 +26,7 @@ class NgmyAppKnowledge {
       ..writeln('- News & NGMY Helper: announcements + AI chat — can call/text/calendar/maps on your phone by name')
       ..writeln('- Profile: settings, wallet, transaction history, theme, logout')
       ..writeln('- Invest: investment plans, purchase, ROI / clock-in earnings')
-      ..writeln('- Jobs marketplace, worksheets, family tree, QR tools, Spark Lounge (from Creator Toolkit)')
+      ..writeln('- Jobs marketplace, worksheets, family tree, QR tools, Play Zone (from Creator Toolkit)')
       ..writeln();
 
     if (isAdmin) {

@@ -27,11 +27,11 @@ void ngmyRegisterAiAppTools({
     tools: {
       'spark_lounge': (ctx) async {
         showNgmyFunGamesDialog(ctx, userEmail: userEmail);
-        return 'Opened Spark Lounge — love match, confidence, riddles & fortune.';
+        return 'Opened Play Zone — love match, confidence, riddles & fortune.';
       },
       'fun_games': (ctx) async {
         showNgmyFunGamesDialog(ctx, userEmail: userEmail);
-        return 'Opened Spark Lounge.';
+        return 'Opened Play Zone.';
       },
       'video_studio': (ctx) async {
         showNgmyVideoStudio(ctx);

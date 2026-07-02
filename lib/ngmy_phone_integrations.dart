@@ -28,7 +28,7 @@ const List<({String id, String label, String example})> kNgmyPhoneConnectedApps 
   (id: 'facebook', label: 'Facebook', example: 'Open my Facebook'),
   (id: 'instagram', label: 'Instagram', example: 'Open Instagram'),
   (id: 'telegram', label: 'Telegram', example: 'Open Telegram'),
-  (id: 'open_tool', label: 'NGMY apps', example: 'Open Video Studio / Spark Lounge / Virtual Device'),
+  (id: 'open_tool', label: 'NGMY apps', example: 'Open Video Studio / Play Zone / Virtual Device'),
 ];
 
 String ngmyHelperPhoneIntegrationContext({
