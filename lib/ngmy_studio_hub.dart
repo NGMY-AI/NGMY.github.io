@@ -7,8 +7,7 @@ import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_iron_triangle_panel.dart';
-import 'ngmy_invoice_storage.dart';
-import 'ngmy_invoice_templates.dart';
+import 'ngmy_invoice_creator.dart';
 import 'ngmy_mechanic_studio.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
@@ -111,7 +110,14 @@ class NgmyCreatorHubTab extends StatelessWidget {
             NgmyHubToolBridge.openPickTwo!();
             return;
           }
-          showNgmyStandaloneQuoteCalc(context);
+          showNgmyStandaloneQuoteCalc(
+            context,
+            userEmail: userEmail,
+            user: user,
+            config: config,
+            onCharge: onCharge,
+            onDataChanged: onDataChanged,
+          );
         },
       ),
       _CreatorTool(
@@ -337,16 +343,41 @@ class _CreatorToolCard extends StatelessWidget {
   }
 }
 
-void showNgmyStandaloneQuoteCalc(BuildContext context) {
+void showNgmyStandaloneQuoteCalc(
+  BuildContext context, {
+  String userEmail = '',
+  dynamic user,
+  dynamic config,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
+}) {
   showDialog<void>(
     context: context,
     barrierColor: Colors.black87,
-    builder: (_) => const _StandaloneQuoteCalcDialog(),
+    builder: (_) => _StandaloneQuoteCalcDialog(
+      userEmail: userEmail,
+      user: user,
+      config: config,
+      onCharge: onCharge,
+      onDataChanged: onDataChanged,
+    ),
   );
 }
 
 class _StandaloneQuoteCalcDialog extends StatefulWidget {
-  const _StandaloneQuoteCalcDialog();
+  const _StandaloneQuoteCalcDialog({
+    this.userEmail = '',
+    this.user,
+    this.config,
+    this.onCharge,
+    this.onDataChanged,
+  });
+
+  final String userEmail;
+  final dynamic user;
+  final dynamic config;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
 
   @override
   State<_StandaloneQuoteCalcDialog> createState() => _StandaloneQuoteCalcDialogState();
@@ -507,6 +538,11 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
                 onEstimateTap: () => _toast('Repair Estimate opens from NGMY Hub. Quote Calc is ready here.'),
                 onInvoiceTap: () => showNgmyStandaloneInvoiceTool(
                   context,
+                  userEmail: widget.userEmail,
+                  user: widget.user,
+                  config: widget.config,
+                  onCharge: widget.onCharge,
+                  onDataChanged: widget.onDataChanged,
                   service: service,
                   amount: netMine > 0 ? netMine : mine,
                 ),
@@ -530,224 +566,24 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
 
 void showNgmyStandaloneInvoiceTool(
   BuildContext context, {
+  String userEmail = '',
+  dynamic user,
+  dynamic config,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
   String service = '',
   double amount = 0,
 }) {
-  showDialog<void>(
-    context: context,
-    barrierColor: Colors.black87,
-    builder: (_) => _StandaloneInvoiceDialog(service: service, amount: amount),
+  showNgmyInvoiceCreator(
+    context,
+    userEmail: userEmail,
+    user: user,
+    config: config,
+    onCharge: onCharge,
+    onDataChanged: onDataChanged,
+    initialService: service,
+    initialAmount: amount,
   );
-}
-
-class _StandaloneInvoiceDialog extends StatefulWidget {
-  const _StandaloneInvoiceDialog({required this.service, required this.amount});
-
-  final String service;
-  final double amount;
-
-  @override
-  State<_StandaloneInvoiceDialog> createState() => _StandaloneInvoiceDialogState();
-}
-
-class _StandaloneInvoiceDialogState extends State<_StandaloneInvoiceDialog> {
-  String _templateId = 'modern';
-  final _bizNameC = TextEditingController(text: 'NGMY Services');
-  final _bizPhoneC = TextEditingController();
-  final _clientNameC = TextEditingController();
-  final _clientEmailC = TextEditingController();
-  final _itemNameC = TextEditingController();
-  final _itemDescC = TextEditingController();
-  final _itemPriceC = TextEditingController();
-  final _itemQtyC = TextEditingController(text: '1');
-  final _paymentInfoC = TextEditingController(text: 'Thank you for your business!');
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.service.trim().isNotEmpty) _itemNameC.text = widget.service.trim();
-    if (widget.amount > 0) _itemPriceC.text = widget.amount.toStringAsFixed(2);
-  }
-
-  @override
-  void dispose() {
-    _bizNameC.dispose();
-    _bizPhoneC.dispose();
-    _clientNameC.dispose();
-    _clientEmailC.dispose();
-    _itemNameC.dispose();
-    _itemDescC.dispose();
-    _itemPriceC.dispose();
-    _itemQtyC.dispose();
-    _paymentInfoC.dispose();
-    super.dispose();
-  }
-
-  double _num(String raw) => double.tryParse(raw.trim()) ?? 0;
-
-  double get _subtotal {
-    final price = _num(_itemPriceC.text);
-    final qty = _num(_itemQtyC.text);
-    return price * (qty <= 0 ? 1 : qty);
-  }
-
-  NgmyInvoicePreviewData _previewData() {
-    final now = DateTime.now();
-    final due = now.add(const Duration(days: 7));
-    return NgmyInvoicePreviewData(
-      templateId: _templateId,
-      businessName: _bizNameC.text.trim().isEmpty ? 'NGMY Services' : _bizNameC.text.trim(),
-      bizStreet: '',
-      bizCityStateZip: '',
-      bizPhone: _bizPhoneC.text.trim(),
-      invoiceNo: DateTime.now().millisecondsSinceEpoch.toString().substring(7),
-      issuedDate: '${now.month}/${now.day}/${now.year}',
-      dueDate: '${due.month}/${due.day}/${due.year}',
-      clientName: _clientNameC.text.trim().isEmpty ? 'Client' : _clientNameC.text.trim(),
-      clientEmail: _clientEmailC.text.trim(),
-      itemName: _itemNameC.text.trim().isEmpty ? 'Service' : _itemNameC.text.trim(),
-      itemPrice: _itemPriceC.text.trim().isEmpty ? '0' : _itemPriceC.text.trim(),
-      itemQty: _itemQtyC.text.trim().isEmpty ? '1' : _itemQtyC.text.trim(),
-      itemDiscount: '0',
-      itemDesc: _itemDescC.text.trim(),
-      paymentInfo: _paymentInfoC.text.trim(),
-      subtotal: _subtotal,
-      providerSignature: const [],
-      clientSignature: const [],
-    );
-  }
-
-  Future<void> _saveInvoice() async {
-    final data = _previewData();
-    await addSavedInvoice({
-      'id': 'standalone_invoice_${DateTime.now().microsecondsSinceEpoch}',
-      'createdAt': DateTime.now().toIso8601String(),
-      'template': data.templateId,
-      'businessName': data.businessName,
-      'bizPhone': data.bizPhone,
-      'clientName': data.clientName,
-      'clientEmail': data.clientEmail,
-      'itemName': data.itemName,
-      'itemDesc': data.itemDesc,
-      'itemPrice': data.itemPrice,
-      'itemQty': data.itemQty,
-      'paymentInfo': data.paymentInfo,
-      'subtotal': data.subtotal,
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invoice saved.')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dialogW = MediaQuery.of(context).size.width > 520 ? 460.0 : MediaQuery.of(context).size.width - 24;
-    final data = _previewData();
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-      backgroundColor: const Color(0xFF091323),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SizedBox(
-        width: dialogW,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981), size: 24),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('Create Invoice', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ngmyInvoiceTemplatePicker(
-                context: context,
-                selectedId: _templateId,
-                onSelect: (id) => setState(() => _templateId = id),
-              ),
-              const SizedBox(height: 12),
-              _field(_bizNameC, 'Business name', Icons.business_rounded),
-              const SizedBox(height: 8),
-              _field(_bizPhoneC, 'Business phone', Icons.phone_rounded),
-              const SizedBox(height: 8),
-              _field(_clientNameC, 'Client name', Icons.person_rounded),
-              const SizedBox(height: 8),
-              _field(_clientEmailC, 'Client email', Icons.email_rounded),
-              const SizedBox(height: 8),
-              _field(_itemNameC, 'Service / item', Icons.handyman_rounded),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _field(_itemPriceC, 'Price', Icons.attach_money_rounded, number: true)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _field(_itemQtyC, 'Qty', Icons.numbers_rounded, number: true)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _field(_itemDescC, 'Description', Icons.notes_rounded),
-              const SizedBox(height: 8),
-              _field(_paymentInfoC, 'Payment note', Icons.payments_rounded),
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: NgmyInvoicePreview(data: data),
-              ),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: _saveInvoice,
-                icon: const Icon(Icons.save_rounded),
-                label: const Text('Save Invoice'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _field(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool number = false,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-      onChanged: (_) => setState(() {}),
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.55)),
-        prefixIcon: Icon(icon, color: Colors.white54, size: 18),
-        filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.28),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: Color(0xFF10B981), width: 1.4),
-        ),
-      ),
-    );
-  }
 }
 
 class _HubGuestUser {
