@@ -15449,83 +15449,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) return;
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
-      1: () => InvestScreen(
-        user: widget.user,
-        plans: widget.globalPlans,
-        purchaseInFlight: _investPurchaseInFlight,
-        onInvest: (n, p, r, cost) {
-          if (_investPurchaseInFlight) return;
-          if (cost <= 0 || ngmyUserHasActivePlan(widget.user, planName: n, planAmount: p)) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('This plan is already active.')),
-            );
-            return;
-          }
-          final txnId = ngmyInvestPurchaseTxnId(widget.user.email, n, p);
-          if (ngmyHasApprovedInvestPurchase(widget.user.email, widget.allTransactions, txnId)) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('You already own this plan. No additional charge was made.')),
-            );
-            return;
-          }
-          if (widget.user.accountBalance >= cost) {
-            setState(() => _investPurchaseInFlight = true);
-            widget.user.activeInvestment = ActiveInvestment(
-              name: n,
-              amount: p,
-              dailyROI: InvestmentPlan.fixedRoi,
-              purchaseDate: DateTime.now(),
-              daysClockedIn: 0,
-              totalEarned: 0.0,
-            );
-            widget.user.pendingInvestmentName = null;
-            widget.user.pendingInvestmentAmount = null;
-            widget.user.pendingInvestmentRoi = null;
-            widget.onAddTransaction(
-              AppTransaction(
-                id: txnId,
-                userEmail: widget.user.email,
-                amount: cost,
-                type: TransactionType.adminRemove,
-                method: PaymentMethod.system,
-                sourceDetails: 'Direct investment buy: $n',
-                status: TransactionStatus.approved,
-                timestamp: DateTime.now(),
-              ),
-            );
-            widget.onDataChanged();
-            if (mounted) {
-              setState(() => _investPurchaseInFlight = false);
-              _tabPagesKey = null;
-              _tabContentBuilders = null;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Plan purchased: $n')),
-              );
-            }
-            return;
-          }
-          setState(() {
-            widget.user.pendingInvestmentName = n;
-            widget.user.pendingInvestmentAmount = p;
-            widget.user.pendingInvestmentRoi = r;
-          });
-          widget.onDataChanged();
-          NgmyNavigator.push(
-            context,
-            SubmitPaymentPage(
-              user: widget.user,
-              amount: cost,
-              onAdd: widget.onAddTransaction,
-              config: widget.config,
-              requestTitle: 'Submit Investment Request',
-              successHint: 'Your investment request was sent to admin for approval.',
-              requestKind: 'investment',
-              investmentPlanName: n,
-              investmentPlanAmount: p,
-              investmentPlanRoi: r,
-            ),
-          );
-        },
+      1: () => NgmyMarketHubScreen(
+        userEmail: widget.user.email,
+        username: widget.user.username,
       ),
       2: () => WalletScreen(
         user: widget.user,
@@ -25039,9 +24965,33 @@ class InvestScreen extends StatefulWidget {
 class _InvestScreenState extends State<InvestScreen> {
   @override
   Widget build(BuildContext context) {
-    return NgmyMarketHubScreen(
-      userEmail: widget.user.email,
-      username: widget.user.username,
+    final user = widget.user;
+    final plans = widget.plans;
+    final bottomPad = _ngmyBottomNavScrollPadding(context);
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPad),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const FloatingTitle(title: 'INVESTMENT PLANS'),
+              const SizedBox(height: 20),
+              if (user.activeInvestment != null) ...[
+                const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 15),
+                _activeCard(context, user.activeInvestment!, user),
+                const SizedBox(height: 30),
+              ],
+              const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 15),
+              ...plans.map((p) => _planRow(context, p)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

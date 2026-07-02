@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
 import 'ngmy_game_session.dart';
+import 'ngmy_local_snapshot_sync.dart';
 
 /// A second, fully local copy of a user's growth-income numbers (balance,
 /// investment, clock-in streak, wallet history). Never touches Supabase —
@@ -97,6 +99,12 @@ class NgmyLocalGrowthIncomeStore {
       if (bumpWalletRevision) revision++;
     }
     await prefs.setString(_key(realEmail), jsonEncode(_toMap(user, transactions, walletStateRevision: revision)));
+    unawaited(ngmySyncLocalLiveSnapshotIfRegistered(
+      ownerEmail: realEmail,
+      user: user,
+      transactions: transactions,
+      walletStateRevision: revision,
+    ));
   }
 
   /// Overwrites the local copy outright (used by snapshot restore — safe here

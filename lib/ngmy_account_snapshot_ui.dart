@@ -179,10 +179,10 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
           return;
         case NgmySnapshotResolveOutcome.foundLive:
-          await _confirmRestore(result.snapshot!, allowLiveRestore: true);
+          await _confirmRestore(result.snapshot!, allowLiveRestore: true, fromCloudRelay: true);
           return;
         case NgmySnapshotResolveOutcome.found:
-          await _confirmRestore(result.snapshot!);
+          await _confirmRestore(result.snapshot!, fromCloudRelay: true);
       }
     }, busyLabel: 'Looking up code…');
   }
@@ -206,14 +206,14 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   bool _isStaleBackup(NgmyAccountSnapshot snapshot) =>
       !NgmyAccountSnapshot.matchesCurrentWalletRevision(snapshot, _walletStateRevision);
 
-  Future<void> _confirmRestore(NgmyAccountSnapshot snapshot, {bool allowLiveRestore = false}) async {
+  Future<void> _confirmRestore(NgmyAccountSnapshot snapshot, {bool allowLiveRestore = false, bool fromCloudRelay = false}) async {
     await _refreshLocalState();
     if (!mounted) return;
     if (!NgmyAccountSnapshot.ownedByRealAccount(snapshot, widget.realEmail)) {
       _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
       return;
     }
-    if (!allowLiveRestore && _isStaleBackup(snapshot)) {
+    if (!allowLiveRestore && !fromCloudRelay && _isStaleBackup(snapshot)) {
       _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
       return;
     }
@@ -418,7 +418,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       final result = await NgmyAccountSnapshot.resolveForRestore(raw, widget.realEmail);
       switch (result.outcome) {
         case NgmySnapshotResolveOutcome.foundLive:
-          await _confirmRestore(result.snapshot!, allowLiveRestore: true);
+          await _confirmRestore(result.snapshot!, allowLiveRestore: true, fromCloudRelay: true);
           return;
         case NgmySnapshotResolveOutcome.wrongAccount:
           _toast(NgmyAccountSnapshot.ownershipBlockMessage(widget.realEmail));
@@ -430,7 +430,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           _toast(NgmyAccountSnapshot.staleBackupBlockMessage());
           return;
         case NgmySnapshotResolveOutcome.found:
-          await _confirmRestore(result.snapshot!);
+          await _confirmRestore(result.snapshot!, fromCloudRelay: true);
       }
     }, busyLabel: 'Loading…');
   }
@@ -542,7 +542,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
                           'Download a file, show a QR, or get a 6-character code to save where you are now. '
                           'Upload, scan, or type that code later to bring it back — on this device or another. '
                           'Scan also accepts admin deposit QR codes, or type the admin\'s 6-digit deposit code under Enter Code. '
-                          'Only your own account can restore a backup, and only if you have not used the wallet since saving. '
+                          'Your QR and code stay updated with your latest local wallet. Only your own account can restore a backup. '
                           'Never touches your real, database-backed wallet.',
                           style: TextStyle(fontSize: 12, height: 1.45, color: muted, fontWeight: FontWeight.w600),
                         ),
@@ -695,6 +695,7 @@ class _NgmyAccountSnapshotQrPageState extends State<_NgmyAccountSnapshotQrPage> 
   @override
   void initState() {
     super.initState();
+    unawaited(_refreshLiveQr());
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_refreshLiveQr()));
   }
 
