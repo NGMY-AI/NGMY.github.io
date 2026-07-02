@@ -6,47 +6,29 @@ import 'package:flutter/material.dart';
 /// Standard US business card ratio (3.5" × 2").
 const double kNgmyBusinessCardAspect = 3.5 / 2.0;
 
-enum NgmyCardLayoutStyle {
-  classicLeft,
-  centerElegant,
-  splitDiagonal,
-  topBand,
-  sideStripe,
-  minimalLine,
-  boldFooter,
-  dualHorizontal,
-  cornerLogo,
-  luxuryDark,
-}
-
 class NgmyBusinessCardTemplate {
   const NgmyBusinessCardTemplate({
     required this.id,
     required this.name,
     required this.category,
-    required this.layout,
+    required this.renderStyle,
     required this.bgStart,
     required this.bgEnd,
     required this.accent,
     required this.textPrimary,
     required this.textSecondary,
-    this.accentBar = false,
-    this.showLogo = true,
-    this.fontWeight = FontWeight.w700,
   });
 
   final String id;
   final String name;
   final String category;
-  final NgmyCardLayoutStyle layout;
+  /// Unique layout engine key — each style has a different structure.
+  final String renderStyle;
   final Color bgStart;
   final Color bgEnd;
   final Color accent;
   final Color textPrimary;
   final Color textSecondary;
-  final bool accentBar;
-  final bool showLogo;
-  final FontWeight fontWeight;
 }
 
 const List<(String id, String label)> kNgmyBusinessCardCategories = [
@@ -61,229 +43,26 @@ const List<(String id, String label)> kNgmyBusinessCardCategories = [
 ];
 
 const List<NgmyBusinessCardTemplate> kNgmyBusinessCardTemplates = [
-  NgmyBusinessCardTemplate(
-    id: 'corp_executive',
-    name: 'Executive Navy',
-    category: 'corporate',
-    layout: NgmyCardLayoutStyle.classicLeft,
-    bgStart: Color(0xFF0F172A),
-    bgEnd: Color(0xFF1E293B),
-    accent: Color(0xFF3B82F6),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFF94A3B8),
-    accentBar: true,
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'corp_stripe',
-    name: 'Blue Stripe',
-    category: 'corporate',
-    layout: NgmyCardLayoutStyle.sideStripe,
-    bgStart: Color(0xFFFFFFFF),
-    bgEnd: Color(0xFFF8FAFC),
-    accent: Color(0xFF2563EB),
-    textPrimary: Color(0xFF0F172A),
-    textSecondary: Color(0xFF64748B),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'corp_slate',
-    name: 'Slate Pro',
-    category: 'corporate',
-    layout: NgmyCardLayoutStyle.topBand,
-    bgStart: Color(0xFF334155),
-    bgEnd: Color(0xFF475569),
-    accent: Color(0xFF38BDF8),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFCBD5E1),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'creative_gradient',
-    name: 'Gradient Pop',
-    category: 'creative',
-    layout: NgmyCardLayoutStyle.splitDiagonal,
-    bgStart: Color(0xFFDB2777),
-    bgEnd: Color(0xFF7C3AED),
-    accent: Color(0xFFFDE047),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFFCE7F3),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'creative_sunset',
-    name: 'Sunset Split',
-    category: 'creative',
-    layout: NgmyCardLayoutStyle.dualHorizontal,
-    bgStart: Color(0xFFF97316),
-    bgEnd: Color(0xFFEC4899),
-    accent: Color(0xFF1E1B4B),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFFFF7ED),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'creative_mint',
-    name: 'Mint Block',
-    category: 'creative',
-    layout: NgmyCardLayoutStyle.boldFooter,
-    bgStart: Color(0xFFECFDF5),
-    bgEnd: Color(0xFFD1FAE5),
-    accent: Color(0xFF059669),
-    textPrimary: Color(0xFF064E3B),
-    textSecondary: Color(0xFF047857),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'minimal_white',
-    name: 'Pure White',
-    category: 'minimal',
-    layout: NgmyCardLayoutStyle.minimalLine,
-    bgStart: Color(0xFFFFFFFF),
-    bgEnd: Color(0xFFFAFAFA),
-    accent: Color(0xFF18181B),
-    textPrimary: Color(0xFF18181B),
-    textSecondary: Color(0xFF71717A),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'minimal_ink',
-    name: 'Ink Mono',
-    category: 'minimal',
-    layout: NgmyCardLayoutStyle.centerElegant,
-    bgStart: Color(0xFFFAFAFA),
-    bgEnd: Color(0xFFF4F4F5),
-    accent: Color(0xFF27272A),
-    textPrimary: Color(0xFF09090B),
-    textSecondary: Color(0xFF52525B),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'minimal_thin',
-    name: 'Thin Line',
-    category: 'minimal',
-    layout: NgmyCardLayoutStyle.classicLeft,
-    bgStart: Color(0xFFFFFFFF),
-    bgEnd: Color(0xFFFFFFFF),
-    accent: Color(0xFFA1A1AA),
-    textPrimary: Color(0xFF27272A),
-    textSecondary: Color(0xFF71717A),
-    accentBar: true,
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'luxury_gold',
-    name: 'Gold Noir',
-    category: 'luxury',
-    layout: NgmyCardLayoutStyle.luxuryDark,
-    bgStart: Color(0xFF0A0A0A),
-    bgEnd: Color(0xFF171717),
-    accent: Color(0xFFD4AF37),
-    textPrimary: Color(0xFFF5F5F4),
-    textSecondary: Color(0xFFA8A29E),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'luxury_marble',
-    name: 'Marble Elite',
-    category: 'luxury',
-    layout: NgmyCardLayoutStyle.centerElegant,
-    bgStart: Color(0xFF1C1917),
-    bgEnd: Color(0xFF44403C),
-    accent: Color(0xFFE7E5E4),
-    textPrimary: Color(0xFFFAFAF9),
-    textSecondary: Color(0xFFD6D3D1),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'tech_neon',
-    name: 'Neon Dark',
-    category: 'tech',
-    layout: NgmyCardLayoutStyle.splitDiagonal,
-    bgStart: Color(0xFF020617),
-    bgEnd: Color(0xFF0F172A),
-    accent: Color(0xFF22D3EE),
-    textPrimary: Color(0xFFF0FDFA),
-    textSecondary: Color(0xFF67E8F9),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'tech_startup',
-    name: 'Startup Clean',
-    category: 'tech',
-    layout: NgmyCardLayoutStyle.cornerLogo,
-    bgStart: Color(0xFFF0F9FF),
-    bgEnd: Color(0xFFE0F2FE),
-    accent: Color(0xFF0284C7),
-    textPrimary: Color(0xFF0C4A6E),
-    textSecondary: Color(0xFF0369A1),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'medical_calm',
-    name: 'Calm Care',
-    category: 'medical',
-    layout: NgmyCardLayoutStyle.topBand,
-    bgStart: Color(0xFFECFEFF),
-    bgEnd: Color(0xFFCFFAFE),
-    accent: Color(0xFF0891B2),
-    textPrimary: Color(0xFF164E63),
-    textSecondary: Color(0xFF155E75),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'medical_trust',
-    name: 'Trust Teal',
-    category: 'medical',
-    layout: NgmyCardLayoutStyle.sideStripe,
-    bgStart: Color(0xFFFFFFFF),
-    bgEnd: Color(0xFFF0FDFA),
-    accent: Color(0xFF0D9488),
-    textPrimary: Color(0xFF134E4A),
-    textSecondary: Color(0xFF115E59),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'realestate_prestige',
-    name: 'Prestige Gold',
-    category: 'real_estate',
-    layout: NgmyCardLayoutStyle.boldFooter,
-    bgStart: Color(0xFF1E293B),
-    bgEnd: Color(0xFF334155),
-    accent: Color(0xFFFBBF24),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFCBD5E1),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'realestate_modern',
-    name: 'Modern Agent',
-    category: 'real_estate',
-    layout: NgmyCardLayoutStyle.classicLeft,
-    bgStart: Color(0xFFFFFFFF),
-    bgEnd: Color(0xFFF1F5F9),
-    accent: Color(0xFF0F766E),
-    textPrimary: Color(0xFF0F172A),
-    textSecondary: Color(0xFF475569),
-    accentBar: true,
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'freelance_personal',
-    name: 'Personal Brand',
-    category: 'freelance',
-    layout: NgmyCardLayoutStyle.centerElegant,
-    bgStart: Color(0xFFFAE8FF),
-    bgEnd: Color(0xFFF3E8FF),
-    accent: Color(0xFF9333EA),
-    textPrimary: Color(0xFF581C87),
-    textSecondary: Color(0xFF7E22CE),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'freelance_bold',
-    name: 'Bold Creator',
-    category: 'freelance',
-    layout: NgmyCardLayoutStyle.dualHorizontal,
-    bgStart: Color(0xFF18181B),
-    bgEnd: Color(0xFF27272A),
-    accent: Color(0xFFF97316),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFD4D4D8),
-  ),
-  NgmyBusinessCardTemplate(
-    id: 'creative_ocean',
-    name: 'Ocean Wave',
-    category: 'creative',
-    layout: NgmyCardLayoutStyle.cornerLogo,
-    bgStart: Color(0xFF1D4ED8),
-    bgEnd: Color(0xFF0EA5E9),
-    accent: Color(0xFFFFFFFF),
-    textPrimary: Colors.white,
-    textSecondary: Color(0xFFE0F2FE),
-  ),
+  NgmyBusinessCardTemplate(id: 'glass_frost', name: 'Glass Frost', category: 'creative', renderStyle: 'glass_frost', bgStart: Color(0xFF1E1B4B), bgEnd: Color(0xFF312E81), accent: Color(0xFF818CF8), textPrimary: Colors.white, textSecondary: Color(0xFFC7D2FE)),
+  NgmyBusinessCardTemplate(id: 'vertical_split', name: 'Split Panel', category: 'corporate', renderStyle: 'vertical_split', bgStart: Color(0xFFF8FAFC), bgEnd: Color(0xFFFFFFFF), accent: Color(0xFF2563EB), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'mega_type', name: 'Mega Type', category: 'creative', renderStyle: 'mega_type', bgStart: Color(0xFFFAFAFA), bgEnd: Color(0xFFF4F4F5), accent: Color(0xFF18181B), textPrimary: Color(0xFF09090B), textSecondary: Color(0xFF71717A)),
+  NgmyBusinessCardTemplate(id: 'orbit', name: 'Orbit Ring', category: 'tech', renderStyle: 'orbit', bgStart: Color(0xFF020617), bgEnd: Color(0xFF0F172A), accent: Color(0xFF22D3EE), textPrimary: Color(0xFFF0FDFA), textSecondary: Color(0xFF67E8F9)),
+  NgmyBusinessCardTemplate(id: 'metro_bento', name: 'Bento Grid', category: 'tech', renderStyle: 'metro_bento', bgStart: Color(0xFF111827), bgEnd: Color(0xFF1F2937), accent: Color(0xFF10B981), textPrimary: Colors.white, textSecondary: Color(0xFF9CA3AF)),
+  NgmyBusinessCardTemplate(id: 'wave_curve', name: 'Wave Flow', category: 'creative', renderStyle: 'wave_curve', bgStart: Color(0xFF0EA5E9), bgEnd: Color(0xFF0284C7), accent: Color(0xFFFFFFFF), textPrimary: Colors.white, textSecondary: Color(0xFFE0F2FE)),
+  NgmyBusinessCardTemplate(id: 'neon_frame', name: 'Neon Edge', category: 'creative', renderStyle: 'neon_frame', bgStart: Color(0xFF020617), bgEnd: Color(0xFF020617), accent: Color(0xFFE879F9), textPrimary: Colors.white, textSecondary: Color(0xFF94A3B8)),
+  NgmyBusinessCardTemplate(id: 'editorial', name: 'Editorial', category: 'luxury', renderStyle: 'editorial', bgStart: Color(0xFFFAF9F7), bgEnd: Color(0xFFF5F5F4), accent: Color(0xFF78716C), textPrimary: Color(0xFF1C1917), textSecondary: Color(0xFF57534E)),
+  NgmyBusinessCardTemplate(id: 'hero_strip', name: 'Hero Band', category: 'corporate', renderStyle: 'hero_strip', bgStart: Color(0xFFFFFFFF), bgEnd: Color(0xFFF1F5F9), accent: Color(0xFF0F766E), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF475569)),
+  NgmyBusinessCardTemplate(id: 'pill_row', name: 'Contact Pills', category: 'freelance', renderStyle: 'pill_row', bgStart: Color(0xFFFDF4FF), bgEnd: Color(0xFFFAE8FF), accent: Color(0xFF9333EA), textPrimary: Color(0xFF581C87), textSecondary: Color(0xFF7E22CE)),
+  NgmyBusinessCardTemplate(id: 'fold_corner', name: 'Fold Corner', category: 'corporate', renderStyle: 'fold_corner', bgStart: Color(0xFFFFFFFF), bgEnd: Color(0xFFF8FAFC), accent: Color(0xFFEF4444), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'bubble_duotone', name: 'Soft Bubbles', category: 'medical', renderStyle: 'bubble_duotone', bgStart: Color(0xFFECFEFF), bgEnd: Color(0xFFCFFAFE), accent: Color(0xFF0891B2), textPrimary: Color(0xFF164E63), textSecondary: Color(0xFF155E75)),
+  NgmyBusinessCardTemplate(id: 'ultra_minimal', name: 'Ultra Clean', category: 'minimal', renderStyle: 'ultra_minimal', bgStart: Colors.white, bgEnd: Colors.white, accent: Color(0xFF0F172A), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'gold_luxe', name: 'Gold Luxe', category: 'luxury', renderStyle: 'gold_luxe', bgStart: Color(0xFF0A0A0A), bgEnd: Color(0xFF171717), accent: Color(0xFFD4AF37), textPrimary: Color(0xFFFAFAF9), textSecondary: Color(0xFFA8A29E)),
+  NgmyBusinessCardTemplate(id: 'pastel_inset', name: 'Pastel Inset', category: 'freelance', renderStyle: 'pastel_inset', bgStart: Color(0xFFFFE4E6), bgEnd: Color(0xFFFCE7F3), accent: Color(0xFFDB2777), textPrimary: Color(0xFF1E293B), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'terminal', name: 'Dev Terminal', category: 'tech', renderStyle: 'terminal', bgStart: Color(0xFF0D1117), bgEnd: Color(0xFF0D1117), accent: Color(0xFF3FB950), textPrimary: Color(0xFF3FB950), textSecondary: Color(0xFF8B949E)),
+  NgmyBusinessCardTemplate(id: 'blueprint', name: 'Blueprint', category: 'real_estate', renderStyle: 'blueprint', bgStart: Color(0xFF1E3A8A), bgEnd: Color(0xFF1D4ED8), accent: Color(0xFF93C5FD), textPrimary: Colors.white, textSecondary: Color(0xFFBFDBFE)),
+  NgmyBusinessCardTemplate(id: 'depth_stack', name: 'Depth Stack', category: 'creative', renderStyle: 'depth_stack', bgStart: Color(0xFFFFFFFF), bgEnd: Color(0xFFF8FAFC), accent: Color(0xFFF97316), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'ribbon', name: 'Brand Ribbon', category: 'real_estate', renderStyle: 'ribbon', bgStart: Color(0xFFF8FAFC), bgEnd: Color(0xFFE2E8F0), accent: Color(0xFF0F766E), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF475569)),
+  NgmyBusinessCardTemplate(id: 'mesh_dots', name: 'Dot Mesh', category: 'minimal', renderStyle: 'mesh_dots', bgStart: Color(0xFF18181B), bgEnd: Color(0xFF27272A), accent: Color(0xFFFAFAFA), textPrimary: Colors.white, textSecondary: Color(0xFFA1A1AA)),
 ];
 
 NgmyBusinessCardTemplate ngmyBusinessCardTemplateById(String id) {
@@ -301,7 +80,7 @@ List<NgmyBusinessCardTemplate> ngmyBusinessCardTemplatesForCategory(String categ
 class NgmyBusinessCardDocument {
   NgmyBusinessCardDocument({
     String? id,
-    this.templateId = 'corp_executive',
+    this.templateId = 'glass_frost',
     this.fullName = 'Alex Morgan',
     this.jobTitle = 'Senior Consultant',
     this.company = 'NGMY Services',
@@ -404,7 +183,7 @@ class NgmyBusinessCardDocument {
 
     return NgmyBusinessCardDocument(
       id: (json['id'] ?? '').toString(),
-      templateId: (json['templateId'] ?? 'corp_executive').toString(),
+      templateId: (json['templateId'] ?? 'glass_frost').toString(),
       fullName: (json['fullName'] ?? '').toString(),
       jobTitle: (json['jobTitle'] ?? '').toString(),
       company: (json['company'] ?? '').toString(),
@@ -427,18 +206,6 @@ class NgmyBusinessCardDocument {
 
   NgmyBusinessCardDocument copy() => NgmyBusinessCardDocument.fromJson(toJson());
 }
-
-const List<String> kNgmyCardElementIds = [
-  'logo',
-  'name',
-  'title',
-  'company',
-  'phone',
-  'email',
-  'website',
-  'address',
-  'tagline',
-];
 
 Offset ngmyCardElementOffset(NgmyBusinessCardDocument doc, String elementId) {
   return Offset(doc.offsetX[elementId] ?? 0, doc.offsetY[elementId] ?? 0);
