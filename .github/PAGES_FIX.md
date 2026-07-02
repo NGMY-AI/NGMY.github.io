@@ -11,15 +11,16 @@ Two different deploy systems were running:
 
 The failure emails come from the **built-in** job, not our workflow.
 
-## One-time fix (2 minutes)
+## One-time fix (2 minutes) — **required if deploy emails continue**
 
 1. Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
-2. Under **Build and deployment** → **Source** → **Deploy from a branch**
-3. Branch: **`gh-pages`** → Folder: **`/ (root)`** → **Save**
-4. Wait 2–3 minutes
-5. Check **https://ngmy.org/version.json** — `build_number` should be recent
+2. Under **Build and deployment** → **Source** → choose **GitHub Actions**
+3. Save (our `Deploy GitHub Pages` workflow will publish the site)
+4. Wait 3–5 minutes, then check **https://ngmy.org/version.json**
 
-**Do not use** `main` / `/docs` as the source.
+**Alternative:** Deploy from branch → **`gh-pages`** → **`/ (root)`** (also works; CI mirrors each build there).
+
+**Never use** `main` / `/docs` — that job times out and sends failure emails.
 
 ## After that
 
