@@ -5,7 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'ngmy_helper_alarm_calendar.dart';
 import 'ngmy_helper_alarm_memory.dart';
-import 'ngmy_helper_alarm_watcher.dart';
+import 'ngmy_helper_alarm_web_stub.dart' if (dart.library.html) 'ngmy_helper_alarm_web.dart' as web_alarm;
 
 final FlutterLocalNotificationsPlugin _ngmyAlarmNotifications = FlutterLocalNotificationsPlugin();
 bool _ngmyAlarmNotificationsReady = false;
@@ -41,11 +41,10 @@ Future<void> _ensureAlarmNotificationsReady() async {
 }
 
 tz.TZDateTime _alarmScheduleInstant(DateTime when) {
-  final local = when.toLocal();
-  return tz.TZDateTime.from(local.toUtc(), tz.UTC);
+  return tz.TZDateTime.from(when.toLocal(), tz.local);
 }
 
-Future<void> _scheduleBackupNotification({
+Future<void> _schedulePhoneNotification({
   required String title,
   required DateTime when,
   String? notes,
@@ -74,13 +73,13 @@ Future<void> _scheduleBackupNotification({
     await _ngmyAlarmNotifications.zonedSchedule(
       id: id,
       title: title,
-      body: notes?.trim().isNotEmpty == true ? notes!.trim() : 'Time to wake up — NGMY Helper',
+      body: notes?.trim().isNotEmpty == true ? notes!.trim() : 'Time to wake up — NGMY',
       scheduledDate: scheduled,
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   } catch (e) {
-    debugPrint('[helper-alarm] backup notification failed: $e');
+    debugPrint('[helper-alarm] phone notification failed: $e');
   }
 }
 
@@ -103,23 +102,41 @@ Future<String> ngmyScheduleHelperWakeAlarm({
   );
   await NgmyHelperAlarmMemoryStore.add(userEmail, entry);
 
-  final calendarMsg = await ngmyInstallWakeAlarmOnDevice(
+  if (kIsWeb) {
+    final webWhen = await web_alarm.ngmyScheduleWebPhoneAlarm(
+      id: entry.id,
+      title: entry.title,
+      when: localWhen,
+      notes: notes,
+    );
+    if (webWhen != null) {
+      return 'Phone alarm set for $webWhen. Your iPhone will ring on the lock screen — you can close NGMY. '
+          'Tip: also add ${_formatClockTime(localWhen)} in Clock → Alarm for a backup buzz.';
+    }
+    final fallback = await ngmyInstallWakeAlarmOnDevice(
+      title: entry.title,
+      when: localWhen,
+      notes: notes,
+      allowPhoneAlertFallback: true,
+    );
+    return fallback;
+  }
+
+  final deviceMsg = await ngmyInstallWakeAlarmOnDevice(
     title: entry.title,
     when: localWhen,
     notes: notes,
   );
+  await _schedulePhoneNotification(title: entry.title, when: localWhen, notes: notes);
 
-  await _scheduleBackupNotification(title: entry.title, when: localWhen, notes: notes);
+  return '$deviceMsg Your phone will ring at ${_formatWhen(localWhen)} even if NGMY is closed.';
+}
 
-  if (userEmail.trim().isNotEmpty) {
-    ngmyStartHelperAlarmWatcher(userEmail);
-  }
-
-  if (kIsWeb) {
-    return '$calendarMsg The alarm will ring inside NGMY at ${_formatWhen(localWhen)} — keep the app open or on your Home Screen.';
-  }
-
-  return '$calendarMsg Phone notification + in-app alarm at ${_formatWhen(localWhen)}.';
+String _formatClockTime(DateTime dt) {
+  final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+  final min = dt.minute.toString().padLeft(2, '0');
+  return '$h:$min $ampm';
 }
 
 String _formatWhen(DateTime dt) {

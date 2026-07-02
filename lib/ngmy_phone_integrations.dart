@@ -53,7 +53,7 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
-- alarm — title, start (ISO local wake time), notes (optional) — schedules phone notification + in-app alarm; also opens Calendar alert on iPhone
+- alarm — title, start (ISO local wake time), notes (optional) — sets alarm on the user's phone (notification or Clock); never tell user to keep NGMY open
 - open_tool — tool (spark_lounge, video_studio, virtual_device, mechanic_lab, ai_outfit, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone

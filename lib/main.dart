@@ -73,7 +73,6 @@ import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_calendar_intent.dart';
 import 'ngmy_phone_alarm_intent.dart';
 import 'ngmy_phone_tool_intent.dart';
-import 'ngmy_helper_alarm_watcher.dart';
 import 'ngmy_register_ai_tools.dart';
 import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_phone_contacts.dart';
@@ -15164,7 +15163,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     ngmyStartItemReminderWatcher(widget.user.email);
-    ngmyStartHelperAlarmWatcher(widget.user.email);
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: widget.user.email,
@@ -15291,7 +15289,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _t?.cancel();
     _onlineCheck?.cancel();
     ngmyStopItemReminderWatcher();
-    ngmyStopHelperAlarmWatcher();
     NgmyAiAppBridge.clear();
     NgmyIncomeSound.bindSession(null);
     super.dispose();

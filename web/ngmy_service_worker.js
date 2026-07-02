@@ -69,6 +69,7 @@ self.addEventListener('activate', (event) => {
           .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
+      await restoreAllAlarms();
       const cache = await caches.open(CACHE_NAME);
       for (const url of CRITICAL_OFFLINE_URLS) {
         const hit = await cache.match(url);
@@ -137,21 +138,125 @@ function isCriticalFont(url) {
   return /MaterialIcons-Regular\.otf|CupertinoIcons\.ttf/i.test(url.pathname);
 }
 
+const ALARM_STORE = 'ngmy-alarms-v1';
+const alarmTimers = new Map();
+
+async function loadStoredAlarms() {
+  try {
+    const cache = await caches.open(ALARM_STORE);
+    const hit = await cache.match('alarms.json');
+    if (!hit) return [];
+    const list = await hit.json();
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.warn('[ngmy-sw] load alarms failed', e);
+    return [];
+  }
+}
+
+async function saveStoredAlarms(alarms) {
+  try {
+    const cache = await caches.open(ALARM_STORE);
+    await cache.put('alarms.json', new Response(JSON.stringify(alarms), {
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  } catch (e) {
+    console.warn('[ngmy-sw] save alarms failed', e);
+  }
+}
+
+function cancelAlarmTimer(id) {
+  const tid = alarmTimers.get(id);
+  if (tid != null) {
+    clearTimeout(tid);
+    alarmTimers.delete(id);
+  }
+}
+
+async function fireAlarm(alarm) {
+  cancelAlarmTimer(alarm.id);
+  try {
+    await self.registration.showNotification(alarm.title || 'Wake up', {
+      body: alarm.body || 'Your NGMY wake alarm',
+      requireInteraction: true,
+      silent: false,
+      tag: alarm.id,
+      vibrate: [800, 300, 800, 300, 800],
+      data: { alarmId: alarm.id },
+    });
+  } catch (e) {
+    console.warn('[ngmy-sw] showNotification failed', e);
+  }
+  const remaining = (await loadStoredAlarms()).filter((a) => a.id !== alarm.id);
+  await saveStoredAlarms(remaining);
+}
+
+function scheduleAlarmTimer(alarm) {
+  if (!alarm || !alarm.id || !alarm.at) return;
+  cancelAlarmTimer(alarm.id);
+  const delay = new Date(alarm.at).getTime() - Date.now();
+  if (delay <= 0) return;
+  if (delay > 7 * 24 * 60 * 60 * 1000) return;
+  const tid = setTimeout(() => fireAlarm(alarm), delay);
+  alarmTimers.set(alarm.id, tid);
+}
+
+async function upsertAlarm(alarm) {
+  const list = await loadStoredAlarms();
+  const next = list.filter((a) => a.id !== alarm.id);
+  next.push({
+    id: alarm.id,
+    at: alarm.at,
+    title: alarm.title || 'Wake up',
+    body: alarm.body || 'Your NGMY wake alarm',
+  });
+  await saveStoredAlarms(next);
+  scheduleAlarmTimer(next[next.length - 1]);
+}
+
+async function restoreAllAlarms() {
+  const list = await loadStoredAlarms();
+  const now = Date.now();
+  const kept = [];
+  for (const alarm of list) {
+    const at = new Date(alarm.at).getTime();
+    if (at <= now) continue;
+    kept.push(alarm);
+    scheduleAlarmTimer(alarm);
+  }
+  if (kept.length !== list.length) await saveStoredAlarms(kept);
+}
+
 self.addEventListener('message', (event) => {
   const data = event.data;
-  if (!data || data.type !== 'ENSURE_CACHED') return;
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const urls = Array.isArray(data.urls) ? data.urls : [];
-      for (const raw of urls) {
-        const rel = raw.startsWith('./') ? raw : './' + raw;
-        const hit = await cache.match(rel);
-        if (hit) continue;
-        await precacheUrl(cache, rel);
-      }
-    })(),
-  );
+  if (!data || !data.type) return;
+
+  if (data.type === 'SCHEDULE_ALARM') {
+    event.waitUntil(
+      upsertAlarm({
+        id: data.id,
+        at: data.at,
+        title: data.title,
+        body: data.body,
+      }),
+    );
+    return;
+  }
+
+  if (data.type === 'ENSURE_CACHED') {
+    event.waitUntil(
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const urls = Array.isArray(data.urls) ? data.urls : [];
+        for (const raw of urls) {
+          const rel = raw.startsWith('./') ? raw : './' + raw;
+          const hit = await cache.match(rel);
+          if (hit) continue;
+          await precacheUrl(cache, rel);
+        }
+      })(),
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {
