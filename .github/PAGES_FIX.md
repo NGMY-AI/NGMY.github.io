@@ -1,29 +1,31 @@
-# Fix GitHub "Run failed" deploy emails
+# Fix GitHub "Run failed: pages build and deployment" emails
 
-## What was failing
+## What those emails mean
 
-Two different deploy systems were running:
+| Workflow name in email | What it is | Status |
+|------------------------|------------|--------|
+| **pages build and deployment** | GitHub built-in (branch deploy) | Was failing — now uses tiny `docs/` stub |
+| **Deploy GitHub Pages** | Our CI workflow | ✅ Builds & publishes the real app |
 
-| Job | Status | Cause |
-|-----|--------|--------|
-| **Deploy GitHub Pages** (our workflow) | ✅ Success | Builds in CI → `gh-pages` branch |
-| **pages build and deployment** (GitHub built-in) | ❌ Failure | Tried to upload ~48MB `docs/` on `main` → times out |
+## One-time fix (stops failures + fixes ngmy.org)
 
-The failure emails come from the **built-in** job, not our workflow.
+Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
 
-## One-time fix (2 minutes) — **required if deploy emails continue**
+1. **Build and deployment → Source** → select **GitHub Actions**
+2. **Custom domain** → enter **`ngmy.org`** → Save
+3. Wait 3 minutes → open **https://ngmy.org/version.json** (should show a recent `build_number`, not `branch-stub`)
 
-1. Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
-2. Under **Build and deployment** → **Source** → choose **GitHub Actions**
-3. Save (our `Deploy GitHub Pages` workflow will publish the site)
-4. Wait 3–5 minutes, then check **https://ngmy.org/version.json**
+## Live URLs
 
-**Alternative:** Deploy from branch → **`gh-pages`** → **`/ (root)`** (also works; CI mirrors each build there).
+- **https://ngmy-ai.github.io/NGMY.github.io/** — always has the latest CI build
+- **https://ngmy.org/** — works after step 2 above (or redirects via stub until then)
 
-**Never use** `main` / `/docs` — that job times out and sends failure emails.
+## Deploy new code
 
-## After that
+```powershell
+git add lib web assets
+git commit -m "Your changes"
+git push origin main
+```
 
-- Push code to `main` (lib/web only) → CI deploys automatically (~3–5 min)
-- No more timeout failures
-- `docs/` is not committed on `main` anymore (local `publish-web.ps1` still works for testing)
+Wait ~5 minutes. Do **not** run `publish-web.ps1` and commit `docs/` (only the small stub files belong in git).

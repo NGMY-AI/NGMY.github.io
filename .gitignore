@@ -44,5 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Prebuilt web output — CI deploys to gh-pages; do not commit on main (avoids Pages timeout emails)
-/docs/
+# Prebuilt web output — only stub files in docs/ are committed (see docs/index.html).
+# CI publishes the full site via .github/workflows/deploy-pages.yml
+/docs/*
+!/docs/index.html
+!/docs/404.html
+!/docs/.nojekyll
+!/docs/CNAME
+!/docs/version.json
