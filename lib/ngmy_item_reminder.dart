@@ -39,15 +39,16 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
   List<NgmyItemReminder> _items = [];
 
   static const _line1 = <(String, Duration)>[
+    ('5 min', Duration(minutes: 5)),
     ('15 min', Duration(minutes: 15)),
     ('30 min', Duration(minutes: 30)),
     ('1 hour', Duration(hours: 1)),
     ('2 hours', Duration(hours: 2)),
-    ('3 hours', Duration(hours: 3)),
-    ('6 hours', Duration(hours: 6)),
   ];
 
   static const _line2 = <(String, Duration)>[
+    ('3 hours', Duration(hours: 3)),
+    ('6 hours', Duration(hours: 6)),
     ('12 hours', Duration(hours: 12)),
     ('24 hours', Duration(hours: 24)),
   ];
@@ -325,12 +326,16 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
   }
 
   Widget _chipRow(List<(String, Duration)> options, {bool showSet = false}) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 0,
+    final items = <Widget>[
+      ...options.map((opt) => Expanded(child: _timeChip(opt.$1, opt.$2))),
+      if (showSet) Expanded(child: _setChip()),
+    ];
+    return Row(
       children: [
-        ...options.map((opt) => _timeChip(opt.$1, opt.$2)),
-        if (showSet) _setChip(),
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          items[i],
+        ],
       ],
     );
   }
@@ -346,16 +351,21 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
         }),
         borderRadius: BorderRadius.circular(12),
         child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: on ? const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)]) : null,
             color: on ? null : const Color(0xFF0B1020),
             border: Border.all(color: on ? const Color(0xFFA78BFA) : Colors.white24),
           ),
-          child: Text(
-            label,
-            style: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 11),
+              ),
+            ),
           ),
         ),
       ),
@@ -370,20 +380,25 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
         onTap: _openCustomSet,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: on ? const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)]) : null,
             color: on ? null : const Color(0xFF0B1020),
             border: Border.all(color: on ? const Color(0xFF22C55E) : const Color(0xFF7C3AED).withValues(alpha: 0.6), width: on ? 1.5 : 1.2),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.tune_rounded, size: 16, color: on ? Colors.white : const Color(0xFFA78BFA)),
-              const SizedBox(width: 6),
-              Text('Set', style: TextStyle(color: on ? Colors.white : const Color(0xFFA78BFA), fontWeight: FontWeight.w900, fontSize: 12)),
-            ],
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.tune_rounded, size: 14, color: on ? Colors.white : const Color(0xFFA78BFA)),
+                  const SizedBox(width: 4),
+                  Text('Set', style: TextStyle(color: on ? Colors.white : const Color(0xFFA78BFA), fontWeight: FontWeight.w900, fontSize: 11)),
+                ],
+              ),
+            ),
           ),
         ),
       ),
