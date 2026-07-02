@@ -855,40 +855,40 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
             Positioned(
               top: 13,
               left: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(13),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.25),
-                      widget.green.withValues(alpha: 0.28),
-                      Colors.white.withValues(alpha: 0.08),
-                    ],
-                  ),
-                  boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.38), blurRadius: 18)],
-                ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 168),
                 child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(13),
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [widget.green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
+                      colors: [
+                        Colors.white.withValues(alpha: 0.25),
+                        widget.green.withValues(alpha: 0.28),
+                        Colors.white.withValues(alpha: 0.08),
+                      ],
                     ),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
+                    boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.38), blurRadius: 18)],
                   ),
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [widget.green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
+                    ),
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7),
+                    ),
                   ),
                 ),
               ),

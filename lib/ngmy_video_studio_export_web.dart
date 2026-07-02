@@ -15,8 +15,8 @@ const _metaTimeout = Duration(seconds: 18);
 /// Up to 10 minutes — full-length template export.
 const _maxRecordSeconds = 600.0;
 const _exportCanvasFps = 30;
-const _exportVideoBitsPerSecond = 14000000;
-const _exportAudioBitsPerSecond = 192000;
+const _exportVideoBitsPerSecond = 18000000;
+const _exportAudioBitsPerSecond = 256000;
 const _recorderTimesliceMs = 250;
 /// Hard stop for one export attempt on desktop.
 const _exportWallCapSec = 300.0;
@@ -24,7 +24,7 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 720;
+const _mobileExportMaxEdgePx = 1080;
 
 bool _ngmyExportCancelled = false;
 
@@ -281,11 +281,13 @@ Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
 }
 
 void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
-  // iOS Safari freezes off-screen videos — keep in viewport at near-zero opacity.
+  // Browsers throttle or freeze decode when the element is clipped to a 1px
+  // speck or parked off-screen. Keep full-size in the viewport at near-zero
+  // opacity so every frame advances during canvas export.
   var w = preferW ?? (v.videoWidth > 0 ? v.videoWidth : 720);
   var h = preferH ?? (v.videoHeight > 0 ? v.videoHeight : 1280);
   if (_ngmyIsMobileBrowser()) {
-    final maxEdge = 720;
+    final maxEdge = _mobileExportMaxEdgePx;
     final edge = math.max(w, h);
     if (edge > maxEdge) {
       final scale = maxEdge / edge;
@@ -293,7 +295,6 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
       h = (h * scale).round();
     }
   }
-  final keepVisibleForIosDecode = _ngmyIsAppleMobileBrowser();
   v
     ..style.position = 'fixed'
     ..style.left = '0'
@@ -301,21 +302,13 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.width = '${w}px'
     ..style.height = '${h}px'
     ..style.objectFit = 'cover'
-    ..style.opacity = keepVisibleForIosDecode ? '0.02' : '0.03'
+    ..style.opacity = '0.02'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
-  // iOS Safari can freeze videos that are clipped to a 1px speck while canvas
-  // is drawing from them. Keep the element barely visible there so decode keeps
-  // advancing; other browsers still get the tiny clipped staging.
-  if (!keepVisibleForIosDecode) {
-    v.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
-    v.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
-  } else {
-    v.style.removeProperty('clip');
-    v.style.removeProperty('clip-path');
-  }
+  v.style.removeProperty('clip');
+  v.style.removeProperty('clip-path');
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
@@ -384,28 +377,31 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
   }
 }
 
-/// Export size — native on desktop; capped on phones so capture does not freeze.
+/// Export size — always target full HD template dimensions; upscale smaller clips.
 (int, int) _resolveExportCanvasSize(NgmyVideoStudioExportConfig config, html.VideoElement? primary) {
-  late int w;
-  late int h;
+  final target = _exportDimensions(config);
+  var w = target.$1;
+  var h = target.$2;
+
   if (primary != null) {
     var vw = primary.videoWidth;
     var vh = primary.videoHeight;
     if (vw > 0 && vh > 0) {
-      if (vw.isOdd) vw++;
-      if (vh.isOdd) vh++;
-      w = vw;
-      h = vh;
-    } else {
-      final dims = _exportDimensions(config);
-      w = dims.$1;
-      h = dims.$2;
+      final targetAspect = w / h;
+      final videoAspect = vw / vh;
+      if ((videoAspect - targetAspect).abs() > 0.02) {
+        if (videoAspect > targetAspect) {
+          h = (w / videoAspect).round();
+        } else {
+          w = (h * videoAspect).round();
+        }
+      }
     }
-  } else {
-    final dims = _exportDimensions(config);
-    w = dims.$1;
-    h = dims.$2;
   }
+
+  if (w.isOdd) w++;
+  if (h.isOdd) h++;
+
   if (_ngmyIsMobileBrowser()) {
     final maxEdge = math.max(w, h);
     if (maxEdge > _mobileExportMaxEdgePx) {
@@ -566,10 +562,8 @@ Future<bool> _waitForPlaybackStart(html.VideoElement? primary, {double minTime =
 }
 
 double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int durationMs) {
-  if (durationSec <= 0 || durationMs <= 0) return 0.99;
-  final fromVideo = (videoTimeSec / durationSec).clamp(0.0, 1.0);
-  final fromWall = (wallMs / durationMs).clamp(0.0, 1.0);
-  return math.max(fromVideo, fromWall).clamp(0.0, 0.99);
+  if (durationSec <= 0) return 0.99;
+  return (videoTimeSec / durationSec).clamp(0.0, 0.99);
 }
 
 int _exportFps() {
@@ -626,16 +620,13 @@ void _styleExportCanvas(html.CanvasElement canvas, int w, int h) {
     ..style.top = '0'
     ..style.width = '${w}px'
     ..style.height = '${h}px'
-    ..style.opacity = '0.03'
+    ..style.opacity = '0.02'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483639'
     ..style.transform = 'translateZ(0)';
   canvas.style.setProperty('will-change', 'transform');
-  // Same technique as _stageHiddenVideoElement — captureStream() reads the
-  // painted buffer regardless of clipping, but without this the template
-  // animation flickers faintly on top of the whole app during export.
-  canvas.style.setProperty('clip', 'rect(0px, 1px, 1px, 0px)');
-  canvas.style.setProperty('clip-path', 'inset(0px calc(100% - 1px) calc(100% - 1px) 0px)');
+  canvas.style.removeProperty('clip');
+  canvas.style.removeProperty('clip-path');
 }
 
 html.MediaStream _videoOnlyStream(html.MediaStream source) {
@@ -1067,6 +1058,11 @@ Future<List<html.Blob>> _recordCanvasExport({
       DateTime.now().isBefore(deadline) &&
       DateTime.now().isBefore(attemptDeadline)) {
     if (_exportWasCancelled) break;
+    for (final v in videoList) {
+      if (!v.ended && v.paused) {
+        await _playVideoForRecord(v);
+      }
+    }
     await _waitNextVideoFrame(primary);
     paintFrame();
     tick++;
@@ -1535,16 +1531,10 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       }
       primaryVideo.pause();
       await _seekVideoTo(primaryVideo, 0, fast: true);
-      // Must finish before recording starts — otherwise the first attempt's
-      // useDedicatedAudio check races this and falls back to unmuting the
-      // staged (visible) video for audio, which browsers often block from
-      // autoplaying without a fresh tap, freezing playback at "Starting…".
-      if (!_ngmyIsMobileBrowser()) {
-        try {
-          await _ensureExportAudioElement(primaryVideo).timeout(const Duration(seconds: 10));
-        } catch (e) {
-          debugPrint('[studio export] dedicated audio element warm-up: $e');
-        }
+      try {
+        await _ensureExportAudioElement(primaryVideo).timeout(Duration(seconds: _ngmyIsMobileBrowser() ? 8 : 10));
+      } catch (e) {
+        debugPrint('[studio export] dedicated audio element warm-up: $e');
       }
     }
     for (var i = 0; i < 6; i++) {
@@ -1747,17 +1737,11 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 }
 
 Future<html.ImageElement?> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig config, int w, int h) async {
-  // Full resolution first on every platform — this overlay carries all the
-  // template's readable text, and rendering it small then stretching it up
-  // to canvas size is what made templates look blurry/unreadable on phones.
-  // Smaller scales are a true last resort, only reached if rendering at
-  // higher resolution genuinely throws/times out.
-  final scales = _ngmyIsMobileBrowser()
-      ? <double>[1.0, 0.85, 0.7, 0.55, 0.4]
-      : <double>[1.0, 0.85, 0.75];
+  // Always render at full export resolution so template text stays crisp.
+  final scales = _ngmyIsMobileBrowser() ? <double>[1.0, 0.92] : <double>[1.0];
   for (final scale in scales) {
-    final rw = math.max(360, (w * scale).round());
-    final rh = math.max(360, (h * scale).round());
+    final rw = math.max(w, (w * scale).round());
+    final rh = math.max(h, (h * scale).round());
     try {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -1777,10 +1761,7 @@ Future<html.ImageElement?> _renderNewsBannerOverlay(NgmyVideoStudioExportConfig 
       if (bytes == null) continue;
       final blob = html.Blob([bytes.buffer.asUint8List()], 'image/png');
       final url = html.Url.createObjectUrlFromBlob(blob);
-      final img = html.ImageElement()
-        ..src = url
-        ..width = w
-        ..height = h;
+      final img = html.ImageElement()..src = url;
       await img.onLoad.first.timeout(const Duration(seconds: 12));
       return img;
     } catch (e) {
