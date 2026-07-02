@@ -470,7 +470,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     final card = isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1C1C1E);
     final muted = Colors.white.withValues(alpha: 0.58);
     const glassGreen = Color(0xFF2EF6A3);
-    final recent = transactions.take(5).toList();
+    final recent = transactions.take(3).toList();
     final active = user.activeInvestment;
     final clockedIn = user.isClockedIn;
     final dailyGoal = user.todayDailyGoal;

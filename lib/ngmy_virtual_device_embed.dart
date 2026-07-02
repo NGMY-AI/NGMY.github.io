@@ -1,27 +1,37 @@
 /// Shared YouTube / embed HTML helpers for virtual device players.
 class NgmyVirtualDeviceEmbed {
   static const String videoEndedMessage = 'ngmy-vd-ended';
-  static const String htmlBaseUrl = 'https://www.youtube.com';
-  /// Parent page origin for YouTube embed API (must match PWA host).
-  static const String embedOrigin = 'https://ngmy.org';
+  static const String htmlBaseUrl = 'https://www.youtube-nocookie.com';
 
-  /// Builds a mobile-friendly YouTube embed URL (www.youtube.com — works in PWA iframes).
+  /// Parent page origin for YouTube embed API — must match the live PWA host.
+  static String get embedOrigin {
+    try {
+      final o = Uri.base.origin;
+      if (o.isNotEmpty && o != 'null' && !o.startsWith('file:')) return o;
+    } catch (_) {}
+    return 'https://ngmy.org';
+  }
+
+  /// Builds a mobile-friendly YouTube embed URL (nocookie endpoint works in PWA iframes).
   static String youtubeEmbedUrl(
     String videoId, {
     bool autoplay = true,
     bool muted = false,
-    String origin = embedOrigin,
+    String? origin,
   }) {
+    final hostOrigin = origin ?? embedOrigin;
     final params = <String>[
       if (autoplay) 'autoplay=1',
       'playsinline=1',
       'rel=0',
       'modestbranding=1',
       'enablejsapi=1',
-      'origin=$origin',
+      'origin=${Uri.encodeComponent(hostOrigin)}',
+      'widget_referrer=${Uri.encodeComponent(hostOrigin)}',
+      'iv_load_policy=3',
       if (muted) 'mute=1',
     ];
-    return 'https://www.youtube.com/embed/$videoId?${params.join('&')}';
+    return 'https://www.youtube-nocookie.com/embed/$videoId?${params.join('&')}';
   }
 
   static String? extractYouTubeVideoId(String url) {
@@ -68,8 +78,9 @@ class NgmyVirtualDeviceEmbed {
     String videoId, {
     bool muted = false,
     bool notifyOnEnd = false,
-    String origin = embedOrigin,
+    String? origin,
   }) {
+    final hostOrigin = origin ?? embedOrigin;
     final muteFlag = muted ? 1 : 0;
     final eventsBlock = notifyOnEnd
         ? '''
@@ -116,7 +127,7 @@ class NgmyVirtualDeviceEmbed {
           rel: 0,
           modestbranding: 1,
           enablejsapi: 1,
-          origin: '$origin',
+          origin: '$hostOrigin',
           mute: $muteFlag
         }$eventsBlock
       });

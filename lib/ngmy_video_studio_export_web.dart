@@ -281,9 +281,7 @@ Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
 }
 
 void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
-  // Browsers throttle or freeze decode when the element is clipped to a 1px
-  // speck or parked off-screen. Keep full-size in the viewport at near-zero
-  // opacity so every frame advances during canvas export.
+  // Keep full-size in the viewport so mobile browsers decode every frame during export.
   var w = preferW ?? (v.videoWidth > 0 ? v.videoWidth : 720);
   var h = preferH ?? (v.videoHeight > 0 ? v.videoHeight : 1280);
   if (_ngmyIsMobileBrowser()) {
@@ -302,13 +300,14 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.width = '${w}px'
     ..style.height = '${h}px'
     ..style.objectFit = 'cover'
-    ..style.opacity = '0.02'
+    ..style.opacity = '0.08'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
   v.style.removeProperty('clip');
   v.style.removeProperty('clip-path');
+  v.style.removeProperty('visibility');
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
@@ -635,6 +634,48 @@ html.MediaStream _videoOnlyStream(html.MediaStream source) {
     out.addTrack(t);
   }
   return out;
+}
+
+Future<String?> _freshExportVideoUrl(String src) async {
+  final s = src.trim();
+  if (s.isEmpty) return s;
+  if (s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://')) {
+    final blob = await _ngmyBlobFromHref(s);
+    if (blob != null && blob.size > 0) {
+      return html.Url.createObjectUrlFromBlob(blob);
+    }
+  }
+  return s;
+}
+
+void _revokeExportCloneUrls(Iterable<String> urls) {
+  for (final u in urls) {
+    if (u.startsWith('blob:')) {
+      try {
+        html.Url.revokeObjectUrl(u);
+      } catch (_) {}
+    }
+  }
+}
+
+Future<void> _warmVideosBeforeExport(List<html.VideoElement> videos) async {
+  for (final v in videos) {
+    v.muted = true;
+    v.playbackRate = 1.0;
+    v.currentTime = 0;
+    try {
+      await v.play().timeout(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (v.currentTime < 0.02) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    } catch (e) {
+      debugPrint('[studio export] warm-up play: $e');
+    } finally {
+      v.pause();
+      v.currentTime = 0;
+    }
+  }
 }
 
 Future<html.Blob?> _ngmyBlobFromHref(String href) async {
@@ -1081,8 +1122,8 @@ Future<List<html.Blob>> _recordCanvasExport({
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
     maxRecordedSec = math.max(maxRecordedSec, t);
     final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-    if (wallMs > (_ngmyIsMobileBrowser() ? 14000 : 16000) && t < 0.08) {
-      debugPrint('[studio export] video frozen at t=$t — aborting attempt');
+    if (wallMs > (_ngmyIsMobileBrowser() ? 22000 : 18000) && t < 0.04) {
+      debugPrint('[studio export] video frozen at t=$t — aborting realtime attempt');
       abortedFrozen = true;
       break;
     }
@@ -1124,12 +1165,94 @@ Future<List<html.Blob>> _recordCanvasExport({
   } catch (_) {}
   await _stopRecorderDrain(recorder, done);
   if (_exportWasCancelled) return const [];
-  final minRecorded = math.min(0.85, durationSec * 0.15);
+  final minRecorded = math.min(0.45, durationSec * 0.08);
   if (abortedFrozen || maxRecordedSec < minRecorded) {
     debugPrint(
-      '[studio export] rejected recording: maxTime=$maxRecordedSec need=$minRecorded frozen=$abortedFrozen',
+      '[studio export] rejected realtime recording: maxTime=$maxRecordedSec need=$minRecorded frozen=$abortedFrozen',
     );
     return const [];
+  }
+  return chunks;
+}
+
+/// Frame-by-frame seek bake — used when realtime playback recording fails on mobile.
+Future<List<html.Blob>> _recordCanvasExportSeekSync({
+  required html.MediaStream stream,
+  required String mimeType,
+  required void Function() paintFrame,
+  required List<html.VideoElement> videoList,
+  required double durationSec,
+  required void Function(double progress, String status) onProgress,
+}) async {
+  final appleMobile = _ngmyIsAppleMobileBrowser();
+  final recorderOptions = <String, dynamic>{
+    'mimeType': mimeType,
+    'videoBitsPerSecond': appleMobile ? 3500000 : (_ngmyIsMobileBrowser() ? 4500000 : 12000000),
+  };
+
+  final recorder = _createMediaRecorder(stream, recorderOptions);
+  if (recorder == null) return const [];
+
+  final chunks = <html.Blob>[];
+  recorder.addEventListener('dataavailable', (event) {
+    final b = (event as html.BlobEvent).data;
+    if (b != null && b.size > 0) chunks.add(b);
+  });
+  final done = Completer<void>();
+  recorder.addEventListener('stop', (_) {
+    if (!done.isCompleted) done.complete();
+  });
+
+  try {
+    recorder.start(_recorderTimesliceMs);
+  } catch (e) {
+    debugPrint('[studio export] seek recorder.start failed: $e');
+    return const [];
+  }
+
+  await Future<void>.delayed(const Duration(milliseconds: 180));
+
+  for (final v in videoList) {
+    v.muted = true;
+    v.pause();
+    v.playbackRate = 1.0;
+    v.currentTime = 0;
+  }
+
+  final fps = _exportFps();
+  final frameMs = (1000 / fps).round().clamp(28, 50);
+  final totalFrames = (durationSec * fps).ceil().clamp(24, (_mobileMaxRecordSeconds * fps).round());
+  onProgress(0.08, 'Baking template frame-by-frame…');
+
+  for (var frame = 0; frame < totalFrames; frame++) {
+    if (_exportWasCancelled) break;
+    final t = frame / fps;
+    for (final v in videoList) {
+      final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.04) : t;
+      v.pause();
+      v.currentTime = t.clamp(0.0, maxT);
+    }
+    await Future<void>.delayed(Duration(milliseconds: frameMs ~/ 3));
+    paintFrame();
+    await Future<void>.delayed(Duration(milliseconds: frameMs));
+    if (frame % 4 == 0) {
+      try {
+        js_util.callMethod(recorder, 'requestData', const []);
+      } catch (_) {}
+    }
+    final p = (frame / totalFrames).clamp(0.0, 0.98);
+    onProgress(p, _ngmyRecordingStatus(p));
+  }
+
+  paintFrame();
+  await Future<void>.delayed(const Duration(milliseconds: 320));
+  try {
+    js_util.callMethod(recorder, 'requestData', const []);
+  } catch (_) {}
+  await _stopRecorderDrain(recorder, done);
+  if (_exportWasCancelled) return const [];
+  if (chunks.isEmpty) {
+    debugPrint('[studio export] seek-sync produced no chunks');
   }
   return chunks;
 }
@@ -1332,9 +1455,17 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
   await _flushProgress(onProgress, 0.02, 'Loading your video…');
 
-  final videos = <String, html.VideoElement>{};
+  final clonedExportUrls = <String>[];
+  final resolvedSources = <String, String>{};
   for (final e in sources.entries) {
     if (e.value.trim().isEmpty) continue;
+    final fresh = await _freshExportVideoUrl(e.value);
+    resolvedSources[e.key] = fresh ?? e.value;
+    if (fresh != null && fresh != e.value) clonedExportUrls.add(fresh);
+  }
+
+  final videos = <String, html.VideoElement>{};
+  for (final e in resolvedSources.entries) {
     final v = html.VideoElement();
     _configureVideoElement(v, e.value);
     html.document.body?.append(v);
@@ -1517,6 +1648,9 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       }
     }
 
+    await _flushProgress(onProgress, 0.075, 'Warming up video playback…');
+    await _warmVideosBeforeExport(videos.values.toList());
+
     for (final v in videos.values) {
       v.muted = true;
       v.pause();
@@ -1655,6 +1789,27 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       mimeType = silentFallbackMime;
     }
 
+    if ((chunks.isEmpty || mimeType == null) && !_exportWasCancelled) {
+      await _flushProgress(onProgress, 0.18, 'Retrying template bake frame-by-frame…');
+      final seekMime = mimeCandidates.isNotEmpty ? mimeCandidates.first : 'video/mp4';
+      final seekStream = _videoOnlyStream(canvasStream);
+      final seekChunks = await _recordCanvasExportSeekSync(
+        stream: seekStream,
+        mimeType: seekMime,
+        paintFrame: paintFrame,
+        videoList: videoList,
+        durationSec: durationSec,
+        onProgress: (p, s) {
+          onProgress?.call(0.18 + p * 0.78, s);
+        },
+      );
+      if (seekChunks.isNotEmpty) {
+        chunks = seekChunks;
+        mimeType = seekMime;
+        debugPrint('[studio export] seek-sync fallback succeeded');
+      }
+    }
+
     if (_exportWasCancelled) {
       return 'Export cancelled.';
     }
@@ -1724,6 +1879,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     return _fallbackComposedExport(config, sources, reason: 'export crashed', allowRawFallback: false);
   } finally {
     _cleanupExportElements();
+    _revokeExportCloneUrls(clonedExportUrls);
     try {
       exportCanvas?.remove();
     } catch (_) {}

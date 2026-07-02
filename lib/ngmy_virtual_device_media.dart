@@ -141,10 +141,16 @@ class NgmyVirtualDeviceMedia {
   }
 
   static String? _youtubeId(String url) {
-    final watch = RegExp(
-      r'(?:youtube\.com/watch\?(?:[^&]*&)*v=|youtu\.be/|youtube\.com/shorts/|youtube\.com/embed/|youtube\.com/live/)([a-zA-Z0-9_-]{11})',
-    );
-    return watch.firstMatch(url)?.group(1);
+    final patterns = [
+      RegExp(r'(?:youtube\.com/embed/|youtube-nocookie\.com/embed/|[?&]v=|youtu\.be/|/shorts/|/live/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
+      RegExp(r'm\.youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
+    ];
+    for (final p in patterns) {
+      final id = p.firstMatch(url)?.group(1);
+      if (id != null && id.length == 11) return id;
+    }
+    return null;
   }
 
   static String? _tiktokId(String url) {

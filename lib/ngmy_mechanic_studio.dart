@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_mechanic_car_scene.dart';
+import 'ngmy_mechanic_car_mesh.dart';
 import 'ngmy_mechanic_studio_models.dart';
 
 void showNgmyMechanicStudio({required BuildContext context}) {
@@ -26,9 +27,19 @@ class _NgmyMechanicStudioPageState extends State<NgmyMechanicStudioPage> {
   final Set<String> _learned = {};
   String? _selectedId;
   double _explode = 0.0;
+  double _doorOpen = 0.0;
+  bool _hoodOpen = false;
 
   NgmyMechanicCarProfile get _car => kNgmyMechanicCars[_carIndex];
   List<NgmyMechanicCarPart> get _parts => ngmyMechanicPartsForCar(_car);
+
+  NgmyMechanicCarDoorState get _doors => NgmyMechanicCarDoorState(
+        frontLeft: _doorOpen,
+        frontRight: _doorOpen,
+        rearLeft: _doorOpen * 0.85,
+        rearRight: _doorOpen * 0.85,
+        hood: _hoodOpen ? 1.0 : 0.0,
+      );
 
   int get _installedCount => _parts.length - _removed.length;
 
@@ -38,6 +49,8 @@ class _NgmyMechanicStudioPageState extends State<NgmyMechanicStudioPage> {
       _removed.clear();
       _selectedId = null;
       _explode = 0;
+      _doorOpen = 0;
+      _hoodOpen = false;
     });
   }
 
@@ -307,6 +320,31 @@ class _NgmyMechanicStudioPageState extends State<NgmyMechanicStudioPage> {
             ),
           ),
           const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _accessoryChip(
+                    icon: Icons.door_front_door_rounded,
+                    label: _doorOpen > 0.5 ? 'Close doors' : 'Open doors',
+                    active: _doorOpen > 0.5,
+                    onTap: () => setState(() => _doorOpen = _doorOpen > 0.5 ? 0.0 : 1.0),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _accessoryChip(
+                    icon: Icons.car_repair_rounded,
+                    label: _hoodOpen ? 'Close hood' : 'Open hood',
+                    active: _hoodOpen,
+                    onTap: () => setState(() => _hoodOpen = !_hoodOpen),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -330,6 +368,8 @@ class _NgmyMechanicStudioPageState extends State<NgmyMechanicStudioPage> {
                     removedPartIds: _removed,
                     selectedPartId: _selectedId,
                     explodeStrength: _explode,
+                    doors: _doors,
+                    showPartMarkers: _mode != NgmyMechanicMode.explore,
                     onPartTap: _onPartTap,
                   ),
                 ),
@@ -338,6 +378,45 @@ class _NgmyMechanicStudioPageState extends State<NgmyMechanicStudioPage> {
           ),
           _partsTray(),
         ],
+      ),
+    );
+  }
+
+  Widget _accessoryChip({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: active ? const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)]) : null,
+            color: active ? null : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: active ? Colors.transparent : Colors.white24),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

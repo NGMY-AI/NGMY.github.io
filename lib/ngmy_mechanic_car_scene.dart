@@ -14,6 +14,8 @@ class NgmyMechanicCarScene extends StatefulWidget {
     required this.explodeStrength,
     required this.onPartTap,
     this.highlightInstalled = true,
+    this.doors = const NgmyMechanicCarDoorState(),
+    this.showPartMarkers = true,
   });
 
   final NgmyMechanicCarProfile car;
@@ -22,6 +24,8 @@ class NgmyMechanicCarScene extends StatefulWidget {
   final String? selectedPartId;
   final double explodeStrength;
   final bool highlightInstalled;
+  final NgmyMechanicCarDoorState doors;
+  final bool showPartMarkers;
   final ValueChanged<NgmyMechanicCarPart> onPartTap;
 
   @override
@@ -29,9 +33,9 @@ class NgmyMechanicCarScene extends StatefulWidget {
 }
 
 class _NgmyMechanicCarSceneState extends State<NgmyMechanicCarScene> with SingleTickerProviderStateMixin {
-  double _rotY = -0.62;
-  double _rotX = 0.22;
-  double _zoom = 1.05;
+  double _rotY = -0.55;
+  double _rotX = 0.18;
+  double _zoom = 1.18;
   late AnimationController _pulse;
 
   @override
@@ -75,9 +79,10 @@ class _NgmyMechanicCarSceneState extends State<NgmyMechanicCarScene> with Single
                   rotX: _rotX,
                   zoom: _zoom,
                   removedPartIds: widget.removedPartIds,
+                  doors: widget.doors,
                 ),
               ),
-              ...widget.parts.map((p) => _buildPartMarker(p, projector)),
+              if (widget.showPartMarkers) ...widget.parts.map((p) => _buildPartMarker(p, projector)),
               Positioned(
                 left: 12,
                 bottom: 12,
@@ -87,7 +92,7 @@ class _NgmyMechanicCarSceneState extends State<NgmyMechanicCarScene> with Single
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: kNgmyMechanicAccent.withValues(alpha: 0.4)),
                   ),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -95,7 +100,7 @@ class _NgmyMechanicCarSceneState extends State<NgmyMechanicCarScene> with Single
                         Icon(Icons.threed_rotation_rounded, color: kNgmyMechanicAccent, size: 16),
                         SizedBox(width: 6),
                         Text(
-                          'Drag to rotate · Pinch to zoom',
+                          'Drag to rotate · Pinch to zoom · Open doors below',
                           style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -108,9 +113,9 @@ class _NgmyMechanicCarSceneState extends State<NgmyMechanicCarScene> with Single
                 top: 12,
                 child: _viewPresetButton(Icons.refresh_rounded, 'Reset view', () {
                   setState(() {
-                    _rotY = -0.62;
-                    _rotX = 0.22;
-                    _zoom = 1.05;
+                    _rotY = -0.55;
+                    _rotX = 0.18;
+                    _zoom = 1.18;
                   });
                 }),
               ),

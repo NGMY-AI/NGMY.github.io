@@ -109,7 +109,7 @@ Future<void> showNgmyVirtualDeviceLinkSearch(BuildContext context, {required int
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '4 phones play at a time · rotates through all $deviceCount',
+                              'Master player + $deviceCount phone previews · rotates in batches of 4',
                               style: TextStyle(
                                 fontSize: 12,
                                 height: 1.35,
@@ -748,7 +748,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Now playing ${media.label} · ${NgmyVirtualDeviceFleetPlayback.activeRangeLabel(_fleet.length)} (4 at a time)',
+                                                'Now playing ${media.label} · ${NgmyVirtualDeviceFleetPlayback.activeRangeLabel(_fleet.length)}',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
@@ -778,7 +778,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     ],
                                     Text(
                                       media != null
-                                          ? 'Only 4 phones play at once. When the video ends, the next 4 start — then loops through all ${_fleet.length}.'
+                                          ? 'Master player plays your link. Grid phones highlight the active batch of 4 — when the video ends, the next batch is highlighted.'
                                           : '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
                                       style: TextStyle(
                                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
@@ -851,20 +851,12 @@ class _MiniVirtualPhoneCard extends StatelessWidget {
   final NgmyVirtualMediaTarget? media;
 
   Widget _miniScreenContent(NgmyVirtualMediaTarget media) {
-    final batch = NgmyVirtualDeviceFleetPlayback.batchStart.value;
-    if (NgmyVirtualDeviceFleetPlayback.isActiveSlot(deviceIndex)) {
-      return NgmyVirtualDeviceMediaView(
-        key: ValueKey('${device.id}_${media.playUrlMuted}_$batch'),
-        viewKey: '${device.id}_mini',
-        playUrl: media.playUrlMuted,
-        compact: true,
-        useEmbedHtml: media.usesEmbedHtml,
-      );
-    }
+    final isActive = NgmyVirtualDeviceFleetPlayback.isActiveSlot(deviceIndex);
+    // One shared master player only — grid uses lightweight previews (no extra iframes).
     return NgmyVirtualDeviceMediaPreview(
       media: media,
       compact: true,
-      queued: true,
+      queued: !isActive,
       batchLabel: NgmyVirtualDeviceFleetPlayback.batchLabel(deviceIndex, fleetSize),
     );
   }

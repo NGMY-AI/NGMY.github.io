@@ -530,7 +530,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     setState(() {
       _exporting = true;
       _exportProgress = 0.02;
-      _exportStatus = 'Recording template into your video…';
+      _exportStatus = 'Preparing your video with template overlay…';
     });
     await Future<void>.delayed(Duration.zero);
     try {

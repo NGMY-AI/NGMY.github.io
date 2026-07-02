@@ -176,10 +176,26 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
       return ColoredBox(
         color: Colors.black,
         child: Center(
-          child: Icon(
-            Icons.videocam_off_rounded,
-            color: Colors.white.withValues(alpha: 0.5),
-            size: widget.compact ? 22 : 36,
+          child: Padding(
+            padding: EdgeInsets.all(widget.compact ? 6 : 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.videocam_off_rounded,
+                  color: Colors.white.withValues(alpha: 0.55),
+                  size: widget.compact ? 22 : 36,
+                ),
+                if (!widget.compact) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Could not play this link.\nUse a public YouTube watch URL.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11, height: 1.35),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       );
