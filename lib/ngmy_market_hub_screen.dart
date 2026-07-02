@@ -60,7 +60,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
           children: [
             _youtubeFrame(
               title: 'Business Card Creator',
-              subtitle: '30 luxurious templates · drag · save PNG',
+              subtitle: '34 luxurious templates · drag · save PNG',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
               accent: const Color(0xFF22C55E),
@@ -202,7 +202,7 @@ class _BusinessCardThumbPreview extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('YOUR NAME', style: TextStyle(color: const Color(0xFFD4AF37), fontWeight: FontWeight.w300, fontSize: 11, letterSpacing: 2)),
+              Text('KB PABLO QR', style: TextStyle(color: const Color(0xFFD4AF37), fontWeight: FontWeight.w300, fontSize: 11, letterSpacing: 2)),
               const Spacer(),
               Container(height: 2, width: 40, color: const Color(0xFFD4AF37)),
               const SizedBox(height: 6),

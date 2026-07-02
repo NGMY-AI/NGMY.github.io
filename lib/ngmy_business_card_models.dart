@@ -73,6 +73,10 @@ const List<NgmyBusinessCardTemplate> kNgmyBusinessCardTemplates = [
   NgmyBusinessCardTemplate(id: 'art_deco', name: 'Art Deco', category: 'luxury', renderStyle: 'art_deco', bgStart: Color(0xFF0C0A09), bgEnd: Color(0xFF1C1917), accent: Color(0xFFD4AF37), textPrimary: Color(0xFFFAFAF9), textSecondary: Color(0xFFA8A29E)),
   NgmyBusinessCardTemplate(id: 'crystalline', name: 'Crystalline', category: 'luxury', renderStyle: 'crystalline', bgStart: Color(0xFF0F172A), bgEnd: Color(0xFF1E293B), accent: Color(0xFF67E8F9), textPrimary: Colors.white, textSecondary: Color(0xFF94A3B8)),
   NgmyBusinessCardTemplate(id: 'executive_monogram', name: 'Executive Monogram', category: 'luxury', renderStyle: 'executive_monogram', bgStart: Color(0xFFFAFAFA), bgEnd: Color(0xFFF4F4F5), accent: Color(0xFF18181B), textPrimary: Color(0xFF09090B), textSecondary: Color(0xFF71717A)),
+  NgmyBusinessCardTemplate(id: 'ghost_type', name: 'Ghost Type', category: 'creative', renderStyle: 'ghost_type', bgStart: Color(0xFF09090B), bgEnd: Color(0xFF18181B), accent: Color(0xFFFAFAFA), textPrimary: Colors.white, textSecondary: Color(0xFFA1A1AA)),
+  NgmyBusinessCardTemplate(id: 'shadow_kb', name: 'Shadow KB', category: 'creative', renderStyle: 'shadow_kb', bgStart: Color(0xFF0F172A), bgEnd: Color(0xFF1E293B), accent: Color(0xFF22D3EE), textPrimary: Colors.white, textSecondary: Color(0xFF94A3B8)),
+  NgmyBusinessCardTemplate(id: 'watermark_gold', name: 'Gold Watermark', category: 'luxury', renderStyle: 'watermark_gold', bgStart: Color(0xFF0A0A0A), bgEnd: Color(0xFF171717), accent: Color(0xFFD4AF37), textPrimary: Color(0xFFFAFAF9), textSecondary: Color(0xFFA8A29E)),
+  NgmyBusinessCardTemplate(id: 'type_halo', name: 'Type Halo', category: 'minimal', renderStyle: 'type_halo', bgStart: Color(0xFFF8FAFC), bgEnd: Color(0xFFE2E8F0), accent: Color(0xFF0F172A), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
 ];
 
 NgmyBusinessCardTemplate ngmyBusinessCardTemplateById(String id) {
@@ -91,11 +95,11 @@ class NgmyBusinessCardDocument {
   NgmyBusinessCardDocument({
     String? id,
     this.templateId = 'glass_frost',
-    this.fullName = 'Alex Morgan',
+    this.fullName = 'KB PABLO QR',
     this.jobTitle = 'Senior Consultant',
     this.company = 'NGMY Services',
     this.phone = '(555) 123-4567',
-    this.email = 'alex@ngmy.org',
+    this.email = 'kbpablo@ngmy.org',
     this.website = 'www.ngmy.org',
     this.address = '123 Main St, City, ST',
     this.tagline = 'Building what matters',

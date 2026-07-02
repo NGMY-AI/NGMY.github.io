@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_item_reminder_alarm.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_nav.dart';
 
@@ -57,6 +58,7 @@ Future<void> showNgmyItemReminderAlert(
 }) async {
   if (_alertOpen) return;
   _alertOpen = true;
+  unawaited(NgmyItemReminderAlarm.start());
   try {
     await showGeneralDialog<void>(
       context: context,
@@ -147,6 +149,7 @@ Future<void> showNgmyItemReminderAlert(
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: () async {
+                          await NgmyItemReminderAlarm.stop();
                           Navigator.of(ctx).pop();
                           await deleteNgmyItemReminder(reminder.id, userEmail: userEmail);
                         },
@@ -162,6 +165,7 @@ Future<void> showNgmyItemReminderAlert(
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () async {
+                        await NgmyItemReminderAlarm.stop();
                         Navigator.of(ctx).pop();
                         await snoozeNgmyItemReminder(reminder, userEmail: userEmail, snoozeBy: const Duration(minutes: 15));
                       },
@@ -183,6 +187,7 @@ Future<void> showNgmyItemReminderAlert(
       },
     );
   } finally {
+    await NgmyItemReminderAlarm.stop();
     _alertOpen = false;
   }
 }

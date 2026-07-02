@@ -76,7 +76,7 @@ class _NgmyCardRenderBody extends StatelessWidget {
       interactive: interactive,
       onDrag: onElementDrag,
     );
-    return switch (tpl.renderStyle) {
+    final layout = switch (tpl.renderStyle) {
       'glass_frost' => _layoutGlassFrost(ctx),
       'vertical_split' => _layoutVerticalSplit(ctx),
       'mega_type' => _layoutMegaType(ctx),
@@ -107,8 +107,28 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'art_deco' => _layoutArtDeco(ctx),
       'crystalline' => _layoutCrystalline(ctx),
       'executive_monogram' => _layoutExecutiveMonogram(ctx),
+      'ghost_type' => _layoutGhostType(ctx),
+      'shadow_kb' => _layoutShadowKb(ctx),
+      'watermark_gold' => _layoutWatermarkGold(ctx),
+      'type_halo' => _layoutTypeHalo(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        layout,
+        if (document.cardEmoji.trim().isNotEmpty)
+          ctx.slot(
+            'card_emoji',
+            Text(
+              document.cardEmoji,
+              style: TextStyle(fontSize: height * 0.17 * document.fontScale),
+            ),
+            left: width * 0.68,
+            top: height * 0.06,
+          ),
+      ],
+    );
   }
 }
 
@@ -170,17 +190,6 @@ class _CardRenderCtx {
     );
   }
 
-  Widget? cardEmojiBadge({double? size, double? top, double? right}) {
-    final e = doc.cardEmoji.trim();
-    if (e.isEmpty) return null;
-    return slot(
-      'emoji',
-      Text(e, style: TextStyle(fontSize: (size ?? h * 0.14) * doc.fontScale)),
-      right: right ?? 12,
-      top: top ?? 10,
-    );
-  }
-
   Widget logo(double size, {BorderRadius? radius}) {
     final bytes = doc.logoBytes;
     return Container(
@@ -195,6 +204,29 @@ class _CardRenderCtx {
       child: bytes == null ? Icon(Icons.person_rounded, color: accent, size: size * 0.42) : null,
     );
   }
+}
+
+List<String> _cardNameParts(String full) {
+  final t = full.trim();
+  if (t.isEmpty) return ['KB'];
+  return t.split(RegExp(r'\s+'));
+}
+
+Widget _nameWatermark(_CardRenderCtx c, String text, {double sizeMul = 0.42, double opacity = 0.12, double left = -8, double top = -6}) {
+  return Positioned(
+    left: left,
+    top: top,
+    child: Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        fontSize: c.h * sizeMul,
+        fontWeight: FontWeight.w900,
+        color: c.accent.withValues(alpha: opacity),
+        height: 0.85,
+        letterSpacing: -1,
+      ),
+    ),
+  );
 }
 
 // ─── Layout 1: Glass frost ───────────────────────────────────────────────────
@@ -252,8 +284,6 @@ Widget _layoutVerticalSplit(_CardRenderCtx c) {
       ),
       Positioned(left: 0, top: 0, bottom: 0, width: c.w * 0.38, child: Center(child: c.logo(c.h * 0.36, radius: BorderRadius.circular(999)))),
       Positioned(left: c.w * 0.36, top: 0, bottom: 0, width: 2, child: Container(color: Colors.white.withValues(alpha: 0.85))),
-      if (c.doc.cardEmoji.trim().isNotEmpty)
-        c.slot('emoji', Text(c.doc.cardEmoji, style: TextStyle(fontSize: c.h * 0.12 * c.doc.fontScale)), right: 8, top: 8),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900, color: c.text), left: c.w * 0.42, top: 14),
       Positioned(left: c.w * 0.42, top: c.h * 0.28, child: Container(width: 32, height: 3, color: c.accent)),
       c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048), left: c.w * 0.42, top: c.h * 0.34),
@@ -267,16 +297,17 @@ Widget _layoutVerticalSplit(_CardRenderCtx c) {
 
 // ─── Layout 3: Mega typography ──────────────────────────────────────────────
 Widget _layoutMegaType(_CardRenderCtx c) {
-  final first = c.doc.fullName.split(' ').first;
-  final last = c.doc.fullName.split(' ').length > 1 ? c.doc.fullName.split(' ').sublist(1).join(' ') : '';
+  final parts = _cardNameParts(c.doc.fullName);
+  final first = parts.first;
+  final rest = parts.length > 1 ? parts.sublist(1).join(' ') : '';
   return Stack(
     fit: StackFit.expand,
     children: [
       Container(color: c.bg1),
-      Positioned(left: -8, top: -6, child: Text(first.toUpperCase(), style: TextStyle(fontSize: c.h * 0.42, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.12), height: 0.85))),
+      _nameWatermark(c, first, sizeMul: 0.44, opacity: 0.14),
       c.slot('name', Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         c.txt(first, size: c.h * 0.18, weight: FontWeight.w900, letterSpacing: -0.5),
-        if (last.isNotEmpty) c.txt(last, size: c.h * 0.12, weight: FontWeight.w300, letterSpacing: 2),
+        if (rest.isNotEmpty) c.txt(rest, size: c.h * 0.11, weight: FontWeight.w300, letterSpacing: 1.5),
       ]), left: 14, top: 12),
       c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.045, letterSpacing: 1.2), left: 14, top: c.h * 0.58),
       c.slot('phone', c.txt(c.doc.phone, size: c.h * 0.04, color: c.sub), left: 14, bottom: 28),
@@ -302,39 +333,57 @@ Widget _layoutOrbit(_CardRenderCtx c) {
 
 // ─── Layout 5: Metro bento ───────────────────────────────────────────────────
 Widget _layoutMetroBento(_CardRenderCtx c) {
-  Widget bentoCell(String id, String val, IconData icon, {Color? bg, Color? fg}) {
+  final parts = _cardNameParts(c.doc.fullName);
+  final wm = parts.first.toUpperCase();
+  final gridTop = c.h * 0.34;
+  final cellW = (c.w - 24) / 2;
+  final cellH = (c.h - gridTop - 14) / 2 - 4;
+
+  Widget bentoTile(String val, IconData icon, {Color? fill}) {
     if (val.trim().isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: bg ?? Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: c.accent.withValues(alpha: 0.25)),
+        color: fill ?? Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 1.2),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: c.h * 0.045, color: c.accent),
-          const SizedBox(width: 6),
-          Expanded(child: c.txt(val, size: c.h * 0.042, color: fg ?? Colors.white, maxLines: 1)),
+          Icon(icon, size: c.h * 0.055, color: c.accent),
+          const SizedBox(height: 4),
+          c.txt(val, size: c.h * 0.038, color: Colors.white, maxLines: 2),
         ],
       ),
     );
   }
 
-  final gridTop = c.h * 0.36;
-  final cellH = (c.h - gridTop - 10) / 2 - 3;
-
   return Stack(
     fit: StackFit.expand,
     children: [
-      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
-      CustomPaint(painter: _GridPainter(c.accent.withValues(alpha: 0.06), 18), size: Size.infinite),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 12, top: 10),
-      c.slot('company', c.txt(c.doc.company, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800), left: 12, top: c.h * 0.22),
-      c.slot('phone', SizedBox(height: cellH, child: bentoCell('phone', c.doc.phone, Icons.phone_rounded, bg: c.accent.withValues(alpha: 0.22))), left: 10, top: gridTop, right: c.w * 0.52),
-      c.slot('email', SizedBox(height: cellH, child: bentoCell('email', c.doc.email, Icons.email_rounded)), left: 10, top: gridTop + cellH + 6, right: c.w * 0.52),
-      c.slot('website', SizedBox(height: cellH, child: bentoCell('website', c.doc.website, Icons.language_rounded)), left: c.w * 0.52, top: gridTop, right: 10),
-      c.slot('address', SizedBox(height: cellH, child: bentoCell('address', c.doc.address, Icons.place_rounded, bg: c.accent.withValues(alpha: 0.14))), left: c.w * 0.52, top: gridTop + cellH + 6, right: 10),
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
+      Positioned(right: -16, top: -24, child: Text(wm, style: TextStyle(fontSize: c.h * 0.62, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.07)))),
+      Positioned(
+        left: 10,
+        right: 10,
+        top: 8,
+        height: c.h * 0.24,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [c.accent.withValues(alpha: 0.28), c.accent.withValues(alpha: 0.08)]),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.accent.withValues(alpha: 0.4)),
+          ),
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.09, weight: FontWeight.w900), left: 18, top: 14),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white.withValues(alpha: 0.75), size: c.h * 0.042, weight: FontWeight.w700), left: 18, top: c.h * 0.18),
+      c.slot('phone', SizedBox(width: cellW, height: cellH, child: bentoTile(c.doc.phone, Icons.phone_rounded, fill: c.accent.withValues(alpha: 0.18))), left: 10, top: gridTop),
+      c.slot('email', SizedBox(width: cellW, height: cellH, child: bentoTile(c.doc.email, Icons.email_rounded)), left: 10 + cellW + 4, top: gridTop),
+      c.slot('website', SizedBox(width: cellW, height: cellH, child: bentoTile(c.doc.website, Icons.language_rounded)), left: 10, top: gridTop + cellH + 4),
+      c.slot('address', SizedBox(width: cellW, height: cellH, child: bentoTile(c.doc.address, Icons.place_rounded, fill: c.accent.withValues(alpha: 0.12))), left: 10 + cellW + 4, top: gridTop + cellH + 4),
     ],
   );
 }
@@ -892,6 +941,81 @@ Widget _layoutExecutiveMonogram(_CardRenderCtx c) {
       c.slot('company', c.txt(c.doc.company, color: c.text, weight: FontWeight.w700, size: c.h * 0.044), left: 16, top: c.h * 0.52),
       c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 16, bottom: 28),
       c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.038), left: 16, bottom: 10),
+    ],
+  );
+}
+
+// ─── Mega-type family (ghost watermark layouts) ──────────────────────────────
+
+Widget _layoutGhostType(_CardRenderCtx c) {
+  final parts = _cardNameParts(c.doc.fullName);
+  final first = parts.first;
+  final rest = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      _nameWatermark(c, first, sizeMul: 0.48, opacity: 0.1, left: -12, top: -10),
+      Positioned(right: -20, bottom: -20, child: Text(first.toUpperCase(), style: TextStyle(fontSize: c.h * 0.35, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.05)))),
+      c.slot('name', Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        c.txt(first, size: c.h * 0.16, weight: FontWeight.w900, color: Colors.white),
+        if (rest.isNotEmpty) c.txt(rest, size: c.h * 0.09, weight: FontWeight.w300, color: c.sub, letterSpacing: 2),
+      ]), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.042, letterSpacing: 1.4), left: 16, top: c.h * 0.56),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.038), left: 16, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.036), left: 16, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutShadowKb(_CardRenderCtx c) {
+  final parts = _cardNameParts(c.doc.fullName);
+  final kb = parts.isNotEmpty ? parts.first.toUpperCase() : 'KB';
+  final rest = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      Positioned(left: -6, top: -18, child: Text(kb, style: TextStyle(fontSize: c.h * 0.72, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.11), height: 0.8))),
+      c.slot('name', Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        c.txt(kb, size: c.h * 0.2, weight: FontWeight.w900, color: c.accent),
+        if (rest.isNotEmpty) c.txt(rest, size: c.h * 0.1, weight: FontWeight.w700, letterSpacing: 1.2),
+      ]), left: 14, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white70, size: c.h * 0.046), left: 14, top: c.h * 0.52),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.042), left: 14, bottom: 28),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent, size: c.h * 0.038), left: 14, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutWatermarkGold(_CardRenderCtx c) {
+  final parts = _cardNameParts(c.doc.fullName);
+  final wm = parts.first.toUpperCase();
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      _nameWatermark(c, wm, sizeMul: 0.5, opacity: 0.16, left: -10, top: -8),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w300, color: c.accent, letterSpacing: 2), left: 18, top: 24),
+      c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: Colors.white60, size: c.h * 0.04, letterSpacing: 1.2), left: 18, top: c.h * 0.42),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white54, size: c.h * 0.044), left: 18, bottom: 32),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent.withValues(alpha: 0.9), size: c.h * 0.038), left: 18, bottom: 14),
+    ],
+  );
+}
+
+Widget _layoutTypeHalo(_CardRenderCtx c) {
+  final parts = _cardNameParts(c.doc.fullName);
+  final wm = parts.first.toUpperCase();
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Center(child: Text(wm, style: TextStyle(fontSize: c.h * 0.55, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.08)))),
+      c.slot('name', Center(child: c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900)), left: 12, right: 12, top: c.h * 0.22),
+      c.slot('title', Center(child: c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.046)), left: 12, right: 12, top: c.h * 0.46),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent, size: c.h * 0.04), left: 16, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.038), right: 16, bottom: 10),
     ],
   );
 }

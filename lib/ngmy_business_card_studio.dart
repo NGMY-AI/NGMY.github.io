@@ -203,21 +203,9 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     widget.onDocumentChanged?.call(_doc);
   }
 
-  void _insertEmoji(String emoji, {bool cardBadge = false}) {
+  void _insertEmoji(String emoji) {
     setState(() {
-      if (cardBadge) {
-        _doc.cardEmoji = emoji;
-      } else if (_activeField != null) {
-        final c = _activeField!;
-        final sel = c.selection;
-        final text = c.text;
-        final pos = sel.start >= 0 ? sel.start : text.length;
-        c.text = text.substring(0, pos) + emoji + text.substring(pos);
-        c.selection = TextSelection.collapsed(offset: pos + emoji.length);
-        _applyControllersToDoc();
-      } else {
-        _doc.cardEmoji = emoji;
-      }
+      _doc.cardEmoji = emoji;
       _doc.touch();
     });
     widget.onDocumentChanged?.call(_doc);
@@ -532,8 +520,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               final e = _businessEmojis[i];
               final selected = _doc.cardEmoji == e;
               return GestureDetector(
-                onTap: () => _insertEmoji(e, cardBadge: _activeField == null),
-                onLongPress: () => _insertEmoji(e, cardBadge: true),
+                onTap: () => _insertEmoji(e),
                 child: Container(
                   width: 36,
                   height: 36,
@@ -549,7 +536,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             },
           ),
         ),
-        Text('Tap to insert · long-press for card badge', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 9)),
+        Text('Tap to place on card · drag emoji to move', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 9)),
       ],
     );
   }
@@ -769,7 +756,7 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Business Card Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                          Text('30 templates · emojis · colors · drag to design', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
+                          Text('34 templates · emojis · colors · drag to design', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
