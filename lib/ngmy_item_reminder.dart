@@ -22,11 +22,17 @@ class _ItemReminderDialog extends StatefulWidget {
 class _ItemReminderDialogState extends State<_ItemReminderDialog> {
   final _itemC = TextEditingController();
   final _locationC = TextEditingController();
-  Duration _delay = const Duration(hours: 2);
+  Duration? _delay;
+  DateTime _customRemindAt = DateTime.now().add(const Duration(hours: 2));
+  bool _useCustomTime = false;
   bool _busy = false;
   List<NgmyItemReminder> _items = [];
 
   static const _delayOptions = <(String, Duration)>[
+    ('3 sec', Duration(seconds: 3)),
+    ('1 min', Duration(minutes: 1)),
+    ('5 min', Duration(minutes: 5)),
+    ('15 min', Duration(minutes: 15)),
     ('30 min', Duration(minutes: 30)),
     ('1 hour', Duration(hours: 1)),
     ('2 hours', Duration(hours: 2)),
@@ -39,6 +45,7 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
   @override
   void initState() {
     super.initState();
+    _delay = const Duration(hours: 2);
     _reload();
   }
 
@@ -55,14 +62,68 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
     setState(() => _items = list);
   }
 
+  Future<void> _pickCustomDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _customRemindAt,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: Color(0xFF7C3AED))),
+        child: child!,
+      ),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_customRemindAt),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: Color(0xFF7C3AED))),
+        child: child!,
+      ),
+    );
+    if (time == null || !mounted) return;
+    setState(() {
+      _customRemindAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _useCustomTime = true;
+      _delay = null;
+    });
+  }
+
+  void _applyCustomSet() {
+    if (_customRemindAt.isBefore(DateTime.now().add(const Duration(seconds: 3)))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick a time at least 3 seconds from now.')),
+      );
+      return;
+    }
+    setState(() {
+      _useCustomTime = true;
+      _delay = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Custom time set for ${_formatRemindAt(_customRemindAt)}')),
+    );
+  }
+
   Future<void> _save() async {
     setState(() => _busy = true);
-    final msg = await addNgmyItemReminder(
-      userEmail: widget.userEmail,
-      itemName: _itemC.text,
-      locationNote: _locationC.text,
-      remindAfter: _delay,
-    );
+    final String msg;
+    if (_useCustomTime) {
+      msg = await addNgmyItemReminderAt(
+        userEmail: widget.userEmail,
+        itemName: _itemC.text,
+        locationNote: _locationC.text,
+        remindAt: _customRemindAt,
+      );
+    } else {
+      msg = await addNgmyItemReminder(
+        userEmail: widget.userEmail,
+        itemName: _itemC.text,
+        locationNote: _locationC.text,
+        remindAfter: _delay ?? const Duration(hours: 2),
+      );
+    }
     if (!mounted) return;
     setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -87,27 +148,33 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
         height: MediaQuery.of(context).size.height * 0.88,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 0),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF7C3AED).withValues(alpha: 0.22), Colors.transparent],
+                ),
+                border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+              ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)]),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.place_rounded, color: Color(0xFFA78BFA), size: 22),
+                    child: const Icon(Icons.place_rounded, color: Colors.white, size: 24),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Where I Put It', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                        const Text('Where I Put It', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                         Text(
-                          due > 0 ? '$due reminder${due == 1 ? '' : 's'} ready now' : 'Never lose your keys again',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                          due > 0 ? '$due reminder${due == 1 ? '' : 's'} ready now' : 'Never lose keys, wallet, or kids gear again',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11.5),
                         ),
                       ],
                     ),
@@ -122,27 +189,86 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _field(_itemC, 'What did you put away?', Icons.key_rounded, hint: 'Car keys, wallet, passport…'),
-                    const SizedBox(height: 10),
+                    _field(_itemC, 'What did you put away?', Icons.key_rounded, hint: 'Car keys, wallet, kids backpack…'),
+                    const SizedBox(height: 12),
                     _field(_locationC, 'Where did you put it?', Icons.location_on_outlined, hint: 'Kitchen counter by the fruit bowl', maxLines: 3),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
                     const Text('Remind me in…', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: _delayOptions.map((opt) {
-                        final on = _delay == opt.$2;
-                        return ChoiceChip(
-                          label: Text(opt.$1),
-                          selected: on,
-                          onSelected: (_) => setState(() => _delay = opt.$2),
-                          selectedColor: const Color(0xFF7C3AED),
-                          labelStyle: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w700, fontSize: 12),
-                          backgroundColor: const Color(0xFF0B1020),
-                          side: BorderSide(color: on ? const Color(0xFFA78BFA) : Colors.white24),
-                        );
-                      }).toList(),
+                      children: [
+                        ..._delayOptions.map((opt) {
+                          final on = !_useCustomTime && _delay == opt.$2;
+                          return ChoiceChip(
+                            label: Text(opt.$1),
+                            selected: on,
+                            onSelected: (_) => setState(() {
+                              _delay = opt.$2;
+                              _useCustomTime = false;
+                            }),
+                            selectedColor: const Color(0xFF7C3AED),
+                            labelStyle: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w700, fontSize: 12),
+                            backgroundColor: const Color(0xFF0B1020),
+                            side: BorderSide(color: on ? const Color(0xFFA78BFA) : Colors.white24),
+                          );
+                        }),
+                        ActionChip(
+                          label: const Text('Set'),
+                          avatar: Icon(Icons.schedule_rounded, size: 18, color: _useCustomTime ? Colors.white : const Color(0xFFA78BFA)),
+                          onPressed: _applyCustomSet,
+                          backgroundColor: _useCustomTime ? const Color(0xFF7C3AED) : const Color(0xFF0B1020),
+                          labelStyle: TextStyle(
+                            color: _useCustomTime ? Colors.white : const Color(0xFFA78BFA),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                          side: BorderSide(color: _useCustomTime ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED).withValues(alpha: 0.5)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0B1020),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _useCustomTime ? const Color(0xFFA78BFA) : Colors.white10),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Custom date & time',
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatRemindAt(_customRemindAt),
+                                  style: TextStyle(
+                                    color: _useCustomTime ? const Color(0xFFA78BFA) : Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _pickCustomDate,
+                            icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+                            label: const Text('Pick'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFA78BFA),
+                              side: const BorderSide(color: Color(0xFF7C3AED)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
@@ -150,14 +276,15 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF7C3AED),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       icon: _busy
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.notifications_active_rounded),
-                      label: const Text('Save & schedule reminder'),
+                      label: const Text('Save & schedule reminder', style: TextStyle(fontWeight: FontWeight.w900)),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 22),
                     Row(
                       children: [
                         const Text('Your reminders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
@@ -175,7 +302,7 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
                           border: Border.all(color: Colors.white10),
                         ),
                         child: Text(
-                          'No reminders yet. Example: "Car keys" → "Hook by the garage door" → remind in 3 hours.',
+                          'No reminders yet. Example: "Car keys" → "Hook by the garage door" → remind in 2 hours.',
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.55), height: 1.35, fontSize: 12),
                         ),
                       )

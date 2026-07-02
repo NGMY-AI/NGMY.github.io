@@ -163,6 +163,8 @@ import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_market_hub_screen.dart';
+import 'ngmy_item_reminder_service.dart';
+import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
 
 part 'ngmy_admin_panels.dart';
@@ -14841,6 +14843,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
+      unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
       if (_idx == 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {});
@@ -15156,6 +15159,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptPushNotificationsIfNeeded());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
+    ngmyStartItemReminderWatcher(widget.user.email);
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
@@ -15274,6 +15278,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _adminTabRefreshDebounce?.cancel();
     _t?.cancel();
     _onlineCheck?.cancel();
+    ngmyStopItemReminderWatcher();
     NgmyIncomeSound.bindSession(null);
     super.dispose();
   }
@@ -15747,7 +15752,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _nav(0, Icons.home_rounded),
-              _nav(1, Icons.trending_up_rounded),
+              _navToolHub(),
               _nav(2, Icons.account_balance_wallet_rounded),
               _navC(3),
               _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
@@ -15776,6 +15781,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(child: NgmyStudioHubNavIcon(dimmed: _idx != 5, size: 30)),
+            ),
+          ),
+        ),
+      );
+
+  Widget _navToolHub() => Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _idx = 1;
+                _visitedTabs.add(1);
+              });
+              unawaited(widget.onRefreshLegalAndPlans?.call());
+            },
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              height: NgmyBottomNavMetrics.barHeight,
+              child: Center(child: NgmyToolHubNavIcon(dimmed: _idx != 1, size: 30)),
             ),
           ),
         ),

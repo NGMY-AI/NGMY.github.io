@@ -104,7 +104,7 @@ Future<void> _ensureNotifyReady() async {
 
 Future<int?> _scheduleItemReminderNotification(NgmyItemReminder reminder) async {
   if (kIsWeb) return null;
-  if (reminder.remindAt.isBefore(DateTime.now().add(const Duration(seconds: 30)))) return null;
+  if (reminder.remindAt.isBefore(DateTime.now().add(const Duration(seconds: 2)))) return null;
   try {
     await _ensureNotifyReady();
     final id = _notifyIdSeq++;
@@ -143,14 +143,28 @@ Future<String> addNgmyItemReminder({
   required String locationNote,
   required Duration remindAfter,
 }) async {
+  return addNgmyItemReminderAt(
+    userEmail: userEmail,
+    itemName: itemName,
+    locationNote: locationNote,
+    remindAt: DateTime.now().add(remindAfter),
+  );
+}
+
+Future<String> addNgmyItemReminderAt({
+  required String userEmail,
+  required String itemName,
+  required String locationNote,
+  required DateTime remindAt,
+}) async {
   final name = itemName.trim();
   final note = locationNote.trim();
   if (name.isEmpty) return 'Enter what you put away (e.g. car keys).';
   if (note.isEmpty) return 'Write where you put it.';
-  if (remindAfter.inMinutes < 1) return 'Pick when you want to be reminded.';
-
-  final remindAt = DateTime.now().add(remindAfter);
-  var reminder = NgmyItemReminder(itemName: name, locationNote: note, remindAt: remindAt);
+  if (remindAt.isBefore(DateTime.now().add(const Duration(seconds: 3)))) {
+    return 'Pick a reminder time at least 3 seconds from now.';
+  }
+  var reminder = NgmyItemReminder(itemName: name, locationNote: note, remindAt: remindAt.toLocal());
   final nid = await _scheduleItemReminderNotification(reminder);
   if (nid != null) {
     reminder = NgmyItemReminder(
@@ -188,6 +202,25 @@ Future<void> deleteNgmyItemReminder(String id, {String userEmail = ''}) async {
 Future<int> ngmyItemReminderDueCount({String userEmail = ''}) async {
   final list = await loadNgmyItemReminders(userEmail: userEmail);
   return list.where((e) => e.isDue).length;
+}
+
+Future<List<NgmyItemReminder>> ngmyDueItemReminders({String userEmail = ''}) async {
+  final list = await loadNgmyItemReminders(userEmail: userEmail);
+  return list.where((e) => e.isDue).toList();
+}
+
+Future<void> snoozeNgmyItemReminder(
+  NgmyItemReminder reminder, {
+  required String userEmail,
+  required Duration snoozeBy,
+}) async {
+  await deleteNgmyItemReminder(reminder.id, userEmail: userEmail);
+  await addNgmyItemReminderAt(
+    userEmail: userEmail,
+    itemName: reminder.itemName,
+    locationNote: reminder.locationNote,
+    remindAt: DateTime.now().add(snoozeBy),
+  );
 }
 
 String _formatWhen(DateTime dt) {

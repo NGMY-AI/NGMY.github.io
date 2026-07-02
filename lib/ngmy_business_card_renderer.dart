@@ -96,6 +96,16 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'depth_stack' => _layoutDepthStack(ctx),
       'ribbon' => _layoutRibbon(ctx),
       'mesh_dots' => _layoutMeshDots(ctx),
+      'black_marble' => _layoutBlackMarble(ctx),
+      'champagne_foil' => _layoutChampagneFoil(ctx),
+      'velvet_night' => _layoutVelvetNight(ctx),
+      'platinum_band' => _layoutPlatinumBand(ctx),
+      'rose_gold_arc' => _layoutRoseGoldArc(ctx),
+      'obsidian_gold' => _layoutObsidianGold(ctx),
+      'silk_gradient' => _layoutSilkGradient(ctx),
+      'art_deco' => _layoutArtDeco(ctx),
+      'crystalline' => _layoutCrystalline(ctx),
+      'executive_monogram' => _layoutExecutiveMonogram(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
   }
@@ -256,51 +266,39 @@ Widget _layoutOrbit(_CardRenderCtx c) {
 
 // ─── Layout 5: Metro bento ───────────────────────────────────────────────────
 Widget _layoutMetroBento(_CardRenderCtx c) {
-  Widget cell(String id, String val, {Color? bg}) {
-    return c.slot(
-      id,
-      Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(color: bg ?? Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-        child: c.txt(val, size: c.h * 0.038, maxLines: 1),
+  Widget bentoCell(String id, String val, IconData icon, {Color? bg, Color? fg}) {
+    if (val.trim().isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg ?? Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.accent.withValues(alpha: 0.25)),
       ),
-      left: 0,
-      top: 0,
+      child: Row(
+        children: [
+          Icon(icon, size: c.h * 0.045, color: c.accent),
+          const SizedBox(width: 6),
+          Expanded(child: c.txt(val, size: c.h * 0.042, color: fg ?? Colors.white, maxLines: 1)),
+        ],
+      ),
     );
   }
+
+  final gridTop = c.h * 0.36;
+  final cellH = (c.h - gridTop - 10) / 2 - 3;
 
   return Stack(
     fit: StackFit.expand,
     children: [
-      Container(color: c.bg1),
-      Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 0, top: 0),
-            c.slot('company', c.txt(c.doc.company, color: c.accent, size: c.h * 0.05), left: 0, top: 0),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(child: Column(children: [
-                    Expanded(child: cell('phone', c.doc.phone, bg: c.accent.withValues(alpha: 0.2))),
-                    const SizedBox(height: 4),
-                    Expanded(child: cell('email', c.doc.email)),
-                  ])),
-                  const SizedBox(width: 4),
-                  Expanded(child: Column(children: [
-                    Expanded(child: cell('website', c.doc.website)),
-                    const SizedBox(height: 4),
-                    Expanded(child: cell('address', c.doc.address, bg: c.accent.withValues(alpha: 0.12))),
-                  ])),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      CustomPaint(painter: _GridPainter(c.accent.withValues(alpha: 0.06), 18), size: Size.infinite),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 12, top: 10),
+      c.slot('company', c.txt(c.doc.company, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800), left: 12, top: c.h * 0.22),
+      c.slot('phone', SizedBox(height: cellH, child: bentoCell('phone', c.doc.phone, Icons.phone_rounded, bg: c.accent.withValues(alpha: 0.22))), left: 10, top: gridTop, right: c.w * 0.52),
+      c.slot('email', SizedBox(height: cellH, child: bentoCell('email', c.doc.email, Icons.email_rounded)), left: 10, top: gridTop + cellH + 6, right: c.w * 0.52),
+      c.slot('website', SizedBox(height: cellH, child: bentoCell('website', c.doc.website, Icons.language_rounded)), left: c.w * 0.52, top: gridTop, right: 10),
+      c.slot('address', SizedBox(height: cellH, child: bentoCell('address', c.doc.address, Icons.place_rounded, bg: c.accent.withValues(alpha: 0.14))), left: c.w * 0.52, top: gridTop + cellH + 6, right: 10),
     ],
   );
 }
@@ -395,17 +393,24 @@ Widget _layoutHeroStrip(_CardRenderCtx c) {
 
 // ─── Layout 10: Pill row ──────────────────────────────────────────────────────
 Widget _layoutPillRow(_CardRenderCtx c) {
-  Widget pill(String id, String label) {
+  Widget pill(String label, IconData icon) {
     if (label.trim().isEmpty) return const SizedBox.shrink();
-    return c.slot(
-      id,
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20), border: Border.all(color: c.accent.withValues(alpha: 0.35))),
-        child: Text(label, style: TextStyle(color: c.text, fontSize: c.h * 0.034, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: c.accent.withValues(alpha: 0.5), width: 1.4),
+        boxShadow: [BoxShadow(color: c.accent.withValues(alpha: 0.18), blurRadius: 6, offset: const Offset(0, 2))],
       ),
-      left: 0,
-      top: 0,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: c.h * 0.038, color: c.accent),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: c.text, fontSize: c.h * 0.04, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 
@@ -413,19 +418,12 @@ Widget _layoutPillRow(_CardRenderCtx c) {
     fit: StackFit.expand,
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.12, weight: FontWeight.w900), left: 16, top: 16),
-      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.05), left: 16, top: c.h * 0.34),
-      c.slot('company', c.txt(c.doc.company, color: c.accent, weight: FontWeight.w800, size: c.h * 0.048), left: 16, top: c.h * 0.46),
-      Positioned(
-        left: 12,
-        right: 12,
-        bottom: 10,
-        child: Wrap(spacing: 4, runSpacing: 4, children: [
-          pill('phone', c.doc.phone),
-          pill('email', c.doc.email),
-          pill('website', c.doc.website),
-        ]),
-      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 16, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048), left: 16, top: c.h * 0.32),
+      c.slot('company', c.txt(c.doc.company, color: c.accent, weight: FontWeight.w800, size: c.h * 0.046), left: 16, top: c.h * 0.44),
+      c.slot('phone', pill(c.doc.phone, Icons.phone_rounded), left: 14, bottom: 38),
+      c.slot('email', pill(c.doc.email, Icons.email_rounded), left: c.w * 0.38, bottom: 38),
+      c.slot('website', pill(c.doc.website, Icons.language_rounded), left: 14, bottom: 10),
     ],
   );
 }
@@ -520,22 +518,31 @@ Widget _layoutPastelInset(_CardRenderCtx c) {
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       Center(
         child: Container(
-          width: c.w * 0.88,
-          height: c.h * 0.78,
+          width: c.w * 0.9,
+          height: c.h * 0.82,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: c.accent.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 6))],
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 2),
+            boxShadow: [
+              BoxShadow(color: c.accent.withValues(alpha: 0.2), blurRadius: 16, offset: const Offset(0, 8)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 4)),
+            ],
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.09, weight: FontWeight.w900, color: const Color(0xFF1E293B)), left: 0, top: 0),
-              c.slot('title', c.txt(c.doc.jobTitle, color: const Color(0xFF64748B), size: c.h * 0.045), left: 0, top: 0),
+              c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: const Color(0xFF0F172A)), left: 0, top: 0),
+              c.slot('title', c.txt(c.doc.jobTitle, color: const Color(0xFF475569), size: c.h * 0.048, weight: FontWeight.w600), left: 0, top: 0),
+              const SizedBox(height: 6),
+              Container(height: 2, width: 36, color: c.accent),
               const Spacer(),
-              c.slot('phone', c.txt(c.doc.phone, color: const Color(0xFF475569), size: c.h * 0.038), left: 0, top: 0),
-              c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.036), left: 0, top: 0),
+              c.slot('phone', c.txt(c.doc.phone, color: const Color(0xFF334155), size: c.h * 0.042, weight: FontWeight.w700), left: 0, top: 0),
+              const SizedBox(height: 4),
+              c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.04, weight: FontWeight.w800), left: 0, top: 0),
+              const SizedBox(height: 4),
+              c.slot('website', c.txt(c.doc.website, color: const Color(0xFF64748B), size: c.h * 0.036), left: 0, top: 0),
             ],
           ),
         ),
@@ -692,6 +699,276 @@ class _DotMeshPainter extends CustomPainter {
         canvas.drawCircle(Offset(x, y), 1.2, paint);
       }
     }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─── Layout 21–30: Luxury collection ─────────────────────────────────────────
+
+Widget _layoutBlackMarble(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      CustomPaint(painter: _MarbleVeinPainter(c.accent.withValues(alpha: 0.35)), size: Size.infinite),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w300, color: c.accent, letterSpacing: 2), left: 18, top: 24),
+      c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: Colors.white70, size: c.h * 0.04, letterSpacing: 1.2), left: 18, top: c.h * 0.42),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white54, size: c.h * 0.044), left: 18, bottom: 32),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent.withValues(alpha: 0.85), size: c.h * 0.038), left: 18, bottom: 14),
+      const Positioned(right: 16, top: 16, child: Icon(Icons.diamond_outlined, color: Color(0xFFD4AF37), size: 18)),
+    ],
+  );
+}
+
+Widget _layoutChampagneFoil(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      Positioned(left: 0, right: 0, top: 0, height: c.h * 0.22, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent.withValues(alpha: 0.55), c.accent.withValues(alpha: 0.15)])))),
+      c.slot('logo', c.logo(c.h * 0.26), left: 14, top: 12),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: c.text), left: c.w * 0.32, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.046), left: c.w * 0.32, top: c.h * 0.32),
+      c.slot('company', c.txt(c.doc.company, color: c.accent, weight: FontWeight.w800, size: c.h * 0.044), left: 14, top: c.h * 0.52),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 14, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.038), left: 14, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutVelvetNight(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment.topRight, radius: 1.4, colors: [c.accent.withValues(alpha: 0.12), c.bg1, c.bg2]))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900, color: c.accent), left: 16, top: 18),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white.withValues(alpha: 0.75), size: c.h * 0.048), left: 16, top: c.h * 0.34),
+      Positioned(left: 16, right: 16, top: c.h * 0.48, child: Container(height: 1, color: c.accent.withValues(alpha: 0.4))),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white54, size: c.h * 0.044), left: 16, top: c.h * 0.54),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent, size: c.h * 0.04), left: 16, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: Colors.white60, size: c.h * 0.038), left: 16, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutPlatinumBand(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(left: 0, right: 0, top: c.h * 0.38, height: c.h * 0.18, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent.withValues(alpha: 0.15), c.accent, c.accent.withValues(alpha: 0.15)])))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 16, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.046), left: 16, top: c.h * 0.26),
+      c.slot('company', c.txt(c.doc.company.toUpperCase(), color: c.accent, size: c.h * 0.038, letterSpacing: 1.5, weight: FontWeight.w800), left: 16, top: c.h * 0.42),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 16, bottom: 28),
+      c.slot('website', c.txt(c.doc.website, color: c.accent, size: c.h * 0.038), left: 16, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutRoseGoldArc(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      CustomPaint(painter: _ArcPainter(c.accent.withValues(alpha: 0.85)), size: Size.infinite),
+      c.slot('logo', c.logo(c.h * 0.3, radius: BorderRadius.circular(999)), right: 14, top: 14),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 14, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048), left: 14, top: c.h * 0.32),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white60, size: c.h * 0.044), left: 14, bottom: 32),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 14, bottom: 12),
+    ],
+  );
+}
+
+Widget _layoutObsidianGold(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(right: 0, top: 0, child: CustomPaint(painter: _GoldCornerPainter(c.accent), size: Size(c.w * 0.35, c.h * 0.45))),
+      Positioned(left: 0, bottom: 0, child: CustomPaint(painter: _GoldCornerPainter(c.accent, flip: true), size: Size(c.w * 0.28, c.h * 0.35))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: c.accent), left: 16, top: 20),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white70, size: c.h * 0.046), left: 16, top: c.h * 0.36),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white54, size: c.h * 0.042), left: 16, bottom: 32),
+      c.slot('email', c.txt(c.doc.email, color: c.accent.withValues(alpha: 0.9), size: c.h * 0.038), left: 16, bottom: 12),
+    ],
+  );
+}
+
+Widget _layoutSilkGradient(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2, c.accent.withValues(alpha: 0.35)]))),
+      CustomPaint(painter: _SilkPainter(Colors.white.withValues(alpha: 0.06)), size: Size.infinite),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w800), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.05), left: 16, top: c.h * 0.34),
+      c.slot('tagline', c.txt(c.doc.tagline, color: Colors.white60, size: c.h * 0.04), left: 16, top: c.h * 0.46),
+      c.slot('phone', c.txt(c.doc.phone, color: Colors.white70, size: c.h * 0.04), left: 16, bottom: 28),
+      c.slot('website', c.txt(c.doc.website, color: c.accent, size: c.h * 0.038), left: 16, bottom: 10),
+    ],
+  );
+}
+
+Widget _layoutArtDeco(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      CustomPaint(painter: _DecoFramePainter(c.accent), size: Size.infinite),
+      c.slot('name', c.txt(c.doc.fullName.toUpperCase(), size: c.h * 0.08, weight: FontWeight.w900, color: c.accent, letterSpacing: 2), left: 20, top: 28),
+      Positioned(left: 20, right: 20, top: c.h * 0.42, child: Row(children: [Expanded(child: Container(height: 1, color: c.accent)), Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.star, color: c.accent, size: 10)), Expanded(child: Container(height: 1, color: c.accent))])),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white70, size: c.h * 0.044), left: 20, top: c.h * 0.48),
+      c.slot('company', c.txt(c.doc.company, color: Colors.white54, size: c.h * 0.04), left: 20, bottom: 32),
+      c.slot('phone', c.txt(c.doc.phone, color: c.accent, size: c.h * 0.038), left: 20, bottom: 14),
+    ],
+  );
+}
+
+Widget _layoutCrystalline(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      CustomPaint(painter: _CrystalPainter(c.accent.withValues(alpha: 0.25)), size: Size.infinite),
+      c.slot('logo', c.logo(c.h * 0.28), left: 14, top: 12),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: c.w * 0.34, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046), left: c.w * 0.34, top: c.h * 0.32),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.042), left: 14, bottom: 32),
+      c.slot('email', c.txt(c.doc.email, color: Colors.white70, size: c.h * 0.038), left: 14, bottom: 12),
+    ],
+  );
+}
+
+Widget _layoutExecutiveMonogram(_CardRenderCtx c) {
+  final initial = c.doc.fullName.trim().isNotEmpty ? c.doc.fullName.trim()[0].toUpperCase() : 'N';
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(right: -c.w * 0.08, top: -c.h * 0.15, child: Text(initial, style: TextStyle(fontSize: c.h * 1.1, fontWeight: FontWeight.w900, color: c.accent.withValues(alpha: 0.08)))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900, color: c.text), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048), left: 16, top: c.h * 0.34),
+      Positioned(left: 16, top: c.h * 0.46, child: Container(width: 48, height: 3, color: c.accent)),
+      c.slot('company', c.txt(c.doc.company, color: c.text, weight: FontWeight.w700, size: c.h * 0.044), left: 16, top: c.h * 0.52),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 16, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.038), left: 16, bottom: 10),
+    ],
+  );
+}
+
+class _MarbleVeinPainter extends CustomPainter {
+  _MarbleVeinPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..strokeWidth = 1.2..style = PaintingStyle.stroke;
+    final path = Path()
+      ..moveTo(0, size.height * 0.3)
+      ..quadraticBezierTo(size.width * 0.4, size.height * 0.1, size.width, size.height * 0.45)
+      ..moveTo(0, size.height * 0.7)
+      ..quadraticBezierTo(size.width * 0.5, size.height * 0.55, size.width, size.height * 0.85);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ArcPainter extends CustomPainter {
+  _ArcPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawArc(Rect.fromLTWH(-size.width * 0.2, size.height * 0.55, size.width * 1.2, size.height), 0, 3.14, false, Paint()..color = color..strokeWidth = 3..style = PaintingStyle.stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GoldCornerPainter extends CustomPainter {
+  _GoldCornerPainter(this.color, {this.flip = false});
+  final Color color;
+  final bool flip;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (flip) {
+      canvas.save();
+      canvas.translate(size.width, size.height);
+      canvas.scale(-1, -1);
+    }
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.35));
+    canvas.drawLine(Offset(0, 0), Offset(size.width, 0), Paint()..color = color..strokeWidth = 2);
+    if (flip) canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SilkPainter extends CustomPainter {
+  _SilkPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..strokeWidth = 1;
+    for (var i = 0.0; i < size.width + size.height; i += 18) {
+      canvas.drawLine(Offset(i, 0), Offset(i - size.height, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _DecoFramePainter extends CustomPainter {
+  _DecoFramePainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..strokeWidth = 1.5..style = PaintingStyle.stroke;
+    canvas.drawRect(Rect.fromLTWH(10, 10, size.width - 20, size.height - 20), paint);
+    canvas.drawLine(const Offset(10, 10), const Offset(24, 24), paint);
+    canvas.drawLine(Offset(size.width - 10, 10), Offset(size.width - 24, 24), paint);
+    canvas.drawLine(Offset(10, size.height - 10), Offset(24, size.height - 24), paint);
+    canvas.drawLine(Offset(size.width - 10, size.height - 10), Offset(size.width - 24, size.height - 24), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _CrystalPainter extends CustomPainter {
+  _CrystalPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final cx = size.width * 0.78;
+    final cy = size.height * 0.55;
+    final path = Path()
+      ..moveTo(cx, cy - 40)
+      ..lineTo(cx + 35, cy)
+      ..lineTo(cx, cy + 40)
+      ..lineTo(cx - 35, cy)
+      ..close();
+    canvas.drawPath(path, paint);
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.5)..style = PaintingStyle.stroke..strokeWidth = 1);
   }
 
   @override
