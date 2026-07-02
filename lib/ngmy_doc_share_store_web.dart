@@ -39,10 +39,52 @@ String _bytesPrefsKey(String email, String id) => 'ngmy_doc_share_blob_${_emailK
 String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
 
 const int _prefsMaxBytes = 512 * 1024; // legacy small-file prefs only; IndexedDB holds everything durable
+const int _streamChunkBytes = 1024 * 1024;
 
 final Map<String, Uint8List> _memoryBlobs = {};
 final Map<String, html.File> _webFiles = {};
 final Map<String, Uint8List> _transferReadCache = {};
+final Map<String, _ChunkManifest> _chunkManifests = {};
+
+class _ChunkManifest {
+  _ChunkManifest({required this.partKeys, required this.totalBytes});
+
+  final List<String> partKeys;
+  final int totalBytes;
+}
+
+String _chunkManifestKey(String baseKey) => '${baseKey}_manifest';
+
+Future<void> _persistChunkManifest(String baseKey, List<String> partKeys, int totalBytes) async {
+  final manifest = _ChunkManifest(partKeys: List.from(partKeys), totalBytes: totalBytes);
+  _chunkManifests[baseKey] = manifest;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(
+    _chunkManifestKey(baseKey),
+    jsonEncode({'parts': partKeys, 'size': totalBytes}),
+  );
+}
+
+Future<_ChunkManifest?> _loadChunkManifest(String baseKey) async {
+  final cached = _chunkManifests[baseKey];
+  if (cached != null) return cached;
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_chunkManifestKey(baseKey));
+  if (raw == null || raw.isEmpty) return null;
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final partsRaw = decoded['parts'];
+    if (partsRaw is! List || partsRaw.isEmpty) return null;
+    final parts = partsRaw.map((e) => e.toString()).toList();
+    final size = (decoded['size'] as num?)?.toInt() ?? 0;
+    final manifest = _ChunkManifest(partKeys: parts, totalBytes: size);
+    _chunkManifests[baseKey] = manifest;
+    return manifest;
+  } catch (_) {
+    return null;
+  }
+}
 
 Future<void> _persistBlob(String key, Uint8List bytes) async {
   if (bytes.isEmpty) return;
@@ -133,12 +175,13 @@ class NgmyDocShareStore {
   static Future<int> addFromDirectory({required String email, required String dirPath}) async => 0;
 
   /// Web folder picker — keeps [html.File] refs for large videos (no full RAM load until transfer).
-  static Future<int> addWebFolderFiles({
+  static Future<List<NgmyDocShareItem>> addWebFolderFiles({
     required String email,
     required List<({String name, html.File file})> files,
+    String? note,
   }) async {
-    if (email.trim().isEmpty || files.isEmpty) return 0;
-    var count = 0;
+    if (email.trim().isEmpty || files.isEmpty) return [];
+    final created = <NgmyDocShareItem>[];
     final items = await _readIndex(email);
     for (final entry in files) {
       if (entry.file.size <= 0) continue;
@@ -150,16 +193,16 @@ class NgmyDocShareStore {
         mime: mime,
         sizeBytes: entry.file.size,
         createdAt: DateTime.now().toUtc().toIso8601String(),
-        note: 'From folder',
+        note: note ?? 'From folder',
         shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       _webFiles[id] = entry.file;
       unawaited(_persistHtmlFile(email, id, entry.file));
       items.add(item);
-      count++;
+      created.add(item);
     }
-    if (count > 0) await _writeIndex(email, items);
-    return count;
+    if (created.isNotEmpty) await _writeIndex(email, items);
+    return created;
   }
 
   static Future<NgmyDocShareItem?> addFromPlatformFile({
@@ -168,11 +211,79 @@ class NgmyDocShareStore {
     String? note,
   }) async {
     final mime = _guessMime(file.name, file.extension);
+    final name = file.name.trim().isEmpty ? 'file' : file.name.trim();
+    final size = file.size;
+    if (size <= 0) return null;
+
+    final stream = file.readStream;
+    if (stream != null) {
+      return _addFromStream(
+        email: email,
+        name: name,
+        mime: mime,
+        stream: stream,
+        sizeBytes: size,
+        note: note,
+      );
+    }
+
     final bytes = file.bytes;
     if (bytes != null && bytes.isNotEmpty) {
-      return addBytes(email: email, name: file.name, mime: mime, bytes: bytes, note: note);
+      return addBytes(email: email, name: name, mime: mime, bytes: bytes, note: note);
     }
     return null;
+  }
+
+  static Future<NgmyDocShareItem?> _addFromStream({
+    required String email,
+    required String name,
+    required String mime,
+    required Stream<List<int>> stream,
+    required int sizeBytes,
+    String? note,
+  }) async {
+    if (email.trim().isEmpty) return null;
+    final id = _newId();
+    final baseKey = _bytesPrefsKey(email, id);
+    final partKeys = <String>[];
+    var partIndex = 0;
+    var received = 0;
+    final buffer = <int>[];
+
+    await for (final chunk in stream) {
+      if (chunk.isEmpty) continue;
+      buffer.addAll(chunk);
+      received += chunk.length;
+      while (buffer.length >= _streamChunkBytes) {
+        final part = Uint8List.fromList(buffer.sublist(0, _streamChunkBytes));
+        buffer.removeRange(0, _streamChunkBytes);
+        final partKey = '${baseKey}_part_$partIndex';
+        await ngmyDocShareIdbPut(partKey, part);
+        partKeys.add(partKey);
+        partIndex++;
+      }
+    }
+    if (buffer.isNotEmpty) {
+      final partKey = '${baseKey}_part_$partIndex';
+      await ngmyDocShareIdbPut(partKey, Uint8List.fromList(buffer));
+      partKeys.add(partKey);
+    }
+    if (partKeys.isEmpty) return null;
+
+    final total = received > 0 ? received : sizeBytes;
+    await _persistChunkManifest(baseKey, partKeys, total);
+    final item = NgmyDocShareItem(
+      id: id,
+      name: name,
+      mime: mime,
+      sizeBytes: total,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+      note: note,
+      shortCode: NgmyDocShareShortCode.generateLocalCode(),
+    );
+    final items = await _readIndex(email)..add(item);
+    await _writeIndex(email, items);
+    return item;
   }
 
   static Future<Uint8List?> readByteRange(String email, NgmyDocShareItem item, int start, int end) async {
@@ -195,10 +306,31 @@ class NgmyDocShareStore {
       return done.future.timeout(const Duration(minutes: 30), onTimeout: () => null);
     }
     final cacheKey = _bytesPrefsKey(email, item.id);
+    final manifest = await _loadChunkManifest(cacheKey);
+    if (manifest != null) {
+      var offset = 0;
+      for (final partKey in manifest.partKeys) {
+        final part = await ngmyDocShareIdbGet(partKey);
+        if (part == null || part.isEmpty) continue;
+        if (offset + part.length <= start) {
+          offset += part.length;
+          continue;
+        }
+        final localStart = start > offset ? start - offset : 0;
+        if (localStart >= part.length) {
+          offset += part.length;
+          continue;
+        }
+        final sliceEnd = end - offset;
+        final safeEnd = sliceEnd > part.length ? part.length : sliceEnd;
+        return Uint8List.sublistView(part, localStart, safeEnd);
+      }
+      return null;
+    }
     var all = _transferReadCache[cacheKey] ?? _memoryBlobs[cacheKey];
     if (all == null) {
       all = await readBytes(email, item);
-      if (all != null && all.length <= 180 * 1024 * 1024) {
+      if (all != null && all.isNotEmpty) {
         _transferReadCache[cacheKey] = all;
       }
     }
@@ -240,6 +372,16 @@ class NgmyDocShareStore {
 
   static Future<Uint8List?> readBytes(String email, NgmyDocShareItem item) async {
     final key = _bytesPrefsKey(email, item.id);
+    final manifest = await _loadChunkManifest(key);
+    if (manifest != null) {
+      final out = BytesBuilder(copy: false);
+      for (final partKey in manifest.partKeys) {
+        final part = await ngmyDocShareIdbGet(partKey);
+        if (part != null && part.isNotEmpty) out.add(part);
+      }
+      final bytes = out.takeBytes();
+      return bytes.isEmpty ? null : bytes;
+    }
     final stored = await _loadBlob(key);
     if (stored != null && stored.isNotEmpty) return stored;
     final webFile = _webFiles[item.id];
@@ -310,8 +452,11 @@ class NgmyDocShareStore {
     String? fromSender,
   }) {
     final id = _nextDiskReceiveId++;
+    final itemId = _newId();
     _diskReceives[id] = _WebDiskReceive(
       email: email,
+      itemId: itemId,
+      baseKey: _bytesPrefsKey(email, itemId),
       name: name,
       mime: mime,
       note: note,
@@ -329,9 +474,10 @@ class NgmyDocShareStore {
       if (_webFiles[item.id] != null) continue;
       final key = _bytesPrefsKey(email, item.id);
       if (_transferReadCache.containsKey(key) || _memoryBlobs.containsKey(key)) continue;
+      if (await _loadChunkManifest(key) != null) continue;
       unawaited(() async {
         final blob = await _loadBlob(key);
-        if (blob != null && blob.length <= 180 * 1024 * 1024) {
+        if (blob != null && blob.isNotEmpty) {
           _transferReadCache[key] = blob;
         }
       }());
@@ -351,10 +497,18 @@ class NgmyDocShareStore {
       return;
     }
     final key = _bytesPrefsKey(email, item.id);
+    final manifest = await _loadChunkManifest(key);
+    if (manifest != null) {
+      for (final partKey in manifest.partKeys) {
+        final part = await ngmyDocShareIdbGet(partKey);
+        if (part != null && part.isNotEmpty) yield part;
+      }
+      return;
+    }
     var all = _transferReadCache[key] ?? _memoryBlobs[key];
     all ??= await _loadBlob(key);
     if (all == null || all.isEmpty) return;
-    if (all.length <= 180 * 1024 * 1024) _transferReadCache[key] = all;
+    if (all.length <= 512 * 1024 * 1024) _transferReadCache[key] = all;
     const step = 1048576;
     for (var i = 0; i < all.length; i += step) {
       final end = (i + step < all.length) ? i + step : all.length;
@@ -365,21 +519,35 @@ class NgmyDocShareStore {
   static Future<bool> writeDiskReceive(int id, List<int> bytes) async {
     final rx = _diskReceives[id];
     if (rx == null || bytes.isEmpty) return false;
-    rx.builder.add(bytes);
+    if (rx.partKeys.length > 1 || rx.pending.length >= _streamChunkBytes) {
+      await rx.flushPending();
+    }
+    rx.pending.add(bytes);
+    if (rx.pending.length >= _streamChunkBytes) {
+      await rx.flushPending();
+    }
     return true;
   }
 
   static Future<NgmyDocShareItem?> finishDiskReceive(int id) async {
     final rx = _diskReceives.remove(id);
-    if (rx == null || rx.builder.length <= 0) return null;
-    return addBytes(
-      email: rx.email,
+    if (rx == null) return null;
+    await rx.flushPending();
+    if (rx.partKeys.isEmpty || rx.totalBytes <= 0) return null;
+    await _persistChunkManifest(rx.baseKey, rx.partKeys, rx.totalBytes);
+    final item = NgmyDocShareItem(
+      id: rx.itemId,
       name: rx.name,
       mime: rx.mime,
-      bytes: rx.builder.takeBytes(),
+      sizeBytes: rx.totalBytes,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+      note: rx.note,
       fromSender: rx.fromSender,
-      note: rx.note ?? 'Received via QR',
+      shortCode: NgmyDocShareShortCode.generateLocalCode(),
     );
+    final items = await _readIndex(rx.email)..add(item);
+    await _writeIndex(rx.email, items);
+    return item;
   }
 
   static Future<void> abortDiskReceive(int id) async {
@@ -400,8 +568,16 @@ class NgmyDocShareStore {
     final key = _bytesPrefsKey(email, id);
     _memoryBlobs.remove(key);
     _webFiles.remove(id);
+    final manifest = await _loadChunkManifest(key);
+    _chunkManifests.remove(key);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
+    await prefs.remove(_chunkManifestKey(key));
+    if (manifest != null) {
+      for (final partKey in manifest.partKeys) {
+        await ngmyDocShareIdbDelete(partKey);
+      }
+    }
     await ngmyDocShareIdbDelete(key);
     await _writeIndex(email, items);
   }
@@ -417,6 +593,8 @@ class NgmyDocShareStore {
 class _WebDiskReceive {
   _WebDiskReceive({
     required this.email,
+    required this.itemId,
+    required this.baseKey,
     required this.name,
     required this.mime,
     this.note,
@@ -424,11 +602,26 @@ class _WebDiskReceive {
   });
 
   final String email;
+  final String itemId;
+  final String baseKey;
   final String name;
   final String mime;
   final String? note;
   final String? fromSender;
-  final BytesBuilder builder = BytesBuilder(copy: false);
+  final List<String> partKeys = [];
+  final BytesBuilder pending = BytesBuilder(copy: false);
+  var partIndex = 0;
+  var totalBytes = 0;
+
+  Future<void> flushPending() async {
+    if (pending.length <= 0) return;
+    final partKey = '${baseKey}_rx_$partIndex';
+    final bytes = pending.takeBytes();
+    await ngmyDocShareIdbPut(partKey, Uint8List.fromList(bytes));
+    partKeys.add(partKey);
+    totalBytes += bytes.length;
+    partIndex++;
+  }
 }
 
 Future<List<NgmyDocShareItem>> _readIndex(String email) async {

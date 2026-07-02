@@ -444,9 +444,18 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   Future<void> _uploadFiles() async {
     await _withWork(() async {
       if (!await _ensureCanCreate()) return;
+      if (kIsWeb) {
+        final picked = await pickWebFiles();
+        if (picked.isEmpty) return;
+        final added = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
+        await _refresh();
+        if (added.isNotEmpty) await _recordCreationIfNeeded(count: added.length);
+        _toast(added.isEmpty ? 'No files selected.' : 'Added ${added.length} file(s) — ready for NGMY Transfer.');
+        return;
+      }
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
-        withData: kIsWeb,
+        withData: false,
         type: FileType.any,
       );
       if (result == null || result.files.isEmpty) return;
@@ -486,10 +495,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
           _toast('No folder selected.');
           return;
         }
-        final count = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
+        final added = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
         await _refresh();
-        if (count > 0) await _recordCreationIfNeeded(count: count);
-        _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
+        if (added.isNotEmpty) await _recordCreationIfNeeded(count: added.length);
+        _toast(added.isEmpty ? 'No files found in that folder.' : 'Added ${added.length} file(s) from folder.');
       }, label: 'Reading folder…');
       return;
     }
@@ -695,6 +704,45 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _openNgmyTransferSend(NgmyDocShareItem item) async {
     await openNgmyTransferSend(context, email: widget.email, items: [item]);
+  }
+
+  Future<void> _openNgmyTransferSendPicked() async {
+    await _withWork(() async {
+      List<NgmyDocShareItem> batch = [];
+      if (_selected.isNotEmpty) {
+        batch = _items.where((e) => _selected.contains(e.id)).toList();
+      } else if (kIsWeb) {
+        final picked = await pickWebFiles();
+        if (picked.isEmpty) return;
+        batch = await NgmyDocShareStore.addWebFolderFiles(
+          email: widget.email,
+          files: picked,
+          note: 'NGMY Transfer',
+        );
+        await _refresh();
+      } else {
+        final result = await FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          withData: false,
+          type: FileType.any,
+        );
+        if (result == null || result.files.isEmpty) return;
+        for (final f in result.files) {
+          final saved = await NgmyDocShareStore.addFromPlatformFile(
+            email: widget.email,
+            file: f,
+            note: 'NGMY Transfer',
+          );
+          if (saved != null) batch.add(saved);
+        }
+      }
+      if (batch.isEmpty) {
+        _toast('Select file(s) or pick videos/documents to send.');
+        return;
+      }
+      if (!mounted) return;
+      await openNgmyTransferSend(context, email: widget.email, items: batch);
+    }, label: 'Preparing transfer…');
   }
 
   Future<void> _openNgmyTransferReceive() async {
@@ -1072,6 +1120,14 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'send_my_code'),
                   ),
                   _DocShareMenuTile(
+                    icon: Icons.north_east_rounded,
+                    label: 'NGMY Transfer · Send',
+                    subtitle: 'Pick big videos & documents · 6-digit code',
+                    accent: true,
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'transfer_send'),
+                  ),
+                  _DocShareMenuTile(
                     icon: Icons.south_west_rounded,
                     label: 'NGMY Transfer · Receive',
                     subtitle: 'Enter sender\'s 6-digit number code',
@@ -1099,6 +1155,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_openMyCode());
       case 'send_my_code':
         unawaited(_openSendToMyCode());
+      case 'transfer_send':
+        unawaited(_openNgmyTransferSendPicked());
       case 'transfer_receive':
         unawaited(_openNgmyTransferReceive());
       case 'import':

@@ -196,7 +196,8 @@ Write-Host ""
 Write-Host "GITHUB PAGES (required after 404 / private repo):" -ForegroundColor Magenta
 Write-Host "  https://github.com/NGMY-AI/NGMY.github.io/settings/pages" -ForegroundColor White
 Write-Host "  Source: branch gh-pages + folder / (root)" -ForegroundColor White
-Write-Host "  Push docs/ to main triggers deploy-pages.yml" -ForegroundColor White
+Write-Host "  CI deploys on push to lib/web (no docs/ commit required)" -ForegroundColor White
+Write-Host "  Skip committing docs/ to avoid failed main/docs Pages emails" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "[7/7] Checking live site (only works AFTER push + Pages enabled) ..." -ForegroundColor Cyan
 try {

@@ -151,11 +151,12 @@ class NgmyDocShareStore {
     return count;
   }
 
-  static Future<int> addWebFolderFiles({
+  static Future<List<NgmyDocShareItem>> addWebFolderFiles({
     required String email,
     required List<dynamic> files,
+    String? note,
   }) async =>
-      0;
+      [];
 
   static Future<NgmyDocShareItem?> addFromPlatformFile({
     required String email,

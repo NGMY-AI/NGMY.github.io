@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:html' as html;
 
-/// Pick an entire folder on web (Chrome, Edge, Safari).
-Future<List<({String name, html.File file})>> pickWebFolderFiles() async {
+Future<List<({String name, html.File file})>> _pickWebFiles({required bool directory}) async {
   final input = html.FileUploadInputElement()
     ..multiple = true
     ..accept = '*/*';
-  input.setAttribute('webkitdirectory', '');
+  if (directory) {
+    input.setAttribute('webkitdirectory', '');
+  }
   input.style.display = 'none';
   html.document.body?.append(input);
 
@@ -35,3 +36,11 @@ Future<List<({String name, html.File file})>> pickWebFolderFiles() async {
     },
   );
 }
+
+/// Pick one or more files on web — keeps [html.File] refs (no full RAM load for big videos).
+Future<List<({String name, html.File file})>> pickWebFiles() =>
+    _pickWebFiles(directory: false);
+
+/// Pick an entire folder on web (Chrome, Edge, Safari).
+Future<List<({String name, html.File file})>> pickWebFolderFiles() =>
+    _pickWebFiles(directory: true);

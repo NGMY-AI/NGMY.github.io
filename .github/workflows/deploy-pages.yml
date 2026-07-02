@@ -1,9 +1,9 @@
-# Publishes prebuilt Flutter web output from /docs to the gh-pages branch.
-# Run publish-web.ps1 locally, commit docs/, then push main.
+# Builds Flutter web in CI and publishes to gh-pages (fast, reliable).
+# Push lib/web/assets changes — no need to commit docs/ on main.
 #
 # GitHub Pages settings (one-time):
 #   Settings → Pages → Deploy from branch → gh-pages → / (root)
-# Do NOT use "GitHub Actions" as Pages source (avoids double-deploy timeouts).
+#   NOT main/docs (that triggers slow built-in deploy that times out).
 
 name: Deploy GitHub Pages
 
@@ -11,7 +11,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docs/**'
+      - 'lib/**'
+      - 'web/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -23,18 +29,71 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify docs site
-        run: test -f docs/index.html
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build web
+        run: |
+          flutter pub get
+          flutter build web --release --base-href=/ --no-wasm-dry-run --no-web-resources-cdn
+          test -f build/web/index.html
+
+      - name: Prepare site folder
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -r build/web/* _site/
+          touch _site/.nojekyll
+          echo -n 'ngmy.org' > _site/CNAME
+          DEPLOY_ID=$(date -u +%Y%m%d%H%M%S)
+          cat > _site/version.json <<EOF
+          {"build_number":"${DEPLOY_ID}","deployed_at":"$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)","app_name":"ngmy","version":"1.0.0","package_name":"ngmy"}
+          EOF
+          if [ -f web/ngmy_service_worker.js ]; then
+            python3 <<'PY'
+          import json, pathlib, re
+          root = pathlib.Path("_site")
+          urls = []
+          for p in sorted(root.rglob("*")):
+              if not p.is_file() or p.name == "ngmy_service_worker.js":
+                  continue
+              rel = "./" + p.relative_to(root).as_posix()
+              urls.append(rel)
+          tpl = pathlib.Path("web/ngmy_service_worker.js").read_text(encoding="utf-8")
+          deploy_id = pathlib.Path("_site/version.json").read_text(encoding="utf-8-sig")
+          import json as j
+          bid = j.loads(deploy_id)["build_number"]
+          out = tpl.replace("__NGMY_DEPLOY_ID__", bid)
+          out = out.replace("__NGMY_PRECACHE_URLS__", json.dumps(urls))
+          (root / "ngmy_service_worker.js").write_text(out, encoding="utf-8")
+          print(f"Wrote service worker ({len(urls)} precache URLs)")
+          PY
+          fi
+          for f in _site/index.html _site/404.html; do
+            if [ -f "$f" ]; then
+              DEPLOY_ID=$(python3 -c "import json; print(json.load(open('_site/version.json'))['build_number'])")
+              sed -i "s/__NGMY_DEPLOY_ID__/${DEPLOY_ID}/g" "$f" 2>/dev/null || \
+                python3 -c "
+          import pathlib, json
+          bid = json.load(open('_site/version.json'))['build_number']
+          p = pathlib.Path('$f')
+          p.write_text(p.read_text(encoding='utf-8').replace('__NGMY_DEPLOY_ID__', bid), encoding='utf-8')
+          "
+            fi
+          done
 
       - name: Publish to gh-pages branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: docs
+          folder: _site
           branch: gh-pages
           clean: true
-          commit-message: 'Deploy web build from main'
+          commit-message: 'Deploy web build from CI'

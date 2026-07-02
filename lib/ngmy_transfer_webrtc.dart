@@ -56,7 +56,7 @@ class NgmyTransferWebRtc {
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(
-        const Duration(minutes: 20),
+        const Duration(hours: 3),
         onTimeout: () => <NgmyDocShareItem>[],
       );
     } catch (_) {
