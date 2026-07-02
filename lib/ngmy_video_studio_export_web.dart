@@ -24,7 +24,7 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 1080;
+const _mobileExportMaxEdgePx = 1280;
 
 bool _ngmyExportCancelled = false;
 
@@ -565,9 +565,46 @@ double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int 
   return (videoTimeSec / durationSec).clamp(0.0, 0.99);
 }
 
-int _exportFps() {
-  if (_ngmyIsMobileBrowser()) return 24;
-  return _exportCanvasFps;
+int _exportFps() => _exportCanvasFps;
+
+Future<void> _awaitWallTime(DateTime wallStart, int targetMs) async {
+  final elapsed = DateTime.now().difference(wallStart).inMilliseconds;
+  final wait = targetMs - elapsed;
+  if (wait > 0) {
+    await Future<void>.delayed(Duration(milliseconds: wait));
+  }
+}
+
+/// Keeps decoded video time aligned with export wall clock so MediaRecorder
+/// output length matches the clip (avoids slow-motion when the browser
+/// throttles `<video>` playback during capture).
+Future<void> _syncExportVideosToWallClock(
+  List<html.VideoElement> videos,
+  html.VideoElement? primary,
+  double wallSec,
+  double durationSec,
+) async {
+  if (primary == null) return;
+  final target = wallSec.clamp(0.0, durationSec);
+  final lag = target - primary.currentTime;
+  if (lag.isNaN || lag.isInfinite) return;
+
+  if (lag > 0.35) {
+    final maxT = primary.duration.isFinite && primary.duration > 0
+        ? math.max(0.0, primary.duration - 0.04)
+        : target;
+    final seekT = target.clamp(0.0, maxT);
+    for (final v in videos) {
+      v.pause();
+      v.playbackRate = 1.0;
+      v.currentTime = seekT;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  } else if (lag > 0.12) {
+    primary.playbackRate = (1.0 + lag * 0.55).clamp(1.0, 1.45);
+  } else {
+    primary.playbackRate = 1.0;
+  }
 }
 
 bool _ngmyIsAppleMobileBrowser() {
@@ -990,7 +1027,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 4500000 : (_ngmyIsMobileBrowser() ? 5500000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 6000000 : (_ngmyIsMobileBrowser() ? 7500000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1056,9 +1093,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final deadline = _exportDeadlineFor(durationSec);
   final attemptDeadline = _exportAttemptDeadline(durationSec);
   final wallStart = DateTime.now();
-  final wallEnd = wallStart.add(
-    Duration(milliseconds: (durationMs * 1.35).ceil() + 4000),
-  );
+  final wallEnd = wallStart.add(Duration(milliseconds: durationMs + 3500));
   // Real elapsed time with no playback progress, not a tick count — a tick
   // count assumes each loop iteration costs a certain amount of wall time,
   // which broke once per-frame work got cheaper/more expensive elsewhere
@@ -1118,32 +1153,37 @@ Future<List<html.Blob>> _recordCanvasExport({
     if (useDedicatedAudio && tick % 12 == 0) {
       await _syncExportAudioPlayback(primary, playing: true);
     }
+    if (tick % 5 == 0) {
+      final wallSecNow = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
+      await _syncExportVideosToWallClock(videoList, primary, wallSecNow, durationSec);
+    }
 
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
     maxRecordedSec = math.max(maxRecordedSec, t);
     final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
+    final wallSec = wallMs / 1000.0;
     if (wallMs > (_ngmyIsMobileBrowser() ? 22000 : 18000) && t < 0.04) {
       debugPrint('[studio export] video frozen at t=$t — aborting realtime attempt');
       abortedFrozen = true;
       break;
     }
     if (wallMs >= startupGraceMs) {
-      if ((t - lastT).abs() >= 0.006) {
-        lastT = t;
+      if ((wallSec - lastT).abs() >= 0.006) {
+        lastT = wallSec;
         lastProgressWallMs = wallMs;
       }
     } else {
-      lastT = t;
+      lastT = wallSec;
       lastProgressWallMs = wallMs;
     }
 
-    final p = _exportProgress(durationSec, t, wallMs, durationMs);
+    final p = _exportProgress(durationSec, wallSec, wallMs, durationMs);
     onProgress(p, _ngmyRecordingStatus(p));
 
     final ended = primary != null &&
         (primary.ended || primary.currentTime >= durationSec - 0.05);
-    if (ended ||
-        t >= durationSec - 0.04 ||
+    if (wallSec >= durationSec - 0.025 ||
+        ended ||
         (primary == null && wallMs >= durationMs) ||
         (wallMs - lastProgressWallMs) > stallLimitMs) {
       break;
@@ -1166,9 +1206,11 @@ Future<List<html.Blob>> _recordCanvasExport({
   await _stopRecorderDrain(recorder, done);
   if (_exportWasCancelled) return const [];
   final minRecorded = math.min(0.45, durationSec * 0.08);
-  if (abortedFrozen || maxRecordedSec < minRecorded) {
+  final recordedWallSec = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
+  if (abortedFrozen ||
+      (recordedWallSec < durationSec * 0.82 && maxRecordedSec < minRecorded)) {
     debugPrint(
-      '[studio export] rejected realtime recording: maxTime=$maxRecordedSec need=$minRecorded frozen=$abortedFrozen',
+      '[studio export] rejected realtime recording: maxTime=$maxRecordedSec wall=${recordedWallSec.toStringAsFixed(1)}s need=$minRecorded frozen=$abortedFrozen',
     );
     return const [];
   }
@@ -1176,6 +1218,8 @@ Future<List<html.Blob>> _recordCanvasExport({
 }
 
 /// Frame-by-frame seek bake — used when realtime playback recording fails on mobile.
+/// Wall-clock pacing keeps output duration equal to the source clip (MediaRecorder
+/// timestamps by real arrival time, not by seeked video time).
 Future<List<html.Blob>> _recordCanvasExportSeekSync({
   required html.MediaStream stream,
   required String mimeType,
@@ -1187,7 +1231,7 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 3500000 : (_ngmyIsMobileBrowser() ? 4500000 : 12000000),
+    'videoBitsPerSecond': appleMobile ? 5500000 : (_ngmyIsMobileBrowser() ? 7000000 : 12000000),
   };
 
   final recorder = _createMediaRecorder(stream, recorderOptions);
@@ -1220,32 +1264,39 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
   }
 
   final fps = _exportFps();
-  final frameMs = (1000 / fps).round().clamp(28, 50);
   final totalFrames = (durationSec * fps).ceil().clamp(24, (_mobileMaxRecordSeconds * fps).round());
-  onProgress(0.08, 'Baking template frame-by-frame…');
+  final totalWallMs = (durationSec * 1000).ceil();
+  final wallStart = DateTime.now();
+  onProgress(0.08, 'Baking template at normal speed…');
 
   for (var frame = 0; frame < totalFrames; frame++) {
     if (_exportWasCancelled) break;
-    final t = frame / fps;
+
+    final slotEndMs = ((frame + 1) * totalWallMs / totalFrames).round();
+    final t = (frame / totalFrames) * durationSec;
     for (final v in videoList) {
       final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.04) : t;
       v.pause();
+      v.playbackRate = 1.0;
       v.currentTime = t.clamp(0.0, maxT);
     }
-    await Future<void>.delayed(Duration(milliseconds: frameMs ~/ 3));
+    await Future<void>.delayed(const Duration(milliseconds: 6));
     paintFrame();
-    await Future<void>.delayed(Duration(milliseconds: frameMs));
+    await _awaitWallTime(wallStart, slotEndMs);
+
     if (frame % 4 == 0) {
       try {
         js_util.callMethod(recorder, 'requestData', const []);
       } catch (_) {}
     }
-    final p = (frame / totalFrames).clamp(0.0, 0.98);
+    final wallSec = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
+    final p = (wallSec / durationSec).clamp(0.0, 0.98);
     onProgress(p, _ngmyRecordingStatus(p));
   }
 
   paintFrame();
-  await Future<void>.delayed(const Duration(milliseconds: 320));
+  await _awaitWallTime(wallStart, totalWallMs);
+  await Future<void>.delayed(const Duration(milliseconds: 120));
   try {
     js_util.callMethod(recorder, 'requestData', const []);
   } catch (_) {}
