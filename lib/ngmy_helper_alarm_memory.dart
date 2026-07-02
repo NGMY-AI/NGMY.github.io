@@ -69,6 +69,13 @@ class NgmyHelperAlarmMemoryStore {
     }
   }
 
+  static Future<void> remove(String email, String id) async {
+    final all = await load(email);
+    all.removeWhere((e) => e.id == id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key(email), jsonEncode(all.map((e) => e.toJson()).toList()));
+  }
+
   static Future<void> add(String email, NgmyHelperAlarmEntry entry) async {
     final all = await load(email);
     all.removeWhere((e) => e.id == entry.id);

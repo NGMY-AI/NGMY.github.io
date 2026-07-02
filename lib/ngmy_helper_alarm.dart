@@ -5,6 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'ngmy_helper_alarm_calendar.dart';
 import 'ngmy_helper_alarm_memory.dart';
+import 'ngmy_helper_alarm_watcher.dart';
 
 final FlutterLocalNotificationsPlugin _ngmyAlarmNotifications = FlutterLocalNotificationsPlugin();
 bool _ngmyAlarmNotificationsReady = false;
@@ -31,9 +32,17 @@ Future<void> _ensureAlarmNotificationsReady() async {
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.requestNotificationsPermission();
   await _ngmyAlarmNotifications
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.requestExactAlarmsPermission();
+  await _ngmyAlarmNotifications
       .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
       ?.requestPermissions(alert: true, badge: true, sound: true);
   _ngmyAlarmNotificationsReady = true;
+}
+
+tz.TZDateTime _alarmScheduleInstant(DateTime when) {
+  final local = when.toLocal();
+  return tz.TZDateTime.from(local.toUtc(), tz.UTC);
 }
 
 Future<void> _scheduleBackupNotification({
@@ -61,7 +70,7 @@ Future<void> _scheduleBackupNotification({
       interruptionLevel: InterruptionLevel.timeSensitive,
     );
     final details = NotificationDetails(android: android, iOS: darwin, macOS: darwin);
-    final scheduled = tz.TZDateTime.from(when.toLocal(), tz.local);
+    final scheduled = _alarmScheduleInstant(when);
     await _ngmyAlarmNotifications.zonedSchedule(
       id: id,
       title: title,
@@ -82,8 +91,8 @@ Future<String> ngmyScheduleHelperWakeAlarm({
   String? notes,
 }) async {
   final localWhen = when.toLocal();
-  if (localWhen.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
-    return 'That time already passed — pick a future time for your wake alarm.';
+  if (localWhen.isBefore(DateTime.now().add(const Duration(seconds: 20)))) {
+    return 'That time already passed — pick a future time for your alarm.';
   }
 
   final entry = NgmyHelperAlarmEntry(
@@ -102,11 +111,22 @@ Future<String> ngmyScheduleHelperWakeAlarm({
 
   await _scheduleBackupNotification(title: entry.title, when: localWhen, notes: notes);
 
-  if (kIsWeb) {
-    return calendarMsg;
+  if (userEmail.trim().isNotEmpty) {
+    ngmyStartHelperAlarmWatcher(userEmail);
   }
 
-  return '$calendarMsg A backup NGMY notification is also scheduled.';
+  if (kIsWeb) {
+    return '$calendarMsg Keep NGMY open or allow the calendar alert — the alarm will ring in-app at ${_formatWhen(localWhen)}.';
+  }
+
+  return '$calendarMsg A phone notification and in-app alarm are scheduled for ${_formatWhen(localWhen)}.';
+}
+
+String _formatWhen(DateTime dt) {
+  final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+  final min = dt.minute.toString().padLeft(2, '0');
+  return '${dt.month}/${dt.day} at $h:$min $ampm';
 }
 
 String ngmyWakeAlarmIosClockNote() =>

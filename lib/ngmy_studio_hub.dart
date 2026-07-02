@@ -81,7 +81,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Fun Games → Video Studio → 3D Mechanic Lab.
+    // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Spark Lounge → Video Studio → 3D Mechanic Lab.
     final tools = <_CreatorTool>[
       _CreatorTool(
         icon: Icons.folder_shared_rounded,
@@ -146,10 +146,10 @@ class NgmyCreatorHubTab extends StatelessWidget {
         },
       ),
       _CreatorTool(
-        icon: Icons.sports_esports_rounded,
-        colors: const [Color(0xFFEC4899), Color(0xFF8B5CF6)],
-        title: 'Fun Games',
-        subtitle: 'Love, brain & fortune',
+        icon: Icons.auto_awesome_rounded,
+        colors: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
+        title: 'Spark Lounge',
+        subtitle: 'Love match, riddles & fortune',
         onTap: () {
           if (NgmyHubToolBridge.openFunGames != null) {
             NgmyHubToolBridge.openFunGames!();

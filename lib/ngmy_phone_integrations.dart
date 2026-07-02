@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_calendar_ics.dart';
 import 'ngmy_helper_alarm.dart';
 import 'ngmy_calendar_download_stub.dart' if (dart.library.html) 'ngmy_calendar_download_web.dart';
@@ -27,7 +28,7 @@ const List<({String id, String label, String example})> kNgmyPhoneConnectedApps 
   (id: 'facebook', label: 'Facebook', example: 'Open my Facebook'),
   (id: 'instagram', label: 'Instagram', example: 'Open Instagram'),
   (id: 'telegram', label: 'Telegram', example: 'Open Telegram'),
-  (id: 'browser', label: 'Safari / Chrome', example: 'Open ngmy.org'),
+  (id: 'open_tool', label: 'NGMY apps', example: 'Open Video Studio / Spark Lounge / Virtual Device'),
 ];
 
 String ngmyHelperPhoneIntegrationContext({
@@ -52,7 +53,8 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
-- alarm — title, start (ISO local wake time), notes (optional) — opens Calendar + Clock with alert at that time (iPhone uses Calendar alert; Apple blocks writing to Clock app)
+- alarm — title, start (ISO local wake time), notes (optional) — schedules phone notification + in-app alarm; also opens Calendar alert on iPhone
+- open_tool — tool (spark_lounge, video_studio, virtual_device, mechanic_lab, ai_outfit, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
 - whatsapp — name OR phone, body (optional)
@@ -68,7 +70,9 @@ Rules:
 - When user says "call Mom" or "text John on WhatsApp", use "name" — NEVER invent phone numbers.
 - If the name is not in PHONE CONTACTS, say you will look them up after they say "allow access" once — do NOT tell them to tap a contacts button.
 - REQUIRED calendar block for any meeting/appointment request.
-- REQUIRED alarm block when user says wake me, set alarm, wake up at, or needs alarm before work/shift/meeting.
+- REQUIRED alarm block when user says wake me, set alarm, timer, remind me in X minutes/hours, or needs alarm before work/shift/meeting.
+- For relative times ("in 2 minutes", "in 2 hours") set start to now + that duration as ISO local datetime.
+- When user asks to open a NGMY feature (games, video studio, virtual phones, mechanic lab, QR, invoice), use open_tool — do NOT tell them to navigate manually.
 - start/end must be valid ISO datetimes in local timezone.
 - You cannot read private Facebook/Instagram/Messenger activity from the phone app. If asked to read activity, explain that Meta requires official account authorization/API approval, then offer to open the app/link or analyze content the user shares.
 ''';
@@ -94,7 +98,7 @@ class NgmyPhoneAction {
         'facebook' => 'Open Facebook',
         'instagram' => 'Open Instagram',
         'telegram' => 'Open Telegram',
-        'open_url' => 'Open Link',
+        'open_tool' => 'Open NGMY tool',
         _ => 'Run',
       };
 
@@ -112,6 +116,7 @@ class NgmyPhoneAction {
         'instagram' => Icons.camera_alt_rounded,
         'telegram' => Icons.send_rounded,
         'open_url' => Icons.open_in_new_rounded,
+        'open_tool' => Icons.apps_rounded,
         _ => Icons.phonelink_rounded,
       };
 
@@ -152,6 +157,8 @@ class NgmyPhoneAction {
       case 'open_url':
         final url = fields['url'] ?? '';
         return url.length > 42 ? '${url.substring(0, 39)}…' : url;
+      case 'open_tool':
+        return fields['tool'] ?? fields['app'] ?? 'NGMY tool';
       default:
         return type;
     }
@@ -212,7 +219,7 @@ class NgmyPhoneAction {
     if (actions.isNotEmpty) return (text: text, actions: actions);
   }
 
-  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|send_email|messenger|facebook|instagram|telegram|open_url)"[\s\S]*?\}\s*\])');
+  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|send_email|messenger|facebook|instagram|telegram|open_url|open_tool)"[\s\S]*?\}\s*\])');
   final looseMatch = loose.firstMatch(raw);
   if (looseMatch != null) {
     text = raw.replaceFirst(loose, '').trim();
@@ -364,6 +371,8 @@ Future<String?> ngmyRunPhoneAction(
       return _runTelegram(action);
     case 'open_url':
       return _runOpenUrl(action);
+    case 'open_tool':
+      return _runOpenTool(action);
     default:
       return 'Unknown action type: ${action.type}';
   }
@@ -627,6 +636,12 @@ Future<String?> _runOpenUrl(NgmyPhoneAction action) async {
   }
   final ok = await _launchExternal(Uri.parse(url));
   return ok ? 'Opening link…' : 'Could not open that link.';
+}
+
+Future<String?> _runOpenTool(NgmyPhoneAction action) async {
+  final tool = (action.fields['tool'] ?? action.fields['app'] ?? '').trim().toLowerCase();
+  if (tool.isEmpty) return 'No NGMY tool was specified.';
+  return NgmyAiAppBridge.open(tool);
 }
 
 /// Compact chips shown under an AI message that triggered phone actions.

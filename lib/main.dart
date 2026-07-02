@@ -72,6 +72,10 @@ import 'ngmy_helper_kb_admin.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_calendar_intent.dart';
 import 'ngmy_phone_alarm_intent.dart';
+import 'ngmy_phone_tool_intent.dart';
+import 'ngmy_helper_alarm_watcher.dart';
+import 'ngmy_register_ai_tools.dart';
+import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_phone_contacts.dart';
 import 'ngmy_phone_contact_resolve.dart';
 import 'ngmy_phone_contact_intent.dart';
@@ -15160,6 +15164,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     ngmyStartItemReminderWatcher(widget.user.email);
+    ngmyStartHelperAlarmWatcher(widget.user.email);
+    ngmyRegisterAiAppTools(
+      context: () => context,
+      userEmail: widget.user.email,
+      user: widget.user,
+      config: widget.config,
+      onDataChanged: widget.onDataChanged,
+    );
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
@@ -15279,6 +15291,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _t?.cancel();
     _onlineCheck?.cancel();
     ngmyStopItemReminderWatcher();
+    ngmyStopHelperAlarmWatcher();
+    NgmyAiAppBridge.clear();
     NgmyIncomeSound.bindSession(null);
     super.dispose();
   }
@@ -16056,6 +16070,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ...ngmyInferAlarmActionsFromUserMessage(text),
           ...ngmyInferCalendarActionsFromUserMessage(text),
           ...ngmyInferContactActionsFromUserMessage(text),
+          ...ngmyInferOpenToolActionsFromUserMessage(text),
           ...ngmyInferSendEmailActionsFromUserMessage(text, isAdmin: widget.user.isAdmin),
         ];
       }
@@ -16125,10 +16140,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         userEmail: widget.user.email,
         isAdmin: widget.user.isAdmin,
         config: widget.config,
+        skipConfirmation: action.type == 'alarm' || action.type == 'open_tool',
       );
       if (!mounted || result == null) continue;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result), backgroundColor: const Color(0xFF16A34A)),
+        SnackBar(
+          content: Text(result),
+          backgroundColor: action.type == 'alarm' ? const Color(0xFFF97316) : const Color(0xFF16A34A),
+          duration: Duration(seconds: action.type == 'alarm' ? 9 : 5),
+        ),
       );
     }
   }
@@ -45591,6 +45611,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           ...ngmyInferAlarmActionsFromUserMessage(text),
           ...ngmyInferCalendarActionsFromUserMessage(text),
           ...ngmyInferContactActionsFromUserMessage(text),
+          ...ngmyInferOpenToolActionsFromUserMessage(text),
           ...ngmyInferSendEmailActionsFromUserMessage(text, isAdmin: widget.user.isAdmin),
         ];
       }
@@ -45687,34 +45708,33 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         continue;
       }
       if (action.type == 'alarm') {
-        await ngmyPresentPhoneAlarmSheet(
+        final result = await ngmyRunPhoneAction(
+          action,
           context: context,
-          action: action,
           userEmail: widget.user.email,
-          onDone: (result) async {
-            if (!mounted || result == null) return;
-            final start = DateTime.tryParse(action.fields['start'] ?? '');
-            if (start != null) {
-              await NgmyHelperCalendarMemoryStore.add(
-                widget.user.email,
-                NgmyCalendarMemoryEntry(
-                  id: 'alarm_cal_${DateTime.now().microsecondsSinceEpoch}',
-                  title: (action.fields['title'] ?? 'Wake up').trim(),
-                  start: start.toLocal(),
-                  end: start.toLocal().add(const Duration(minutes: 15)),
-                  notes: action.fields['notes'] ?? 'Wake alarm from NGMY Helper',
-                ),
-              );
-              unawaited(_bootstrapHelperConnections());
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$result\n${ngmyWakeAlarmIosClockNote()}'),
-                backgroundColor: const Color(0xFFF97316),
-                duration: const Duration(seconds: 8),
-              ),
-            );
-          },
+          skipConfirmation: true,
+        );
+        if (!mounted || result == null) continue;
+        final start = DateTime.tryParse(action.fields['start'] ?? '');
+        if (start != null) {
+          await NgmyHelperCalendarMemoryStore.add(
+            widget.user.email,
+            NgmyCalendarMemoryEntry(
+              id: 'alarm_cal_${DateTime.now().microsecondsSinceEpoch}',
+              title: (action.fields['title'] ?? 'Wake up').trim(),
+              start: start.toLocal(),
+              end: start.toLocal().add(const Duration(minutes: 15)),
+              notes: action.fields['notes'] ?? 'Wake alarm from NGMY Helper',
+            ),
+          );
+          unawaited(_bootstrapHelperConnections());
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$result\n${ngmyWakeAlarmIosClockNote()}'),
+            backgroundColor: const Color(0xFFF97316),
+            duration: const Duration(seconds: 9),
+          ),
         );
         continue;
       }
@@ -45763,16 +45783,19 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return;
     }
     if (action.type == 'alarm') {
-      await ngmyPresentPhoneAlarmSheet(
+      final result = await ngmyRunPhoneAction(
+        action,
         context: context,
-        action: action,
         userEmail: widget.user.email,
-        onDone: (result) async {
-          if (!mounted || result == null) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result), backgroundColor: const Color(0xFFF97316)),
-          );
-        },
+        skipConfirmation: true,
+      );
+      if (!mounted || result == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$result\n${ngmyWakeAlarmIosClockNote()}'),
+          backgroundColor: const Color(0xFFF97316),
+          duration: const Duration(seconds: 9),
+        ),
       );
       return;
     }
