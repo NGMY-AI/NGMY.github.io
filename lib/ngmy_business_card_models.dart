@@ -113,6 +113,7 @@ class NgmyBusinessCardDocument {
     this.cardEmoji = '',
     Map<String, double>? offsetX,
     Map<String, double>? offsetY,
+    Map<String, double>? elementScale,
     Map<String, bool>? hidden,
     this.logoBase64 = '',
     DateTime? createdAt,
@@ -120,6 +121,7 @@ class NgmyBusinessCardDocument {
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         offsetX = offsetX ?? {},
         offsetY = offsetY ?? {},
+        elementScale = elementScale ?? {},
         hidden = hidden ?? {},
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
@@ -144,6 +146,7 @@ class NgmyBusinessCardDocument {
   String cardEmoji;
   final Map<String, double> offsetX;
   final Map<String, double> offsetY;
+  final Map<String, double> elementScale;
   final Map<String, bool> hidden;
   String logoBase64;
   DateTime createdAt;
@@ -188,6 +191,7 @@ class NgmyBusinessCardDocument {
         'cardEmoji': cardEmoji,
         'offsetX': offsetX,
         'offsetY': offsetY,
+        'elementScale': elementScale,
         'hidden': hidden,
         'logoBase64': logoBase64,
         'createdAt': createdAt.toIso8601String(),
@@ -232,6 +236,7 @@ class NgmyBusinessCardDocument {
       cardEmoji: (json['cardEmoji'] ?? '').toString(),
       offsetX: mapDouble(json['offsetX']),
       offsetY: mapDouble(json['offsetY']),
+      elementScale: mapDouble(json['elementScale']),
       hidden: mapBool(json['hidden']),
       logoBase64: (json['logoBase64'] ?? '').toString(),
       createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
@@ -252,6 +257,19 @@ void ngmyCardSetElementOffset(NgmyBusinessCardDocument doc, String elementId, Of
   doc.touch();
 }
 
+double ngmyCardElementScale(NgmyBusinessCardDocument doc, String elementId) {
+  return doc.elementScale[elementId] ?? 1.0;
+}
+
+void ngmyCardSetElementScale(NgmyBusinessCardDocument doc, String elementId, double scale) {
+  doc.elementScale[elementId] = scale.clamp(0.5, 2.5);
+  doc.touch();
+}
+
+void ngmyCardNudgeElementScale(NgmyBusinessCardDocument doc, String elementId, double delta) {
+  ngmyCardSetElementScale(doc, elementId, ngmyCardElementScale(doc, elementId) + delta);
+}
+
 bool ngmyCardElementVisible(NgmyBusinessCardDocument doc, String elementId) {
   return doc.hidden[elementId] != true;
 }
@@ -259,5 +277,23 @@ bool ngmyCardElementVisible(NgmyBusinessCardDocument doc, String elementId) {
 void ngmyCardResetLayout(NgmyBusinessCardDocument doc) {
   doc.offsetX.clear();
   doc.offsetY.clear();
+  doc.elementScale.clear();
   doc.touch();
+}
+
+String ngmyCardElementLabel(String elementId) {
+  return switch (elementId) {
+    'name' => 'Name',
+    'title' => 'Job title',
+    'company' => 'Company',
+    'phone' => 'Phone',
+    'email' => 'Email',
+    'website' => 'Website',
+    'address' => 'Address',
+    'tagline' => 'Tagline',
+    'logo' => 'Logo',
+    'card_emoji' => 'Emoji',
+    'emoji' => 'Emoji',
+    _ => elementId,
+  };
 }

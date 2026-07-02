@@ -38,6 +38,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   bool _editMode = true;
   final GlobalKey _captureKey = GlobalKey();
   TextEditingController? _activeField;
+  String? _selectedElementId;
 
   static const _businessEmojis = [
     '💼', '📇', '✨', '🏢', '💡', '🎯', '⭐', '🔥', '💎', '🚀',
@@ -211,6 +212,27 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     widget.onDocumentChanged?.call(_doc);
   }
 
+  void _clearEmoji() {
+    setState(() {
+      _doc.cardEmoji = '';
+      _doc.touch();
+    });
+    widget.onDocumentChanged?.call(_doc);
+  }
+
+  void _selectElement(String id) {
+    setState(() => _selectedElementId = id);
+  }
+
+  void _nudgeSelectedScale(double delta) {
+    final id = _selectedElementId;
+    if (id == null) return;
+    setState(() {
+      ngmyCardNudgeElementScale(_doc, id, delta);
+    });
+    widget.onDocumentChanged?.call(_doc);
+  }
+
   void _insertIconSnippet(String snippet) {
     if (_activeField == null) return;
     setState(() {
@@ -291,8 +313,11 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               document: _doc,
               interactive: _editMode,
               width: widget.compact ? 320 : 360,
+              selectedElementId: _selectedElementId,
+              onElementSelect: _selectElement,
               onElementDrag: (id, delta) {
                 setState(() {
+                  _selectedElementId = id;
                   ngmyCardSetElementOffset(_doc, id, delta);
                 });
                 widget.onDocumentChanged?.call(_doc);
@@ -300,6 +325,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             ),
           ),
         ),
+        if (_editMode && _selectedElementId != null) _selectedElementSizeBar(),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -314,7 +340,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             IconButton(
               tooltip: 'Reset layout',
               onPressed: () {
-                setState(() => ngmyCardResetLayout(_doc));
+                setState(() {
+                  ngmyCardResetLayout(_doc);
+                  _selectedElementId = null;
+                });
                 widget.onDocumentChanged?.call(_doc);
               },
               icon: const Icon(Icons.restart_alt_rounded),
@@ -504,6 +533,45 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     );
   }
 
+  Widget _selectedElementSizeBar() {
+    final id = _selectedElementId!;
+    final scale = ngmyCardElementScale(_doc, id);
+    final pct = (scale * 100).round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1020),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.open_with_rounded, size: 16, color: const Color(0xFF22C55E).withValues(alpha: 0.85)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Selected: ${ngmyCardElementLabel(id)}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+          ),
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+            onPressed: scale <= 0.55 ? null : () => _nudgeSelectedScale(-0.08),
+            icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF22C55E), size: 22),
+          ),
+          Text('$pct%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+            onPressed: scale >= 2.45 ? null : () => _nudgeSelectedScale(0.08),
+            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E), size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _emojiStrip() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,13 +582,33 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
           height: 38,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: _businessEmojis.length,
+            itemCount: _businessEmojis.length + 1,
             separatorBuilder: (_, __) => const SizedBox(width: 4),
             itemBuilder: (_, i) {
-              final e = _businessEmojis[i];
+              if (i == 0) {
+                final noneSelected = _doc.cardEmoji.trim().isEmpty;
+                return GestureDetector(
+                  onTap: _clearEmoji,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: noneSelected ? const Color(0xFF22C55E).withValues(alpha: 0.2) : Colors.black26,
+                      border: Border.all(color: noneSelected ? const Color(0xFF22C55E) : Colors.white12),
+                    ),
+                    child: Text('None', style: TextStyle(color: noneSelected ? const Color(0xFF22C55E) : Colors.white54, fontWeight: FontWeight.w800, fontSize: 8)),
+                  ),
+                );
+              }
+              final e = _businessEmojis[i - 1];
               final selected = _doc.cardEmoji == e;
               return GestureDetector(
-                onTap: () => _insertEmoji(e),
+                onTap: () {
+                  _insertEmoji(e);
+                  _selectElement('card_emoji');
+                },
                 child: Container(
                   width: 36,
                   height: 36,
@@ -536,7 +624,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             },
           ),
         ),
-        Text('Tap to place on card · drag emoji to move', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 9)),
+        Text('None clears emoji · tap to place · drag to move · use +/- to resize', style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 9)),
       ],
     );
   }

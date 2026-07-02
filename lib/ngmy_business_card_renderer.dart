@@ -12,12 +12,16 @@ class NgmyBusinessCardPreview extends StatelessWidget {
     this.width = 350,
     this.interactive = false,
     this.onElementDrag,
+    this.onElementSelect,
+    this.selectedElementId,
   });
 
   final NgmyBusinessCardDocument document;
   final double width;
   final bool interactive;
   final void Function(String elementId, Offset delta)? onElementDrag;
+  final void Function(String elementId)? onElementSelect;
+  final String? selectedElementId;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,8 @@ class NgmyBusinessCardPreview extends StatelessWidget {
           height: h,
           interactive: interactive,
           onElementDrag: onElementDrag,
+          onElementSelect: onElementSelect,
+          selectedElementId: selectedElementId,
         ),
       ),
     );
@@ -57,6 +63,8 @@ class _NgmyCardRenderBody extends StatelessWidget {
     required this.height,
     required this.interactive,
     this.onElementDrag,
+    this.onElementSelect,
+    this.selectedElementId,
   });
 
   final NgmyBusinessCardDocument document;
@@ -65,6 +73,8 @@ class _NgmyCardRenderBody extends StatelessWidget {
   final double height;
   final bool interactive;
   final void Function(String elementId, Offset delta)? onElementDrag;
+  final void Function(String elementId)? onElementSelect;
+  final String? selectedElementId;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +85,8 @@ class _NgmyCardRenderBody extends StatelessWidget {
       h: height,
       interactive: interactive,
       onDrag: onElementDrag,
+      onSelect: onElementSelect,
+      selectedElementId: selectedElementId,
     );
     final layout = switch (tpl.renderStyle) {
       'glass_frost' => _layoutGlassFrost(ctx),
@@ -122,7 +134,7 @@ class _NgmyCardRenderBody extends StatelessWidget {
             'card_emoji',
             Text(
               document.cardEmoji,
-              style: TextStyle(fontSize: height * 0.17 * document.fontScale),
+              style: TextStyle(fontSize: height * 0.17 * document.fontScale * ngmyCardElementScale(document, 'card_emoji')),
             ),
             left: width * 0.68,
             top: height * 0.06,
@@ -140,6 +152,8 @@ class _CardRenderCtx {
     required this.h,
     required this.interactive,
     this.onDrag,
+    this.onSelect,
+    this.selectedElementId,
   });
 
   final NgmyBusinessCardDocument doc;
@@ -148,6 +162,8 @@ class _CardRenderCtx {
   final double h;
   final bool interactive;
   final void Function(String elementId, Offset delta)? onDrag;
+  final void Function(String elementId)? onSelect;
+  final String? selectedElementId;
 
   Color get accent => doc.effectiveAccent;
   Color get text => doc.effectiveText;
@@ -158,31 +174,36 @@ class _CardRenderCtx {
   Widget slot(String id, Widget child, {double? left, double? top, double? right, double? bottom}) {
     if (!ngmyCardElementVisible(doc, id)) return const SizedBox.shrink();
     final o = ngmyCardElementOffset(doc, id);
+    final scale = ngmyCardElementScale(doc, id);
+    Widget content = scale == 1.0 ? child : Transform.scale(scale: scale, alignment: Alignment.topLeft, child: child);
     return Positioned(
       left: left != null ? left + o.dx : null,
       top: top != null ? top + o.dy : null,
-      right: right,
-      bottom: bottom,
+      right: right != null ? right - o.dx : null,
+      bottom: bottom != null ? bottom - o.dy : null,
       child: interactive && onDrag != null
           ? _DraggableCardElement(
+              elementId: id,
+              selected: selectedElementId == id,
+              onSelect: onSelect,
               onDrag: (d) => onDrag!(id, Offset(o.dx + d.dx, o.dy + d.dy)),
-              child: child,
+              child: content,
             )
-          : child,
+          : content,
     );
   }
 
   Widget txt(String s, {double? size, FontWeight? weight, Color? color, int maxLines = 2, double? letterSpacing}) {
     if (s.trim().isEmpty) return const SizedBox.shrink();
     final baseSize = (size ?? h * 0.058) * doc.fontScale;
-    final w = weight ?? (doc.boldText ? FontWeight.w900 : FontWeight.w700);
+    final wgt = weight ?? (doc.boldText ? FontWeight.w900 : FontWeight.w700);
     return Text(
       s,
       maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: color ?? text,
-        fontWeight: w,
+        fontWeight: wgt,
         fontSize: baseSize,
         height: 1.12,
         letterSpacing: letterSpacing,
@@ -597,41 +618,53 @@ Widget _layoutGoldLuxe(_CardRenderCtx c) {
 
 // ─── Layout 15: Pastel inset ──────────────────────────────────────────────────
 Widget _layoutPastelInset(_CardRenderCtx c) {
+  final insetW = c.w * 0.9;
+  final insetH = c.h * 0.86;
+  final insetL = (c.w - insetW) / 2;
+  final insetT = (c.h - insetH) / 2;
   return Stack(
     fit: StackFit.expand,
     children: [
-      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
-      Center(
-        child: Container(
-          width: c.w * 0.9,
-          height: c.h * 0.82,
+      Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]),
+        ),
+      ),
+      Positioned(
+        left: insetL - 4,
+        top: insetT - 4,
+        width: insetW + 8,
+        height: insetH + 8,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(colors: [c.accent.withValues(alpha: 0.35), c.accent.withValues(alpha: 0.08)]),
+          ),
+        ),
+      ),
+      Positioned(
+        left: insetL,
+        top: insetT,
+        width: insetW,
+        height: insetH,
+        child: DecoratedBox(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 2),
+            border: Border.all(color: c.accent, width: 2.2),
             boxShadow: [
-              BoxShadow(color: c.accent.withValues(alpha: 0.2), blurRadius: 16, offset: const Offset(0, 8)),
-              BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 4)),
-            ],
-          ),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: const Color(0xFF0F172A)), left: 0, top: 0),
-              c.slot('title', c.txt(c.doc.jobTitle, color: const Color(0xFF475569), size: c.h * 0.048, weight: FontWeight.w600), left: 0, top: 0),
-              const SizedBox(height: 6),
-              Container(height: 2, width: 36, color: c.accent),
-              const Spacer(),
-              c.slot('phone', c.txt(c.doc.phone, color: const Color(0xFF334155), size: c.h * 0.042, weight: FontWeight.w700), left: 0, top: 0),
-              const SizedBox(height: 4),
-              c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.04, weight: FontWeight.w800), left: 0, top: 0),
-              const SizedBox(height: 4),
-              c.slot('website', c.txt(c.doc.website, color: const Color(0xFF64748B), size: c.h * 0.036), left: 0, top: 0),
+              BoxShadow(color: c.accent.withValues(alpha: 0.25), blurRadius: 18, offset: const Offset(0, 8)),
             ],
           ),
         ),
       ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900, color: const Color(0xFF0F172A)), left: insetL + 14, top: insetT + 12),
+      c.slot('title', c.txt(c.doc.jobTitle, color: const Color(0xFF475569), size: c.h * 0.048, weight: FontWeight.w600), left: insetL + 14, top: insetT + c.h * 0.24),
+      Positioned(left: insetL + 14, top: insetT + c.h * 0.36, child: Container(width: 44, height: 3, color: c.accent)),
+      c.slot('company', c.txt(c.doc.company, color: c.accent, size: c.h * 0.044, weight: FontWeight.w800), left: insetL + 14, top: insetT + c.h * 0.42),
+      c.slot('phone', c.txt('📞 ${c.doc.phone}', color: const Color(0xFF334155), size: c.h * 0.04, weight: FontWeight.w700), left: insetL + 14, bottom: c.h - insetT - insetH + 38),
+      c.slot('email', c.txt('✉️ ${c.doc.email}', color: const Color(0xFF1E293B), size: c.h * 0.038, weight: FontWeight.w700), left: insetL + 14, bottom: c.h - insetT - insetH + 18),
+      c.slot('website', c.txt('🌐 ${c.doc.website}', color: const Color(0xFF64748B), size: c.h * 0.036), right: insetL + 14, bottom: c.h - insetT - insetH + 18),
     ],
   );
 }
@@ -1136,9 +1169,18 @@ class _CrystalPainter extends CustomPainter {
 }
 
 class _DraggableCardElement extends StatefulWidget {
-  const _DraggableCardElement({required this.child, required this.onDrag});
+  const _DraggableCardElement({
+    required this.elementId,
+    required this.child,
+    required this.onDrag,
+    this.onSelect,
+    this.selected = false,
+  });
+  final String elementId;
   final Widget child;
   final ValueChanged<Offset> onDrag;
+  final void Function(String elementId)? onSelect;
+  final bool selected;
 
   @override
   State<_DraggableCardElement> createState() => _DraggableCardElementState();
@@ -1150,6 +1192,8 @@ class _DraggableCardElementState extends State<_DraggableCardElement> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: () => widget.onSelect?.call(widget.elementId),
+      onPanDown: (_) => widget.onSelect?.call(widget.elementId),
       onPanUpdate: (d) => setState(() => _drag += d.delta),
       onPanEnd: (_) {
         widget.onDrag(_drag);
@@ -1159,7 +1203,10 @@ class _DraggableCardElementState extends State<_DraggableCardElement> {
         offset: _drag,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4)),
+            border: Border.all(
+              color: widget.selected ? const Color(0xFF22C55E) : const Color(0xFF22C55E).withValues(alpha: 0.35),
+              width: widget.selected ? 2 : 1,
+            ),
             borderRadius: BorderRadius.circular(4),
           ),
           child: widget.child,
