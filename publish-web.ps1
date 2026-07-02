@@ -173,10 +173,9 @@ Write-Host "  version.json build_number: $DeployId"
 Write-Host "`n[5/6] Git status ..."
 git status -sb
 
-Write-Host "`n[6/7] Ready to push. Run these commands if git shows changes:" -ForegroundColor Yellow
-Write-Host "  git add docs web lib publish-web.ps1" -ForegroundColor White
-Write-Host "  git add -u" -ForegroundColor White
-Write-Host "  git commit -m ""Deploy web build $DeployId""" -ForegroundColor White
+Write-Host "`n[6/7] Ready to push (CI deploys — do NOT commit docs/):" -ForegroundColor Yellow
+Write-Host "  git add lib web assets pubspec.yaml .github" -ForegroundColor White
+Write-Host "  git commit -m ""Your message""" -ForegroundColor White
 Write-Host "  git push origin main" -ForegroundColor White
 Write-Host ""
 Write-Host "Live URL (after push, wait 1-3 min):" -ForegroundColor Green

@@ -9,20 +9,35 @@ Black screen / “Failed to load app” happens when `base href` does not match 
 
 ---
 
-## Publish from PowerShell
+## Publish (automatic — recommended)
+
+Push changes to `lib/`, `web/`, or `assets/` on `main`. GitHub Actions builds and deploys to the **`gh-pages`** branch.
+
+```powershell
+cd C:\Users\appbu\StudioProjects\ngmy
+git add lib web assets pubspec.yaml
+git commit -m "Your change description"
+git push origin main
+```
+
+Wait 3–5 minutes, then check **https://ngmy.org/version.json**.
+
+**Do not commit `docs/` on main** — that triggers a separate GitHub job that times out and sends failure emails. See [.github/PAGES_FIX.md](.github/PAGES_FIX.md).
+
+## Publish locally (optional test build)
 
 ```powershell
 cd C:\Users\appbu\StudioProjects\ngmy
 .\publish-web.ps1
-git add docs web lib publish-web.ps1 DEPLOY.md
-git add -u
-git commit -m "Fix web base href for ngmy-ai.github.io"
-git push origin main
 ```
 
-If your GitHub Pages site is fed from a **different** repo (e.g. `ngmy-ai/NGMY.github.io`), push the same `docs` folder there too.
+This writes to `docs/` locally only (gitignored). To go live, push `lib/` / `web/` to `main` and let CI deploy.
 
-Wait 2–5 minutes after push.
+---
+
+## Old manual docs commit (deprecated)
+
+~~`git add docs`~~ — removed. CI handles deploy.
 
 ---
 

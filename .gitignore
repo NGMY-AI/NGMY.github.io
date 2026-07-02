@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Prebuilt web output — CI deploys to gh-pages; do not commit on main (avoids Pages timeout emails)
+/docs/

@@ -1,9 +1,6 @@
-# Builds Flutter web in CI and publishes to gh-pages (fast, reliable).
-# Push lib/web/assets changes — no need to commit docs/ on main.
-#
-# GitHub Pages settings (one-time):
-#   Settings → Pages → Deploy from branch → gh-pages → / (root)
-#   NOT main/docs (that triggers slow built-in deploy that times out).
+# Builds Flutter web in CI → publishes to gh-pages branch.
+# Do NOT commit docs/ on main (see .gitignore) — that triggers a separate
+# GitHub "pages build and deployment" job on main/docs that times out and emails you.
 
 name: Deploy GitHub Pages
 
@@ -21,6 +18,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: gh-pages-deploy
@@ -29,7 +28,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,40 +47,34 @@ jobs:
 
       - name: Prepare site folder
         run: |
+          set -e
           rm -rf _site
-          mkdir -p _site
-          cp -r build/web/* _site/
+          cp -r build/web _site
           touch _site/.nojekyll
-          echo -n 'ngmy.org' > _site/CNAME
+          printf '%s' 'ngmy.org' > _site/CNAME
           DEPLOY_ID=$(date -u +%Y%m%d%H%M%S)
-          cat > _site/version.json <<EOF
-          {"build_number":"${DEPLOY_ID}","deployed_at":"$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)","app_name":"ngmy","version":"1.0.0","package_name":"ngmy"}
-          EOF
+          printf '{"build_number":"%s","deployed_at":"%s","app_name":"ngmy","version":"1.0.0","package_name":"ngmy"}\n' \
+            "$DEPLOY_ID" "$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)" > _site/version.json
           if [ -f web/ngmy_service_worker.js ]; then
-            python3 <<'PY'
-          import json, pathlib, re
+            python3 - <<'PY'
+          import json, pathlib
           root = pathlib.Path("_site")
           urls = []
           for p in sorted(root.rglob("*")):
               if not p.is_file() or p.name == "ngmy_service_worker.js":
                   continue
-              rel = "./" + p.relative_to(root).as_posix()
-              urls.append(rel)
+              urls.append("./" + p.relative_to(root).as_posix())
           tpl = pathlib.Path("web/ngmy_service_worker.js").read_text(encoding="utf-8")
-          deploy_id = pathlib.Path("_site/version.json").read_text(encoding="utf-8-sig")
-          import json as j
-          bid = j.loads(deploy_id)["build_number"]
-          out = tpl.replace("__NGMY_DEPLOY_ID__", bid)
-          out = out.replace("__NGMY_PRECACHE_URLS__", json.dumps(urls))
-          (root / "ngmy_service_worker.js").write_text(out, encoding="utf-8")
-          print(f"Wrote service worker ({len(urls)} precache URLs)")
+          bid = json.loads(root.joinpath("version.json").read_text(encoding="utf-8-sig"))["build_number"]
+          out = tpl.replace("__NGMY_DEPLOY_ID__", bid).replace("__NGMY_PRECACHE_URLS__", json.dumps(urls))
+          root.joinpath("ngmy_service_worker.js").write_text(out, encoding="utf-8")
+          print(f"service worker: {len(urls)} precache URLs")
           PY
           fi
           for f in _site/index.html _site/404.html; do
             if [ -f "$f" ]; then
               DEPLOY_ID=$(python3 -c "import json; print(json.load(open('_site/version.json'))['build_number'])")
-              sed -i "s/__NGMY_DEPLOY_ID__/${DEPLOY_ID}/g" "$f" 2>/dev/null || \
-                python3 -c "
+              python3 -c "
           import pathlib, json
           bid = json.load(open('_site/version.json'))['build_number']
           p = pathlib.Path('$f')
@@ -97,3 +90,22 @@ jobs:
           branch: gh-pages
           clean: true
           commit-message: 'Deploy web build from CI'
+
+      - name: Point GitHub Pages at gh-pages (stops main/docs failure emails)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -sS -o /tmp/pages.json -w "%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/pages" \
+            -d '{"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}')
+          echo "Pages API HTTP ${code}"
+          cat /tmp/pages.json || true
+          if [ "$code" = "200" ] || [ "$code" = "201" ] || [ "$code" = "204" ]; then
+            echo "Pages source set to gh-pages branch."
+          else
+            echo "::warning::Could not auto-set Pages source. Open Settings → Pages → branch gh-pages / root."
+          fi
