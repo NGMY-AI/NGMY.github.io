@@ -57,16 +57,17 @@ Making the repo **private** turns off GitHub Pages. Making it **public** again d
 Do this once:
 
 1. Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
-2. Under **Build and deployment** → **Source**, choose **GitHub Actions** (recommended; uses `.github/workflows/deploy-pages.yml`).
-   - Or choose **Deploy from a branch** → branch **main** → folder **/docs** → Save.
-3. Wait 2–5 minutes, then open **https://ngmy-ai.github.io/NGMY.github.io/version.json** — you should see a `build_number`, not 404.
+2. Under **Build and deployment** → **Source**, choose **Deploy from a branch**.
+3. Branch **gh-pages** → folder **/ (root)** → Save.
+   - Pushing updates to `docs/` on `main` runs `.github/workflows/deploy-pages.yml`, which publishes to `gh-pages`.
+4. Wait 2–5 minutes, then open **https://ngmy.org/version.json** — you should see a fresh `build_number`, not 404.
 
 After every `git push` to `main`, Pages should rebuild automatically.
 
 ### Stop email on every deploy
 
-1. **This repo** — the `Deploy GitHub Pages` workflow only runs manually (`workflow_dispatch`). Pushing `docs/` to `main` does **not** run Actions, so you should not get failed-deploy emails from that workflow anymore.
-2. **GitHub Pages** — use **Settings → Pages → Deploy from branch `main` / folder `/docs`** (not “GitHub Actions”).
+1. **This repo** — pushing `docs/` to `main` runs the `Deploy GitHub Pages` workflow (JamesIves → `gh-pages` branch).
+2. **GitHub Pages** — use **Settings → Pages → Deploy from branch `gh-pages` / root** (not `main` / `docs`, not “GitHub Actions”).
 3. **Your account** — GitHub → **Settings** → **Notifications** → uncheck **Actions** and **Deployments** (or set **NGMY.github.io** to **Watch: Custom** and disable those).
 
 ---

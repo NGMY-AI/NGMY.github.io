@@ -1,27 +1,29 @@
-# Site is published from /docs on branch main (see publish-web.ps1).
-# Do NOT enable "GitHub Actions" as Pages source — it conflicts and times out.
-# To publish: run .\publish-web.ps1 then git push origin main
+# Publishes prebuilt Flutter web output from /docs to the gh-pages branch.
+# Run publish-web.ps1 locally, commit docs/, then push main.
+#
+# GitHub Pages settings (one-time):
+#   Settings → Pages → Deploy from branch → gh-pages → / (root)
+# Do NOT use "GitHub Actions" as Pages source (avoids double-deploy timeouts).
 
 name: Deploy GitHub Pages
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: gh-pages-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,11 +31,10 @@ jobs:
       - name: Verify docs site
         run: test -f docs/index.html
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: docs
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          folder: docs
+          branch: gh-pages
+          clean: true
+          commit-message: 'Deploy web build from main'
