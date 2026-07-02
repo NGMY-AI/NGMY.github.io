@@ -116,10 +116,10 @@ Future<String> ngmyScheduleHelperWakeAlarm({
   }
 
   if (kIsWeb) {
-    return '$calendarMsg Keep NGMY open or allow the calendar alert — the alarm will ring in-app at ${_formatWhen(localWhen)}.';
+    return '$calendarMsg The alarm will ring inside NGMY at ${_formatWhen(localWhen)} — keep the app open or on your Home Screen.';
   }
 
-  return '$calendarMsg A phone notification and in-app alarm are scheduled for ${_formatWhen(localWhen)}.';
+  return '$calendarMsg Phone notification + in-app alarm at ${_formatWhen(localWhen)}.';
 }
 
 String _formatWhen(DateTime dt) {
@@ -128,6 +128,3 @@ String _formatWhen(DateTime dt) {
   final min = dt.minute.toString().padLeft(2, '0');
   return '${dt.month}/${dt.day} at $h:$min $ampm';
 }
-
-String ngmyWakeAlarmIosClockNote() =>
-    'On iPhone, Apple does not let any app add alarms inside the Clock app. NGMY adds a Calendar alert that rings at the set time — tap Allow when prompted.';

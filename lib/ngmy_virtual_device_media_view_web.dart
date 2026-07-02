@@ -1,10 +1,10 @@
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
 import 'ngmy_virtual_device_embed.dart';
-import 'ngmy_virtual_device_fleet_playback.dart';
 
 /// Single shared player (web iframe). Only mount one at a time.
 class NgmyVirtualDeviceMediaView extends StatefulWidget {
@@ -16,6 +16,7 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     this.useEmbedHtml = true,
     this.notifyOnEnd = false,
     this.lockNavigation = false,
+    this.startMuted = false,
   });
 
   final String viewKey;
@@ -24,6 +25,8 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
   final bool useEmbedHtml;
   final bool notifyOnEnd;
   final bool lockNavigation;
+  /// Muted autoplay works on mobile browsers; user can tap to unmute.
+  final bool startMuted;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -34,25 +37,27 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   html.IFrameElement? _frame;
   var _loading = true;
   var _failed = false;
+  var _userUnmuted = false;
 
-  bool _isMutedUrl(String url) => url.contains('mute=1');
+  bool get _showUnmuteHint => widget.startMuted && !_userUnmuted && !_loading && !_failed;
+
+  String _youtubeEmbedFor(String url, {required bool muted}) {
+    final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
+    if (ytId != null) {
+      return NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted);
+    }
+    return url;
+  }
 
   void _applySrc(html.IFrameElement frame, String url) {
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
+    final muted = widget.startMuted && !_userUnmuted;
+
     if (ytId != null && widget.useEmbedHtml) {
-      if (widget.notifyOnEnd) {
-        frame
-          ..removeAttribute('src')
-          ..srcdoc = NgmyVirtualDeviceEmbed.youtubePlayerHtml(
-            ytId,
-            muted: _isMutedUrl(url),
-            notifyOnEnd: true,
-          );
-      } else {
-        frame
-          ..removeAttribute('srcdoc')
-          ..src = NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: _isMutedUrl(url));
-      }
+      // Direct nocookie embed — srcdoc + IFrame API breaks inside Flutter HtmlElementView on iOS PWA.
+      frame
+        ..removeAttribute('srcdoc')
+        ..src = _youtubeEmbedFor(url, muted: muted);
       return;
     }
 
@@ -62,7 +67,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
         ..srcdoc = NgmyVirtualDeviceEmbed.iframeHtml(
           url,
           notifyOnEnd: widget.notifyOnEnd,
-          muted: _isMutedUrl(url),
+          muted: muted,
         );
     } else {
       frame
@@ -76,6 +81,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     return lower.contains('tiktok.com/player') ||
         lower.contains('instagram.com') ||
         lower.contains('facebook.com/plugins');
+  }
+
+  void _unmute() {
+    if (_userUnmuted) return;
+    setState(() => _userUnmuted = true);
+    final frame = _frame;
+    if (frame != null) {
+      _applySrc(frame, widget.playUrl);
+    }
   }
 
   @override
@@ -96,7 +110,12 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
           );
         _applySrc(_frame!, widget.playUrl);
         _frame!.onLoad.listen((_) {
-          if (mounted) setState(() => _loading = false);
+          if (mounted) {
+            setState(() => _loading = false);
+            Future<void>.delayed(const Duration(seconds: 4), () {
+              if (mounted && _loading) setState(() => _loading = false);
+            });
+          }
         });
         _frame!.onError.listen((_) {
           if (mounted) {
@@ -121,6 +140,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
       setState(() {
         _loading = true;
         _failed = false;
+        _userUnmuted = false;
       });
       _applySrc(_frame!, widget.playUrl);
     }
@@ -172,6 +192,40 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
               ),
             ),
           ),
+        if (_showUnmuteHint)
+          Positioned.fill(
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.35),
+              child: InkWell(
+                onTap: _unmute,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.volume_up_rounded, color: Colors.white.withValues(alpha: 0.9), size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tap for sound',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w700,
+                            fontSize: widget.compact ? 11 : 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -183,6 +237,24 @@ void ngmyVirtualDeviceListenForVideoEnded(void Function() onEnded) {
     final data = event.data?.toString() ?? '';
     if (data == NgmyVirtualDeviceEmbed.videoEndedMessage) {
       onEnded();
+      return;
     }
+    final origin = event.origin.toLowerCase();
+    if (!origin.contains('youtube.com') && !origin.contains('youtube-nocookie.com')) {
+      return;
+    }
+    try {
+      final dynamic parsed = jsonDecode(data);
+      if (parsed is Map) {
+        final info = parsed['info'];
+        if (parsed['event'] == 'onStateChange' && info == 0) {
+          onEnded();
+          return;
+        }
+        if (parsed['event'] == 'infoDelivery' && info is Map && info['playerState'] == 0) {
+          onEnded();
+        }
+      }
+    } catch (_) {}
   });
 }

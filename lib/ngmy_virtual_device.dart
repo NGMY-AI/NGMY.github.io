@@ -765,11 +765,12 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                           child: AspectRatio(
                                             aspectRatio: 16 / 9,
                                             child: NgmyVirtualDeviceMediaView(
-                                              key: ValueKey('fleet_master_${media.playUrlAudible}_$batchStart'),
+                                              key: ValueKey('fleet_master_${media.playUrlAudible}'),
                                               viewKey: 'fleet_master',
                                               playUrl: media.playUrlAudible,
                                               useEmbedHtml: media.usesEmbedHtml,
                                               notifyOnEnd: true,
+                                              startMuted: true,
                                             ),
                                           ),
                                         ),
@@ -778,7 +779,7 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
                                     ],
                                     Text(
                                       media != null
-                                          ? 'Master player plays your link. Grid phones highlight the active batch of 4 — when the video ends, the next batch is highlighted.'
+                                          ? 'Master player above plays your video (tap for sound). Grid badges show which batch is active — previews only, not separate players.'
                                           : '${_fleet.length} separate virtual phones — 4 per row. Tap search above to paste a link, or tap a phone to open it.',
                                       style: TextStyle(
                                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),

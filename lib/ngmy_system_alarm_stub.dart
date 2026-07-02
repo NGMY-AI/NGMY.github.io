@@ -3,3 +3,5 @@ Future<bool> ngmyTryOpenSystemClockAlarm({
   required String label,
 }) async =>
     false;
+
+Future<bool> ngmyTryOpenIosClockApp() async => false;

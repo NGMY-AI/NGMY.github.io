@@ -4,6 +4,7 @@ import 'ngmy_business_card_studio.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_item_reminder_storage.dart';
+import 'ngmy_tech_exclusive.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -60,7 +61,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
           children: [
             _youtubeFrame(
               title: 'Business Card Creator',
-              subtitle: '34 luxurious templates · drag · save PNG',
+              subtitle: '37 luxurious templates · drag · save PNG',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
               accent: const Color(0xFF22C55E),
@@ -81,6 +82,36 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 await _refreshBadges();
                 await ngmyCheckItemRemindersNow(userEmail: widget.userEmail);
               },
+            ),
+            const SizedBox(height: 18),
+            _youtubeFrame(
+              title: 'Phantom Handshake',
+              subtitle: 'NGMY-only · one-time pairing codes · 5 min expiry',
+              thumbHeight: thumbH,
+              gradient: const [Color(0xFF020617), Color(0xFF0E7490), Color(0xFF164E63)],
+              accent: const Color(0xFF22D3EE),
+              preview: _TechThumbPreview(icon: Icons.link_rounded, accent: Color(0xFF22D3EE), label: 'PAIR • 8 DIGIT'),
+              onTap: () => showNgmyPhantomHandshakeDialog(context),
+            ),
+            const SizedBox(height: 18),
+            _youtubeFrame(
+              title: 'Cipher Drop',
+              subtitle: 'Encrypt secrets on-device · zero server · passphrase key',
+              thumbHeight: thumbH,
+              gradient: const [Color(0xFF022C22), Color(0xFF064E3B), Color(0xFF14532D)],
+              accent: const Color(0xFF10B981),
+              preview: _TechThumbPreview(icon: Icons.enhanced_encryption_rounded, accent: Color(0xFF10B981), label: 'AES-LOCAL'),
+              onTap: () => showNgmyCipherDropDialog(context),
+            ),
+            const SizedBox(height: 18),
+            _youtubeFrame(
+              title: 'Signal Ghost',
+              subtitle: 'Passive device trace · fingerprint · NGMY recon lens',
+              thumbHeight: thumbH,
+              gradient: const [Color(0xFF1C0A00), Color(0xFF7C2D12), Color(0xFF431407)],
+              accent: const Color(0xFFF97316),
+              preview: _TechThumbPreview(icon: Icons.radar_rounded, accent: Color(0xFFF97316), label: 'GHOST SCAN'),
+              onTap: () => showNgmySignalGhostDialog(context),
             ),
           ],
         ),
@@ -243,6 +274,36 @@ class _ReminderThumbPreview extends StatelessWidget {
                 Text('Kitchen counter · 2 hr', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w700, fontSize: 12)),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TechThumbPreview extends StatelessWidget {
+  const _TechThumbPreview({required this.icon, required this.accent, required this.label});
+
+  final IconData icon;
+  final Color accent;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: accent.withValues(alpha: 0.92), size: 52),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: accent.withValues(alpha: 0.45)),
+            ),
+            child: Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
           ),
         ],
       ),

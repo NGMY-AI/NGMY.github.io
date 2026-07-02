@@ -16,6 +16,7 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
     this.useEmbedHtml = true,
     this.notifyOnEnd = false,
     this.lockNavigation = false,
+    this.startMuted = false,
   });
 
   final String viewKey;
@@ -24,6 +25,7 @@ class NgmyVirtualDeviceMediaView extends StatefulWidget {
   final bool useEmbedHtml;
   final bool notifyOnEnd;
   final bool lockNavigation;
+  final bool startMuted;
 
   @override
   State<NgmyVirtualDeviceMediaView> createState() => _NgmyVirtualDeviceMediaViewState();
@@ -119,23 +121,13 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
 
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
     if (ytId != null) {
-      if (widget.notifyOnEnd) {
-        _controller.loadHtmlString(
-          NgmyVirtualDeviceEmbed.youtubePlayerHtml(
-            ytId,
-            muted: _isMutedUrl(url),
-            notifyOnEnd: true,
-          ),
-          baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
-        );
-      } else {
-        _controller.loadHtmlString(
-          NgmyVirtualDeviceEmbed.genericIframeHtml(
-            NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: _isMutedUrl(url)),
-          ),
-          baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
-        );
-      }
+      final muted = widget.startMuted || _isMutedUrl(url);
+      _controller.loadHtmlString(
+        NgmyVirtualDeviceEmbed.genericIframeHtml(
+          NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted),
+        ),
+        baseUrl: NgmyVirtualDeviceEmbed.htmlBaseUrl,
+      );
       return;
     }
 

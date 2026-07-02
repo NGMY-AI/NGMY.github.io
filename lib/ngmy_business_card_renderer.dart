@@ -105,6 +105,9 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'gold_luxe' => _layoutGoldLuxe(ctx),
       'pastel_inset' => _layoutPastelInset(ctx),
       'terminal' => _layoutTerminal(ctx),
+      'ngmy_matrix' => _layoutNgmyMatrix(ctx),
+      'ngmy_recon' => _layoutNgmyRecon(ctx),
+      'ngmy_circuit' => _layoutNgmyCircuit(ctx),
       'blueprint' => _layoutBlueprint(ctx),
       'depth_stack' => _layoutDepthStack(ctx),
       'ribbon' => _layoutRibbon(ctx),
@@ -687,6 +690,58 @@ Widget _layoutTerminal(_CardRenderCtx c) {
 }
 
 // ─── Layout 17: Blueprint ─────────────────────────────────────────────────────
+Widget _layoutNgmyMatrix(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [Color(0xFF000000), Color(0xFF001A00)]),
+        ),
+      ),
+      CustomPaint(painter: _GridPainter(const Color(0xFF00FF41).withValues(alpha: 0.06), 8), size: Size.infinite),
+      c.slot('name', c.txt(c.doc.fullName.toUpperCase(), size: c.h * 0.09, weight: FontWeight.w900, color: const Color(0xFF00FF41)), left: 12, top: 10),
+      c.slot('title', c.txt('// ${c.doc.jobTitle}', color: const Color(0xFF6EE7B7), size: c.h * 0.04), left: 12, top: c.h * 0.32),
+      c.slot('company', c.txt('NGMY::${c.doc.company}', color: Colors.white70, size: c.h * 0.038), left: 12, bottom: 28),
+      c.slot('phone', c.txt('node:${c.doc.phone}', color: const Color(0xFF00FF41), size: c.h * 0.034), left: 12, bottom: 12),
+      Positioned(right: 8, top: 8, child: Text('NGMY', style: TextStyle(color: const Color(0xFF00FF41).withValues(alpha: 0.35), fontSize: c.h * 0.05, fontWeight: FontWeight.w900))),
+    ],
+  );
+}
+
+Widget _layoutNgmyRecon(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: const Color(0xFF0F172A)),
+      Positioned(left: 0, right: 0, top: 0, height: 3, child: Container(color: const Color(0xFFF97316))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: Colors.white), left: 12, top: 14),
+      c.slot('title', c.txt('RECON · ${c.doc.jobTitle}', color: const Color(0xFFF97316), size: c.h * 0.042, weight: FontWeight.w700), left: 12, top: c.h * 0.34),
+      c.slot('company', c.txt(c.doc.company, color: const Color(0xFF94A3B8), size: c.h * 0.04), left: 12, bottom: 28),
+      c.slot('email', c.txt(c.doc.email, color: Colors.white60, size: c.h * 0.036), left: 12, bottom: 10),
+      Positioned(right: 10, bottom: 10, child: Icon(Icons.radar_rounded, color: const Color(0xFFF97316).withValues(alpha: 0.7), size: c.h * 0.14)),
+    ],
+  );
+}
+
+Widget _layoutNgmyCircuit(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF090014), Color(0xFF1E0A3C)]),
+        ),
+      ),
+      Positioned(right: -20, top: -20, child: Container(width: c.w * 0.45, height: c.w * 0.45, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFA855F7).withValues(alpha: 0.35), width: 2)))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w800, color: Colors.white), left: 14, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: const Color(0xFFC4B5FD), size: c.h * 0.045), left: 14, top: c.h * 0.34),
+      c.slot('company', c.txt(c.doc.company, color: const Color(0xFFA855F7), size: c.h * 0.042, weight: FontWeight.w700), left: 14, bottom: 28),
+      c.slot('website', c.txt(c.doc.website, color: Colors.white54, size: c.h * 0.036), left: 14, bottom: 10),
+    ],
+  );
+}
+
 Widget _layoutBlueprint(_CardRenderCtx c) {
   return Stack(
     fit: StackFit.expand,

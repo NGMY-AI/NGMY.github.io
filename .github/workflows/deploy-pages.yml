@@ -1,23 +1,43 @@
-# Site is published from the /docs folder on branch main (see publish-web.ps1).
-# This workflow is intentionally NOT run on push — it avoids failed-deploy emails when
-# GitHub Pages is set to "Deploy from branch /docs" instead of "GitHub Actions".
-#
-# To publish: run .\publish-web.ps1 then git push origin main
+# Deploy prebuilt Flutter web output from /docs on push to main.
+# Run publish-web.ps1 locally first, then push docs/ + lib/ changes.
 
 name: Deploy GitHub Pages
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  note:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Pages uses docs/ on main
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify docs site
         run: |
-          echo "No Action deploy needed."
-          echo "Enable Pages: Settings → Pages → Source: branch main, folder /docs"
-          echo "Or run publish-web.ps1 locally and push docs/ to main."
+          test -f docs/index.html || (echo "Missing docs/index.html — run publish-web.ps1 first" && exit 1)
+          test -f docs/.nojekyll || echo "docs/.nojekyll missing (Jekyll may ignore _underscore paths)"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
