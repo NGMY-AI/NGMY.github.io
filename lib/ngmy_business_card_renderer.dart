@@ -30,6 +30,7 @@ class NgmyBusinessCardPreview extends StatelessWidget {
         height: h,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
+          border: document.borderColor != null ? Border.all(color: document.borderColor!, width: 2.5) : null,
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 10)),
           ],
@@ -132,7 +133,7 @@ class _CardRenderCtx {
   Color get text => doc.effectiveText;
   Color get sub => doc.effectiveSubtext;
   Color get bg1 => doc.backgroundColor ?? tpl.bgStart;
-  Color get bg2 => doc.backgroundColor ?? tpl.bgEnd;
+  Color get bg2 => doc.effectiveBgEnd;
 
   Widget slot(String id, Widget child, {double? left, double? top, double? right, double? bottom}) {
     if (!ngmyCardElementVisible(doc, id)) return const SizedBox.shrink();
@@ -153,17 +154,30 @@ class _CardRenderCtx {
 
   Widget txt(String s, {double? size, FontWeight? weight, Color? color, int maxLines = 2, double? letterSpacing}) {
     if (s.trim().isEmpty) return const SizedBox.shrink();
+    final baseSize = (size ?? h * 0.058) * doc.fontScale;
+    final w = weight ?? (doc.boldText ? FontWeight.w900 : FontWeight.w700);
     return Text(
       s,
       maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: color ?? text,
-        fontWeight: weight ?? FontWeight.w700,
-        fontSize: size ?? h * 0.058,
+        fontWeight: w,
+        fontSize: baseSize,
         height: 1.12,
         letterSpacing: letterSpacing,
       ),
+    );
+  }
+
+  Widget? cardEmojiBadge({double? size, double? top, double? right}) {
+    final e = doc.cardEmoji.trim();
+    if (e.isEmpty) return null;
+    return slot(
+      'emoji',
+      Text(e, style: TextStyle(fontSize: (size ?? h * 0.14) * doc.fontScale)),
+      right: right ?? 12,
+      top: top ?? 10,
     );
   }
 
@@ -214,17 +228,39 @@ Widget _layoutVerticalSplit(_CardRenderCtx c) {
     children: [
       Row(
         children: [
-          Container(width: c.w * 0.36, color: c.accent),
-          Expanded(child: Container(color: c.bg2)),
+          Expanded(
+            flex: 38,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [c.accent, c.accent.withValues(alpha: 0.72), c.bg2.withValues(alpha: 0.15)],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 62,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg2, c.bg1]),
+              ),
+            ),
+          ),
         ],
       ),
-      Positioned(left: 12, top: 0, bottom: 0, width: c.w * 0.32, child: Center(child: c.logo(c.h * 0.42, radius: BorderRadius.circular(999)))),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: c.bg1.computeLuminance() > 0.5 ? c.text : Colors.white), left: c.w * 0.4, top: 16),
-      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.05), left: c.w * 0.4, top: c.h * 0.32),
-      c.slot('company', c.txt(c.doc.company, weight: FontWeight.w800, size: c.h * 0.048), left: c.w * 0.4, top: c.h * 0.44),
-      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.044), left: c.w * 0.4, bottom: 28),
-      c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.042), left: c.w * 0.4, bottom: 12),
-      c.slot('website', c.txt(c.doc.website, color: c.sub, size: c.h * 0.04), right: 10, bottom: 12),
+      Positioned(left: 0, top: 0, bottom: 0, width: c.w * 0.38, child: Center(child: c.logo(c.h * 0.36, radius: BorderRadius.circular(999)))),
+      Positioned(left: c.w * 0.36, top: 0, bottom: 0, width: 2, child: Container(color: Colors.white.withValues(alpha: 0.85))),
+      if (c.doc.cardEmoji.trim().isNotEmpty)
+        c.slot('emoji', Text(c.doc.cardEmoji, style: TextStyle(fontSize: c.h * 0.12 * c.doc.fontScale)), right: 8, top: 8),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900, color: c.text), left: c.w * 0.42, top: 14),
+      Positioned(left: c.w * 0.42, top: c.h * 0.28, child: Container(width: 32, height: 3, color: c.accent)),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048), left: c.w * 0.42, top: c.h * 0.34),
+      c.slot('company', c.txt(c.doc.company, weight: FontWeight.w800, color: c.accent, size: c.h * 0.046), left: c.w * 0.42, top: c.h * 0.46),
+      c.slot('phone', c.txt('📞 ${c.doc.phone}', color: c.sub, size: c.h * 0.042), left: c.w * 0.42, bottom: 30),
+      c.slot('email', c.txt('✉️ ${c.doc.email}', color: c.text, size: c.h * 0.04), left: c.w * 0.42, bottom: 14),
+      c.slot('website', c.txt('🌐 ${c.doc.website}', color: c.sub, size: c.h * 0.038), right: 10, bottom: 14),
     ],
   );
 }

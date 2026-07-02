@@ -101,7 +101,12 @@ class NgmyBusinessCardDocument {
     this.tagline = 'Building what matters',
     this.accentColor,
     this.backgroundColor,
+    this.backgroundEndColor,
     this.textColor,
+    this.borderColor,
+    this.fontScale = 1.0,
+    this.boldText = false,
+    this.cardEmoji = '',
     Map<String, double>? offsetX,
     Map<String, double>? offsetY,
     Map<String, bool>? hidden,
@@ -127,7 +132,12 @@ class NgmyBusinessCardDocument {
   String tagline;
   Color? accentColor;
   Color? backgroundColor;
+  Color? backgroundEndColor;
   Color? textColor;
+  Color? borderColor;
+  double fontScale;
+  bool boldText;
+  String cardEmoji;
   final Map<String, double> offsetX;
   final Map<String, double> offsetY;
   final Map<String, bool> hidden;
@@ -140,6 +150,7 @@ class NgmyBusinessCardDocument {
   Color get effectiveAccent => accentColor ?? template.accent;
   Color get effectiveText => textColor ?? template.textPrimary;
   Color get effectiveSubtext => template.textSecondary;
+  Color get effectiveBgEnd => backgroundEndColor ?? template.bgEnd;
 
   Uint8List? get logoBytes {
     if (logoBase64.isEmpty) return null;
@@ -165,7 +176,12 @@ class NgmyBusinessCardDocument {
         'tagline': tagline,
         if (accentColor != null) 'accentColor': accentColor!.toARGB32(),
         if (backgroundColor != null) 'backgroundColor': backgroundColor!.toARGB32(),
+        if (backgroundEndColor != null) 'backgroundEndColor': backgroundEndColor!.toARGB32(),
         if (textColor != null) 'textColor': textColor!.toARGB32(),
+        if (borderColor != null) 'borderColor': borderColor!.toARGB32(),
+        'fontScale': fontScale,
+        'boldText': boldText,
+        'cardEmoji': cardEmoji,
         'offsetX': offsetX,
         'offsetY': offsetY,
         'hidden': hidden,
@@ -204,7 +220,12 @@ class NgmyBusinessCardDocument {
       tagline: (json['tagline'] ?? '').toString(),
       accentColor: colorFrom(json['accentColor']),
       backgroundColor: colorFrom(json['backgroundColor']),
+      backgroundEndColor: colorFrom(json['backgroundEndColor']),
       textColor: colorFrom(json['textColor']),
+      borderColor: colorFrom(json['borderColor']),
+      fontScale: (json['fontScale'] is num) ? (json['fontScale'] as num).toDouble() : double.tryParse('${json['fontScale']}') ?? 1.0,
+      boldText: json['boldText'] == true,
+      cardEmoji: (json['cardEmoji'] ?? '').toString(),
       offsetX: mapDouble(json['offsetX']),
       offsetY: mapDouble(json['offsetY']),
       hidden: mapBool(json['hidden']),
