@@ -1221,6 +1221,8 @@ Map<String, dynamic> _helperAiSettingsPayload(AppConfig config) => {
       'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
       'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
       'elevenLabsApiKey': config.elevenLabsApiKey.trim(),
+      'resendApiKey': config.resendApiKey.trim(),
+      'resendFromEmail': config.resendFromEmail.trim(),
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -1233,6 +1235,12 @@ void _applyHelperAiSettingsPayload(AppConfig config, Map<String, dynamic> payloa
   if (payload.containsKey('elevenLabsApiKey')) {
     config.elevenLabsApiKey = (payload['elevenLabsApiKey'] ?? '').toString().trim();
   }
+  if (payload.containsKey('resendApiKey')) {
+    config.resendApiKey = (payload['resendApiKey'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('resendFromEmail')) {
+    config.resendFromEmail = (payload['resendFromEmail'] ?? 'NGMY <noreply@ngmy.org>').toString().trim();
+  }
 }
 
 Future<void> _persistHelperAiSettingsLocal(AppConfig config) async {
@@ -1240,6 +1248,8 @@ Future<void> _persistHelperAiSettingsLocal(AppConfig config) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kNgmyHelperAiPrefsKey, jsonEncode(_helperAiSettingsPayload(config)));
     await NgmyElevenLabsTts.persistLocalKey(config.elevenLabsApiKey);
+    await NgmyResendEmail.persistLocalKey(config.resendApiKey);
+    await NgmyResendEmail.persistLocalFrom(config.resendFromEmail);
   } catch (e) {
     debugPrint('[admin helper ai] local backup: $e');
   }

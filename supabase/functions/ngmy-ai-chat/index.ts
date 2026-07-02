@@ -232,6 +232,41 @@ async function elevenLabsTts(
   throw new Error(lastErr);
 }
 
+async function resendSendEmail(
+  apiKey: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<{ id?: string }> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `Resend HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return { id: data?.id ? String(data.id) : undefined };
+}
+
+const NGMY_ADMIN_EMAILS = new Set([
+  "kbpabloqr@gmail.com",
+  "ngumoyaking@gmail.com",
+  "appbusiness321@gmail.com",
+  "appbusiness84@gmail.com",
+]);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -263,6 +298,36 @@ serve(async (req) => {
       }
       const audioBase64 = await elevenLabsTts(apiKey, text, voiceId, modelId);
       return new Response(JSON.stringify({ audioBase64 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "resendEmail") {
+      const requesterEmail = String(body?.requesterEmail ?? "").trim().toLowerCase();
+      if (!requesterEmail || !NGMY_ADMIN_EMAILS.has(requesterEmail)) {
+        return new Response(JSON.stringify({ error: "Admin access required for email send" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const resendKey = String(body?.apiKey ?? Deno.env.get("RESEND_API_KEY") ?? "").trim();
+      const to = String(body?.to ?? "").trim();
+      const subject = String(body?.subject ?? "Message from NGMY").trim();
+      const html = String(body?.html ?? body?.body ?? "").trim();
+      const from = String(
+        body?.from ?? Deno.env.get("RESEND_FROM_EMAIL") ?? "NGMY <noreply@ngmy.org>",
+      ).trim();
+      if (!resendKey || !to || !html) {
+        return new Response(
+          JSON.stringify({ error: "apiKey, to, and html/body are required for resendEmail" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const sent = await resendSendEmail(resendKey, from, to, subject, html);
+      return new Response(JSON.stringify({ ok: true, id: sent.id ?? null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

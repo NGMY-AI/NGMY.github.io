@@ -27,6 +27,8 @@ import 'ngmy_ai_memory.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_civic_help_mode_storage.dart';
 import 'ngmy_elevenlabs_tts.dart';
+import 'ngmy_resend_email.dart';
+import 'ngmy_phone_email_intent.dart';
 import 'ngmy_app_knowledge.dart';
 import 'ngmy_wallet_decisions.dart';
 import 'ngmy_news_retention.dart';
@@ -1449,6 +1451,10 @@ class AppConfig {
   String geminiApiKey;
   /// ElevenLabs API key for message translator text-to-speech (starts with sk_).
   String elevenLabsApiKey;
+  /// Resend.com API key for admin-only AI email delivery (starts with re_).
+  String resendApiKey;
+  /// Verified Resend from address, e.g. NGMY <noreply@ngmy.org>
+  String resendFromEmail;
   String logoUrl;
   List<String> cities;
   /// State name → city names for Civic Registry (registrars manage their state only).
@@ -1582,6 +1588,8 @@ class AppConfig {
     this.loanHowItWorks = '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     this.geminiApiKey = '',
     this.elevenLabsApiKey = '',
+    this.resendApiKey = '',
+    this.resendFromEmail = 'NGMY <noreply@ngmy.org>',
     this.logoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     this.cities = const ['Stone Mountain', 'Atlanta', 'Savannah'],
     Map<String, List<String>>? civicCitiesByState,
@@ -1730,6 +1738,8 @@ class AppConfig {
     'loanHowItWorks': loanHowItWorks,
     'geminiApiKey': geminiApiKey,
     'elevenLabsApiKey': elevenLabsApiKey,
+    'resendApiKey': resendApiKey,
+    'resendFromEmail': resendFromEmail,
     'logoUrl': logoUrl,
     'cities': cities,
     'rooms': rooms,
@@ -1847,6 +1857,8 @@ class AppConfig {
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     geminiApiKey: _geminiKeyFromMap(json),
     elevenLabsApiKey: (json['elevenLabsApiKey'] ?? '').toString().trim(),
+    resendApiKey: (json['resendApiKey'] ?? '').toString().trim(),
+    resendFromEmail: (json['resendFromEmail'] ?? 'NGMY <noreply@ngmy.org>').toString().trim(),
     logoUrl: json['logoUrl'] ?? 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     cities: byState.isNotEmpty
         ? NgmyCivicRegistryStats.allCitiesUnion(byState)
@@ -7095,6 +7107,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
+          'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n'
       : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
@@ -7105,7 +7118,8 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'The AI is connected and working — never say you are waiting for an API key or that Gemini is unreachable. '
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
-          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n';
+          'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
+          'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -16074,6 +16088,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       );
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
           '\n$phoneCtx\n'
+          '${widget.user.isAdmin ? '\n${ngmyAdminEmailSendContext(ngmyUsers: ngmyUserMaps)}\n' : ''}'
           '\n$liveDb\n'
           '${NgmyAiMemoryStore.transcriptForPrompt(_assistantMessages)}\n'
           '\nUser: $text';
@@ -16089,8 +16104,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ...ngmyInferAlarmActionsFromUserMessage(text),
           ...ngmyInferCalendarActionsFromUserMessage(text),
           ...ngmyInferContactActionsFromUserMessage(text),
+          ...ngmyInferSendEmailActionsFromUserMessage(text, isAdmin: widget.user.isAdmin),
         ];
       }
+      phoneActions = ngmyFilterAdminOnlyPhoneActions(phoneActions, isAdmin: widget.user.isAdmin);
       phoneActions = await ngmyResolvePhoneActionsByName(
         context: context,
         userEmail: widget.user.email,
@@ -16154,6 +16171,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         action,
         context: context,
         userEmail: widget.user.email,
+        isAdmin: widget.user.isAdmin,
+        config: widget.config,
       );
       if (!mounted || result == null) continue;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -26783,6 +26802,8 @@ class _NgmyAiAdminSheet extends StatefulWidget {
 class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   late final TextEditingController _apiC;
   late final TextEditingController _elevenLabsC;
+  late final TextEditingController _resendC;
+  late final TextEditingController _resendFromC;
   late final TextEditingController _helperLimitC;
   late final TextEditingController _logoC;
   final ImagePicker _picker = ImagePicker();
@@ -26793,12 +26814,15 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   bool _logoUploading = false;
   bool _apiKeyVisible = false;
   bool _elevenLabsKeyVisible = false;
+  bool _resendKeyVisible = false;
 
   @override
   void initState() {
     super.initState();
     _apiC = TextEditingController(text: widget.config.geminiApiKey);
     _elevenLabsC = TextEditingController(text: widget.config.elevenLabsApiKey);
+    _resendC = TextEditingController(text: widget.config.resendApiKey);
+    _resendFromC = TextEditingController(text: widget.config.resendFromEmail);
     _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
     _elevenLabsFocus.addListener(_onElevenLabsFocus);
@@ -26827,6 +26851,8 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
     _scrollC.dispose();
     _apiC.dispose();
     _elevenLabsC.dispose();
+    _resendC.dispose();
+    _resendFromC.dispose();
     _helperLimitC.dispose();
     _logoC.dispose();
     super.dispose();
@@ -26929,7 +26955,11 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
     widget.config.logoUrl = await _resolveLogoForSave();
     widget.config.geminiApiKey = _apiC.text.trim();
     widget.config.elevenLabsApiKey = _elevenLabsC.text.trim();
+    widget.config.resendApiKey = _resendC.text.trim();
+    widget.config.resendFromEmail = _resendFromC.text.trim().isEmpty ? NgmyResendEmail.defaultFrom : _resendFromC.text.trim();
     await NgmyElevenLabsTts.persistLocalKey(widget.config.elevenLabsApiKey);
+    await NgmyResendEmail.persistLocalKey(widget.config.resendApiKey);
+    await NgmyResendEmail.persistLocalFrom(widget.config.resendFromEmail);
     final helperLimit = int.tryParse(_helperLimitC.text.trim());
     if (helperLimit == null || helperLimit < 0) {
       if (!context.mounted) return;
@@ -27108,6 +27138,37 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                       Text(
                         'Lets users tap a speaker icon in Message translator to hear translations aloud (English & Swahili). '
                         'On web, redeploy the Supabase AI proxy function after updates.',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _resendC,
+                        obscureText: !_resendKeyVisible,
+                        decoration: widget.adminInputDecoration(
+                          label: 'Resend API Key (admin email send)',
+                          hint: 're_… from resend.com',
+                          isDark: isDark,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(_resendKeyVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                            tooltip: _resendKeyVisible ? 'Hide key' : 'Show key',
+                            onPressed: () => setState(() => _resendKeyVisible = !_resendKeyVisible),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _resendFromC,
+                        decoration: widget.adminInputDecoration(
+                          label: 'Resend From address',
+                          hint: 'NGMY <noreply@ngmy.org>',
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Admin-only: NGMY AI can send real emails to any user when you ask it. '
+                        'The From address must be verified in your Resend account.',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),
@@ -45878,6 +45939,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       final prompt = '${_ngmyHelperSystemContext(user: widget.user)}'
           '\n$superCtx\n'
           '\n$phoneCtx\n'
+          '${widget.user.isAdmin ? '\n${ngmyAdminEmailSendContext(ngmyUsers: ngmyUserMaps)}\n' : ''}'
           '${liveDb.isNotEmpty ? '\n$liveDb\n' : ''}'
           '${preflight.isNotEmpty ? '\n$preflight\n' : ''}'
           '$grantNote'
@@ -45895,8 +45957,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           ...ngmyInferAlarmActionsFromUserMessage(text),
           ...ngmyInferCalendarActionsFromUserMessage(text),
           ...ngmyInferContactActionsFromUserMessage(text),
+          ...ngmyInferSendEmailActionsFromUserMessage(text, isAdmin: widget.user.isAdmin),
         ];
       }
+      phoneActions = ngmyFilterAdminOnlyPhoneActions(phoneActions, isAdmin: widget.user.isAdmin);
       phoneActions = await ngmyResolvePhoneActionsByName(
         context: context,
         userEmail: widget.user.email,
@@ -46025,6 +46089,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         context: context,
         userEmail: widget.user.email,
         skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
+        isAdmin: widget.user.isAdmin,
+        config: widget.config,
       );
       if (!mounted || result == null) continue;
       if (action.type == 'call') {
@@ -46080,7 +46146,9 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       action,
       context: context,
       userEmail: widget.user.email,
-      skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp',
+      skipConfirmation: action.type == 'call' || action.type == 'sms' || action.type == 'whatsapp' || action.type == 'send_email',
+      isAdmin: widget.user.isAdmin,
+      config: widget.config,
     );
     if (!mounted || result == null) return;
     ScaffoldMessenger.of(context).showSnackBar(

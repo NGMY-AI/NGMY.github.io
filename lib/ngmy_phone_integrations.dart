@@ -10,6 +10,7 @@ import 'ngmy_helper_alarm.dart';
 import 'ngmy_calendar_download_stub.dart' if (dart.library.html) 'ngmy_calendar_download_web.dart';
 import 'ngmy_calendar_native_stub.dart' if (dart.library.io) 'ngmy_calendar_native_io.dart';
 import 'ngmy_phone_action_ui.dart';
+import 'ngmy_resend_email.dart';
 
 export 'ngmy_phone_action_ui.dart';
 
@@ -88,6 +89,7 @@ class NgmyPhoneAction {
         'sms' => 'Send Text',
         'whatsapp' => 'WhatsApp',
         'email' => 'Send Email',
+        'send_email' => 'Send via NGMY',
         'messenger' => 'Open Messenger',
         'facebook' => 'Open Facebook',
         'instagram' => 'Open Instagram',
@@ -104,6 +106,7 @@ class NgmyPhoneAction {
         'sms' => Icons.sms_rounded,
         'whatsapp' => Icons.chat_rounded,
         'email' => Icons.email_rounded,
+        'send_email' => Icons.mark_email_read_rounded,
         'messenger' => Icons.forum_rounded,
         'facebook' => Icons.facebook_rounded,
         'instagram' => Icons.camera_alt_rounded,
@@ -139,6 +142,7 @@ class NgmyPhoneAction {
         if (who.isNotEmpty) return who;
         return phone;
       case 'email':
+      case 'send_email':
         return fields['to'] ?? fields['subject'] ?? 'Email';
       case 'messenger':
       case 'facebook':
@@ -208,7 +212,7 @@ class NgmyPhoneAction {
     if (actions.isNotEmpty) return (text: text, actions: actions);
   }
 
-  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|messenger|facebook|instagram|telegram|open_url)"[\s\S]*?\}\s*\])');
+  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|send_email|messenger|facebook|instagram|telegram|open_url)"[\s\S]*?\}\s*\])');
   final looseMatch = loose.firstMatch(raw);
   if (looseMatch != null) {
     text = raw.replaceFirst(loose, '').trim();
@@ -304,6 +308,7 @@ bool _needsConfirmation(NgmyPhoneAction action) {
       action.type == 'sms' ||
       action.type == 'whatsapp' ||
       action.type == 'email' ||
+      action.type == 'send_email' ||
       action.type == 'messenger' ||
       action.type == 'facebook' ||
       action.type == 'instagram' ||
@@ -315,6 +320,10 @@ Future<String?> ngmyRunPhoneAction(
   BuildContext? context,
   bool skipConfirmation = false,
   String userEmail = '',
+  bool isAdmin = false,
+  String resendApiKey = '',
+  String resendFromEmail = '',
+  dynamic config,
 }) async {
   if (_needsConfirmation(action) && context != null && context.mounted && !skipConfirmation) {
     final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
@@ -336,6 +345,15 @@ Future<String?> ngmyRunPhoneAction(
       return _runWhatsApp(action);
     case 'email':
       return _runEmail(action);
+    case 'send_email':
+      return _runSendEmail(
+        action,
+        isAdmin: isAdmin,
+        requesterEmail: userEmail,
+        resendApiKey: resendApiKey,
+        resendFromEmail: resendFromEmail,
+        config: config,
+      );
     case 'messenger':
       return _runMessenger(action);
     case 'facebook':
@@ -489,6 +507,41 @@ Future<String?> _runEmail(NgmyPhoneAction action) async {
   final uri = Uri(scheme: 'mailto', path: to, queryParameters: params.isEmpty ? null : params);
   final ok = await _launchExternal(uri);
   return ok ? 'Opening Mail…' : 'Could not open Mail.';
+}
+
+Future<String?> _runSendEmail(
+  NgmyPhoneAction action, {
+  required bool isAdmin,
+  required String requesterEmail,
+  String resendApiKey = '',
+  String resendFromEmail = '',
+  dynamic config,
+}) async {
+  if (!isAdmin) return 'Only NGMY admins can send direct emails from the AI.';
+  final to = (action.fields['to'] ?? '').trim();
+  if (to.isEmpty) return 'No email address provided.';
+  final subject = (action.fields['subject'] ?? 'Message from NGMY').trim();
+  final body = (action.fields['body'] ?? action.fields['html'] ?? action.fields['message'] ?? '').trim();
+  if (body.isEmpty) return 'No email message body was provided.';
+
+  final apiKey = resendApiKey.trim().isNotEmpty
+      ? resendApiKey.trim()
+      : await NgmyResendEmail.resolveApiKey(config: config);
+  final from = resendFromEmail.trim().isNotEmpty
+      ? resendFromEmail.trim()
+      : await NgmyResendEmail.resolveFromEmail(config: config);
+
+  final result = await NgmyResendEmail.send(
+    apiKey: apiKey,
+    from: from,
+    to: to,
+    subject: subject,
+    body: body,
+    requesterEmail: requesterEmail,
+  );
+  if (!result.ok) return result.error ?? 'Email could not be sent.';
+  final id = result.messageId;
+  return id != null && id.isNotEmpty ? 'Email sent to $to.' : 'Email sent to $to.';
 }
 
 String _cleanHandle(String raw) => raw.trim().replaceFirst(RegExp(r'^@+'), '').trim();
