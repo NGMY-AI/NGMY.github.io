@@ -442,7 +442,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _ingestPickedWebFiles(
-    List<({String name, dynamic file})> picked, {
+    List<NgmyWebPickedFile> picked, {
     required String emptyMessage,
     required String successLabel,
     String? note,
@@ -596,7 +596,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     unawaited(_openNgmyTransferSendPickedNative());
   }
 
-  Future<void> _startTransferSendWithPicked(List<({String name, dynamic file})> picked) async {
+  Future<void> _startTransferSendWithPicked(List<NgmyWebPickedFile> picked) async {
     await _withWork(() async {
       if (picked.isEmpty) {
         _toast('Select file(s) or pick videos/documents to send.');

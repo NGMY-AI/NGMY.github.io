@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_short_code.dart';
+import 'ngmy_doc_share_folder_stub.dart' show NgmyWebPickedFile;
 
 String _emailKey(String email) => email.toLowerCase().trim();
 
@@ -153,7 +154,7 @@ class NgmyDocShareStore {
 
   static Future<List<NgmyDocShareItem>> addWebFolderFiles({
     required String email,
-    required List<dynamic> files,
+    required List<NgmyWebPickedFile> files,
     String? note,
   }) async =>
       [];

@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_blob_db_web.dart';
+import 'ngmy_doc_share_folder_web.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_short_code.dart';
 
@@ -118,10 +119,14 @@ Future<Uint8List?> _loadBlob(String key) async {
 
 Future<Uint8List?> _readHtmlBlobSlice(html.Blob slice) async {
   final reader = html.FileReader();
-  final done = Completer<ByteBuffer?>();
+  final done = Completer<Uint8List?>();
   reader.onLoadEnd.listen((_) {
     final result = reader.result;
-    done.complete(result is ByteBuffer ? result : null);
+    if (result is ByteBuffer) {
+      done.complete(Uint8List.view(result));
+    } else {
+      done.complete(null);
+    }
   });
   reader.onError.listen((_) => done.complete(null));
   reader.readAsArrayBuffer(slice);
@@ -136,10 +141,8 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
   try {
     for (var start = 0; start < size; start += _streamChunkBytes) {
       final end = start + _streamChunkBytes < size ? start + _streamChunkBytes : size;
-      final buf = await _readHtmlBlobSlice(file.slice(start, end));
-      if (buf == null) continue;
-      final chunk = Uint8List.view(buf);
-      if (chunk.isEmpty) continue;
+      final chunk = await _readHtmlBlobSlice(file.slice(start, end));
+      if (chunk == null || chunk.isEmpty) continue;
       final partKey = '${baseKey}_part_${partKeys.length}';
       await ngmyDocShareIdbPut(partKey, chunk);
       partKeys.add(partKey);
@@ -218,7 +221,7 @@ class NgmyDocShareStore {
   /// Web folder picker — keeps [html.File] refs for large videos (no full RAM load until transfer).
   static Future<List<NgmyDocShareItem>> addWebFolderFiles({
     required String email,
-    required List<({String name, html.File file})> files,
+    required List<NgmyWebPickedFile> files,
     String? note,
   }) async {
     if (email.trim().isEmpty || files.isEmpty) return [];
