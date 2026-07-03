@@ -90,11 +90,14 @@ jobs:
           if [ -f _site/flutter_bootstrap.js ]; then
             python3 - <<'PY'
           import pathlib, re
+
           p = pathlib.Path("_site/flutter_bootstrap.js")
           boot = p.read_text(encoding="utf-8")
           boot = boot.replace(",{}", "")
           boot = re.sub(r",?\s*serviceWorkerSettings:\s*\{[^}]*\}", "", boot)
-          loader = """_flutter.loader.load({
+
+          loader = """// NGMY: use ngmy_service_worker.js (registered in index.html) — not Flutter's worker.
+          _flutter.loader.load({
             config: {
               canvasKitBaseUrl: "./canvaskit/",
               useLocalCanvasKit: true
@@ -105,10 +108,30 @@ jobs:
               "NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen."
             );
           });"""
-          if "_flutter.loader.load({" in boot:
-            boot = re.sub(r"_flutter\.loader\.load\(\{[^;]*\}\);?", loader, boot, count=1, flags=re.S)
+
+          # Replace the entire NGMY loader tail (avoids duplicate .catch from naive regex).
+          if "// NGMY: use ngmy_service_worker" in boot:
+            boot = re.sub(
+              r"// NGMY: use ngmy_service_worker\.js[^\n]*\n.*",
+              loader,
+              boot,
+              count=1,
+              flags=re.S,
+            )
           elif "_flutter.loader.load();" in boot:
             boot = boot.replace("_flutter.loader.load();", loader)
+          elif "_flutter.loader.load({" in boot:
+            boot = re.sub(
+              r"_flutter\.loader\.load\(\{.*\}\)(?:\.catch\(function \(e\) \{.*?\}\))?;?\s*",
+              loader,
+              boot,
+              count=1,
+              flags=re.S,
+            )
+
+          # Repair any prior broken deploy that left `});.catch(` (invalid JavaScript).
+          boot = re.sub(r"\}\);\s*\.catch\(", "}).catch(", boot)
+
           p.write_text(boot, encoding="utf-8")
           print("patched flutter_bootstrap.js (local CanvasKit, no Flutter SW)")
           PY

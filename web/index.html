@@ -307,7 +307,39 @@
 
     #ngmy-splash {
 
-      display: none !important;
+      display: flex;
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 9999;
+
+      align-items: center;
+
+      justify-content: center;
+
+      flex-direction: column;
+
+      gap: 12px;
+
+      background: #ffffff;
+
+      color: #121212;
+
+      font-family: system-ui, sans-serif;
+
+      font-size: 16px;
+
+      font-weight: 600;
+
+    }
+
+    html.ngmy-app-dark #ngmy-splash {
+
+      background: #121212;
+
+      color: #ffffff;
 
     }
 
@@ -345,7 +377,13 @@
 
 <body>
 
-  <div id="ngmy-splash" aria-hidden="true"></div>
+  <div id="ngmy-splash" aria-live="polite">
+    <div style="width:36px;height:36px;border:3px solid rgba(124,58,237,0.25);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
+    <div>Loading NGMY…</div>
+  </div>
+  <style>
+    @keyframes ngmy-spin { to { transform: rotate(360deg); } }
+  </style>
 
   <div id="ngmy-error">
 
