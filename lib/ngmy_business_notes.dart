@@ -2114,11 +2114,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
                           onPressed: _onWillPop,
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-                          child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                        ),
+                        if (!_previewMode) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                          ),
+                        ],
                         const Spacer(),
                         _headerBtn(
                           icon: _previewMode ? Icons.edit_rounded : Icons.visibility_rounded,
@@ -2132,17 +2134,20 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             }
                           }),
                         ),
-                        IconButton(
-                          icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
-                          onPressed: () => setState(() => _note.pinned = !_note.pinned),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.more_horiz_rounded, color: muted),
-                          onPressed: _showActions,
-                        ),
+                        if (!_previewMode) ...[
+                          IconButton(
+                            icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
+                            onPressed: () => setState(() => _note.pinned = !_note.pinned),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.more_horiz_rounded, color: muted),
+                            onPressed: _showActions,
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  if (!_previewMode)
                   Container(
                     margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -2184,25 +2189,32 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         children: [
                           Row(
                             children: [
-                              GestureDetector(
-                                onTap: _showEmojiPicker,
-                                child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
-                              ),
+                              if (_previewMode)
+                                Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28))
+                              else
+                                GestureDetector(
+                                  onTap: _showEmojiPicker,
+                                  child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
+                                ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: TextField(
-                                  controller: _title,
-                                  enabled: !_previewMode,
-                                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
-                                  decoration: InputDecoration(
-                                    hintText: 'Title',
-                                    hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                  maxLines: 2,
-                                ),
+                                child: _previewMode
+                                    ? Text(
+                                        _title.text.trim().isEmpty ? 'Untitled' : _title.text,
+                                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
+                                      )
+                                    : TextField(
+                                        controller: _title,
+                                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
+                                        decoration: InputDecoration(
+                                          hintText: 'Title',
+                                          hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        maxLines: 2,
+                                      ),
                               ),
                             ],
                           ),
@@ -2237,7 +2249,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                       ),
                     ),
                   ),
-                  if (_dirty)
+                  if (_dirty && !_previewMode)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
