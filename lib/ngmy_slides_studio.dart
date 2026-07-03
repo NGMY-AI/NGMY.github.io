@@ -2544,12 +2544,11 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   void _scheduleAutoAdvance() {
     _autoTimer?.cancel();
     if (!_autoPlaying) return;
-    final seconds = widget.deck.durationForSlide(_index);
+    final seconds = widget.deck.durationForSlide(_index).clamp(1, 120);
     _autoTimer = Timer(Duration(seconds: seconds), () {
-      if (!mounted) return;
+      if (!mounted || !_autoPlaying) return;
       if (_index < widget.deck.slides.length - 1) {
         _next();
-        _scheduleAutoAdvance();
       }
     });
   }
@@ -2599,7 +2598,9 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         ],
       ),
       transitionBuilder: (child, animation) {
-        if (animation.status == AnimationStatus.reverse) return child;
+        if (animation.status == AnimationStatus.reverse) {
+          return FadeTransition(opacity: animation, child: child);
+        }
         return _slideshowIncomingTransition(_lastTransition, child, animation);
       },
       child: KeyedSubtree(key: ValueKey(_index), child: slideContent),
@@ -2715,7 +2716,10 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   @override
   Widget build(BuildContext context) {
     final slide = widget.deck.slides[_index];
-    final slideContent = SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true));
+    final slideContent = ColoredBox(
+      color: Color(slide.background),
+      child: SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true)),
+    );
     final body = _slideshowSwitcher(slideContent);
 
     return Scaffold(

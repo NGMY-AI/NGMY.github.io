@@ -233,8 +233,9 @@ List<(String, NgmySlideLayout)> get ngmySlidesSchoolLayouts => const [
 
 extension NgmySlideDeckToolkit on NgmySlideDeck {
   int durationForSlide(int index) {
-    if (index < 0 || index >= slides.length) return autoAdvanceSeconds;
+    if (index < 0 || index >= slides.length) return autoAdvanceSeconds.clamp(1, 120);
     final perSlide = slides[index].durationSeconds;
-    return perSlide > 0 ? perSlide : autoAdvanceSeconds;
+    final base = perSlide > 0 ? perSlide : autoAdvanceSeconds;
+    return base.clamp(1, 120);
   }
 }

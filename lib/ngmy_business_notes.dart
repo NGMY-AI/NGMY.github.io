@@ -55,7 +55,7 @@ class _NoteBackgroundDef {
 }
 
 const _noteBackgrounds = <_NoteBackgroundDef>[
-  _NoteBackgroundDef(id: 'sunrise_meadow', label: 'Sunrise Meadow', category: 'Personal', colors: [Color(0xFFFFF7ED), Color(0xFFBBF7D0), Color(0xFF86EFAC)], pattern: _NoteBgPattern.grass, emojis: ['🌅', '🌿'], floatingEmojis: ['🌅', '🌼', '🌿']),
+  _NoteBackgroundDef(id: 'sunrise_meadow', label: 'Sunrise Meadow', category: 'Personal', colors: [Color(0xFFFFF7ED), Color(0xFFBBF7D0), Color(0xFF86EFAC)], pattern: _NoteBgPattern.grass, emojis: ['🌅', '🌿'], floatingEmojis: ['🌼', '🌿', '🦋']),
   _NoteBackgroundDef(id: 'ocean_waves', label: 'Ocean Waves', category: 'Nature', colors: [Color(0xFF0EA5E9), Color(0xFF0369A1), Color(0xFF1E3A8A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🌊'], floatingEmojis: ['🐟', '🐠', '🐬'], darkText: true),
   _NoteBackgroundDef(id: 'rainforest', label: 'Rainforest', category: 'Nature', colors: [Color(0xFF14532D), Color(0xFF166534), Color(0xFF052E16)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🌳', '🦜'], floatingEmojis: ['🦜', '🌿', '🐒'], darkText: true),
   _NoteBackgroundDef(id: 'cherry_blossom', label: 'Cherry Blossom', category: 'Personal', colors: [Color(0xFFFDF2F8), Color(0xFFFBCFE8), Color(0xFFF472B6)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌸'], floatingEmojis: ['🌸', '🌸', '🌸']),
@@ -81,7 +81,7 @@ const _noteBackgrounds = <_NoteBackgroundDef>[
   _NoteBackgroundDef(id: 'snowy_peaks', label: 'Snowy Peaks', category: 'Nature', colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1), Color(0xFF64748B)], pattern: _NoteBgPattern.snow, overlay: _NoteBgAnimOverlay.snow, emojis: ['🏔️'], floatingEmojis: ['❄️', '🏔️']),
   _NoteBackgroundDef(id: 'hummingbird', label: 'Hummingbird', category: 'Nature', colors: [Color(0xFFECFDF5), Color(0xFF6EE7B7), Color(0xFF059669)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🌺'], floatingEmojis: ['🐦', '🌺']),
   _NoteBackgroundDef(id: 'coral_reef', label: 'Coral Reef', category: 'Nature', colors: [Color(0xFFF97316), Color(0xFFFB7185), Color(0xFF0EA5E9)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🪸'], floatingEmojis: ['🐠', '🪸', '🐟'], darkText: true),
-  _NoteBackgroundDef(id: 'desert_dusk', label: 'Desert Dusk', category: 'Nature', colors: [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, emojis: ['🌵'], floatingEmojis: ['🌵', '🦅', '☀️'], darkText: true),
+  _NoteBackgroundDef(id: 'desert_dusk', label: 'Desert Dusk', category: 'Nature', colors: [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, emojis: ['🌵'], floatingEmojis: ['🌵', '🦅', '🦎'], darkText: true),
   _NoteBackgroundDef(id: 'bamboo_grove', label: 'Bamboo Grove', category: 'Nature', colors: [Color(0xFFDCFCE7), Color(0xFF86EFAC), Color(0xFF166534)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🎋'], floatingEmojis: ['🎋', '🎋', '🎋']),
   _NoteBackgroundDef(id: 'firefly_night', label: 'Firefly Night', category: 'Personal', colors: [Color(0xFF1E3A5F), Color(0xFF0F172A), Color(0xFF312E81)], pattern: _NoteBgPattern.fireflies, overlay: _NoteBgAnimOverlay.fireflies, emojis: ['🌙'], floatingEmojis: ['✨'], darkText: true),
   _NoteBackgroundDef(id: 'rose_garden', label: 'Rose Garden', category: 'Personal', colors: [Color(0xFFFECDD3), Color(0xFFFB7185), Color(0xFFBE123C)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌹'], floatingEmojis: ['🌹', '💕', '🌹']),
@@ -97,12 +97,12 @@ const _noteBackgrounds = <_NoteBackgroundDef>[
   _NoteBackgroundDef(id: 'workshop_notes', label: 'Workshop', category: 'Meeting', colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA), Color(0xFFEA580C)], pattern: _NoteBgPattern.bokeh, emojis: ['🔧']),
   _NoteBackgroundDef(id: 'podcast_studio', label: 'Podcast Studio', category: 'Ideas', colors: [Color(0xFF18181B), Color(0xFF3F3F46), Color(0xFF7C3AED)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🎙️'], floatingEmojis: ['🎙️'], darkText: true),
   _NoteBackgroundDef(id: 'art_studio', label: 'Art Studio', category: 'Ideas', colors: [Color(0xFFFDF4FF), Color(0xFFE879F9), Color(0xFF2563EB)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🎨'], floatingEmojis: ['🎨', '🌸']),
-  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF020617), Color(0xFF064E3B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌', '⭐', '✨', '🌌', '⭐', '✨'], darkText: true),
+  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF020617), Color(0xFF064E3B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌', '⭐'], darkText: true),
 ];
 
 int _gridCountTwoPerRow(int itemCount) => itemCount.isOdd ? itemCount + 1 : itemCount;
 
-const _kFloatingEmojiCount = 7;
+const _kFloatingEmojiCount = 3;
 
 /// Normalized cross-screen travel paths (0–1 coords; values may go slightly off-screen).
 class _CrossScreenPath {
@@ -1522,7 +1522,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            _NoteBackgroundLayer(note: _note, hideFloatingEmojis: true),
+            _NoteBackgroundLayer(note: _note),
             SafeArea(
               child: Column(
                 children: [
@@ -1654,7 +1654,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                 ],
               ),
             ),
-            _NoteFloatingEmojiOverlay(note: _note),
           ],
         ),
       ),
@@ -1869,11 +1868,10 @@ class _NoteBackgroundPreview extends StatelessWidget {
 }
 
 class _NoteAnimatedBackgroundLayer extends StatefulWidget {
-  const _NoteAnimatedBackgroundLayer({this.note, this.backgroundId, this.compact = false, this.hideFloatingEmojis = false});
+  const _NoteAnimatedBackgroundLayer({this.note, this.backgroundId, this.compact = false});
   final NgmyBusinessNote? note;
   final String? backgroundId;
   final bool compact;
-  final bool hideFloatingEmojis;
 
   @override
   State<_NoteAnimatedBackgroundLayer> createState() => _NoteAnimatedBackgroundLayerState();
@@ -1980,7 +1978,7 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
                   compact: widget.compact,
                 ),
               ),
-              ..._animatedOverlays(def, t, includeFloating: !widget.hideFloatingEmojis),
+              ..._animatedOverlays(def, t),
               ..._staticEmojis(def.emojis),
             ],
           );
@@ -2002,9 +2000,9 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
     ];
   }
 
-  List<Widget> _animatedOverlays(_NoteBackgroundDef def, double t, {bool includeFloating = true}) {
+  List<Widget> _animatedOverlays(_NoteBackgroundDef def, double t) {
     final widgets = <Widget>[
-      if (includeFloating) ..._floatingThemeEmojis(def, t),
+      ..._floatingThemeEmojis(def, t),
       ..._ambientOverlay(def, t),
     ];
     return widgets;
@@ -2018,14 +2016,13 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
       final path = _crossScreenPaths[i % _crossScreenPaths.length];
       final pos = path.at(t);
       final size = (widget.compact ? 26.0 : 42.0) + (i % 3) * 5;
-      return _InteractiveFloatingEmoji(
+      return _FloatingEmoji(
         key: ValueKey('${def.id}_float_$i'),
         emoji: emoji,
         normalizedPos: pos,
         size: size,
         t: t,
         phase: path.phase,
-        interactive: !widget.compact,
         flapsWings: _emojiFlapsWings(emoji),
         swims: _emojiSwims(emoji),
       );
@@ -2403,16 +2400,15 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
       oldDelegate.t != t || oldDelegate.pattern != pattern || oldDelegate.backgroundId != backgroundId;
 }
 
-/// Tap-reactive emoji that travels across the full screen.
-class _InteractiveFloatingEmoji extends StatefulWidget {
-  const _InteractiveFloatingEmoji({
+/// Background emoji that travels across the screen (never blocks text taps).
+class _FloatingEmoji extends StatelessWidget {
+  const _FloatingEmoji({
     super.key,
     required this.emoji,
     required this.normalizedPos,
     required this.size,
     required this.t,
     required this.phase,
-    required this.interactive,
     required this.flapsWings,
     required this.swims,
   });
@@ -2422,77 +2418,35 @@ class _InteractiveFloatingEmoji extends StatefulWidget {
   final double size;
   final double t;
   final double phase;
-  final bool interactive;
   final bool flapsWings;
   final bool swims;
 
   @override
-  State<_InteractiveFloatingEmoji> createState() => _InteractiveFloatingEmojiState();
-}
-
-class _InteractiveFloatingEmojiState extends State<_InteractiveFloatingEmoji> with SingleTickerProviderStateMixin {
-  late AnimationController _react;
-
-  @override
-  void initState() {
-    super.initState();
-    _react = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-  }
-
-  @override
-  void dispose() {
-    _react.dispose();
-    super.dispose();
-  }
-
-  void _onTap() {
-    if (!widget.interactive) return;
-    _react.forward(from: 0);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final flap = widget.flapsWings ? 0.65 + math.sin((widget.t * 2.0 + widget.phase) * math.pi * 2).abs() * 0.35 : 1.0;
-    final bob = widget.swims ? math.sin((widget.t * 1.4 + widget.phase) * math.pi * 2) * 5 : 0.0;
+    final flap = flapsWings ? 0.65 + math.sin((t * 2.0 + phase) * math.pi * 2).abs() * 0.35 : 1.0;
+    final bob = swims ? math.sin((t * 1.4 + phase) * math.pi * 2) * 5 : 0.0;
     return Positioned.fill(
-      child: LayoutBuilder(
-        builder: (_, c) {
-          final dx = widget.normalizedPos.dx * c.maxWidth;
-          final dy = widget.normalizedPos.dy * c.maxHeight + bob;
-          return AnimatedBuilder(
-            animation: _react,
-            builder: (_, __) {
-              final reactScale = 1.0 + Curves.elasticOut.transform(_react.value) * 0.45;
-              final reactSpin = _react.value * math.pi * 2;
-              final child = Transform.rotate(
-                angle: reactSpin * 0.35,
-                child: Transform.scale(
-                  scale: reactScale,
-                  child: Transform.scale(
-                    scaleX: flap,
-                    scaleY: 1.0,
-                    child: Text(
-                      widget.emoji,
-                      style: TextStyle(
-                        fontSize: widget.size,
-                        shadows: [
-                          Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
-                          if (_react.value > 0) Shadow(color: Colors.white.withValues(alpha: 0.5 * (1 - _react.value)), blurRadius: 16),
-                        ],
-                      ),
-                    ),
+      child: IgnorePointer(
+        child: LayoutBuilder(
+          builder: (_, c) {
+            final dx = normalizedPos.dx * c.maxWidth;
+            final dy = normalizedPos.dy * c.maxHeight + bob;
+            return Transform.translate(
+              offset: Offset(dx, dy),
+              child: Transform.scale(
+                scaleX: flap,
+                scaleY: 1.0,
+                child: Text(
+                  emoji,
+                  style: TextStyle(
+                    fontSize: size,
+                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 5)],
                   ),
                 ),
-              );
-              return Transform.translate(
-                offset: Offset(dx, dy),
-                child: widget.interactive
-                    ? GestureDetector(onTap: _onTap, behavior: HitTestBehavior.opaque, child: child)
-                    : IgnorePointer(child: child),
-              );
-            },
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2596,72 +2550,3 @@ class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTic
 
 // Alias for editor/list usage
 typedef _NoteBackgroundLayer = _NoteAnimatedBackgroundLayer;
-
-/// Editor overlay — floating emojis above text so taps register; empty areas pass through.
-class _NoteFloatingEmojiOverlay extends StatefulWidget {
-  const _NoteFloatingEmojiOverlay({required this.note});
-  final NgmyBusinessNote note;
-
-  @override
-  State<_NoteFloatingEmojiOverlay> createState() => _NoteFloatingEmojiOverlayState();
-}
-
-class _NoteFloatingEmojiOverlayState extends State<_NoteFloatingEmojiOverlay> with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 22))..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  bool _emojiFlapsWings(String emoji) {
-    const flappers = {'🦋', '🐦', '🦅', '🕊️', '🦜', '🐬', '🐟', '🐠', '🐧'};
-    return flappers.contains(emoji);
-  }
-
-  bool _emojiSwims(String emoji) {
-    const swimmers = {'🐟', '🐠', '🐬', '🐧'};
-    return swimmers.contains(emoji);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.note.usesCustomColor) return const SizedBox.shrink();
-    final def = _noteBackgroundById(widget.note.effectiveBackgroundId);
-    if (def.floatingEmojis.isEmpty) return const SizedBox.shrink();
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, __) {
-        final t = _ctrl.value;
-        final emojis = def.floatingEmojis;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: List.generate(_kFloatingEmojiCount, (i) {
-            final emoji = emojis[i % emojis.length];
-            final path = _crossScreenPaths[i % _crossScreenPaths.length];
-            final pos = path.at(t);
-            final size = 42.0 + (i % 3) * 5;
-            return _InteractiveFloatingEmoji(
-              key: ValueKey('editor_float_${def.id}_$i'),
-              emoji: emoji,
-              normalizedPos: pos,
-              size: size,
-              t: t,
-              phase: path.phase,
-              interactive: true,
-              flapsWings: _emojiFlapsWings(emoji),
-              swims: _emojiSwims(emoji),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
