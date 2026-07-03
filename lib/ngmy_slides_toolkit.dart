@@ -1,0 +1,224 @@
+import 'dart:convert';
+import 'dart:ui' as ui;
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+
+import 'ngmy_invoice_signature.dart';
+import 'ngmy_slides_models.dart';
+import 'ngmy_slides_print_stub.dart' if (dart.library.html) 'ngmy_slides_print_web.dart';
+import 'ngmy_worksheet_helpers.dart';
+
+/// Pick a PDF and return a data URL for embedding on a slide.
+Future<({String dataUrl, String fileName})?> ngmySlidesPickPdf() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['pdf'],
+    withData: true,
+  );
+  if (result == null || result.files.isEmpty) return null;
+  final file = result.files.first;
+  final bytes = file.bytes;
+  if (bytes == null || bytes.isEmpty) return null;
+  final name = file.name.trim().isEmpty ? 'document.pdf' : file.name.trim();
+  return (dataUrl: 'data:application/pdf;base64,${base64Encode(bytes)}', fileName: name);
+}
+
+/// Enhance image clarity — contrast + sharpen for school photos / scans.
+Future<String?> ngmySlidesEnhanceImage(String dataUrl) async {
+  if (!dataUrl.startsWith('data:image')) return dataUrl;
+  try {
+    final payload = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
+    final bytes = base64Decode(payload);
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 2400);
+    final frame = await codec.getNextFrame();
+    final src = frame.image;
+    final sw = src.width;
+    final sh = src.height;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()
+      ..colorFilter = const ColorFilter.matrix([
+        1.18, -0.05, -0.05, 0, 8,
+        -0.05, 1.18, -0.05, 0, 8,
+        -0.05, -0.05, 1.18, 0, 8,
+        0, 0, 0, 1, 0,
+      ]);
+    canvas.drawImage(src, Offset.zero, paint);
+    src.dispose();
+    final picture = recorder.endRecording();
+    final enhanced = await picture.toImage(sw, sh);
+    picture.dispose();
+    final byteData = await enhanced.toByteData(format: ui.ImageByteFormat.png);
+    enhanced.dispose();
+    if (byteData == null) return dataUrl;
+    return 'data:image/png;base64,${base64Encode(byteData.buffer.asUint8List())}';
+  } catch (e) {
+    debugPrint('[slides enhance] $e');
+    return dataUrl;
+  }
+}
+
+Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize) async {
+  if (points.whereType<Offset>().isEmpty) return null;
+  try {
+    const w = 800;
+    final scale = w / canvasSize.width;
+    final h = (canvasSize.height * scale).round().clamp(120, 400);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()), Paint()..color = Colors.white);
+    final stroke = Paint()
+      ..color = const Color(0xFF111827)
+      ..strokeWidth = 3.5 * scale
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    Offset? last;
+    for (final p in points) {
+      if (p == null) {
+        last = null;
+        continue;
+      }
+      final scaled = Offset(p.dx * scale, p.dy * scale);
+      if (last != null) canvas.drawLine(last, scaled, stroke);
+      last = scaled;
+    }
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(w, h);
+    picture.dispose();
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    img.dispose();
+    if (bytes == null) return null;
+    return 'data:image/png;base64,${base64Encode(bytes.buffer.asUint8List())}';
+  } catch (e) {
+    debugPrint('[slides signature] $e');
+    return null;
+  }
+}
+
+Future<String?> ngmySlidesCaptureSignature(BuildContext context) async {
+  final points = <Offset?>[];
+  Size? size;
+  await showNgmyFullscreenSignature(
+    context,
+    title: 'Sign document',
+    points: points,
+    onSave: (saved, canvasSize) {
+      points
+        ..clear()
+        ..addAll(saved);
+      size = canvasSize;
+    },
+  );
+  if (points.whereType<Offset>().isEmpty || size == null) return null;
+  return ngmySlidesSignatureToImage(points, size!);
+}
+
+String ngmySlidesPrintHtml(NgmySlideDeck deck) {
+  final aspect = deck.aspectValue;
+  final maxW = aspect >= 1 ? 960 : 540;
+  final maxH = (maxW / aspect).round();
+  final buf = StringBuffer('''
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>${_escapeHtml(deck.name)}</title>
+<style>
+  @page { margin: 12mm; }
+  body { font-family: system-ui, sans-serif; background: #fff; color: #111; }
+  .slide { page-break-after: always; width: ${maxW}px; height: ${maxH}px; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }
+  .el { position: absolute; overflow: hidden; }
+  .txt { white-space: pre-wrap; word-break: break-word; }
+  img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .pdf { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#f8fafc; }
+</style></head><body>
+<h1>${_escapeHtml(deck.name)}</h1>
+''');
+  for (var i = 0; i < deck.slides.length; i++) {
+    final slide = deck.slides[i];
+    final bg = slide.background.toRadixString(16).padLeft(8, '0').substring(2);
+    buf.writeln('<div class="slide" style="background:#$bg">');
+    for (final e in slide.elements) {
+      final left = (e.x * 100).toStringAsFixed(2);
+      final top = (e.y * 100).toStringAsFixed(2);
+      final width = (e.w * 100).toStringAsFixed(2);
+      final height = (e.h * 100).toStringAsFixed(2);
+      buf.write('<div class="el" style="left:$left%;top:$top%;width:$width%;height:$height%">');
+      switch (e.type) {
+        case NgmySlideElementType.text:
+          final color = e.color.toRadixString(16).padLeft(8, '0').substring(2);
+          buf.write('<div class="txt" style="font-size:${e.fontSize}px;color:#$color">${_escapeHtml(e.text)}</div>');
+        case NgmySlideElementType.image:
+        case NgmySlideElementType.signature:
+          if (e.imageRef != null && e.imageRef!.startsWith('data:image')) {
+            buf.write('<img src="${e.imageRef}" alt="" />');
+          }
+        case NgmySlideElementType.pdf:
+          buf.write('<div class="pdf"><div>📄 ${_escapeHtml(e.fileName.isEmpty ? 'PDF document' : e.fileName)}</div></div>');
+        case NgmySlideElementType.shape:
+          buf.write('<div style="width:100%;height:100%;background:#${e.fillColor.toRadixString(16).padLeft(8, '0').substring(2)};border:2px solid #${e.strokeColor.toRadixString(16).padLeft(8, '0').substring(2)}"></div>');
+      }
+      buf.writeln('</div>');
+    }
+    buf.writeln('</div>');
+  }
+  buf.writeln('</body></html>');
+  return buf.toString();
+}
+
+String _escapeHtml(String s) => s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+Future<void> ngmySlidesOpenPrintPreview(BuildContext context, NgmySlideDeck deck) async {
+  final html = ngmySlidesPrintHtml(deck);
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF0C1220),
+      title: const Text('Print preview', style: TextStyle(color: Colors.white)),
+      content: SizedBox(
+        width: 320,
+        child: Text(
+          'Use your browser Print dialog (Ctrl/Cmd+P) after tapping Open print view. ${deck.slides.length} slide(s) ready.',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            ngmySlidesLaunchPrintHtml(html, title: deck.name);
+          },
+          child: const Text('Open print view'),
+        ),
+      ],
+    ),
+  );
+}
+
+void ngmySlidesLaunchPrintHtml(String html, {required String title}) {
+  ngmySlidesOpenPrintHtml(html, title: title);
+}
+
+Future<String?> ngmySlidesPickAndEnhancePhoto() async {
+  final ref = await ngmyPickImageBase64(imageQuality: 92, maxWidth: 2400);
+  if (ref == null) return null;
+  return ngmySlidesEnhanceImage(ref);
+}
+
+List<(String, NgmySlideLayout)> get ngmySlidesSchoolLayouts => const [
+      ('Flashcard', NgmySlideLayout.flashcard),
+      ('Quiz', NgmySlideLayout.quiz),
+      ('Worksheet', NgmySlideLayout.worksheet),
+      ('Notes', NgmySlideLayout.titleContent),
+      ('Section', NgmySlideLayout.section),
+    ];
+
+extension NgmySlideDeckToolkit on NgmySlideDeck {
+  int durationForSlide(int index) {
+    if (index < 0 || index >= slides.length) return autoAdvanceSeconds;
+    final perSlide = slides[index].durationSeconds;
+    return perSlide > 0 ? perSlide : autoAdvanceSeconds;
+  }
+}

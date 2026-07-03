@@ -21,7 +21,12 @@ TextDecoration _ngmySlideDecorationFromKey(Object? raw) {
   }
 }
 
-enum NgmySlideElementType { text, image, shape }
+enum NgmySlideElementType { text, image, shape, pdf, signature }
+
+enum NgmySlideAspectRatio {
+  landscape169,
+  portrait916,
+}
 
 enum NgmySlideShapeKind { rectangle, circle, triangle, arrow, line }
 
@@ -32,6 +37,9 @@ enum NgmySlideLayout {
   twoColumn,
   section,
   comparison,
+  flashcard,
+  quiz,
+  worksheet,
 }
 
 enum NgmySlideTransition {
@@ -64,6 +72,7 @@ class NgmySlideElement {
     this.strokeWidth = 2,
     this.rotation = 0,
     this.bulletList = false,
+    this.fileName = '',
   });
 
   final String id;
@@ -86,6 +95,7 @@ class NgmySlideElement {
   double strokeWidth;
   double rotation;
   bool bulletList;
+  String fileName;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -108,6 +118,7 @@ class NgmySlideElement {
         strokeWidth: strokeWidth,
         rotation: rotation,
         bulletList: bulletList,
+        fileName: fileName,
       );
 
   Map<String, dynamic> toJson() => {
@@ -131,6 +142,7 @@ class NgmySlideElement {
         'strokeWidth': strokeWidth,
         'rotation': rotation,
         'bulletList': bulletList,
+        'fileName': fileName,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -139,7 +151,7 @@ class NgmySlideElement {
     final alignIndex = (json['align'] as num?)?.toInt() ?? TextAlign.left.index;
     return NgmySlideElement(
       id: (json['id'] ?? '').toString(),
-      type: NgmySlideElementType.values.byName((json['type'] ?? 'text').toString()),
+      type: _elementTypeFromJson(json['type']),
       x: (json['x'] as num?)?.toDouble() ?? 0.08,
       y: (json['y'] as num?)?.toDouble() ?? 0.12,
       w: (json['w'] as num?)?.toDouble() ?? 0.84,
@@ -158,8 +170,17 @@ class NgmySlideElement {
       strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 2,
       rotation: (json['rotation'] as num?)?.toDouble() ?? 0,
       bulletList: json['bulletList'] == true,
+      fileName: (json['fileName'] ?? '').toString(),
     );
   }
+}
+
+NgmySlideElementType _elementTypeFromJson(Object? raw) {
+  final name = (raw ?? 'text').toString();
+  for (final t in NgmySlideElementType.values) {
+    if (t.name == name) return t;
+  }
+  return NgmySlideElementType.text;
 }
 
 class NgmySlide {
@@ -171,6 +192,7 @@ class NgmySlide {
     this.background = 0xFFFFFFFF,
     this.backgroundEnd,
     this.transition = NgmySlideTransition.fade,
+    this.durationSeconds = 0,
     List<NgmySlideElement>? elements,
   }) : elements = elements ?? [];
 
@@ -181,6 +203,7 @@ class NgmySlide {
   int background;
   int? backgroundEnd;
   NgmySlideTransition transition;
+  int durationSeconds;
   List<NgmySlideElement> elements;
 
   NgmySlide copy() => NgmySlide(
@@ -191,6 +214,7 @@ class NgmySlide {
         background: background,
         backgroundEnd: backgroundEnd,
         transition: transition,
+        durationSeconds: durationSeconds,
         elements: elements.map((e) => e.copy()).toList(),
       );
 
@@ -202,6 +226,7 @@ class NgmySlide {
         'background': background,
         'backgroundEnd': backgroundEnd,
         'transition': transition.name,
+        'durationSeconds': durationSeconds,
         'elements': elements.map((e) => e.toJson()).toList(),
       };
 
@@ -209,10 +234,11 @@ class NgmySlide {
         id: (json['id'] ?? '').toString(),
         title: (json['title'] ?? '').toString(),
         notes: (json['notes'] ?? '').toString(),
-        layout: NgmySlideLayout.values.byName((json['layout'] ?? 'titleContent').toString()),
+        layout: _layoutFromJson(json['layout']),
         background: (json['background'] as num?)?.toInt() ?? 0xFFFFFFFF,
         backgroundEnd: (json['backgroundEnd'] as num?)?.toInt(),
         transition: NgmySlideTransition.values.byName((json['transition'] ?? 'fade').toString()),
+        durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
         elements: (json['elements'] as List?)
                 ?.whereType<Map>()
                 .map((e) => NgmySlideElement.fromJson(Map<String, dynamic>.from(e)))
@@ -221,11 +247,21 @@ class NgmySlide {
       );
 }
 
+NgmySlideLayout _layoutFromJson(Object? raw) {
+  final name = (raw ?? 'titleContent').toString();
+  for (final l in NgmySlideLayout.values) {
+    if (l.name == name) return l;
+  }
+  return NgmySlideLayout.titleContent;
+}
+
 class NgmySlideDeck {
   NgmySlideDeck({
     required this.id,
     required this.name,
     this.themeId = 'office_blue',
+    this.aspectRatio = NgmySlideAspectRatio.landscape169,
+    this.autoAdvanceSeconds = 5,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -234,13 +270,19 @@ class NgmySlideDeck {
   final String id;
   String name;
   String themeId;
+  NgmySlideAspectRatio aspectRatio;
+  int autoAdvanceSeconds;
   DateTime updatedAt;
   List<NgmySlide> slides;
+
+  double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
 
   NgmySlideDeck copy() => NgmySlideDeck(
         id: id,
         name: name,
         themeId: themeId,
+        aspectRatio: aspectRatio,
+        autoAdvanceSeconds: autoAdvanceSeconds,
         updatedAt: updatedAt,
         slides: slides.map((s) => s.copy()).toList(),
       );
@@ -249,6 +291,8 @@ class NgmySlideDeck {
         'id': id,
         'name': name,
         'themeId': themeId,
+        'aspectRatio': aspectRatio.name,
+        'autoAdvanceSeconds': autoAdvanceSeconds,
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         'slides': slides.map((s) => s.toJson()).toList(),
       };
@@ -257,6 +301,8 @@ class NgmySlideDeck {
         id: (json['id'] ?? '').toString(),
         name: (json['name'] ?? 'Untitled Presentation').toString(),
         themeId: (json['themeId'] ?? 'office_blue').toString(),
+        aspectRatio: _aspectFromJson(json['aspectRatio']),
+        autoAdvanceSeconds: (json['autoAdvanceSeconds'] as num?)?.toInt().clamp(1, 120) ?? 5,
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
@@ -264,6 +310,14 @@ class NgmySlideDeck {
                 .toList() ??
             [NgmySlidesTemplates.blankSlide()],
       );
+}
+
+NgmySlideAspectRatio _aspectFromJson(Object? raw) {
+  final name = (raw ?? 'landscape169').toString();
+  for (final a in NgmySlideAspectRatio.values) {
+    if (a.name == name) return a;
+  }
+  return NgmySlideAspectRatio.landscape169;
 }
 
 class NgmySlidesTheme {
@@ -547,6 +601,87 @@ class NgmySlidesTemplates {
             text: 'Option B',
             fontSize: 20,
             fontWeight: FontWeight.w700,
+            color: theme.bodyColor.value,
+          ),
+        ]);
+      case NgmySlideLayout.flashcard:
+        slide.elements.addAll([
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.1,
+            y: 0.12,
+            w: 0.8,
+            h: 0.35,
+            text: 'TERM / QUESTION',
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+            color: theme.titleColor.value,
+            align: TextAlign.center,
+          ),
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.1,
+            y: 0.52,
+            w: 0.8,
+            h: 0.35,
+            text: 'Definition or answer — flip mentally when presenting',
+            fontSize: 22,
+            fontWeight: FontWeight.w500,
+            color: theme.bodyColor.value,
+            align: TextAlign.center,
+          ),
+        ]);
+      case NgmySlideLayout.quiz:
+        slide.elements.addAll([
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.06,
+            y: 0.06,
+            w: 0.88,
+            h: 0.18,
+            text: 'Quiz Question',
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: theme.titleColor.value,
+          ),
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.08,
+            y: 0.28,
+            w: 0.84,
+            h: 0.62,
+            text: 'A) Answer choice\nB) Answer choice\nC) Answer choice\nD) Answer choice',
+            fontSize: 20,
+            color: theme.bodyColor.value,
+          ),
+        ]);
+      case NgmySlideLayout.worksheet:
+        slide.elements.addAll([
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.06,
+            y: 0.04,
+            w: 0.88,
+            h: 0.1,
+            text: 'Worksheet / Assignment',
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            color: theme.titleColor.value,
+          ),
+          NgmySlideElement(
+            id: newId(),
+            type: NgmySlideElementType.text,
+            x: 0.06,
+            y: 0.16,
+            w: 0.88,
+            h: 0.78,
+            text: 'Name: _______________\nDate: _______________\n\n1. _________________________________\n\n2. _________________________________\n\n3. _________________________________',
+            fontSize: 18,
             color: theme.bodyColor.value,
           ),
         ]);

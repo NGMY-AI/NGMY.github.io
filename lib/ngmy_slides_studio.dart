@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_toolkit.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// PowerPoint-style presentation studio for students — slides, text, shapes,
@@ -116,9 +117,34 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     final i = _decks.indexWhere((d) => d.id == _activeDeck!.id);
     if (i >= 0) {
       _decks[i] = _activeDeck!.copy();
-      _activeDeck = _decks[i].copy();
+      _decks[i].updatedAt = DateTime.now();
     }
     _activeDeck!.updatedAt = DateTime.now();
+  }
+
+  NgmySlideElement? _findElement(String id) {
+    final slide = _currentSlide;
+    if (slide == null) return null;
+    for (final e in slide.elements) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
+  void _updateElementText(String elementId, String value) {
+    final el = _findElement(elementId);
+    if (el == null || el.text == value) return;
+    el.text = value;
+    _syncDeckIntoList();
+    _scheduleAutosave();
+  }
+
+  void _updateSlideNotes(String slideId, String value) {
+    final slide = _currentSlide;
+    if (slide == null || slide.id != slideId || slide.notes == value) return;
+    slide.notes = value;
+    _syncDeckIntoList();
+    _scheduleAutosave();
   }
 
   NgmySlide? get _currentSlide {
@@ -249,7 +275,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     return _textControllers.putIfAbsent(el.id, () => TextEditingController(text: el.text));
   }
 
-  void _selectElement(String? id) => setState(() => _selectedElementId = id);
+  void _selectElement(String? id) {
+    setState(() {
+      _selectedElementId = id;
+      if (id != null) {
+        final el = _findElement(id);
+        if (el != null && el.type == NgmySlideElementType.text) {
+          _controllerFor(el).text = el.text;
+        }
+      }
+    });
+  }
 
   void _addTextBox() {
     _mutate(() {
@@ -355,12 +391,93 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   void _startSlideshow() {
     final deck = _activeDeck;
     if (deck == null || deck.slides.isEmpty) return;
+    _syncDeckIntoList();
+    unawaited(_persistDecks());
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _NgmySlideshowPage(deck: deck.copy(), startIndex: _slideIndex),
+        builder: (_) => _NgmySlideshowPage(
+          deck: _decks.firstWhere((d) => d.id == deck.id, orElse: () => deck).copy(),
+          startIndex: _slideIndex,
+        ),
       ),
     );
+  }
+
+  Future<void> _addPdf() async {
+    final picked = await ngmySlidesPickPdf();
+    if (picked == null || _currentSlide == null) return;
+    _mutate(() {
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.pdf,
+        x: 0.12,
+        y: 0.12,
+        w: 0.76,
+        h: 0.76,
+        imageRef: picked.dataUrl,
+        fileName: picked.fileName,
+        text: picked.fileName,
+      );
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
+    });
+  }
+
+  Future<void> _addSignature() async {
+    final imageRef = await ngmySlidesCaptureSignature(context);
+    if (imageRef == null || _currentSlide == null) return;
+    _mutate(() {
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.signature,
+        x: 0.55,
+        y: 0.62,
+        w: 0.35,
+        h: 0.2,
+        imageRef: imageRef,
+        fileName: 'Signature',
+      );
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
+    });
+  }
+
+  Future<void> _addEnhancedPhoto() async {
+    final ref = await ngmySlidesPickAndEnhancePhoto();
+    if (ref == null || _currentSlide == null) return;
+    _mutate(() {
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.image,
+        x: 0.1,
+        y: 0.1,
+        w: 0.8,
+        h: 0.8,
+        imageRef: ref,
+        fileName: 'HD Photo',
+      );
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
+    });
+  }
+
+  Future<void> _enhanceSelectedImage() async {
+    final el = _selectedElement();
+    if (el == null || el.imageRef == null) return;
+    final enhanced = await ngmySlidesEnhanceImage(el.imageRef!);
+    if (enhanced == null) return;
+    _mutate(() => el.imageRef = enhanced);
+  }
+
+  void _addSchoolSlide(NgmySlideLayout layout) {
+    _mutate(() {
+      final slide = NgmySlide(id: NgmySlidesTemplates.newId());
+      NgmySlidesTemplates.applyLayout(slide, layout, _theme);
+      _activeDeck!.slides.insert(_slideIndex + 1, slide);
+      _slideIndex++;
+      _selectedElementId = null;
+    });
   }
 
   @override
@@ -386,8 +503,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           children: [
             _header(
               title: 'NGMY SLIDES',
-              subtitle: 'Create presentations like PowerPoint',
-              icon: Icons.slideshow_rounded,
+              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
+              icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
             ),
             const SizedBox(height: 18),
@@ -586,17 +703,47 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               backgroundColor: const Color(0xFF2563EB),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
             label: const Text('Present', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
           ),
           const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Auto-advance: ${_activeDeck?.autoAdvanceSeconds ?? 5}s per slide',
+            onPressed: () async {
+              final deck = _activeDeck;
+              if (deck == null) return;
+              final picked = await showModalBottomSheet<int>(
+                context: context,
+                backgroundColor: const Color(0xFF111827),
+                builder: (ctx) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text('Seconds per slide during Present', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                      ),
+                      for (final s in [3, 5, 8, 10, 15, 20, 30, 60])
+                        ListTile(
+                          title: Text('$s seconds', style: const TextStyle(color: Colors.white)),
+                          trailing: deck.autoAdvanceSeconds == s ? const Icon(Icons.check_rounded, color: Color(0xFF2563EB)) : null,
+                          onTap: () => Navigator.pop(ctx, s),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+              if (picked != null) _mutate(() => deck.autoAdvanceSeconds = picked);
+            },
+            icon: Icon(Icons.timer_outlined, size: 20, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+          ),
         ],
       ),
     );
   }
 
   Widget _ribbon(bool isDark) {
-    final tabs = ['Home', 'Insert', 'Design', 'Transitions', 'View'];
+    final tabs = ['Home', 'Insert', 'School', 'Tools', 'Design', 'Transitions', 'View'];
     return Container(
       color: isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC),
       child: Column(
@@ -635,6 +782,33 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
 
   Widget _ribbonTools(bool isDark) {
     switch (_ribbonTab) {
+      case 'School':
+        return Row(
+          children: [
+            for (final (label, layout) in ngmySlidesSchoolLayouts)
+              _ribbonBtn(_schoolLayoutIcon(layout), label, () => _addSchoolSlide(layout), isDark),
+            _ribbonBtn(Icons.notes_rounded, 'Notes Slide', () => _addSchoolSlide(NgmySlideLayout.titleContent), isDark),
+          ],
+        );
+      case 'Tools':
+        return Row(
+          children: [
+            _ribbonBtn(Icons.picture_as_pdf_rounded, 'Upload PDF', () => unawaited(_addPdf()), isDark),
+            _ribbonBtn(Icons.draw_rounded, 'Sign Paper', () => unawaited(_addSignature()), isDark),
+            _ribbonBtn(Icons.hd_rounded, 'HD Photo', () => unawaited(_addEnhancedPhoto()), isDark),
+            _ribbonBtn(Icons.auto_fix_high_rounded, 'Sharpen Image', () => unawaited(_enhanceSelectedImage()), isDark),
+            _ribbonBtn(Icons.print_rounded, 'Print', () {
+              final deck = _activeDeck;
+              if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
+            }, isDark),
+            _ribbonBtn(Icons.crop_rotate_rounded, 'Rotate', () {
+              final el = _selectedElement();
+              if (el != null) _mutate(() => el.rotation += 0.785398);
+            }, isDark),
+            _ribbonBtn(Icons.text_fields_rounded, 'Text Box', _addTextBox, isDark),
+            _ribbonBtn(Icons.image_rounded, 'Picture', () => unawaited(_addImage()), isDark),
+          ],
+        );
       case 'Insert':
         return Row(
           children: [
@@ -645,12 +819,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             _ribbonBtn(Icons.change_history_rounded, 'Triangle', () => _addShape(NgmySlideShapeKind.triangle), isDark),
             _ribbonBtn(Icons.arrow_forward_rounded, 'Arrow', () => _addShape(NgmySlideShapeKind.arrow), isDark),
             _ribbonBtn(Icons.horizontal_rule_rounded, 'Line', () => _addShape(NgmySlideShapeKind.line), isDark),
+            _ribbonBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_addPdf()), isDark),
+            _ribbonBtn(Icons.draw_outlined, 'Signature', () => unawaited(_addSignature()), isDark),
             _ribbonBtn(Icons.add_box_outlined, 'New Slide', () => _addSlide(), isDark),
           ],
         );
       case 'Design':
         return Row(
           children: [
+            _aspectChip('Wide 16:9', NgmySlideAspectRatio.landscape169, isDark),
+            _aspectChip('Short 9:16', NgmySlideAspectRatio.portrait916, isDark),
+            const SizedBox(width: 8),
             ...NgmySlidesTemplates.themes.map((t) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ActionChip(
@@ -680,9 +859,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         return Row(
           children: [
             _ribbonBtn(Icons.notes_rounded, _showNotes ? 'Hide Notes' : 'Show Notes', () => setState(() => _showNotes = !_showNotes), isDark),
+            _ribbonBtn(Icons.print_rounded, 'Print deck', () {
+              final deck = _activeDeck;
+              if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
+            }, isDark),
             _ribbonBtn(Icons.file_download_outlined, 'Export JSON', () => unawaited(_exportJson()), isDark),
             _ribbonBtn(Icons.content_copy_rounded, 'Duplicate Slide', _duplicateSlide, isDark),
             _ribbonBtn(Icons.delete_outline_rounded, 'Delete Slide', _deleteSlide, isDark),
+            _slideDurationStepper(isDark),
           ],
         );
       case 'Home':
@@ -712,6 +896,71 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             ],
           ],
         );
+    }
+  }
+
+  Widget _aspectChip(String label, NgmySlideAspectRatio ratio, bool isDark) {
+    final selected = _activeDeck?.aspectRatio == ratio;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+        selected: selected,
+        onSelected: (_) => _mutate(() => _activeDeck!.aspectRatio = ratio),
+        selectedColor: const Color(0xFF2563EB).withValues(alpha: 0.25),
+      ),
+    );
+  }
+
+  Widget _slideDurationStepper(bool isDark) {
+    final slide = _currentSlide;
+    if (slide == null) return const SizedBox.shrink();
+    final val = slide.durationSeconds > 0 ? slide.durationSeconds : (_activeDeck?.autoAdvanceSeconds ?? 5);
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 14, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.remove, size: 16),
+            onPressed: () => _mutate(() {
+              final base = slide.durationSeconds > 0 ? slide.durationSeconds : (_activeDeck?.autoAdvanceSeconds ?? 5);
+              slide.durationSeconds = (base - 1).clamp(1, 120);
+            }),
+          ),
+          Text('${val}s', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.white : Colors.black87)),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.add, size: 16),
+            onPressed: () => _mutate(() {
+              final base = slide.durationSeconds > 0 ? slide.durationSeconds : (_activeDeck?.autoAdvanceSeconds ?? 5);
+              slide.durationSeconds = (base + 1).clamp(1, 120);
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _schoolLayoutIcon(NgmySlideLayout layout) {
+    switch (layout) {
+      case NgmySlideLayout.flashcard:
+        return Icons.style_rounded;
+      case NgmySlideLayout.quiz:
+        return Icons.quiz_rounded;
+      case NgmySlideLayout.worksheet:
+        return Icons.assignment_rounded;
+      case NgmySlideLayout.section:
+        return Icons.view_agenda_rounded;
+      default:
+        return Icons.notes_rounded;
     }
   }
 
@@ -891,11 +1140,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   }
 
   Widget _canvas(NgmySlide slide, bool isDark) {
+    final aspect = _activeDeck?.aspectValue ?? 16 / 9;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Center(
         child: AspectRatio(
-          aspectRatio: 16 / 9,
+          aspectRatio: aspect,
           child: GestureDetector(
             onTap: () => _selectElement(null),
             child: LayoutBuilder(
@@ -945,45 +1195,59 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     switch (e.type) {
       case NgmySlideElementType.text:
         final controller = _controllerFor(e);
-        if (selected) {
-          controller.text = e.text;
-          child = TextField(
-            controller: controller,
-            maxLines: null,
-            expands: true,
-            style: TextStyle(
-              fontSize: e.fontSize * (cw / 960),
-              fontWeight: e.fontWeight,
-              fontStyle: e.fontStyle,
-              decoration: e.decoration,
-              color: Color(e.color),
-            ),
-            textAlign: e.align,
-            decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.all(4)),
-            onChanged: (v) {
-              e.text = v;
-              _syncDeckIntoList();
-              _scheduleAutosave();
-            },
-          );
-        } else {
-          child = Text(
-            e.text,
-            style: TextStyle(
-              fontSize: e.fontSize * (cw / 960),
-              fontWeight: e.fontWeight,
-              fontStyle: e.fontStyle,
-              decoration: e.decoration,
-              color: Color(e.color),
-            ),
-            textAlign: e.align,
-          );
-        }
+        child = TextField(
+          controller: controller,
+          maxLines: null,
+          expands: true,
+          readOnly: !selected,
+          style: TextStyle(
+            fontSize: e.fontSize * (cw / 960),
+            fontWeight: e.fontWeight,
+            fontStyle: e.fontStyle,
+            decoration: e.decoration,
+            color: Color(e.color),
+          ),
+          textAlign: e.align,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: const EdgeInsets.all(4),
+            filled: selected,
+            fillColor: selected ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+          ),
+          onChanged: selected ? (v) => _updateElementText(e.id, v) : null,
+          onTap: () => _selectElement(e.id),
+        );
       case NgmySlideElementType.image:
+      case NgmySlideElementType.signature:
         final ref = e.imageRef;
         child = ref != null && ref.startsWith('data:image')
             ? Image.memory(base64Decode(ref.split(',').last), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))
             : const Icon(Icons.image, size: 48, color: Colors.grey);
+      case NgmySlideElementType.pdf:
+        child = Container(
+          color: Colors.white.withValues(alpha: 0.92),
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, size: 48, color: Color(0xFFDC2626)),
+              const SizedBox(height: 8),
+              Text(
+                e.fileName.isEmpty ? 'PDF Document' : e.fileName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12 * (cw / 960), fontWeight: FontWeight.w700, color: const Color(0xFF334155)),
+              ),
+              if (selected)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text('Tap Sign Paper in Tools to add signature', style: TextStyle(fontSize: 9 * (cw / 960), color: Colors.grey)),
+                ),
+            ],
+          ),
+        );
       case NgmySlideElementType.shape:
         child = CustomPaint(painter: _ShapePainter(e), size: Size.infinite);
     }
@@ -1043,11 +1307,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onChanged: (v) {
-                slide.notes = v;
-                _syncDeckIntoList();
-                _scheduleAutosave();
-              },
+              onChanged: (v) => _updateSlideNotes(slide.id, v),
             ),
           ),
         ],
@@ -1269,18 +1529,44 @@ class _NgmySlideshowPage extends StatefulWidget {
 class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   late int _index;
   NgmySlideTransition _lastTransition = NgmySlideTransition.fade;
+  Timer? _autoTimer;
+  bool _autoPlaying = true;
 
   @override
   void initState() {
     super.initState();
     _index = widget.startIndex.clamp(0, widget.deck.slides.length - 1);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _scheduleAutoAdvance();
   }
 
   @override
   void dispose() {
+    _autoTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  void _scheduleAutoAdvance() {
+    _autoTimer?.cancel();
+    if (!_autoPlaying) return;
+    final seconds = widget.deck.durationForSlide(_index);
+    _autoTimer = Timer(Duration(seconds: seconds), () {
+      if (!mounted) return;
+      if (_index < widget.deck.slides.length - 1) {
+        _next();
+        _scheduleAutoAdvance();
+      }
+    });
+  }
+
+  void _toggleAuto() {
+    setState(() => _autoPlaying = !_autoPlaying);
+    if (_autoPlaying) {
+      _scheduleAutoAdvance();
+    } else {
+      _autoTimer?.cancel();
+    }
   }
 
   void _next() {
@@ -1289,6 +1575,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         _lastTransition = widget.deck.slides[_index + 1].transition;
         _index++;
       });
+      _scheduleAutoAdvance();
     }
   }
 
@@ -1298,6 +1585,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         _lastTransition = widget.deck.slides[_index].transition;
         _index--;
       });
+      _scheduleAutoAdvance();
     }
   }
 
@@ -1342,14 +1630,36 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: AspectRatio(aspectRatio: 16 / 9, child: body)),
+            Center(child: AspectRatio(aspectRatio: widget.deck.aspectValue, child: body)),
             Positioned(
               top: 12,
               left: 12,
-              child: IconButton.filled(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close_rounded),
-                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              child: Row(
+                children: [
+                  IconButton.filled(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _toggleAuto,
+                    icon: Icon(_autoPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                child: Text(
+                  _autoPlaying ? 'Auto ${widget.deck.durationForSlide(_index)}s' : 'Manual',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
+                ),
               ),
             ),
             Positioned(
@@ -1404,9 +1714,19 @@ class _SlideRender extends StatelessWidget {
                       ),
                       textAlign: e.align,
                     ),
-                  NgmySlideElementType.image => e.imageRef != null && e.imageRef!.startsWith('data:image')
+                  NgmySlideElementType.image || NgmySlideElementType.signature => e.imageRef != null && e.imageRef!.startsWith('data:image')
                       ? Image.memory(base64Decode(e.imageRef!.split(',').last), fit: BoxFit.contain)
                       : const SizedBox.shrink(),
+                  NgmySlideElementType.pdf => Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.picture_as_pdf_rounded, size: 64, color: Color(0xFFDC2626)),
+                          const SizedBox(height: 8),
+                          Text(e.fileName.isEmpty ? 'PDF' : e.fileName, style: TextStyle(fontSize: 18 * (w / 960), fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
                   NgmySlideElementType.shape => CustomPaint(painter: _ShapePainter(e), size: Size.infinite),
                 },
               );

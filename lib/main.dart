@@ -14551,7 +14551,7 @@ class _NgmyAdminSafeHome extends StatelessWidget {
             runSpacing: 10,
             children: [
               _AdminQuickAction(label: 'Invest', icon: Icons.trending_up_rounded, onTap: () => onOpenTab(1)),
-              _AdminQuickAction(label: 'Slides', icon: Icons.slideshow_rounded, onTap: () => onOpenTab(2)),
+              _AdminQuickAction(label: 'Slides', icon: Icons.auto_stories_rounded, onTap: () => onOpenTab(2)),
               _AdminQuickAction(label: 'NGMY Hub', icon: Icons.auto_awesome_rounded, onTap: () => onOpenTab(3)),
               _AdminQuickAction(label: 'Profile', icon: Icons.person_rounded, onTap: () => onOpenTab(6)),
             ],
@@ -15724,7 +15724,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             children: [
               _nav(0, Icons.home_rounded),
               _navToolHub(),
-              _nav(2, Icons.slideshow_rounded),
+              _nav(2, Icons.auto_stories_rounded),
               _navC(3),
               _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
               _navStudio(),
