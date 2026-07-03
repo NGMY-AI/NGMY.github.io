@@ -2025,7 +2025,7 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
         size: size,
         t: t,
         phase: path.phase,
-        interactive: widget.interactive && !widget.compact,
+        interactive: !widget.compact,
         flapsWings: _emojiFlapsWings(emoji),
         swims: _emojiSwims(emoji),
       );
