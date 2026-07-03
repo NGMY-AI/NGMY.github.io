@@ -1267,6 +1267,155 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     );
   }
 
+  void _dismissFormatPanel() {
+    setState(() => _selectedElementId = null);
+  }
+
+  Future<void> _showDeckActionsSheet(NgmySlideDeck deck, bool isDark) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1220),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+                    ),
+                    child: const Icon(Icons.slideshow_rounded, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(deck.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                        const SizedBox(height: 4),
+                        Text('${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
+              const SizedBox(height: 10),
+              _deckActionRow(ctx, Icons.content_copy_rounded, 'Duplicate', 'Create a copy you can edit', const Color(0xFF059669), 'duplicate'),
+              const SizedBox(height: 10),
+              _deckActionRow(ctx, Icons.delete_outline_rounded, 'Delete presentation', 'Remove permanently', const Color(0xFFEF4444), 'delete'),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'delete') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF111827),
+          title: const Text('Delete presentation?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          content: Text('Delete "${deck.name}" permanently?', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), child: const Text('Delete')),
+          ],
+        ),
+      );
+      if (ok == true) _deleteDeck(deck);
+    } else if (action == 'rename') {
+      final name = await _promptText('Rename presentation', deck.name);
+      if (name != null) _renameDeck(deck, name);
+    } else if (action == 'duplicate') {
+      final json = deck.toJson();
+      json['id'] = NgmySlidesTemplates.newId();
+      json['name'] = '${deck.name} (Copy)';
+      setState(() => _decks.insert(0, NgmySlideDeck.fromJson(json)));
+      _scheduleAutosave();
+    }
+  }
+
+  Widget _deckActionRow(BuildContext ctx, IconData icon, String title, String subtitle, Color accent, String value) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => Navigator.pop(ctx, value),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: value == 'delete' ? const Color(0xFFFCA5A5) : Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.25)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _panelDoneButton({required VoidCallback onDone, bool isDark = true}) {
+    return TextButton(
+      onPressed: onDone,
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFF2563EB),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+    );
+  }
+
   Widget _deckTile(NgmySlideDeck deck, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1292,37 +1441,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (v) async {
-            if (v == 'delete') {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete presentation?'),
-                  content: Text('Delete "${deck.name}" permanently?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-                  ],
-                ),
-              );
-              if (ok == true) _deleteDeck(deck);
-            } else if (v == 'rename') {
-              final name = await _promptText('Rename presentation', deck.name);
-              if (name != null) _renameDeck(deck, name);
-            } else if (v == 'duplicate') {
-              final json = deck.toJson();
-              json['id'] = NgmySlidesTemplates.newId();
-              json['name'] = '${deck.name} (Copy)';
-              setState(() => _decks.insert(0, NgmySlideDeck.fromJson(json)));
-              _scheduleAutosave();
-            }
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'rename', child: Text('Rename')),
-            PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
-            PopupMenuItem(value: 'delete', child: Text('Delete')),
-          ],
+        trailing: IconButton(
+          icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+          tooltip: 'Project options',
+          onPressed: () => _showDeckActionsSheet(deck, isDark),
         ),
         onTap: () => _openDeck(deck),
       ),
@@ -1362,7 +1484,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 ],
               ),
             ),
-            if (compact && _shouldShowFormatPanel(compact)) SizedBox(height: 120, child: _formatPanel(isDark)),
+            if (compact && _shouldShowFormatPanel(compact)) SizedBox(height: 200, child: _formatPanel(isDark, compact: true)),
             SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
           ],
         ),
@@ -2158,53 +2280,68 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     }
     final notesC = _notesControllers[slide.id]!;
     return Container(
-      height: compact ? 56 : 88,
-      padding: EdgeInsets.fromLTRB(12, compact ? 4 : 8, 12, compact ? 4 : 8),
-      color: isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      height: compact ? 96 : 96,
+      padding: EdgeInsets.fromLTRB(12, compact ? 8 : 10, 12, compact ? 8 : 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC),
+        borderRadius: compact ? const BorderRadius.vertical(top: Radius.circular(18)) : null,
+        border: compact ? Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0))) : null,
+        boxShadow: compact ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, -4))] : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!compact)
-            Text('Notes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-          if (!compact) const SizedBox(width: 12),
+          Row(
+            children: [
+              Text('Speaker Notes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF475569))),
+              const Spacer(),
+              _panelDoneButton(onDone: () => setState(() => _showNotes = false), isDark: isDark),
+            ],
+          ),
+          const SizedBox(height: 6),
           Expanded(
             child: TextField(
               controller: notesC,
-              maxLines: compact ? 1 : 3,
-              style: TextStyle(fontSize: compact ? 11 : 12, color: isDark ? Colors.white : const Color(0xFF334155)),
+              maxLines: compact ? 2 : 2,
+              style: TextStyle(fontSize: compact ? 12 : 12, color: isDark ? Colors.white : const Color(0xFF334155)),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: compact ? 'Speaker notes…' : 'Speaker notes for this slide…',
+                hintText: 'Speaker notes for this slide…',
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 8 : 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               ),
               onChanged: (v) => _updateSlideNotes(slide.id, v),
             ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
-            tooltip: 'Hide notes',
-            onPressed: () => setState(() => _showNotes = false),
           ),
         ],
       ),
     );
   }
 
-  Widget _formatPanel(bool isDark) {
+  Widget _formatPanel(bool isDark, {bool compact = false}) {
     final el = _selectedElement()!;
     final colors = [
       0xFF111827, 0xFFFFFFFF, 0xFF2563EB, 0xFF059669, 0xFFDC2626,
       0xFF7C3AED, 0xFFEA580C, 0xFF334155,
     ];
     return Container(
-      padding: const EdgeInsets.all(12),
-      color: isDark ? const Color(0xFF1F2937) : Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F2937) : Colors.white,
+        borderRadius: compact ? const BorderRadius.vertical(top: Radius.circular(18)) : null,
+        border: compact ? Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0))) : null,
+        boxShadow: compact ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, -4))] : null,
+      ),
       child: ListView(
         children: [
-          Text('Format', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+          Row(
+            children: [
+              Text('Format', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+              const Spacer(),
+              _panelDoneButton(onDone: _dismissFormatPanel, isDark: isDark),
+            ],
+          ),
           const SizedBox(height: 10),
           Text('Size', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
           Row(

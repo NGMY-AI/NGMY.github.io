@@ -375,9 +375,33 @@ Future<void> _showAutoDismissPreview(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                  const SizedBox(height: 6),
-                  Text('Applied — preview closes automatically', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                            const SizedBox(height: 4),
+                            Text('Applied — tap Done or wait a few seconds', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          timer?.cancel();
+                          Navigator.of(ctx, rootNavigator: true).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 14),
                   preview,
                 ],
