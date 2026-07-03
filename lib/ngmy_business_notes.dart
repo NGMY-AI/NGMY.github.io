@@ -1335,13 +1335,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     });
   }
 
-  void _shiftAnimsForInsert(int pos, int delta) {
-    for (final a in _note.textAnims) {
-      if (a.start >= pos) a.start += delta;
-      if (a.end >= pos) a.end += delta;
-    }
-  }
-
   void _refreshBodyDisplay({int? putCursorCanonical}) {
     final cursorCanon = putCursorCanonical ?? _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
     final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
