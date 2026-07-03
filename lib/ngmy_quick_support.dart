@@ -141,6 +141,17 @@ Future<int> ngmyQuickSupportCount({required String userEmail}) async {
   return (await _loadSupportLines(userEmail)).length;
 }
 
+Future<List<NgmySupportLine>> ngmyExportQuickSupport({required String userEmail}) => _loadSupportLines(userEmail);
+
+Future<void> ngmyImportQuickSupport({required String userEmail, required List<NgmySupportLine> items}) async {
+  final existing = await _loadSupportLines(userEmail);
+  final byId = {for (final e in existing) e.id: e};
+  for (final item in items) {
+    byId[item.id] = item;
+  }
+  await _saveSupportLines(userEmail, byId.values.toList());
+}
+
 Future<void> showNgmyQuickSupportDialog(BuildContext context, {required String userEmail}) {
   return showGeneralDialog<void>(
     context: context,

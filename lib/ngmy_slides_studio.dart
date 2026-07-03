@@ -791,7 +791,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
 
   Widget _editorTopBar(NgmySlideDeck deck, bool isDark) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF111827) : Colors.white,
         border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0))),
@@ -808,51 +808,58 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               deck.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
             ),
           ),
-          IconButton(tooltip: 'Undo', onPressed: _undo.isEmpty ? null : _undoAction, icon: const Icon(Icons.undo_rounded, size: 20)),
-          IconButton(tooltip: 'Redo', onPressed: _redo.isEmpty ? null : _redoAction, icon: const Icon(Icons.redo_rounded, size: 20)),
-          IconButton(tooltip: 'Share outline', onPressed: _shareOutline, icon: const Icon(Icons.ios_share_rounded, size: 20)),
-          FilledButton.icon(
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+            onSelected: (v) async {
+              switch (v) {
+                case 'undo':
+                  _undoAction();
+                case 'redo':
+                  _redoAction();
+                case 'share':
+                  await _shareOutline();
+                case 'timer':
+                  final d = _activeDeck;
+                  if (d == null) return;
+                  final picked = await showModalBottomSheet<int>(
+                    context: context,
+                    backgroundColor: const Color(0xFF111827),
+                    builder: (ctx) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Padding(padding: EdgeInsets.all(12), child: Text('Seconds per slide', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+                          for (final s in [3, 5, 8, 10, 15, 20, 30, 60])
+                            ListTile(
+                              title: Text('$s seconds', style: const TextStyle(color: Colors.white)),
+                              trailing: d.autoAdvanceSeconds == s ? const Icon(Icons.check_rounded, color: Color(0xFF2563EB)) : null,
+                              onTap: () => Navigator.pop(ctx, s),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (picked != null) _mutate(() => d.autoAdvanceSeconds = picked);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'undo', enabled: _undo.isNotEmpty, child: const Text('Undo')),
+              PopupMenuItem(value: 'redo', enabled: _redo.isNotEmpty, child: const Text('Redo')),
+              const PopupMenuItem(value: 'share', child: Text('Share outline')),
+              PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
+            ],
+          ),
+          FilledButton(
             onPressed: _startSlideshow,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF2563EB),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              minimumSize: const Size(0, 36),
             ),
-            icon: const Icon(Icons.play_circle_fill_rounded, size: 18),
-            label: const Text('Present', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Auto-advance: ${_activeDeck?.autoAdvanceSeconds ?? 5}s per slide',
-            onPressed: () async {
-              final deck = _activeDeck;
-              if (deck == null) return;
-              final picked = await showModalBottomSheet<int>(
-                context: context,
-                backgroundColor: const Color(0xFF111827),
-                builder: (ctx) => SafeArea(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Text('Seconds per slide during Present', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                      ),
-                      for (final s in [3, 5, 8, 10, 15, 20, 30, 60])
-                        ListTile(
-                          title: Text('$s seconds', style: const TextStyle(color: Colors.white)),
-                          trailing: deck.autoAdvanceSeconds == s ? const Icon(Icons.check_rounded, color: Color(0xFF2563EB)) : null,
-                          onTap: () => Navigator.pop(ctx, s),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-              if (picked != null) _mutate(() => deck.autoAdvanceSeconds = picked);
-            },
-            icon: Icon(Icons.timer_outlined, size: 20, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
           ),
         ],
       ),
@@ -947,28 +954,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             _aspectChip('Wide 16:9', NgmySlideAspectRatio.landscape169, isDark),
             _aspectChip('Short 9:16', NgmySlideAspectRatio.portrait916, isDark),
             const SizedBox(width: 8),
-            ...NgmySlidesTemplates.themes.map((t) {
-              final selected = _activeDeck?.themeId == t.id;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  selected: selected,
-                  avatar: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent.withValues(alpha: 0.35)]),
-                      border: Border.all(color: t.accent, width: 1.5),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: NgmySlidesTemplates.themes.map((t) {
+                final selected = _activeDeck?.themeId == t.id;
+                return GestureDetector(
+                  onTap: () => _applyTheme(t),
+                  child: Tooltip(
+                    message: t.label,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent]),
+                        border: Border.all(color: selected ? t.accent : Colors.white24, width: selected ? 2.5 : 1),
+                        boxShadow: selected ? [BoxShadow(color: t.accent.withValues(alpha: 0.5), blurRadius: 8)] : null,
+                      ),
                     ),
                   ),
-                  label: Text(t.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: selected ? t.accent : null)),
-                  selectedColor: t.accent.withValues(alpha: 0.2),
-                  checkmarkColor: t.accent,
-                  onSelected: (_) => _applyTheme(t),
-                ),
-              );
-            }),
+                );
+              }).toList(),
+            ),
             const SizedBox(width: 8),
             _layoutMenu(isDark),
           ],
@@ -977,16 +985,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         return Wrap(
           spacing: 6,
           runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
           children: NgmySlideTransition.values.map((tr) {
             final selected = _currentSlide?.transition == tr;
-            return FilterChip(
-              label: Text('${ngmySlideTransitionEmoji(tr)} ${ngmySlideTransitionEmoji(tr)}', style: const TextStyle(fontSize: 16)),
-              tooltip: tr.name,
-              selected: selected,
-              onSelected: (_) => _mutate(() => _currentSlide!.transition = tr),
-              selectedColor: const Color(0xFF2563EB).withValues(alpha: 0.25),
-              checkmarkColor: const Color(0xFF2563EB),
+            return GestureDetector(
+              onTap: () => showNgmyTransitionPreview(
+                context,
+                transition: tr,
+                onApply: () => _mutate(() => _currentSlide!.transition = tr),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFF2563EB).withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.white12),
+                ),
+                child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 18)),
+              ),
             );
           }).toList(),
         );
@@ -1319,19 +1334,51 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         },
         child: Transform.rotate(
           angle: e.rotation,
-          child: Container(
-            decoration: BoxDecoration(
-              border: selected ? Border.all(color: const Color(0xFF2563EB), width: 2) : null,
-            ),
-            child: NgmySlideElementView(
-              element: e,
-              scale: scale,
-              editing: true,
-              selected: selected,
-              controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
-              onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
-              onTap: () => _selectElement(e.id),
-            ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: selected ? Border.all(color: const Color(0xFF2563EB), width: 2) : null,
+                  color: e.type == NgmySlideElementType.signature ? Colors.transparent : null,
+                ),
+                child: NgmySlideElementView(
+                  element: e,
+                  scale: scale,
+                  editing: true,
+                  selected: selected,
+                  controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
+                  onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
+                  onTap: () => _selectElement(e.id),
+                ),
+              ),
+              if (selected)
+                Positioned(
+                  right: -4,
+                  bottom: -4,
+                  child: GestureDetector(
+                    onPanUpdate: (d) {
+                      setState(() {
+                        e.w = (e.w + d.delta.dx / cw).clamp(0.05, 1.0 - e.x);
+                        e.h = (e.h + d.delta.dy / ch).clamp(0.05, 1.0 - e.y);
+                      });
+                      _commitDraftIfNeeded();
+                      _syncDeckIntoList();
+                      _scheduleAutosave();
+                    },
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: const Icon(Icons.open_in_full_rounded, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -1386,6 +1433,32 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         children: [
           Text('Format', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
           const SizedBox(height: 10),
+          Text('Size', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          Row(
+            children: [
+              const Text('W', style: TextStyle(fontSize: 10)),
+              Expanded(child: Slider(value: el.w, min: 0.05, max: 1.0 - el.x, onChanged: (v) => _mutate(() => el.w = v))),
+            ],
+          ),
+          Row(
+            children: [
+              const Text('H', style: TextStyle(fontSize: 10)),
+              Expanded(child: Slider(value: el.h, min: 0.05, max: 1.0 - el.y, onChanged: (v) => _mutate(() => el.h = v))),
+            ],
+          ),
+          if (el.type == NgmySlideElementType.text)
+            Row(
+              children: [
+                const Text('Font', style: TextStyle(fontSize: 10)),
+                Expanded(child: Slider(value: el.fontSize, min: 10, max: 96, onChanged: (v) => _mutate(() => el.fontSize = v))),
+              ],
+            ),
+          if (el.type == NgmySlideElementType.image || el.type == NgmySlideElementType.signature || el.type == NgmySlideElementType.pdf) ...[
+            Text('Crop / position', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+            Row(children: [const Text('X', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.x, min: 0, max: 1 - el.w, onChanged: (v) => _mutate(() => el.x = v)))]),
+            Row(children: [const Text('Y', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.y, min: 0, max: 1 - el.h, onChanged: (v) => _mutate(() => el.y = v)))]),
+          ],
+          const SizedBox(height: 8),
           if (el.type == NgmySlideElementType.text) ...[
             Text('Text color', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
             const SizedBox(height: 6),
@@ -1725,6 +1798,58 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
           ),
           child: KeyedSubtree(key: ValueKey(_index), child: body),
         );
+      case NgmySlideTransition.wipeLeft:
+      case NgmySlideTransition.push:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          transitionBuilder: (c, a) => ClipRect(
+            clipper: _SlideWipeClipper(a.value),
+            child: SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(a), child: c),
+          ),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.wipeRight:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.bounce:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 550),
+          transitionBuilder: (c, a) => ScaleTransition(scale: Tween<double>(begin: 0.4, end: 1).animate(CurvedAnimation(parent: a, curve: Curves.bounceOut)), child: FadeTransition(opacity: a, child: c)),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.flash:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          transitionBuilder: (c, a) => FadeTransition(opacity: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: a, curve: const Interval(0.2, 1))), child: c),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.spiral:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 600),
+          transitionBuilder: (c, a) {
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()..rotateZ((1 - a.value) * 2)..scale(a.value, a.value),
+              child: Opacity(opacity: a.value, child: c),
+            );
+          },
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.swing:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          transitionBuilder: (c, a) => Transform.rotate(angle: (1 - a.value) * 0.25, child: FadeTransition(opacity: a, child: c)),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
+      case NgmySlideTransition.curtain:
+        body = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
+          child: KeyedSubtree(key: ValueKey(_index), child: body),
+        );
       case NgmySlideTransition.none:
         break;
     }
@@ -1786,6 +1911,17 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
       ),
     );
   }
+}
+
+class _SlideWipeClipper extends CustomClipper<Rect> {
+  _SlideWipeClipper(this.progress);
+  final double progress;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(0, 0, size.width * progress.clamp(0, 1), size.height);
+
+  @override
+  bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
 }
 
 class _SlideRender extends StatelessWidget {

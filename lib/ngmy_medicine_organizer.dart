@@ -21,6 +21,8 @@ class NgmyMedicineEntry {
     this.schedule = '',
     this.notes = '',
     this.category = 'Daily',
+    this.startDate,
+    this.endDate,
     DateTime? createdAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now();
@@ -32,6 +34,8 @@ class NgmyMedicineEntry {
   String schedule;
   String notes;
   String category;
+  DateTime? startDate;
+  DateTime? endDate;
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => {
@@ -42,6 +46,8 @@ class NgmyMedicineEntry {
         'schedule': schedule,
         'notes': notes,
         'category': category,
+        if (startDate != null) 'startDate': startDate!.toUtc().toIso8601String(),
+        if (endDate != null) 'endDate': endDate!.toUtc().toIso8601String(),
         'createdAt': createdAt.toUtc().toIso8601String(),
       };
 
@@ -53,6 +59,8 @@ class NgmyMedicineEntry {
         schedule: (json['schedule'] ?? '').toString(),
         notes: (json['notes'] ?? '').toString(),
         category: (json['category'] ?? 'Daily').toString(),
+        startDate: DateTime.tryParse((json['startDate'] ?? '').toString()),
+        endDate: DateTime.tryParse((json['endDate'] ?? '').toString()),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
       );
 }
@@ -77,6 +85,17 @@ Future<void> _saveMedicines(String userEmail, List<NgmyMedicineEntry> items) asy
 
 Future<int> ngmyMedicineOrganizerCount({required String userEmail}) async {
   return (await _loadMedicines(userEmail)).length;
+}
+
+Future<List<NgmyMedicineEntry>> ngmyExportMedicines({required String userEmail}) => _loadMedicines(userEmail);
+
+Future<void> ngmyImportMedicines({required String userEmail, required List<NgmyMedicineEntry> items}) async {
+  final existing = await _loadMedicines(userEmail);
+  final byId = {for (final e in existing) e.id: e};
+  for (final item in items) {
+    byId[item.id] = item;
+  }
+  await _saveMedicines(userEmail, byId.values.toList());
 }
 
 Future<void> showNgmyMedicineOrganizerDialog(BuildContext context, {required String userEmail}) {
@@ -291,6 +310,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
   late final TextEditingController _notes;
   int _timesPerDay = 1;
   String _category = 'Daily';
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -302,6 +323,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
     _notes = TextEditingController(text: e?.notes ?? '');
     _timesPerDay = e?.timesPerDay ?? 1;
     _category = e?.category ?? 'Daily';
+    _startDate = e?.startDate;
+    _endDate = e?.endDate;
   }
 
   @override
@@ -328,6 +351,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
         schedule: _schedule.text.trim(),
         notes: _notes.text.trim(),
         category: _category,
+        startDate: _startDate,
+        endDate: _endDate,
         createdAt: widget.existing?.createdAt,
       ),
     );
@@ -358,6 +383,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
             onSelected: (v) => setState(() => _timesPerDay = int.parse(v)),
           ),
           NgmyModernField(controller: _schedule, label: 'Schedule', hint: 'Morning & evening, with food…', icon: Icons.schedule_rounded, accent: _accent),
+          NgmyModernDateField(label: 'Start date', value: _startDate, accent: _accent, onChanged: (d) => setState(() => _startDate = d)),
+          NgmyModernDateField(label: 'End date', value: _endDate, accent: _accent, onChanged: (d) => setState(() => _endDate = d)),
           Text('TYPE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
           const SizedBox(height: 8),
           NgmyModernChipRow(

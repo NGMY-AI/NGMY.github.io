@@ -147,6 +147,17 @@ Future<int> ngmySavedLocationCount({required String userEmail}) async {
   return (await _loadLocations(userEmail)).length;
 }
 
+Future<List<NgmySavedLocation>> ngmyExportSavedLocations({required String userEmail}) => _loadLocations(userEmail);
+
+Future<void> ngmyImportSavedLocations({required String userEmail, required List<NgmySavedLocation> items}) async {
+  final existing = await _loadLocations(userEmail);
+  final byId = {for (final e in existing) e.id: e};
+  for (final item in items) {
+    byId[item.id] = item;
+  }
+  await _saveLocations(userEmail, byId.values.toList());
+}
+
 Future<void> showNgmySavedLocationsDialog(BuildContext context, {required String userEmail}) {
   return showGeneralDialog<void>(
     context: context,
@@ -474,6 +485,7 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
   double? _lat;
   double? _lng;
   bool _locating = false;
+  DateTime? _lastVisited;
 
   @override
   void initState() {
@@ -485,6 +497,7 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
     _category = e?.category ?? 'Client Site';
     _lat = e?.lat;
     _lng = e?.lng;
+    _lastVisited = e?.lastVisited;
   }
 
   @override
@@ -532,7 +545,7 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
         lng: _lng,
         notes: _notes.text.trim(),
         visitCount: widget.existing?.visitCount ?? 0,
-        lastVisited: widget.existing?.lastVisited,
+        lastVisited: _lastVisited,
         createdAt: widget.existing?.createdAt,
       ),
     );
@@ -592,6 +605,7 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
             ),
           ),
           const SizedBox(height: 14),
+          NgmyModernDateField(label: 'Last visit', value: _lastVisited, accent: _accent, onChanged: (d) => setState(() => _lastVisited = d)),
           NgmyModernField(controller: _notes, label: 'Notes', hint: 'Gate code, contact on site…', icon: Icons.notes_rounded, accent: _accent, maxLines: 2),
         ],
       ),

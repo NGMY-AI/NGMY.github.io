@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_business_contacts.dart';
+import 'ngmy_essentials_transfer.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -99,6 +100,22 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                   ),
                   const Expanded(
                     child: Text('Business Essentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                  ),
+                  IconButton(
+                    tooltip: 'Transfer / backup',
+                    onPressed: () async {
+                      await showNgmyEssentialsTransferHub(context, userEmail: widget.userEmail);
+                      await _reload();
+                    },
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                      ),
+                      child: const Icon(Icons.sync_alt_rounded, color: Color(0xFF38BDF8), size: 18),
+                    ),
                   ),
                 ],
               ),

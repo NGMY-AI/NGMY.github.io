@@ -57,6 +57,14 @@ enum NgmySlideTransition {
   cube,
   blur,
   dissolve,
+  wipeLeft,
+  wipeRight,
+  bounce,
+  push,
+  flash,
+  spiral,
+  swing,
+  curtain,
 }
 
 class NgmySlideElement {
@@ -801,6 +809,18 @@ class NgmySlidesTemplates {
       slideBg: Color(0xFFF5F3FF),
       slideBgEnd: Color(0xFFDDD6FE),
     ),
+    NgmySlidesTheme(id: 'coral', label: 'Coral', accent: Color(0xFFF97316), titleColor: Color(0xFF9A3412), bodyColor: Color(0xFF431407), slideBg: Color(0xFFFFF7ED), slideBgEnd: Color(0xFFFDBA74)),
+    NgmySlidesTheme(id: 'forest', label: 'Forest', accent: Color(0xFF166534), titleColor: Color(0xFF14532D), bodyColor: Color(0xFF1F2937), slideBg: Color(0xFFECFDF5), slideBgEnd: Color(0xFF86EFAC)),
+    NgmySlidesTheme(id: 'berry', label: 'Berry', accent: Color(0xFFA855F7), titleColor: Color(0xFF6B21A8), bodyColor: Color(0xFF3B0764), slideBg: Color(0xFFFAF5FF), slideBgEnd: Color(0xFFE9D5FF)),
+    NgmySlidesTheme(id: 'sand', label: 'Sand', accent: Color(0xFFD97706), titleColor: Color(0xFF92400E), bodyColor: Color(0xFF44403C), slideBg: Color(0xFFFFFBEB), slideBgEnd: Color(0xFFFDE68A)),
+    NgmySlidesTheme(id: 'ice', label: 'Ice', accent: Color(0xFF0284C7), titleColor: Color(0xFF075985), bodyColor: Color(0xFF334155), slideBg: Color(0xFFF0F9FF), slideBgEnd: Color(0xFFBAE6FD)),
+    NgmySlidesTheme(id: 'charcoal', label: 'Charcoal', accent: Color(0xFF64748B), titleColor: Color(0xFFF8FAFC), bodyColor: Color(0xFFCBD5E1), slideBg: Color(0xFF1E293B), slideBgEnd: Color(0xFF0F172A)),
+    NgmySlidesTheme(id: 'mint', label: 'Mint', accent: Color(0xFF10B981), titleColor: Color(0xFF047857), bodyColor: Color(0xFF065F46), slideBg: Color(0xFFECFDF5), slideBgEnd: Color(0xFFA7F3D0)),
+    NgmySlidesTheme(id: 'crimson', label: 'Crimson', accent: Color(0xFFDC2626), titleColor: Color(0xFF991B1B), bodyColor: Color(0xFF450A0A), slideBg: Color(0xFFFEF2F2), slideBgEnd: Color(0xFFFECACA)),
+    NgmySlidesTheme(id: 'gold', label: 'Gold', accent: Color(0xFFEAB308), titleColor: Color(0xFF854D0E), bodyColor: Color(0xFF422006), slideBg: Color(0xFFFEFCE8), slideBgEnd: Color(0xFFFEF08A)),
+    NgmySlidesTheme(id: 'aqua', label: 'Aqua', accent: Color(0xFF06B6D4), titleColor: Color(0xFF155E75), bodyColor: Color(0xFF164E63), slideBg: Color(0xFFECFEFF), slideBgEnd: Color(0xFFA5F3FC)),
+    NgmySlidesTheme(id: 'plum', label: 'Plum', accent: Color(0xFF9333EA), titleColor: Color(0xFF581C87), bodyColor: Color(0xFF3B0764), slideBg: Color(0xFFFDF4FF), slideBgEnd: Color(0xFFF0ABFC)),
+    NgmySlidesTheme(id: 'steel', label: 'Steel', accent: Color(0xFF3B82F6), titleColor: Color(0xFF1E3A8A), bodyColor: Color(0xFF1E293B), slideBg: Color(0xFFEFF6FF), slideBgEnd: Color(0xFFBFDBFE)),
   ];
 
   static void applyThemeToDeck(NgmySlideDeck deck, NgmySlidesTheme theme) {

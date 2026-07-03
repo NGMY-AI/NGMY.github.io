@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// Modern full-screen editor shell for hub tools — gradient hero, glass fields, pill chips.
 class NgmyModernEditorPage extends StatelessWidget {
@@ -262,4 +263,87 @@ Future<T?> showNgmyModernEditorPage<T>(BuildContext context, Widget page) {
       },
     ),
   );
+}
+
+/// Professional date picker row with underline divider.
+class NgmyModernDateField extends StatelessWidget {
+  const NgmyModernDateField({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.accent,
+    this.hint = 'Select date',
+  });
+
+  final String label;
+  final DateTime? value;
+  final ValueChanged<DateTime?> onChanged;
+  final Color accent;
+  final String hint;
+
+  static final _fmt = DateFormat('MMM d, yyyy');
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(), style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          const SizedBox(height: 6),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: value ?? now,
+                  firstDate: DateTime(now.year - 10),
+                  lastDate: DateTime(now.year + 10),
+                  builder: (ctx, child) => Theme(
+                    data: Theme.of(ctx).copyWith(colorScheme: ColorScheme.dark(primary: accent, surface: const Color(0xFF111827))),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) onChanged(picked);
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today_rounded, color: accent, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        value != null ? _fmt.format(value!) : hint,
+                        style: TextStyle(color: value != null ? Colors.white : Colors.white.withValues(alpha: 0.28), fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                    ),
+                    if (value != null)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => onChanged(null),
+                        icon: Icon(Icons.close_rounded, size: 16, color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(height: 1, color: accent.withValues(alpha: 0.35)),
+        ],
+      ),
+    );
+  }
 }

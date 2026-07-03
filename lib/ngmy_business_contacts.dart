@@ -147,6 +147,17 @@ Future<int> ngmyBusinessContactCount({required String userEmail}) async {
   return list.length;
 }
 
+Future<List<NgmyBusinessContact>> ngmyExportBusinessContacts({required String userEmail}) => _loadContacts(userEmail);
+
+Future<void> ngmyImportBusinessContacts({required String userEmail, required List<NgmyBusinessContact> items}) async {
+  final existing = await _loadContacts(userEmail);
+  final byId = {for (final e in existing) e.id: e};
+  for (final item in items) {
+    byId[item.id] = item;
+  }
+  await _saveContacts(userEmail, byId.values.toList());
+}
+
 Future<void> showNgmyBusinessContactsDialog(BuildContext context, {required String userEmail}) {
   return showGeneralDialog<void>(
     context: context,
@@ -455,6 +466,7 @@ class _ContactEditorPageState extends State<_ContactEditorPage> {
   late final TextEditingController _email;
   late final TextEditingController _notes;
   String _category = 'Client';
+  DateTime? _lastContacted;
 
   @override
   void initState() {
@@ -466,6 +478,7 @@ class _ContactEditorPageState extends State<_ContactEditorPage> {
     _email = TextEditingController(text: e?.email ?? '');
     _notes = TextEditingController(text: e?.notes ?? '');
     _category = e?.category ?? 'Client';
+    _lastContacted = e?.lastContacted;
   }
 
   @override
@@ -494,7 +507,7 @@ class _ContactEditorPageState extends State<_ContactEditorPage> {
         category: _category,
         notes: _notes.text.trim(),
         favorite: widget.existing?.favorite ?? false,
-        lastContacted: widget.existing?.lastContacted,
+        lastContacted: _lastContacted,
         createdAt: widget.existing?.createdAt,
       ),
     );
@@ -526,6 +539,7 @@ class _ContactEditorPageState extends State<_ContactEditorPage> {
             accent: _accent,
             onSelected: (v) => setState(() => _category = v),
           ),
+          NgmyModernDateField(label: 'Last contacted', value: _lastContacted, accent: _accent, onChanged: (d) => setState(() => _lastContacted = d)),
           NgmyModernField(controller: _notes, label: 'Notes', hint: 'Best time to call, account #…', icon: Icons.notes_rounded, accent: _accent, maxLines: 3),
         ],
       ),
