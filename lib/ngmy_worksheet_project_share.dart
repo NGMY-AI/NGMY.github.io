@@ -334,7 +334,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionLabel(p, 'Send project'),
+                    _sectionLabel(p, 'QR restore'),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -342,7 +342,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                           p,
                           icon: Icons.qr_code_2_rounded,
                           title: 'QR code',
-                          subtitle: 'Instant scan',
+                          subtitle: 'Show to scan',
                           iconColor: const Color(0xFF38BDF8),
                           iconBg: const Color(0xFF38BDF8),
                           featured: true,
@@ -351,28 +351,28 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                         const SizedBox(width: 10),
                         _actionTile(
                           p,
-                          icon: Icons.download_rounded,
-                          title: 'Backup file',
-                          subtitle: 'Full copy',
-                          iconColor: WorksheetPalette.teal,
-                          iconBg: WorksheetPalette.green,
-                          onTap: () => _download(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sectionLabel(p, 'Import project'),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _actionTile(
-                          p,
                           icon: Icons.qr_code_scanner_rounded,
                           title: 'Scan QR',
                           subtitle: 'From camera',
                           iconColor: const Color(0xFFA78BFA),
                           iconBg: const Color(0xFF8B5CF6),
                           onTap: () => _scan(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel(p, 'Backup files'),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _actionTile(
+                          p,
+                          icon: Icons.download_rounded,
+                          title: 'Backup file',
+                          subtitle: 'Full copy',
+                          iconColor: WorksheetPalette.teal,
+                          iconBg: WorksheetPalette.green,
+                          onTap: () => _download(context),
                         ),
                         const SizedBox(width: 10),
                         _actionTile(

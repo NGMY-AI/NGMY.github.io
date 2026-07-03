@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:flutter/scheduler.dart';
@@ -69,8 +68,6 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   bool _canExport = false;
   String? _statusMessage;
   bool _working = false;
-
-  static const Color _accent = WorksheetPalette.green;
 
   @override
   void initState() {
@@ -247,16 +244,13 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final palette = _FamilyTreePalette.of(isDark);
+    final titleColor = palette.title;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: palette.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: palette.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -272,139 +266,91 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 32),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
             children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [WorksheetPalette.green, WorksheetPalette.greenDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 2),
-                      ),
-                      child: const Icon(Icons.park_rounded, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Move your family trees',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.importOnly
-                                ? 'Upload a file or scan a QR from someone who shared their tree. View only until you create your own tree.'
-                                : widget.isAdmin
-                                    ? 'Photos and family books stay on this device. Admin skips cloud codes.'
-                                    : 'Full trees stay local. QR works 2 times — names & dates sync to cloud only.',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, height: 1.35),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              _FamilyTreeHeroBanner(
+                palette: palette,
+                importOnly: widget.importOnly,
+                isAdmin: widget.isAdmin,
               ),
-              const SizedBox(height: 18),
-              Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
+              const SizedBox(height: 28),
+              _FamilyTreeSectionLabel(palette, 'QR restore'),
               const SizedBox(height: 10),
-              if (_canExport) ...[
-                _SyncActionTile(
-                  icon: Icons.download_rounded,
-                  label: 'Download all family trees',
-                  subtitle: 'Photos, books & notes included in file',
-                  card: card,
-                  border: border,
-                  onTap: _working ? null : _exportAll,
-                ),
-                const SizedBox(height: 8),
-              ],
-              _SyncActionTile(
-                icon: Icons.upload_file_rounded,
-                label: 'Upload backup file',
-                subtitle: widget.importOnly ? 'Restore a shared family tree file' : 'Restore trees from a saved file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _importFile,
+              Row(
+                children: [
+                  if (_canExport) ...[
+                    Expanded(
+                      child: _FamilyTreeActionTile(
+                        palette: palette,
+                        icon: Icons.qr_code_2_rounded,
+                        title: 'Show restore QR',
+                        subtitle: widget.isAdmin ? 'Scannable backup' : '2 scans max',
+                        iconColor: const Color(0xFF38BDF8),
+                        iconBg: const Color(0xFF38BDF8),
+                        featured: true,
+                        onTap: _working ? null : _showQr,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: _FamilyTreeActionTile(
+                      palette: palette,
+                      icon: Icons.qr_code_scanner_rounded,
+                      title: 'Scan QR to restore',
+                      subtitle: 'From another phone',
+                      iconColor: const Color(0xFFA78BFA),
+                      iconBg: const Color(0xFF8B5CF6),
+                      featured: !_canExport,
+                      onTap: _working ? null : _scanQr,
+                    ),
+                  ),
+                ],
               ),
-              if (_canExport) ...[
-                const SizedBox(height: 8),
-                _SyncActionTile(
-                  icon: Icons.qr_code_2_rounded,
-                  label: 'Show restore QR',
-                  subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
-                  card: card,
-                  border: border,
-                  accent: true,
-                  onTap: _working ? null : _showQr,
-                ),
-              ],
-              const SizedBox(height: 8),
-              _SyncActionTile(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Scan QR to restore',
-                subtitle: 'Import from another device — no tree purchase required',
-                card: card,
-                border: border,
-                accent: widget.importOnly || !_canExport,
-                onTap: _working ? null : _scanQr,
+              const SizedBox(height: 20),
+              _FamilyTreeSectionLabel(palette, 'Backup files'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (_canExport) ...[
+                    Expanded(
+                      child: _FamilyTreeActionTile(
+                        palette: palette,
+                        icon: Icons.download_rounded,
+                        title: 'Download all trees',
+                        subtitle: 'Photos & books included',
+                        iconColor: WorksheetPalette.teal,
+                        iconBg: WorksheetPalette.green,
+                        onTap: _working ? null : _exportAll,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: _FamilyTreeActionTile(
+                      palette: palette,
+                      icon: Icons.upload_file_rounded,
+                      title: 'Upload backup file',
+                      subtitle: widget.importOnly ? 'Restore shared file' : 'From saved file',
+                      iconColor: const Color(0xFFFBBF24),
+                      iconBg: const Color(0xFFF59E0B),
+                      onTap: _working ? null : _importFile,
+                    ),
+                  ),
+                ],
               ),
               if (_canExport && _trees.length > 1 && widget.onlyTreeId == null) ...[
-                const SizedBox(height: 22),
-                Text('One tree', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
-                const SizedBox(height: 8),
+                const SizedBox(height: 28),
+                _FamilyTreeSectionLabel(palette, 'One tree'),
+                const SizedBox(height: 10),
                 ..._trees.map(
                   (t) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Material(
-                      color: card,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        onTap: _working ? null : () => _exportOne(t.id),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: border),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: _accent.withValues(alpha: 0.15),
-                                child: const Icon(Icons.park_outlined, color: _accent, size: 18),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(t.name, style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
-                                    Text('${t.count} members', style: TextStyle(fontSize: 11, color: muted)),
-                                  ],
-                                ),
-                              ),
-                              Icon(Icons.download_outlined, color: muted, size: 20),
-                            ],
-                          ),
-                        ),
-                      ),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _FamilyTreeSingleTreeTile(
+                      palette: palette,
+                      name: t.name,
+                      count: t.count,
+                      onTap: _working ? null : () => _exportOne(t.id),
                     ),
                   ),
                 ),
@@ -413,20 +359,31 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
           ),
           if (_working)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Material(
-                elevation: 8,
-                color: card,
-                child: Padding(
+              left: 20,
+              right: 20,
+              bottom: 24,
+              child: SafeArea(
+                top: false,
+                child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: palette.card,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
                   child: Row(
                     children: [
                       const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: _accent),
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: WorksheetPalette.green),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -446,70 +403,303 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   }
 }
 
-class _SyncActionTile extends StatelessWidget {
-  const _SyncActionTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
+class _FamilyTreePalette {
+  const _FamilyTreePalette({
+    required this.bg,
     required this.card,
     required this.border,
-    required this.onTap,
-    this.accent = false,
+    required this.title,
+    required this.muted,
   });
 
-  final IconData icon;
-  final String label;
-  final String subtitle;
+  final Color bg;
   final Color card;
   final Color border;
-  final VoidCallback? onTap;
-  final bool accent;
+  final Color title;
+  final Color muted;
 
-  static const Color _accent = WorksheetPalette.green;
+  factory _FamilyTreePalette.of(bool isDark) {
+    return _FamilyTreePalette(
+      bg: isDark ? const Color(0xFF0B1018) : const Color(0xFFF3F4F6),
+      card: isDark ? const Color(0xFF1A2433) : const Color(0xFFF8FAFC),
+      border: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB),
+      title: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF111827),
+      muted: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280),
+    );
+  }
+}
+
+class _FamilyTreeHeroBanner extends StatelessWidget {
+  const _FamilyTreeHeroBanner({
+    required this.palette,
+    required this.importOnly,
+    required this.isAdmin,
+  });
+
+  final _FamilyTreePalette palette;
+  final bool importOnly;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-    final iconBg = accent ? _accent : _accent.withValues(alpha: 0.12);
-    final iconFg = accent ? Colors.white : _accent;
+    final subtitle = importOnly
+        ? 'Upload a file or scan a QR from someone who shared their tree. View only until you create your own tree.'
+        : isAdmin
+            ? 'Photos and family books stay on this device. Admin skips cloud codes.'
+            : 'Full trees stay local. QR works 2 times — names & dates sync to cloud only.';
 
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF059669), Color(0xFF10B981), Color(0xFF14B8A6)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: WorksheetPalette.green.withValues(alpha: 0.32),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            top: -10,
+            child: Icon(Icons.sync_alt_rounded, size: 110, color: Colors.white.withValues(alpha: 0.07)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+                  ),
+                  child: const Icon(Icons.park_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Move your family trees',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FamilyTreeSectionLabel extends StatelessWidget {
+  const _FamilyTreeSectionLabel(this.palette, this.text);
+
+  final _FamilyTreePalette palette;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: WorksheetPalette.green,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            color: palette.muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.9,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FamilyTreeActionTile extends StatelessWidget {
+  const _FamilyTreeActionTile({
+    required this.palette,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.iconColor,
+    required this.iconBg,
+    required this.onTap,
+    this.featured = false,
+  });
+
+  final _FamilyTreePalette palette;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color iconColor;
+  final Color iconBg;
+  final VoidCallback? onTap;
+  final bool featured;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
     return Material(
-      color: card,
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent ? _accent.withValues(alpha: 0.45) : border),
+            borderRadius: BorderRadius.circular(18),
+            color: palette.card,
+            border: Border.all(
+              color: featured
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                  : palette.border,
+              width: featured ? 1.5 : 1,
+            ),
+            boxShadow: featured
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconFg, size: 22),
+          child: Opacity(
+            opacity: disabled ? 0.45 : 1,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: iconBg.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: iconColor.withValues(alpha: 0.35)),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 22),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: palette.title,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: palette.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: titleColor)),
-                    Text(subtitle, style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
-                  ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FamilyTreeSingleTreeTile extends StatelessWidget {
+  const _FamilyTreeSingleTreeTile({
+    required this.palette,
+    required this.name,
+    required this.count,
+    required this.onTap,
+  });
+
+  final _FamilyTreePalette palette;
+  final String name;
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: palette.card,
+            border: Border.all(color: palette.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: WorksheetPalette.green.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+                  ),
+                  child: const Icon(Icons.park_outlined, color: WorksheetPalette.green, size: 20),
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: muted),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, color: palette.title)),
+                      Text('$count members', style: TextStyle(fontSize: 11, color: palette.muted)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.download_rounded, color: palette.muted, size: 20),
+              ],
+            ),
           ),
         ),
       ),
