@@ -9,7 +9,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
-import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent, ngmyWarmCommunicateAvatarsFromConfig;
+import 'ngmy_communicate.dart' show kNgmyAdvisorsHubAccent, kNgmyAdvisorsHubAccent2, ngmyWarmCommunicateAvatarsFromConfig;
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
@@ -252,195 +252,105 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
-    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final palette = _SyncPalette.of(isDark);
+
+    final exportActions = <_SyncActionSpec>[
+      if (_canExport)
+        _SyncActionSpec(
+          icon: Icons.cloud_download_rounded,
+          label: 'Download all conversations',
+          subtitle: 'Save every advisor chat as a file',
+          accent: false,
+          onTap: _working ? null : _exportAll,
+        ),
+      _SyncActionSpec(
+        icon: Icons.folder_open_rounded,
+        label: 'Upload backup file',
+        subtitle: 'Restore chats from a saved file',
+        accent: false,
+        onTap: _working ? null : _importFile,
+      ),
+      if (_canExport)
+        _SyncActionSpec(
+          icon: Icons.qr_code_2_rounded,
+          label: 'Show restore QR',
+          subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
+          accent: true,
+          onTap: _working ? null : _showQr,
+        ),
+      _SyncActionSpec(
+        icon: Icons.qr_code_scanner_rounded,
+        label: 'Scan QR to restore',
+        subtitle: 'Import from another device — toggle Helper at bottom or Helper only at top',
+        accent: !_canExport,
+        onTap: _working ? null : _scanQr,
+      ),
+    ];
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: palette.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: palette.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: palette.title, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Conversation sync',
-          style: TextStyle(color: titleColor, fontWeight: FontWeight.w900, fontSize: 17),
+          style: TextStyle(color: palette.title, fontWeight: FontWeight.w900, fontSize: 17),
         ),
         centerTitle: true,
       ),
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 32),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
             children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.sync_rounded, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Move your advisor chats',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.isAdmin
-                                ? 'Backups stay on this device. Admin skips cloud codes.'
-                                : _canExport
-                                    ? 'Messages stay local. QR works 2 times while your pass is active.'
-                                    : 'Scan a QR or upload a file to receive conversations — no pass needed to import.',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 12, height: 1.35),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              _SyncHeroBanner(
+                palette: palette,
+                isAdmin: widget.isAdmin,
+                canExport: _canExport,
               ),
-              const SizedBox(height: 18),
-              Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
-              const SizedBox(height: 10),
-              if (_canExport) ...[
-                _SyncActionTile(
-                  icon: Icons.download_rounded,
-                  label: 'Download all conversations',
-                  subtitle: 'Save every advisor chat as a file',
-                  card: card,
-                  border: border,
-                  onTap: _working ? null : _exportAll,
-                ),
-                const SizedBox(height: 8),
-              ],
-              _SyncActionTile(
-                icon: Icons.upload_file_rounded,
-                label: 'Upload backup file',
-                subtitle: 'Restore chats from a saved file',
-                card: card,
-                border: border,
-                onTap: _working ? null : _importFile,
+              const SizedBox(height: 28),
+              _SyncSectionHeader(
+                title: 'Actions',
+                subtitle: 'Move, restore, or share your advisor chats',
+                palette: palette,
               ),
-              if (_canExport) ...[
-                const SizedBox(height: 8),
-                _SyncActionTile(
-                  icon: Icons.qr_code_2_rounded,
-                  label: 'Show restore QR',
-                  subtitle: widget.isAdmin ? 'Share a scannable backup' : 'Works 2 times — any phone can scan',
-                  card: card,
-                  border: border,
-                  accent: true,
-                  onTap: _working ? null : _showQr,
-                ),
-              ],
-              const SizedBox(height: 8),
-              _SyncActionTile(
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Scan QR to restore',
-                subtitle: 'Import from another device — toggle Helper at bottom or Helper only at top',
-                card: card,
-                border: border,
-                accent: !_canExport,
-                onTap: _working ? null : _scanQr,
+              const SizedBox(height: 14),
+              _SyncActionGroup(
+                palette: palette,
+                actions: exportActions,
               ),
               if (_canExport && _threads.isNotEmpty) ...[
-                const SizedBox(height: 22),
-                Text('One advisor', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: titleColor)),
-                const SizedBox(height: 8),
-                ..._threads.map(
-                  (t) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Material(
-                      color: card,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        onTap: _working ? null : () => _exportOne(t.id),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: border),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: kNgmyAdvisorsHubAccent.withValues(alpha: 0.15),
-                                child: const Icon(Icons.support_agent_rounded, color: kNgmyAdvisorsHubAccent, size: 18),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(t.name, style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
-                                    Text('${t.count} messages', style: TextStyle(fontSize: 11, color: muted)),
-                                  ],
-                                ),
-                              ),
-                              Icon(Icons.download_outlined, color: muted, size: 20),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 28),
+                _SyncSectionHeader(
+                  title: 'One advisor',
+                  subtitle: 'Download a single conversation thread',
+                  palette: palette,
+                ),
+                const SizedBox(height: 14),
+                _SyncAdvisorGroup(
+                  palette: palette,
+                  threads: _threads,
+                  working: _working,
+                  onExport: _exportOne,
                 ),
               ],
             ],
           ),
           if (_working)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Material(
-                elevation: 8,
-                color: card,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  child: Row(
-                    children: [
-                      const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: kNgmyAdvisorsHubAccent),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _statusMessage ?? 'Working…',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: titleColor, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
+              left: 20,
+              right: 20,
+              bottom: 24,
+              child: SafeArea(
+                top: false,
+                child: _SyncWorkingPill(
+                  palette: palette,
+                  message: _statusMessage ?? 'Working…',
                 ),
               ),
             ),
@@ -450,13 +360,11 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   }
 }
 
-class _SyncActionTile extends StatelessWidget {
-  const _SyncActionTile({
+class _SyncActionSpec {
+  const _SyncActionSpec({
     required this.icon,
     required this.label,
     required this.subtitle,
-    required this.card,
-    required this.border,
     required this.onTap,
     this.accent = false,
   });
@@ -464,56 +372,514 @@ class _SyncActionTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
+  final VoidCallback? onTap;
+  final bool accent;
+}
+
+class _SyncPalette {
+  const _SyncPalette({
+    required this.bg,
+    required this.card,
+    required this.cardElevated,
+    required this.border,
+    required this.title,
+    required this.muted,
+    required this.softFill,
+  });
+
+  final Color bg;
   final Color card;
+  final Color cardElevated;
   final Color border;
+  final Color title;
+  final Color muted;
+  final Color softFill;
+
+  factory _SyncPalette.of(bool isDark) {
+    return _SyncPalette(
+      bg: isDark ? const Color(0xFF070A12) : const Color(0xFFF8FAFC),
+      card: isDark ? const Color(0xFF121826) : Colors.white,
+      cardElevated: isDark ? const Color(0xFF171F31) : const Color(0xFFFFFFFF),
+      border: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFE2E8F0),
+      title: isDark ? Colors.white : const Color(0xFF0F172A),
+      muted: isDark ? Colors.white.withValues(alpha: 0.58) : const Color(0xFF64748B),
+      softFill: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
+    );
+  }
+}
+
+class _SyncHeroBanner extends StatelessWidget {
+  const _SyncHeroBanner({
+    required this.palette,
+    required this.isAdmin,
+    required this.canExport,
+  });
+
+  final _SyncPalette palette;
+  final bool isAdmin;
+  final bool canExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = isAdmin
+        ? 'Backups stay on this device. Admin skips cloud codes.'
+        : canExport
+            ? 'Messages stay local. QR works 2 times while your pass is active.'
+            : 'Scan a QR or upload a file to receive conversations — no pass needed to import.';
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [kNgmyAdvisorsHubAccent, kNgmyAdvisorsHubAccent2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.28),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -18,
+            top: -18,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -24,
+            bottom: -30,
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                  ),
+                  child: const Icon(Icons.sync_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Move your advisor chats',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncSectionHeader extends StatelessWidget {
+  const _SyncSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.palette,
+  });
+
+  final String title;
+  final String subtitle;
+  final _SyncPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: palette.title),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: TextStyle(fontSize: 12, height: 1.35, color: palette.muted),
+        ),
+      ],
+    );
+  }
+}
+
+class _SyncActionGroup extends StatelessWidget {
+  const _SyncActionGroup({
+    required this.palette,
+    required this.actions,
+  });
+
+  final _SyncPalette palette;
+  final List<_SyncActionSpec> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: palette.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              _SyncActionTile(
+                palette: palette,
+                icon: actions[i].icon,
+                label: actions[i].label,
+                subtitle: actions[i].subtitle,
+                accent: actions[i].accent,
+                onTap: actions[i].onTap,
+              ),
+              if (i < actions.length - 1)
+                Divider(height: 1, thickness: 1, color: palette.border),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncActionTile extends StatelessWidget {
+  const _SyncActionTile({
+    required this.palette,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+    this.accent = false,
+  });
+
+  final _SyncPalette palette;
+  final IconData icon;
+  final String label;
+  final String subtitle;
   final VoidCallback? onTap;
   final bool accent;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-    final iconBg = accent ? kNgmyAdvisorsHubAccent : kNgmyAdvisorsHubAccent.withValues(alpha: 0.12);
-    final iconFg = accent ? Colors.white : kNgmyAdvisorsHubAccent;
+    final disabled = onTap == null;
+    final iconGradient = accent
+        ? const LinearGradient(
+            colors: [kNgmyAdvisorsHubAccent, kNgmyAdvisorsHubAccent2],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : null;
 
     return Material(
-      color: card,
-      borderRadius: BorderRadius.circular(16),
+      color: accent ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.05) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.45) : border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
+        child: Opacity(
+          opacity: disabled ? 0.45 : 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: iconGradient,
+                    color: iconGradient == null ? palette.softFill : null,
+                    borderRadius: BorderRadius.circular(14),
+                    border: accent
+                        ? null
+                        : Border.all(color: palette.border),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: accent ? Colors.white : kNgmyAdvisorsHubAccent,
+                    size: 22,
+                  ),
                 ),
-                child: Icon(icon, color: iconFg, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: titleColor)),
-                    Text(subtitle, style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
-                  ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: palette.title,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, height: 1.35, color: palette.muted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: muted),
-            ],
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: accent
+                        ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.12)
+                        : palette.softFill,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: accent ? kNgmyAdvisorsHubAccent : palette.muted,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SyncAdvisorGroup extends StatelessWidget {
+  const _SyncAdvisorGroup({
+    required this.palette,
+    required this.threads,
+    required this.working,
+    required this.onExport,
+  });
+
+  final _SyncPalette palette;
+  final List<({String id, String name, int count})> threads;
+  final bool working;
+  final Future<void> Function(String profileId) onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: palette.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            for (var i = 0; i < threads.length; i++) ...[
+              _SyncAdvisorTile(
+                palette: palette,
+                name: threads[i].name,
+                count: threads[i].count,
+                onTap: working ? null : () => onExport(threads[i].id),
+              ),
+              if (i < threads.length - 1)
+                Divider(height: 1, thickness: 1, color: palette.border),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncAdvisorTile extends StatelessWidget {
+  const _SyncAdvisorTile({
+    required this.palette,
+    required this.name,
+    required this.count,
+    required this.onTap,
+  });
+
+  final _SyncPalette palette;
+  final String name;
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Opacity(
+          opacity: onTap == null ? 0.45 : 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        kNgmyAdvisorsHubAccent.withValues(alpha: 0.18),
+                        kNgmyAdvisorsHubAccent2.withValues(alpha: 0.12),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.support_agent_rounded, color: kNgmyAdvisorsHubAccent, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: palette.title),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$count message${count == 1 ? '' : 's'}',
+                        style: TextStyle(fontSize: 12, color: palette.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: palette.softFill,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.download_rounded, size: 14, color: kNgmyAdvisorsHubAccent),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Save',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: kNgmyAdvisorsHubAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncWorkingPill extends StatelessWidget {
+  const _SyncWorkingPill({
+    required this.palette,
+    required this.message,
+  });
+
+  final _SyncPalette palette;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: palette.cardElevated,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: kNgmyAdvisorsHubAccent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontWeight: FontWeight.w800, color: palette.title, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }
