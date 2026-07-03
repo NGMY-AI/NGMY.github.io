@@ -95,7 +95,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             const SizedBox(height: 18),
             _youtubeFrame(
               title: 'Business Essentials',
-              subtitle: 'Contacts · locations · support — pick a category inside',
+              subtitle: 'Contacts · site map · hotlines — pick inside',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF0F172A), Color(0xFF1E3A8A), Color(0xFF0E7490)],
               accent: const Color(0xFF38BDF8),
@@ -280,38 +280,30 @@ class _EssentialsThumbPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8), 'Contacts'),
-            const SizedBox(width: 10),
-            _miniTile(Icons.place_rounded, const Color(0xFF34D399), 'Places'),
-            const SizedBox(width: 10),
-            _miniTile(Icons.support_agent_rounded, const Color(0xFFFBBF24), 'Support'),
-          ],
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8)),
+          const SizedBox(width: 6),
+          _miniTile(Icons.map_rounded, const Color(0xFF34D399)),
+          const SizedBox(width: 6),
+          _miniTile(Icons.phone_in_talk_rounded, const Color(0xFFFBBF24)),
+        ],
       ),
     );
   }
 
-  static Widget _miniTile(IconData icon, Color accent, String label) {
+  static Widget _miniTile(IconData icon, Color accent) {
     return Container(
-      width: 88,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withValues(alpha: 0.5)),
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.2),
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: accent, size: 26),
-          const SizedBox(height: 6),
-          Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 0.5)),
-        ],
-      ),
+      child: Icon(icon, color: accent, size: 22),
     );
   }
 }

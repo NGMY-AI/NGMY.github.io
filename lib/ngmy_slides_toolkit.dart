@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -10,7 +11,7 @@ import 'ngmy_slides_print_stub.dart' if (dart.library.html) 'ngmy_slides_print_w
 import 'ngmy_worksheet_helpers.dart';
 
 /// Pick a PDF and return a data URL for embedding on a slide.
-Future<({String dataUrl, String fileName})?> ngmySlidesPickPdf() async {
+Future<({String dataUrl, String fileName, Uint8List bytes})?> ngmySlidesPickPdf() async {
   final result = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['pdf'],
@@ -21,7 +22,22 @@ Future<({String dataUrl, String fileName})?> ngmySlidesPickPdf() async {
   final bytes = file.bytes;
   if (bytes == null || bytes.isEmpty) return null;
   final name = file.name.trim().isEmpty ? 'document.pdf' : file.name.trim();
-  return (dataUrl: 'data:application/pdf;base64,${base64Encode(bytes)}', fileName: name);
+  return (dataUrl: 'data:application/pdf;base64,${base64Encode(bytes)}', fileName: name, bytes: bytes);
+}
+
+/// Best-effort page count from raw PDF bytes (local only — no upload).
+int ngmySlidesEstimatePdfPages(Uint8List bytes) {
+  try {
+    final text = String.fromCharCodes(bytes);
+    final countMatch = RegExp(r'/Type\s*/Pages[^>]*?/Count\s+(\d+)', dotAll: true).firstMatch(text);
+    if (countMatch != null) {
+      final n = int.tryParse(countMatch.group(1)!);
+      if (n != null && n > 0) return n.clamp(1, 200);
+    }
+    final pages = RegExp(r'/Type\s*/Page\b').allMatches(text).length;
+    if (pages > 0) return pages.clamp(1, 200);
+  } catch (_) {}
+  return 1;
 }
 
 /// Enhance image clarity — contrast + sharpen for school photos / scans.

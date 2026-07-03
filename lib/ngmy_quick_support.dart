@@ -292,8 +292,8 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Quick Support', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Help desk', style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Hotlines', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Call list', style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -425,7 +425,7 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.support_agent_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
+                                Icon(Icons.phone_in_talk_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
                                 const SizedBox(height: 12),
                                 const Text('Your business help desk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                                 const SizedBox(height: 6),
@@ -554,7 +554,7 @@ class _SupportEditorPageState extends State<_SupportEditorPage> {
       title: isNew ? 'New Support Line' : 'Edit Support Line',
       subtitle: isNew ? 'Save a hotline — insurance, IT, bank fraud, legal, and more.' : 'Update this help-desk entry.',
       accent: _accent,
-      icon: Icons.support_agent_rounded,
+      icon: Icons.phone_in_talk_rounded,
       onClose: () => Navigator.pop(context),
       onSave: _save,
       saveLabel: isNew ? 'Save Line' : 'Update Line',
@@ -652,20 +652,11 @@ class _SupportCard extends StatelessWidget {
               [line.provider, line.category].where((e) => e.isNotEmpty).join(' · '),
               style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
             ),
-            trailing: PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded, color: Colors.white.withValues(alpha: 0.5)),
-              color: const Color(0xFF111827),
-              onSelected: (v) {
-                switch (v) {
-                  case 'edit':
-                    onEdit();
-                  case 'delete':
-                    onDelete();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
           ),

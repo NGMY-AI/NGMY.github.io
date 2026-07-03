@@ -583,23 +583,12 @@ class _ContactCard extends StatelessWidget {
               ],
             ),
             subtitle: Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
-            trailing: PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded, color: Colors.white.withValues(alpha: 0.5)),
-              color: const Color(0xFF111827),
-              onSelected: (v) {
-                switch (v) {
-                  case 'edit':
-                    onEdit();
-                  case 'favorite':
-                    onFavorite();
-                  case 'delete':
-                    onDelete();
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'favorite', child: Text(contact.favorite ? 'Unstar' : 'Star favorite')),
-                const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(tooltip: contact.favorite ? 'Unstar' : 'Star', onPressed: onFavorite, icon: Icon(contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, color: const Color(0xFFFBBF24), size: 20)),
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
           ),

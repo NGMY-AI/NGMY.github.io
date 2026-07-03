@@ -333,8 +333,8 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Saved Locations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Site map', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Site Map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Addresses & pins', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -545,7 +545,7 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
       title: isNew ? 'New Location' : 'Edit Location',
       subtitle: isNew ? 'Pin a client site, office, or delivery drop.' : 'Update this saved place.',
       accent: _accent,
-      icon: Icons.place_rounded,
+      icon: Icons.map_rounded,
       onClose: () => Navigator.pop(context),
       onSave: _save,
       saveLabel: isNew ? 'Save Location' : 'Update Location',
@@ -650,20 +650,11 @@ class _LocationCard extends StatelessWidget {
                 ),
               ],
             ),
-            trailing: PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded, color: Colors.white.withValues(alpha: 0.5)),
-              color: const Color(0xFF111827),
-              onSelected: (v) {
-                switch (v) {
-                  case 'edit':
-                    onEdit();
-                  case 'delete':
-                    onDelete();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
           ),

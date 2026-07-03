@@ -46,8 +46,17 @@ enum NgmySlideTransition {
   none,
   fade,
   slideLeft,
+  slideRight,
   slideUp,
+  slideDown,
   zoom,
+  zoomOut,
+  flip,
+  flipVertical,
+  rotate3d,
+  cube,
+  blur,
+  dissolve,
 }
 
 class NgmySlideElement {
@@ -73,6 +82,7 @@ class NgmySlideElement {
     this.rotation = 0,
     this.bulletList = false,
     this.fileName = '',
+    this.pdfPage = 0,
   });
 
   final String id;
@@ -96,6 +106,7 @@ class NgmySlideElement {
   double rotation;
   bool bulletList;
   String fileName;
+  int pdfPage;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -119,6 +130,7 @@ class NgmySlideElement {
         rotation: rotation,
         bulletList: bulletList,
         fileName: fileName,
+        pdfPage: pdfPage,
       );
 
   Map<String, dynamic> toJson() => {
@@ -143,6 +155,7 @@ class NgmySlideElement {
         'rotation': rotation,
         'bulletList': bulletList,
         'fileName': fileName,
+        'pdfPage': pdfPage,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -171,8 +184,17 @@ class NgmySlideElement {
       rotation: (json['rotation'] as num?)?.toDouble() ?? 0,
       bulletList: json['bulletList'] == true,
       fileName: (json['fileName'] ?? '').toString(),
+      pdfPage: (json['pdfPage'] as num?)?.toInt() ?? 0,
     );
   }
+}
+
+NgmySlideTransition _transitionFromJson(Object? raw) {
+  final name = (raw ?? 'fade').toString();
+  for (final t in NgmySlideTransition.values) {
+    if (t.name == name) return t;
+  }
+  return NgmySlideTransition.fade;
 }
 
 NgmySlideElementType _elementTypeFromJson(Object? raw) {
@@ -237,7 +259,7 @@ class NgmySlide {
         layout: _layoutFromJson(json['layout']),
         background: (json['background'] as num?)?.toInt() ?? 0xFFFFFFFF,
         backgroundEnd: (json['backgroundEnd'] as num?)?.toInt(),
-        transition: NgmySlideTransition.values.byName((json['transition'] ?? 'fade').toString()),
+        transition: _transitionFromJson(json['transition']),
         durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
         elements: (json['elements'] as List?)
                 ?.whereType<Map>()
@@ -696,6 +718,7 @@ class NgmySlidesTemplates {
       titleColor: Color(0xFF1E3A8A),
       bodyColor: Color(0xFF334155),
       slideBg: Color(0xFFFFFFFF),
+      slideBgEnd: Color(0xFFEFF6FF),
     ),
     NgmySlidesTheme(
       id: 'campus_green',
@@ -704,6 +727,7 @@ class NgmySlidesTemplates {
       titleColor: Color(0xFF065F46),
       bodyColor: Color(0xFF374151),
       slideBg: Color(0xFFF0FDF4),
+      slideBgEnd: Color(0xFFD1FAE5),
     ),
     NgmySlidesTheme(
       id: 'sunset',
@@ -712,6 +736,7 @@ class NgmySlidesTemplates {
       titleColor: Color(0xFF9A3412),
       bodyColor: Color(0xFF44403C),
       slideBg: Color(0xFFFFF7ED),
+      slideBgEnd: Color(0xFFFED7AA),
     ),
     NgmySlidesTheme(
       id: 'midnight',
@@ -729,8 +754,77 @@ class NgmySlidesTemplates {
       titleColor: Color(0xFF1C1917),
       bodyColor: Color(0xFF57534E),
       slideBg: Color(0xFFFFFBEB),
+      slideBgEnd: Color(0xFFFEF3C7),
+    ),
+    NgmySlidesTheme(
+      id: 'rose_gold',
+      label: 'Rose Gold',
+      accent: Color(0xFFE11D48),
+      titleColor: Color(0xFF881337),
+      bodyColor: Color(0xFF4C0519),
+      slideBg: Color(0xFFFFF1F2),
+      slideBgEnd: Color(0xFFFECDD3),
+    ),
+    NgmySlidesTheme(
+      id: 'ocean_teal',
+      label: 'Ocean Teal',
+      accent: Color(0xFF0D9488),
+      titleColor: Color(0xFF115E59),
+      bodyColor: Color(0xFF134E4A),
+      slideBg: Color(0xFFF0FDFA),
+      slideBgEnd: Color(0xFF99F6E4),
+    ),
+    NgmySlidesTheme(
+      id: 'slate_pro',
+      label: 'Slate Pro',
+      accent: Color(0xFF475569),
+      titleColor: Color(0xFF0F172A),
+      bodyColor: Color(0xFF334155),
+      slideBg: Color(0xFFF8FAFC),
+      slideBgEnd: Color(0xFFE2E8F0),
+    ),
+    NgmySlidesTheme(
+      id: 'neon_night',
+      label: 'Neon Night',
+      accent: Color(0xFF22D3EE),
+      titleColor: Color(0xFF67E8F9),
+      bodyColor: Color(0xFFE2E8F0),
+      slideBg: Color(0xFF020617),
+      slideBgEnd: Color(0xFF0F172A),
+    ),
+    NgmySlidesTheme(
+      id: 'lavender',
+      label: 'Lavender',
+      accent: Color(0xFF8B5CF6),
+      titleColor: Color(0xFF5B21B6),
+      bodyColor: Color(0xFF4C1D95),
+      slideBg: Color(0xFFF5F3FF),
+      slideBgEnd: Color(0xFFDDD6FE),
     ),
   ];
+
+  static void applyThemeToDeck(NgmySlideDeck deck, NgmySlidesTheme theme) {
+    deck.themeId = theme.id;
+    for (final slide in deck.slides) {
+      slide.background = theme.slideBg.value;
+      slide.backgroundEnd = theme.slideBgEnd?.value;
+      for (final e in slide.elements) {
+        switch (e.type) {
+          case NgmySlideElementType.text:
+            if (e.fontSize >= 28 || e.fontWeight.index >= FontWeight.w800.index) {
+              e.color = theme.titleColor.value;
+            } else {
+              e.color = theme.bodyColor.value;
+            }
+          case NgmySlideElementType.shape:
+            e.fillColor = theme.accent.withValues(alpha: 0.22).value;
+            e.strokeColor = theme.accent.value;
+          default:
+            break;
+        }
+      }
+    }
+  }
 
   static NgmySlidesTheme themeById(String id) =>
       themes.firstWhere((t) => t.id == id, orElse: () => themes.first);
