@@ -97,10 +97,47 @@ const _noteBackgrounds = <_NoteBackgroundDef>[
   _NoteBackgroundDef(id: 'workshop_notes', label: 'Workshop', category: 'Meeting', colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA), Color(0xFFEA580C)], pattern: _NoteBgPattern.bokeh, emojis: ['🔧']),
   _NoteBackgroundDef(id: 'podcast_studio', label: 'Podcast Studio', category: 'Ideas', colors: [Color(0xFF18181B), Color(0xFF3F3F46), Color(0xFF7C3AED)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🎙️'], floatingEmojis: ['🎙️'], darkText: true),
   _NoteBackgroundDef(id: 'art_studio', label: 'Art Studio', category: 'Ideas', colors: [Color(0xFFFDF4FF), Color(0xFFE879F9), Color(0xFF2563EB)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🎨'], floatingEmojis: ['🎨', '🌸']),
-  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF064E3B), Color(0xFF6366F1), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌'], darkText: true),
+  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF020617), Color(0xFF064E3B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌', '⭐', '✨', '🌌', '⭐', '✨'], darkText: true),
 ];
 
 int _gridCountTwoPerRow(int itemCount) => itemCount.isOdd ? itemCount + 1 : itemCount;
+
+const _kFloatingEmojiCount = 7;
+
+/// Normalized cross-screen travel paths (0–1 coords; values may go slightly off-screen).
+class _CrossScreenPath {
+  const _CrossScreenPath({
+    required this.start,
+    required this.end,
+    this.wave = 0.04,
+    this.speed = 0.28,
+    this.phase = 0,
+  });
+  final Offset start;
+  final Offset end;
+  final double wave;
+  final double speed;
+  final double phase;
+
+  Offset at(double t) {
+    final p = (t * speed + phase) % 1.0;
+    final x = start.dx + (end.dx - start.dx) * p;
+    final y = start.dy + (end.dy - start.dy) * p + math.sin(p * math.pi * 2) * wave;
+    return Offset(x, y);
+  }
+}
+
+const _crossScreenPaths = <_CrossScreenPath>[
+  _CrossScreenPath(start: Offset(-0.1, 0.18), end: Offset(1.1, 0.32), wave: 0.05, speed: 0.22, phase: 0.02),
+  _CrossScreenPath(start: Offset(1.1, 0.12), end: Offset(-0.1, 0.48), wave: 0.04, speed: 0.19, phase: 0.18),
+  _CrossScreenPath(start: Offset(-0.1, 0.62), end: Offset(1.1, 0.78), wave: 0.045, speed: 0.24, phase: 0.35),
+  _CrossScreenPath(start: Offset(0.15, -0.1), end: Offset(0.85, 1.1), wave: 0.035, speed: 0.17, phase: 0.51),
+  _CrossScreenPath(start: Offset(1.1, 0.88), end: Offset(-0.1, 0.22), wave: 0.05, speed: 0.21, phase: 0.67),
+  _CrossScreenPath(start: Offset(-0.1, 0.42), end: Offset(1.1, 0.55), wave: 0.04, speed: 0.23, phase: 0.79),
+  _CrossScreenPath(start: Offset(0.85, 1.1), end: Offset(0.2, -0.1), wave: 0.038, speed: 0.18, phase: 0.91),
+];
+
+const _textAnimEffects = ['bounce', 'pulse', 'glow', 'wave', 'shake', 'rainbow', 'fade'];
 
 const _bgCategories = ['All', 'Personal', 'Work', 'Meeting', 'Ideas', 'Nature'];
 
@@ -1137,6 +1174,59 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _markDirty();
   }
 
+  Future<void> _showTextAnimationPicker() async {
+    final effect = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 14),
+              const Text('Text animation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 6),
+              const Text('Wrap selected text with a live effect (visible in Preview)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _textAnimEffects.map((fx) {
+                  return ActionChip(
+                    label: Text(fx, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: () => Navigator.pop(ctx, fx),
+                    backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                    labelStyle: const TextStyle(color: Colors.white),
+                    side: const BorderSide(color: Color(0xFF8B5CF6)),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (effect == null) return;
+    final t = _body.text;
+    final sel = _body.selection;
+    final s = sel.start.clamp(0, t.length);
+    final e = sel.end.clamp(0, t.length);
+    if (s != e) {
+      final selected = t.substring(s, e);
+      _body.text = t.substring(0, s) + '⟦$effect:$selected⟧' + t.substring(e);
+      _body.selection = TextSelection.collapsed(offset: s + effect.length + selected.length + 3);
+    } else {
+      _insertAtCursor('⟦$effect:your text⟧');
+      final cursor = _body.selection.start;
+      _body.selection = TextSelection(baseOffset: cursor - 12, extentOffset: cursor - 1);
+    }
+    _markDirty();
+  }
+
   Future<void> _showEmojiPicker() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -1432,7 +1522,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            _NoteBackgroundLayer(note: _note),
+            _NoteBackgroundLayer(note: _note, hideFloatingEmojis: true),
             SafeArea(
               child: Column(
                 children: [
@@ -1487,6 +1577,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           _tool(Icons.title_rounded, 'Heading', () => _insertLine('# '), fg),
                           _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
                           _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
+                          _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
                           _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
                           _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
                           _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
@@ -1563,6 +1654,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                 ],
               ),
             ),
+            _NoteFloatingEmojiOverlay(note: _note),
           ],
         ),
       ),
@@ -1706,6 +1798,23 @@ class _NoteMarkdownPreview extends StatelessWidget {
     final spans = <InlineSpan>[];
     var i = 0;
     while (i < raw.length) {
+      if (raw.startsWith('⟦', i)) {
+        final end = raw.indexOf('⟧', i);
+        if (end != -1) {
+          final inner = raw.substring(i + 1, end);
+          final colon = inner.indexOf(':');
+          if (colon > 0) {
+            final effect = inner.substring(0, colon);
+            final txt = inner.substring(colon + 1);
+            spans.add(WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: _AnimatedTextEffect(effect: effect, text: txt, color: fg, fontSize: baseSize, fontWeight: baseWeight),
+            ));
+            i = end + 1;
+            continue;
+          }
+        }
+      }
       if (raw.startsWith('**', i)) {
         final end = raw.indexOf('**', i + 2);
         if (end != -1) {
@@ -1739,6 +1848,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
 
   int _nextSpecial(String s, int from) {
     final indices = [
+      if (s.indexOf('⟦', from) >= 0) s.indexOf('⟦', from),
       if (s.indexOf('**', from) >= 0) s.indexOf('**', from),
       if (s.indexOf('_', from) >= 0) s.indexOf('_', from),
       if (s.indexOf('<u>', from) >= 0) s.indexOf('<u>', from),
@@ -1759,10 +1869,11 @@ class _NoteBackgroundPreview extends StatelessWidget {
 }
 
 class _NoteAnimatedBackgroundLayer extends StatefulWidget {
-  const _NoteAnimatedBackgroundLayer({this.note, this.backgroundId, this.compact = false});
+  const _NoteAnimatedBackgroundLayer({this.note, this.backgroundId, this.compact = false, this.hideFloatingEmojis = false});
   final NgmyBusinessNote? note;
   final String? backgroundId;
   final bool compact;
+  final bool hideFloatingEmojis;
 
   @override
   State<_NoteAnimatedBackgroundLayer> createState() => _NoteAnimatedBackgroundLayerState();
@@ -1863,12 +1974,13 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
               CustomPaint(
                 painter: _NoteAnimatedBackgroundPainter(
                   pattern: def.pattern,
+                  backgroundId: def.id,
                   t: t,
                   particles: _particles,
                   compact: widget.compact,
                 ),
               ),
-              ..._animatedOverlays(def, t),
+              ..._animatedOverlays(def, t, includeFloating: !widget.hideFloatingEmojis),
               ..._staticEmojis(def.emojis),
             ],
           );
@@ -1890,9 +2002,9 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
     ];
   }
 
-  List<Widget> _animatedOverlays(_NoteBackgroundDef def, double t) {
+  List<Widget> _animatedOverlays(_NoteBackgroundDef def, double t, {bool includeFloating = true}) {
     final widgets = <Widget>[
-      ..._floatingThemeEmojis(def, t),
+      if (includeFloating) ..._floatingThemeEmojis(def, t),
       ..._ambientOverlay(def, t),
     ];
     return widgets;
@@ -1901,23 +2013,21 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
   List<Widget> _floatingThemeEmojis(_NoteBackgroundDef def, double t) {
     if (def.floatingEmojis.isEmpty) return const [];
     final emojis = def.floatingEmojis;
-    final maxCount = widget.compact ? emojis.length.clamp(1, 3) : emojis.length;
-    return List.generate(maxCount, (i) {
+    return List.generate(_kFloatingEmojiCount, (i) {
       final emoji = emojis[i % emojis.length];
-      final phase = i * 0.27 + 0.11;
-      final xBase = 0.12 + (i * 0.31) % 0.72;
-      final yBase = 0.18 + (i * 0.23) % 0.58;
-      final size = (widget.compact ? 18.0 : 28.0) + (i % 3) * 4;
-      final speed = 0.18 + (i % 4) * 0.04;
-      return _floatingCreature(
+      final path = _crossScreenPaths[i % _crossScreenPaths.length];
+      final pos = path.at(t);
+      final size = (widget.compact ? 26.0 : 42.0) + (i % 3) * 5;
+      return _InteractiveFloatingEmoji(
+        key: ValueKey('${def.id}_float_$i'),
         emoji: emoji,
-        t: t,
-        xBase: xBase,
-        yBase: yBase,
+        normalizedPos: pos,
         size: size,
-        drift: Offset(0.06 + i * 0.02, 0.05 + i * 0.015),
-        speed: speed,
-        phase: phase,
+        t: t,
+        phase: path.phase,
+        interactive: widget.interactive && !widget.compact,
+        flapsWings: _emojiFlapsWings(emoji),
+        swims: _emojiSwims(emoji),
       );
     });
   }
@@ -1969,46 +2079,6 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
   bool _emojiSwims(String emoji) {
     const swimmers = {'🐟', '🐠', '🐬', '🐧'};
     return swimmers.contains(emoji);
-  }
-
-  Widget _floatingCreature({
-    required String emoji,
-    required double t,
-    required double xBase,
-    required double yBase,
-    required double size,
-    required Offset drift,
-    required double speed,
-    required double phase,
-  }) {
-    final cycle = (t * speed + phase) % 1.0;
-    final x = xBase + math.sin(cycle * math.pi * 2) * drift.dx;
-    final y = yBase + math.cos(cycle * math.pi * 2) * drift.dy * 0.35;
-    final tilt = math.sin(cycle * math.pi * 4) * 0.06;
-    final flap = _emojiFlapsWings(emoji)
-        ? 0.68 + math.sin((t * 2.2 + phase) * math.pi * 2).abs() * 0.32
-        : 1.0;
-    final bob = _emojiSwims(emoji) ? math.sin((t * 1.6 + phase) * math.pi * 2) * 3 : 0.0;
-    return Positioned.fill(
-      child: LayoutBuilder(
-        builder: (_, c) {
-          return Transform.translate(
-            offset: Offset(x * c.maxWidth, y * c.maxHeight + bob),
-            child: Transform.rotate(
-              angle: tilt,
-              child: Transform.scale(
-                scaleX: flap,
-                scaleY: 1.0,
-                child: Text(
-                  emoji,
-                  style: TextStyle(fontSize: size, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 4)]),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   _NoteBgAnimOverlay _overlayFromPattern(_NoteBgPattern p) {
@@ -2071,12 +2141,14 @@ class _AnimParticle {
 class _NoteAnimatedBackgroundPainter extends CustomPainter {
   _NoteAnimatedBackgroundPainter({
     required this.pattern,
+    required this.backgroundId,
     required this.t,
     required this.particles,
     required this.compact,
   });
 
   final _NoteBgPattern pattern;
+  final String backgroundId;
   final double t;
   final List<_AnimParticle> particles;
   final bool compact;
@@ -2109,7 +2181,12 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
       case _NoteBgPattern.stars:
         _paintStars(canvas, size, paint);
       case _NoteBgPattern.aurora:
-        _paintAurora(canvas, size, paint);
+        if (backgroundId == 'northern_lights') {
+          _paintNorthernLights(canvas, size, paint);
+        } else {
+          _paintAurora(canvas, size, paint);
+        }
+        _paintStars(canvas, size, paint, dense: backgroundId == 'northern_lights');
       case _NoteBgPattern.clouds:
         _paintCloudMist(canvas, size, paint);
       case _NoteBgPattern.grid:
@@ -2210,14 +2287,67 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
     }
   }
 
-  void _paintStars(Canvas canvas, Size size, Paint paint) {
-    for (var i = 0; i < (compact ? 18 : 32); i++) {
-      final dx = (i * 47.0) % size.width;
-      final dy = (i * 61.0) % size.height;
+  void _paintStars(Canvas canvas, Size size, Paint paint, {bool dense = false}) {
+    final count = dense ? (compact ? 40 : 70) : (compact ? 18 : 32);
+    for (var i = 0; i < count; i++) {
+      final dx = (i * 47.0 + 13) % size.width;
+      final dy = (i * 61.0 + 29) % size.height;
       final twinkle = 0.25 + math.sin((t + i * 0.07) * math.pi * 2) * 0.35;
-      paint.color = Colors.white.withValues(alpha: twinkle.clamp(0.1, 0.85));
-      canvas.drawCircle(Offset(dx, dy), 1 + (i % 3) * 0.6, paint);
+      paint.shader = null;
+      paint.style = PaintingStyle.fill;
+      paint.color = Colors.white.withValues(alpha: twinkle.clamp(0.1, 0.9));
+      canvas.drawCircle(Offset(dx, dy), (dense ? 1.2 : 1.0) + (i % 3) * 0.6, paint);
     }
+  }
+
+  void _paintNorthernLights(Canvas canvas, Size size, Paint paint) {
+    paint.style = PaintingStyle.fill;
+    final bands = [
+      [const Color(0xFF34D399), const Color(0xFF10B981), const Color(0xFF059669)],
+      [const Color(0xFF818CF8), const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+      [const Color(0xFF22D3EE), const Color(0xFF06B6D4), const Color(0xFF0891B2)],
+      [const Color(0xFFA78BFA), const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
+      [const Color(0xFF4ADE80), const Color(0xFF22C55E), const Color(0xFF16A34A)],
+    ];
+    for (var band = 0; band < bands.length; band++) {
+      final path = Path();
+      final baseY = size.height * (0.08 + band * 0.11);
+      path.moveTo(0, baseY);
+      for (var x = 0.0; x <= size.width; x += 6) {
+        final wave = math.sin((x / size.width * 5 * math.pi) + (t * math.pi * 0.55) + band * 1.2) * (18 + band * 10);
+        final ripple = math.cos((x / size.width * 3 * math.pi) - (t * math.pi * 0.35) + band) * 8;
+        path.lineTo(x, baseY + wave + ripple);
+      }
+      path.lineTo(size.width, size.height);
+      path.lineTo(0, size.height);
+      path.close();
+      final shimmer = 0.18 + math.sin(t * math.pi * 0.8 + band * 0.9) * 0.08;
+      paint.shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          bands[band][0].withValues(alpha: shimmer * 0.35),
+          bands[band][1].withValues(alpha: shimmer),
+          bands[band][2].withValues(alpha: shimmer * 0.45),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.35, 0.65, 1.0],
+      ).createShader(Rect.fromLTWH(0, baseY - 30, size.width, size.height - baseY + 40));
+      canvas.drawPath(path, paint);
+      paint.shader = null;
+    }
+    // Soft horizon glow
+    paint.shader = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Colors.transparent,
+        const Color(0xFF6366F1).withValues(alpha: 0.06 + math.sin(t * math.pi * 0.5) * 0.03),
+        const Color(0xFF10B981).withValues(alpha: 0.1 + math.sin(t * math.pi * 0.4) * 0.04),
+      ],
+    ).createShader(Rect.fromLTWH(0, size.height * 0.5, size.width, size.height * 0.5));
+    canvas.drawRect(Rect.fromLTWH(0, size.height * 0.5, size.width, size.height * 0.5), paint);
+    paint.shader = null;
   }
 
   void _paintAurora(Canvas canvas, Size size, Paint paint) {
@@ -2270,8 +2400,268 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _NoteAnimatedBackgroundPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.pattern != pattern;
+      oldDelegate.t != t || oldDelegate.pattern != pattern || oldDelegate.backgroundId != backgroundId;
+}
+
+/// Tap-reactive emoji that travels across the full screen.
+class _InteractiveFloatingEmoji extends StatefulWidget {
+  const _InteractiveFloatingEmoji({
+    super.key,
+    required this.emoji,
+    required this.normalizedPos,
+    required this.size,
+    required this.t,
+    required this.phase,
+    required this.interactive,
+    required this.flapsWings,
+    required this.swims,
+  });
+
+  final String emoji;
+  final Offset normalizedPos;
+  final double size;
+  final double t;
+  final double phase;
+  final bool interactive;
+  final bool flapsWings;
+  final bool swims;
+
+  @override
+  State<_InteractiveFloatingEmoji> createState() => _InteractiveFloatingEmojiState();
+}
+
+class _InteractiveFloatingEmojiState extends State<_InteractiveFloatingEmoji> with SingleTickerProviderStateMixin {
+  late AnimationController _react;
+
+  @override
+  void initState() {
+    super.initState();
+    _react = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+  }
+
+  @override
+  void dispose() {
+    _react.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    if (!widget.interactive) return;
+    _react.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final flap = widget.flapsWings ? 0.65 + math.sin((widget.t * 2.0 + widget.phase) * math.pi * 2).abs() * 0.35 : 1.0;
+    final bob = widget.swims ? math.sin((widget.t * 1.4 + widget.phase) * math.pi * 2) * 5 : 0.0;
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (_, c) {
+          final dx = widget.normalizedPos.dx * c.maxWidth;
+          final dy = widget.normalizedPos.dy * c.maxHeight + bob;
+          return AnimatedBuilder(
+            animation: _react,
+            builder: (_, __) {
+              final reactScale = 1.0 + Curves.elasticOut.transform(_react.value) * 0.45;
+              final reactSpin = _react.value * math.pi * 2;
+              final child = Transform.rotate(
+                angle: reactSpin * 0.35,
+                child: Transform.scale(
+                  scale: reactScale,
+                  child: Transform.scale(
+                    scaleX: flap,
+                    scaleY: 1.0,
+                    child: Text(
+                      widget.emoji,
+                      style: TextStyle(
+                        fontSize: widget.size,
+                        shadows: [
+                          Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
+                          if (_react.value > 0) Shadow(color: Colors.white.withValues(alpha: 0.5 * (1 - _react.value)), blurRadius: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              return Transform.translate(
+                offset: Offset(dx, dy),
+                child: widget.interactive
+                    ? GestureDetector(onTap: _onTap, behavior: HitTestBehavior.opaque, child: child)
+                    : IgnorePointer(child: child),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Live text effect for preview (syntax: ⟦effect:words⟧).
+class _AnimatedTextEffect extends StatefulWidget {
+  const _AnimatedTextEffect({
+    required this.effect,
+    required this.text,
+    required this.color,
+    required this.fontSize,
+    required this.fontWeight,
+  });
+
+  final String effect;
+  final String text;
+  final Color color;
+  final double fontSize;
+  final FontWeight fontWeight;
+
+  @override
+  State<_AnimatedTextEffect> createState() => _AnimatedTextEffectState();
+}
+
+class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        final fx = widget.effect.toLowerCase();
+        var dy = 0.0;
+        var scale = 1.0;
+        var angle = 0.0;
+        var opacity = 1.0;
+        Color color = widget.color;
+        switch (fx) {
+          case 'bounce':
+            dy = -math.sin(t * math.pi * 2).abs() * 8;
+          case 'pulse':
+            scale = 1.0 + math.sin(t * math.pi * 2) * 0.12;
+          case 'glow':
+            scale = 1.0 + math.sin(t * math.pi * 2) * 0.05;
+            color = Color.lerp(widget.color, Colors.white, 0.25 + math.sin(t * math.pi * 2) * 0.15)!;
+          case 'wave':
+            dy = math.sin(t * math.pi * 4) * 4;
+            angle = math.sin(t * math.pi * 2) * 0.08;
+          case 'shake':
+            dy = math.sin(t * math.pi * 8) * 3;
+            angle = math.sin(t * math.pi * 10) * 0.06;
+          case 'rainbow':
+            color = HSVColor.fromAHSV(1, (t * 360) % 360, 0.55, 0.95).toColor();
+          case 'fade':
+            opacity = 0.45 + math.sin(t * math.pi * 2) * 0.45;
+          default:
+            dy = -math.sin(t * math.pi * 2).abs() * 6;
+        }
+        return Opacity(
+          opacity: opacity.clamp(0.2, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, dy),
+            child: Transform.rotate(
+              angle: angle,
+              child: Transform.scale(
+                scale: scale,
+                child: Text(
+                  widget.text,
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
+                    fontWeight: widget.fontWeight,
+                    color: color,
+                    shadows: fx == 'glow'
+                        ? [Shadow(color: color.withValues(alpha: 0.8), blurRadius: 12)]
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 // Alias for editor/list usage
 typedef _NoteBackgroundLayer = _NoteAnimatedBackgroundLayer;
+
+/// Editor overlay — floating emojis above text so taps register; empty areas pass through.
+class _NoteFloatingEmojiOverlay extends StatefulWidget {
+  const _NoteFloatingEmojiOverlay({required this.note});
+  final NgmyBusinessNote note;
+
+  @override
+  State<_NoteFloatingEmojiOverlay> createState() => _NoteFloatingEmojiOverlayState();
+}
+
+class _NoteFloatingEmojiOverlayState extends State<_NoteFloatingEmojiOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 22))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  bool _emojiFlapsWings(String emoji) {
+    const flappers = {'🦋', '🐦', '🦅', '🕊️', '🦜', '🐬', '🐟', '🐠', '🐧'};
+    return flappers.contains(emoji);
+  }
+
+  bool _emojiSwims(String emoji) {
+    const swimmers = {'🐟', '🐠', '🐬', '🐧'};
+    return swimmers.contains(emoji);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.note.usesCustomColor) return const SizedBox.shrink();
+    final def = _noteBackgroundById(widget.note.effectiveBackgroundId);
+    if (def.floatingEmojis.isEmpty) return const SizedBox.shrink();
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final t = _ctrl.value;
+        final emojis = def.floatingEmojis;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: List.generate(_kFloatingEmojiCount, (i) {
+            final emoji = emojis[i % emojis.length];
+            final path = _crossScreenPaths[i % _crossScreenPaths.length];
+            final pos = path.at(t);
+            final size = 42.0 + (i % 3) * 5;
+            return _InteractiveFloatingEmoji(
+              key: ValueKey('editor_float_${def.id}_$i'),
+              emoji: emoji,
+              normalizedPos: pos,
+              size: size,
+              t: t,
+              phase: path.phase,
+              interactive: true,
+              flapsWings: _emojiFlapsWings(emoji),
+              swims: _emojiSwims(emoji),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
