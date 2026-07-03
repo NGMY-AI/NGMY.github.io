@@ -40,6 +40,7 @@ String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(
 
 const int _prefsMaxBytes = 512 * 1024; // legacy small-file prefs only; IndexedDB holds everything durable
 const int _streamChunkBytes = 1024 * 1024;
+const int _webPersistMaxBytes = 32 * 1024 * 1024; // keep html.File ref for bigger files; stream on transfer
 
 final Map<String, Uint8List> _memoryBlobs = {};
 final Map<String, html.File> _webFiles = {};
@@ -115,7 +116,47 @@ Future<Uint8List?> _loadBlob(String key) async {
   }
 }
 
+Future<Uint8List?> _readHtmlBlobSlice(html.Blob slice) async {
+  final reader = html.FileReader();
+  final done = Completer<ByteBuffer?>();
+  reader.onLoadEnd.listen((_) {
+    final result = reader.result;
+    done.complete(result is ByteBuffer ? result : null);
+  });
+  reader.onError.listen((_) => done.complete(null));
+  reader.readAsArrayBuffer(slice);
+  return done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
+}
+
+Future<void> _persistHtmlFileChunked(String email, String id, html.File file) async {
+  final baseKey = _bytesPrefsKey(email, id);
+  final partKeys = <String>[];
+  final size = file.size.round();
+  if (size <= 0) return;
+  try {
+    for (var start = 0; start < size; start += _streamChunkBytes) {
+      final end = start + _streamChunkBytes < size ? start + _streamChunkBytes : size;
+      final buf = await _readHtmlBlobSlice(file.slice(start, end));
+      if (buf == null) continue;
+      final chunk = Uint8List.view(buf);
+      if (chunk.isEmpty) continue;
+      final partKey = '${baseKey}_part_${partKeys.length}';
+      await ngmyDocShareIdbPut(partKey, chunk);
+      partKeys.add(partKey);
+    }
+    if (partKeys.isEmpty) return;
+    await _persistChunkManifest(baseKey, partKeys, size);
+    _webFiles.remove(id);
+  } catch (e) {
+    debugPrint('[doc share web persist chunked] $e');
+  }
+}
+
 Future<void> _persistHtmlFile(String email, String id, html.File file) async {
+  if (file.size > _webPersistMaxBytes) {
+    unawaited(_persistHtmlFileChunked(email, id, file));
+    return;
+  }
   final key = _bytesPrefsKey(email, id);
   try {
     final reader = html.FileReader();
@@ -365,6 +406,38 @@ class NgmyDocShareStore {
         return 'video/x-msvideo';
       case 'pdf':
         return 'application/pdf';
+      case 'txt':
+        return 'text/plain';
+      case 'csv':
+        return 'text/csv';
+      case 'json':
+        return 'application/json';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'zip':
+        return 'application/zip';
+      case 'rar':
+        return 'application/vnd.rar';
+      case '7z':
+        return 'application/x-7z-compressed';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'aac':
+        return 'audio/aac';
+      case 'heic':
+        return 'image/heic';
       default:
         return 'application/octet-stream';
     }
@@ -473,14 +546,9 @@ class NgmyDocShareStore {
     for (final item in items) {
       if (_webFiles[item.id] != null) continue;
       final key = _bytesPrefsKey(email, item.id);
-      if (_transferReadCache.containsKey(key) || _memoryBlobs.containsKey(key)) continue;
       if (await _loadChunkManifest(key) != null) continue;
-      unawaited(() async {
-        final blob = await _loadBlob(key);
-        if (blob != null && blob.isNotEmpty) {
-          _transferReadCache[key] = blob;
-        }
-      }());
+      if (_memoryBlobs.containsKey(key)) continue;
+      unawaited(readByteRange(email, item, 0, 1));
     }
   }
 
@@ -505,14 +573,13 @@ class NgmyDocShareStore {
       }
       return;
     }
-    var all = _transferReadCache[key] ?? _memoryBlobs[key];
-    all ??= await _loadBlob(key);
-    if (all == null || all.isEmpty) return;
-    if (all.length <= 512 * 1024 * 1024) _transferReadCache[key] = all;
+    final size = item.sizeBytes;
+    if (size <= 0) return;
     const step = 1048576;
-    for (var i = 0; i < all.length; i += step) {
-      final end = (i + step < all.length) ? i + step : all.length;
-      yield Uint8List.sublistView(all, i, end);
+    for (var start = 0; start < size; start += step) {
+      final end = start + step < size ? start + step : size;
+      final chunk = await readByteRange(email, item, start, end);
+      if (chunk != null && chunk.isNotEmpty) yield chunk;
     }
   }
 

@@ -441,34 +441,57 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
   }
 
-  Future<void> _uploadFiles() async {
+  Future<void> _ingestPickedWebFiles(
+    List<({String name, dynamic file})> picked, {
+    required String emptyMessage,
+    required String successLabel,
+    String? note,
+  }) async {
+    if (picked.isEmpty) {
+      _toast(emptyMessage);
+      return;
+    }
     await _withWork(() async {
       if (!await _ensureCanCreate()) return;
-      if (kIsWeb) {
-        final picked = await pickWebFiles();
-        if (picked.isEmpty) return;
-        final added = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
-        await _refresh();
-        if (added.isNotEmpty) await _recordCreationIfNeeded(count: added.length);
-        _toast(added.isEmpty ? 'No files selected.' : 'Added ${added.length} file(s) — ready for NGMY Transfer.');
-        return;
-      }
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: false,
-        type: FileType.any,
+      final added = await NgmyDocShareStore.addWebFolderFiles(
+        email: widget.email,
+        files: picked,
+        note: note,
       );
-      if (result == null || result.files.isEmpty) return;
+      await _refresh();
+      if (added.isNotEmpty) await _recordCreationIfNeeded(count: added.length);
+      _toast(added.isEmpty ? emptyMessage : '$successLabel ${added.length} file(s).');
+    }, label: 'Uploading…');
+  }
+
+  Future<void> _ingestNativePlatformFiles(
+    List<PlatformFile> files, {
+    required String emptyMessage,
+    String? note,
+    bool prepareCloudShare = true,
+  }) async {
+    if (files.isEmpty) {
+      _toast(emptyMessage);
+      return;
+    }
+    await _withWork(() async {
+      if (!await _ensureCanCreate()) return;
       var added = 0;
       var skipped = 0;
-      for (final file in result.files) {
-        final item = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: file);
+      for (final file in files) {
+        final item = await NgmyDocShareStore.addFromPlatformFile(
+          email: widget.email,
+          file: file,
+          note: note,
+        );
         if (item != null) {
           added++;
-          if (mounted) setState(() => _status = 'Preparing share…');
-          final ready = await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
-          if (!ready && mounted) {
-            _toast('Saved "${item.name}" — tap Share via QR once if code does not work yet.');
+          if (prepareCloudShare) {
+            if (mounted) setState(() => _status = 'Preparing share…');
+            final ready = await NgmyDocShareSync.ensureCloudShareForItem(ownerEmail: widget.email, item: item);
+            if (!ready && mounted) {
+              _toast('Saved "${item.name}" — tap Share via QR once if code does not work yet.');
+            }
           }
         } else {
           skipped++;
@@ -477,7 +500,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       await _refresh();
       if (added > 0) await _recordCreationIfNeeded(count: added);
       if (added == 0) {
-        _toast(skipped > 0 ? 'Could not read selected file(s). Try again.' : 'No files selected.');
+        _toast(skipped > 0 ? 'Could not read selected file(s). Try again.' : emptyMessage);
       } else if (skipped > 0) {
         _toast('Added $added file(s). $skipped could not be read.');
       } else {
@@ -486,31 +509,148 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }, label: 'Uploading…');
   }
 
-  Future<void> _uploadFolder() async {
+  void _beginUploadFilesFromUserGesture() {
     if (kIsWeb) {
-      await _withWork(() async {
-        if (!await _ensureCanCreate()) return;
-        final picked = await pickWebFolderFiles();
-        if (picked.isEmpty) {
-          _toast('No folder selected.');
-          return;
-        }
-        final added = await NgmyDocShareStore.addWebFolderFiles(email: widget.email, files: picked);
-        await _refresh();
-        if (added.isNotEmpty) await _recordCreationIfNeeded(count: added.length);
-        _toast(added.isEmpty ? 'No files found in that folder.' : 'Added ${added.length} file(s) from folder.');
-      }, label: 'Reading folder…');
+      ngmyWebPickFilesFromUserGesture(
+        directory: false,
+        onResult: (picked) {
+          unawaited(_ingestPickedWebFiles(
+            picked,
+            emptyMessage: 'No files selected.',
+            successLabel: 'Added',
+          ));
+        },
+      );
       return;
     }
-    await _withWork(() async {
-      if (!await _ensureCanCreate()) return;
+    unawaited(_pickNativeUploadFiles());
+  }
+
+  void _beginUploadFolderFromUserGesture() {
+    if (kIsWeb) {
+      ngmyWebPickFilesFromUserGesture(
+        directory: true,
+        onResult: (picked) {
+          unawaited(_ingestPickedWebFiles(
+            picked,
+            emptyMessage: 'No files found in that folder.',
+            successLabel: 'Added',
+            note: 'From folder',
+          ));
+        },
+      );
+      return;
+    }
+    unawaited(_pickNativeUploadFolder());
+  }
+
+  Future<void> _pickNativeUploadFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: false,
+        type: FileType.any,
+      );
+      if (result == null || result.files.isEmpty) return;
+      await _ingestNativePlatformFiles(
+        result.files,
+        emptyMessage: 'No files selected.',
+      );
+    } catch (e) {
+      debugPrint('[doc share upload files] $e');
+      _toast('Could not open file picker. Try again.');
+    }
+  }
+
+  Future<void> _pickNativeUploadFolder() async {
+    try {
       final path = await FilePicker.platform.getDirectoryPath();
       if (path == null || path.isEmpty) return;
-      final count = await NgmyDocShareStore.addFromDirectory(email: widget.email, dirPath: path);
+      await _withWork(() async {
+        if (!await _ensureCanCreate()) return;
+        final count = await NgmyDocShareStore.addFromDirectory(email: widget.email, dirPath: path);
+        await _refresh();
+        if (count > 0) await _recordCreationIfNeeded(count: count);
+        _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
+      }, label: 'Reading folder…');
+    } catch (e) {
+      debugPrint('[doc share upload folder] $e');
+      _toast('Could not open folder picker. Try again.');
+    }
+  }
+
+  Future<void> _uploadFiles() async => _beginUploadFilesFromUserGesture();
+
+  Future<void> _uploadFolder() async => _beginUploadFolderFromUserGesture();
+
+  void _beginTransferSendFromUserGesture() {
+    if (kIsWeb) {
+      ngmyWebPickFilesFromUserGesture(
+        directory: false,
+        onResult: (picked) {
+          unawaited(_startTransferSendWithPicked(picked));
+        },
+      );
+      return;
+    }
+    unawaited(_openNgmyTransferSendPickedNative());
+  }
+
+  Future<void> _startTransferSendWithPicked(List<({String name, dynamic file})> picked) async {
+    await _withWork(() async {
+      if (picked.isEmpty) {
+        _toast('Select file(s) or pick videos/documents to send.');
+        return;
+      }
+      final batch = await NgmyDocShareStore.addWebFolderFiles(
+        email: widget.email,
+        files: picked,
+        note: 'NGMY Transfer',
+      );
       await _refresh();
-      if (count > 0) await _recordCreationIfNeeded(count: count);
-      _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
-    }, label: 'Reading folder…');
+      if (batch.isEmpty) {
+        _toast('Could not read selected file(s). Try again.');
+        return;
+      }
+      if (!mounted) return;
+      await openNgmyTransferSend(context, email: widget.email, items: batch);
+    }, label: 'Preparing transfer…');
+  }
+
+  Future<void> _openNgmyTransferSendPickedNative() async {
+    await _withWork(() async {
+      List<NgmyDocShareItem> batch = [];
+      if (_selected.isNotEmpty) {
+        batch = _items.where((e) => _selected.contains(e.id)).toList();
+      } else {
+        try {
+          final result = await FilePicker.platform.pickFiles(
+            allowMultiple: true,
+            withData: false,
+            type: FileType.any,
+          );
+          if (result == null || result.files.isEmpty) return;
+          for (final f in result.files) {
+            final saved = await NgmyDocShareStore.addFromPlatformFile(
+              email: widget.email,
+              file: f,
+              note: 'NGMY Transfer',
+            );
+            if (saved != null) batch.add(saved);
+          }
+        } catch (e) {
+          debugPrint('[doc share transfer pick] $e');
+          _toast('Could not open file picker. Try again.');
+          return;
+        }
+      }
+      if (batch.isEmpty) {
+        _toast('Select file(s) or pick videos/documents to send.');
+        return;
+      }
+      if (!mounted) return;
+      await openNgmyTransferSend(context, email: widget.email, items: batch);
+    }, label: 'Preparing transfer…');
   }
 
   void _selectAll() {
@@ -525,7 +665,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _pickUpload() async {
     final c = _docShareColors(context);
-    final choice = await showModalBottomSheet<String>(
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: c.card,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -536,24 +676,25 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
             ListTile(
               leading: Icon(Icons.upload_file_rounded, color: c.fg),
               title: Text('Upload files', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
-              subtitle: Text('Photos, videos, documents', style: TextStyle(color: c.muted, fontSize: 12)),
-              onTap: () => Navigator.pop(ctx, 'files'),
+              subtitle: Text('Any type — photos, videos, documents', style: TextStyle(color: c.muted, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _beginUploadFilesFromUserGesture();
+              },
             ),
             ListTile(
               leading: Icon(Icons.folder_open_rounded, color: c.fg),
               title: Text('Upload folder', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
               subtitle: Text('Entire folder of pictures or videos', style: TextStyle(color: c.muted, fontSize: 12)),
-              onTap: () => Navigator.pop(ctx, 'folder'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _beginUploadFolderFromUserGesture();
+              },
             ),
           ],
         ),
       ),
     );
-    if (choice == 'files') {
-      await _uploadFiles();
-    } else if (choice == 'folder') {
-      await _uploadFolder();
-    }
   }
 
   @override
@@ -707,42 +848,16 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _openNgmyTransferSendPicked() async {
-    await _withWork(() async {
-      List<NgmyDocShareItem> batch = [];
-      if (_selected.isNotEmpty) {
-        batch = _items.where((e) => _selected.contains(e.id)).toList();
-      } else if (kIsWeb) {
-        final picked = await pickWebFiles();
-        if (picked.isEmpty) return;
-        batch = await NgmyDocShareStore.addWebFolderFiles(
-          email: widget.email,
-          files: picked,
-          note: 'NGMY Transfer',
-        );
-        await _refresh();
-      } else {
-        final result = await FilePicker.platform.pickFiles(
-          allowMultiple: true,
-          withData: false,
-          type: FileType.any,
-        );
-        if (result == null || result.files.isEmpty) return;
-        for (final f in result.files) {
-          final saved = await NgmyDocShareStore.addFromPlatformFile(
-            email: widget.email,
-            file: f,
-            note: 'NGMY Transfer',
-          );
-          if (saved != null) batch.add(saved);
-        }
-      }
+    if (_selected.isNotEmpty) {
+      final batch = _items.where((e) => _selected.contains(e.id)).toList();
       if (batch.isEmpty) {
         _toast('Select file(s) or pick videos/documents to send.');
         return;
       }
-      if (!mounted) return;
       await openNgmyTransferSend(context, email: widget.email, items: batch);
-    }, label: 'Preparing transfer…');
+      return;
+    }
+    _beginTransferSendFromUserGesture();
   }
 
   Future<void> _openNgmyTransferReceive() async {
@@ -884,27 +999,61 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     await openNgmyDocShareMyCodePage(context, email: widget.email);
   }
 
+  void _beginSendToMyCodeFromUserGesture({String? preselectedCode}) {
+    if (kIsWeb) {
+      ngmyWebPickFilesFromUserGesture(
+        directory: false,
+        onResult: (picked) {
+          unawaited(_withWork(() async {
+            if (picked.isEmpty) {
+              _toast('No files selected.');
+              return;
+            }
+            final added = await NgmyDocShareStore.addWebFolderFiles(
+              email: widget.email,
+              files: picked,
+            );
+            if (added.isEmpty) {
+              _toast('Could not read selected file(s). Try again.');
+              return;
+            }
+            if (!mounted) return;
+            final ok = await openNgmyDocShareSendToMyCodePage(
+              context,
+              senderEmail: widget.email,
+              items: added,
+              preselectedCode: preselectedCode,
+            );
+            if (!mounted) return;
+            if (ok) _toast('Document sent to their Doc Share.');
+          }, label: 'Preparing…'));
+        },
+      );
+      return;
+    }
+    unawaited(_openSendToMyCode(preselectedCode: preselectedCode));
+  }
+
   Future<void> _openSendToMyCode({String? preselectedCode, List<NgmyDocShareItem>? items}) async {
     List<NgmyDocShareItem> batch = items ?? [];
     if (batch.isEmpty && _selected.isNotEmpty) {
       batch = _items.where((e) => _selected.contains(e.id)).toList();
     }
     if (batch.isEmpty) {
-      final picked = await FilePicker.platform.pickFiles(withData: true, allowMultiple: true);
-      if (picked == null || picked.files.isEmpty) return;
-      await _withWork(() async {
-        for (final f in picked.files) {
-          final bytes = f.bytes;
-          if (bytes == null || bytes.isEmpty) continue;
-          final saved = await NgmyDocShareStore.addBytes(
-            email: widget.email,
-            name: f.name,
-            mime: f.extension != null ? 'application/${f.extension}' : 'application/octet-stream',
-            bytes: bytes,
-          );
-          if (saved != null) batch.add(saved);
-        }
-      }, label: 'Preparing…');
+      try {
+        final picked = await FilePicker.platform.pickFiles(withData: false, allowMultiple: true, type: FileType.any);
+        if (picked == null || picked.files.isEmpty) return;
+        await _withWork(() async {
+          for (final f in picked.files) {
+            final saved = await NgmyDocShareStore.addFromPlatformFile(email: widget.email, file: f);
+            if (saved != null) batch.add(saved);
+          }
+        }, label: 'Preparing…');
+      } catch (e) {
+        debugPrint('[doc share send my code pick] $e');
+        _toast('Could not open file picker. Try again.');
+        return;
+      }
       if (batch.isEmpty) {
         _toast('No files selected.');
         return;
@@ -1117,15 +1266,21 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     label: 'Send to My Code',
                     subtitle: 'Enter someone\'s 5-digit code + letter',
                     colors: c,
-                    onTap: () => Navigator.pop(ctx, 'send_my_code'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _beginSendToMyCodeFromUserGesture();
+                    },
                   ),
                   _DocShareMenuTile(
                     icon: Icons.north_east_rounded,
                     label: 'NGMY Transfer · Send',
-                    subtitle: 'Pick big videos & documents · 6-digit code',
+                    subtitle: 'Any file type · any size · 6-digit code',
                     accent: true,
                     colors: c,
-                    onTap: () => Navigator.pop(ctx, 'transfer_send'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _beginTransferSendFromUserGesture();
+                    },
                   ),
                   _DocShareMenuTile(
                     icon: Icons.south_west_rounded,
@@ -1153,10 +1308,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     switch (action) {
       case 'my_code':
         unawaited(_openMyCode());
-      case 'send_my_code':
-        unawaited(_openSendToMyCode());
-      case 'transfer_send':
-        unawaited(_openNgmyTransferSendPicked());
       case 'transfer_receive':
         unawaited(_openNgmyTransferReceive());
       case 'import':

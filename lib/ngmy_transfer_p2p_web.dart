@@ -9,7 +9,7 @@ import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_stash.dart';
 import 'ngmy_transfer_signal.dart';
 
-const int _kMaxBufferedBytes = 16 * 1024 * 1024;
+const int _kMaxBufferedBytes = 64 * 1024 * 1024;
 
 const Map<String, dynamic> _rtcConfig = {
   'iceServers': [

@@ -1,3 +1,13 @@
-Future<List<({String name, dynamic file})>> pickWebFolderFiles() async => [];
+typedef NgmyWebPickedFile = ({String name, dynamic file});
+typedef NgmyWebPickCallback = void Function(List<NgmyWebPickedFile> files);
 
-Future<List<({String name, dynamic file})>> pickWebFiles() async => [];
+void ngmyWebPickFilesFromUserGesture({
+  required NgmyWebPickCallback onResult,
+  bool directory = false,
+}) {
+  onResult([]);
+}
+
+Future<List<NgmyWebPickedFile>> pickWebFolderFiles() async => [];
+
+Future<List<NgmyWebPickedFile>> pickWebFiles() async => [];
