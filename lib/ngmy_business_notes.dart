@@ -381,6 +381,7 @@ class NgmyBusinessNote {
     this.customColor,
     this.pinned = false,
     this.icon = '📝',
+    this.openInPreview = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
@@ -396,6 +397,7 @@ class NgmyBusinessNote {
   int? customColor;
   bool pinned;
   String icon;
+  bool openInPreview;
   final DateTime createdAt;
   DateTime updatedAt;
 
@@ -427,6 +429,7 @@ class NgmyBusinessNote {
         if (customColor != null) 'customColor': customColor,
         'pinned': pinned,
         'icon': icon,
+        'openInPreview': openInPreview,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
@@ -441,6 +444,7 @@ class NgmyBusinessNote {
         customColor: (json['customColor'] as num?)?.toInt(),
         pinned: json['pinned'] == true,
         icon: (json['icon'] ?? '📝').toString(),
+        openInPreview: json['openInPreview'] == true,
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
       );
@@ -1070,6 +1074,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _bodyFocus = FocusNode();
     _title.addListener(_markDirty);
     _body.addListener(_markDirty);
+    if (!widget.isNew && _note.openInPreview) {
+      _previewMode = true;
+    }
   }
 
   bool _hasSaveableContent() {
@@ -1107,6 +1114,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       return false;
     }
     await _persist();
+    _note.openInPreview = true;
     if (mounted) Navigator.pop(context, _note);
     return false;
   }
@@ -1544,7 +1552,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           icon: _previewMode ? Icons.edit_rounded : Icons.visibility_rounded,
                           label: _previewMode ? 'Edit' : 'Preview',
                           fg: fg,
-                          onTap: () => setState(() => _previewMode = !_previewMode),
+                          onTap: () => setState(() {
+                            _previewMode = !_previewMode;
+                            if (!_previewMode) _note.openInPreview = false;
+                          }),
                         ),
                         IconButton(
                           icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
