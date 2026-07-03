@@ -19,7 +19,10 @@ const CRITICAL_OFFLINE_URLS = [
   './main.dart.js',
   './canvaskit/canvaskit.js',
   './canvaskit/canvaskit.wasm',
+  './canvaskit/chromium/canvaskit.js',
+  './canvaskit/chromium/canvaskit.wasm',
   './assets/AssetManifest.bin.json',
+  './assets/AssetManifest.bin',
   './assets/FontManifest.json',
   './assets/assets/fonts/Roboto-Light.ttf',
   './assets/assets/fonts/Roboto-Regular.ttf',
@@ -30,7 +33,77 @@ const CRITICAL_OFFLINE_URLS = [
   './manifest.json',
   './favicon.png',
   './icons/Icon-192.png',
+  './ngmy_service_worker.js',
 ];
+
+function criticalPartUrls() {
+  return PRECACHE_URLS.filter((u) => /main\.dart\.js.*\.part\.js/i.test(u));
+}
+
+function absoluteShellUrls() {
+  const origin = self.location.origin;
+  const base = SCOPE_PATH.endsWith('/') ? SCOPE_PATH : SCOPE_PATH + '/';
+  return [
+    origin + base,
+    origin + base + 'index.html',
+    origin + '/',
+    origin + '/index.html',
+  ];
+}
+
+async function cacheAbsoluteShell(cache) {
+  for (const abs of absoluteShellUrls()) {
+    try {
+      const hit = await cache.match(abs);
+      if (hit) continue;
+      const rel = abs.replace(self.location.origin, '');
+      const fromRel = await cache.match('./index.html') || await cache.match('index.html');
+      if (fromRel) {
+        await cache.put(abs, fromRel.clone());
+        continue;
+      }
+      await precacheUrl(cache, abs);
+    } catch (e) {
+      console.warn('[ngmy-sw] absolute shell', abs, e);
+    }
+  }
+}
+
+async function shellCachedIn(cache) {
+  for (const u of INDEX_CANDIDATES) {
+    const hit = await cache.match(new Request(u));
+    if (hit) return true;
+  }
+  for (const abs of absoluteShellUrls()) {
+    const hit = await cache.match(abs);
+    if (hit) return true;
+  }
+  return false;
+}
+
+async function offlineDocumentFromCache(cache) {
+  for (const u of INDEX_CANDIDATES) {
+    const hit = await cache.match(new Request(u));
+    if (hit) return hit;
+  }
+  for (const abs of absoluteShellUrls()) {
+    const hit = await cache.match(abs);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+async function offlineDocumentAnyCache() {
+  const hit = await offlineDocument();
+  if (hit) return hit;
+  const keys = await caches.keys();
+  for (const k of keys.filter((x) => x.startsWith(CACHE_PREFIX))) {
+    const c = await caches.open(k);
+    const doc = await offlineDocumentFromCache(c);
+    if (doc) return doc;
+  }
+  return undefined;
+}
 
 async function precacheUrl(cache, url) {
   try {
@@ -49,11 +122,15 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      for (const url of CRITICAL_OFFLINE_URLS) {
+      const allCritical = CRITICAL_OFFLINE_URLS.concat(criticalPartUrls());
+      for (const url of allCritical) {
         await precacheUrl(cache, url);
       }
-      const rest = PRECACHE_URLS.filter((u) => CRITICAL_OFFLINE_URLS.indexOf(u) === -1);
+      const rest = PRECACHE_URLS.filter(
+        (u) => allCritical.indexOf(u) === -1,
+      );
       await Promise.allSettled(rest.map((url) => precacheUrl(cache, url)));
+      await cacheAbsoluteShell(cache);
       await self.skipWaiting();
     })(),
   );
@@ -62,19 +139,28 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
-          .map((k) => caches.delete(k)),
-      );
-      await self.clients.claim();
-      await restoreAllAlarms();
       const cache = await caches.open(CACHE_NAME);
-      for (const url of CRITICAL_OFFLINE_URLS) {
+      const allCritical = CRITICAL_OFFLINE_URLS.concat(criticalPartUrls());
+      for (const url of allCritical) {
         const hit = await cache.match(url);
         if (!hit) await precacheUrl(cache, url);
       }
+      await cacheAbsoluteShell(cache);
+      const ready = await shellCachedIn(cache);
+
+      if (ready) {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+            .map((k) => caches.delete(k)),
+        );
+      } else {
+        console.warn('[ngmy-sw] keep prior cache — new shell not ready yet');
+      }
+
+      await self.clients.claim();
+      await restoreAllAlarms();
       const clients = await self.clients.matchAll({ type: 'window' });
       for (const client of clients) {
         client.postMessage({ type: 'CACHE_READY' });
@@ -115,6 +201,10 @@ async function cacheLookupByPathname(url) {
 async function offlineDocument() {
   for (const u of INDEX_CANDIDATES) {
     const hit = await cacheLookup(new Request(u));
+    if (hit) return hit;
+  }
+  for (const abs of absoluteShellUrls()) {
+    const hit = await caches.match(abs);
     if (hit) return hit;
   }
   return undefined;
@@ -308,13 +398,16 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (event.request.mode === 'navigate') {
-        const cachedNav = await offlineDocument();
+        const cachedNav = await offlineDocumentAnyCache();
         if (cachedNav) {
           if (self.navigator.onLine) {
             event.waitUntil(
               fetch(event.request)
                 .then((res) => {
-                  if (res && res.status === 200) return cache.put(event.request, res.clone());
+                  if (res && res.status === 200) {
+                    cache.put(event.request, res.clone());
+                    return cacheAbsoluteShell(cache);
+                  }
                 })
                 .catch(() => {}),
             );

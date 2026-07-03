@@ -83,6 +83,39 @@ jobs:
           DEPLOY_ID=$(date -u +%Y%m%d%H%M%S)
           printf '{"build_number":"%s","deployed_at":"%s","app_name":"ngmy","version":"1.0.0","package_name":"ngmy"}\n' \
             "$DEPLOY_ID" "$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)" > _site/version.json
+
+          # SPA + guest app routes on GitHub Pages
+          cp _site/index.html _site/404.html
+
+          # Disable Flutter's unregister-only service worker — ngmy_service_worker.js handles offline.
+          if [ -f _site/flutter_bootstrap.js ]; then
+            python3 - <<'PY'
+          import pathlib, re
+          p = pathlib.Path("_site/flutter_bootstrap.js")
+          boot = p.read_text(encoding="utf-8")
+          boot = boot.replace(",{}", "")
+          boot = re.sub(r",?\s*serviceWorkerSettings:\s*\{[^}]*\}", "", boot)
+          loader = """_flutter.loader.load({
+            config: {
+              canvasKitBaseUrl: "./canvaskit/",
+              useLocalCanvasKit: true
+            }
+          }).catch(function (e) {
+            console.error("[ngmy] Flutter load failed", e);
+            window.__ngmyShowLoadError && window.__ngmyShowLoadError(
+              "NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen."
+            );
+          });"""
+          if "_flutter.loader.load({" in boot:
+            boot = re.sub(r"_flutter\.loader\.load\(\{[^;]*\}\);?", loader, boot, count=1, flags=re.S)
+          elif "_flutter.loader.load();" in boot:
+            boot = boot.replace("_flutter.loader.load();", loader)
+          p.write_text(boot, encoding="utf-8")
+          print("patched flutter_bootstrap.js (local CanvasKit, no Flutter SW)")
+          PY
+          fi
+          rm -f _site/flutter_service_worker.js
+
           if [ -f web/ngmy_service_worker.js ]; then
             python3 - <<'PY'
           import json, pathlib

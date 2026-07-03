@@ -24,6 +24,18 @@
 
   <script>
     (function () {
+      var deployId = '__NGMY_DEPLOY_ID__';
+      var scope = window.__NGMY_BASE_PATH__ || '/';
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: scope }).catch(function (e) {
+          console.warn('[ngmy] early service worker register', e);
+        });
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
       function ngmyExtractGuestAppSlug() {
         var path = location.pathname || "";
         var m = path.match(/\/app\/([^/?#]+)/i);
@@ -472,7 +484,27 @@
       function warmOfflineCache() {
         if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
         try {
-          navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: OFFLINE_CRITICAL });
+          var urls = OFFLINE_CRITICAL.slice();
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
+              if (!ngmyKeys.length) {
+                navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+                return;
+              }
+              caches.open(ngmyKeys[ngmyKeys.length - 1]).then(function (cache) {
+                return cache.keys().then(function (reqs) {
+                  reqs.forEach(function (r) {
+                    var p = (r.url || '').split('/').pop() || '';
+                    if (/main\.dart\.js.*\.part\.js/i.test(r.url || '')) urls.push(r.url.replace(location.origin + (swScope === '/' ? '' : swScope.replace(/\/$/, '')), '').replace(/^\//, ''));
+                  });
+                  navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+                });
+              });
+            });
+          } else {
+            navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+          }
         } catch (e) {}
       }
 
