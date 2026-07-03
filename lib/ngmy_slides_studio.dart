@@ -35,7 +35,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   int _slideIndex = 0;
   String? _selectedElementId;
   bool _loading = true;
-  bool _showNotes = true;
+  bool _showNotes = false;
   String _ribbonTab = 'Home';
   bool _colorApplyAllSlides = false;
   Timer? _autosaveTimer;
@@ -1100,6 +1100,48 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     }
   }
 
+  bool _isCompactLayout(BuildContext context) => MediaQuery.sizeOf(context).width < 900;
+
+  bool _shouldShowNotesPanel(bool compact) {
+    if (!_showNotes) return false;
+    if (!compact) return true;
+    const hiddenTabs = {'Design', 'Transitions', 'Insert'};
+    return !hiddenTabs.contains(_ribbonTab);
+  }
+
+  bool _shouldShowFormatPanel(bool compact) {
+    if (_selectedElement() == null) return false;
+    if (!compact) return true;
+    const hiddenTabs = {'Design', 'Transitions'};
+    return !hiddenTabs.contains(_ribbonTab);
+  }
+
+  Widget _transitionChip(NgmySlideTransition tr, bool selected, Color accent, bool isDark, VoidCallback onTap) {
+    final isNone = tr == NgmySlideTransition.none;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: isNone ? 12 : 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? accent.withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? accent : Colors.white12, width: isNone && selected ? 2 : 1),
+          ),
+          child: Text(
+            ngmySlideTransitionChipLabel(tr),
+            style: TextStyle(
+              fontSize: isNone ? 12 : 18,
+              fontWeight: isNone ? FontWeight.w800 : FontWeight.normal,
+              color: isNone ? (selected ? accent : (isDark ? Colors.white70 : const Color(0xFF64748B))) : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _elementTransitionPicker(bool isDark) {
     final el = _selectedElement();
     if (el == null) return const SizedBox.shrink();
@@ -1110,24 +1152,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         const SizedBox(width: 6),
         ...NgmySlideTransition.values.map((tr) {
           final selected = el.textTransition == tr;
-          return Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: GestureDetector(
-              onTap: () => showNgmyTextTransitionPreview(
-                context,
-                transition: tr,
-                onApply: () => _mutate(() => el.textTransition = tr),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF059669).withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: selected ? const Color(0xFF059669) : Colors.white12),
-                ),
-                child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 16)),
-              ),
-            ),
+          return _transitionChip(
+            tr,
+            selected,
+            const Color(0xFF059669),
+            isDark,
+            () => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr)),
           );
         }),
       ],
@@ -1303,7 +1333,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     final deck = _activeDeck!;
     final slide = _currentSlide!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final compact = _isCompactLayout(context);
+    final wide = !compact;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFE2E8F0),
@@ -1321,18 +1352,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                   Expanded(
                     child: Column(
                       children: [
-                        if (!wide) SizedBox(height: 92, child: _slideStrip(isDark, vertical: false)),
+                        if (compact) SizedBox(height: 76, child: _slideStrip(isDark, vertical: false)),
                         Expanded(child: _canvas(slide, isDark)),
-                        if (_showNotes) _notesPanel(slide, isDark),
+                        if (_shouldShowNotesPanel(compact)) _notesPanel(slide, isDark, compact: compact),
                       ],
                     ),
                   ),
-                  if (wide && _selectedElement() != null) SizedBox(width: 220, child: _formatPanel(isDark)),
+                  if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 220, child: _formatPanel(isDark)),
                 ],
               ),
             ),
-            if (!wide && _selectedElement() != null) SizedBox(height: 140, child: _formatPanel(isDark)),
-            SizedBox(height: widget.bottomScrollPadding),
+            if (compact && _shouldShowFormatPanel(compact)) SizedBox(height: 120, child: _formatPanel(isDark)),
+            SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
           ],
         ),
       ),
@@ -1647,22 +1678,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: transitions.map((tr) {
-                final sel = selected == tr;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: GestureDetector(
-                    onTap: () => onTap(tr),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel ? accent.withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: sel ? accent : Colors.white12),
-                      ),
-                      child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 18)),
-                    ),
-                  ),
-                );
+                return _transitionChip(tr, selected == tr, accent, isDark, () => onTap(tr));
               }).toList(),
             ),
           );
@@ -2134,7 +2150,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     );
   }
 
-  Widget _notesPanel(NgmySlide slide, bool isDark) {
+  Widget _notesPanel(NgmySlide slide, bool isDark, {bool compact = false}) {
     if (_notesSlideId != slide.id) {
       _notesSlideId = slide.id;
       _notesControllers[slide.id]?.dispose();
@@ -2142,27 +2158,35 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     }
     final notesC = _notesControllers[slide.id]!;
     return Container(
-      height: 88,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      height: compact ? 56 : 88,
+      padding: EdgeInsets.fromLTRB(12, compact ? 4 : 8, 12, compact ? 4 : 8),
       color: isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('Notes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-          const SizedBox(width: 12),
+          if (!compact)
+            Text('Notes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          if (!compact) const SizedBox(width: 12),
           Expanded(
             child: TextField(
               controller: notesC,
-              maxLines: 3,
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF334155)),
+              maxLines: compact ? 1 : 3,
+              style: TextStyle(fontSize: compact ? 11 : 12, color: isDark ? Colors.white : const Color(0xFF334155)),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: 'Speaker notes for this slide…',
+                hintText: compact ? 'Speaker notes…' : 'Speaker notes for this slide…',
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 8 : 10),
               ),
               onChanged: (v) => _updateSlideNotes(slide.id, v),
             ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+            tooltip: 'Hide notes',
+            onPressed: () => setState(() => _showNotes = false),
           ),
         ],
       ),

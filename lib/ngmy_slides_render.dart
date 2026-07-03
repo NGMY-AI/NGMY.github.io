@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -324,34 +325,110 @@ String ngmySlideTransitionEmoji(NgmySlideTransition t) {
   }
 }
 
-/// Preview a transition animation, then optionally apply it.
+String ngmySlideTransitionChipLabel(NgmySlideTransition tr) {
+  if (tr == NgmySlideTransition.none) return 'None';
+  return ngmySlideTransitionEmoji(tr);
+}
+
+bool _ngmyPreviewDialogOpen = false;
+
+Future<void> _showAutoDismissPreview(
+  BuildContext context, {
+  required String title,
+  required Widget preview,
+  Duration duration = const Duration(seconds: 3),
+}) async {
+  if (!context.mounted) return;
+  final nav = Navigator.of(context, rootNavigator: true);
+  if (_ngmyPreviewDialogOpen && nav.canPop()) {
+    nav.pop();
+  }
+  _ngmyPreviewDialogOpen = true;
+  Timer? timer;
+  await showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Animation preview',
+    barrierColor: Colors.black87,
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (ctx, anim, secondary) {
+      timer = Timer(duration, () {
+        if (ctx.mounted && Navigator.of(ctx, rootNavigator: true).canPop()) {
+          Navigator.of(ctx, rootNavigator: true).pop();
+        }
+      });
+      return FadeTransition(
+        opacity: anim,
+        child: Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(ctx).width * 0.94),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111827),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white12),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 28, offset: const Offset(0, 12))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                  const SizedBox(height: 6),
+                  Text('Applied — preview closes automatically', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 14),
+                  preview,
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  timer?.cancel();
+  _ngmyPreviewDialogOpen = false;
+}
+
+/// Preview a slide transition — applies immediately, auto-closes after 3 seconds.
 Future<void> showNgmyTransitionPreview(
   BuildContext context, {
   required NgmySlideTransition transition,
   required VoidCallback onApply,
 }) async {
-  await showDialog<void>(
-    context: context,
-    barrierColor: Colors.black87,
-    builder: (ctx) => _TransitionPreviewDialog(transition: transition, onApply: () {
-      Navigator.pop(ctx);
-      onApply();
-    }),
+  onApply();
+  if (!context.mounted) return;
+  final previewW = (MediaQuery.sizeOf(context).width * 0.88).clamp(280.0, 440.0);
+  final title = transition == NgmySlideTransition.none
+      ? '⏭️ None — no slide transition'
+      : '${ngmySlideTransitionEmoji(transition)} Slide transition preview';
+  await _showAutoDismissPreview(
+    context,
+    title: title,
+    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 1500) : const Duration(seconds: 3),
+    preview: SizedBox(
+      width: previewW,
+      height: previewW * 0.56,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: _TransitionPreviewLoop(transition: transition),
+      ),
+    ),
   );
 }
 
-class _TransitionPreviewDialog extends StatefulWidget {
-  const _TransitionPreviewDialog({required this.transition, required this.onApply});
+class _TransitionPreviewLoop extends StatefulWidget {
+  const _TransitionPreviewLoop({required this.transition});
   final NgmySlideTransition transition;
-  final VoidCallback onApply;
 
   @override
-  State<_TransitionPreviewDialog> createState() => _TransitionPreviewDialogState();
+  State<_TransitionPreviewLoop> createState() => _TransitionPreviewLoopState();
 }
 
-class _TransitionPreviewDialogState extends State<_TransitionPreviewDialog> with SingleTickerProviderStateMixin {
+class _TransitionPreviewLoopState extends State<_TransitionPreviewLoop> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
-  var _playing = true;
 
   @override
   void initState() {
@@ -378,6 +455,15 @@ class _TransitionPreviewDialogState extends State<_TransitionPreviewDialog> with
   Widget _animatedPreview() {
     final out = _buildSlide('Slide A', const Color(0xFF2563EB));
     final inn = _buildSlide('Slide B', const Color(0xFF059669));
+    if (widget.transition == NgmySlideTransition.none) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          out,
+          Center(child: Text('No transition', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w700, fontSize: 16))),
+        ],
+      );
+    }
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, _) {
@@ -387,21 +473,21 @@ class _TransitionPreviewDialogState extends State<_TransitionPreviewDialog> with
             return inn;
           case NgmySlideTransition.fade:
           case NgmySlideTransition.dissolve:
-            return Stack(children: [out, Opacity(opacity: t, child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, Opacity(opacity: t, child: inn)]);
           case NgmySlideTransition.slideLeft:
           case NgmySlideTransition.push:
-            return Stack(children: [out, Transform.translate(offset: Offset((1 - t) * 220, 0), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.translate(offset: Offset((1 - t) * 220, 0), child: inn)]);
           case NgmySlideTransition.slideRight:
-            return Stack(children: [out, Transform.translate(offset: Offset(-(1 - t) * 220, 0), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.translate(offset: Offset(-(1 - t) * 220, 0), child: inn)]);
           case NgmySlideTransition.slideUp:
           case NgmySlideTransition.curtain:
-            return Stack(children: [out, Transform.translate(offset: Offset(0, (1 - t) * 140), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.translate(offset: Offset(0, (1 - t) * 140), child: inn)]);
           case NgmySlideTransition.slideDown:
-            return Stack(children: [out, Transform.translate(offset: Offset(0, -(1 - t) * 140), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.translate(offset: Offset(0, -(1 - t) * 140), child: inn)]);
           case NgmySlideTransition.zoom:
-            return Stack(children: [out, Transform.scale(scale: 0.6 + t * 0.4, child: Opacity(opacity: t, child: inn))]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.scale(scale: 0.6 + t * 0.4, child: Opacity(opacity: t, child: inn))]);
           case NgmySlideTransition.zoomOut:
-            return Stack(children: [out, Transform.scale(scale: 1.3 - t * 0.3, child: Opacity(opacity: t, child: inn))]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.scale(scale: 1.3 - t * 0.3, child: Opacity(opacity: t, child: inn))]);
           case NgmySlideTransition.flip:
             return Transform(
               alignment: Alignment.center,
@@ -427,16 +513,16 @@ class _TransitionPreviewDialogState extends State<_TransitionPreviewDialog> with
               child: Opacity(opacity: t, child: inn),
             );
           case NgmySlideTransition.blur:
-            return Stack(children: [out, Opacity(opacity: t, child: Transform.scale(scale: 1.02 - t * 0.02, child: inn))]);
+            return Stack(fit: StackFit.expand, children: [out, Opacity(opacity: t, child: Transform.scale(scale: 1.02 - t * 0.02, child: inn))]);
           case NgmySlideTransition.wipeLeft:
-            return Stack(children: [out, ClipRect(clipper: _WipeClipper(t), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, ClipRect(clipper: _WipeClipper(t), child: inn)]);
           case NgmySlideTransition.wipeRight:
-            return Stack(children: [out, ClipRect(clipper: _WipeClipper(1 - t), child: inn)]);
+            return Stack(fit: StackFit.expand, children: [out, ClipRect(clipper: _WipeClipper(1 - t), child: inn)]);
           case NgmySlideTransition.bounce:
             final bounce = Curves.bounceOut.transform(t);
-            return Stack(children: [out, Transform.scale(scale: 0.5 + bounce * 0.5, child: Opacity(opacity: t, child: inn))]);
+            return Stack(fit: StackFit.expand, children: [out, Transform.scale(scale: 0.5 + bounce * 0.5, child: Opacity(opacity: t, child: inn))]);
           case NgmySlideTransition.flash:
-            return Stack(children: [out, Opacity(opacity: t < 0.15 ? 1 : t, child: ColoredBox(color: Colors.white.withValues(alpha: t < 0.15 ? 0.9 : 0), child: inn))]);
+            return Stack(fit: StackFit.expand, children: [out, Opacity(opacity: t < 0.15 ? 1 : t, child: ColoredBox(color: Colors.white.withValues(alpha: t < 0.15 ? 0.9 : 0), child: inn))]);
           case NgmySlideTransition.spiral:
             return Transform(
               alignment: Alignment.center,
@@ -444,38 +530,14 @@ class _TransitionPreviewDialogState extends State<_TransitionPreviewDialog> with
               child: inn,
             );
           case NgmySlideTransition.swing:
-            return Transform.rotate(angle: (t - 0.5) * 0.35, child: Stack(children: [out, Opacity(opacity: t, child: inn)]));
+            return Transform.rotate(angle: (t - 0.5) * 0.35, child: Stack(fit: StackFit.expand, children: [out, Opacity(opacity: t, child: inn)]));
         }
       },
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF111827),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${ngmySlideTransitionEmoji(widget.transition)} Preview', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-            const SizedBox(height: 14),
-            SizedBox(width: 280, height: 160, child: ClipRRect(borderRadius: BorderRadius.circular(12), child: _animatedPreview())),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                const Spacer(),
-                FilledButton(onPressed: widget.onApply, child: const Text('Use transition')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _animatedPreview();
 }
 
 class _WipeClipper extends CustomClipper<Rect> {
@@ -662,52 +724,120 @@ class NgmySlideAnimatedRender extends StatelessWidget {
   }
 }
 
-/// Preview text/element entrance animation before applying.
+/// Preview element entrance animation — applies immediately, auto-closes after 3 seconds.
 Future<void> showNgmyTextTransitionPreview(
   BuildContext context, {
   required NgmySlideTransition transition,
   required VoidCallback onApply,
 }) async {
-  await showDialog<void>(
-    context: context,
-    barrierColor: Colors.black87,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF111827),
-      title: Text('${ngmySlideTransitionEmoji(transition)} Element animation', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-      content: SizedBox(
-        width: 280,
-        height: 120,
-        child: NgmyElementEntrance(
-          element: NgmySlideElement(
-            id: 'preview',
-            type: NgmySlideElementType.text,
-            text: 'Sample text flies in',
-            textTransition: transition,
-            fontSize: 22,
-            color: 0xFFFFFFFF,
-          ),
-          animate: true,
-          child: Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2563EB).withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text('Sample text flies in', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-          ),
-        ),
+  onApply();
+  if (!context.mounted) return;
+  final previewW = (MediaQuery.sizeOf(context).width * 0.88).clamp(300.0, 440.0);
+  final title = transition == NgmySlideTransition.none
+      ? '⏭️ None — no element animation'
+      : '${ngmySlideTransitionEmoji(transition)} Element animation preview';
+  await _showAutoDismissPreview(
+    context,
+    title: title,
+    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 1500) : const Duration(seconds: 3),
+    preview: SizedBox(
+      width: previewW,
+      height: previewW * 0.62,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: _ElementAnimationPreview(transition: transition),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(ctx);
-            onApply();
-          },
-          child: const Text('Apply to text'),
-        ),
-      ],
     ),
   );
+}
+
+class _ElementAnimationPreview extends StatefulWidget {
+  const _ElementAnimationPreview({required this.transition});
+  final NgmySlideTransition transition;
+
+  @override
+  State<_ElementAnimationPreview> createState() => _ElementAnimationPreviewState();
+}
+
+class _ElementAnimationPreviewState extends State<_ElementAnimationPreview> {
+  var _cycle = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.transition != NgmySlideTransition.none) {
+      Future.delayed(const Duration(milliseconds: 1100), () {
+        if (mounted) setState(() => _cycle++);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+        ),
+      ),
+      child: widget.transition == NgmySlideTransition.none
+          ? Center(child: Text('No animation on elements', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontWeight: FontWeight.w700, fontSize: 16)))
+          : Stack(
+              children: [
+                Positioned(
+                  left: 24,
+                  top: 28,
+                  child: NgmyElementEntrance(
+                    key: ValueKey('shape_${widget.transition}_$_cycle'),
+                    element: NgmySlideElement(
+                      id: 'preview_shape',
+                      type: NgmySlideElementType.shape,
+                      fillColor: 0xFFF97316,
+                      textTransition: widget.transition,
+                    ),
+                    animate: true,
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 32,
+                  child: NgmyElementEntrance(
+                    key: ValueKey('text_${widget.transition}_$_cycle'),
+                    element: NgmySlideElement(
+                      id: 'preview_text',
+                      type: NgmySlideElementType.text,
+                      text: 'Element flies in',
+                      textTransition: widget.transition,
+                      fontSize: 22,
+                      color: 0xFFFFFFFF,
+                    ),
+                    animate: true,
+                    staggerIndex: 1,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Text('Element flies in', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 }
