@@ -144,6 +144,7 @@ Future<void> _pushFiles(RTCDataChannel channel) async {
   final email = _txOwnerEmail;
   if (email == null) return;
   try {
+    await NgmyDocShareStore.preloadForTransfer(email, _txItems);
     for (final item in _txItems) {
       final size = item.sizeBytes;
       if (size <= 0) continue;
@@ -160,6 +161,14 @@ Future<void> _pushFiles(RTCDataChannel channel) async {
         await _sendBinary(channel, chunk);
         sent += chunk.length;
         _txBytesCallback?.call(sent, size);
+      }
+      if (sent <= 0 && size > 0) {
+        final fallback = await NgmyDocShareStore.readBytes(email, item);
+        if (fallback != null && fallback.isNotEmpty) {
+          await _sendBinary(channel, fallback);
+          sent = fallback.length;
+          _txBytesCallback?.call(sent, size);
+        }
       }
       if (sent <= 0 && size > 0) {
         debugPrint('[ngmy transfer p2p] no bytes read for ${item.name}');

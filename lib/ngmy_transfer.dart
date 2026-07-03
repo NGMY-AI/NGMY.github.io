@@ -54,12 +54,7 @@ class NgmyTransfer {
 
     await stopSend();
 
-    final readable = await NgmyDocShareStore.ensureReadableForTransfer(ownerEmail, items);
-    if (!readable) {
-      debugPrint('[ngmy transfer] files not readable for send');
-      return null;
-    }
-
+    // Preload file bytes in background — never block showing the 6-digit code.
     unawaited(NgmyDocShareStore.preloadForTransfer(ownerEmail, items));
 
     final transferKey = NgmyTransferRendezvous.generateTransferKey();

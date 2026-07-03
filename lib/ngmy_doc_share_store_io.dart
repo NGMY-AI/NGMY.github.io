@@ -374,26 +374,6 @@ class NgmyDocShareStore {
     }
   }
 
-  static Future<bool> ensureReadableForTransfer(
-    String email,
-    List<NgmyDocShareItem> items, {
-    Duration maxWait = const Duration(seconds: 30),
-  }) async {
-    if (items.isEmpty) return false;
-    for (final item in items) {
-      if (item.sizeBytes <= 0) return false;
-      var ok = false;
-      await for (final chunk in readFileStream(email, item)) {
-        if (chunk.isNotEmpty) {
-          ok = true;
-          break;
-        }
-      }
-      if (!ok) return false;
-    }
-    return true;
-  }
-
   static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
     final root = await _userDir(email);
     final f = await _fileForId(root, item.id, nameHint: item.name);

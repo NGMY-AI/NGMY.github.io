@@ -170,7 +170,7 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
     }
     if (partKeys.isEmpty) return;
     await _persistChunkManifest(baseKey, partKeys, size);
-    if (await _blobIsReadable(baseKey, minBytes: size > 0 ? size : 1)) {
+    if (await _blobIsReadable(baseKey, minBytes: 1)) {
       _webFiles.remove(id);
     } else {
       debugPrint('[doc share web persist chunked] verify failed for $id — keeping live file ref');
@@ -198,8 +198,7 @@ Future<void> _persistHtmlFile(String email, String id, html.File file) async {
     final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
     if (buf == null) return;
     await _persistBlob(key, Uint8List.view(buf));
-    final expected = file.size.round();
-    if (await _blobIsReadable(key, minBytes: expected > 0 ? expected : 1)) {
+    if (await _blobIsReadable(key, minBytes: 1)) {
       _webFiles.remove(id);
     } else {
       debugPrint('[doc share web persist] verify failed for $id — keeping live file ref');
@@ -579,42 +578,13 @@ class NgmyDocShareStore {
     for (final item in items) {
       if (_webFiles[item.id] != null) continue;
       final key = _bytesPrefsKey(email, item.id);
-      if (await _blobIsReadable(key, minBytes: 1)) continue;
-      unawaited(readBytes(email, item));
-    }
-  }
-
-  /// Waits until every file can be read from local storage (required before send).
-  static Future<bool> ensureReadableForTransfer(
-    String email,
-    List<NgmyDocShareItem> items, {
-    Duration maxWait = const Duration(seconds: 90),
-  }) async {
-    if (items.isEmpty) return false;
-    final deadline = DateTime.now().add(maxWait);
-    while (DateTime.now().isBefore(deadline)) {
-      var allOk = true;
-      for (final item in items) {
-        if (item.sizeBytes <= 0) {
-          allOk = false;
-          break;
-        }
-        var readable = false;
-        await for (final chunk in readFileStream(email, item)) {
-          if (chunk.isNotEmpty) {
-            readable = true;
-            break;
-          }
-        }
-        if (!readable) {
-          allOk = false;
-          break;
-        }
+      final cached = _transferReadCache[key];
+      if (cached != null && cached.isNotEmpty) continue;
+      final bytes = await readBytes(email, item);
+      if (bytes != null && bytes.isNotEmpty) {
+        _transferReadCache[key] = bytes;
       }
-      if (allOk) return true;
-      await Future<void>.delayed(const Duration(milliseconds: 250));
     }
-    return false;
   }
 
   static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
