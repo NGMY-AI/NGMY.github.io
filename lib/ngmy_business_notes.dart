@@ -38,6 +38,7 @@ class _NoteBackgroundDef {
     this.pattern = _NoteBgPattern.none,
     this.overlay = _NoteBgAnimOverlay.none,
     this.emojis = const [],
+    this.floatingEmojis = const [],
     this.darkText = false,
   });
 
@@ -48,53 +49,55 @@ class _NoteBackgroundDef {
   final _NoteBgPattern pattern;
   final _NoteBgAnimOverlay overlay;
   final List<String> emojis;
+  /// Theme-accurate animated creatures/objects for this design (flowers, animals, etc.)
+  final List<String> floatingEmojis;
   final bool darkText;
 }
 
 const _noteBackgrounds = <_NoteBackgroundDef>[
-  _NoteBackgroundDef(id: 'sunrise_meadow', label: 'Sunrise Meadow', category: 'Personal', colors: [Color(0xFFFFF7ED), Color(0xFFBBF7D0), Color(0xFF86EFAC)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.butterflies, emojis: ['🌅', '🌿']),
-  _NoteBackgroundDef(id: 'ocean_waves', label: 'Ocean Waves', category: 'Nature', colors: [Color(0xFF0EA5E9), Color(0xFF0369A1), Color(0xFF1E3A8A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🌊'], darkText: true),
-  _NoteBackgroundDef(id: 'rainforest', label: 'Rainforest', category: 'Nature', colors: [Color(0xFF14532D), Color(0xFF166534), Color(0xFF052E16)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🌳', '🦜'], darkText: true),
-  _NoteBackgroundDef(id: 'cherry_blossom', label: 'Cherry Blossom', category: 'Personal', colors: [Color(0xFFFDF2F8), Color(0xFFFBCFE8), Color(0xFFF472B6)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌸']),
-  _NoteBackgroundDef(id: 'starry_night', label: 'Starry Night', category: 'Personal', colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.stars, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌙'], darkText: true),
+  _NoteBackgroundDef(id: 'sunrise_meadow', label: 'Sunrise Meadow', category: 'Personal', colors: [Color(0xFFFFF7ED), Color(0xFFBBF7D0), Color(0xFF86EFAC)], pattern: _NoteBgPattern.grass, emojis: ['🌅', '🌿'], floatingEmojis: ['🌅', '🌼', '🌿']),
+  _NoteBackgroundDef(id: 'ocean_waves', label: 'Ocean Waves', category: 'Nature', colors: [Color(0xFF0EA5E9), Color(0xFF0369A1), Color(0xFF1E3A8A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🌊'], floatingEmojis: ['🐟', '🐠', '🐬'], darkText: true),
+  _NoteBackgroundDef(id: 'rainforest', label: 'Rainforest', category: 'Nature', colors: [Color(0xFF14532D), Color(0xFF166534), Color(0xFF052E16)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🌳', '🦜'], floatingEmojis: ['🦜', '🌿', '🐒'], darkText: true),
+  _NoteBackgroundDef(id: 'cherry_blossom', label: 'Cherry Blossom', category: 'Personal', colors: [Color(0xFFFDF2F8), Color(0xFFFBCFE8), Color(0xFFF472B6)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌸'], floatingEmojis: ['🌸', '🌸', '🌸']),
+  _NoteBackgroundDef(id: 'starry_night', label: 'Starry Night', category: 'Personal', colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.stars, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌙'], floatingEmojis: ['✨', '🌙'], darkText: true),
   _NoteBackgroundDef(id: 'rain_drops', label: 'Rainy Day', category: 'Nature', colors: [Color(0xFFCBD5E1), Color(0xFF64748B), Color(0xFF334155)], pattern: _NoteBgPattern.rain, overlay: _NoteBgAnimOverlay.clouds, emojis: ['☔'], darkText: true),
   _NoteBackgroundDef(id: 'mountain_mist', label: 'Mountain Mist', category: 'Nature', colors: [Color(0xFFE2E8F0), Color(0xFF94A3B8), Color(0xFF475569)], pattern: _NoteBgPattern.clouds, overlay: _NoteBgAnimOverlay.clouds, emojis: ['🏔️']),
-  _NoteBackgroundDef(id: 'tropical_beach', label: 'Tropical Beach', category: 'Personal', colors: [Color(0xFF67E8F9), Color(0xFF22D3EE), Color(0xFFFDE68A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.birds, emojis: ['🏝️', '🌴']),
-  _NoteBackgroundDef(id: 'butterfly_garden', label: 'Butterfly Garden', category: 'Personal', colors: [Color(0xFFFEF9C3), Color(0xFFFDE68A), Color(0xFFF0ABFC)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.butterflies, emojis: ['🌺']),
-  _NoteBackgroundDef(id: 'koi_pond', label: 'Koi Pond', category: 'Nature', colors: [Color(0xFF99F6E4), Color(0xFF2DD4BF), Color(0xFF0F766E)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🪷']),
-  _NoteBackgroundDef(id: 'safari_sunset', label: 'Safari Sunset', category: 'Nature', colors: [Color(0xFFFDBA74), Color(0xFFEA580C), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.birds, emojis: ['🦁', '🦒'], darkText: true),
-  _NoteBackgroundDef(id: 'waterfall_mist', label: 'Waterfall', category: 'Nature', colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF0284C7)], pattern: _NoteBgPattern.rain, overlay: _NoteBgAnimOverlay.clouds, emojis: ['💧']),
+  _NoteBackgroundDef(id: 'tropical_beach', label: 'Tropical Beach', category: 'Personal', colors: [Color(0xFF67E8F9), Color(0xFF22D3EE), Color(0xFFFDE68A)], pattern: _NoteBgPattern.waves, emojis: ['🏝️', '🌴'], floatingEmojis: ['🌴', '🦜', '🏝️']),
+  _NoteBackgroundDef(id: 'butterfly_garden', label: 'Butterfly Garden', category: 'Personal', colors: [Color(0xFFFEF9C3), Color(0xFFFDE68A), Color(0xFFF0ABFC)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌺'], floatingEmojis: ['🦋', '🦋', '🌺']),
+  _NoteBackgroundDef(id: 'koi_pond', label: 'Koi Pond', category: 'Nature', colors: [Color(0xFF99F6E4), Color(0xFF2DD4BF), Color(0xFF0F766E)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🪷'], floatingEmojis: ['🐟', '🪷']),
+  _NoteBackgroundDef(id: 'safari_sunset', label: 'Safari Sunset', category: 'Nature', colors: [Color(0xFFFDBA74), Color(0xFFEA580C), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, emojis: ['🦁', '🦒'], floatingEmojis: ['🦁', '🦒', '🐘'], darkText: true),
+  _NoteBackgroundDef(id: 'waterfall_mist', label: 'Waterfall', category: 'Nature', colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF0284C7)], pattern: _NoteBgPattern.rain, overlay: _NoteBgAnimOverlay.clouds, emojis: ['💧'], floatingEmojis: ['💧']),
   _NoteBackgroundDef(id: 'executive_blue', label: 'Executive Blue', category: 'Work', colors: [Color(0xFFEFF6FF), Color(0xFFBFDBFE), Color(0xFF93C5FD)], pattern: _NoteBgPattern.grid, emojis: ['💼']),
   _NoteBackgroundDef(id: 'boardroom_slate', label: 'Boardroom', category: 'Work', colors: [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)], pattern: _NoteBgPattern.none, emojis: ['📊'], darkText: true),
   _NoteBackgroundDef(id: 'graph_paper', label: 'Graph Paper', category: 'Work', colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFFE2E8F0)], pattern: _NoteBgPattern.grid, emojis: ['📐']),
   _NoteBackgroundDef(id: 'conference_cream', label: 'Conference', category: 'Meeting', colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7), Color(0xFFFDE68A)], pattern: _NoteBgPattern.none, emojis: ['🤝']),
   _NoteBackgroundDef(id: 'calendar_blue', label: 'Calendar', category: 'Meeting', colors: [Color(0xFFF0F9FF), Color(0xFFDBEAFE), Color(0xFFBFDBFE)], pattern: _NoteBgPattern.grid, emojis: ['📅']),
-  _NoteBackgroundDef(id: 'brainstorm_aurora', label: 'Aurora Ideas', category: 'Ideas', colors: [Color(0xFF4ADE80), Color(0xFF818CF8), Color(0xFF312E81)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['💡'], darkText: true),
-  _NoteBackgroundDef(id: 'cosmos_purple', label: 'Cosmos', category: 'Ideas', colors: [Color(0xFF581C87), Color(0xFF7E22CE), Color(0xFF1E1B4B)], pattern: _NoteBgPattern.stars, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🚀'], darkText: true),
+  _NoteBackgroundDef(id: 'brainstorm_aurora', label: 'Aurora Ideas', category: 'Ideas', colors: [Color(0xFF4ADE80), Color(0xFF818CF8), Color(0xFF312E81)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['💡'], floatingEmojis: ['💡', '✨'], darkText: true),
+  _NoteBackgroundDef(id: 'cosmos_purple', label: 'Cosmos', category: 'Ideas', colors: [Color(0xFF581C87), Color(0xFF7E22CE), Color(0xFF1E1B4B)], pattern: _NoteBgPattern.stars, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🚀'], floatingEmojis: ['🚀', '✨'], darkText: true),
   _NoteBackgroundDef(id: 'lightning_storm', label: 'Lightning', category: 'Ideas', colors: [Color(0xFF1E293B), Color(0xFF334155), Color(0xFFCA8A04)], pattern: _NoteBgPattern.lightning, overlay: _NoteBgAnimOverlay.clouds, emojis: ['⚡'], darkText: true),
-  _NoteBackgroundDef(id: 'wildlife_forest', label: 'Wildlife', category: 'Nature', colors: [Color(0xFF365314), Color(0xFF4D7C0F), Color(0xFF14532D)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🦊'], darkText: true),
+  _NoteBackgroundDef(id: 'wildlife_forest', label: 'Wildlife', category: 'Nature', colors: [Color(0xFF365314), Color(0xFF4D7C0F), Color(0xFF14532D)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🦊'], floatingEmojis: ['🦊', '🐿️', '🦌'], darkText: true),
   // ── 20 new animated designs ──
-  _NoteBackgroundDef(id: 'lavender_fields', label: 'Lavender Fields', category: 'Personal', colors: [Color(0xFFEDE9FE), Color(0xFFC4B5FD), Color(0xFF8B5CF6)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['💜']),
-  _NoteBackgroundDef(id: 'snowy_peaks', label: 'Snowy Peaks', category: 'Nature', colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1), Color(0xFF64748B)], pattern: _NoteBgPattern.snow, overlay: _NoteBgAnimOverlay.snow, emojis: ['🏔️']),
-  _NoteBackgroundDef(id: 'hummingbird', label: 'Hummingbird', category: 'Nature', colors: [Color(0xFFECFDF5), Color(0xFF6EE7B7), Color(0xFF059669)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.birds, emojis: ['🌺']),
-  _NoteBackgroundDef(id: 'coral_reef', label: 'Coral Reef', category: 'Nature', colors: [Color(0xFFF97316), Color(0xFFFB7185), Color(0xFF0EA5E9)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🪸'], darkText: true),
-  _NoteBackgroundDef(id: 'desert_dusk', label: 'Desert Dusk', category: 'Nature', colors: [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.birds, emojis: ['🌵'], darkText: true),
-  _NoteBackgroundDef(id: 'bamboo_grove', label: 'Bamboo Grove', category: 'Nature', colors: [Color(0xFFDCFCE7), Color(0xFF86EFAC), Color(0xFF166534)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🎋']),
-  _NoteBackgroundDef(id: 'firefly_night', label: 'Firefly Night', category: 'Personal', colors: [Color(0xFF1E3A5F), Color(0xFF0F172A), Color(0xFF312E81)], pattern: _NoteBgPattern.fireflies, overlay: _NoteBgAnimOverlay.fireflies, emojis: ['🌙'], darkText: true),
-  _NoteBackgroundDef(id: 'rose_garden', label: 'Rose Garden', category: 'Personal', colors: [Color(0xFFFECDD3), Color(0xFFFB7185), Color(0xFFBE123C)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌹']),
-  _NoteBackgroundDef(id: 'moonlit_lake', label: 'Moonlit Lake', category: 'Personal', colors: [Color(0xFF1E3A8A), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌕'], darkText: true),
-  _NoteBackgroundDef(id: 'zen_garden', label: 'Zen Garden', category: 'Personal', colors: [Color(0xFFF5F5F4), Color(0xFFD6D3D1), Color(0xFF78716C)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🪨']),
-  _NoteBackgroundDef(id: 'eagle_sky', label: 'Eagle Sky', category: 'Nature', colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF1D4ED8)], pattern: _NoteBgPattern.clouds, overlay: _NoteBgAnimOverlay.birds, emojis: ['🦅']),
-  _NoteBackgroundDef(id: 'penguin_ice', label: 'Penguin Ice', category: 'Nature', colors: [Color(0xFFE0F2FE), Color(0xFF7DD3FC), Color(0xFF0369A1)], pattern: _NoteBgPattern.snow, overlay: _NoteBgAnimOverlay.snow, emojis: ['🐧']),
-  _NoteBackgroundDef(id: 'dolphin_bay', label: 'Dolphin Bay', category: 'Nature', colors: [Color(0xFF67E8F9), Color(0xFF0891B2), Color(0xFF164E63)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🐬']),
-  _NoteBackgroundDef(id: 'sunflower_field', label: 'Sunflower Field', category: 'Personal', colors: [Color(0xFFFEF08A), Color(0xFFFACC15), Color(0xFFCA8A04)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.butterflies, emojis: ['🌻']),
-  _NoteBackgroundDef(id: 'startup_pitch', label: 'Startup Pitch', category: 'Work', colors: [Color(0xFFF0FDF4), Color(0xFF86EFAC), Color(0xFF16A34A)], pattern: _NoteBgPattern.grid, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🚀']),
+  _NoteBackgroundDef(id: 'lavender_fields', label: 'Lavender Fields', category: 'Personal', colors: [Color(0xFFEDE9FE), Color(0xFFC4B5FD), Color(0xFF8B5CF6)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['💜'], floatingEmojis: ['💜', '🌸', '💕']),
+  _NoteBackgroundDef(id: 'snowy_peaks', label: 'Snowy Peaks', category: 'Nature', colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1), Color(0xFF64748B)], pattern: _NoteBgPattern.snow, overlay: _NoteBgAnimOverlay.snow, emojis: ['🏔️'], floatingEmojis: ['❄️', '🏔️']),
+  _NoteBackgroundDef(id: 'hummingbird', label: 'Hummingbird', category: 'Nature', colors: [Color(0xFFECFDF5), Color(0xFF6EE7B7), Color(0xFF059669)], pattern: _NoteBgPattern.leaves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🌺'], floatingEmojis: ['🐦', '🌺']),
+  _NoteBackgroundDef(id: 'coral_reef', label: 'Coral Reef', category: 'Nature', colors: [Color(0xFFF97316), Color(0xFFFB7185), Color(0xFF0EA5E9)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🪸'], floatingEmojis: ['🐠', '🪸', '🐟'], darkText: true),
+  _NoteBackgroundDef(id: 'desert_dusk', label: 'Desert Dusk', category: 'Nature', colors: [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, emojis: ['🌵'], floatingEmojis: ['🌵', '🦅', '☀️'], darkText: true),
+  _NoteBackgroundDef(id: 'bamboo_grove', label: 'Bamboo Grove', category: 'Nature', colors: [Color(0xFFDCFCE7), Color(0xFF86EFAC), Color(0xFF166534)], pattern: _NoteBgPattern.grass, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🎋'], floatingEmojis: ['🎋', '🎋', '🎋']),
+  _NoteBackgroundDef(id: 'firefly_night', label: 'Firefly Night', category: 'Personal', colors: [Color(0xFF1E3A5F), Color(0xFF0F172A), Color(0xFF312E81)], pattern: _NoteBgPattern.fireflies, overlay: _NoteBgAnimOverlay.fireflies, emojis: ['🌙'], floatingEmojis: ['✨'], darkText: true),
+  _NoteBackgroundDef(id: 'rose_garden', label: 'Rose Garden', category: 'Personal', colors: [Color(0xFFFECDD3), Color(0xFFFB7185), Color(0xFFBE123C)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌹'], floatingEmojis: ['🌹', '💕', '🌹']),
+  _NoteBackgroundDef(id: 'moonlit_lake', label: 'Moonlit Lake', category: 'Personal', colors: [Color(0xFF1E3A8A), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌕'], floatingEmojis: ['🌕', '✨'], darkText: true),
+  _NoteBackgroundDef(id: 'zen_garden', label: 'Zen Garden', category: 'Personal', colors: [Color(0xFFF5F5F4), Color(0xFFD6D3D1), Color(0xFF78716C)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.leaves, emojis: ['🪨'], floatingEmojis: ['🪨', '🎋']),
+  _NoteBackgroundDef(id: 'eagle_sky', label: 'Eagle Sky', category: 'Nature', colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF1D4ED8)], pattern: _NoteBgPattern.clouds, overlay: _NoteBgAnimOverlay.clouds, emojis: ['🦅'], floatingEmojis: ['🦅']),
+  _NoteBackgroundDef(id: 'penguin_ice', label: 'Penguin Ice', category: 'Nature', colors: [Color(0xFFE0F2FE), Color(0xFF7DD3FC), Color(0xFF0369A1)], pattern: _NoteBgPattern.snow, overlay: _NoteBgAnimOverlay.snow, emojis: ['🐧'], floatingEmojis: ['🐧', '❄️']),
+  _NoteBackgroundDef(id: 'dolphin_bay', label: 'Dolphin Bay', category: 'Nature', colors: [Color(0xFF67E8F9), Color(0xFF0891B2), Color(0xFF164E63)], pattern: _NoteBgPattern.waves, overlay: _NoteBgAnimOverlay.fish, emojis: ['🐬'], floatingEmojis: ['🐬', '🐟']),
+  _NoteBackgroundDef(id: 'sunflower_field', label: 'Sunflower Field', category: 'Personal', colors: [Color(0xFFFEF08A), Color(0xFFFACC15), Color(0xFFCA8A04)], pattern: _NoteBgPattern.bokeh, overlay: _NoteBgAnimOverlay.petals, emojis: ['🌻'], floatingEmojis: ['🌻', '🌻', '🌼']),
+  _NoteBackgroundDef(id: 'startup_pitch', label: 'Startup Pitch', category: 'Work', colors: [Color(0xFFF0FDF4), Color(0xFF86EFAC), Color(0xFF16A34A)], pattern: _NoteBgPattern.grid, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🚀'], floatingEmojis: ['🚀']),
   _NoteBackgroundDef(id: 'finance_green', label: 'Finance Pro', category: 'Work', colors: [Color(0xFFECFDF5), Color(0xFF34D399), Color(0xFF047857)], pattern: _NoteBgPattern.grid, emojis: ['💰']),
   _NoteBackgroundDef(id: 'legal_brief', label: 'Legal Brief', category: 'Work', colors: [Color(0xFFF8FAFC), Color(0xFFCBD5E1), Color(0xFF475569)], pattern: _NoteBgPattern.none, emojis: ['⚖️']),
   _NoteBackgroundDef(id: 'workshop_notes', label: 'Workshop', category: 'Meeting', colors: [Color(0xFFFFF7ED), Color(0xFFFED7AA), Color(0xFFEA580C)], pattern: _NoteBgPattern.bokeh, emojis: ['🔧']),
-  _NoteBackgroundDef(id: 'podcast_studio', label: 'Podcast Studio', category: 'Ideas', colors: [Color(0xFF18181B), Color(0xFF3F3F46), Color(0xFF7C3AED)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🎙️'], darkText: true),
-  _NoteBackgroundDef(id: 'art_studio', label: 'Art Studio', category: 'Ideas', colors: [Color(0xFFFDF4FF), Color(0xFFE879F9), Color(0xFF2563EB)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🎨']),
-  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF064E3B), Color(0xFF6366F1), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], darkText: true),
+  _NoteBackgroundDef(id: 'podcast_studio', label: 'Podcast Studio', category: 'Ideas', colors: [Color(0xFF18181B), Color(0xFF3F3F46), Color(0xFF7C3AED)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🎙️'], floatingEmojis: ['🎙️'], darkText: true),
+  _NoteBackgroundDef(id: 'art_studio', label: 'Art Studio', category: 'Ideas', colors: [Color(0xFFFDF4FF), Color(0xFFE879F9), Color(0xFF2563EB)], pattern: _NoteBgPattern.petals, overlay: _NoteBgAnimOverlay.petals, emojis: ['🎨'], floatingEmojis: ['🎨', '🌸']),
+  _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF064E3B), Color(0xFF6366F1), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌'], darkText: true),
 ];
 
 int _gridCountTwoPerRow(int itemCount) => itemCount.isOdd ? itemCount + 1 : itemCount;
@@ -1015,6 +1018,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late final TextEditingController _title;
   late final TextEditingController _body;
   late final FocusNode _bodyFocus;
+  late final String _initialBody;
   Timer? _autosave;
   bool _dirty = false;
   bool _previewMode = false;
@@ -1023,11 +1027,18 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   void initState() {
     super.initState();
     _note = widget.note ?? NgmyBusinessNote(folder: 'Personal');
+    _initialBody = _note.body;
     _title = TextEditingController(text: _note.title);
     _body = TextEditingController(text: _note.body);
     _bodyFocus = FocusNode();
     _title.addListener(_markDirty);
     _body.addListener(_markDirty);
+  }
+
+  bool _hasSaveableContent() {
+    if (_title.text.trim().isNotEmpty) return true;
+    if (_body.text.trim().isEmpty) return false;
+    return _body.text.trim() != _initialBody.trim();
   }
 
   void _markDirty() {
@@ -1054,6 +1065,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<bool> _onWillPop() async {
+    if (!_hasSaveableContent()) {
+      if (mounted) Navigator.pop(context, null);
+      return false;
+    }
     await _persist();
     if (mounted) Navigator.pop(context, _note);
     return false;
@@ -1763,7 +1778,7 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
     super.initState();
     _rng = math.Random(backgroundId.hashCode);
     _particles = _spawnParticles(_def);
-    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 22))..repeat();
   }
 
   String get backgroundId => widget.backgroundId ?? widget.note?.effectiveBackgroundId ?? _noteBackgrounds.first.id;
@@ -1792,9 +1807,14 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
   }
 
   List<_AnimParticle> _spawnParticles(_NoteBackgroundDef def) {
-    final count = widget.compact ? 14 : 28;
+    final isRain = def.pattern == _NoteBgPattern.rain || def.pattern == _NoteBgPattern.lightning;
+    final count = isRain
+        ? (widget.compact ? 48 : 90)
+        : def.pattern == _NoteBgPattern.snow
+            ? (widget.compact ? 22 : 40)
+            : (widget.compact ? 16 : 30);
     return List.generate(count, (i) {
-      final kind = def.pattern == _NoteBgPattern.rain || def.pattern == _NoteBgPattern.lightning
+      final kind = isRain
           ? _ParticleKind.rain
           : def.pattern == _NoteBgPattern.snow
               ? _ParticleKind.snow
@@ -1808,7 +1828,7 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
       return _AnimParticle(
         x: _rng.nextDouble(),
         y: _rng.nextDouble(),
-        speed: 0.08 + _rng.nextDouble() * 0.22,
+        speed: 0.025 + _rng.nextDouble() * 0.08,
         size: 0.4 + _rng.nextDouble() * 0.8,
         phase: _rng.nextDouble(),
         kind: kind,
@@ -1871,25 +1891,40 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
   }
 
   List<Widget> _animatedOverlays(_NoteBackgroundDef def, double t) {
+    final widgets = <Widget>[
+      ..._floatingThemeEmojis(def, t),
+      ..._ambientOverlay(def, t),
+    ];
+    return widgets;
+  }
+
+  List<Widget> _floatingThemeEmojis(_NoteBackgroundDef def, double t) {
+    if (def.floatingEmojis.isEmpty) return const [];
+    final emojis = def.floatingEmojis;
+    final maxCount = widget.compact ? emojis.length.clamp(1, 3) : emojis.length;
+    return List.generate(maxCount, (i) {
+      final emoji = emojis[i % emojis.length];
+      final phase = i * 0.27 + 0.11;
+      final xBase = 0.12 + (i * 0.31) % 0.72;
+      final yBase = 0.18 + (i * 0.23) % 0.58;
+      final size = (widget.compact ? 18.0 : 28.0) + (i % 3) * 4;
+      final speed = 0.18 + (i % 4) * 0.04;
+      return _floatingCreature(
+        emoji: emoji,
+        t: t,
+        xBase: xBase,
+        yBase: yBase,
+        size: size,
+        drift: Offset(0.06 + i * 0.02, 0.05 + i * 0.015),
+        speed: speed,
+        phase: phase,
+      );
+    });
+  }
+
+  List<Widget> _ambientOverlay(_NoteBackgroundDef def, double t) {
     final overlay = def.overlay == _NoteBgAnimOverlay.none ? _overlayFromPattern(def.pattern) : def.overlay;
     switch (overlay) {
-      case _NoteBgAnimOverlay.butterflies:
-        return [
-          _flyingEmoji('🦋', t, 0.18, 0.22, widget.compact ? 22 : 34, const Offset(0.08, 0.72), 1.4),
-          _flyingEmoji('🦋', t, 0.55, 0.38, widget.compact ? 18 : 28, const Offset(0.72, 0.62), 1.1),
-          _flyingEmoji('🦋', t, 0.82, 0.64, widget.compact ? 20 : 30, const Offset(0.42, 0.78), 1.25),
-        ];
-      case _NoteBgAnimOverlay.birds:
-        return [
-          _flyingEmoji('🕊️', t, 0.12, 0.18, widget.compact ? 20 : 30, const Offset(-0.1, 0.28), 0.9),
-          _flyingEmoji('🦅', t, 0.48, 0.52, widget.compact ? 24 : 36, const Offset(0.85, 0.22), 1.0),
-        ];
-      case _NoteBgAnimOverlay.fish:
-        return [
-          _flyingEmoji('🐟', t, 0.2, 0.35, widget.compact ? 18 : 26, const Offset(-0.15, 0.55), 0.75),
-          _flyingEmoji('🐠', t, 0.62, 0.48, widget.compact ? 16 : 24, const Offset(0.9, 0.68), 0.85),
-          _flyingEmoji('🐬', t, 0.35, 0.78, widget.compact ? 22 : 32, const Offset(-0.2, 0.82), 0.7),
-        ];
       case _NoteBgAnimOverlay.fireflies:
         return List.generate(widget.compact ? 5 : 8, (i) {
           return Positioned.fill(
@@ -1914,6 +1949,9 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
           _driftingCloud(t, 0.0, 0.08, widget.compact ? 48 : 72),
           _driftingCloud(t, 0.45, 0.18, widget.compact ? 36 : 56),
         ];
+      case _NoteBgAnimOverlay.butterflies:
+      case _NoteBgAnimOverlay.birds:
+      case _NoteBgAnimOverlay.fish:
       case _NoteBgAnimOverlay.snow:
       case _NoteBgAnimOverlay.petals:
       case _NoteBgAnimOverlay.leaves:
@@ -1923,15 +1961,61 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
     }
   }
 
+  bool _emojiFlapsWings(String emoji) {
+    const flappers = {'🦋', '🐦', '🦅', '🕊️', '🦜', '🐬', '🐟', '🐠', '🐧'};
+    return flappers.contains(emoji);
+  }
+
+  bool _emojiSwims(String emoji) {
+    const swimmers = {'🐟', '🐠', '🐬', '🐧'};
+    return swimmers.contains(emoji);
+  }
+
+  Widget _floatingCreature({
+    required String emoji,
+    required double t,
+    required double xBase,
+    required double yBase,
+    required double size,
+    required Offset drift,
+    required double speed,
+    required double phase,
+  }) {
+    final cycle = (t * speed + phase) % 1.0;
+    final x = xBase + math.sin(cycle * math.pi * 2) * drift.dx;
+    final y = yBase + math.cos(cycle * math.pi * 2) * drift.dy * 0.35;
+    final tilt = math.sin(cycle * math.pi * 4) * 0.06;
+    final flap = _emojiFlapsWings(emoji)
+        ? 0.68 + math.sin((t * 2.2 + phase) * math.pi * 2).abs() * 0.32
+        : 1.0;
+    final bob = _emojiSwims(emoji) ? math.sin((t * 1.6 + phase) * math.pi * 2) * 3 : 0.0;
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (_, c) {
+          return Transform.translate(
+            offset: Offset(x * c.maxWidth, y * c.maxHeight + bob),
+            child: Transform.rotate(
+              angle: tilt,
+              child: Transform.scale(
+                scaleX: flap,
+                scaleY: 1.0,
+                child: Text(
+                  emoji,
+                  style: TextStyle(fontSize: size, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 4)]),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   _NoteBgAnimOverlay _overlayFromPattern(_NoteBgPattern p) {
     switch (p) {
       case _NoteBgPattern.rain:
       case _NoteBgPattern.lightning:
         return _NoteBgAnimOverlay.clouds;
-      case _NoteBgPattern.waves:
-        return _NoteBgAnimOverlay.fish;
-      case _NoteBgPattern.grass:
-        return _NoteBgAnimOverlay.butterflies;
       case _NoteBgPattern.stars:
       case _NoteBgPattern.aurora:
         return _NoteBgAnimOverlay.aurora;
@@ -1943,8 +2027,6 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
         return _NoteBgAnimOverlay.leaves;
       case _NoteBgPattern.fireflies:
         return _NoteBgAnimOverlay.fireflies;
-      case _NoteBgPattern.fish:
-        return _NoteBgAnimOverlay.fish;
       case _NoteBgPattern.clouds:
         return _NoteBgAnimOverlay.clouds;
       default:
@@ -1952,31 +2034,11 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
     }
   }
 
-  Widget _flyingEmoji(String emoji, double t, double xBase, double yBase, double size, Offset drift, double speed) {
-    final flyT = (t * speed + xBase) % 1.0;
-    final x = xBase + math.sin(flyT * math.pi * 2) * drift.dx;
-    final y = yBase + math.cos(flyT * math.pi * 2) * drift.dy * 0.35;
-    final tilt = math.sin(flyT * math.pi * 4) * 0.18;
-    return Positioned.fill(
-      child: LayoutBuilder(
-        builder: (_, c) {
-          return Transform.translate(
-            offset: Offset(x * c.maxWidth, y * c.maxHeight),
-            child: Transform.rotate(
-              angle: tilt,
-              child: Text(emoji, style: TextStyle(fontSize: size, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)])),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _driftingCloud(double t, double yFactor, double phase, double width) {
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (_, c) {
-          final x = ((t + phase) % 1.0) * (c.maxWidth + width) - width;
+          final x = ((t * 0.35 + phase) % 1.0) * (c.maxWidth + width) - width;
           return Transform.translate(
             offset: Offset(x, yFactor * c.maxHeight),
             child: Icon(Icons.cloud_rounded, size: width, color: Colors.white.withValues(alpha: 0.16)),
@@ -2024,20 +2086,23 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
     final paint = Paint();
     switch (pattern) {
       case _NoteBgPattern.rain:
+        _paintRain(canvas, size, paint, long: true);
       case _NoteBgPattern.lightning:
         _paintRain(canvas, size, paint, long: true);
-        if (pattern == _NoteBgPattern.lightning && (t % 0.25) < 0.03) {
+        if ((t % 0.25) < 0.03) {
           paint.color = Colors.white.withValues(alpha: 0.25);
           canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
         }
       case _NoteBgPattern.snow:
         _paintSnow(canvas, size, paint);
       case _NoteBgPattern.petals:
+        _paintPetals(canvas, size, paint);
       case _NoteBgPattern.leaves:
-        _paintPetals(canvas, size, paint, leaves: pattern == _NoteBgPattern.leaves);
+        _paintPetals(canvas, size, paint, leaves: true);
       case _NoteBgPattern.fireflies:
         _paintFireflies(canvas, size, paint);
       case _NoteBgPattern.waves:
+      case _NoteBgPattern.fish:
         _paintWaves(canvas, size, paint);
       case _NoteBgPattern.grass:
         _paintGrass(canvas, size, paint);
@@ -2047,8 +2112,6 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
         _paintAurora(canvas, size, paint);
       case _NoteBgPattern.clouds:
         _paintCloudMist(canvas, size, paint);
-      case _NoteBgPattern.fish:
-        _paintWaves(canvas, size, paint);
       case _NoteBgPattern.grid:
         _paintGrid(canvas, size, paint);
       case _NoteBgPattern.bokeh:
@@ -2059,21 +2122,34 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
   }
 
   void _paintRain(Canvas canvas, Size size, Paint paint, {bool long = false}) {
-    paint.strokeWidth = long ? 1.6 : 1.2;
-    paint.strokeCap = StrokeCap.round;
+    paint.style = PaintingStyle.fill;
     for (final p in particles) {
-      final y = ((p.y + t * p.speed * 1.8) % 1.2) * size.height - size.height * 0.1;
-      final x = p.x * size.width;
-      paint.color = Colors.white.withValues(alpha: 0.15 + p.size * 0.12);
-      final len = 8 + p.size * (long ? 14 : 8);
-      canvas.drawLine(Offset(x, y), Offset(x - 2.5, y + len), paint);
+      if (p.kind != _ParticleKind.rain) continue;
+      final y = ((p.y + t * p.speed * 0.65) % 1.15) * size.height - size.height * 0.08;
+      final x = p.x * size.width + math.sin(p.phase * math.pi * 2) * 2;
+      final dropH = 5 + p.size * (long ? 10 : 7);
+      final dropW = 1.2 + p.size * 0.5;
+      final alpha = 0.22 + p.size * 0.18;
+
+      // Teardrop head
+      paint.color = Colors.white.withValues(alpha: alpha);
+      canvas.drawOval(Rect.fromCenter(center: Offset(x, y), width: dropW * 1.6, height: dropW * 1.4), paint);
+
+      // Falling streak
+      paint.style = PaintingStyle.stroke;
+      paint.strokeWidth = dropW * 0.7;
+      paint.strokeCap = StrokeCap.round;
+      paint.color = Colors.white.withValues(alpha: alpha * 0.85);
+      canvas.drawLine(Offset(x, y + dropW * 0.5), Offset(x - 1.8, y + dropH), paint);
+      paint.style = PaintingStyle.fill;
     }
   }
 
   void _paintSnow(Canvas canvas, Size size, Paint paint) {
     for (final p in particles) {
-      final y = ((p.y + t * p.speed * 0.55) % 1.15) * size.height - size.height * 0.08;
-      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 12;
+      if (p.kind != _ParticleKind.snow) continue;
+      final y = ((p.y + t * p.speed * 0.28) % 1.15) * size.height - size.height * 0.08;
+      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 10;
       paint.color = Colors.white.withValues(alpha: 0.45 + p.size * 0.2);
       canvas.drawCircle(Offset(x, y), 1.2 + p.size * 1.8, paint);
     }
@@ -2081,12 +2157,13 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
 
   void _paintPetals(Canvas canvas, Size size, Paint paint, {bool leaves = false}) {
     for (final p in particles) {
-      final y = ((p.y + t * p.speed * 0.45) % 1.1) * size.height;
-      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 18;
+      if (p.kind != _ParticleKind.petal) continue;
+      final y = ((p.y + t * p.speed * 0.22) % 1.1) * size.height;
+      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 14;
       paint.color = (leaves ? const Color(0xFF86EFAC) : const Color(0xFFF472B6)).withValues(alpha: 0.35 + p.size * 0.15);
       canvas.save();
       canvas.translate(x, y);
-      canvas.rotate((t + p.phase) * math.pi * 2);
+      canvas.rotate((t * 0.5 + p.phase) * math.pi * 2);
       canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: 6 + p.size * 4, height: 3 + p.size * 2), paint);
       canvas.restore();
     }
@@ -2094,10 +2171,11 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
 
   void _paintFireflies(Canvas canvas, Size size, Paint paint) {
     for (final p in particles) {
-      final flicker = 0.3 + math.sin((t + p.phase) * math.pi * 6) * 0.35;
+      if (p.kind != _ParticleKind.firefly) continue;
+      final flicker = 0.3 + math.sin((t + p.phase) * math.pi * 4) * 0.35;
       if (flicker < 0.15) continue;
-      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 8;
-      final y = p.y * size.height + math.cos((t + p.phase) * math.pi * 2) * 8;
+      final x = p.x * size.width + math.sin((t + p.phase) * math.pi * 2) * 6;
+      final y = p.y * size.height + math.cos((t + p.phase) * math.pi * 2) * 6;
       paint.color = const Color(0xFFFDE047).withValues(alpha: flicker);
       canvas.drawCircle(Offset(x, y), 2 + p.size, paint);
       paint.color = const Color(0xFFFDE047).withValues(alpha: flicker * 0.35);
@@ -2114,7 +2192,7 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
       final baseY = size.height * (0.42 + i * 0.1);
       path.moveTo(0, baseY);
       for (var x = 0.0; x <= size.width; x += 12) {
-        final wave = math.sin((x / size.width * 4 * math.pi) + (t * math.pi * 2) + i) * (8 + i * 2);
+        final wave = math.sin((x / size.width * 4 * math.pi) + (t * math.pi * 0.8) + i) * (8 + i * 2);
         path.lineTo(x, baseY + wave);
       }
       canvas.drawPath(path, paint);
@@ -2126,7 +2204,7 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
     paint.strokeWidth = 1.8;
     paint.color = Colors.white.withValues(alpha: 0.18);
     for (var x = 0.0; x < size.width; x += 12) {
-      final sway = math.sin((t * math.pi * 2) + x * 0.04) * 4;
+      final sway = math.sin((t * math.pi * 0.7) + x * 0.04) * 4;
       final h = 10 + (x % 20);
       canvas.drawLine(Offset(x, size.height), Offset(x - 3 + sway, size.height - h), paint);
     }
@@ -2149,10 +2227,10 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: [
           Colors.transparent,
-          [const Color(0xFF4ADE80), const Color(0xFF818CF8), const Color(0xFF22D3EE)][i].withValues(alpha: 0.08 + math.sin(t * math.pi * 2 + i) * 0.04),
+          [const Color(0xFF4ADE80), const Color(0xFF818CF8), const Color(0xFF22D3EE)][i].withValues(alpha: 0.08 + math.sin(t * math.pi * 0.8 + i) * 0.04),
           Colors.transparent,
         ],
-      ).createShader(Rect.fromLTWH(0, size.height * (0.1 + i * 0.12 + math.sin(t * math.pi * 2) * 0.03), size.width, size.height * 0.35));
+      ).createShader(Rect.fromLTWH(0, size.height * (0.1 + i * 0.12 + math.sin(t * math.pi * 0.8) * 0.03), size.width, size.height * 0.35));
       canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
       paint.shader = null;
     }
@@ -2161,7 +2239,7 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
   void _paintCloudMist(Canvas canvas, Size size, Paint paint) {
     paint.color = Colors.white.withValues(alpha: 0.06);
     for (var i = 0; i < 4; i++) {
-      final cx = ((t * 0.15 + i * 0.22) % 1.2) * size.width;
+      final cx = ((t * 0.06 + i * 0.22) % 1.2) * size.width;
       final cy = size.height * (0.15 + i * 0.12);
       canvas.drawOval(Rect.fromCenter(center: Offset(cx, cy), width: size.width * 0.35, height: size.height * 0.12), paint);
     }
@@ -2171,7 +2249,7 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
     paint.color = Colors.black.withValues(alpha: 0.04);
     paint.strokeWidth = 1;
     paint.style = PaintingStyle.stroke;
-    final offset = (t * 18) % 18;
+    final offset = (t * 6) % 18;
     for (var x = -offset; x < size.width; x += 18) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
@@ -2183,10 +2261,10 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
   void _paintBokeh(Canvas canvas, Size size, Paint paint) {
     paint.style = PaintingStyle.fill;
     for (var i = 0; i < 8; i++) {
-      final pulse = 0.06 + math.sin((t + i * 0.11) * math.pi * 2) * 0.03;
+      final pulse = 0.06 + math.sin((t + i * 0.11) * math.pi * 0.8) * 0.03;
       paint.color = Colors.white.withValues(alpha: pulse);
-      final r = 16.0 + (i % 4) * 12 + math.sin((t + i) * math.pi * 2) * 4;
-      canvas.drawCircle(Offset((i * 73.0 + t * 20) % size.width, (i * 41.0) % size.height), r, paint);
+      final r = 16.0 + (i % 4) * 12 + math.sin((t + i) * math.pi * 0.8) * 4;
+      canvas.drawCircle(Offset((i * 73.0 + t * 8) % size.width, (i * 41.0) % size.height), r, paint);
     }
   }
 
