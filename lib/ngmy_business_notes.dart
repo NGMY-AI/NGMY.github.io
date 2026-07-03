@@ -140,7 +140,10 @@ const _crossScreenPaths = <_CrossScreenPath>[
 const _textAnimEffects = [
   'bounce', 'pulse', 'glow', 'wave', 'shake', 'rainbow', 'fade',
   'zoom', 'spin', 'float', 'wiggle', 'blink', 'neon', 'typewriter', 'slide',
+  'sparkle', 'heartbeat', 'flip', 'glitch',
 ];
+
+const _textAnimPickerOptions = ['none', ..._textAnimEffects];
 
 /// Character-range text animation stored separately from visible note body.
 class NgmyNoteTextAnim {
@@ -270,6 +273,24 @@ int _displayFromCanonical(_BodyViewMap map, int canonOffset) {
     if (map.d2c[i] >= canonOffset) return i;
   }
   return map.d2c.length;
+}
+
+Color? _parseNoteHexColor(String hex) {
+  var h = hex.trim();
+  if (h.startsWith('#')) h = h.substring(1);
+  if (h.length == 6) h = 'FF$h';
+  if (h.length != 8) return null;
+  final value = int.tryParse(h, radix: 16);
+  return value == null ? null : Color(value);
+}
+
+(String, Color?) _stripNoteColorMarkup(String raw, Color defaultFg) {
+  if (!raw.startsWith('<c:#')) return (raw, null);
+  final endTag = raw.indexOf('>');
+  final close = raw.indexOf('</c>');
+  if (endTag == -1 || close == -1 || close <= endTag) return (raw, null);
+  final color = _parseNoteHexColor(raw.substring(4, endTag)) ?? defaultFg;
+  return (raw.substring(endTag + 1, close), color);
 }
 
 String _mergeDisplayEdit(String canonical, _BodyViewMap oldMap, String oldDisplay, String newDisplay) {
@@ -1261,6 +1282,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late String _storedBody;
   late _BodyViewMap _lastBodyView;
   bool _syncingBody = false;
+  int? _pendingDisplaySelStart;
+  int? _pendingDisplaySelEnd;
 
   @override
   void initState() {
@@ -1407,7 +1430,82 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         _storedBody[a.start] == ')';
   }
 
-  void _applyTextEffect(String effect) {
+  void _captureEditorSelection() {
+    _pendingDisplaySelStart = _body.selection.start;
+    _pendingDisplaySelEnd = _body.selection.end;
+  }
+
+  (int, int) _pendingDisplaySelection() {
+    final start = _pendingDisplaySelStart ?? _body.selection.start;
+    final end = _pendingDisplaySelEnd ?? _body.selection.end;
+    return (start, end);
+  }
+
+  NgmyNoteTextAnim? _animMatchingInnerRange(int cStart, int cEnd) {
+    for (final a in _note.textAnims) {
+      if (a.start == cStart && a.end == cEnd) return a;
+    }
+    return null;
+  }
+
+  void _unwrapAnim(NgmyNoteTextAnim a) {
+    final open = a.start - 1;
+    final closeParen = a.end;
+    if (open < 0 || closeParen >= _storedBody.length) return;
+    final inner = _storedBody.substring(a.start, closeParen);
+    final oldStored = _storedBody;
+    _storedBody = '${_storedBody.substring(0, open)}$inner${_storedBody.substring(closeParen + 1)}';
+    _note.textAnims.remove(a);
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+  }
+
+  void _removeTextEffect({required int dSelStart, required int dSelEnd}) {
+    var cStart = _canonicalFromDisplay(_lastBodyView, dSelStart);
+    var cEnd = _canonicalFromDisplay(_lastBodyView, dSelEnd);
+    if (cStart > cEnd) {
+      final t = cStart;
+      cStart = cEnd;
+      cEnd = t;
+    }
+    final toRemove = <NgmyNoteTextAnim>[];
+    if (cStart == cEnd) {
+      for (final a in _note.textAnims) {
+        final open = a.start - 1;
+        final closeParen = a.end;
+        if (cStart >= open && cStart <= closeParen) toRemove.add(a);
+      }
+    } else {
+      for (final a in _note.textAnims) {
+        final open = a.start - 1;
+        final closeParen = a.end;
+        if (cEnd > open && cStart < closeParen + 1) toRemove.add(a);
+      }
+    }
+    if (toRemove.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No animation on this text'), duration: Duration(seconds: 2)),
+        );
+      }
+      return;
+    }
+    toRemove.sort((a, b) => b.start.compareTo(a.start));
+    for (final a in toRemove) {
+      _unwrapAnim(a);
+    }
+    _note.body = _storedBody;
+    _refreshBodyDisplay(putCursorCanonical: cStart);
+    _bodyFocus.requestFocus();
+    _markDirty();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Animation removed'), duration: Duration(seconds: 2)),
+      );
+    }
+  }
+
+  void _wrapCanonicalSelection(String left, String right) {
     var cStart = _canonicalFromDisplay(_lastBodyView, _body.selection.start);
     var cEnd = _canonicalFromDisplay(_lastBodyView, _body.selection.end);
     if (cStart > cEnd) {
@@ -1416,28 +1514,68 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       cEnd = t;
     }
     final oldStored = _storedBody;
+    if (cStart == cEnd) {
+      _storedBody = '${_storedBody.substring(0, cStart)}$left$right${_storedBody.substring(cEnd)}';
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
+      _note.body = _storedBody;
+      _refreshBodyDisplay(putCursorCanonical: cStart + left.length);
+    } else {
+      final selected = _storedBody.substring(cStart, cEnd);
+      _storedBody = '${_storedBody.substring(0, cStart)}$left$selected$right${_storedBody.substring(cEnd)}';
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
+      _note.body = _storedBody;
+      _refreshBodyDisplay(putCursorCanonical: cEnd + left.length + right.length);
+    }
+    _bodyFocus.requestFocus();
+    _markDirty();
+  }
+
+  void _applyTextEffect(String effect, {required int dSelStart, required int dSelEnd}) {
+    var cStart = _canonicalFromDisplay(_lastBodyView, dSelStart);
+    var cEnd = _canonicalFromDisplay(_lastBodyView, dSelEnd);
+    if (cStart > cEnd) {
+      final t = cStart;
+      cStart = cEnd;
+      cEnd = t;
+    }
+    final existing = cStart != cEnd ? _animMatchingInnerRange(cStart, cEnd) : null;
+    if (existing != null) {
+      existing.effect = effect;
+      _refreshBodyDisplay(putCursorCanonical: cEnd);
+      _bodyFocus.requestFocus();
+      _markDirty();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Animation changed to $effect'), duration: const Duration(seconds: 2)),
+        );
+      }
+      return;
+    }
+    final oldStored = _storedBody;
     if (cStart != cEnd) {
       final selected = _storedBody.substring(cStart, cEnd);
       _storedBody = '${_storedBody.substring(0, cStart)}($selected)${_storedBody.substring(cEnd)}';
-      _shiftAnimsForInsert(cStart, 2);
       _note.textAnims.removeWhere((a) => !(a.end <= cStart || a.start >= cEnd + 2));
       _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1 + selected.length, effect: effect));
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
       _refreshBodyDisplay(putCursorCanonical: cStart + 1 + selected.length);
     } else {
       _storedBody = '${_storedBody.substring(0, cStart)}()${_storedBody.substring(cStart)}';
-      _shiftAnimsForInsert(cStart, 2);
       _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1, effect: effect));
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
       _refreshBodyDisplay(putCursorCanonical: cStart + 1);
     }
-    _reconcileTextAnims(oldStored, _storedBody);
-    _syncAnimRangesFromParens();
     _note.body = _storedBody;
     _bodyFocus.requestFocus();
     _markDirty();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Type between ( ) — $effect animates in Preview'),
+          content: Text(cStart != cEnd ? '$effect applied to selected text' : 'Type between ( ) — $effect animates in Preview'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1548,9 +1686,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<void> _showTextAnimationPicker() async {
+    _captureEditorSelection();
+    final pending = _pendingDisplaySelection();
     final effect = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -1564,23 +1705,28 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
               const Text('Text animation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 6),
               const Text(
-                'Pick an effect — ( ) is inserted automatically. Type your word inside, like (mango). '
-                'Parentheses hide when you move 3+ words away; Preview always shows the animation.',
+                'Highlight text first to animate only that part. Pick None to remove animation. '
+                'Or pick an effect to insert ( ) and type inside.',
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _textAnimEffects.map((fx) {
-                  return ActionChip(
-                    label: Text(fx, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    onPressed: () => Navigator.pop(ctx, fx),
-                    backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
-                    labelStyle: const TextStyle(color: Colors.white),
-                    side: const BorderSide(color: Color(0xFF8B5CF6)),
-                  );
-                }).toList(),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.42),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _textAnimPickerOptions.map((fx) {
+                      final isNone = fx == 'none';
+                      return ActionChip(
+                        label: Text(fx, style: TextStyle(fontWeight: FontWeight.w700, color: isNone ? Colors.white70 : Colors.white)),
+                        onPressed: () => Navigator.pop(ctx, fx),
+                        backgroundColor: isNone ? Colors.white.withValues(alpha: 0.08) : const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                        side: BorderSide(color: isNone ? Colors.white24 : const Color(0xFF8B5CF6)),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -1588,7 +1734,11 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (effect == null) return;
-    _applyTextEffect(effect);
+    if (effect == 'none') {
+      _removeTextEffect(dSelStart: pending.$1, dSelEnd: pending.$2);
+    } else {
+      _applyTextEffect(effect, dSelStart: pending.$1, dSelEnd: pending.$2);
+    }
   }
 
   Future<void> _showEmojiPicker() async {
@@ -1753,6 +1903,79 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       _note.backgroundId = picked;
       _note.customColor = null;
     });
+  }
+
+  Future<void> _showTextColorPicker() async {
+    _captureEditorSelection();
+    var hue = 210.0;
+    var sat = 0.85;
+    var val = 0.95;
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final preview = HSVColor.fromAHSV(1, hue, sat, val).toColor();
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: Container(width: 44, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  const Text('Text color', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 6),
+                  const Text('Highlight words first, then pick a color.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  const SizedBox(height: 14),
+                  Container(
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: preview, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white24)),
+                    child: Text('Sample text', style: TextStyle(color: preview.computeLuminance() > 0.55 ? Colors.black87 : Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                  ),
+                  const SizedBox(height: 14),
+                  Slider(value: hue, min: 0, max: 360, activeColor: preview, onChanged: (v) => setLocal(() => hue = v)),
+                  Slider(value: sat, min: 0, max: 1, activeColor: preview, onChanged: (v) => setLocal(() => sat = v)),
+                  Slider(value: val, min: 0.1, max: 1, activeColor: preview, onChanged: (v) => setLocal(() => val = v)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in const [
+                        0xFFEF4444, 0xFFF97316, 0xFFFBBF24, 0xFF22C55E, 0xFF06B6D4, 0xFF3B82F6,
+                        0xFF8B5CF6, 0xFFEC4899, 0xFFFFFFFF, 0xFF0F172A,
+                      ])
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx, c),
+                          child: Container(width: 32, height: 32, decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle, border: Border.all(color: Colors.white24))),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, preview.toARGB32()),
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: const Text('Apply to selected text', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (picked == null) return;
+    final hex = (picked & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+    _wrapCanonicalSelection('<c:#$hex>', '</c>');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Text color applied — visible in Preview'), duration: Duration(seconds: 2)),
+      );
+    }
   }
 
   Future<void> _showCustomColorPicker() async {
@@ -1934,13 +2157,16 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                       color: dark ? Colors.black.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: SingleChildScrollView(
+                    child: Listener(
+                      onPointerDown: (_) => _captureEditorSelection(),
+                      child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
                           _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
                           _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
                           _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
+                          _tool(Icons.format_color_text_rounded, 'Text color', _showTextColorPicker, fg),
                           _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
                           _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
                           _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
@@ -1955,6 +2181,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           ],
                         ),
                       ),
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -2187,11 +2414,12 @@ class _NoteMarkdownPreview extends StatelessWidget {
       if (le <= ls) continue;
       final before = raw.substring(pos, ls - lineStart);
       if (before.isNotEmpty) spans.addAll(_markdownSpans(before, fg, baseSize: baseSize, baseWeight: baseWeight));
-      final animText = raw.substring(ls - lineStart, le - lineStart);
-      if (animText.isNotEmpty) {
+      final animSlice = raw.substring(ls - lineStart, le - lineStart);
+      if (animSlice.isNotEmpty) {
+        final parsed = _stripNoteColorMarkup(animSlice, fg);
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
-          child: _AnimatedTextEffect(effect: a.effect, text: animText, color: fg, fontSize: baseSize, fontWeight: baseWeight),
+          child: _AnimatedTextEffect(effect: a.effect, text: parsed.$1, color: parsed.$2 ?? fg, fontSize: baseSize, fontWeight: baseWeight),
         ));
       }
       pos = le - lineStart;
@@ -2230,6 +2458,16 @@ class _NoteMarkdownPreview extends StatelessWidget {
           continue;
         }
       }
+      if (raw.startsWith('<c:#', i)) {
+        final endTag = raw.indexOf('>', i);
+        final close = raw.indexOf('</c>', i);
+        if (endTag != -1 && close != -1 && close > endTag) {
+          final color = _parseNoteHexColor(raw.substring(i + 4, endTag)) ?? fg;
+          spans.add(TextSpan(text: raw.substring(endTag + 1, close), style: TextStyle(color: color, fontSize: baseSize, fontWeight: baseWeight)));
+          i = close + 4;
+          continue;
+        }
+      }
       final nextSpecial = _nextMarkdownSpecial(raw, i);
       spans.add(TextSpan(text: raw.substring(i, nextSpecial), style: TextStyle(color: fg, fontSize: baseSize, fontWeight: baseWeight)));
       i = nextSpecial;
@@ -2242,6 +2480,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
       if (s.indexOf('**', from) >= 0) s.indexOf('**', from),
       if (s.indexOf('_', from) >= 0) s.indexOf('_', from),
       if (s.indexOf('<u>', from) >= 0) s.indexOf('<u>', from),
+      if (s.indexOf('<c:#', from) >= 0) s.indexOf('<c:#', from),
     ];
     if (indices.isEmpty) return s.length;
     return indices.reduce((a, b) => a < b ? a : b);
@@ -2928,6 +3167,19 @@ class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTic
           case 'slide':
             dy = math.sin(t * math.pi * 2) * 5;
             scale = 1.0 + math.cos(t * math.pi * 2) * 0.04;
+          case 'sparkle':
+            scale = 0.92 + math.sin(t * math.pi * 4).abs() * 0.14;
+            opacity = 0.55 + math.sin(t * math.pi * 6).abs() * 0.45;
+            color = Color.lerp(widget.color, Colors.white, math.sin(t * math.pi * 3).abs() * 0.45)!;
+          case 'heartbeat':
+            scale = 1.0 + math.pow(math.sin(t * math.pi * 2), 2).toDouble() * 0.18;
+          case 'flip':
+            scale = 1.0 + math.sin(t * math.pi * 2).abs() * 0.04;
+            angle = math.sin(t * math.pi * 2) * 0.18;
+          case 'glitch':
+            dy = (math.sin(t * math.pi * 14) * 2).roundToDouble();
+            angle = math.sin(t * math.pi * 20) * 0.04;
+            opacity = 0.65 + math.sin(t * math.pi * 16).abs() * 0.35;
           default:
             dy = -math.sin(t * math.pi * 2).abs() * 6;
         }
