@@ -324,90 +324,100 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                 ),
             if (emergency.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7F1D1D).withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.emergency_rounded, color: Color(0xFFEF4444), size: 18),
-                          SizedBox(width: 6),
-                          Text('Emergency', style: TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w800, fontSize: 12)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ...emergency.map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => _dial(e),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(e.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            e.phone,
-                                            style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.5),
-                                          ),
-                                        ],
-                                      ),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.emergency_rounded, color: const Color(0xFFEF4444).withValues(alpha: 0.9), size: 14),
+                        const SizedBox(width: 5),
+                        Text('Emergency', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.3)),
+                      ],
+                    ),
+                    ...emergency.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _dial(e),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7F1D1D).withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          e.title,
+                                          style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600, fontSize: 12),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          e.phone,
+                                          style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: 0.3, height: 1.1),
+                                        ),
+                                      ],
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEF4444).withValues(alpha: 0.25),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.call_rounded, color: Color(0xFFEF4444), size: 28),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444).withValues(alpha: 0.22),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                  ],
-                                ),
+                                    child: const Icon(Icons.call_rounded, color: Color(0xFFEF4444), size: 18),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
+                    ),
+                    if (emergency.length == 1)
                       Align(
                         alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: emergency.length == 1 ? () => _openEditor(existing: emergency.first) : null,
-                          icon: const Icon(Icons.more_horiz_rounded, size: 18),
-                          label: Text(emergency.length == 1 ? 'Edit / delete' : 'Tap number to call · edit in list below'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.white.withValues(alpha: 0.45)),
+                        child: TextButton(
+                          onPressed: () => _openEditor(existing: emergency.first),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white.withValues(alpha: 0.4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Edit', style: TextStyle(fontSize: 11)),
                         ),
                       ),
-                      if (emergency.length > 1)
-                        ...emergency.map(
-                          (e) => Padding(
-                            padding: const EdgeInsets.only(left: 8, bottom: 4),
-                            child: Row(
-                              children: [
-                                Expanded(child: Text(e.title, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11))),
-                                TextButton(onPressed: () => _openEditor(existing: e), child: const Text('Edit', style: TextStyle(fontSize: 11))),
-                                TextButton(onPressed: () => _delete(e), child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11))),
-                              ],
+                    if (emergency.length > 1)
+                      ...emergency.map(
+                        (e) => Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => _openEditor(existing: e),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white.withValues(alpha: 0.4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
+                            child: Text('Edit ${e.title}', style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             if (_lines.isEmpty && !_loading)

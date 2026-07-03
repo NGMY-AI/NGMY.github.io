@@ -28,7 +28,7 @@ enum NgmySlideAspectRatio {
   portrait916,
 }
 
-enum NgmySlideShapeKind { rectangle, circle, triangle, arrow, line }
+enum NgmySlideShapeKind { rectangle, circle, triangle, arrow, line, parallelogram, hexagon }
 
 enum NgmySlideLayout {
   blank,

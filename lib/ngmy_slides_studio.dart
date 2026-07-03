@@ -1003,13 +1003,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     }
   }
 
-  Widget _textTransitionPicker(bool isDark) {
+  Widget _elementTransitionPicker(bool isDark) {
     final el = _selectedElement();
-    if (el == null || el.type != NgmySlideElementType.text) return const SizedBox.shrink();
+    if (el == null || el.fileName == '__design__') return const SizedBox.shrink();
     return Row(
       children: [
         const SizedBox(width: 8),
-        Text('Text:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+        Text('Anim:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
         const SizedBox(width: 6),
         ...NgmySlideTransition.values.map((tr) {
           final selected = el.textTransition == tr;
@@ -1395,6 +1395,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             _ribbonBtn(Icons.circle_outlined, 'Circle', () => _addShape(NgmySlideShapeKind.circle), isDark),
             _ribbonBtn(Icons.change_history_rounded, 'Triangle', () => _addShape(NgmySlideShapeKind.triangle), isDark),
             _ribbonBtn(Icons.arrow_forward_rounded, 'Arrow', () => _addShape(NgmySlideShapeKind.arrow), isDark),
+            _ribbonBtn(Icons.crop_landscape_rounded, 'Parallelogram', () => _addShape(NgmySlideShapeKind.parallelogram), isDark),
+            _ribbonBtn(Icons.hexagon_outlined, 'Hexagon', () => _addShape(NgmySlideShapeKind.hexagon), isDark),
             _ribbonBtn(Icons.horizontal_rule_rounded, 'Line', () => _addShape(NgmySlideShapeKind.line), isDark),
             _ribbonBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_addPdf()), isDark),
             _ribbonBtn(Icons.draw_outlined, 'Signature', () => unawaited(_addSignature()), isDark),
@@ -1462,13 +1464,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                         },
                         child: Column(
                           children: [
-                            Container(
-                              width: 72,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                gradient: LinearGradient(colors: d.previewColors),
-                                border: Border.all(color: Colors.white24),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: 72,
+                                height: 44,
+                                child: ngmyMiniSlidePreview(ngmySlideDesignPreview(d.id)),
                               ),
                             ),
                             const SizedBox(height: 3),
@@ -1486,7 +1487,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           ),
         );
       case 'Transitions':
-        final textEl = _selectedElement();
+        final el = _selectedElement();
         final screenW = MediaQuery.sizeOf(context).width - 20;
         Widget transitionRow(List<NgmySlideTransition> transitions, NgmySlideTransition? selected, void Function(NgmySlideTransition) onTap, Color accent) {
           return SingleChildScrollView(
@@ -1519,13 +1520,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (textEl != null && textEl.type == NgmySlideElementType.text) ...[
-                Text('TEXT ANIMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+              if (el != null && el.fileName != '__design__') ...[
+                Text('ELEMENT ANIMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
                 const SizedBox(height: 4),
                 transitionRow(
                   NgmySlideTransition.values,
-                  textEl.textTransition,
-                  (tr) => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => textEl.textTransition = tr)),
+                  el.textTransition,
+                  (tr) => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr)),
                   const Color(0xFF059669),
                 ),
                 const SizedBox(height: 8),
@@ -1589,7 +1590,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 _mutate(() => el.bulletList = !el.bulletList);
               }, isDark),
               _fontSizeStepper(el, isDark),
-              if (el.type == NgmySlideElementType.text) _textTransitionPicker(isDark),
+              if (el != null && el.fileName != '__design__') _elementTransitionPicker(isDark),
               _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
             ],
           ],
@@ -1877,6 +1878,22 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
     final selected = _selectedElementId == e.id;
     final scale = cw / 960;
+    final isDesign = e.fileName == '__design__';
+    if (isDesign) {
+      return Positioned(
+        key: ValueKey('el_${e.id}'),
+        left: e.x * cw,
+        top: e.y * ch,
+        width: e.w * cw,
+        height: e.h * ch,
+        child: IgnorePointer(
+          child: Transform.rotate(
+            angle: e.rotation,
+            child: NgmySlideElementView(element: e, scale: scale),
+          ),
+        ),
+      );
+    }
     return Positioned(
       key: ValueKey('el_${e.id}'),
       left: e.x * cw,

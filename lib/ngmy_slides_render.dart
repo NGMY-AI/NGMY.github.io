@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -201,6 +202,34 @@ class NgmyShapePainter extends CustomPainter {
         canvas.drawPath(path, stroke);
       case NgmySlideShapeKind.line:
         canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), stroke..strokeWidth = element.strokeWidth + 2);
+      case NgmySlideShapeKind.parallelogram:
+        final skew = size.width * 0.22;
+        final path = Path()
+          ..moveTo(skew, 0)
+          ..lineTo(size.width, 0)
+          ..lineTo(size.width - skew, size.height)
+          ..lineTo(0, size.height)
+          ..close();
+        canvas.drawPath(path, fill);
+        canvas.drawPath(path, stroke);
+      case NgmySlideShapeKind.hexagon:
+        final cx = size.width / 2;
+        final cy = size.height / 2;
+        final r = math.min(size.width, size.height) / 2;
+        final path = Path();
+        for (var i = 0; i < 6; i++) {
+          final angle = math.pi / 3 * i - math.pi / 6;
+          final x = cx + r * math.cos(angle);
+          final y = cy + r * math.sin(angle);
+          if (i == 0) {
+            path.moveTo(x, y);
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+        path.close();
+        canvas.drawPath(path, fill);
+        canvas.drawPath(path, stroke);
     }
   }
 
@@ -641,7 +670,7 @@ Future<void> showNgmyTextTransitionPreview(
     barrierColor: Colors.black87,
     builder: (ctx) => AlertDialog(
       backgroundColor: const Color(0xFF111827),
-      title: Text('${ngmySlideTransitionEmoji(transition)} Text animation', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+      title: Text('${ngmySlideTransitionEmoji(transition)} Element animation', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
       content: SizedBox(
         width: 280,
         height: 120,
