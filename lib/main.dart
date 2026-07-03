@@ -111,6 +111,7 @@ import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
 import 'ngmy_studio_hub.dart';
+import 'ngmy_slides_studio.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart';
@@ -363,10 +364,10 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     }
 
     if (config != null) {
-      await ngmyHydrateCommunicateSettingsFromAllBackups(config);
-      await ngmyHydrateHelpCenterHubFromAllBackups(config);
+      unawaited(ngmyHydrateCommunicateSettingsFromAllBackups(config));
+      unawaited(ngmyHydrateHelpCenterHubFromAllBackups(config));
     } else {
-      await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
+      unawaited(NgmyCommunicateAvatarCache.hydrateRamFromDisk());
     }
 
     return NgmyLaunchBootstrap(
@@ -7543,8 +7544,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   UserData? _currentUser;
   bool _launchCacheHydrated = false;
   bool _appOffline = false;
-  Widget? _materialAppShellChild;
   Timer? _startupRebuildDebounce;
+  Timer? _dataChangedUiDebounce;
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   String? _cloudUserRowEnsuredForEmail;
@@ -8967,6 +8968,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try { _inAppNoticeEntry?.remove(); } catch (_) {}
     try { _saveDebounceTimer?.cancel(); } catch (_) {}
     try { _heavySaveTimer?.cancel(); } catch (_) {}
+    try { _dataChangedUiDebounce?.cancel(); } catch (_) {}
     NgmySupabaseSyncThrottle.reset();
     try { _legalPlansRefreshDebounce?.cancel(); } catch (_) {}
     try { _authSub?.cancel(); } catch (_) {}
@@ -9411,7 +9413,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
-    if (mounted) setState(() {});
+    _dataChangedUiDebounce?.cancel();
+    _dataChangedUiDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() {});
+    });
     final isAdmin = _ngmySessionIsAdmin(_currentUser);
     if (isAdmin) {
       unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: true));
@@ -11799,31 +11804,71 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(_config);
   }
 
+  Future<void> _deferredLocalConfigHydrates() async {
+    try {
+      final pinBackup = await NgmyCivicRegistryPins.loadLocalBackup();
+      if (pinBackup.global.trim().isNotEmpty && _config.civicRegistryPin.trim().isEmpty) {
+        _config.civicRegistryPin = pinBackup.global.trim();
+      }
+      _config.civicRegistryPinsByState = NgmyCivicRegistryPins.mergeMaps(
+        pinBackup.byState,
+        _config.civicRegistryPinsByState,
+      );
+      await ngmyHydrateManagementListsFromAllBackups(_config);
+      await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
+      await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+      await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+      await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+      await NgmyAppStudioAccess.hydrate(_config);
+      await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+      await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+      await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
+      await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
+      await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+      await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+      await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+      await ngmyHydrateHelpCenterHubFromAllBackups(_config);
+      await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
+      await ngmyHydrateWalletPaymentsFromAllBackups(_config);
+      await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+      await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+      await ngmyHydrateAppBrandingFromAllBackups(_config);
+      if (mounted) _scheduleDeferredStartupRebuild();
+    } catch (e) {
+      debugPrint('[ngmy] deferred config hydrate: $e');
+    }
+  }
+
   Future<void> _loadData() async {
     _resetWalletLedgerSyncState();
     try {
       final prefs = await SharedPreferences.getInstance();
       await ngmyLoadAppLoginUserRegistry();
       _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
-      // Theme is already loaded before first frame to prevent startup flashing.
 
-      String? safeGet(String key) {
-        try {
-          final val = prefs.getString(key);
-          if (val == null || val.trim().isEmpty || val == "null") return null;
-          final trimmed = val.trim();
-          // Reject corrupted/binary-like strings (can crash jsonDecode on Windows).
-          if (trimmed.contains('\u0000')) {
-            prefs.remove(key);
-            return null;
-          }
-          if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
-          return trimmed;
-        } catch (_) { return null; }
+      String? safeGet(String key) => _ngmyPrefsJson(prefs, key);
+
+      // Bootstrap already painted the shell from disk — skip re-decoding megabytes
+      // before first interaction; hydrate config and sync cloud in background.
+      if (_launchCacheHydrated && _currentUser != null && !_userExplicitlyLoggedOut) {
+        _tombstonedMediaIds = await _loadTombstonedMediaIds();
+        unawaited(_hydrateMediaTombstonesFromCloud(_tombstonedMediaIds));
+        unawaited(_refreshWalletDecisionLedger());
+        _seedNotificationSeenIds();
+        unawaited(_seedTransactionNotificationBaseline());
+        unawaited(_deferredLocalConfigHydrates());
+        unawaited(_bootstrapCloudData(
+          prefs: prefs,
+          safeGet: safeGet,
+          localMedia: _allMedia,
+          localAnnouncements: _allAnnouncements,
+          localCurrent: _currentUser,
+        ));
+        return;
       }
 
       _tombstonedMediaIds = await _loadTombstonedMediaIds();
-      await _hydrateMediaTombstonesFromCloud(_tombstonedMediaIds);
+      unawaited(_hydrateMediaTombstonesFromCloud(_tombstonedMediaIds));
 
       // 1. Load Local Config & Plans First
       final plansJson = safeGet('investment_plans');
@@ -12246,7 +12291,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_refreshAdminDashboardFromCloud());
     }
-    setState(() {});
     _scheduleDeferredStartupRebuild();
   }
 
@@ -12707,20 +12751,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         themeMode: _effectiveThemeMode,
         themeAnimationDuration: Duration.zero,
         builder: (context, child) {
-          // MaterialApp's builder can pass a null child for a single transient
-          // frame (theme/locale resolution at startup). Reusing the last good
-          // child instead of a placeholder avoids that frame ever being visible
-          // — showing a placeholder here regressed into a gray screen that
-          // could get stuck if nothing else triggered a follow-up rebuild.
-          if (child != null) _materialAppShellChild = child;
-          final body = child ?? _materialAppShellChild;
-          if (body == null) {
-            return const ColoredBox(
-              color: Color(0xFFF1F5F9),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          return body;
+          // Never cache [child] — reusing a stale navigator subtree caused black
+          // blink loops on web/PWA after cloud sync or any parent rebuild.
+          if (child != null) return child;
+          final bg = Theme.of(context).scaffoldBackgroundColor;
+          return ColoredBox(
+            color: bg,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          );
         },
         home: _currentUser == null
             ? AuthScreen(
@@ -14509,7 +14551,7 @@ class _NgmyAdminSafeHome extends StatelessWidget {
             runSpacing: 10,
             children: [
               _AdminQuickAction(label: 'Invest', icon: Icons.trending_up_rounded, onTap: () => onOpenTab(1)),
-              _AdminQuickAction(label: 'Wallet', icon: Icons.account_balance_wallet_rounded, onTap: () => onOpenTab(2)),
+              _AdminQuickAction(label: 'Slides', icon: Icons.slideshow_rounded, onTap: () => onOpenTab(2)),
               _AdminQuickAction(label: 'NGMY Hub', icon: Icons.auto_awesome_rounded, onTap: () => onOpenTab(3)),
               _AdminQuickAction(label: 'Profile', icon: Icons.person_rounded, onTap: () => onOpenTab(6)),
             ],
@@ -15006,12 +15048,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _warmTransactionCacheAfterFrame();
       }
     }
-    final mountedAt = _mainShellMountedAt;
-    if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 12)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) WidgetsBinding.instance.scheduleForcedFrame();
-      });
-    }
     if (oldWidget.user.username != widget.user.username ||
         oldWidget.user.crownBadge != widget.user.crownBadge ||
         (oldWidget.user.fullName ?? '') != (widget.user.fullName ?? '')) {
@@ -15306,10 +15342,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildHomeTabWidget() {
-    return _NgmyHomeScaffold(
-      child: HomeScreen(
-        key: _homeTabKey,
-        user: widget.user,
+    return RepaintBoundary(
+      key: _homeTabKey,
+      child: _NgmyHomeScaffold(
+        child: HomeScreen(
+          key: const ValueKey('ngmy_home_screen'),
+          user: widget.user,
         onClockIn: () => unawaited(_autoAttemptClockIn()),
         allTransactions: _homeTransactionsForDisplay(),
         onProcess: widget.onProcessTransaction,
@@ -15345,6 +15383,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
         onOpenInvest: () => setState(() => _idx = 1),
         onOpenAdminDashboard: widget.user.isAdmin ? _openAdminDashboardFromHome : null,
+        ),
       ),
     );
   }
@@ -15464,14 +15503,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         userEmail: widget.user.email,
         username: widget.user.username,
       ),
-      2: () => WalletScreen(
-        user: widget.user,
-        transactions: ngmyUserWalletHistoryTransactions(sorted, widget.user.email),
-        allTransactions: sorted,
-        onAdd: widget.onAddTransaction,
-        config: widget.config,
-        onDataChanged: widget.onDataChanged,
-        onPersistUser: (u) => _pushUserToCloudFast(u),
+      2: () => NgmySlidesStudioScreen(
+        userEmail: widget.user.email,
+        bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
       ),
       3: () => NgmyHubScreen(
         user: widget.user,
@@ -15690,7 +15724,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             children: [
               _nav(0, Icons.home_rounded),
               _navToolHub(),
-              _nav(2, Icons.account_balance_wallet_rounded),
+              _nav(2, Icons.slideshow_rounded),
               _navC(3),
               _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
               _navStudio(),
@@ -15709,10 +15743,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             onTap: () => setState(() {
               _idx = 5;
               _visitedTabs.add(5);
-              // Build NGMY Hub in the background too — Pick Two/QR/Fun Games in
-              // Creator Toolkit call back into Hub's NgmyHubToolBridge, which only
-              // registers once Hub's State has been created.
-              _visitedTabs.add(3);
             }),
             customBorder: const CircleBorder(),
             child: SizedBox(
@@ -15863,7 +15893,7 @@ class HomeScreen extends StatefulWidget {
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver, NgmyBalanceListener {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _smokeCtrl;
   int _unreadNewsCount = 0;
   DateTime? _homeMountedAt;
@@ -22966,1705 +22996,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 // --- STANDARD SCREENS ---
 
-enum _WalletHistoryFilter { all, deposit, withdrawal, clockIn }
-
-Future<void> ngmyPersistWalletHandlesLocal(UserData user) async {
-  final key = user.email.toLowerCase().trim();
-  if (key.isEmpty) return;
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ngmy_cash_tag_$key', user.savedCashAppTag.trim());
-    await prefs.setString('ngmy_btc_addr_$key', user.savedBitcoinAddress.trim());
-  } catch (e) {
-    debugPrint('[wallet] persist handles: $e');
-  }
-}
-
-Future<void> ngmyHydrateWalletHandlesLocal(UserData user) async {
-  final key = user.email.toLowerCase().trim();
-  if (key.isEmpty) return;
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    if (user.savedCashAppTag.trim().isEmpty) {
-      user.savedCashAppTag = (prefs.getString('ngmy_cash_tag_$key') ?? '').trim();
-    }
-    if (user.savedBitcoinAddress.trim().isEmpty) {
-      user.savedBitcoinAddress = (prefs.getString('ngmy_btc_addr_$key') ?? '').trim();
-    }
-  } catch (e) {
-    debugPrint('[wallet] hydrate handles: $e');
-  }
-}
-
-class WalletScreen extends StatefulWidget {
-  final UserData user;
-  final List<AppTransaction> transactions;
-  final List<AppTransaction> allTransactions;
-  final Function(AppTransaction) onAdd;
-  final AppConfig config;
-  final VoidCallback onDataChanged;
-  final Future<void> Function(UserData user)? onPersistUser;
-  const WalletScreen({
-    super.key,
-    required this.user,
-    required this.transactions,
-    required this.allTransactions,
-    required this.onAdd,
-    required this.config,
-    required this.onDataChanged,
-    this.onPersistUser,
-  });
-  @override State<WalletScreen> createState() => _WalletScreenState();
-}
-class _WalletScreenState extends State<WalletScreen> with NgmyBalanceListener {
-  final _amt = TextEditingController(); final _handle = TextEditingController(); PaymentMethod _method = PaymentMethod.cashApp;
-  final _movieId = TextEditingController(text: '533535');
-  final _movieTitle = TextEditingController(text: 'Deadpool & Wolverine');
-  final _embedUrl = TextEditingController(text: 'https://www.vidking.net/embed/movie/533535');
-  final _season = TextEditingController(text: '1');
-  final _episode = TextEditingController(text: '1');
-  final _accentHex = TextEditingController(text: '00E5FF');
-  final _movieSearch = TextEditingController();
-  final _tmdbKey = TextEditingController();
-  final _moviePlayerKey = GlobalKey();
-  int _view = 0; // 0: Deposit, 1: Withdraw, 2: History
-  _WalletHistoryFilter _historyFilter = _WalletHistoryFilter.all;
-  Timer? _handleSaveDebounce;
-  Timer? _movieSearchDebounce;
-  bool _movieIsTv = false;
-  bool _movieAutoplay = false;
-  bool _movieNextEpisode = true;
-  bool _movieEpisodeSelector = true;
-  String _activeMovieUrl = 'https://www.vidking.net/embed/movie/533535';
-  String _activeMovieTitle = 'Deadpool & Wolverine';
-  double _movieProgress = 0.0;
-  DateTime? _movieLastWatched;
-  bool _movieCatalogLoading = false;
-  String _movieCatalogMode = 'now_playing';
-  String? _movieCatalogError;
-  List<_NgmyMovieCatalogItem> _movieCatalog = _ngmyFallbackMovies;
-  List<_NgmyMovieCatalogItem> _popularMovies = _ngmyPopularFallbackMovies;
-  List<_NgmyMovieCatalogItem> _topRatedMovies = _ngmyTopRatedFallbackMovies;
-  List<_NgmyMovieCatalogItem> _upcomingMovies = _ngmyNewReleaseFallbackMovies;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadSavedWithdrawHandles());
-    unawaited(_loadMovieHubState());
-    unawaited(_loadMovieCatalog());
-  }
-
-  @override
-  void didUpdateWidget(covariant WalletScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.user.accountBalance != widget.user.accountBalance ||
-        oldWidget.transactions.length != widget.transactions.length) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _handleSaveDebounce?.cancel();
-    _amt.dispose();
-    _handle.dispose();
-    _movieId.dispose();
-    _movieTitle.dispose();
-    _embedUrl.dispose();
-    _season.dispose();
-    _episode.dispose();
-    _accentHex.dispose();
-    _movieSearch.dispose();
-    _tmdbKey.dispose();
-    _movieSearchDebounce?.cancel();
-    super.dispose();
-  }
-
-  String get _moviePrefsKey => 'ngmy_movie_hub_${widget.user.email.toLowerCase().trim()}';
-  Future<void> _loadMovieHubState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_moviePrefsKey);
-      if (raw == null || raw.trim().isEmpty) return;
-      final map = jsonDecode(raw);
-      if (map is! Map) return;
-      final nextUrl = (map['activeUrl'] ?? '').toString().trim();
-      final nextTitle = (map['title'] ?? '').toString().trim();
-      final legacyDemoMovie = nextUrl.contains('/1078605') || nextTitle == 'Featured Movie';
-      if (!mounted) return;
-      setState(() {
-        if (nextUrl.isNotEmpty && !legacyDemoMovie) {
-          _activeMovieUrl = nextUrl;
-          _embedUrl.text = nextUrl;
-        }
-        if (nextTitle.isNotEmpty && !legacyDemoMovie) {
-          _activeMovieTitle = nextTitle;
-          _movieTitle.text = nextTitle;
-        }
-        _movieProgress = ((map['progress'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0);
-        _movieLastWatched = DateTime.tryParse((map['lastWatched'] ?? '').toString());
-        _tmdbKey.text = (map['tmdbKey'] ?? '').toString().trim();
-      });
-      unawaited(_loadMovieCatalog(query: _movieSearch.text));
-    } catch (e) {
-      debugPrint('[movie hub] load: $e');
-    }
-  }
-
-  Future<void> _saveMovieHubState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _moviePrefsKey,
-        jsonEncode({
-          'activeUrl': _activeMovieUrl,
-          'title': _activeMovieTitle,
-          'progress': _movieProgress,
-          'lastWatched': (_movieLastWatched ?? DateTime.now()).toUtc().toIso8601String(),
-          'tmdbKey': _effectiveTmdbKey,
-        }),
-      );
-    } catch (e) {
-      debugPrint('[movie hub] save: $e');
-    }
-  }
-
-  String _cleanHexColor() {
-    final raw = _accentHex.text.trim().replaceAll('#', '');
-    if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(raw)) return raw.toUpperCase();
-    return '00E5FF';
-  }
-
-  String get _effectiveTmdbKey {
-    final saved = _tmdbKey.text.trim();
-    return saved;
-  }
-
-  String _extractMovieEmbedSrc(String raw) {
-    final text = raw.trim();
-    if (text.isEmpty) return '';
-    final match = RegExp(r'''src=["']([^"']+)["']''', caseSensitive: false).firstMatch(text);
-    return (match?.group(1) ?? text).trim();
-  }
-
-  void _playMovieEmbed({String? url, String? title}) {
-    final nextUrl = _extractMovieEmbedSrc(url ?? _embedUrl.text);
-    if (nextUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Paste or generate an embed URL first.')));
-      return;
-    }
-    setState(() {
-      _activeMovieUrl = nextUrl.startsWith('http') ? nextUrl : 'https://$nextUrl';
-      _activeMovieTitle = (title ?? _movieTitle.text).trim().isEmpty ? 'Movie' : (title ?? _movieTitle.text).trim();
-      _movieLastWatched = DateTime.now();
-    });
-    unawaited(_saveMovieHubState());
-  }
-
-  Future<void> _loadMovieCatalog({String query = ''}) async {
-    final key = _effectiveTmdbKey;
-    final localQuery = query.trim().toLowerCase();
-    List<_NgmyMovieCatalogItem> localSearch() {
-      if (localQuery.isEmpty) return _ngmyFallbackMovies;
-      final all = _ngmyAllFallbackMovies.where((m) => m.title.toLowerCase().contains(localQuery)).toList();
-      return all.isEmpty ? _ngmyFallbackMovies : all;
-    }
-    if (key.isEmpty) {
-      setState(() {
-        _movieCatalog = localSearch();
-        _popularMovies = _ngmyPopularFallbackMovies;
-        _topRatedMovies = _ngmyTopRatedFallbackMovies;
-        _upcomingMovies = _ngmyNewReleaseFallbackMovies;
-        _movieCatalogError = null;
-        _movieCatalogLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _movieCatalogLoading = true;
-      _movieCatalogError = null;
-    });
-
-    try {
-      final endpoint = query.trim().isNotEmpty
-          ? 'https://api.themoviedb.org/3/search/movie'
-          : 'https://api.themoviedb.org/3/movie/$_movieCatalogMode';
-      final params = <String, String>{
-        'language': 'en-US',
-        'page': '1',
-        if (query.trim().isNotEmpty) 'query': query.trim(),
-        if (!key.startsWith('eyJ')) 'api_key': key,
-      };
-      final uri = Uri.parse(endpoint).replace(queryParameters: params);
-      final response = await http.get(
-        uri,
-        headers: key.startsWith('eyJ') ? {'Authorization': 'Bearer $key'} : const <String, String>{},
-      ).timeout(const Duration(seconds: 12));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('TMDB returned ${response.statusCode}');
-      }
-      final decoded = jsonDecode(response.body);
-      final results = decoded is Map ? decoded['results'] : null;
-      if (results is! List) throw Exception('TMDB response missing results');
-      final items = results
-          .whereType<Map>()
-          .map((m) => _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic>.from(m)))
-          .where((m) => m.title.trim().isNotEmpty && m.posterUrl != null)
-          .take(18)
-          .toList();
-      final parallel = query.trim().isEmpty
-          ? await Future.wait([
-              _fetchMovieList('popular', key),
-              _fetchMovieList('top_rated', key),
-              _fetchMovieList('now_playing', key),
-            ])
-          : <List<_NgmyMovieCatalogItem>>[];
-      if (!mounted) return;
-      setState(() {
-        _movieCatalog = items.isEmpty ? _ngmyFallbackMovies : items;
-        if (parallel.length == 3) {
-          _popularMovies = parallel[0].isEmpty ? _ngmyFallbackMovies : parallel[0];
-          _topRatedMovies = parallel[1].isEmpty ? _ngmyFallbackMovies : parallel[1];
-          _upcomingMovies = parallel[2].isEmpty ? _ngmyFallbackMovies : parallel[2];
-        }
-        _movieCatalogLoading = false;
-        _movieCatalogError = null;
-      });
-    } catch (e) {
-      debugPrint('[movie hub] catalog: $e');
-      if (!mounted) return;
-      setState(() {
-        _movieCatalog = localSearch();
-        _popularMovies = _ngmyPopularFallbackMovies;
-        _topRatedMovies = _ngmyTopRatedFallbackMovies;
-        _upcomingMovies = _ngmyNewReleaseFallbackMovies;
-        _movieCatalogLoading = false;
-        _movieCatalogError = null;
-      });
-    }
-  }
-
-  Future<List<_NgmyMovieCatalogItem>> _fetchMovieList(String mode, String key) async {
-    final params = <String, String>{
-      'language': 'en-US',
-      'page': '1',
-      if (!key.startsWith('eyJ')) 'api_key': key,
-    };
-    final uri = Uri.parse('https://api.themoviedb.org/3/movie/$mode').replace(queryParameters: params);
-    final response = await http.get(
-      uri,
-      headers: key.startsWith('eyJ') ? {'Authorization': 'Bearer $key'} : const <String, String>{},
-    ).timeout(const Duration(seconds: 12));
-    if (response.statusCode < 200 || response.statusCode >= 300) return const [];
-    final decoded = jsonDecode(response.body);
-    final results = decoded is Map ? decoded['results'] : null;
-    if (results is! List) return const [];
-    return results
-        .whereType<Map>()
-        .map((m) => _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic>.from(m)))
-        .where((m) => m.title.trim().isNotEmpty && m.posterUrl != null)
-        .take(18)
-        .toList();
-  }
-
-  void _scheduleMovieSearch(String value) {
-    _movieSearchDebounce?.cancel();
-    _movieSearchDebounce = Timer(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      unawaited(_loadMovieCatalog(query: value));
-    });
-  }
-
-  void _playCatalogMovie(_NgmyMovieCatalogItem item) {
-    setState(() {
-      _movieIsTv = false;
-      _movieId.text = item.id.toString();
-      _movieTitle.text = item.title;
-      _embedUrl.text = item.embedUrl(color: _cleanHexColor(), autoplay: _movieAutoplay);
-    });
-    _playMovieEmbed(url: _embedUrl.text, title: item.title);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _moviePlayerKey.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
-      }
-    });
-  }
-
-  void _saveMovieProgress(double value) {
-    setState(() {
-      _movieProgress = value.clamp(0.0, 1.0);
-      _movieLastWatched = DateTime.now();
-    });
-    unawaited(_saveMovieHubState());
-  }
-
-  Future<void> _loadSavedWithdrawHandles() async {
-    await ngmyHydrateWalletHandlesLocal(widget.user);
-    _applySavedWithdrawHandle();
-    if (mounted) setState(() {});
-  }
-
-  String get _savedHandleForMethod =>
-      _method == PaymentMethod.cashApp ? widget.user.savedCashAppTag.trim() : widget.user.savedBitcoinAddress.trim();
-
-  void _applySavedWithdrawHandle() {
-    final saved = _savedHandleForMethod;
-    if (saved.isNotEmpty) {
-      _handle.text = _method == PaymentMethod.cashApp ? ngmyCashAppTagInputText(saved) : saved;
-    }
-  }
-
-  void _saveWithdrawHandle(String handle) {
-    final trimmed = handle.trim();
-    if (trimmed.isEmpty) return;
-    if (_method == PaymentMethod.cashApp) {
-      widget.user.savedCashAppTag = ngmyNormalizeCashAppTagForSubmit(trimmed);
-    } else {
-      widget.user.savedBitcoinAddress = trimmed;
-    }
-    unawaited(ngmyPersistWalletHandlesLocal(widget.user));
-    widget.onDataChanged();
-    final persist = widget.onPersistUser;
-    if (persist != null) unawaited(persist(widget.user));
-  }
-
-  void _scheduleWithdrawHandleSave() {
-    _handleSaveDebounce?.cancel();
-    _handleSaveDebounce = Timer(const Duration(milliseconds: 700), () {
-      final text = _handle.text.trim();
-      if (text.isNotEmpty) _saveWithdrawHandle(text);
-    });
-  }
-
-  void _clearSavedWithdrawHandle() {
-    if (_method == PaymentMethod.cashApp) {
-      widget.user.savedCashAppTag = '';
-    } else {
-      widget.user.savedBitcoinAddress = '';
-    }
-    _handle.clear();
-    widget.onDataChanged();
-    setState(() {});
-  }
-
-  void _submitWithdraw() async {
-    final amount = double.tryParse(_amt.text) ?? 0;
-    if (amount <= 0) return;
-
-    if (!ngmyUserWalletLedgerSettled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your balance is still syncing. Please wait a moment and try again.')),
-      );
-      return;
-    }
-
-    final spendable = ngmyResolveAccountBalance(
-      widget.user.email,
-      widget.user.accountBalance,
-      widget.allTransactions,
-    );
-
-    if (spendable < kNgmyMinimumWithdrawalAmount) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You need at least \$${formatCurrency(kNgmyMinimumWithdrawalAmount)} in your account to withdraw.')),
-      );
-      return;
-    }
-
-    if (amount < kNgmyMinimumWithdrawalAmount) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}.')),
-      );
-      return;
-    }
-
-    if (amount > spendable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Insufficient balance. You have \$${formatCurrency(spendable)}'))
-      );
-      return;
-    }
-
-    final noWithdrawFee = widget.user.isOnFreeTrial;
-    final fee = noWithdrawFee ? 0.0 : amount * 0.15;
-    final receive = amount - fee;
-
-    String handle = _handle.text.trim();
-    if (handle.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_method == PaymentMethod.cashApp ? 'Enter your Cash App tag.' : 'Enter your Bitcoin wallet address.')),
-      );
-      return;
-    }
-    if (_method == PaymentMethod.cashApp) {
-      handle = ngmyNormalizeCashAppTagForSubmit(handle);
-      if (handle.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter your Cash App tag.')),
-        );
-        return;
-      }
-    }
-
-    _saveWithdrawHandle(handle);
-
-    widget.onAdd(AppTransaction(
-      id: 'wd-${DateTime.now().microsecondsSinceEpoch}',
-      userEmail: widget.user.email,
-      amount: amount,
-      type: TransactionType.withdrawal,
-      method: _method,
-      sourceDetails: noWithdrawFee
-          ? '($handle) - Free trial: no fee - You receive: \$${formatCurrency(receive)}'
-          : '($handle) - Fee: \$${formatCurrency(fee)} - You receive: \$${formatCurrency(receive)}',
-      timestamp: DateTime.now(),
-    ));
-
-    widget.onDataChanged();
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(noWithdrawFee
-          ? 'Withdrawal request sent! You will receive \$${formatCurrency(receive)} (no fee on free trial).'
-          : 'Withdrawal request sent! You will receive \$${formatCurrency(receive)} after 15% fee.')
-    ));
-    _amt.clear();
-    _applySavedWithdrawHandle();
-  }
-
-  @override Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(0, 0, 0, _ngmyBottomNavScrollPadding(context)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _movieTopBar(),
-              _movieFeaturedHero(),
-              _moviePlayerCard(),
-              _movieCatalogSection(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  _NgmyMovieCatalogItem get _featuredMovie => _movieCatalog.isNotEmpty ? _movieCatalog.first : _ngmyFallbackMovies.first;
-
-  Widget _movieTopBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9),
-              color: const Color(0xFFE50914),
-            ),
-            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 10),
-          const Text('NGMY MOVIES', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-            child: const Text('Movies', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _movieFeaturedHero() {
-    final movie = _featuredMovie;
-    final image = movie.backdropUrl ?? movie.posterUrl;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 4, 14, 18),
-      height: 410,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        color: const Color(0xFF101010),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 30, offset: const Offset(0, 16))],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (image != null)
-            Image.network(
-              image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF111111)),
-            ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Color(0x99000000), Colors.black],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: const Color(0xFFE50914), borderRadius: BorderRadius.circular(999)),
-                  child: const Text('FEATURED MOVIE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-                ),
-                const SizedBox(height: 10),
-                Text(movie.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, height: 0.96)),
-                const SizedBox(height: 8),
-                Text('${movie.year}  •  ${movie.ratingLabel}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => _playCatalogMovie(movie),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Play', style: TextStyle(fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.info_outline_rounded, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _moviePlayerCard() {
-    final target = NgmyVirtualDeviceMedia.parse(_activeMovieUrl);
-    final playUrl = target?.playUrl ?? _activeMovieUrl;
-    final useEmbedHtml = target?.usesEmbedHtml ?? false;
-    return Container(
-      key: _moviePlayerKey,
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE50914).withOpacity(0.35)),
-        boxShadow: [BoxShadow(color: const Color(0xFFE50914).withOpacity(0.10), blurRadius: 24, offset: const Offset(0, 12))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              children: [
-                const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFE50914), size: 22),
-                const SizedBox(width: 8),
-                Expanded(child: Text(_activeMovieTitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
-                Text('${(_movieProgress * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: NgmyVirtualDeviceMediaView(
-                key: ValueKey(_activeMovieUrl),
-                viewKey: 'wallet_movie_${_activeMovieUrl.hashCode}',
-                playUrl: playUrl,
-                useEmbedHtml: useEmbedHtml,
-                lockNavigation: true,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _movieCatalogSection() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: TextField(
-              controller: _movieSearch,
-              style: const TextStyle(color: Colors.white),
-              decoration: _movieInput('Search movies').copyWith(
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFE50914)),
-                suffixIcon: _movieSearch.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _movieSearch.clear();
-                          unawaited(_loadMovieCatalog());
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.close_rounded, color: Colors.white54),
-                      ),
-              ),
-              onChanged: (v) {
-                setState(() {});
-                _scheduleMovieSearch(v);
-              },
-            ),
-          ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.only(left: 14),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _movieModeChip('Now Playing', 'now_playing'),
-                  _movieModeChip('Popular', 'popular'),
-                  _movieModeChip('Top Rated', 'top_rated'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          if (_movieCatalogLoading)
-            const SizedBox(
-              height: 220,
-              child: Center(child: CircularProgressIndicator(color: Color(0xFFE50914))),
-            )
-          else ...[
-            _moviePosterRow(_movieSearch.text.trim().isEmpty ? 'Trending Now' : 'Search Results', _movieCatalog, large: true),
-            _moviePosterRow('Popular on NGMY', _popularMovies),
-            _moviePosterRow('Top Rated Movies', _topRatedMovies),
-            _moviePosterRow('New Releases', _upcomingMovies),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _movieModeChip(String label, String mode) {
-    final selected = _movieCatalogMode == mode && _movieSearch.text.trim().isEmpty;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        selected: selected,
-        label: Text(label),
-        onSelected: (_) {
-          setState(() {
-            _movieSearch.clear();
-            _movieCatalogMode = mode;
-          });
-          unawaited(_loadMovieCatalog());
-        },
-        selectedColor: const Color(0xFFE50914),
-        backgroundColor: const Color(0xFF121212),
-        labelStyle: TextStyle(color: selected ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12),
-        side: BorderSide(color: selected ? const Color(0xFFE50914) : Colors.white.withOpacity(0.10)),
-      ),
-    );
-  }
-
-  Widget _moviePosterRow(String title, List<_NgmyMovieCatalogItem> movies, {bool large = false}) {
-    if (movies.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: large ? 292 : 238,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              scrollDirection: Axis.horizontal,
-              itemCount: movies.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) => _moviePosterCard(movies[index], large: large),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _moviePosterCard(_NgmyMovieCatalogItem item, {bool large = false}) {
-    final width = large ? 166.0 : 132.0;
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () => _playCatalogMovie(item),
-      child: SizedBox(
-        width: width,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF080A10),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.38), blurRadius: 12, offset: const Offset(0, 8))],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (item.posterUrl != null)
-                      Image.network(
-                        item.posterUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.movie_rounded, color: Colors.white38, size: 42)),
-                      )
-                    else
-                      const Center(child: Icon(Icons.movie_rounded, color: Colors.white38, size: 42)),
-                    Positioned(
-                      right: 8,
-                      bottom: 8,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: const BoxDecoration(color: Color(0xFFE50914), shape: BoxShape.circle),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: large ? 13 : 12, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 2),
-            Text('${item.year} • ${item.ratingLabel}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 10)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _movieInput(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: Colors.white38),
-      filled: true,
-      fillColor: const Color(0xFF141414),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-        borderSide: BorderSide(color: Color(0xFFE50914), width: 1.4),
-      ),
-    );
-  }
-
-  Widget _wNav(int i, IconData ic, String l) {
-    final bool selected = _view == i;
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF22C55E) : Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: selected ? const Color(0xFF16A34A) : Colors.grey.withOpacity(0.2),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: selected ? const Color(0xFF22C55E).withOpacity(0.2) : Colors.black.withOpacity(0.05),
-            blurRadius: selected ? 12 : 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(ic, color: selected ? Colors.white : const Color(0xFF16A34A), size: 20),
-          const SizedBox(height: 5),
-          Text(
-            l,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1F2937)),
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _walletBody() {
-    if (_view == 2) {
-      final balanceAfterById = ngmyBalanceAfterTransactionById(
-        email: widget.user.email,
-        allTransactions: widget.allTransactions,
-        currentBalance: widget.user.accountBalance,
-      );
-      final filteredTransactions = widget.transactions.where((t) {
-        switch (_historyFilter) {
-          case _WalletHistoryFilter.deposit:
-            return t.type == TransactionType.deposit;
-          case _WalletHistoryFilter.withdrawal:
-            return t.type == TransactionType.withdrawal;
-          case _WalletHistoryFilter.clockIn:
-            return ngmyIsClockInHistoryTransaction(t);
-          case _WalletHistoryFilter.all:
-            return true;
-        }
-      }).toList();
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 15)],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'TRANSACTION HISTORY',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
-                  ),
-                ),
-                PopupMenuButton<_WalletHistoryFilter>(
-                  tooltip: 'Filter transactions',
-                  offset: const Offset(0, 36),
-                  initialValue: _historyFilter,
-                  onSelected: (v) => setState(() => _historyFilter = v),
-                  itemBuilder: (ctx) => [
-                    _historyFilterMenuItem(_WalletHistoryFilter.all, 'All transactions'),
-                    _historyFilterMenuItem(_WalletHistoryFilter.deposit, 'Deposits only'),
-                    _historyFilterMenuItem(_WalletHistoryFilter.withdrawal, 'Withdrawals only'),
-                    _historyFilterMenuItem(_WalletHistoryFilter.clockIn, 'Clock-in only'),
-                  ],
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.filter_list_rounded, size: 16, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.arrow_drop_down_rounded, size: 18, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_historyFilter != _WalletHistoryFilter.all) ...[
-              const SizedBox(height: 8),
-              Text(
-                switch (_historyFilter) {
-                  _WalletHistoryFilter.deposit => 'Showing deposits',
-                  _WalletHistoryFilter.withdrawal => 'Showing withdrawals',
-                  _WalletHistoryFilter.clockIn => 'Showing clock-in earnings',
-                  _WalletHistoryFilter.all => '',
-                },
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : Colors.black45),
-              ),
-            ],
-            if (_historyFilter == _WalletHistoryFilter.all) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Deposits, withdrawals, clock-in, store, and more. Game wins/losses are in Game Center receipts only.',
-                style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black45),
-              ),
-            ],
-            const SizedBox(height: 15),
-            if (filteredTransactions.isEmpty)
-              Center(
-                child: Text(
-                  widget.transactions.isEmpty
-                      ? 'Empty'
-                      : 'No ${switch (_historyFilter) {
-                          _WalletHistoryFilter.deposit => 'deposits',
-                          _WalletHistoryFilter.withdrawal => 'withdrawals',
-                          _WalletHistoryFilter.clockIn => 'clock-in transactions',
-                          _WalletHistoryFilter.all => 'transactions',
-                        }}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              )
-            else
-              ...filteredTransactions.map((t) {
-          final balanceAfter = balanceAfterById[t.id] ?? widget.user.accountBalance;
-          final incoming = _isIncomingTransaction(t);
-          final icon = incoming ? Icons.arrow_downward : Icons.arrow_upward;
-          final color = t.status == TransactionStatus.approved ? Colors.green : (t.status == TransactionStatus.pending ? Colors.orange : Colors.red);
-          final typeLabel = _transactionTypeLabel(t);
-          final details = _transactionDetails(t);
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.04) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.withOpacity(0.2)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, size: 18, color: color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                          if (_walletHistoryShowsStatus(t))
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: color.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _walletHistoryStatusLabel(t.status),
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(_historyTimestamp(t.timestamp), style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                      const SizedBox(height: 2),
-                      Text(details, style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${incoming ? '+' : '-'}\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: incoming ? Colors.green : Colors.red)),
-                    Text('Wallet total: \$${formatCurrency(balanceAfter)}', style: const TextStyle(color: Colors.grey, fontSize: 9)),
-                  ],
-                )
-              ],
-            ),
-          );
-        }),
-          ],
-        ),
-      );
-    }
-    bool isDep = _view == 0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC);
-    final inputBorder = isDark ? const Color(0xFF2B3440) : const Color(0xFFD1D5DB);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 14, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            isDep ? 'Deposit Amount' : 'Withdrawal Amount',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _amt,
-            keyboardType: TextInputType.number,
-            decoration: _iosInputDecoration(
-              fill: inputBg,
-              borderColor: inputBorder,
-              hint: '\$ 0.00',
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF22C55E).withOpacity(isDark ? 0.16 : 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Text('Available:', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w500)),
-                const Spacer(),
-                NgmyLiveBalance(
-                  userEmail: widget.user.email,
-                  fallback: () => widget.user.accountBalance,
-                  showDollarSign: false,
-                  style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87),
-                ),
-              ],
-            ),
-          ),
-          if (isDep) ...[
-            const SizedBox(height: 16),
-            Text('Choose Deposit Amount', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [10, 50, 100, 200].map((v) {
-                final selected = _amt.text.trim() == v.toString();
-                return GestureDetector(
-                  onTap: () => setState(() => _amt.text = v.toString()),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selected ? const Color(0xFF22C55E).withOpacity(0.16) : inputBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: selected ? const Color(0xFF22C55E) : inputBorder, width: 1.2),
-                    ),
-                    child: Text('\$$v', style: TextStyle(fontWeight: FontWeight.w700, color: selected ? const Color(0xFF15803D) : (isDark ? Colors.white70 : const Color(0xFF334155)))),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () {
-                  final double? a = double.tryParse(_amt.text);
-                  if (a != null && a > 0) {
-                    NgmyNavigator.push(context, SubmitPaymentPage(user: widget.user, amount: a, onAdd: widget.onAdd, config: widget.config));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF22C55E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Text('Deposit Funds', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22 * 0.7)),
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            Text('Choose Withdrawal Method', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _methodOptionCard(
-                    label: 'Cash App',
-                    symbol: '\$',
-                    selected: _method == PaymentMethod.cashApp,
-                    onTap: () => setState(() {
-                      _method = PaymentMethod.cashApp;
-                      _applySavedWithdrawHandle();
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _methodOptionCard(
-                    label: 'Bitcoin',
-                    symbol: '₿',
-                    selected: _method == PaymentMethod.bitcoin,
-                    onTap: () => setState(() {
-                      _method = PaymentMethod.bitcoin;
-                      _applySavedWithdrawHandle();
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              _method == PaymentMethod.cashApp ? 'Your Cash App Tag' : 'Your Bitcoin Wallet',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF334155), fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _handle,
-              decoration: _iosInputDecoration(
-                fill: inputBg,
-                borderColor: inputBorder,
-                hint: _method == PaymentMethod.cashApp ? 'YourCashTag' : 'bc1...',
-              ).copyWith(
-                prefixText: _method == PaymentMethod.cashApp ? '\$ ' : null,
-              ),
-              onChanged: (_) => _scheduleWithdrawHandleSave(),
-            ),
-            if (_savedHandleForMethod.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF22C55E).withOpacity(isDark ? 0.14 : 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.35)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Saved — we\'ll fill this next time. Edit anytime.',
-                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF334155)),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _clearSavedWithdrawHandle,
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                      child: const Text('Change', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _submitWithdraw,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF22C55E),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Text('Withdraw Funds', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22 * 0.7)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDF5DD),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFF5C64C)),
-              ),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(text: 'Note: ', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF9A3412))),
-                    TextSpan(
-                      text: widget.user.isOnFreeTrial
-                          ? 'Your free trial includes no withdrawal fees. Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}. Requests are processed within 24 hours after verification.'
-                          : 'A 15% processing fee applies to all withdrawals. Minimum withdrawal is \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}. Requests are processed within 24 hours after verification.',
-                      style: const TextStyle(color: Color(0xFF9A3412)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _iosInputDecoration({required Color fill, required Color borderColor, required String hint}) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: fill,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: borderColor),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-        borderSide: BorderSide(color: Color(0xFF22C55E), width: 1.5),
-      ),
-    );
-  }
-
-  Widget _methodOptionCard({
-    required String label,
-    required String symbol,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF22C55E).withOpacity(0.15) : (isDark ? const Color(0xFF0F141B) : const Color(0xFFF8FAFC)),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.grey.withOpacity(0.3), width: selected ? 1.6 : 1.2),
-        ),
-        child: Column(
-          children: [
-            Text(symbol, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: selected ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black54))),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  PopupMenuItem<_WalletHistoryFilter> _historyFilterMenuItem(_WalletHistoryFilter value, String label) {
-    final selected = _historyFilter == value;
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          Icon(selected ? Icons.check_rounded : Icons.circle_outlined, size: 16, color: selected ? const Color(0xFF22C55E) : Colors.grey),
-          const SizedBox(width: 10),
-          Text(label, style: TextStyle(fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-  bool _isIncomingTransaction(AppTransaction t) {
-    return t.type == TransactionType.deposit ||
-        t.type == TransactionType.adminAdd ||
-        t.type == TransactionType.reimbursement ||
-        t.type == TransactionType.claim;
-  }
-
-  double _transactionSignedDelta(AppTransaction t) {
-    return _isIncomingTransaction(t) ? t.amount : -t.amount;
-  }
-
-  /// History balance column — matches full ledger effect per row.
-  double _walletHistoryBalanceDelta(AppTransaction t) => ngmyTransactionLedgerEffect(t);
-
-  bool _walletHistoryShowsStatus(AppTransaction t) =>
-      t.type == TransactionType.deposit || t.type == TransactionType.withdrawal;
-
-  String _walletHistoryStatusLabel(TransactionStatus status) {
-    switch (status) {
-      case TransactionStatus.pending:
-        return 'PENDING';
-      case TransactionStatus.approved:
-        return 'APPROVED';
-      case TransactionStatus.rejected:
-        return 'REJECTED';
-    }
-  }
-
-  String _transactionTypeLabel(AppTransaction t) {
-    final raw = (t.sourceDetails ?? '').toLowerCase();
-    switch (t.type) {
-      case TransactionType.deposit:
-        if (isInvestmentRequestDetails(t.sourceDetails)) return 'Investment Request';
-        return 'Deposit';
-      case TransactionType.withdrawal:
-        return 'Withdrawal';
-      case TransactionType.adminAdd:
-        return 'Admin Credit';
-      case TransactionType.adminRemove:
-        if (raw.contains('investment')) return 'Invested';
-        if (raw.contains('game bet')) return 'Game Bet';
-        if (raw.contains('ngmy store purchase')) return 'Store Purchase';
-        if (raw.contains('video unlock')) return 'Video Unlock';
-        if (raw.contains('ticket')) return 'Ticket Purchase';
-        return 'Purchase';
-      case TransactionType.reimbursement:
-        if (raw.contains('points converted')) return 'Points Conversion';
-        if (raw.contains('clock-in session started')) return 'Clock In Started';
-        if (raw.contains('clock-in')) return 'Clock In';
-        if (raw.contains('game partial')) return 'Game Win (Partial)';
-        if (raw.contains('game payout')) return 'Game Win';
-        if (raw.contains('multiplayer payout')) return 'Game Win (Multiplayer)';
-        if (raw.contains('dice')) return 'Dice Win';
-        if (raw.contains('video unlock sale')) return 'Video Sale';
-        if (raw.contains('ticket sale')) return 'Ticket Sale';
-        if (raw.contains('creator')) return 'Creator Sale';
-        if (raw.contains('rhyme')) return 'Rhyme Payment';
-        if (raw.contains('savings')) return 'Savings Withdrawal';
-        if (raw.contains('ngmy store')) return 'Store Credit';
-        return 'Earnings';
-      case TransactionType.contribution:
-        return 'Contribution';
-      case TransactionType.claim:
-        return 'Claim';
-    }
-  }
-
-  String _transactionDetails(AppTransaction t) {
-    final details = (t.sourceDetails ?? '').trim();
-    if (isInvestmentRequestDetails(details)) {
-      final meta = parseInvestmentRequestDetails(details);
-      final plan = meta['plan'] ?? 'plan';
-      final payer = meta['payer'] ?? 'payment handle';
-      return 'Investment request for $plan via $payer';
-    }
-    if (details.isNotEmpty) return details;
-    switch (t.type) {
-      case TransactionType.deposit:
-        return 'Funds added via ${t.method.name.toUpperCase()}';
-      case TransactionType.withdrawal:
-        return 'Withdrawal request submitted';
-      case TransactionType.adminAdd:
-        return 'Admin account credit';
-      case TransactionType.adminRemove:
-        return 'Deducted from account';
-      case TransactionType.reimbursement:
-        return 'Income added to account';
-      case TransactionType.contribution:
-        return 'Community contribution';
-      case TransactionType.claim:
-        return 'Claim adjustment';
-    }
-  }
-
-  String _historyTimestamp(DateTime date) {
-    final d = date.isUtc ? date.toLocal() : date;
-    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final hour12 = d.hour == 0 ? 12 : (d.hour > 12 ? d.hour - 12 : d.hour);
-    final minute = d.minute.toString().padLeft(2, '0');
-    final ampm = d.hour >= 12 ? 'PM' : 'AM';
-    return '${monthNames[d.month - 1]} ${d.day} ${d.year}, $hour12:$minute $ampm';
-  }
-}
-
-class _NgmyMovieCatalogItem {
-  const _NgmyMovieCatalogItem({
-    required this.id,
-    required this.title,
-    required this.type,
-    required this.year,
-    required this.rating,
-    this.posterUrl,
-    this.backdropUrl,
-    this.overview = '',
-  });
-
-  final int id;
-  final String title;
-  final String type;
-  final String year;
-  final double rating;
-  final String? posterUrl;
-  final String? backdropUrl;
-  final String overview;
-
-  String get ratingLabel => rating <= 0 ? 'New' : '${rating.toStringAsFixed(1)}/10';
-
-  String embedUrl({
-    required String color,
-    required bool autoplay,
-  }) {
-    final params = <String>[
-      'color=$color',
-      if (autoplay) 'autoPlay=true',
-      if (type == 'tv') 'nextEpisode=true',
-      if (type == 'tv') 'episodeSelector=true',
-    ];
-    final path = type == 'tv' ? '/embed/tv/$id/1/1' : '/embed/movie/$id';
-    return 'https://www.vidking.net$path${params.isEmpty ? '' : '?${params.join('&')}'}';
-  }
-
-  factory _NgmyMovieCatalogItem.fromTmdb(Map<String, dynamic> json) {
-    final mediaType = (json['media_type'] ?? '').toString();
-    final isTv = mediaType == 'tv' || json.containsKey('first_air_date');
-    final title = (json[isTv ? 'name' : 'title'] ?? json['name'] ?? json['title'] ?? '').toString();
-    final date = (json[isTv ? 'first_air_date' : 'release_date'] ?? json['release_date'] ?? json['first_air_date'] ?? '').toString();
-    final posterPath = (json['poster_path'] ?? '').toString();
-    final backdropPath = (json['backdrop_path'] ?? '').toString();
-    return _NgmyMovieCatalogItem(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      title: title,
-      type: 'movie',
-      year: date.length >= 4 ? date.substring(0, 4) : 'New',
-      rating: ((json['vote_average'] as num?)?.toDouble() ?? 0).clamp(0.0, 10.0),
-      posterUrl: posterPath.isEmpty ? null : 'https://image.tmdb.org/t/p/w500$posterPath',
-      backdropUrl: backdropPath.isEmpty ? null : 'https://image.tmdb.org/t/p/w780$backdropPath',
-      overview: (json['overview'] ?? '').toString(),
-    );
-  }
-}
-
-const List<_NgmyMovieCatalogItem> _ngmyFallbackMovies = [
-  _NgmyMovieCatalogItem(
-    id: 533535,
-    title: 'Deadpool & Wolverine',
-    type: 'movie',
-    year: '2024',
-    rating: 7.6,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 693134,
-    title: 'Dune: Part Two',
-    type: 'movie',
-    year: '2024',
-    rating: 8.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 1022789,
-    title: 'Inside Out 2',
-    type: 'movie',
-    year: '2024',
-    rating: 7.6,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/vpnVM9B6NMmQpWeZvzLvDESb2QY.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 823464,
-    title: 'Godzilla x Kong',
-    type: 'movie',
-    year: '2024',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/z1p34vh7dEOnLDmyCrlUVLuoDzd.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 653346,
-    title: 'Kingdom of the Planet of the Apes',
-    type: 'movie',
-    year: '2024',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/gKkl37BQuKTanygYQG1pyYgLVgf.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 573435,
-    title: 'Bad Boys: Ride or Die',
-    type: 'movie',
-    year: '2024',
-    rating: 7.4,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/oGythE98MYleE6mZlGs5oBGkux1.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 746036,
-    title: 'The Fall Guy',
-    type: 'movie',
-    year: '2024',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/tSz1qsmSJon0rqjHBxXZmrotuse.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 945961,
-    title: 'Alien: Romulus',
-    type: 'movie',
-    year: '2024',
-    rating: 7.2,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/b33nnKl1GSFbao4l3fZDDqsMx0F.jpg',
-  ),
-];
-
-const List<_NgmyMovieCatalogItem> _ngmyPopularFallbackMovies = [
-  _NgmyMovieCatalogItem(
-    id: 872585,
-    title: 'Oppenheimer',
-    type: 'movie',
-    year: '2023',
-    rating: 8.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 346698,
-    title: 'Barbie',
-    type: 'movie',
-    year: '2023',
-    rating: 7.0,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 866398,
-    title: 'The Beekeeper',
-    type: 'movie',
-    year: '2024',
-    rating: 7.3,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/A7EByudX0eOzlkQ2FIbogzyazm2.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 1011985,
-    title: 'Kung Fu Panda 4',
-    type: 'movie',
-    year: '2024',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/kDp1vUBnMpe8ak4rjgl3cLELqjU.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 786892,
-    title: 'Furiosa',
-    type: 'movie',
-    year: '2024',
-    rating: 7.5,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/iADOJ8Zymht2JPMoy3R7xceZprc.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 929590,
-    title: 'Civil War',
-    type: 'movie',
-    year: '2024',
-    rating: 6.9,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/sh7Rg8Er3tFcN9BpKIPOMvALgZd.jpg',
-  ),
-];
-
-const List<_NgmyMovieCatalogItem> _ngmyTopRatedFallbackMovies = [
-  _NgmyMovieCatalogItem(
-    id: 278,
-    title: 'The Shawshank Redemption',
-    type: 'movie',
-    year: '1994',
-    rating: 8.7,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/9cqNxx0GxF0bflZmeSMuL5tnGzr.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 238,
-    title: 'The Godfather',
-    type: 'movie',
-    year: '1972',
-    rating: 8.7,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 155,
-    title: 'The Dark Knight',
-    type: 'movie',
-    year: '2008',
-    rating: 8.5,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 496243,
-    title: 'Parasite',
-    type: 'movie',
-    year: '2019',
-    rating: 8.5,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 129,
-    title: 'Spirited Away',
-    type: 'movie',
-    year: '2001',
-    rating: 8.5,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 680,
-    title: 'Pulp Fiction',
-    type: 'movie',
-    year: '1994',
-    rating: 8.5,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg',
-  ),
-];
-
-const List<_NgmyMovieCatalogItem> _ngmyNewReleaseFallbackMovies = [
-  _NgmyMovieCatalogItem(
-    id: 519182,
-    title: 'Despicable Me 4',
-    type: 'movie',
-    year: '2024',
-    rating: 7.1,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/wWba3TaojhK7NdycRhoQpsG0FaH.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 718821,
-    title: 'Twisters',
-    type: 'movie',
-    year: '2024',
-    rating: 7.0,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/pjnD08FlMAIXsfOLKQbvmO0f0MD.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 558449,
-    title: 'Gladiator II',
-    type: 'movie',
-    year: '2024',
-    rating: 6.8,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 402431,
-    title: 'Wicked',
-    type: 'movie',
-    year: '2024',
-    rating: 7.3,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/xDGbZ0JJ3mYaGKy4Nzd9Kph6M9L.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 1034541,
-    title: 'Terrifier 3',
-    type: 'movie',
-    year: '2024',
-    rating: 6.9,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/l1175hgL5DoXnqeZQCcU3eZIdhX.jpg',
-  ),
-  _NgmyMovieCatalogItem(
-    id: 1184918,
-    title: 'The Wild Robot',
-    type: 'movie',
-    year: '2024',
-    rating: 8.4,
-    posterUrl: 'https://image.tmdb.org/t/p/w500/wTnV3PCVW5O92JMrFvvrRcV39RU.jpg',
-  ),
-];
-
-const List<_NgmyMovieCatalogItem> _ngmyAllFallbackMovies = [
-  ..._ngmyFallbackMovies,
-  ..._ngmyPopularFallbackMovies,
-  ..._ngmyTopRatedFallbackMovies,
-  ..._ngmyNewReleaseFallbackMovies,
-];
-
 // --- NEW SUBMIT PAYMENT PAGE ---
 
 class SubmitPaymentPage extends StatefulWidget {
@@ -29268,11 +27599,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       widget.onDataChanged();
       if (mounted) setState(() {});
     }());
-    NgmyHubToolBridge.register(
-      pickTwo: _openGServicesPriceCalculator,
-      qrGenerator: _openYQrGenerator,
-      funGames: _openMFunGames,
-    );
   }
 
   bool _loadingInvoiceProvider = false;
@@ -29338,7 +27664,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   @override
   void dispose() {
-    NgmyHubToolBridge.clear();
     _animCtrl.dispose();
     _calcCityC.dispose();
     _calcStateC.dispose();

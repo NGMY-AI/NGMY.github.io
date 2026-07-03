@@ -40,7 +40,6 @@ void ngmyRegisterPageVisibleHandler(void Function() onVisible) {
     }
   });
   html.window.onPageShow.listen((_) => fire());
-  html.window.onFocus.listen((_) => fire());
 }
 
 void ngmyUnregisterPageVisibleHandler(void Function() onVisible) {

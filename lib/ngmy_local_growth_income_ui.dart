@@ -282,20 +282,26 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         onOpenHelper: _openHelper,
         onOpenGameCenter: _openGameCenter,
       ),
-      InvestScreen(
-        key: const ValueKey('ngmy_local_invest'),
-        user: _user!,
-        plans: widget.plans,
-        purchaseInFlight: _investPurchaseInFlight,
-        onInvest: _onInvest,
+      ColoredBox(
+        color: bg,
+        child: InvestScreen(
+          key: const ValueKey('ngmy_local_invest'),
+          user: _user!,
+          plans: widget.plans,
+          purchaseInFlight: _investPurchaseInFlight,
+          onInvest: _onInvest,
+        ),
       ),
-      _LocalWalletTab(
-        key: const ValueKey('ngmy_local_wallet'),
-        user: _user!,
-        realEmail: widget.liveUser.email,
-        config: widget.config,
-        onAdd: _onAddTransaction,
-        onBackup: _openBackup,
+      ColoredBox(
+        color: bg,
+        child: _LocalWalletTab(
+          key: const ValueKey('ngmy_local_wallet'),
+          user: _user!,
+          realEmail: widget.liveUser.email,
+          config: widget.config,
+          onAdd: _onAddTransaction,
+          onBackup: _openBackup,
+        ),
       ),
     ];
 
@@ -314,9 +320,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           children: [
             Positioned.fill(child: ColoredBox(color: bg)),
             Positioned.fill(
-              // Not an IndexedStack on purpose: HomeScreen runs its own ticker
-              // while mounted. Building only the active tab tears that ticker
-              // down the moment the user leaves Home.
               child: SafeArea(
                 bottom: false,
                 child: pages[_idx],

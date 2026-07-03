@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
-import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_creator.dart';
 import 'ngmy_mechanic_studio.dart';
@@ -106,10 +105,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Quote Calc',
         subtitle: 'Invoices, rates & estimates',
         onTap: () {
-          if (NgmyHubToolBridge.openPickTwo != null) {
-            NgmyHubToolBridge.openPickTwo!();
-            return;
-          }
           showNgmyStandaloneQuoteCalc(
             context,
             userEmail: userEmail,
@@ -126,10 +121,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'QR Generator',
         subtitle: 'Create & save QR codes',
         onTap: () {
-          if (NgmyHubToolBridge.openQrGenerator != null) {
-            NgmyHubToolBridge.openQrGenerator!();
-            return;
-          }
           showNgmyQrGeneratorDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
         },
       ),
@@ -151,10 +142,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Play Zone',
         subtitle: 'Love match · riddles · daily fun',
         onTap: () {
-          if (NgmyHubToolBridge.openFunGames != null) {
-            NgmyHubToolBridge.openFunGames!();
-            return;
-          }
           showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
         },
       ),
