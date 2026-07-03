@@ -234,6 +234,7 @@ class NgmySlide {
     this.transition = NgmySlideTransition.fade,
     this.durationSeconds = 0,
     this.slideDesignId = '',
+    this.designRevision = 0,
     List<NgmySlideElement>? elements,
   }) : elements = elements ?? [];
 
@@ -247,6 +248,8 @@ class NgmySlide {
   int durationSeconds;
   /// Active slide design template id — used to replace (not stack) design layers.
   String slideDesignId;
+  /// Bumped on each design apply so canvas rebuilds cleanly.
+  int designRevision;
   List<NgmySlideElement> elements;
 
   NgmySlide copy() => NgmySlide(
@@ -259,6 +262,7 @@ class NgmySlide {
         transition: transition,
         durationSeconds: durationSeconds,
         slideDesignId: slideDesignId,
+        designRevision: designRevision,
         elements: elements.map((e) => e.copy()).toList(),
       );
 
@@ -272,6 +276,7 @@ class NgmySlide {
         'transition': transition.name,
         'durationSeconds': durationSeconds,
         'slideDesignId': slideDesignId,
+        'designRevision': designRevision,
         'elements': elements.map((e) => e.toJson()).toList(),
       };
 
@@ -285,6 +290,7 @@ class NgmySlide {
         transition: _transitionFromJson(json['transition']),
         durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
         slideDesignId: (json['slideDesignId'] ?? '').toString(),
+        designRevision: (json['designRevision'] as num?)?.toInt() ?? 0,
         elements: (json['elements'] as List?)
                 ?.whereType<Map>()
                 .map((e) => NgmySlideElement.fromJson(Map<String, dynamic>.from(e)))

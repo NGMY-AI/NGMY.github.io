@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_business_contacts.dart';
+import 'ngmy_business_notes.dart';
+import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_transfer.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
@@ -12,8 +14,10 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmySavedLocationCount(userEmail: userEmail),
     ngmyQuickSupportCount(userEmail: userEmail),
     ngmyMedicineOrganizerCount(userEmail: userEmail),
+    ngmyBusinessNotesCount(userEmail: userEmail),
+    ngmyBusinessTasksCount(userEmail: userEmail),
   ]);
-  return results[0] + results[1] + results[2] + results[3];
+  return results.fold<int>(0, (a, b) => a + b);
 }
 
 Future<void> showNgmyBusinessEssentialsHub(BuildContext context, {required String userEmail}) {
@@ -48,6 +52,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _locations = 0;
   int _support = 0;
   int _medicines = 0;
+  int _notes = 0;
+  int _tasks = 0;
   bool _loading = true;
 
   @override
@@ -62,6 +68,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmySavedLocationCount(userEmail: widget.userEmail),
       ngmyQuickSupportCount(userEmail: widget.userEmail),
       ngmyMedicineOrganizerCount(userEmail: widget.userEmail),
+      ngmyBusinessNotesCount(userEmail: widget.userEmail),
+      ngmyBusinessTasksCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -69,6 +77,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _locations = results[1];
       _support = results[2];
       _medicines = results[3];
+      _notes = results[4];
+      _tasks = results[5];
       _loading = false;
     });
   }
@@ -125,7 +135,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
               child: Text(
-                'Organize contacts, sites, hotlines, medicines & more — all saved locally',
+                'Organize contacts, sites, hotlines, medicines, notes, tasks & more — all saved locally',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13, height: 1.35),
               ),
             ),
@@ -167,6 +177,20 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                       accent: const Color(0xFFEC4899),
                       count: _medicines,
                       onTap: () => _openCategory((ctx) => showNgmyMedicineOrganizerDialog(ctx, userEmail: widget.userEmail)),
+                    ),
+                    _CompactCategoryCard(
+                      title: 'Notes',
+                      icon: Icons.note_alt_rounded,
+                      accent: const Color(0xFFA78BFA),
+                      count: _notes,
+                      onTap: () => _openCategory((ctx) => showNgmyBusinessNotesDialog(ctx, userEmail: widget.userEmail)),
+                    ),
+                    _CompactCategoryCard(
+                      title: 'Quick Tasks',
+                      icon: Icons.task_alt_rounded,
+                      accent: const Color(0xFF34D399),
+                      count: _tasks,
+                      onTap: () => _openCategory((ctx) => showNgmyBusinessTasksDialog(ctx, userEmail: widget.userEmail)),
                     ),
                   ],
                 ),

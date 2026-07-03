@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_business_contacts.dart';
+import 'ngmy_business_notes.dart';
+import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_short_code.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_qr_generator.dart';
@@ -20,7 +22,7 @@ const _accent2 = Color(0xFF34D399);
 const _bg = Color(0xFF030712);
 const _card = Color(0xFF0F172A);
 
-enum EssentialsTransferCategory { contacts, locations, support, medicines, all }
+enum EssentialsTransferCategory { contacts, locations, support, medicines, notes, tasks, all }
 
 Future<Map<String, dynamic>> ngmyEssentialsExportBundle(String userEmail, Set<EssentialsTransferCategory> cats) async {
   final all = cats.contains(EssentialsTransferCategory.all);
@@ -36,6 +38,12 @@ Future<Map<String, dynamic>> ngmyEssentialsExportBundle(String userEmail, Set<Es
   }
   if (all || cats.contains(EssentialsTransferCategory.medicines)) {
     bundle['medicines'] = (await ngmyExportMedicines(userEmail: userEmail)).map((e) => e.toJson()).toList();
+  }
+  if (all || cats.contains(EssentialsTransferCategory.notes)) {
+    bundle['notes'] = (await ngmyExportBusinessNotes(userEmail: userEmail)).map((e) => e.toJson()).toList();
+  }
+  if (all || cats.contains(EssentialsTransferCategory.tasks)) {
+    bundle['tasks'] = (await ngmyExportBusinessTasks(userEmail: userEmail)).map((e) => e.toJson()).toList();
   }
   return bundle;
 }
@@ -74,6 +82,14 @@ Future<void> ngmyEssentialsImportBundle(String userEmail, Map<String, dynamic> b
     final items = (bundle['medicines'] as List).whereType<Map>().map((m) => NgmyMedicineEntry.fromJson(Map<String, dynamic>.from(m))).toList();
     await ngmyImportMedicines(userEmail: userEmail, items: items);
   }
+  if (bundle['notes'] is List) {
+    final items = (bundle['notes'] as List).whereType<Map>().map((m) => NgmyBusinessNote.fromJson(Map<String, dynamic>.from(m))).toList();
+    await ngmyImportBusinessNotes(userEmail: userEmail, items: items);
+  }
+  if (bundle['tasks'] is List) {
+    final items = (bundle['tasks'] as List).whereType<Map>().map((m) => NgmyBusinessTask.fromJson(Map<String, dynamic>.from(m))).toList();
+    await ngmyImportBusinessTasks(userEmail: userEmail, items: items);
+  }
 }
 
 Future<String?> ngmyEssentialsResolveImportPayload(String raw) async {
@@ -103,6 +119,8 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
   var _locations = true;
   var _support = true;
   var _medicines = true;
+  var _notes = true;
+  var _tasks = true;
   var _busy = false;
 
   Set<EssentialsTransferCategory> get _selected {
@@ -112,6 +130,8 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     if (_locations) s.add(EssentialsTransferCategory.locations);
     if (_support) s.add(EssentialsTransferCategory.support);
     if (_medicines) s.add(EssentialsTransferCategory.medicines);
+    if (_notes) s.add(EssentialsTransferCategory.notes);
+    if (_tasks) s.add(EssentialsTransferCategory.tasks);
     return s;
   }
 
@@ -241,6 +261,8 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                     _checkTile('Site Map', _locations, (v) => setState(() => _locations = v ?? false)),
                     _checkTile('Hotlines', _support, (v) => setState(() => _support = v ?? false)),
                     _checkTile('Medicines', _medicines, (v) => setState(() => _medicines = v ?? false)),
+                    _checkTile('Notes', _notes, (v) => setState(() => _notes = v ?? false)),
+                    _checkTile('Quick Tasks', _tasks, (v) => setState(() => _tasks = v ?? false)),
                   ],
                   if (_busy) ...[const SizedBox(height: 24), const Center(child: CircularProgressIndicator(color: _accent))],
                 ],

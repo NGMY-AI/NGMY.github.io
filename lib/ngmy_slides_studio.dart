@@ -1468,16 +1468,30 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                         onTap: () {
                           final slide = _currentSlide;
                           if (slide == null) return;
+                          if (slide.slideDesignId == d.id) {
+                            _mutate(() => ngmyApplySlideDesignToCurrent(slide, d.id));
+                            return;
+                          }
                           _mutate(() => ngmyApplySlideDesignToCurrent(slide, d.id));
                         },
                         child: Column(
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
+                              child: Container(
                                 width: 72,
                                 height: 44,
-                                child: ngmyMiniSlidePreview(ngmySlideDesignPreview(d.id)),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: _currentSlide?.slideDesignId == d.id ? const Color(0xFF2563EB) : Colors.white24,
+                                    width: _currentSlide?.slideDesignId == d.id ? 2.5 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(7),
+                                  child: ngmyMiniSlidePreview(ngmySlideDesignPreview(d.id)),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 3),
@@ -1846,6 +1860,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                     color: slide.backgroundEnd == null ? Color(slide.background) : null,
                   ),
                   child: Stack(
+                    key: ValueKey('canvas_${slide.id}_${slide.slideDesignId}_${slide.designRevision}'),
                     clipBehavior: Clip.none,
                     children: [
                       ClipRRect(
@@ -1886,7 +1901,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
     final selected = _selectedElementId == e.id;
     final scale = cw / 960;
-    final isDesign = e.fileName.startsWith('__design__');
+    final isDesign = e.fileName.startsWith('__design__') || e.id.startsWith('design_');
     if (isDesign) {
       return Positioned(
         key: ValueKey('el_${e.id}'),

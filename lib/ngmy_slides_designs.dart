@@ -20,11 +20,15 @@ class NgmySlideDesignDef {
 }
 
 const _kDesignTag = '__design__';
+const _kDesignIdPrefix = 'design_';
 
 String _applyingDesignId = '';
 
+bool _isDesignLayerElement(NgmySlideElement e) =>
+    e.fileName.startsWith(_kDesignTag) || e.id.startsWith(_kDesignIdPrefix);
+
 void _clearSlideDesign(NgmySlide slide) {
-  slide.elements.removeWhere((e) => e.fileName.startsWith(_kDesignTag));
+  slide.elements = slide.elements.where((e) => !_isDesignLayerElement(e)).toList();
   slide.slideDesignId = '';
 }
 
@@ -45,7 +49,7 @@ NgmySlideElement _shape({
   double rotation = 0,
 }) =>
     NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
+      id: '${_kDesignIdPrefix}${NgmySlidesTemplates.newId()}',
       type: NgmySlideElementType.shape,
       x: x,
       y: y,
@@ -349,12 +353,74 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
       _bg(s, 0xFFFFFFFF, 0xFFDBEAFE);
     },
   ),
+  NgmySlideDesignDef(
+    id: 'headline_orange',
+    label: 'Headline Orange',
+    category: 'Modern',
+    previewColors: [Color(0xFFEA580C), Color(0xFF14B8A6)],
+    apply: (s) {
+      _addDesignShape(s, _shape(x: -0.12, y: -0.08, w: 0.55, h: 0.55, shape: NgmySlideShapeKind.parallelogram, fill: 0x33EA580C, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.62, y: -0.05, w: 0.45, h: 0.45, shape: NgmySlideShapeKind.parallelogram, fill: 0x3314B8A6, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.52, y: 0.12, w: 0.38, h: 0.38, shape: NgmySlideShapeKind.parallelogram, fill: 0x00FFFFFF, stroke: 0xFFEA580C, strokeW: 5, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.56, y: 0.16, w: 0.3, h: 0.3, shape: NgmySlideShapeKind.parallelogram, fill: 0x22EA580C, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.38, y: 0.04, w: 0.16, h: 0.06, fill: 0xFF14B8A6));
+      _addDesignShape(s, _shape(x: 0.66, y: 0.52, w: 0.28, h: 0.28, shape: NgmySlideShapeKind.circle, fill: 0x44EA580C));
+      _bg(s, 0xFFFFFFFF, 0xFFF8FAFC);
+    },
+  ),
+  NgmySlideDesignDef(
+    id: 'infographic_teal',
+    label: 'Infographic',
+    category: 'Modern',
+    previewColors: [Color(0xFF0D9488), Color(0xFFEA580C)],
+    apply: (s) {
+      _addDesignShape(s, _shape(x: 0, y: 0, w: 0.07, h: 1, fill: 0xFF0D9488));
+      _addDesignShape(s, _shape(x: 0.48, y: 0.14, w: 0.46, h: 0.1, fill: 0xFFF1F5F9, stroke: 0xFFCBD5E1, strokeW: 1));
+      _addDesignShape(s, _shape(x: 0.48, y: 0.28, w: 0.46, h: 0.1, fill: 0xFFF1F5F9, stroke: 0xFFCBD5E1, strokeW: 1));
+      _addDesignShape(s, _shape(x: 0.48, y: 0.42, w: 0.46, h: 0.1, fill: 0xFFF1F5F9, stroke: 0xFFCBD5E1, strokeW: 1));
+      _addDesignShape(s, _shape(x: 0.5, y: 0.16, w: 0.08, h: 0.08, shape: NgmySlideShapeKind.circle, fill: 0xFFEA580C));
+      _addDesignShape(s, _shape(x: 0.5, y: 0.3, w: 0.08, h: 0.08, shape: NgmySlideShapeKind.circle, fill: 0xFF0D9488));
+      _addDesignShape(s, _shape(x: 0.5, y: 0.44, w: 0.08, h: 0.08, shape: NgmySlideShapeKind.circle, fill: 0xFF14B8A6));
+      _addDesignShape(s, _shape(x: 0.1, y: 0.18, w: 0.32, h: 0.32, shape: NgmySlideShapeKind.parallelogram, fill: 0x00FFFFFF, stroke: 0xFFEA580C, strokeW: 4, rotation: 0.45));
+      _bg(s, 0xFFFFFFFF, 0xFFF0FDFA);
+    },
+  ),
+  NgmySlideDesignDef(
+    id: 'content_year',
+    label: 'Year Feature',
+    category: 'Modern',
+    previewColors: [Color(0xFFEA580C), Color(0xFFFFFFFF)],
+    apply: (s) {
+      _addDesignShape(s, _shape(x: 0.02, y: 0.06, w: 0.1, h: 0.08, fill: 0xFFF1F5F9, stroke: 0xFF14B8A6, strokeW: 2));
+      _addDesignShape(s, _shape(x: 0.58, y: 0.18, w: 0.36, h: 0.42, fill: 0xFFEA580C));
+      _addDesignShape(s, _shape(x: 0.62, y: 0.24, w: 0.28, h: 0.12, fill: 0x33FFFFFF));
+      _addDesignShape(s, _shape(x: 0, y: 0.72, w: 0.32, h: 0.28, shape: NgmySlideShapeKind.circle, fill: 0x00FFFFFF, stroke: 0xFFEA580C, strokeW: 4));
+      _addDesignShape(s, _shape(x: 0.08, y: 0.22, w: 0.42, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF0F172A, stroke: 0xFF0F172A, strokeW: 3));
+      for (var i = 0; i < 3; i++) {
+        _addDesignShape(s, _shape(x: 0.08, y: 0.58 + i * 0.1, w: 0.04, h: 0.04, shape: NgmySlideShapeKind.circle, fill: 0x00FFFFFF, stroke: 0xFF14B8A6, strokeW: 2));
+      }
+      _bg(s, 0xFFFFFFFF, 0xFFFFF7ED);
+    },
+  ),
+  NgmySlideDesignDef(
+    id: 'photo_cta',
+    label: 'Photo CTA',
+    category: 'Modern',
+    previewColors: [Color(0xFF0F172A), Color(0xFF14B8A6)],
+    apply: (s) {
+      _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.55, fill: 0xCC0F172A));
+      _addDesignShape(s, _shape(x: 0.22, y: 0.18, w: 0.56, h: 0.56, shape: NgmySlideShapeKind.parallelogram, fill: 0xEEFFFFFF, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.28, y: 0.24, w: 0.44, h: 0.44, shape: NgmySlideShapeKind.parallelogram, fill: 0xCCFFFFFF, rotation: 0.45));
+      _addDesignShape(s, _shape(x: 0.34, y: 0.62, w: 0.22, h: 0.07, fill: 0xFF14B8A6));
+      _addDesignShape(s, _shape(x: 0, y: 0, w: 0.07, h: 1, fill: 0xFF14B8A6));
+      _bg(s, 0xFF1E293B, 0xFF0F172A);
+    },
+  ),
 ];
 
 NgmySlide ngmySlideDesignPreview(String id) {
   final slide = NgmySlide(id: 'preview_$id', title: '', layout: NgmySlideLayout.blank);
-  final def = ngmySlideDesignTemplates.firstWhere((d) => d.id == id, orElse: () => ngmySlideDesignTemplates.first);
-  def.apply(slide);
+  ngmyApplySlideDesignToCurrent(slide, id);
   return slide;
 }
 
@@ -369,9 +435,12 @@ void ngmyApplySlideDesignToCurrent(NgmySlide slide, String designId) {
   final def = ngmySlideDesignTemplates.firstWhere((d) => d.id == designId, orElse: () => ngmySlideDesignTemplates.first);
   _applyingDesignId = def.id;
   slide.slideDesignId = def.id;
+  slide.designRevision++;
   try {
     def.apply(slide);
   } finally {
     _applyingDesignId = '';
   }
+  // New list reference so Flutter drops old design layer widgets immediately.
+  slide.elements = List<NgmySlideElement>.from(slide.elements);
 }
