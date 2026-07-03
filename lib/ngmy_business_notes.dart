@@ -209,8 +209,9 @@ class NgmyNoteTextAnim {
   return (buf.toString(), anims);
 }
 
-/// How many words before an animated `(word)` the editor still shows parentheses.
-const _kAnimHideWordGap = 3;
+/// Parentheses show in the editor only when the cursor is inside `(word)` or
+/// directly adjacent with no words typed before it (one word in front hides them).
+const _kAnimHideWordGap = 0;
 
 class _BodyViewMap {
   const _BodyViewMap({required this.display, required this.d2c});
@@ -223,8 +224,39 @@ int _countWords(String s) => RegExp(r'\S+').allMatches(s).length;
 bool _showAnimParensInEditor(int cursorCanon, int open, int closeParen, String text) {
   if (cursorCanon >= open && cursorCanon <= closeParen) return true;
   if (cursorCanon < open) return _countWords(text.substring(cursorCanon, open)) <= _kAnimHideWordGap;
-  return _countWords(text.substring(closeParen + 1, cursorCanon)) <= _kAnimHideWordGap;
+  return false;
 }
+
+/// Body text and anim ranges with `(markers)` removed for preview, lists, and sharing.
+(String, List<NgmyNoteTextAnim>) _notePublicView(String body, List<NgmyNoteTextAnim> anims) {
+  if (anims.isEmpty) return (body, anims);
+  final sorted = List<NgmyNoteTextAnim>.from(anims)..sort((a, b) => a.start.compareTo(b.start));
+  final outAnims = <NgmyNoteTextAnim>[];
+  final buf = StringBuffer();
+  var pos = 0;
+  var outPos = 0;
+  for (final a in sorted) {
+    final open = a.start - 1;
+    final closeParen = a.end;
+    if (open < 0 || closeParen >= body.length || body[open] != '(' || body[closeParen] != ')') continue;
+    if (pos < open) {
+      final chunk = body.substring(pos, open);
+      buf.write(chunk);
+      outPos += chunk.length;
+    }
+    final inner = body.substring(a.start, closeParen);
+    if (inner.isNotEmpty) {
+      outAnims.add(NgmyNoteTextAnim(start: outPos, end: outPos + inner.length, effect: a.effect));
+    }
+    buf.write(inner);
+    outPos += inner.length;
+    pos = closeParen + 1;
+  }
+  if (pos < body.length) buf.write(body.substring(pos));
+  return (buf.toString(), outAnims);
+}
+
+String _notePublicBody(String body, List<NgmyNoteTextAnim> anims) => _notePublicView(body, anims).$1;
 
 _BodyViewMap _buildNoteBodyView(String canonical, List<NgmyNoteTextAnim> anims, int cursorCanon) {
   final sorted = List<NgmyNoteTextAnim>.from(anims)..sort((a, b) => a.start.compareTo(b.start));
@@ -614,8 +646,11 @@ class NgmyBusinessNote {
   String get preview {
     if (title.trim().isNotEmpty) return title.trim();
     final line = body.split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
-    return line.trim().isEmpty ? 'New Note' : line.trim();
+    if (line.trim().isEmpty) return 'New Note';
+    return _notePublicBody(line, textAnims).trim();
   }
+
+  String get displayBody => _notePublicBody(body, textAnims);
 
   String get effectiveBackgroundId => backgroundId.isEmpty ? _defaultBackgroundForFolder(folder) : backgroundId;
 
@@ -1008,7 +1043,7 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  n.body.trim().isEmpty ? 'Empty note' : n.body.replaceAll('\n', ' '),
+                                                  n.displayBody.trim().isEmpty ? 'Empty note' : n.displayBody.replaceAll('\n', ' '),
                                                   maxLines: 2,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(color: dark ? Colors.white60 : const Color(0xFF64748B), fontSize: 13, height: 1.35),
@@ -1699,7 +1734,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
               const SizedBox(height: 6),
               const Text(
                 'Highlight text first to animate only that part. Pick None to remove animation. '
-                'Or pick an effect to insert ( ) and type inside.',
+                '( ) only shows while you edit right next to the word — never in Preview or note list.',
                 style: TextStyle(color: Colors.white54, fontSize: 12),
               ),
               const SizedBox(height: 14),
@@ -2064,10 +2099,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
     if (action == null || !mounted) return;
     if (action == 'copy') {
-      await Clipboard.setData(ClipboardData(text: '${_title.text}\n\n${_body.text}'));
+      await Clipboard.setData(ClipboardData(text: '${_title.text}\n\n${_note.displayBody}'));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
     } else if (action == 'share') {
-      await Clipboard.setData(ClipboardData(text: '${_title.text}\n\n${_body.text}'));
+      await Clipboard.setData(ClipboardData(text: '${_title.text}\n\n${_note.displayBody}'));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note copied — paste to share')));
     } else if (action == 'pin') {
       setState(() => _note.pinned = !_note.pinned);
@@ -2092,6 +2127,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     final dark = _note.darkTheme;
     final fg = dark ? Colors.white : const Color(0xFF0F172A);
     final muted = dark ? Colors.white60 : const Color(0xFF64748B);
+    final public = _notePublicView(_storedBody, _note.textAnims);
 
     return PopScope(
       canPop: false,
@@ -2182,28 +2218,57 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                     ),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    child: _previewMode
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (_previewMode)
-                                Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28))
-                              else
-                                GestureDetector(
-                                  onTap: _showEmojiPicker,
-                                  child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
-                                ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _previewMode
-                                    ? Text(
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
                                         _title.text.trim().isEmpty ? 'Untitled' : _title.text,
                                         style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
-                                      )
-                                    : TextField(
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                                child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                              ),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                                  child: _NoteMarkdownPreview(
+                                    key: ValueKey('pv_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
+                                    text: public.$1,
+                                    dark: dark,
+                                    textAnims: public.$2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: _showEmojiPicker,
+                                      child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: TextField(
                                         controller: _title,
                                         style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
                                         decoration: InputDecoration(
@@ -2215,22 +2280,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                         ),
                                         maxLines: 2,
                                       ),
-                              ),
-                            ],
-                          ),
-                          Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          Expanded(
-                            child: _previewMode
-                                ? SingleChildScrollView(
-                                    child: _NoteMarkdownPreview(
-                                      key: ValueKey('pv_${_storedBody.hashCode}_${_note.textAnims.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
-                                      text: _storedBody,
-                                      dark: dark,
-                                      textAnims: List<NgmyNoteTextAnim>.from(_note.textAnims),
                                     ),
-                                  )
-                                : TextField(
+                                  ],
+                                ),
+                                Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 8),
+                                Expanded(
+                                  child: TextField(
                                     controller: _body,
                                     focusNode: _bodyFocus,
                                     onTap: _onBodySelectionChanged,
@@ -2244,10 +2300,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                     expands: true,
                                     textAlignVertical: TextAlignVertical.top,
                                   ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
                   ),
                   if (_dirty && !_previewMode)
                     Padding(
