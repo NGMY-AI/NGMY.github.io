@@ -63,17 +63,24 @@ class NgmyTransferDownload {
           fromSender: ownerEmail.isNotEmpty ? ownerEmail : null,
           note: 'NGMY Transfer',
         );
+        await NgmyDocShareStore.prepareDiskReceive(rxId);
         var bytesReceived = 0;
-        await for (final chunk in streamed.stream) {
-          bytesReceived += chunk.length;
-          onBytes?.call(name, bytesReceived, streamed.contentLength);
-          await NgmyDocShareStore.writeDiskReceive(rxId, chunk);
-        }
-        final saved = await NgmyDocShareStore.finishDiskReceive(rxId);
-        if (saved != null) {
-          imported.add(saved);
-          received++;
-          onProgress?.call(received, total);
+        try {
+          await for (final chunk in streamed.stream) {
+            bytesReceived += chunk.length;
+            final totalBytes = streamed.contentLength;
+            onBytes?.call(name, bytesReceived, totalBytes != null && totalBytes > 0 ? totalBytes : null);
+            await NgmyDocShareStore.writeDiskReceive(rxId, chunk);
+          }
+          final saved = await NgmyDocShareStore.finishDiskReceive(rxId);
+          if (saved != null) {
+            imported.add(saved);
+            received++;
+            onProgress?.call(received, total);
+          }
+        } catch (e) {
+          debugPrint('[ngmy transfer pull web] $name: $e');
+          await NgmyDocShareStore.abortDiskReceive(rxId);
         }
       } catch (e) {
         debugPrint('[ngmy transfer pull web] $name: $e');

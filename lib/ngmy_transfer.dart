@@ -142,7 +142,7 @@ class NgmyTransfer {
 
   static Future<bool> waitForWebRtcReceiver(
     NgmyTransferSendSession session, {
-    Duration maxWait = const Duration(seconds: 60),
+    Duration maxWait = const Duration(minutes: 3),
   }) async {
     if (!session.hasWebRtc) return true;
     final token = session.offerToken!;

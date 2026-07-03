@@ -43,8 +43,8 @@ class NgmyTransferWebRtc {
       onProgress: onProgress,
       onBytes: onBytes == null
           ? null
-          : (fileIndex, receivedBytes, totalBytes) {
-              onBytes('file', receivedBytes, totalBytes);
+          : (fileName, receivedBytes, totalBytes) {
+              onBytes(fileName, receivedBytes, totalBytes);
             },
     );
     if (session == null) {
@@ -56,7 +56,7 @@ class NgmyTransferWebRtc {
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(
-        const Duration(hours: 3),
+        const Duration(hours: 6),
         onTimeout: () => <NgmyDocShareItem>[],
       );
     } catch (_) {

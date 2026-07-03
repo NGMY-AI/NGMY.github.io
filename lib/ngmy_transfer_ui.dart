@@ -297,6 +297,13 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
   double? _byteProgress;
   var _filesDone = 0;
   var _filesTotal = 0;
+  String? _currentFileName;
+
+  String _sizeLabel(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
 
   @override
   void initState() {
@@ -325,6 +332,7 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
       _byteProgress = null;
       _filesDone = 0;
       _filesTotal = 0;
+      _currentFileName = null;
     });
 
     final imported = await NgmyTransfer.receiveByCode(
@@ -341,9 +349,15 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
           });
         }
       },
-      onBytes: (_, received, total) {
-        if (mounted && total != null && total > 0) {
-          setState(() => _byteProgress = received / total);
+      onBytes: (fileName, received, total) {
+        if (mounted) {
+          setState(() {
+            _currentFileName = fileName;
+            if (total != null && total > 0) {
+              _byteProgress = received / total;
+              _status = 'Receiving ${fileName.split('/').last}… ${((received / total) * 100).round()}% (${_sizeLabel(received)} / ${_sizeLabel(total)})';
+            }
+          });
         }
       },
     );
@@ -382,7 +396,7 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
           children: [
             Text(
               'Type the 6-digit number from the sender\'s NGMY Transfer Send screen.\n'
-              'This is not the QR share code (letters) shown on files.',
+              'Large videos and files are supported — keep this screen open until the transfer finishes.',
               style: TextStyle(color: muted, height: 1.45, fontSize: 13),
             ),
             const SizedBox(height: 20),
@@ -420,6 +434,16 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
                 value: _byteProgress,
                 backgroundColor: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
                 color: kNgmyStudioHubAccent,
+              ),
+            ],
+            if (_currentFileName != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _currentFileName!.split('/').last,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 13),
               ),
             ],
             if (_filesTotal > 0) ...[

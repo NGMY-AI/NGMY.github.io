@@ -589,11 +589,8 @@ class NgmyDocShareStore {
   static Future<bool> writeDiskReceive(int id, List<int> bytes) async {
     final rx = _diskReceives[id];
     if (rx == null || bytes.isEmpty) return false;
-    if (rx.partKeys.length > 1 || rx.pending.length >= _streamChunkBytes) {
-      await rx.flushPending();
-    }
     rx.pending.add(bytes);
-    if (rx.pending.length >= _streamChunkBytes) {
+    while (rx.pending.length >= _streamChunkBytes) {
       await rx.flushPending();
     }
     return true;
@@ -603,7 +600,10 @@ class NgmyDocShareStore {
     final rx = _diskReceives.remove(id);
     if (rx == null) return null;
     await rx.flushPending();
-    if (rx.partKeys.isEmpty || rx.totalBytes <= 0) return null;
+    if (rx.partKeys.isEmpty || rx.totalBytes <= 0) {
+      debugPrint('[doc share web recv] empty receive id=$id');
+      return null;
+    }
     await _persistChunkManifest(rx.baseKey, rx.partKeys, rx.totalBytes);
     final item = NgmyDocShareItem(
       id: rx.itemId,
@@ -621,7 +621,12 @@ class NgmyDocShareStore {
   }
 
   static Future<void> abortDiskReceive(int id) async {
-    _diskReceives.remove(id);
+    final rx = _diskReceives.remove(id);
+    if (rx == null) return;
+    for (final partKey in rx.partKeys) {
+      await ngmyDocShareIdbDelete(partKey);
+    }
+    rx.pending.clear();
   }
 
   static Future<void> updateShortCode(String email, String itemId, String shortCode) async {

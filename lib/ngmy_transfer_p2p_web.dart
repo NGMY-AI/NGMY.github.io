@@ -185,7 +185,7 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   required String offerToken,
   required String recipientEmail,
   void Function(int received, int total)? onProgress,
-  void Function(int fileIndex, int receivedBytes, int totalBytes)? onBytes,
+  void Function(String fileName, int receivedBytes, int totalBytes)? onBytes,
 }) async {
   final jsonText = await _loadOfferJson(offerToken);
   if (jsonText == null) return null;
@@ -204,39 +204,43 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   var pendingMime = 'application/octet-stream';
   var pendingSize = 0;
   var pendingReceived = 0;
-  var fileIndex = 0;
   int? activeReceiveId;
   final imported = <NgmyDocShareItem>[];
   var received = 0;
   final done = Completer<List<NgmyDocShareItem>>();
-  Future<void> writeTail = Future<void>.value();
+  Future<void> recvChain = Future<void>.value();
 
   Future<void> finalizeCurrentFile() async {
     if (activeReceiveId == null) return;
     final id = activeReceiveId!;
     activeReceiveId = null;
-    await writeTail;
     final saved = await NgmyDocShareStore.finishDiskReceive(id);
     if (saved != null) {
       imported.add(saved);
       received++;
       onProgress?.call(received, total);
+    } else if (pendingReceived > 0) {
+      debugPrint('[ngmy transfer p2p] finish failed for $pendingName ($pendingReceived bytes)');
+      await NgmyDocShareStore.abortDiskReceive(id);
     }
   }
 
   pc.onDataChannel = (channel) {
     channel.onMessage = (msg) {
-      if (msg.isBinary) {
-        final id = activeReceiveId;
-        if (id != null) {
-          pendingReceived += msg.binary.length;
-          onBytes?.call(fileIndex, pendingReceived, pendingSize);
-          writeTail = writeTail.then((_) => NgmyDocShareStore.writeDiskReceive(id, msg.binary));
-        }
-        return;
-      }
-      unawaited(Future<void>(() async {
+      recvChain = recvChain.then((_) async {
         try {
+          if (msg.isBinary) {
+            final id = activeReceiveId;
+            if (id == null) {
+              debugPrint('[ngmy transfer p2p] binary before meta (${msg.binary.length} bytes dropped)');
+              return;
+            }
+            pendingReceived += msg.binary.length;
+            onBytes?.call(pendingName, pendingReceived, pendingSize);
+            await NgmyDocShareStore.writeDiskReceive(id, msg.binary);
+            return;
+          }
+
           final data = jsonDecode(msg.text);
           if (data is! Map) return;
           final type = (data['type'] ?? '').toString();
@@ -246,26 +250,29 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
             pendingMime = (data['mime'] ?? 'application/octet-stream').toString();
             pendingSize = (data['size'] as num?)?.toInt() ?? 0;
             pendingReceived = 0;
-            fileIndex = received;
             final id = NgmyDocShareStore.beginDiskReceive(
               email: recipientEmail,
               name: pendingName,
               mime: pendingMime,
               note: 'NGMY Transfer',
             );
-            await NgmyDocShareStore.prepareDiskReceive(id);
             activeReceiveId = id;
+            await NgmyDocShareStore.prepareDiskReceive(id);
           } else if (type == 'done') {
             await finalizeCurrentFile();
             if (!done.isCompleted) done.complete(imported);
           } else if (type == 'error') {
+            if (activeReceiveId != null) {
+              await NgmyDocShareStore.abortDiskReceive(activeReceiveId!);
+              activeReceiveId = null;
+            }
             if (!done.isCompleted) done.complete(imported);
           }
         } catch (e) {
           debugPrint('[ngmy transfer p2p] recv: $e');
           if (!done.isCompleted) done.complete(imported);
         }
-      }));
+      });
     };
   };
 
