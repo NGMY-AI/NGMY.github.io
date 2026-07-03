@@ -91,6 +91,8 @@ class NgmySlideElement {
     this.bulletList = false,
     this.fileName = '',
     this.pdfPage = 0,
+    this.textTransition = NgmySlideTransition.none,
+    this.textAnimDelayMs = 0,
   });
 
   final String id;
@@ -115,6 +117,8 @@ class NgmySlideElement {
   bool bulletList;
   String fileName;
   int pdfPage;
+  NgmySlideTransition textTransition;
+  int textAnimDelayMs;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -139,6 +143,8 @@ class NgmySlideElement {
         bulletList: bulletList,
         fileName: fileName,
         pdfPage: pdfPage,
+        textTransition: textTransition,
+        textAnimDelayMs: textAnimDelayMs,
       );
 
   Map<String, dynamic> toJson() => {
@@ -164,6 +170,8 @@ class NgmySlideElement {
         'bulletList': bulletList,
         'fileName': fileName,
         'pdfPage': pdfPage,
+        'textTransition': textTransition.name,
+        'textAnimDelayMs': textAnimDelayMs,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -193,6 +201,8 @@ class NgmySlideElement {
       bulletList: json['bulletList'] == true,
       fileName: (json['fileName'] ?? '').toString(),
       pdfPage: (json['pdfPage'] as num?)?.toInt() ?? 0,
+      textTransition: _transitionFromJson(json['textTransition']),
+      textAnimDelayMs: (json['textAnimDelayMs'] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -431,3 +431,225 @@ class _WipeClipper extends CustomClipper<Rect> {
   @override
   bool shouldReclip(covariant _WipeClipper oldClipper) => oldClipper.progress != progress;
 }
+
+/// Wraps a slide element with an entrance animation (text / any element with textTransition set).
+class NgmyElementEntrance extends StatefulWidget {
+  const NgmyElementEntrance({
+    super.key,
+    required this.element,
+    required this.child,
+    this.animate = true,
+    this.staggerIndex = 0,
+  });
+
+  final NgmySlideElement element;
+  final Widget child;
+  final bool animate;
+  final int staggerIndex;
+
+  @override
+  State<NgmyElementEntrance> createState() => _NgmyElementEntranceState();
+}
+
+class _NgmyElementEntranceState extends State<NgmyElementEntrance> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+    if (!widget.animate || widget.element.textTransition == NgmySlideTransition.none) {
+      _ctrl.value = 1;
+      return;
+    }
+    final delay = widget.element.textAnimDelayMs + widget.staggerIndex * 120;
+    Future.delayed(Duration(milliseconds: delay), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyElementEntrance oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.element.id != widget.element.id ||
+        oldWidget.element.textTransition != widget.element.textTransition ||
+        oldWidget.staggerIndex != widget.staggerIndex) {
+      _ctrl.reset();
+      if (!widget.animate || widget.element.textTransition == NgmySlideTransition.none) {
+        _ctrl.value = 1;
+      } else {
+        final delay = widget.element.textAnimDelayMs + widget.staggerIndex * 120;
+        Future.delayed(Duration(milliseconds: delay), () {
+          if (mounted) _ctrl.forward();
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget _buildAnimated(Widget child, Animation<double> a) {
+    final t = Curves.easeOutCubic.transform(a.value);
+    switch (widget.element.textTransition) {
+      case NgmySlideTransition.none:
+        return child;
+      case NgmySlideTransition.fade:
+      case NgmySlideTransition.dissolve:
+      case NgmySlideTransition.flash:
+        return Opacity(opacity: t, child: child);
+      case NgmySlideTransition.slideLeft:
+      case NgmySlideTransition.push:
+        return Transform.translate(offset: Offset((1 - t) * 48, 0), child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.slideRight:
+        return Transform.translate(offset: Offset(-(1 - t) * 48, 0), child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.slideUp:
+      case NgmySlideTransition.curtain:
+        return Transform.translate(offset: Offset(0, (1 - t) * 36), child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.slideDown:
+        return Transform.translate(offset: Offset(0, -(1 - t) * 36), child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.zoom:
+      case NgmySlideTransition.bounce:
+        return Transform.scale(scale: 0.5 + t * 0.5, child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.zoomOut:
+        return Transform.scale(scale: 1.4 - t * 0.4, child: Opacity(opacity: t, child: child));
+      case NgmySlideTransition.flip:
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY((1 - t) * 1.2),
+          child: Opacity(opacity: t, child: child),
+        );
+      case NgmySlideTransition.flipVertical:
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateX((1 - t) * 1.2),
+          child: Opacity(opacity: t, child: child),
+        );
+      case NgmySlideTransition.rotate3d:
+      case NgmySlideTransition.spiral:
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.002)
+            ..rotateZ((1 - t) * 0.8)
+            ..scale(0.6 + t * 0.4),
+          child: Opacity(opacity: t, child: child),
+        );
+      case NgmySlideTransition.cube:
+      case NgmySlideTransition.blur:
+      case NgmySlideTransition.wipeLeft:
+      case NgmySlideTransition.wipeRight:
+      case NgmySlideTransition.swing:
+        return Transform.translate(offset: Offset((1 - t) * 24, 0), child: Opacity(opacity: t, child: child));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.element.textTransition == NgmySlideTransition.none || !widget.animate) {
+      return widget.child;
+    }
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, child) => _buildAnimated(child!, _ctrl),
+      child: widget.child,
+    );
+  }
+}
+
+/// Slide renderer with animated text/element entrances for Present mode.
+class NgmySlideAnimatedRender extends StatelessWidget {
+  const NgmySlideAnimatedRender({super.key, required this.slide, this.animate = true});
+
+  final NgmySlide slide;
+  final bool animate;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final h = c.maxHeight;
+        var animIndex = 0;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: slide.backgroundEnd != null
+                ? LinearGradient(colors: [Color(slide.background), Color(slide.backgroundEnd!)])
+                : null,
+            color: slide.backgroundEnd == null ? Color(slide.background) : null,
+          ),
+          child: Stack(
+            children: slide.elements.map((e) {
+              final stagger = e.textTransition != NgmySlideTransition.none ? animIndex++ : 0;
+              return Positioned(
+                left: e.x * w,
+                top: e.y * h,
+                width: e.w * w,
+                height: e.h * h,
+                child: NgmyElementEntrance(
+                  element: e,
+                  animate: animate,
+                  staggerIndex: stagger,
+                  child: NgmySlideElementView(element: e, scale: w / 960),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Preview text/element entrance animation before applying.
+Future<void> showNgmyTextTransitionPreview(
+  BuildContext context, {
+  required NgmySlideTransition transition,
+  required VoidCallback onApply,
+}) async {
+  await showDialog<void>(
+    context: context,
+    barrierColor: Colors.black87,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: const Color(0xFF111827),
+      title: Text('${ngmySlideTransitionEmoji(transition)} Text animation', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+      content: SizedBox(
+        width: 280,
+        height: 120,
+        child: NgmyElementEntrance(
+          element: NgmySlideElement(
+            id: 'preview',
+            type: NgmySlideElementType.text,
+            text: 'Sample text flies in',
+            textTransition: transition,
+            fontSize: 22,
+            color: 0xFFFFFFFF,
+          ),
+          animate: true,
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text('Sample text flies in', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            onApply();
+          },
+          child: const Text('Apply to text'),
+        ),
+      ],
+    ),
+  );
+}

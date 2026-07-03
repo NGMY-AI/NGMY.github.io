@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
@@ -587,6 +588,368 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     _mutate(() => el.imageRef = enhanced);
   }
 
+  void _addPresetText(NgmySlideElement el) {
+    _mutate(() {
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
+    });
+  }
+
+  void _applyDocTool(String toolId) {
+    switch (toolId) {
+      case 'upload_pdf':
+        unawaited(_addPdf());
+        return;
+      case 'sign_paper':
+        unawaited(_addSignature());
+        return;
+      case 'hd_photo':
+        unawaited(_addEnhancedPhoto());
+        return;
+      case 'sharpen':
+        unawaited(_enhanceSelectedImage());
+        return;
+      case 'print':
+        final deck = _activeDeck;
+        if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
+        return;
+      case 'rotate':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.rotation += 0.785398);
+        return;
+      case 'text_box':
+        _addTextBox();
+        return;
+      case 'picture':
+        unawaited(_addImage());
+        return;
+      case 'present':
+        _startSlideshow();
+        return;
+      case 'new_slide':
+        _addSlide();
+        return;
+      case 'export_json':
+        unawaited(_exportJson());
+        return;
+      case 'outline_share':
+        unawaited(_shareOutline());
+        return;
+      case 'flashcard_tool':
+        _addSchoolSlide(NgmySlideLayout.flashcard);
+        return;
+      case 'quiz_tool':
+        _addSchoolSlide(NgmySlideLayout.quiz);
+        return;
+      case 'worksheet_tool':
+        _addSchoolSlide(NgmySlideLayout.worksheet);
+        return;
+      case 'duplicate_el':
+        final el = _selectedElement();
+        if (el == null) return;
+        _mutate(() {
+          final c = el.copy();
+          final copy = NgmySlideElement(
+            id: NgmySlidesTemplates.newId(),
+            type: c.type,
+            x: (c.x + 0.04).clamp(0, 0.92),
+            y: (c.y + 0.04).clamp(0, 0.92),
+            w: c.w,
+            h: c.h,
+            text: c.text,
+            fontSize: c.fontSize,
+            fontWeight: c.fontWeight,
+            fontStyle: c.fontStyle,
+            decoration: c.decoration,
+            color: c.color,
+            align: c.align,
+            imageRef: c.imageRef,
+            shape: c.shape,
+            fillColor: c.fillColor,
+            strokeColor: c.strokeColor,
+            strokeWidth: c.strokeWidth,
+            rotation: c.rotation,
+            bulletList: c.bulletList,
+            fileName: c.fileName,
+            pdfPage: c.pdfPage,
+            textTransition: c.textTransition,
+            textAnimDelayMs: c.textAnimDelayMs,
+          );
+          _currentSlide!.elements.add(copy);
+          _selectedElementId = copy.id;
+        });
+        return;
+      case 'delete_el':
+        _deleteSelected();
+        return;
+      case 'bring_fwd':
+        final el = _selectedElement();
+        if (el == null || _currentSlide == null) return;
+        _mutate(() {
+          final list = _currentSlide!.elements;
+          final i = list.indexWhere((e) => e.id == el.id);
+          if (i >= 0 && i < list.length - 1) {
+            list.removeAt(i);
+            list.insert(i + 1, el);
+          }
+        });
+        return;
+      case 'send_back':
+        final el = _selectedElement();
+        if (el == null || _currentSlide == null) return;
+        _mutate(() {
+          final list = _currentSlide!.elements;
+          final i = list.indexWhere((e) => e.id == el.id);
+          if (i > 0) {
+            list.removeAt(i);
+            list.insert(i - 1, el);
+          }
+        });
+        return;
+      case 'align_left':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.align = TextAlign.left);
+        return;
+      case 'align_center':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.align = TextAlign.center);
+        return;
+      case 'align_right':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.align = TextAlign.right);
+        return;
+      case 'grayscale':
+      case 'brighten':
+        unawaited(_enhanceSelectedImage());
+        return;
+      case 'flip_h':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.rotation += 3.14159);
+        return;
+      case 'flip_v':
+        final el = _selectedElement();
+        if (el != null) _mutate(() => el.rotation -= 3.14159);
+        return;
+      case 'rectangle':
+        _addShape(NgmySlideShapeKind.rectangle);
+        return;
+      case 'circle':
+        _addShape(NgmySlideShapeKind.circle);
+        return;
+      case 'triangle':
+        _addShape(NgmySlideShapeKind.triangle);
+        return;
+      case 'arrow':
+        _addShape(NgmySlideShapeKind.arrow);
+        return;
+      case 'line':
+      case 'divider':
+        _addShape(NgmySlideShapeKind.line);
+        return;
+      case 'word_count':
+        final slide = _currentSlide;
+        if (slide == null) return;
+        var words = 0;
+        for (final e in slide.elements.where((x) => x.type == NgmySlideElementType.text)) {
+          words += e.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$words words on this slide')));
+        return;
+      case 'title':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Presentation Title', y: 0.28, h: 0.18, fontSize: 40, fontWeight: FontWeight.w900, color: _theme.titleColor.value, align: TextAlign.center, textTransition: NgmySlideTransition.zoom));
+        return;
+      case 'subtitle':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Subtitle goes here', y: 0.48, h: 0.12, fontSize: 22, color: _theme.bodyColor.value, align: TextAlign.center, textTransition: NgmySlideTransition.fade));
+        return;
+      case 'bullets':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '• First point\n• Second point\n• Third point', y: 0.22, h: 0.5, fontSize: 20, bulletList: true, textTransition: NgmySlideTransition.slideUp));
+        return;
+      case 'numbered':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '1. First item\n2. Second item\n3. Third item', y: 0.22, h: 0.5, fontSize: 20, textTransition: NgmySlideTransition.slideLeft));
+        return;
+      case 'quote':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '"Insert meaningful quote here."', y: 0.3, h: 0.25, fontSize: 24, fontStyle: FontStyle.italic, align: TextAlign.center, textTransition: NgmySlideTransition.fade));
+        return;
+      case 'citation':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Author, Title (Year). Publisher.', y: 0.78, h: 0.1, fontSize: 14, color: 0xFF64748B, textTransition: NgmySlideTransition.slideUp));
+        return;
+      case 'date_stamp':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: ngmySlidesTodayStamp(), x: 0.72, y: 0.04, w: 0.24, h: 0.08, fontSize: 14, align: TextAlign.right, textTransition: NgmySlideTransition.fade));
+        return;
+      case 'page_number':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Page ${_slideIndex + 1}', x: 0.78, y: 0.9, w: 0.18, h: 0.06, fontSize: 13, align: TextAlign.right));
+        return;
+      case 'header_bar':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0, y: 0, w: 1, h: 0.1, fillColor: _theme.accent.withValues(alpha: 0.18).value, strokeColor: 0x00000000));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Document Header', x: 0.05, y: 0.02, w: 0.9, h: 0.07, fontSize: 18, fontWeight: FontWeight.w800, color: _theme.titleColor.value));
+        });
+        return;
+      case 'footer_bar':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0, y: 0.9, w: 1, h: 0.1, fillColor: _theme.accent.withValues(alpha: 0.12).value, strokeColor: 0x00000000));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Footer · ${ngmySlidesTodayStamp()}', x: 0.05, y: 0.92, w: 0.9, h: 0.06, fontSize: 12, color: _theme.bodyColor.value, align: TextAlign.center));
+        });
+        return;
+      case 'highlight':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.12, y: 0.35, w: 0.76, h: 0.12, fillColor: 0x66FDE047, strokeColor: 0xFFFACC15));
+        });
+        return;
+      case 'redact':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.2, y: 0.4, w: 0.5, h: 0.08, fillColor: 0xFF111827, strokeColor: 0xFF111827));
+        });
+        return;
+      case 'callout':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), shape: NgmySlideShapeKind.arrow, x: 0.15, y: 0.55, w: 0.2, h: 0.12, fillColor: _theme.accent.withValues(alpha: 0.35).value));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Important note', x: 0.38, y: 0.52, w: 0.5, h: 0.15, fontSize: 18, textTransition: NgmySlideTransition.bounce));
+        });
+        return;
+      case 'checkboxes':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '☐ Task one\n☐ Task two\n☐ Task three', y: 0.2, h: 0.45, fontSize: 20));
+        return;
+      case 'table':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Column A\tColumn B\tColumn C\nRow 1\tData\tData\nRow 2\tData\tData', y: 0.18, h: 0.55, fontSize: 16, align: TextAlign.left));
+        return;
+      case 'memo':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.08, y: 0.1, w: 0.84, h: 0.78, fillColor: 0xFFF8FAFC, strokeColor: 0xFFCBD5E1, strokeWidth: 1.5));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'MEMO\n\nTo:\nFrom:\nDate: ${ngmySlidesTodayStamp()}\n\nSubject:\n\nBody text…', x: 0.12, y: 0.14, w: 0.76, h: 0.7, fontSize: 16, color: 0xFF0F172A));
+        });
+        return;
+      case 'letter':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '${ngmySlidesTodayStamp()}\n\nDear [Name],\n\n[Letter body]\n\nSincerely,\n[Your name]', y: 0.08, h: 0.82, fontSize: 17, color: 0xFF0F172A));
+        return;
+      case 'agenda':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'AGENDA\n\n1. Welcome\n2. Updates\n3. Discussion\n4. Action items\n5. Next steps', y: 0.12, h: 0.76, fontSize: 22, fontWeight: FontWeight.w700, textTransition: NgmySlideTransition.slideUp));
+        return;
+      case 'toc':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'TABLE OF CONTENTS\n\n1. Introduction .......... 1\n2. Main topic .......... 3\n3. Conclusion .......... 8', y: 0.12, h: 0.76, fontSize: 18));
+        return;
+      case 'sig_line':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Signature: _________________________', y: 0.78, h: 0.08, fontSize: 16));
+        return;
+      case 'initial_line':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Initials: ______', x: 0.65, y: 0.78, w: 0.3, h: 0.08, fontSize: 16));
+        return;
+      case 'approved':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'APPROVED', x: 0.62, y: 0.08, w: 0.32, h: 0.12, fontSize: 28, fontWeight: FontWeight.w900, color: 0xFF059669, align: TextAlign.center, textTransition: NgmySlideTransition.zoom));
+        return;
+      case 'draft':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'DRAFT', x: 0.62, y: 0.08, w: 0.32, h: 0.12, fontSize: 28, fontWeight: FontWeight.w900, color: 0xFFDC2626, align: TextAlign.center, textTransition: NgmySlideTransition.fade));
+        return;
+      case 'confidential':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'CONFIDENTIAL', y: 0.42, h: 0.12, fontSize: 36, fontWeight: FontWeight.w900, color: 0x33EF4444, align: TextAlign.center));
+        return;
+      case 'sticky':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.62, y: 0.12, w: 0.3, h: 0.28, fillColor: 0xFFFEF08A, strokeColor: 0xFFFACC15));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Sticky note', x: 0.64, y: 0.14, w: 0.26, h: 0.24, fontSize: 15, color: 0xFF713F12, textTransition: NgmySlideTransition.swing));
+        });
+        return;
+      case 'progress':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.1, y: 0.48, w: 0.8, h: 0.04, fillColor: 0xFFE2E8F0, strokeColor: 0xFFCBD5E1));
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.1, y: 0.48, w: 0.55, h: 0.04, fillColor: 0xFF2563EB, strokeColor: 0xFF2563EB));
+        });
+        return;
+      case 'stars':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '★★★★☆', y: 0.4, h: 0.12, fontSize: 36, align: TextAlign.center, textTransition: NgmySlideTransition.bounce));
+        return;
+      case 'equation':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'y = mx + b', y: 0.38, h: 0.14, fontSize: 32, align: TextAlign.center, fontWeight: FontWeight.w700));
+        return;
+      case 'timeline':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '2024 ──► 2025 ──► 2026\nPhase 1    Phase 2    Phase 3', y: 0.35, h: 0.2, fontSize: 18, align: TextAlign.center, textTransition: NgmySlideTransition.slideLeft));
+        return;
+      case 'two_col':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Left column\n\n• Point A\n• Point B', x: 0.06, y: 0.18, w: 0.42, h: 0.62, fontSize: 18, textTransition: NgmySlideTransition.slideRight));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Right column\n\n• Point C\n• Point D', x: 0.52, y: 0.18, w: 0.42, h: 0.62, fontSize: 18, textTransition: NgmySlideTransition.slideLeft, textAnimDelayMs: 200));
+        });
+        return;
+      case 'compare':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.05, y: 0.18, w: 0.42, h: 0.62, fillColor: 0x332563EB, strokeColor: 0xFF2563EB));
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.53, y: 0.18, w: 0.42, h: 0.62, fillColor: 0x33059669, strokeColor: 0xFF059669));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Option A', x: 0.08, y: 0.2, w: 0.36, h: 0.1, fontSize: 20, fontWeight: FontWeight.w800));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'Option B', x: 0.56, y: 0.2, w: 0.36, h: 0.1, fontSize: 20, fontWeight: FontWeight.w800));
+        });
+        return;
+      case 'link_text':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'https://example.com', y: 0.5, h: 0.1, fontSize: 16, color: 0xFF2563EB, decoration: TextDecoration.underline));
+        return;
+      case 'phone':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '(555) 123-4567', y: 0.5, h: 0.1, fontSize: 18));
+        return;
+      case 'email':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'name@email.com', y: 0.5, h: 0.1, fontSize: 18, color: 0xFF2563EB));
+        return;
+      case 'qr_placeholder':
+        _mutate(() {
+          _currentSlide!.elements.add(ngmySlidesMakeShape(id: NgmySlidesTemplates.newId(), x: 0.38, y: 0.28, w: 0.24, h: 0.36, fillColor: 0xFFFFFFFF, strokeColor: 0xFF111827));
+          _currentSlide!.elements.add(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: '[ QR CODE ]', x: 0.38, y: 0.4, w: 0.24, h: 0.12, fontSize: 14, align: TextAlign.center));
+        });
+        return;
+      case 'cover_page':
+        final slide = _currentSlide;
+        if (slide == null) return;
+        _mutate(() => NgmySlidesTemplates.applyLayout(slide, NgmySlideLayout.title, _theme));
+        return;
+      case 'invoice':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'INVOICE #001\n\nBill To:\nItem\tQty\tPrice\nService A\t1\t\$100\nTOTAL\t\t\$100', y: 0.08, h: 0.84, fontSize: 16, color: 0xFF0F172A));
+        return;
+      case 'resume':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'YOUR NAME\nJob Title\n\nExperience\n• Role at Company\n\nEducation\n• Degree', y: 0.08, h: 0.84, fontSize: 17, color: 0xFF0F172A));
+        return;
+      case 'minutes':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'MEETING MINUTES\nDate: ${ngmySlidesTodayStamp()}\nAttendees:\n\nDiscussion:\n\nDecisions:\n\nAction items:', y: 0.06, h: 0.88, fontSize: 16));
+        return;
+      case 'lab_report':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'LAB REPORT\n\nHypothesis:\n\nProcedure:\n\nResults:\n\nConclusion:', y: 0.06, h: 0.88, fontSize: 17));
+        return;
+      case 'rubric':
+        _addPresetText(ngmySlidesMakeText(id: NgmySlidesTemplates.newId(), text: 'RUBRIC\nCriteria\tExcellent\tGood\tNeeds work\nContent\t4\t3\t2\nOrganization\t4\t3\t2', y: 0.1, h: 0.8, fontSize: 15));
+        return;
+    }
+  }
+
+  Widget _textTransitionPicker(bool isDark) {
+    final el = _selectedElement();
+    if (el == null || el.type != NgmySlideElementType.text) return const SizedBox.shrink();
+    return Row(
+      children: [
+        const SizedBox(width: 8),
+        Text('Text:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+        const SizedBox(width: 6),
+        ...NgmySlideTransition.values.map((tr) {
+          final selected = el.textTransition == tr;
+          return Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: GestureDetector(
+              onTap: () => showNgmyTextTransitionPreview(
+                context,
+                transition: tr,
+                onApply: () => _mutate(() => el.textTransition = tr),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFF059669).withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: selected ? const Color(0xFF059669) : Colors.white12),
+                ),
+                child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 16)),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   void _addSchoolSlide(NgmySlideLayout layout) {
     _mutate(() {
       final slide = NgmySlide(id: NgmySlidesTemplates.newId());
@@ -920,20 +1283,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       case 'Tools':
         return Row(
           children: [
-            _ribbonBtn(Icons.picture_as_pdf_rounded, 'Upload PDF', () => unawaited(_addPdf()), isDark),
-            _ribbonBtn(Icons.draw_rounded, 'Sign Paper', () => unawaited(_addSignature()), isDark),
-            _ribbonBtn(Icons.hd_rounded, 'HD Photo', () => unawaited(_addEnhancedPhoto()), isDark),
-            _ribbonBtn(Icons.auto_fix_high_rounded, 'Sharpen Image', () => unawaited(_enhanceSelectedImage()), isDark),
-            _ribbonBtn(Icons.print_rounded, 'Print', () {
-              final deck = _activeDeck;
-              if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
-            }, isDark),
-            _ribbonBtn(Icons.crop_rotate_rounded, 'Rotate', () {
-              final el = _selectedElement();
-              if (el != null) _mutate(() => el.rotation += 0.785398);
-            }, isDark),
-            _ribbonBtn(Icons.text_fields_rounded, 'Text Box', _addTextBox, isDark),
-            _ribbonBtn(Icons.image_rounded, 'Picture', () => unawaited(_addImage()), isDark),
+            for (final tool in ngmySlidesDocumentTools)
+              _ribbonBtn(tool.icon, tool.label, () => _applyDocTool(tool.id), isDark),
           ],
         );
       case 'Insert':
@@ -985,28 +1336,60 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           ],
         );
       case 'Transitions':
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: NgmySlideTransition.values.map((tr) {
-            final selected = _currentSlide?.transition == tr;
-            return GestureDetector(
-              onTap: () => showNgmyTransitionPreview(
-                context,
-                transition: tr,
-                onApply: () => _mutate(() => _currentSlide!.transition = tr),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: selected ? const Color(0xFF2563EB).withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.white12),
+        final textEl = _selectedElement();
+        final screenW = MediaQuery.sizeOf(context).width - 20;
+        Widget transitionRow(List<NgmySlideTransition> transitions, NgmySlideTransition? selected, void Function(NgmySlideTransition) onTap, Color accent) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: transitions.map((tr) {
+                final sel = selected == tr;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => onTap(tr),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? accent.withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: sel ? accent : Colors.white12),
+                      ),
+                      child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        }
+        return SizedBox(
+          width: screenW,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (textEl != null && textEl.type == NgmySlideElementType.text) ...[
+                Text('TEXT ANIMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+                const SizedBox(height: 4),
+                transitionRow(
+                  NgmySlideTransition.values,
+                  textEl.textTransition,
+                  (tr) => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => textEl.textTransition = tr)),
+                  const Color(0xFF059669),
                 ),
-                child: Text(ngmySlideTransitionEmoji(tr), style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 8),
+                Text('SLIDE TRANSITION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+                const SizedBox(height: 4),
+              ],
+              transitionRow(
+                NgmySlideTransition.values,
+                _currentSlide?.transition,
+                (tr) => showNgmyTransitionPreview(context, transition: tr, onApply: () => _mutate(() => _currentSlide!.transition = tr)),
+                const Color(0xFF2563EB),
               ),
-            );
-          }).toList(),
+            ],
+          ),
         );
       case 'View':
         return Row(
@@ -1045,6 +1428,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 _mutate(() => el.bulletList = !el.bulletList);
               }, isDark),
               _fontSizeStepper(el, isDark),
+              if (el.type == NgmySlideElementType.text) _textTransitionPicker(isDark),
               if (el.type != NgmySlideElementType.text) _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
             ],
           ],
@@ -1678,7 +2062,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   @override
   Widget build(BuildContext context) {
     final slide = widget.deck.slides[_index];
-    Widget body = _SlideRender(slide: slide);
+    Widget body = NgmySlideAnimatedRender(slide: slide, animate: true);
 
     switch (_lastTransition) {
       case NgmySlideTransition.fade:
@@ -1925,38 +2309,4 @@ class _SlideWipeClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
-}
-
-class _SlideRender extends StatelessWidget {
-  const _SlideRender({required this.slide});
-  final NgmySlide slide;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final h = c.maxHeight;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: slide.backgroundEnd != null
-                ? LinearGradient(colors: [Color(slide.background), Color(slide.backgroundEnd!)])
-                : null,
-            color: slide.backgroundEnd == null ? Color(slide.background) : null,
-          ),
-          child: Stack(
-            children: slide.elements.map((e) {
-              return Positioned(
-                left: e.x * w,
-                top: e.y * h,
-                width: e.w * w,
-                height: e.h * h,
-                child: NgmySlideElementView(element: e, scale: w / 960),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
 }
