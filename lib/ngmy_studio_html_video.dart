@@ -21,7 +21,9 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
   bool _playing = false;
   bool _ready = false;
   bool _muted = true;
+  bool _userPaused = false;
   String? _error;
+  Timer? _playWatchdog;
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
       _video!.onLoadedData.listen((_) async {
         if (!mounted) return;
         setState(() => _ready = true);
+        _startPlayWatchdog();
         try {
           await _video!.play();
           if (mounted) setState(() => _playing = true);
@@ -55,6 +58,8 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
           debugPrint('[studio html video] autoplay: $e');
         }
       });
+      _video!.onStalled.listen((_) => unawaited(_ensurePlaying()));
+      _video!.onWaiting.listen((_) => unawaited(_ensurePlaying()));
       _video!.onPlay.listen((_) {
         if (mounted) setState(() => _playing = true);
       });
@@ -69,6 +74,38 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
     });
   }
 
+  void _startPlayWatchdog() {
+    _playWatchdog?.cancel();
+    _playWatchdog = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      unawaited(_ensurePlaying());
+    });
+  }
+
+  Future<void> _ensurePlaying() async {
+    final v = _video;
+    if (v == null || !mounted || !_ready || _userPaused) return;
+    if (v.ended) {
+      try {
+        v.currentTime = 0;
+        await v.play();
+        if (mounted) setState(() => _playing = true);
+      } catch (_) {}
+      return;
+    }
+    if (v.paused) {
+      try {
+        await v.play();
+        if (mounted) setState(() => _playing = true);
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _playWatchdog?.cancel();
+    super.dispose();
+  }
+
   Future<void> _togglePlay() async {
     final v = _video;
     if (v == null) return;
@@ -76,9 +113,11 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
       if (v.paused) {
         await v.play();
         if (mounted) setState(() => _playing = true);
+        _userPaused = false;
       } else {
         v.pause();
         if (mounted) setState(() => _playing = false);
+        _userPaused = true;
       }
     } catch (e) {
       debugPrint('[studio html video] play: $e');
@@ -92,7 +131,10 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
     try {
       v.currentTime = 0;
       await v.play();
-      if (mounted) setState(() => _playing = true);
+      if (mounted) {
+        setState(() => _playing = true);
+        _userPaused = false;
+      }
     } catch (e) {
       debugPrint('[studio html video] replay: $e');
     }
