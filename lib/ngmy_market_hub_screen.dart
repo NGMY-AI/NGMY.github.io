@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_business_essentials.dart';
 import 'ngmy_business_card_studio.dart';
-import 'ngmy_business_contacts.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_item_reminder_storage.dart';
-import 'ngmy_quick_support.dart';
-import 'ngmy_saved_locations.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -30,9 +28,7 @@ class NgmyMarketHubScreen extends StatefulWidget {
 
 class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   int _dueReminders = 0;
-  int _contactCount = 0;
-  int _locationCount = 0;
-  int _supportCount = 0;
+  int _essentialsCount = 0;
 
   @override
   void initState() {
@@ -49,16 +45,12 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   Future<void> _refreshBadges() async {
     final results = await Future.wait([
       ngmyItemReminderDueCount(userEmail: widget.userEmail),
-      ngmyBusinessContactCount(userEmail: widget.userEmail),
-      ngmySavedLocationCount(userEmail: widget.userEmail),
-      ngmyQuickSupportCount(userEmail: widget.userEmail),
+      ngmyBusinessEssentialsTotalCount(userEmail: widget.userEmail),
     ]);
     if (mounted) {
       setState(() {
         _dueReminders = results[0];
-        _contactCount = results[1];
-        _locationCount = results[2];
-        _supportCount = results[3];
+        _essentialsCount = results[1];
       });
     }
   }
@@ -102,43 +94,15 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
-              title: 'Business Contacts',
-              subtitle: 'Rolodex — save clients & vendors, star favorites, tap to call',
+              title: 'Business Essentials',
+              subtitle: 'Contacts · locations · support — pick a category inside',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF0C1929), Color(0xFF1E3A5F), Color(0xFF0E4D6E)],
+              gradient: const [Color(0xFF0F172A), Color(0xFF1E3A8A), Color(0xFF0E7490)],
               accent: const Color(0xFF38BDF8),
-              badge: _contactCount > 0 ? '$_contactCount saved' : null,
-              preview: _DailyThumbPreview(icon: Icons.contacts_rounded, accent: Color(0xFF38BDF8), label: 'CONTACTS'),
+              badge: _essentialsCount > 0 ? '$_essentialsCount saved' : null,
+              preview: const _EssentialsThumbPreview(),
               onTap: () async {
-                await showNgmyBusinessContactsDialog(context, userEmail: widget.userEmail);
-                await _refreshBadges();
-              },
-            ),
-            const SizedBox(height: 18),
-            _youtubeFrame(
-              title: 'Saved Locations',
-              subtitle: 'Site map — pin offices & delivery drops, navigate in one tap',
-              thumbHeight: thumbH,
-              gradient: const [Color(0xFF022C22), Color(0xFF064E3B), Color(0xFF14532D)],
-              accent: const Color(0xFF34D399),
-              badge: _locationCount > 0 ? '$_locationCount pinned' : null,
-              preview: _DailyThumbPreview(icon: Icons.place_rounded, accent: Color(0xFF34D399), label: 'LOCATIONS'),
-              onTap: () async {
-                await showNgmySavedLocationsDialog(context, userEmail: widget.userEmail);
-                await _refreshBadges();
-              },
-            ),
-            const SizedBox(height: 18),
-            _youtubeFrame(
-              title: 'Quick Support',
-              subtitle: 'Help desk — insurance, IT, bank & emergency hotlines',
-              thumbHeight: thumbH,
-              gradient: const [Color(0xFF1C1400), Color(0xFF713F12), Color(0xFF422006)],
-              accent: const Color(0xFFFBBF24),
-              badge: _supportCount > 0 ? '$_supportCount lines' : null,
-              preview: _DailyThumbPreview(icon: Icons.support_agent_rounded, accent: Color(0xFFFBBF24), label: 'SUPPORT'),
-              onTap: () async {
-                await showNgmyQuickSupportDialog(context, userEmail: widget.userEmail);
+                await showNgmyBusinessEssentialsHub(context, userEmail: widget.userEmail);
                 await _refreshBadges();
               },
             ),
@@ -310,30 +274,42 @@ class _ReminderThumbPreview extends StatelessWidget {
   }
 }
 
-class _DailyThumbPreview extends StatelessWidget {
-  const _DailyThumbPreview({required this.icon, required this.accent, required this.label});
-
-  final IconData icon;
-  final Color accent;
-  final String label;
+class _EssentialsThumbPreview extends StatelessWidget {
+  const _EssentialsThumbPreview();
 
   @override
   Widget build(BuildContext context) {
     return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8), 'Contacts'),
+            const SizedBox(width: 10),
+            _miniTile(Icons.place_rounded, const Color(0xFF34D399), 'Places'),
+            const SizedBox(width: 10),
+            _miniTile(Icons.support_agent_rounded, const Color(0xFFFBBF24), 'Support'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _miniTile(IconData icon, Color accent, String label) {
+    return Container(
+      width: 88,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.5)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: accent.withValues(alpha: 0.92), size: 52),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: accent.withValues(alpha: 0.45)),
-            ),
-            child: Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
-          ),
+          Icon(icon, color: accent, size: 26),
+          const SizedBox(height: 6),
+          Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 0.5)),
         ],
       ),
     );

@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_hub_form_ui.dart';
+
 const _kStorageKey = 'ngmy_saved_locations_v2';
 
 String _locationsKey(String userEmail) {
@@ -238,12 +240,9 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
   }
 
   Future<void> _openEditor({NgmySavedLocation? existing}) async {
-    final saved = await showModalBottomSheet<NgmySavedLocation>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0C1220),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => _LocationEditorSheet(existing: existing),
+    final saved = await showNgmyModernEditorPage<NgmySavedLocation>(
+      context,
+      _LocationEditorPage(existing: existing),
     );
     if (saved == null) return;
     final list = List<NgmySavedLocation>.from(_locations);
@@ -297,22 +296,62 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
 
     return Material(
-      color: const Color(0xFF05070C),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
-                  const Expanded(
-                    child: Text('Saved Locations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                  ),
-                  IconButton(onPressed: () => _openEditor(), icon: const Icon(Icons.add_location_alt_rounded, color: Color(0xFF34D399))),
-                ],
+      color: const Color(0xFF030712),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 160,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF34D399).withValues(alpha: 0.2), const Color(0xFF030712)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Saved Locations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Site map', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _openEditor(),
+                        icon: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF059669)]),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.add_location_alt_rounded, color: Colors.black, size: 22),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Row(
@@ -408,8 +447,153 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                           },
                         ),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationEditorPage extends StatefulWidget {
+  const _LocationEditorPage({this.existing});
+
+  final NgmySavedLocation? existing;
+
+  @override
+  State<_LocationEditorPage> createState() => _LocationEditorPageState();
+}
+
+class _LocationEditorPageState extends State<_LocationEditorPage> {
+  static const _accent = Color(0xFF34D399);
+  late final TextEditingController _name;
+  late final TextEditingController _address;
+  late final TextEditingController _notes;
+  String _category = 'Client Site';
+  double? _lat;
+  double? _lng;
+  bool _locating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _name = TextEditingController(text: e?.name ?? '');
+    _address = TextEditingController(text: e?.address ?? '');
+    _notes = TextEditingController(text: e?.notes ?? '');
+    _category = e?.category ?? 'Client Site';
+    _lat = e?.lat;
+    _lng = e?.lng;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _address.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _captureGps() async {
+    setState(() => _locating = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Allow location to save GPS pin')));
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      setState(() {
+        _lat = pos.latitude;
+        _lng = pos.longitude;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('GPS failed: $e')));
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  void _save() {
+    if (_name.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a location name')));
+      return;
+    }
+    Navigator.pop(
+      context,
+      NgmySavedLocation(
+        id: widget.existing?.id,
+        name: _name.text.trim(),
+        address: _address.text.trim(),
+        category: _category,
+        lat: _lat,
+        lng: _lng,
+        notes: _notes.text.trim(),
+        visitCount: widget.existing?.visitCount ?? 0,
+        lastVisited: widget.existing?.lastVisited,
+        createdAt: widget.existing?.createdAt,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.existing == null;
+    return NgmyModernEditorPage(
+      title: isNew ? 'New Location' : 'Edit Location',
+      subtitle: isNew ? 'Pin a client site, office, or delivery drop.' : 'Update this saved place.',
+      accent: _accent,
+      icon: Icons.place_rounded,
+      onClose: () => Navigator.pop(context),
+      onSave: _save,
+      saveLabel: isNew ? 'Save Location' : 'Update Location',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NgmyModernField(controller: _name, label: 'Name', hint: 'Office, client site, warehouse…', icon: Icons.label_outline_rounded, accent: _accent),
+          NgmyModernField(controller: _address, label: 'Address', hint: 'Street, suite, landmark', icon: Icons.location_on_outlined, accent: _accent),
+          Text('TYPE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          const SizedBox(height: 8),
+          NgmyModernChipRow(
+            options: const ['Client Site', 'Office', 'Warehouse', 'Delivery', 'Meeting', 'Other'],
+            selected: _category,
+            accent: _accent,
+            onSelected: (v) => setState(() => _category = v),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _locating ? null : _captureGps,
+              borderRadius: BorderRadius.circular(14),
+              child: Ink(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _accent.withValues(alpha: 0.45)),
+                  gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.15), _accent.withValues(alpha: 0.05)]),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(_locating ? Icons.hourglass_top_rounded : Icons.my_location_rounded, color: _accent),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _locating
+                            ? 'Getting GPS…'
+                            : (_lat != null ? 'GPS pinned: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}' : 'Tap to drop GPS pin here'),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          NgmyModernField(controller: _notes, label: 'Notes', hint: 'Gate code, contact on site…', icon: Icons.notes_rounded, accent: _accent, maxLines: 2),
+        ],
       ),
     );
   }
@@ -526,160 +710,6 @@ class _LocAction extends StatelessWidget {
             const SizedBox(width: 4),
             Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationEditorSheet extends StatefulWidget {
-  const _LocationEditorSheet({this.existing});
-
-  final NgmySavedLocation? existing;
-
-  @override
-  State<_LocationEditorSheet> createState() => _LocationEditorSheetState();
-}
-
-class _LocationEditorSheetState extends State<_LocationEditorSheet> {
-  late final TextEditingController _name;
-  late final TextEditingController _address;
-  late final TextEditingController _notes;
-  String _category = 'Client Site';
-  double? _lat;
-  double? _lng;
-  bool _locating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    _name = TextEditingController(text: e?.name ?? '');
-    _address = TextEditingController(text: e?.address ?? '');
-    _notes = TextEditingController(text: e?.notes ?? '');
-    _category = e?.category ?? 'Client Site';
-    _lat = e?.lat;
-    _lng = e?.lng;
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _address.dispose();
-    _notes.dispose();
-    super.dispose();
-  }
-
-  Future<void> _captureGps() async {
-    setState(() => _locating = true);
-    try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Allow location to save GPS pin')));
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition();
-      setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-      });
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('GPS failed: $e')));
-    } finally {
-      if (mounted) setState(() => _locating = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 12),
-            Text(widget.existing == null ? 'New location' : 'Edit location', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-            const SizedBox(height: 12),
-            _field(_name, 'Location name'),
-            _field(_address, 'Address / suite / landmark'),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ['Client Site', 'Office', 'Warehouse', 'Delivery', 'Meeting', 'Other'].map((cat) {
-                final selected = _category == cat;
-                return ChoiceChip(
-                  label: Text(cat),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _category = cat),
-                  selectedColor: const Color(0xFF34D399).withValues(alpha: 0.25),
-                  labelStyle: TextStyle(color: selected ? const Color(0xFF34D399) : Colors.white70),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _locating ? null : _captureGps,
-              icon: _locating
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.my_location_rounded, size: 18),
-              label: Text(_locating ? 'Getting GPS…' : (_lat != null ? 'GPS: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}' : 'Drop GPS pin here')),
-              style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF34D399)),
-            ),
-            const SizedBox(height: 8),
-            _field(_notes, 'Notes (gate code, contact on site…)', maxLines: 2),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  if (_name.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a location name')));
-                    return;
-                  }
-                  Navigator.pop(
-                    context,
-                    NgmySavedLocation(
-                      id: widget.existing?.id,
-                      name: _name.text.trim(),
-                      address: _address.text.trim(),
-                      category: _category,
-                      lat: _lat,
-                      lng: _lng,
-                      notes: _notes.text.trim(),
-                      visitCount: widget.existing?.visitCount ?? 0,
-                      lastVisited: widget.existing?.lastVisited,
-                      createdAt: widget.existing?.createdAt,
-                    ),
-                  );
-                },
-                child: Text(widget.existing == null ? 'Save location' : 'Update location'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController c, String label, {int maxLines = 1}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextField(
-        controller: c,
-        maxLines: maxLines,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.06),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );

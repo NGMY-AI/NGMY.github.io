@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_hub_form_ui.dart';
+
 const _kStorageKey = 'ngmy_quick_support_v2';
 
 String _supportKey(String userEmail) {
@@ -205,12 +207,9 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
   }
 
   Future<void> _openEditor({NgmySupportLine? existing, _SupportTemplate? fromTemplate}) async {
-    final saved = await showModalBottomSheet<NgmySupportLine>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0C1220),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => _SupportEditorSheet(existing: existing, template: fromTemplate),
+    final saved = await showNgmyModernEditorPage<NgmySupportLine>(
+      context,
+      _SupportEditorPage(existing: existing, template: fromTemplate),
     );
     if (saved == null) return;
     final list = List<NgmySupportLine>.from(_lines);
@@ -256,22 +255,62 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
     final emergency = _lines.where((e) => e.emergency).toList();
 
     return Material(
-      color: const Color(0xFF05070C),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
-                  const Expanded(
-                    child: Text('Quick Support', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                  ),
-                  IconButton(onPressed: () => _openEditor(), icon: const Icon(Icons.add_ic_call_rounded, color: Color(0xFFFBBF24))),
-                ],
+      color: const Color(0xFF030712),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 160,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFFFBBF24).withValues(alpha: 0.18), const Color(0xFF030712)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Quick Support', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Help desk', style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w700, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _openEditor(),
+                        icon: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)]),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.add_ic_call_rounded, color: Colors.black, size: 22),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             if (emergency.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -428,8 +467,144 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                           },
                         ),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportEditorPage extends StatefulWidget {
+  const _SupportEditorPage({this.existing, this.template});
+
+  final NgmySupportLine? existing;
+  final _SupportTemplate? template;
+
+  @override
+  State<_SupportEditorPage> createState() => _SupportEditorPageState();
+}
+
+class _SupportEditorPageState extends State<_SupportEditorPage> {
+  static const _accent = Color(0xFFFBBF24);
+  static const _categoryOptions = ['Insurance', 'IT', 'Bank', 'Legal', 'HR', 'Utilities', 'Custom'];
+
+  late final TextEditingController _title;
+  late final TextEditingController _provider;
+  late final TextEditingController _phone;
+  late final TextEditingController _accountRef;
+  late final TextEditingController _extension;
+  late final TextEditingController _notes;
+  String _category = 'Custom';
+  bool _emergency = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    final t = widget.template;
+    _title = TextEditingController(text: e?.title ?? t?.title ?? '');
+    _provider = TextEditingController(text: e?.provider ?? t?.provider ?? '');
+    _phone = TextEditingController(text: e?.phone ?? '');
+    _accountRef = TextEditingController(text: e?.accountRef ?? '');
+    _extension = TextEditingController(text: e?.extension ?? '');
+    _notes = TextEditingController(text: e?.notes ?? '');
+    _category = e?.category ?? t?.category ?? 'Custom';
+    _emergency = e?.emergency ?? false;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _provider.dispose();
+    _phone.dispose();
+    _accountRef.dispose();
+    _extension.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_title.text.trim().isEmpty || _phone.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter title and phone')));
+      return;
+    }
+    Navigator.pop(
+      context,
+      NgmySupportLine(
+        id: widget.existing?.id,
+        title: _title.text.trim(),
+        provider: _provider.text.trim(),
+        phone: _phone.text.trim(),
+        category: _category,
+        accountRef: _accountRef.text.trim(),
+        extension: _extension.text.trim(),
+        notes: _notes.text.trim(),
+        emergency: _emergency,
+        createdAt: widget.existing?.createdAt,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.existing == null;
+    return NgmyModernEditorPage(
+      title: isNew ? 'New Support Line' : 'Edit Support Line',
+      subtitle: isNew ? 'Save a hotline — insurance, IT, bank fraud, legal, and more.' : 'Update this help-desk entry.',
+      accent: _accent,
+      icon: Icons.support_agent_rounded,
+      onClose: () => Navigator.pop(context),
+      onSave: _save,
+      saveLabel: isNew ? 'Save Line' : 'Update Line',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NgmyModernField(controller: _title, label: 'Title', hint: 'Business insurance, IT helpdesk…', icon: Icons.label_rounded, accent: _accent),
+          NgmyModernField(controller: _provider, label: 'Provider', hint: 'Company or department name', icon: Icons.business_rounded, accent: _accent),
+          NgmyModernField(controller: _phone, label: 'Phone', hint: '+1 (800) 000-0000', icon: Icons.phone_rounded, accent: _accent, keyboard: TextInputType.phone),
+          NgmyModernField(controller: _extension, label: 'Extension', hint: 'Optional extension', icon: Icons.dialpad_rounded, accent: _accent, keyboard: TextInputType.phone),
+          NgmyModernField(controller: _accountRef, label: 'Account / policy #', hint: 'Case, policy, or account reference', icon: Icons.tag_rounded, accent: _accent),
+          Text('CATEGORY', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          const SizedBox(height: 8),
+          NgmyModernChipRow(
+            options: _categoryOptions,
+            selected: _category,
+            accent: _accent,
+            onSelected: (v) => setState(() => _category = v),
+          ),
+          NgmyModernField(controller: _notes, label: 'Notes', hint: 'Hours, PIN, what to say when you call…', icon: Icons.notes_rounded, accent: _accent, maxLines: 3),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _emergency ? const Color(0xFF7F1D1D).withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _emergency ? const Color(0xFFEF4444).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.emergency_rounded, color: _emergency ? const Color(0xFFEF4444) : Colors.white38, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Emergency line', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                      Text('Pins to top with red quick-dial', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: _emergency,
+                  activeTrackColor: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                  activeThumbColor: const Color(0xFFEF4444),
+                  onChanged: (v) => setState(() => _emergency = v),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -549,134 +724,6 @@ class _SupportAction extends StatelessWidget {
             const SizedBox(width: 4),
             Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportEditorSheet extends StatefulWidget {
-  const _SupportEditorSheet({this.existing, this.template});
-
-  final NgmySupportLine? existing;
-  final _SupportTemplate? template;
-
-  @override
-  State<_SupportEditorSheet> createState() => _SupportEditorSheetState();
-}
-
-class _SupportEditorSheetState extends State<_SupportEditorSheet> {
-  late final TextEditingController _title;
-  late final TextEditingController _provider;
-  late final TextEditingController _phone;
-  late final TextEditingController _accountRef;
-  late final TextEditingController _extension;
-  late final TextEditingController _notes;
-  String _category = 'Custom';
-  bool _emergency = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    final t = widget.template;
-    _title = TextEditingController(text: e?.title ?? t?.title ?? '');
-    _provider = TextEditingController(text: e?.provider ?? t?.provider ?? '');
-    _phone = TextEditingController(text: e?.phone ?? '');
-    _accountRef = TextEditingController(text: e?.accountRef ?? '');
-    _extension = TextEditingController(text: e?.extension ?? '');
-    _notes = TextEditingController(text: e?.notes ?? '');
-    _category = e?.category ?? t?.category ?? 'Custom';
-    _emergency = e?.emergency ?? false;
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    _provider.dispose();
-    _phone.dispose();
-    _accountRef.dispose();
-    _extension.dispose();
-    _notes.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 12),
-            Text(widget.existing == null ? 'Add support line' : 'Edit support line', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-            const SizedBox(height: 12),
-            _field(_title, 'Title (e.g. Business insurance)'),
-            _field(_provider, 'Provider / company name'),
-            _field(_phone, 'Phone number', keyboard: TextInputType.phone),
-            _field(_extension, 'Extension (optional)'),
-            _field(_accountRef, 'Account / policy / case #'),
-            _field(_notes, 'Notes (hours, PIN, what to say…)', maxLines: 2),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Emergency line', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Pins to top with red quick-dial', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
-              value: _emergency,
-              activeThumbColor: const Color(0xFFEF4444),
-              onChanged: (v) => setState(() => _emergency = v),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  if (_title.text.trim().isEmpty || _phone.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter title and phone')));
-                    return;
-                  }
-                  Navigator.pop(
-                    context,
-                    NgmySupportLine(
-                      id: widget.existing?.id,
-                      title: _title.text.trim(),
-                      provider: _provider.text.trim(),
-                      phone: _phone.text.trim(),
-                      category: _category,
-                      accountRef: _accountRef.text.trim(),
-                      extension: _extension.text.trim(),
-                      notes: _notes.text.trim(),
-                      emergency: _emergency,
-                      createdAt: widget.existing?.createdAt,
-                    ),
-                  );
-                },
-                child: const Text('Save'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController c, String label, {TextInputType? keyboard, int maxLines = 1}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextField(
-        controller: c,
-        keyboardType: keyboard,
-        maxLines: maxLines,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.06),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );
