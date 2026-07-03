@@ -206,6 +206,125 @@ class NgmyNoteTextAnim {
   return (buf.toString(), anims);
 }
 
+/// How many words before an animated `(word)` the editor still shows parentheses.
+const _kAnimHideWordGap = 3;
+
+class _BodyViewMap {
+  const _BodyViewMap({required this.display, required this.d2c});
+  final String display;
+  final List<int> d2c;
+}
+
+int _countWords(String s) => RegExp(r'\S+').allMatches(s).length;
+
+bool _showAnimParensInEditor(int cursorCanon, int open, int closeParen, String text) {
+  if (cursorCanon >= open && cursorCanon <= closeParen) return true;
+  if (cursorCanon < open) return _countWords(text.substring(cursorCanon, open)) <= _kAnimHideWordGap;
+  return _countWords(text.substring(closeParen + 1, cursorCanon)) <= _kAnimHideWordGap;
+}
+
+_BodyViewMap _buildNoteBodyView(String canonical, List<NgmyNoteTextAnim> anims, int cursorCanon) {
+  final sorted = List<NgmyNoteTextAnim>.from(anims)..sort((a, b) => a.start.compareTo(b.start));
+  final buf = StringBuffer();
+  final d2c = <int>[];
+  var pos = 0;
+  for (final a in sorted) {
+    final open = a.start - 1;
+    final closeParen = a.end;
+    if (open < 0 || closeParen >= canonical.length || canonical[open] != '(' || canonical[closeParen] != ')') {
+      continue;
+    }
+    for (var i = pos; i < open; i++) {
+      buf.write(canonical[i]);
+      d2c.add(i);
+    }
+    if (_showAnimParensInEditor(cursorCanon, open, closeParen, canonical)) {
+      for (var i = open; i <= closeParen; i++) {
+        buf.write(canonical[i]);
+        d2c.add(i);
+      }
+    } else {
+      for (var i = open + 1; i < closeParen; i++) {
+        buf.write(canonical[i]);
+        d2c.add(i);
+      }
+    }
+    pos = closeParen + 1;
+  }
+  for (var i = pos; i < canonical.length; i++) {
+    buf.write(canonical[i]);
+    d2c.add(i);
+  }
+  return _BodyViewMap(display: buf.toString(), d2c: d2c);
+}
+
+int _canonicalFromDisplay(_BodyViewMap map, int displayOffset) {
+  if (map.d2c.isEmpty) return 0;
+  if (displayOffset <= 0) return map.d2c.first;
+  if (displayOffset >= map.d2c.length) return map.d2c.last + 1;
+  return map.d2c[displayOffset];
+}
+
+int _displayFromCanonical(_BodyViewMap map, int canonOffset) {
+  for (var i = 0; i < map.d2c.length; i++) {
+    if (map.d2c[i] >= canonOffset) return i;
+  }
+  return map.d2c.length;
+}
+
+String _mergeDisplayEdit(String canonical, _BodyViewMap oldMap, String oldDisplay, String newDisplay) {
+  var start = 0;
+  while (start < oldDisplay.length && start < newDisplay.length && oldDisplay[start] == newDisplay[start]) {
+    start++;
+  }
+  var oldTail = oldDisplay.length;
+  var newTail = newDisplay.length;
+  while (oldTail > start && newTail > start && oldDisplay[oldTail - 1] == newDisplay[newTail - 1]) {
+    oldTail--;
+    newTail--;
+  }
+  final cStart = start < oldMap.d2c.length ? oldMap.d2c[start] : canonical.length;
+  final cEnd = oldTail < oldMap.d2c.length ? oldMap.d2c[oldTail] : canonical.length;
+  return canonical.substring(0, cStart) + newDisplay.substring(start, newTail) + canonical.substring(cEnd);
+}
+
+void _ensureParenMarkersInBody(NgmyBusinessNote note) {
+  final sorted = List<NgmyNoteTextAnim>.from(note.textAnims)..sort((a, b) => b.start.compareTo(a.start));
+  var body = note.body;
+  for (final a in sorted) {
+    if (a.start < 0 || a.end > body.length || a.end < a.start) continue;
+    if (a.start > 0 && body[a.start - 1] != '(') {
+      body = '${body.substring(0, a.start)}(${body.substring(a.start)}';
+      a.start += 1;
+      a.end += 1;
+    }
+    if (a.end < body.length && body[a.end] != ')') {
+      body = '${body.substring(0, a.end)})${body.substring(a.end)}';
+      a.end += 1;
+    }
+  }
+  note.body = body;
+}
+
+void _ensureAnimsForParens(NgmyBusinessNote note) {
+  var i = 0;
+  while (i < note.body.length) {
+    if (note.body[i] == '(') {
+      final close = note.body.indexOf(')', i + 1);
+      if (close != -1) {
+        final innerStart = i + 1;
+        final hasAnim = note.textAnims.any((a) => a.start - 1 == i && a.end == close);
+        if (!hasAnim) {
+          note.textAnims.add(NgmyNoteTextAnim(start: innerStart, end: close, effect: 'bounce'));
+        }
+        i = close + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+}
+
 const _bgCategories = ['All', 'Personal', 'Work', 'Meeting', 'Ideas', 'Nature'];
 
 _NoteBackgroundDef _noteBackgroundById(String id) =>
@@ -1139,12 +1258,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   Timer? _autosave;
   bool _dirty = false;
   bool _previewMode = false;
-  String? _prevBody;
-  int? _growAnimIndex;
-  int? _cachedSelStart;
-  int? _cachedSelEnd;
-  int? _lastRangeSelStart;
-  int? _lastRangeSelEnd;
+  late String _storedBody;
+  late _BodyViewMap _lastBodyView;
+  bool _syncingBody = false;
 
   @override
   void initState() {
@@ -1155,69 +1271,98 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       _note.body = migrated.$1;
       _note.textAnims.addAll(migrated.$2);
     }
-    _initialBody = _note.body;
+    _ensureParenMarkersInBody(_note);
+    _ensureAnimsForParens(_note);
+    _storedBody = _note.body;
+    _initialBody = _storedBody;
     _title = TextEditingController(text: _note.title);
-    _body = TextEditingController(text: _note.body);
+    _body = TextEditingController();
+    _lastBodyView = _buildNoteBodyView(_storedBody, _note.textAnims, 0);
     _bodyFocus = FocusNode();
-    _prevBody = _body.text;
+    _bodyFocus.onKeyEvent = (_, event) {
+      if (event is KeyDownEvent) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _onBodySelectionChanged();
+        });
+      }
+      return KeyEventResult.ignored;
+    };
     _title.addListener(_markDirty);
     _body.addListener(_onBodyChanged);
+    _refreshBodyDisplay(putCursorCanonical: _storedBody.length);
     if (!widget.isNew && _note.openInPreview) {
       _previewMode = true;
     }
   }
 
-  void _captureBodySelection() {
-    final sel = _body.selection;
-    if (!sel.isValid) return;
-    final len = _body.text.length;
-    final s = sel.start.clamp(0, len);
-    final e = sel.end.clamp(0, len);
-    _cachedSelStart = s;
-    _cachedSelEnd = e;
-    if (s != e) {
-      _lastRangeSelStart = s;
-      _lastRangeSelEnd = e;
+  void _syncAnimRangesFromParens() {
+    for (final a in _note.textAnims) {
+      final open = a.start - 1;
+      if (open < 0 || open >= _storedBody.length || _storedBody[open] != '(') continue;
+      final closeIdx = _storedBody.indexOf(')', open + 1);
+      if (closeIdx == -1) continue;
+      a.start = open + 1;
+      a.end = closeIdx;
+    }
+    _note.textAnims.removeWhere((a) {
+      final open = a.start - 1;
+      if (open < 0 || open >= _storedBody.length || _storedBody[open] != '(') return true;
+      if (a.end >= _storedBody.length || _storedBody[a.end] != ')') return true;
+      return false;
+    });
+  }
+
+  void _shiftAnimsForInsert(int pos, int delta) {
+    for (final a in _note.textAnims) {
+      if (a.start >= pos) a.start += delta;
+      if (a.end >= pos) a.end += delta;
     }
   }
 
-  (int, int) _selectionForTextAnim() {
-    _captureBodySelection();
-    final len = _body.text.length;
-    var s = (_cachedSelStart ?? _body.selection.start).clamp(0, len);
-    var e = (_cachedSelEnd ?? _body.selection.extentOffset).clamp(0, len);
-    if (s == e && _lastRangeSelStart != null && _lastRangeSelEnd != null) {
-      final ls = _lastRangeSelStart!.clamp(0, len);
-      final le = _lastRangeSelEnd!.clamp(0, len);
-      if (ls < le) {
-        s = ls;
-        e = le;
-      }
-    }
-    return (s, e);
+  void _refreshBodyDisplay({int? putCursorCanonical}) {
+    final cursorCanon = putCursorCanonical ?? _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
+    final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
+    final displayCursor = _displayFromCanonical(view, cursorCanon).clamp(0, view.display.length);
+    _syncingBody = true;
+    _body.value = TextEditingValue(
+      text: view.display,
+      selection: TextSelection.collapsed(offset: displayCursor),
+    );
+    _syncingBody = false;
+    _lastBodyView = view;
+  }
+
+  void _onBodySelectionChanged() {
+    if (_syncingBody || _previewMode) return;
+    final cursorCanon = _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
+    final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
+    if (view.display == _lastBodyView.display) return;
+    final displayCursor = _displayFromCanonical(view, cursorCanon).clamp(0, view.display.length);
+    _syncingBody = true;
+    _body.value = TextEditingValue(
+      text: view.display,
+      selection: TextSelection.collapsed(offset: displayCursor),
+    );
+    _syncingBody = false;
+    _lastBodyView = view;
   }
 
   void _onBodyChanged() {
-    _captureBodySelection();
-    final newText = _body.text;
-    if (_growAnimIndex != null && _growAnimIndex! < _note.textAnims.length) {
-      final a = _note.textAnims[_growAnimIndex!];
-      final cursor = _body.selection.extentOffset.clamp(0, newText.length);
-      if (cursor > a.start) {
-        a.end = cursor;
-      }
+    if (_syncingBody) return;
+    final newDisplay = _body.text;
+    final oldDisplay = _lastBodyView.display;
+    final cursorBefore = _body.selection.baseOffset;
+    if (newDisplay != oldDisplay) {
+      final cursorCanon = _canonicalFromDisplay(_lastBodyView, cursorBefore);
+      final oldStored = _storedBody;
+      _storedBody = _mergeDisplayEdit(_storedBody, _lastBodyView, oldDisplay, newDisplay);
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
+      _note.body = _storedBody;
+      _refreshBodyDisplay(putCursorCanonical: cursorCanon);
+    } else {
+      _onBodySelectionChanged();
     }
-    if (_prevBody != null && _prevBody != newText) {
-      _reconcileTextAnims(_prevBody!, newText);
-    }
-    if (_growAnimIndex != null && _growAnimIndex! < _note.textAnims.length) {
-      final a = _note.textAnims[_growAnimIndex!];
-      if (a.end <= a.start) {
-        _note.textAnims.removeAt(_growAnimIndex!);
-        _growAnimIndex = null;
-      }
-    }
-    _prevBody = newText;
     _markDirty();
   }
 
@@ -1249,109 +1394,60 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         }
       }
     }
-    _note.textAnims.removeWhere((a) => a.end <= a.start);
-    if (_growAnimIndex != null && _growAnimIndex! >= _note.textAnims.length) {
-      _growAnimIndex = null;
-    }
+    _note.textAnims.removeWhere((a) => a.end <= a.start && !_isEmptyAnimParen(a));
+    _syncAnimRangesFromParens();
   }
 
-  void _applyTextEffect(String effect, {int? selStart, int? selEnd}) {
-    final t = _body.text;
-    var s = selStart ?? _body.selection.baseOffset;
-    var e = selEnd ?? _body.selection.extentOffset;
-    if (s < 0 || e < 0) {
-      final cursor = _body.selection.extentOffset.clamp(0, t.length);
-      s = cursor;
-      e = cursor;
+  bool _isEmptyAnimParen(NgmyNoteTextAnim a) {
+    final open = a.start - 1;
+    return open >= 0 &&
+        open < _storedBody.length &&
+        _storedBody[open] == '(' &&
+        a.start < _storedBody.length &&
+        _storedBody[a.start] == ')';
+  }
+
+  void _applyTextEffect(String effect) {
+    var cStart = _canonicalFromDisplay(_lastBodyView, _body.selection.start);
+    var cEnd = _canonicalFromDisplay(_lastBodyView, _body.selection.end);
+    if (cStart > cEnd) {
+      final t = cStart;
+      cStart = cEnd;
+      cEnd = t;
     }
-    s = s.clamp(0, t.length);
-    e = e.clamp(0, t.length);
-    if (s > e) {
-      final tmp = s;
-      s = e;
-      e = tmp;
-    }
-    if (s == e) {
-      final word = _wordRangeAt(t, s);
-      if (word != null) {
-        s = word.$1;
-        e = word.$2;
-      } else {
-        final line = _lineRangeAt(t, s);
-        if (line != null) {
-          s = line.$1;
-          e = line.$2;
-        }
-      }
-    }
-    _note.textAnims.removeWhere((a) => !(a.end <= s || a.start >= e));
-    final applied = s != e;
-    if (applied) {
-      _note.textAnims.add(NgmyNoteTextAnim(start: s, end: e, effect: effect));
-      _growAnimIndex = null;
+    final oldStored = _storedBody;
+    if (cStart != cEnd) {
+      final selected = _storedBody.substring(cStart, cEnd);
+      _storedBody = '${_storedBody.substring(0, cStart)}($selected)${_storedBody.substring(cEnd)}';
+      _shiftAnimsForInsert(cStart, 2);
+      _note.textAnims.removeWhere((a) => !(a.end <= cStart || a.start >= cEnd + 2));
+      _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1 + selected.length, effect: effect));
+      _refreshBodyDisplay(putCursorCanonical: cStart + 1 + selected.length);
     } else {
-      _note.textAnims.add(NgmyNoteTextAnim(start: s, end: s, effect: effect));
-      _growAnimIndex = _note.textAnims.length - 1;
+      _storedBody = '${_storedBody.substring(0, cStart)}()${_storedBody.substring(cStart)}';
+      _shiftAnimsForInsert(cStart, 2);
+      _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1, effect: effect));
+      _refreshBodyDisplay(putCursorCanonical: cStart + 1);
     }
-    setState(() {
-      if (applied) _previewMode = true;
-    });
-    if (applied) {
-      _bodyFocus.unfocus();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$effect applied — showing Preview'), duration: const Duration(seconds: 2)),
-        );
-      }
-    } else {
-      _bodyFocus.requestFocus();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Start typing — $effect will animate in Preview'), duration: const Duration(seconds: 2)),
-        );
-      }
-    }
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _bodyFocus.requestFocus();
     _markDirty();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Type between ( ) — $effect animates in Preview'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
-
-  (int, int)? _wordRangeAt(String text, int pos) {
-    if (text.isEmpty) return null;
-    pos = pos.clamp(0, text.length);
-    if (pos == text.length && pos > 0) pos--;
-    var start = pos;
-    while (start > 0 && !_isWordBreak(text[start - 1])) {
-      start--;
-    }
-    var end = pos;
-    while (end < text.length && !_isWordBreak(text[end])) {
-      end++;
-    }
-    return end > start ? (start, end) : null;
-  }
-
-  (int, int)? _lineRangeAt(String text, int pos) {
-    if (text.trim().isEmpty) return null;
-    pos = pos.clamp(0, text.length);
-    final lineStart = text.lastIndexOf('\n', pos == 0 ? 0 : pos - 1) + 1;
-    final nextBreak = text.indexOf('\n', pos);
-    final lineEnd = nextBreak == -1 ? text.length : nextBreak;
-    var s = lineStart;
-    var e = lineEnd;
-    while (s < e && _isWordBreak(text[s])) {
-      s++;
-    }
-    while (e > s && _isWordBreak(text[e - 1])) {
-      e--;
-    }
-    return e > s ? (s, e) : null;
-  }
-
-  bool _isWordBreak(String ch) => ch == ' ' || ch == '\n' || ch == '\t';
 
   bool _hasSaveableContent() {
     if (_title.text.trim().isNotEmpty) return true;
-    if (_body.text.trim().isEmpty) return false;
-    return _body.text.trim() != _initialBody.trim();
+    if (_storedBody.trim().isEmpty) return false;
+    return _storedBody.trim() != _initialBody.trim();
   }
 
   void _markDirty() {
@@ -1362,7 +1458,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 
   Future<void> _persist() async {
     _note.title = _title.text;
-    _note.body = _body.text;
+    _note.body = _storedBody;
     _note.updatedAt = DateTime.now();
     _dirty = false;
     if (mounted) setState(() {});
@@ -1452,9 +1548,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<void> _showTextAnimationPicker() async {
-    final saved = _selectionForTextAnim();
-    final savedBase = saved.$1;
-    final savedExtent = saved.$2;
     final effect = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
@@ -1470,7 +1563,11 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
               const SizedBox(height: 14),
               const Text('Text animation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 6),
-              const Text('Select text, pick an effect — only your words show while editing. Effects play in Preview.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const Text(
+                'Pick an effect — ( ) is inserted automatically. Type your word inside, like (mango). '
+                'Parentheses hide when you move 3+ words away; Preview always shows the animation.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 8,
@@ -1491,10 +1588,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (effect == null) return;
-    if (savedBase >= 0 && savedExtent >= 0) {
-      _body.selection = TextSelection(baseOffset: savedBase, extentOffset: savedExtent);
-    }
-    _applyTextEffect(effect, selStart: savedBase, selEnd: savedExtent);
+    _applyTextEffect(effect);
   }
 
   Future<void> _showEmojiPicker() async {
@@ -1816,7 +1910,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           fg: fg,
                           onTap: () => setState(() {
                             _previewMode = !_previewMode;
-                            if (!_previewMode) _note.openInPreview = false;
+                            if (!_previewMode) {
+                              _note.openInPreview = false;
+                              _refreshBodyDisplay();
+                            }
                           }),
                         ),
                         IconButton(
@@ -1837,9 +1934,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                       color: dark ? Colors.black.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Listener(
-                      onPointerDown: (_) => _captureBodySelection(),
-                      child: SingleChildScrollView(
+                    child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
@@ -1860,7 +1955,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           ],
                         ),
                       ),
-                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -1898,8 +1992,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             child: _previewMode
                                 ? SingleChildScrollView(
                                     child: _NoteMarkdownPreview(
-                                      key: ValueKey('pv_${_body.text.hashCode}_${_note.textAnims.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
-                                      text: _body.text,
+                                      key: ValueKey('pv_${_storedBody.hashCode}_${_note.textAnims.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
+                                      text: _storedBody,
                                       dark: dark,
                                       textAnims: List<NgmyNoteTextAnim>.from(_note.textAnims),
                                     ),
@@ -1907,6 +2001,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                 : TextField(
                                     controller: _body,
                                     focusNode: _bodyFocus,
+                                    onTap: _onBodySelectionChanged,
                                     style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
                                     decoration: InputDecoration(
                                       hintText: 'Start writing…',
