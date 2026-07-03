@@ -53,35 +53,41 @@ class NgmySlideElementView extends StatelessWidget {
 
   Widget _textView() {
     if (editing && selected && controller != null) {
-      return TextField(
-        key: ValueKey('slide_tf_${element.id}'),
-        controller: controller,
-        maxLines: null,
-        expands: true,
-        style: _textStyle(),
-        textAlign: element.align,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.all(4),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.08),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
+        child: TextField(
+          key: ValueKey('slide_tf_${element.id}'),
+          controller: controller,
+          maxLines: null,
+          minLines: 1,
+          style: _textStyle().copyWith(height: 1.35),
+          strutStyle: StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true),
+          textAlign: element.align,
+          textAlignVertical: TextAlignVertical.top,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.06),
+          ),
+          onChanged: onTextChanged,
+          onTap: onTap,
         ),
-        onChanged: onTextChanged,
-        onTap: onTap,
       );
     }
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
         child: Align(
           alignment: _alignToAlignment(element.align),
           child: Text(
             element.text,
             key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
-            style: _textStyle(),
+            style: _textStyle().copyWith(height: 1.35),
+            strutStyle: StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true),
             textAlign: element.align,
             softWrap: true,
             overflow: TextOverflow.visible,
@@ -106,8 +112,27 @@ class NgmySlideElementView extends StatelessWidget {
   Widget _imageView() {
     final ref = element.imageRef;
     if (ref == null || !ref.startsWith('data:image')) {
-      return const Center(child: Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 32));
+      return Center(child: Icon(element.type == NgmySlideElementType.signature ? Icons.draw_rounded : Icons.image_not_supported_outlined, color: Colors.white54, size: 32));
     }
+    final img = _buildImageMemory(ref);
+    if (element.type == NgmySlideElementType.signature) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))],
+        ),
+        padding: const EdgeInsets.all(6),
+        child: img,
+      );
+    }
+    return img;
+  }
+
+  Widget _buildImageMemory(String ref) {
     try {
       final bytes = base64Decode(ref.split(',').last);
       return Image.memory(
@@ -582,6 +607,7 @@ class NgmySlideAnimatedRender extends StatelessWidget {
             color: slide.backgroundEnd == null ? Color(slide.background) : null,
           ),
           child: Stack(
+            clipBehavior: Clip.none,
             children: slide.elements.map((e) {
               final stagger = e.textTransition != NgmySlideTransition.none ? animIndex++ : 0;
               return Positioned(

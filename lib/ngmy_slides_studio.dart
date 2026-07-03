@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'ngmy_slides_class_templates.dart';
+import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
@@ -243,7 +245,92 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   }
 
   void _createDeck({String? name, bool sample = false}) {
-    _openDraftEditor(name: name, sample: sample);
+    if (sample) {
+      unawaited(_pickClassTemplate());
+      return;
+    }
+    _openDraftEditor(name: name, sample: false);
+  }
+
+  Future<void> _pickClassTemplate() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B1220),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        minChildSize: 0.45,
+        maxChildSize: 0.95,
+        builder: (_, scrollCtrl) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Choose a class template', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                  const SizedBox(height: 6),
+                  Text('20 professional decks · 5 slides each · Normal to luxury', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: GridView.builder(
+                controller: scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.15),
+                itemCount: ngmyClassPresentationTemplates.length,
+                itemBuilder: (_, i) {
+                  final t = ngmyClassPresentationTemplates[i];
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, t.id),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(colors: [t.bg, t.bgEnd]),
+                          border: Border.all(color: t.accent.withValues(alpha: 0.45)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: t.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                              child: Text(t.category, style: TextStyle(color: t.accent, fontWeight: FontWeight.w800, fontSize: 9)),
+                            ),
+                            const Spacer(),
+                            Text(t.name, style: TextStyle(color: t.titleColor, fontWeight: FontWeight.w900, fontSize: 14)),
+                            Text('5 slides', style: TextStyle(color: t.bodyColor.withValues(alpha: 0.8), fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final deck = ngmyClassTemplateById(picked).build();
+    setState(() {
+      _activeDeck = deck.copy();
+      _slideIndex = 0;
+      _selectedElementId = null;
+      _isDraft = true;
+      _undo.clear();
+      _redo.clear();
+      _clearTextControllers();
+    });
   }
 
   void _pushUndoIfEditing() {
@@ -356,7 +443,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         x: 0.15,
         y: 0.2,
         w: 0.7,
-        h: 0.18,
+        h: 0.22,
         text: 'Click to edit text',
         fontSize: 24,
         color: _theme.bodyColor.value,
@@ -552,7 +639,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         x: 0.55,
         y: 0.62,
         w: 0.35,
-        h: 0.2,
+        h: 0.22,
         imageRef: imageRef,
         fileName: 'Signature',
       );
@@ -1278,6 +1365,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             for (final (label, layout) in ngmySlidesSchoolLayouts)
               _ribbonBtn(_schoolLayoutIcon(layout), label, () => _addSchoolSlide(layout), isDark),
             _ribbonBtn(Icons.notes_rounded, 'Notes Slide', () => _addSchoolSlide(NgmySlideLayout.titleContent), isDark),
+            _ribbonBtn(Icons.quiz_rounded, 'Quiz', () => _addSchoolSlide(NgmySlideLayout.quiz), isDark),
+            _ribbonBtn(Icons.assignment_rounded, 'Worksheet', () => _addSchoolSlide(NgmySlideLayout.worksheet), isDark),
+            _ribbonBtn(Icons.style_rounded, 'Flashcard', () => _addSchoolSlide(NgmySlideLayout.flashcard), isDark),
+            _ribbonBtn(Icons.science_rounded, 'Lab Report', () => _applyDocTool('lab_report'), isDark),
+            _ribbonBtn(Icons.fact_check_rounded, 'Rubric', () => _applyDocTool('rubric'), isDark),
+            _ribbonBtn(Icons.groups_rounded, 'Minutes', () => _applyDocTool('minutes'), isDark),
+            _ribbonBtn(Icons.menu_book_rounded, 'Syllabus', () => _applyDocTool('agenda'), isDark),
+            _ribbonBtn(Icons.timeline_rounded, 'Timeline', () => _applyDocTool('timeline'), isDark),
           ],
         );
       case 'Tools':
@@ -1292,6 +1387,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           children: [
             _ribbonBtn(Icons.title_rounded, 'Text Box', _addTextBox, isDark),
             _ribbonBtn(Icons.image_rounded, 'Picture', () => unawaited(_addImage()), isDark),
+            _ribbonBtn(Icons.table_chart_rounded, 'Table', () => _applyDocTool('table'), isDark),
+            _ribbonBtn(Icons.sticky_note_2_rounded, 'Sticky', () => _applyDocTool('sticky'), isDark),
+            _ribbonBtn(Icons.horizontal_rule_rounded, 'Divider', () => _applyDocTool('divider'), isDark),
+            _ribbonBtn(Icons.view_agenda_rounded, 'Header', () => _applyDocTool('header_bar'), isDark),
             _ribbonBtn(Icons.crop_square_rounded, 'Rectangle', () => _addShape(NgmySlideShapeKind.rectangle), isDark),
             _ribbonBtn(Icons.circle_outlined, 'Circle', () => _addShape(NgmySlideShapeKind.circle), isDark),
             _ribbonBtn(Icons.change_history_rounded, 'Triangle', () => _addShape(NgmySlideShapeKind.triangle), isDark),
@@ -1299,41 +1398,92 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             _ribbonBtn(Icons.horizontal_rule_rounded, 'Line', () => _addShape(NgmySlideShapeKind.line), isDark),
             _ribbonBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_addPdf()), isDark),
             _ribbonBtn(Icons.draw_outlined, 'Signature', () => unawaited(_addSignature()), isDark),
+            _ribbonBtn(Icons.format_quote_rounded, 'Quote', () => _applyDocTool('quote'), isDark),
             _ribbonBtn(Icons.add_box_outlined, 'New Slide', () => _addSlide(), isDark),
           ],
         );
       case 'Design':
-        return Row(
-          children: [
-            _aspectChip('Wide 16:9', NgmySlideAspectRatio.landscape169, isDark),
-            _aspectChip('Short 9:16', NgmySlideAspectRatio.portrait916, isDark),
-            const SizedBox(width: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: NgmySlidesTemplates.themes.map((t) {
-                final selected = _activeDeck?.themeId == t.id;
-                return GestureDetector(
-                  onTap: () => _applyTheme(t),
-                  child: Tooltip(
-                    message: t.label,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent]),
-                        border: Border.all(color: selected ? t.accent : Colors.white24, width: selected ? 2.5 : 1),
-                        boxShadow: selected ? [BoxShadow(color: t.accent.withValues(alpha: 0.5), blurRadius: 8)] : null,
+        final screenW = MediaQuery.sizeOf(context).width - 20;
+        return SizedBox(
+          width: screenW,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _aspectChip('Wide 16:9', NgmySlideAspectRatio.landscape169, isDark),
+                  _aspectChip('Short 9:16', NgmySlideAspectRatio.portrait916, isDark),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('COLORS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: NgmySlidesTemplates.themes.map((t) {
+                    final selected = _activeDeck?.themeId == t.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: GestureDetector(
+                        onTap: () => _applyTheme(t),
+                        child: Tooltip(
+                          message: t.label,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent]),
+                              border: Border.all(color: selected ? t.accent : Colors.white24, width: selected ? 2.5 : 1),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(width: 8),
-            _layoutMenu(isDark),
-          ],
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('SLIDE DESIGNS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ngmySlideDesignTemplates.map((d) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          final slide = _currentSlide;
+                          if (slide == null) return;
+                          _mutate(() => ngmyApplySlideDesignToCurrent(slide, d.id));
+                        },
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                gradient: LinearGradient(colors: d.previewColors),
+                                border: Border.all(color: Colors.white24),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(d.label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 6),
+              _layoutMenu(isDark),
+            ],
+          ),
         );
       case 'Transitions':
         final textEl = _selectedElement();
@@ -1413,6 +1563,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             _ribbonBtn(Icons.add_box_outlined, 'New Slide', () => _addSlide(), isDark),
             _ribbonBtn(Icons.content_copy_rounded, 'Duplicate', _duplicateSlide, isDark),
             _ribbonBtn(Icons.delete_outline_rounded, 'Delete Slide', _deleteSlide, isDark),
+            _ribbonBtn(Icons.slideshow_rounded, 'Present', _startSlideshow, isDark),
+            _ribbonBtn(Icons.text_fields_rounded, 'Text Box', _addTextBox, isDark),
+            _ribbonBtn(Icons.open_in_full_rounded, 'Fit Text', () {
+              final el = _selectedElement();
+              if (el != null && el.type == NgmySlideElementType.text) {
+                _mutate(() {
+                  el.h = (el.h * 1.25).clamp(0.08, 1.8);
+                  el.w = (el.w * 1.1).clamp(0.08, 1.8);
+                });
+              }
+            }, isDark),
             if (el != null) ...[
               const SizedBox(width: 8),
               _ribbonBtn(Icons.format_bold, 'Bold', () {
@@ -1429,7 +1590,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               }, isDark),
               _fontSizeStepper(el, isDark),
               if (el.type == NgmySlideElementType.text) _textTransitionPicker(isDark),
-              if (el.type != NgmySlideElementType.text) _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
+              _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
             ],
           ],
         );
@@ -1675,20 +1836,34 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                         : null,
                     color: slide.backgroundEnd == null ? Color(slide.background) : null,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Stack(
-                      children: [
-                        ...slide.elements.map((e) => _canvasElement(e, w, h, isDark)),
-                        if (slide.elements.isEmpty)
-                          Center(
-                            child: Text(
-                              'Use Insert → Text Box, Picture, or Shapes',
-                              style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF94A3B8), fontWeight: FontWeight.w600),
-                            ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: slide.backgroundEnd != null
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [Color(slide.background), Color(slide.backgroundEnd!)],
+                                  )
+                                : null,
+                            color: slide.backgroundEnd == null ? Color(slide.background) : null,
                           ),
-                      ],
-                    ),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                      ...slide.elements.map((e) => _canvasElement(e, w, h, isDark)),
+                      if (slide.elements.isEmpty)
+                        Center(
+                          child: Text(
+                            'Use Insert → Text Box, Picture, or Shapes',
+                            style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },
@@ -1712,8 +1887,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         onTap: () => _selectElement(e.id),
         onPanUpdate: (d) {
           setState(() {
-            e.x = (e.x + d.delta.dx / cw).clamp(0.0, 1.0 - e.w);
-            e.y = (e.y + d.delta.dy / ch).clamp(0.0, 1.0 - e.h);
+            e.x = (e.x + d.delta.dx / cw).clamp(-0.3, 1.2);
+            e.y = (e.y + d.delta.dy / ch).clamp(-0.3, 1.2);
           });
           _commitDraftIfNeeded();
           _syncDeckIntoList();
@@ -1746,8 +1921,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                   child: GestureDetector(
                     onPanUpdate: (d) {
                       setState(() {
-                        e.w = (e.w + d.delta.dx / cw).clamp(0.05, 1.0 - e.x);
-                        e.h = (e.h + d.delta.dy / ch).clamp(0.05, 1.0 - e.y);
+                        e.w = (e.w + d.delta.dx / cw).clamp(0.04, 1.8);
+                        e.h = (e.h + d.delta.dy / ch).clamp(0.04, 1.8);
+                      });
+                      _commitDraftIfNeeded();
+                      _syncDeckIntoList();
+                      _scheduleAutosave();
+                    },
+                    onScaleUpdate: (d) {
+                      setState(() {
+                        e.w = (e.w * d.scale).clamp(0.04, 1.8);
+                        e.h = (e.h * d.scale).clamp(0.04, 1.8);
+                        if (e.type == NgmySlideElementType.text) {
+                          e.fontSize = (e.fontSize * d.scale).clamp(10, 120);
+                        }
                       });
                       _commitDraftIfNeeded();
                       _syncDeckIntoList();
@@ -1946,11 +2133,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 6))],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(height: 12),
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+            Icon(icon, color: Colors.white, size: 32),
+            const SizedBox(height: 10),
+            Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
           ],
         ),
       ),

@@ -83,6 +83,7 @@ Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize
     final h = (canvasSize.height * scale).round().clamp(120, 400);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    canvas.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()), Paint()..color = const Color(0xFFFFFFFF));
     final stroke = Paint()
       ..color = const Color(0xFF111827)
       ..strokeWidth = 3.5 * scale
