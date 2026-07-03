@@ -85,11 +85,12 @@ Future<void> ngmyImportBusinessTasks({required String userEmail, required List<N
 }
 
 Future<void> showNgmyBusinessTasksDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Tasks',
-    barrierColor: Colors.black.withValues(alpha: 0.92),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (_, __, ___) => _BusinessTasksScreen(userEmail: userEmail),
     transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -167,9 +168,10 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final visible = _visible;
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: SafeArea(
         child: Column(
           children: [
@@ -181,11 +183,11 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                      decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                     ),
                   ),
-                  const Expanded(child: Text('Quick Tasks', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20))),
+                  Expanded(child: Text('Quick Tasks', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20))),
                   IconButton(
                     onPressed: _addTask,
                     icon: Container(
@@ -209,10 +211,11 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: FilterChip(
-                      label: Text(f, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                      label: Text(f, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: sel ? _accent : t.chipOffLabel)),
                       selected: sel,
                       onSelected: (_) => setState(() => _filter = f),
-                      selectedColor: _accent.withValues(alpha: 0.3),
+                      selectedColor: _accent.withValues(alpha: t.isDark ? 0.3 : 0.18),
+                      backgroundColor: t.chipOffBg,
                       showCheckmark: false,
                     ),
                   );
@@ -221,52 +224,52 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: _accent))
+                  ? Center(child: CircularProgressIndicator(color: _accent))
                   : visible.isEmpty
-                      ? Center(child: Text('No tasks', style: TextStyle(color: Colors.white.withValues(alpha: 0.45))))
+                      ? Center(child: Text('No tasks', style: TextStyle(color: t.subtitle)))
                       : ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           itemCount: visible.length,
                           itemBuilder: (_, i) {
-                            final t = visible[i];
-                            final priColor = t.priority == 'High'
+                            final task = visible[i];
+                            final priColor = task.priority == 'High'
                                 ? const Color(0xFFEF4444)
-                                : t.priority == 'Low'
+                                : task.priority == 'Low'
                                     ? const Color(0xFF94A3B8)
                                     : _accent;
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
+                                color: t.listItemBg,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: priColor.withValues(alpha: 0.25)),
                               ),
                               child: ListTile(
                                 leading: Checkbox(
-                                  value: t.done,
+                                  value: task.done,
                                   activeColor: _accent,
                                   onChanged: (v) async {
-                                    t.done = v ?? false;
+                                    task.done = v ?? false;
                                     final items = await _loadTasks(widget.userEmail);
-                                    final j = items.indexWhere((e) => e.id == t.id);
-                                    if (j >= 0) items[j] = t;
+                                    final j = items.indexWhere((e) => e.id == task.id);
+                                    if (j >= 0) items[j] = task;
                                     await _save(items);
                                   },
                                 ),
                                 title: Text(
-                                  t.title,
+                                  task.title,
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: t.title,
                                     fontWeight: FontWeight.w700,
-                                    decoration: t.done ? TextDecoration.lineThrough : null,
+                                    decoration: task.done ? TextDecoration.lineThrough : null,
                                   ),
                                 ),
-                                subtitle: Text('${t.category} · ${t.priority}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
+                                subtitle: Text('${task.category} · ${task.priority}', style: TextStyle(color: t.subtitle, fontSize: 11)),
                                 trailing: IconButton(
-                                  icon: Icon(Icons.edit_outlined, color: Colors.white.withValues(alpha: 0.45), size: 18),
-                                  onPressed: () => _editTask(t),
+                                  icon: Icon(Icons.edit_outlined, color: t.muted, size: 18),
+                                  onPressed: () => _editTask(task),
                                 ),
-                                onTap: () => _editTask(t),
+                                onTap: () => _editTask(task),
                               ),
                             );
                           },
@@ -343,7 +346,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
           const SizedBox(height: 12),
           NgmyModernField(controller: _notes, label: 'Notes', hint: 'Optional details', icon: Icons.notes_rounded, accent: _accent, maxLines: 3),
           const SizedBox(height: 12),
-          Text('CATEGORY', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          Text('CATEGORY', style: NgmyHubTheme.of(context).sectionLabel),
           const SizedBox(height: 6),
           NgmyModernChipRow(
             options: const ['Work', 'Personal', 'Urgent', 'Follow-up'],
@@ -351,7 +354,7 @@ class _TaskEditorPageState extends State<_TaskEditorPage> {
             accent: _accent,
             onSelected: (v) => setState(() => _category = v),
           ),
-          Text('PRIORITY', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          Text('PRIORITY', style: NgmyHubTheme.of(context).sectionLabel),
           const SizedBox(height: 6),
           NgmyModernChipRow(
             options: const ['High', 'Normal', 'Low'],

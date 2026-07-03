@@ -159,11 +159,12 @@ Future<void> ngmyImportBusinessContacts({required String userEmail, required Lis
 }
 
 Future<void> showNgmyBusinessContactsDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Business Contacts',
-    barrierColor: Colors.black.withValues(alpha: 0.88),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (ctx, a1, a2) => _BusinessContactsScreen(userEmail: userEmail),
     transitionBuilder: (ctx, anim, _, child) {
@@ -255,15 +256,18 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
   Future<void> _delete(NgmyBusinessContact c) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0C1220),
-        title: const Text('Delete contact?', style: TextStyle(color: Colors.white)),
-        content: Text('Remove ${c.name.isEmpty ? c.company : c.name}?', style: const TextStyle(color: Colors.white70)),
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return AlertDialog(
+          backgroundColor: t.dialogBg,
+          title: Text('Delete contact?', style: TextStyle(color: t.title)),
+          content: Text('Remove ${c.name.isEmpty ? c.company : c.name}?', style: TextStyle(color: t.subtitle)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
         ],
-      ),
+        );
+      },
     );
     if (ok != true) return;
     await _persist(_contacts.where((e) => e.id != c.id).toList());
@@ -283,11 +287,13 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final visible = _visible;
+    const accent = Color(0xFF38BDF8);
 
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: Stack(
         children: [
           Positioned(
@@ -298,7 +304,7 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFF38BDF8).withValues(alpha: 0.22), const Color(0xFF030712)],
+                  colors: [accent.withValues(alpha: t.isDark ? 0.22 : 0.12), t.heroGradientEnd],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -316,16 +322,16 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                         onPressed: () => Navigator.pop(context),
                         icon: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Business Contacts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Rolodex', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Business Contacts', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Rolodex', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -334,9 +340,9 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                         icon: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [const Color(0xFF38BDF8), const Color(0xFF2563EB)]),
+                            gradient: LinearGradient(colors: [accent, const Color(0xFF2563EB)]),
                             borderRadius: BorderRadius.circular(14),
-                            boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.35), blurRadius: 12)],
+                            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 12)],
                           ),
                           child: const Icon(Icons.add_rounded, color: Colors.black, size: 22),
                         ),
@@ -348,14 +354,15 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: TextField(
                 onChanged: (v) => setState(() => _query = v),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: t.title),
                 decoration: InputDecoration(
                   hintText: 'Search name, company, phone…',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.5)),
+                  hintStyle: TextStyle(color: t.muted),
+                  prefixIcon: Icon(Icons.search_rounded, color: t.muted),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.06),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  fillColor: t.inputFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
                 ),
               ),
             ),
@@ -373,16 +380,17 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                     label: Text(cat),
                     selected: selected,
                     onSelected: (_) => setState(() => _filter = cat),
-                    selectedColor: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                    checkmarkColor: const Color(0xFF38BDF8),
-                    labelStyle: TextStyle(color: selected ? const Color(0xFF38BDF8) : Colors.white70, fontWeight: FontWeight.w600),
+                    selectedColor: accent.withValues(alpha: t.isDark ? 0.25 : 0.18),
+                    backgroundColor: t.chipOffBg,
+                    checkmarkColor: accent,
+                    labelStyle: TextStyle(color: selected ? accent : t.chipOffLabel, fontWeight: FontWeight.w600),
                   );
                 },
               ),
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
+                  ? Center(child: CircularProgressIndicator(color: accent))
                   : visible.isEmpty
                       ? Center(
                           child: Padding(
@@ -390,23 +398,23 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.contacts_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
+                                Icon(Icons.contacts_rounded, size: 56, color: t.muted.withValues(alpha: 0.5)),
                                 const SizedBox(height: 12),
                                 Text(
                                   _contacts.isEmpty ? 'Build your business rolodex' : 'No matches',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                                  style: TextStyle(color: t.title, fontWeight: FontWeight.w700, fontSize: 16),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Save clients, vendors, and partners — star favorites and tap to call instantly.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                                  style: TextStyle(color: t.subtitle, fontSize: 13),
                                 ),
                                 const SizedBox(height: 16),
                                 FilledButton.icon(
                                   onPressed: () => _openEditor(),
                                   style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF38BDF8),
+                                    backgroundColor: accent,
                                     foregroundColor: Colors.black,
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -531,7 +539,7 @@ class _ContactEditorPageState extends State<_ContactEditorPage> {
           NgmyModernField(controller: _company, label: 'Company', hint: 'Business or organization', icon: Icons.business_rounded, accent: _accent),
           NgmyModernField(controller: _phone, label: 'Phone', hint: '+1 (555) 000-0000', icon: Icons.phone_rounded, accent: _accent, keyboard: TextInputType.phone),
           NgmyModernField(controller: _email, label: 'Email', hint: 'name@company.com', icon: Icons.mail_outline_rounded, accent: _accent, keyboard: TextInputType.emailAddress),
-          Text('CATEGORY', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          Text('CATEGORY', style: NgmyHubTheme.of(context).sectionLabel),
           const SizedBox(height: 8),
           NgmyModernChipRow(
             options: const ['Client', 'Vendor', 'Partner', 'Employee', 'Other'],
@@ -570,13 +578,14 @@ class _ContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final title = contact.name.isNotEmpty ? contact.name : contact.company;
     final subtitle = contact.company.isNotEmpty && contact.name.isNotEmpty ? contact.company : contact.category;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: t.listItemBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accent.withValues(alpha: 0.25)),
       ),
@@ -591,17 +600,17 @@ class _ContactCard extends StatelessWidget {
             ),
             title: Row(
               children: [
-                Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                Expanded(child: Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w700))),
                 if (contact.favorite)
                   const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 18),
               ],
             ),
-            subtitle: Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+            subtitle: Text(subtitle, style: TextStyle(color: t.subtitle, fontSize: 12)),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(tooltip: contact.favorite ? 'Unstar' : 'Star', onPressed: onFavorite, icon: Icon(contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, color: const Color(0xFFFBBF24), size: 20)),
-                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: t.muted, size: 20)),
                 IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
@@ -615,7 +624,7 @@ class _ContactCard extends StatelessWidget {
                 children: [
                   if (contact.phone.isNotEmpty) ...[
                     _ActionChip(icon: Icons.call_rounded, label: 'Call', color: accent, onTap: onCall),
-                    _ActionChip(icon: Icons.copy_rounded, label: 'Copy #', color: Colors.white54, onTap: onCopy),
+                    _ActionChip(icon: Icons.copy_rounded, label: 'Copy #', color: t.muted, onTap: onCopy),
                   ],
                   if (contact.email.isNotEmpty)
                     _ActionChip(icon: Icons.email_outlined, label: 'Email', color: const Color(0xFF34D399), onTap: onEmail),
@@ -625,7 +634,7 @@ class _ContactCard extends StatelessWidget {
           if (contact.notes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-              child: Text(contact.notes, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
+              child: Text(contact.notes, style: TextStyle(color: t.muted, fontSize: 11)),
             ),
         ],
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_business_essentials.dart';
 import 'ngmy_business_card_studio.dart';
+import 'ngmy_hub_form_ui.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_item_reminder_storage.dart';
@@ -56,35 +57,40 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final bottomPad = ngmyMarketHubBottomPadding(context);
     final width = MediaQuery.sizeOf(context).width - 32;
     final thumbH = width * 9 / 16;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF05070C),
+      backgroundColor: t.scaffold,
       body: SafeArea(
         bottom: false,
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
           children: [
             _youtubeFrame(
+              t: t,
               title: 'Business Card Creator',
               subtitle: '37 luxurious templates · drag · save PNG',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
+              darkGradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
+              lightGradient: const [Color(0xFFE2E8F0), Color(0xFFD1FAE5), Color(0xFFECFDF5)],
               accent: const Color(0xFF22C55E),
-              preview: _BusinessCardThumbPreview(accent: const Color(0xFF22C55E)),
+              preview: _BusinessCardThumbPreview(accent: const Color(0xFF22C55E), isDark: t.isDark),
               onTap: () => showNgmyBusinessCardStudioDialog(context, userEmail: widget.userEmail),
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
+              t: t,
               title: 'Where I Put It',
               subtitle: 'Keys · wallet · kids bag — schedule reminders',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF0B1020), Color(0xFF3B0764), Color(0xFF1E1B4B)],
+              darkGradient: const [Color(0xFF0B1020), Color(0xFF3B0764), Color(0xFF1E1B4B)],
+              lightGradient: const [Color(0xFFE2E8F0), Color(0xFFEDE9FE), Color(0xFFF5F3FF)],
               accent: const Color(0xFFA78BFA),
               badge: _dueReminders > 0 ? '$_dueReminders due' : null,
-              preview: _ReminderThumbPreview(accent: const Color(0xFFA78BFA)),
+              preview: _ReminderThumbPreview(accent: const Color(0xFFA78BFA), isDark: t.isDark),
               onTap: () async {
                 await showNgmyItemReminderDialog(context, userEmail: widget.userEmail);
                 await _refreshBadges();
@@ -93,13 +99,15 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
+              t: t,
               title: 'Business Essentials',
               subtitle: 'Contacts · site map · hotlines — pick inside',
               thumbHeight: thumbH,
-              gradient: const [Color(0xFF0F172A), Color(0xFF1E3A8A), Color(0xFF0E7490)],
+              darkGradient: const [Color(0xFF0F172A), Color(0xFF1E3A8A), Color(0xFF0E7490)],
+              lightGradient: const [Color(0xFFE0F2FE), Color(0xFFDBEAFE), Color(0xFFE0F7FA)],
               accent: const Color(0xFF38BDF8),
               badge: _essentialsCount > 0 ? '$_essentialsCount saved' : null,
-              preview: const _EssentialsThumbPreview(),
+              preview: _EssentialsThumbPreview(isDark: t.isDark),
               onTap: () async {
                 await showNgmyBusinessEssentialsHub(context, userEmail: widget.userEmail);
                 await _refreshBadges();
@@ -112,15 +120,18 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   }
 
   Widget _youtubeFrame({
+    required NgmyHubTheme t,
     required String title,
     required String subtitle,
     required double thumbHeight,
-    required List<Color> gradient,
+    required List<Color> darkGradient,
+    required List<Color> lightGradient,
     required Color accent,
     required Widget preview,
     required VoidCallback onTap,
     String? badge,
   }) {
+    final gradient = t.frameGradient(darkGradient, lightGradient);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -153,7 +164,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.82)],
+                            colors: [Colors.transparent, t.overlayDark],
                           ),
                         ),
                       ),
@@ -165,7 +176,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
+                          color: t.isDark ? Colors.black.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.85),
                           shape: BoxShape.circle,
                           border: Border.all(color: accent.withValues(alpha: 0.7), width: 2),
                         ),
@@ -191,9 +202,9 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16, height: 1.2)),
+            Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16, height: 1.2)),
             const SizedBox(height: 3),
-            Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.48), fontSize: 12, height: 1.25)),
+            Text(subtitle, style: TextStyle(color: t.muted, fontSize: 12, height: 1.25)),
           ],
         ),
       ),
@@ -202,9 +213,10 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
 }
 
 class _BusinessCardThumbPreview extends StatelessWidget {
-  const _BusinessCardThumbPreview({required this.accent});
+  const _BusinessCardThumbPreview({required this.accent, required this.isDark});
 
   final Color accent;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +229,9 @@ class _BusinessCardThumbPreview extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 24),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(colors: [Color(0xFF0A0A0A), Color(0xFF171717)]),
+            gradient: LinearGradient(
+              colors: isDark ? const [Color(0xFF0A0A0A), Color(0xFF171717)] : const [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+            ),
             border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.6)),
             boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, 12))],
           ),
@@ -229,7 +243,7 @@ class _BusinessCardThumbPreview extends StatelessWidget {
               const Spacer(),
               Container(height: 2, width: 40, color: const Color(0xFFD4AF37)),
               const SizedBox(height: 6),
-              Text('Business Card Studio', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9)),
+              Text('Business Card Studio', style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF64748B), fontSize: 9)),
             ],
           ),
         ),
@@ -239,9 +253,10 @@ class _BusinessCardThumbPreview extends StatelessWidget {
 }
 
 class _ReminderThumbPreview extends StatelessWidget {
-  const _ReminderThumbPreview({required this.accent});
+  const _ReminderThumbPreview({required this.accent, required this.isDark});
 
   final Color accent;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +269,7 @@ class _ReminderThumbPreview extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: isDark ? Colors.black.withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: accent.withValues(alpha: 0.4)),
             ),
@@ -263,7 +278,7 @@ class _ReminderThumbPreview extends StatelessWidget {
               children: [
                 Icon(Icons.location_on_rounded, color: accent, size: 18),
                 const SizedBox(width: 6),
-                Text('Kitchen counter · 2 hr', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w700, fontSize: 12)),
+                Text('Kitchen counter · 2 hr', style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF334155), fontWeight: FontWeight.w700, fontSize: 12)),
               ],
             ),
           ),
@@ -274,7 +289,9 @@ class _ReminderThumbPreview extends StatelessWidget {
 }
 
 class _EssentialsThumbPreview extends StatelessWidget {
-  const _EssentialsThumbPreview();
+  const _EssentialsThumbPreview({required this.isDark});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -283,22 +300,22 @@ class _EssentialsThumbPreview extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8)),
+          _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8), isDark),
           const SizedBox(width: 6),
-          _miniTile(Icons.map_rounded, const Color(0xFF34D399)),
+          _miniTile(Icons.map_rounded, const Color(0xFF34D399), isDark),
           const SizedBox(width: 6),
-          _miniTile(Icons.phone_in_talk_rounded, const Color(0xFFFBBF24)),
+          _miniTile(Icons.phone_in_talk_rounded, const Color(0xFFFBBF24), isDark),
         ],
       ),
     );
   }
 
-  static Widget _miniTile(IconData icon, Color accent) {
+  static Widget _miniTile(IconData icon, Color accent, bool isDark) {
     return Container(
       width: 52,
       height: 52,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
+        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.2),
       ),

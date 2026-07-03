@@ -153,11 +153,12 @@ Future<void> ngmyImportQuickSupport({required String userEmail, required List<Ng
 }
 
 Future<void> showNgmyQuickSupportDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Quick Support',
-    barrierColor: Colors.black.withValues(alpha: 0.88),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (ctx, a1, a2) => _QuickSupportScreen(userEmail: userEmail),
     transitionBuilder: (ctx, anim, _, child) {
@@ -236,15 +237,18 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
   Future<void> _delete(NgmySupportLine line) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0C1220),
-        title: const Text('Remove support line?', style: TextStyle(color: Colors.white)),
-        content: Text('Delete ${line.title}?', style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return AlertDialog(
+          backgroundColor: t.dialogBg,
+          title: Text('Remove support line?', style: TextStyle(color: t.title)),
+          content: Text('Delete ${line.title}?', style: TextStyle(color: t.subtitle)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     await _persist(_lines.where((e) => e.id != line.id).toList());
@@ -261,12 +265,14 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final visible = _visible;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final emergency = _lines.where((e) => e.emergency).toList();
+    const accent = Color(0xFFFBBF24);
 
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: Stack(
         children: [
           Positioned(
@@ -277,7 +283,7 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFFFBBF24).withValues(alpha: 0.18), const Color(0xFF030712)],
+                  colors: [accent.withValues(alpha: t.isDark ? 0.18 : 0.12), t.heroGradientEnd],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -295,16 +301,16 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                         onPressed: () => Navigator.pop(context),
                         icon: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Hotlines', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Call list', style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Hotlines', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Call list', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -332,7 +338,7 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                       children: [
                         Icon(Icons.emergency_rounded, color: const Color(0xFFEF4444).withValues(alpha: 0.9), size: 14),
                         const SizedBox(width: 5),
-                        Text('Emergency', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.3)),
+                        Text('Emergency', style: TextStyle(color: t.subtitle, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.3)),
                       ],
                     ),
                     ...emergency.map(
@@ -423,7 +429,7 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
             if (_lines.isEmpty && !_loading)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Text('Quick-add from template:', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                child: Text('Quick-add from template:', style: TextStyle(color: t.subtitle, fontSize: 12)),
               ),
             if (_lines.isEmpty && !_loading)
               SizedBox(
@@ -434,25 +440,25 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                   itemCount: _templates.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (_, i) {
-                    final t = _templates[i];
+                    final tmpl = _templates[i];
                     return InkWell(
-                      onTap: () => _openEditor(fromTemplate: t),
+                      onTap: () => _openEditor(fromTemplate: tmpl),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         width: 120,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: t.color.withValues(alpha: 0.12),
+                          color: tmpl.color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: t.color.withValues(alpha: 0.35)),
+                          border: Border.all(color: tmpl.color.withValues(alpha: 0.35)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(t.icon, color: t.color, size: 22),
+                            Icon(tmpl.icon, color: tmpl.color, size: 22),
                             const Spacer(),
-                            Text(t.category, style: TextStyle(color: t.color, fontWeight: FontWeight.w800, fontSize: 11)),
-                            Text(t.title, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
+                            Text(tmpl.category, style: TextStyle(color: tmpl.color, fontWeight: FontWeight.w800, fontSize: 11)),
+                            Text(tmpl.title, style: TextStyle(color: t.title.withValues(alpha: 0.85), fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -475,16 +481,17 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                       label: Text(cat),
                       selected: selected,
                       onSelected: (_) => setState(() => _filter = cat),
-                      selectedColor: const Color(0xFFFBBF24).withValues(alpha: 0.25),
-                      checkmarkColor: const Color(0xFFFBBF24),
-                      labelStyle: TextStyle(color: selected ? const Color(0xFFFBBF24) : Colors.white70, fontWeight: FontWeight.w600),
+                      selectedColor: accent.withValues(alpha: t.isDark ? 0.25 : 0.18),
+                      backgroundColor: t.chipOffBg,
+                      checkmarkColor: accent,
+                      labelStyle: TextStyle(color: selected ? accent : t.chipOffLabel, fontWeight: FontWeight.w600),
                     );
                   },
                 ),
               ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFFBBF24)))
+                  ? Center(child: CircularProgressIndicator(color: accent))
                   : visible.isEmpty
                       ? Center(
                           child: Padding(
@@ -492,14 +499,14 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.phone_in_talk_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
+                                Icon(Icons.phone_in_talk_rounded, size: 56, color: t.muted.withValues(alpha: 0.5)),
                                 const SizedBox(height: 12),
-                                const Text('Your business help desk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                                Text('Your business help desk', style: TextStyle(color: t.title, fontWeight: FontWeight.w700, fontSize: 16)),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Insurance, IT, bank fraud, legal — save every hotline and dial in one tap.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                                  style: TextStyle(color: t.subtitle, fontSize: 13),
                                 ),
                               ],
                             ),
@@ -698,10 +705,11 @@ class _SupportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = NgmyHubTheme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: theme.listItemBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accent.withValues(alpha: 0.25)),
       ),
@@ -714,15 +722,15 @@ class _SupportCard extends StatelessWidget {
               backgroundColor: accent.withValues(alpha: 0.2),
               child: Icon(icon, color: accent, size: 20),
             ),
-            title: Text(line.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            title: Text(line.title, style: TextStyle(color: theme.title, fontWeight: FontWeight.w700)),
             subtitle: Text(
               [line.provider, line.category].where((e) => e.isNotEmpty).join(' · '),
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
+              style: TextStyle(color: theme.subtitle, fontSize: 12),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: theme.muted, size: 20)),
                 IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
@@ -735,7 +743,7 @@ class _SupportCard extends StatelessWidget {
           if (line.notes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: Text(line.notes, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
+              child: Text(line.notes, style: TextStyle(color: theme.muted, fontSize: 11)),
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
@@ -745,7 +753,7 @@ class _SupportCard extends StatelessWidget {
                 if (line.phone.isNotEmpty)
                   _SupportAction(icon: Icons.call_rounded, label: line.phone, color: accent, onTap: onCall),
                 if (line.accountRef.isNotEmpty)
-                  _SupportAction(icon: Icons.copy_rounded, label: 'Copy ref', color: Colors.white54, onTap: onCopyRef),
+                  _SupportAction(icon: Icons.copy_rounded, label: 'Copy ref', color: theme.muted, onTap: onCopyRef),
               ],
             ),
           ),

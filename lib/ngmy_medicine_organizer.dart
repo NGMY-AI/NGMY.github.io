@@ -126,11 +126,12 @@ List<String> ngmyDefaultMedicineReminderTimes(int timesPerDay) {
 }
 
 Future<void> showNgmyMedicineOrganizerDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Medicine Organizer',
-    barrierColor: Colors.black.withValues(alpha: 0.88),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (ctx, a1, a2) => _MedicineOrganizerScreen(userEmail: userEmail),
     transitionBuilder: (ctx, anim, _, child) {
@@ -191,15 +192,18 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
   Future<void> _delete(NgmyMedicineEntry item) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0C1220),
-        title: const Text('Remove medicine?', style: TextStyle(color: Colors.white)),
-        content: Text('Delete ${item.name}?', style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)), child: const Text('Delete')),
-        ],
-      ),
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return AlertDialog(
+          backgroundColor: t.dialogBg,
+          title: Text('Remove medicine?', style: TextStyle(color: t.title)),
+          content: Text('Delete ${item.name}?', style: TextStyle(color: t.subtitle)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)), child: const Text('Delete')),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     await _persist(_items.where((e) => e.id != item.id).toList());
@@ -207,8 +211,10 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
+    const accent = Color(0xFFEC4899);
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: Stack(
         children: [
           Positioned(
@@ -219,7 +225,7 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFFEC4899).withValues(alpha: 0.2), const Color(0xFF030712)],
+                  colors: [accent.withValues(alpha: t.isDark ? 0.2 : 0.12), t.heroGradientEnd],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -237,16 +243,16 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                         onPressed: () => Navigator.pop(context),
                         icon: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Medicine Organizer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Dosage & schedule tracker', style: TextStyle(color: Color(0xFFF472B6), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Medicine Organizer', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Dosage & schedule tracker', style: TextStyle(color: const Color(0xFFF472B6), fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -266,7 +272,7 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                 ),
                 Expanded(
                   child: _loading
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFFEC4899)))
+                      ? Center(child: CircularProgressIndicator(color: accent))
                       : _items.isEmpty
                           ? Center(
                               child: Padding(
@@ -274,11 +280,11 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.medication_liquid_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
+                                    Icon(Icons.medication_liquid_rounded, size: 56, color: t.muted.withValues(alpha: 0.5)),
                                     const SizedBox(height: 12),
-                                    const Text('Track medicines & vitamins', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                                    Text('Track medicines & vitamins', style: TextStyle(color: t.title, fontWeight: FontWeight.w700, fontSize: 16)),
                                     const SizedBox(height: 6),
-                                    Text('Save name, dosage, and how many times per day — all stored locally on your device.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13)),
+                                    Text('Save name, dosage, and how many times per day — all stored locally on your device.', textAlign: TextAlign.center, style: TextStyle(color: t.subtitle, fontSize: 13)),
                                   ],
                                 ),
                               ),
@@ -291,18 +297,18 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.05),
+                                    color: t.listItemBg,
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.25)),
+                                    border: Border.all(color: accent.withValues(alpha: 0.25)),
                                   ),
                                   child: ListTile(
-                                    leading: CircleAvatar(backgroundColor: const Color(0xFFEC4899).withValues(alpha: 0.2), child: const Icon(Icons.medication_rounded, color: Color(0xFFEC4899), size: 20)),
-                                    title: Text(m.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                                    subtitle: Text('${m.dosage.isEmpty ? 'No dosage' : m.dosage} · ${m.timesPerDay}x/day${m.schedule.isNotEmpty ? ' · $m.schedule' : ''}', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                                    leading: CircleAvatar(backgroundColor: accent.withValues(alpha: 0.2), child: const Icon(Icons.medication_rounded, color: accent, size: 20)),
+                                    title: Text(m.name, style: TextStyle(color: t.title, fontWeight: FontWeight.w700)),
+                                    subtitle: Text('${m.dosage.isEmpty ? 'No dosage' : m.dosage} · ${m.timesPerDay}x/day${m.schedule.isNotEmpty ? ' · ${m.schedule}' : ''}', style: TextStyle(color: t.subtitle, fontSize: 12)),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        IconButton(tooltip: 'Edit', onPressed: () => _openEditor(existing: m), icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.6), size: 20)),
+                                        IconButton(tooltip: 'Edit', onPressed: () => _openEditor(existing: m), icon: Icon(Icons.edit_rounded, color: t.muted, size: 20)),
                                         IconButton(tooltip: 'Delete', onPressed: () => _delete(m), icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
                                       ],
                                     ),

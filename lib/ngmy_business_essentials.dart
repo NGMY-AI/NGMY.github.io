@@ -4,6 +4,7 @@ import 'ngmy_business_contacts.dart';
 import 'ngmy_business_notes.dart';
 import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_transfer.dart';
+import 'ngmy_hub_form_ui.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -21,11 +22,12 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
 }
 
 Future<void> showNgmyBusinessEssentialsHub(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Business Essentials',
-    barrierColor: Colors.black.withValues(alpha: 0.9),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 340),
     pageBuilder: (ctx, a1, a2) => _BusinessEssentialsHub(userEmail: userEmail),
     transitionBuilder: (ctx, anim, _, child) {
@@ -90,8 +92,9 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,12 +107,12 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                     onPressed: () => Navigator.pop(context),
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.close_rounded, color: Colors.white70),
+                      decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12)),
+                      child: Icon(Icons.close_rounded, color: t.iconButtonIcon),
                     ),
                   ),
-                  const Expanded(
-                    child: Text('Business Essentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                  Expanded(
+                    child: Text('Business Essentials', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20)),
                   ),
                   IconButton(
                     tooltip: 'Transfer / backup',
@@ -136,7 +139,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
               child: Text(
                 'Organize contacts, sites, hotlines, medicines, notes, tasks & more — all saved locally',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13, height: 1.35),
+                style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
               ),
             ),
             if (_loading)
@@ -219,6 +222,7 @@ class _CompactCategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -226,9 +230,9 @@ class _CompactCategoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.1),
+            color: t.categoryCardBg(accent),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent.withValues(alpha: 0.35)),
+            border: Border.all(color: t.categoryCardBorder(accent)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -239,13 +243,13 @@ class _CompactCategoryCard extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.18),
+                    color: t.categoryIconBg(accent),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: accent, size: 22),
                 ),
                 const SizedBox(height: 8),
-                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 13)),
                 if (count > 0)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_hub_form_ui.dart';
+
 const _kStorageKey = 'ngmy_business_notes_v1';
 
 String _notesKey(String userEmail) {
@@ -733,11 +735,12 @@ Future<void> ngmyImportBusinessNotes({required String userEmail, required List<N
 }
 
 Future<void> showNgmyBusinessNotesDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Notes',
-    barrierColor: Colors.black.withValues(alpha: 0.92),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (_, __, ___) => _BusinessNotesScreen(userEmail: userEmail),
     transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
@@ -844,9 +847,10 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hub = NgmyHubTheme.of(context);
     final visible = _visible;
     return Material(
-      color: const Color(0xFF0B0F19),
+      color: hub.scaffold,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,17 +863,17 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                      decoration: BoxDecoration(color: hub.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: hub.border)),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, color: hub.iconButtonIcon, size: 18),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Notes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5)),
-                        Text('Business Essentials', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12)),
+                        Text('Notes', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5)),
+                        Text('Business Essentials', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w600, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -904,14 +908,15 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: TextField(
                 onChanged: (v) => setState(() => _query = v),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                style: TextStyle(color: hub.title, fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
                   hintText: 'Search notes…',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.4)),
+                  hintStyle: TextStyle(color: hub.muted),
+                  prefixIcon: Icon(Icons.search_rounded, color: hub.muted),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.07),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  fillColor: hub.inputFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: hub.inputBorder)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: hub.inputBorder)),
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -933,11 +938,11 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: sel ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]) : null,
-                        color: sel ? null : Colors.white.withValues(alpha: 0.06),
+                        color: sel ? null : hub.chipIdleBg,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.08)),
+                        border: Border.all(color: sel ? Colors.transparent : hub.border),
                       ),
-                      child: Text(f, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: sel ? Colors.white : Colors.white54)),
+                      child: Text(f, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: sel ? Colors.white : hub.chipOffLabel)),
                     ),
                   );
                 },
@@ -953,13 +958,13 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), shape: BoxShape.circle),
-                                child: Icon(Icons.note_alt_outlined, size: 48, color: Colors.white.withValues(alpha: 0.2)),
+                                decoration: BoxDecoration(color: hub.chipIdleBg, shape: BoxShape.circle),
+                                child: Icon(Icons.note_alt_outlined, size: 48, color: hub.muted.withValues(alpha: 0.6)),
                               ),
                               const SizedBox(height: 16),
-                              Text('No notes yet', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w800, fontSize: 18)),
+                              Text('No notes yet', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 18)),
                               const SizedBox(height: 8),
-                              Text('Pick a template or start blank', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+                              Text('Pick a template or start blank', style: TextStyle(color: hub.subtitle, fontSize: 13)),
                               const SizedBox(height: 20),
                               FilledButton.icon(
                                 onPressed: _pickTemplateAndCreate,

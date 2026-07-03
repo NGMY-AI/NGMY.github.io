@@ -159,11 +159,12 @@ Future<void> ngmyImportSavedLocations({required String userEmail, required List<
 }
 
 Future<void> showNgmySavedLocationsDialog(BuildContext context, {required String userEmail}) {
+  final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Saved Locations',
-    barrierColor: Colors.black.withValues(alpha: 0.88),
+    barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
     pageBuilder: (ctx, a1, a2) => _SavedLocationsScreen(userEmail: userEmail),
     transitionBuilder: (ctx, anim, _, child) {
@@ -287,15 +288,18 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
   Future<void> _delete(NgmySavedLocation loc) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0C1220),
-        title: const Text('Delete location?', style: TextStyle(color: Colors.white)),
-        content: Text('Remove ${loc.name}?', style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return AlertDialog(
+          backgroundColor: t.dialogBg,
+          title: Text('Delete location?', style: TextStyle(color: t.title)),
+          content: Text('Remove ${loc.name}?', style: TextStyle(color: t.subtitle)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     await _persist(_locations.where((e) => e.id != loc.id).toList());
@@ -303,11 +307,13 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final visible = _visible;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    const accent = Color(0xFF34D399);
 
     return Material(
-      color: const Color(0xFF030712),
+      color: t.scaffold,
       child: Stack(
         children: [
           Positioned(
@@ -318,7 +324,7 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFF34D399).withValues(alpha: 0.2), const Color(0xFF030712)],
+                  colors: [accent.withValues(alpha: t.isDark ? 0.2 : 0.12), t.heroGradientEnd],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -336,16 +342,16 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                         onPressed: () => Navigator.pop(context),
                         icon: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                          decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                         ),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Site Map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('Addresses & pins', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 11)),
+                            Text('Site Map', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Addresses & pins', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -375,7 +381,7 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                       },
                       icon: Icon(_sortByDistance ? Icons.near_me_rounded : Icons.sort_rounded, size: 16),
                       label: Text(_sortByDistance ? 'Nearest first' : 'Sort by recent'),
-                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF34D399)),
+                      style: OutlinedButton.styleFrom(foregroundColor: accent),
                     ),
                   ),
                 ],
@@ -395,16 +401,17 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                     label: Text(cat),
                     selected: selected,
                     onSelected: (_) => setState(() => _filter = cat),
-                    selectedColor: const Color(0xFF34D399).withValues(alpha: 0.25),
-                    checkmarkColor: const Color(0xFF34D399),
-                    labelStyle: TextStyle(color: selected ? const Color(0xFF34D399) : Colors.white70, fontWeight: FontWeight.w600),
+                    selectedColor: accent.withValues(alpha: t.isDark ? 0.25 : 0.18),
+                    backgroundColor: t.chipOffBg,
+                    checkmarkColor: accent,
+                    labelStyle: TextStyle(color: selected ? accent : t.chipOffLabel, fontWeight: FontWeight.w600),
                   );
                 },
               ),
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF34D399)))
+                  ? Center(child: CircularProgressIndicator(color: accent))
                   : visible.isEmpty
                       ? Center(
                           child: Padding(
@@ -412,14 +419,14 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.map_rounded, size: 56, color: Colors.white.withValues(alpha: 0.2)),
+                                Icon(Icons.map_rounded, size: 56, color: t.muted.withValues(alpha: 0.5)),
                                 const SizedBox(height: 12),
-                                const Text('Your business site map', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                                Text('Your business site map', style: TextStyle(color: t.title, fontWeight: FontWeight.w700, fontSize: 16)),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Pin client sites, offices, warehouses, and delivery drops — navigate in one tap.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                                  style: TextStyle(color: t.subtitle, fontSize: 13),
                                 ),
                                 const SizedBox(height: 16),
                                 FilledButton.icon(
@@ -634,10 +641,11 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: t.listItemBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: accent.withValues(alpha: 0.25)),
       ),
@@ -650,12 +658,12 @@ class _LocationCard extends StatelessWidget {
               backgroundColor: accent.withValues(alpha: 0.2),
               child: Icon(Icons.place_rounded, color: accent, size: 20),
             ),
-            title: Text(location.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            title: Text(location.name, style: TextStyle(color: t.title, fontWeight: FontWeight.w700)),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (location.address.isNotEmpty)
-                  Text(location.address, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                  Text(location.address, style: TextStyle(color: t.subtitle, fontSize: 12)),
                 Text(
                   [location.category, if (distanceLabel != null) distanceLabel, if (location.visitCount > 0) '${location.visitCount} visits']
                       .whereType<String>()
@@ -667,7 +675,7 @@ class _LocationCard extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20)),
+                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: t.muted, size: 20)),
                 IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
               ],
             ),
@@ -678,7 +686,7 @@ class _LocationCard extends StatelessWidget {
               spacing: 8,
               children: [
                 _LocAction(icon: Icons.navigation_rounded, label: 'Navigate', color: accent, onTap: onNavigate),
-                _LocAction(icon: Icons.copy_rounded, label: 'Copy', color: Colors.white54, onTap: onCopy),
+                _LocAction(icon: Icons.copy_rounded, label: 'Copy', color: t.muted, onTap: onCopy),
               ],
             ),
           ),
