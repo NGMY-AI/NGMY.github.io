@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_hub_form_ui.dart';
+
 const _kStorageKey = 'ngmy_business_contacts_v2';
 
 String _contactsKey(String userEmail) {
@@ -224,12 +226,9 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
   }
 
   Future<void> _openEditor({NgmyBusinessContact? existing}) async {
-    final saved = await showModalBottomSheet<NgmyBusinessContact>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0C1220),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => _ContactEditorSheet(existing: existing),
+    final saved = await showNgmyModernEditorPage<NgmyBusinessContact>(
+      context,
+      _ContactEditorPage(existing: existing),
     );
     if (saved == null) return;
     final list = List<NgmyBusinessContact>.from(_contacts);
@@ -277,25 +276,63 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
     final visible = _visible;
 
     return Material(
-      color: const Color(0xFF05070C),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
-                  const Expanded(
-                    child: Text('Business Contacts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                  ),
-                  IconButton(
-                    onPressed: () => _openEditor(),
-                    icon: const Icon(Icons.person_add_rounded, color: Color(0xFF38BDF8)),
-                  ),
-                ],
+      color: const Color(0xFF030712),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 160,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [const Color(0xFF38BDF8).withValues(alpha: 0.22), const Color(0xFF030712)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Business Contacts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text('Rolodex', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w700, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _openEditor(),
+                        icon: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [const Color(0xFF38BDF8), const Color(0xFF2563EB)]),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.35), blurRadius: 12)],
+                          ),
+                          child: const Icon(Icons.add_rounded, color: Colors.black, size: 22),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: TextField(
@@ -357,8 +394,14 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                                 const SizedBox(height: 16),
                                 FilledButton.icon(
                                   onPressed: () => _openEditor(),
-                                  icon: const Icon(Icons.add_rounded),
-                                  label: const Text('Add first contact'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF38BDF8),
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                                  label: const Text('Add your first contact', style: TextStyle(fontWeight: FontWeight.w900)),
                                 ),
                               ],
                             ),
@@ -386,8 +429,105 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
                           },
                         ),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContactEditorPage extends StatefulWidget {
+  const _ContactEditorPage({this.existing});
+
+  final NgmyBusinessContact? existing;
+
+  @override
+  State<_ContactEditorPage> createState() => _ContactEditorPageState();
+}
+
+class _ContactEditorPageState extends State<_ContactEditorPage> {
+  static const _accent = Color(0xFF38BDF8);
+  late final TextEditingController _name;
+  late final TextEditingController _company;
+  late final TextEditingController _phone;
+  late final TextEditingController _email;
+  late final TextEditingController _notes;
+  String _category = 'Client';
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _name = TextEditingController(text: e?.name ?? '');
+    _company = TextEditingController(text: e?.company ?? '');
+    _phone = TextEditingController(text: e?.phone ?? '');
+    _email = TextEditingController(text: e?.email ?? '');
+    _notes = TextEditingController(text: e?.notes ?? '');
+    _category = e?.category ?? 'Client';
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _company.dispose();
+    _phone.dispose();
+    _email.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_name.text.trim().isEmpty && _company.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a name or company')));
+      return;
+    }
+    Navigator.pop(
+      context,
+      NgmyBusinessContact(
+        id: widget.existing?.id,
+        name: _name.text.trim(),
+        company: _company.text.trim(),
+        phone: _phone.text.trim(),
+        email: _email.text.trim(),
+        category: _category,
+        notes: _notes.text.trim(),
+        favorite: widget.existing?.favorite ?? false,
+        lastContacted: widget.existing?.lastContacted,
+        createdAt: widget.existing?.createdAt,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.existing == null;
+    return NgmyModernEditorPage(
+      title: isNew ? 'New Contact' : 'Edit Contact',
+      subtitle: isNew ? 'Add someone you call often — client, vendor, or partner.' : 'Update details for this contact.',
+      accent: _accent,
+      icon: Icons.contacts_rounded,
+      onClose: () => Navigator.pop(context),
+      onSave: _save,
+      saveLabel: isNew ? 'Save Contact' : 'Update Contact',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NgmyModernField(controller: _name, label: 'Name', hint: 'Full name', icon: Icons.person_outline_rounded, accent: _accent),
+          NgmyModernField(controller: _company, label: 'Company', hint: 'Business or organization', icon: Icons.business_rounded, accent: _accent),
+          NgmyModernField(controller: _phone, label: 'Phone', hint: '+1 (555) 000-0000', icon: Icons.phone_rounded, accent: _accent, keyboard: TextInputType.phone),
+          NgmyModernField(controller: _email, label: 'Email', hint: 'name@company.com', icon: Icons.mail_outline_rounded, accent: _accent, keyboard: TextInputType.emailAddress),
+          Text('CATEGORY', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          const SizedBox(height: 8),
+          NgmyModernChipRow(
+            options: const ['Client', 'Vendor', 'Partner', 'Employee', 'Other'],
+            selected: _category,
+            accent: _accent,
+            onSelected: (v) => setState(() => _category = v),
+          ),
+          NgmyModernField(controller: _notes, label: 'Notes', hint: 'Best time to call, account #…', icon: Icons.notes_rounded, accent: _accent, maxLines: 3),
+        ],
       ),
     );
   }
@@ -517,137 +657,6 @@ class _ActionChip extends StatelessWidget {
             const SizedBox(width: 4),
             Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ContactEditorSheet extends StatefulWidget {
-  const _ContactEditorSheet({this.existing});
-
-  final NgmyBusinessContact? existing;
-
-  @override
-  State<_ContactEditorSheet> createState() => _ContactEditorSheetState();
-}
-
-class _ContactEditorSheetState extends State<_ContactEditorSheet> {
-  late final TextEditingController _name;
-  late final TextEditingController _company;
-  late final TextEditingController _phone;
-  late final TextEditingController _email;
-  late final TextEditingController _notes;
-  String _category = 'Client';
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    _name = TextEditingController(text: e?.name ?? '');
-    _company = TextEditingController(text: e?.company ?? '');
-    _phone = TextEditingController(text: e?.phone ?? '');
-    _email = TextEditingController(text: e?.email ?? '');
-    _notes = TextEditingController(text: e?.notes ?? '');
-    _category = e?.category ?? 'Client';
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _company.dispose();
-    _phone.dispose();
-    _email.dispose();
-    _notes.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottom),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: 12),
-            Text(widget.existing == null ? 'New contact' : 'Edit contact', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
-            const SizedBox(height: 12),
-            _field(_name, 'Contact name'),
-            _field(_company, 'Company / business'),
-            _field(_phone, 'Phone', keyboard: TextInputType.phone),
-            _field(_email, 'Email', keyboard: TextInputType.emailAddress),
-            const SizedBox(height: 4),
-            Text('Category', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              children: ['Client', 'Vendor', 'Partner', 'Employee', 'Other'].map((cat) {
-                final selected = _category == cat;
-                return ChoiceChip(
-                  label: Text(cat),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _category = cat),
-                  selectedColor: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                  labelStyle: TextStyle(color: selected ? const Color(0xFF38BDF8) : Colors.white70),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            _field(_notes, 'Notes (hours, account #, best time)', maxLines: 3),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () {
-                  if (_name.text.trim().isEmpty && _company.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a name or company')));
-                    return;
-                  }
-                  Navigator.pop(
-                    context,
-                    NgmyBusinessContact(
-                      id: widget.existing?.id,
-                      name: _name.text.trim(),
-                      company: _company.text.trim(),
-                      phone: _phone.text.trim(),
-                      email: _email.text.trim(),
-                      category: _category,
-                      notes: _notes.text.trim(),
-                      favorite: widget.existing?.favorite ?? false,
-                      lastContacted: widget.existing?.lastContacted,
-                      createdAt: widget.existing?.createdAt,
-                    ),
-                  );
-                },
-                child: Text(widget.existing == null ? 'Add contact' : 'Save changes'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController c, String label, {TextInputType? keyboard, int maxLines = 1}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: TextField(
-        controller: c,
-        keyboardType: keyboard,
-        maxLines: maxLines,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.06),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );
