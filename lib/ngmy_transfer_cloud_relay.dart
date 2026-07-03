@@ -1,28 +1,22 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_network_resilience.dart';
+import 'ngmy_supabase_multipart_relay.dart';
 import 'ngmy_transfer_rendezvous.dart';
 
 /// Cloud fallback when WebRTC cannot connect — sender uploads while sharing the code.
 const String kNgmyTransferCloudRelayPrefix = 'ngmy_transfer_relay_v1_';
-const String _storageBucket = 'media';
 const String _storageFolder = 'transfer-relay';
+const Duration _kMaxCloudWait = Duration(minutes: 20);
 
 class NgmyTransferCloudRelay {
   static String _relayKey(String code) => '$kNgmyTransferCloudRelayPrefix${code.trim()}';
-
-  static String _safeName(String name) {
-    final safe = name.replaceAll(RegExp(r'[^\w\-.]+'), '_').trim();
-    return safe.isEmpty ? 'file' : safe;
-  }
 
   static Future<Map<String, dynamic>?> _loadRelay(String code) async {
     if (!await ngmyCanReachCloud()) return null;
@@ -61,7 +55,6 @@ class NgmyTransferCloudRelay {
     }
   }
 
-  /// Starts uploading files in the background so receive can fall back to cloud.
   static void beginUpload({
     required String code,
     required String ownerEmail,
@@ -87,7 +80,8 @@ class NgmyTransferCloudRelay {
               'name': e.name,
               'mime': e.mime,
               'sizeBytes': e.sizeBytes,
-              'storagePath': '$_storageFolder/$normalized/$sessionId/${_safeName(e.name)}',
+              'storageBase': '$_storageFolder/$normalized/$sessionId/${ngmySupabaseRelaySafeName(e.name)}',
+              'partCount': 0,
             })
         .toList();
 
@@ -104,40 +98,58 @@ class NgmyTransferCloudRelay {
     try {
       for (var i = 0; i < items.length; i++) {
         final item = items[i];
-        final storagePath = (fileRows[i]['storagePath'] ?? '').toString();
-        if (storagePath.isEmpty) continue;
+        final base = (fileRows[i]['storageBase'] ?? '').toString();
+        if (base.isEmpty) continue;
 
-        final uploaded = await _uploadItemStreaming(
-          ownerEmail: ownerEmail,
-          item: item,
-          storagePath: storagePath,
-          onProgress: (sent, total) async {
-            if (total <= 0) return;
-            final base = i / items.length;
-            final part = (sent / total) / items.length;
-            final existing = await _loadRelay(normalized) ?? {};
-            await _saveRelay(normalized, {
-              ...existing,
-              'uploadProgress': (base + part).clamp(0.0, 0.99),
-              'uploading': true,
-              'ready': false,
-            });
-          },
-        );
-        if (!uploaded) {
+        var partCount = 0;
+        var sent = 0;
+        final total = item.sizeBytes;
+
+        await for (final chunk in NgmyDocShareStore.readFileStream(ownerEmail, item)) {
+          if (chunk.isEmpty) continue;
+          final partPath = '$base.part${partCount.toString().padLeft(5, '0')}';
+          await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
+                partPath,
+                chunk,
+                fileOptions: FileOptions(upsert: true, contentType: item.mime),
+              );
+          partCount++;
+          sent += chunk.length;
+
+          final existing = await _loadRelay(normalized) ?? {};
+          final progressBase = i / items.length;
+          final progressPart = total > 0 ? (sent / total) / items.length : 0.0;
+          await _saveRelay(normalized, {
+            ...existing,
+            'uploadProgress': (progressBase + progressPart).clamp(0.0, 0.99),
+            'uploading': true,
+            'ready': false,
+          });
+        }
+
+        if (partCount <= 0) {
           final existing = await _loadRelay(normalized) ?? {};
           await _saveRelay(normalized, {
             ...existing,
             'ready': false,
             'uploading': false,
-            'error': 'Upload failed for ${item.name}',
+            'error': 'Could not read ${item.name} for cloud backup.',
           });
           return;
         }
+
+        fileRows[i]['partCount'] = partCount;
+        final existing = await _loadRelay(normalized) ?? {};
+        await _saveRelay(normalized, {
+          ...existing,
+          'files': fileRows,
+        });
       }
+
       final existing = await _loadRelay(normalized) ?? {};
       await _saveRelay(normalized, {
         ...existing,
+        'files': fileRows,
         'ready': true,
         'uploading': false,
         'uploadProgress': 1.0,
@@ -155,44 +167,9 @@ class NgmyTransferCloudRelay {
     }
   }
 
-  static Future<bool> _uploadItemStreaming({
-    required String ownerEmail,
-    required NgmyDocShareItem item,
-    required String storagePath,
-    void Function(int sent, int total)? onProgress,
-  }) async {
-    try {
-      final total = item.sizeBytes;
-      if (total <= 0) return false;
-
-      final builder = BytesBuilder(copy: false);
-      var sent = 0;
-      await for (final chunk in NgmyDocShareStore.readFileStream(ownerEmail, item)) {
-        if (chunk.isEmpty) continue;
-        builder.add(chunk);
-        sent += chunk.length;
-        onProgress?.call(sent, total);
-      }
-      final bytes = builder.takeBytes();
-      if (bytes.isEmpty) return false;
-
-      await Supabase.instance.client.storage.from(_storageBucket).uploadBinary(
-            storagePath,
-            bytes,
-            fileOptions: FileOptions(upsert: true, contentType: item.mime),
-          );
-      onProgress?.call(bytes.length, bytes.length);
-      return true;
-    } catch (e) {
-      debugPrint('[ngmy transfer relay] upload item ${item.name}: $e');
-      return false;
-    }
-  }
-
   static Future<bool> isReady(String code) async {
     final row = await _loadRelay(code);
-    if (row == null) return false;
-    return row['ready'] == true;
+    return row?['ready'] == true;
   }
 
   static Future<double?> uploadProgress(String code) async {
@@ -203,29 +180,50 @@ class NgmyTransferCloudRelay {
     return row['ready'] == true ? 1.0 : 0.0;
   }
 
-  /// Download relayed files when peer-to-peer fails.
+  static Future<String?> relayError(String code) async {
+    final row = await _loadRelay(code);
+    final err = (row?['error'] ?? '').toString();
+    return err.isEmpty ? null : err;
+  }
+
   static Future<List<NgmyDocShareItem>> importByCode({
     required String code,
     required String recipientEmail,
     void Function(int received, int total)? onProgress,
     void Function(String status)? onStatus,
     void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
+    bool skipWait = false,
+    Duration maxWait = _kMaxCloudWait,
   }) async {
     final normalized = NgmyTransferRendezvous.normalizeInput(code);
     if (normalized == null) return [];
 
-    onStatus?.call('Peer link unavailable — waiting for cloud backup…');
+    if (!skipWait) {
+      onStatus?.call('Checking cloud backup…');
+      final deadline = DateTime.now().add(maxWait);
+      while (DateTime.now().isBefore(deadline)) {
+        if (await isReady(normalized)) break;
 
-    for (var attempt = 0; attempt < 3600; attempt++) {
-      if (await isReady(normalized)) break;
-      final progress = await uploadProgress(normalized);
-      if (progress != null && progress > 0) {
-        onStatus?.call('Cloud backup ${(progress * 100).round()}% — keep sender on Send screen…');
+        final err = await relayError(normalized);
+        if (err != null) {
+          onStatus?.call('Cloud backup failed: $err');
+          return [];
+        }
+
+        final progress = await uploadProgress(normalized);
+        if (progress != null && progress > 0) {
+          onStatus?.call('Cloud backup ${(progress * 100).round()}% — sender must keep Send screen open…');
+        } else {
+          onStatus?.call('Waiting for cloud backup from sender…');
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
       }
-      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
+
     if (!await isReady(normalized)) {
-      onStatus?.call('Cloud backup not ready. Sender must keep Send screen open and try again.');
+      if (!skipWait) {
+        onStatus?.call('Cloud backup not ready yet. Sender must keep Send screen open.');
+      }
       return [];
     }
 
@@ -238,6 +236,7 @@ class NgmyTransferCloudRelay {
     final total = files.length;
     var received = 0;
     final imported = <NgmyDocShareItem>[];
+    final pathsToDelete = <String>[];
 
     onStatus?.call('Downloading via cloud…');
 
@@ -245,18 +244,23 @@ class NgmyTransferCloudRelay {
       if (raw is! Map) continue;
       final name = (raw['name'] ?? 'file').toString();
       final mime = (raw['mime'] ?? 'application/octet-stream').toString();
-      final storagePath = (raw['storagePath'] ?? '').toString();
-      if (storagePath.isEmpty) continue;
+      final base = (raw['storageBase'] ?? raw['storagePath'] ?? '').toString();
+      final partCount = (raw['partCount'] as num?)?.toInt() ?? 0;
+      if (base.isEmpty || partCount <= 0) continue;
+
+      final partPaths = ngmySupabasePartPathsFor(base, partCount);
+      pathsToDelete.addAll(partPaths);
 
       try {
-        final url = Supabase.instance.client.storage.from(_storageBucket).getPublicUrl(storagePath);
-        final saved = await _pullStreaming(
+        final saved = await ngmySupabaseDownloadToDocShare(
           recipientEmail: recipientEmail,
-          fileUri: Uri.parse(url),
           name: name,
           mime: mime,
           ownerEmail: owner,
-          onBytes: onBytes,
+          storagePaths: partPaths,
+          onBytes: (rx, totalBytes) {
+            onBytes?.call(name, rx, totalBytes);
+          },
         );
         if (saved != null) {
           imported.add(saved);
@@ -270,64 +274,15 @@ class NgmyTransferCloudRelay {
 
     if (imported.isNotEmpty) {
       onStatus?.call('Received ${imported.length} file(s) via cloud backup.');
-      unawaited(_cleanupRelay(normalized, files));
+      unawaited(_cleanupRelay(normalized, pathsToDelete));
     }
     return imported;
   }
 
-  static Future<NgmyDocShareItem?> _pullStreaming({
-    required String recipientEmail,
-    required Uri fileUri,
-    required String name,
-    required String mime,
-    required String ownerEmail,
-    void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
-  }) async {
-    try {
-      final streamed = await http.Client().send(http.Request('GET', fileUri)).timeout(const Duration(hours: 6));
-      if (streamed.statusCode != 200) return null;
-
-      final rxId = NgmyDocShareStore.beginDiskReceive(
-        email: recipientEmail,
-        name: name,
-        mime: mime,
-        fromSender: ownerEmail.isNotEmpty ? ownerEmail : null,
-        note: 'NGMY Transfer',
-      );
-      await NgmyDocShareStore.prepareDiskReceive(rxId);
-      var bytesReceived = 0;
-      try {
-        await for (final chunk in streamed.stream) {
-          bytesReceived += chunk.length;
-          final totalBytes = streamed.contentLength;
-          onBytes?.call(name, bytesReceived, totalBytes != null && totalBytes > 0 ? totalBytes : null);
-          await NgmyDocShareStore.writeDiskReceive(rxId, chunk);
-        }
-        return NgmyDocShareStore.finishDiskReceive(rxId);
-      } catch (e) {
-        debugPrint('[ngmy transfer relay] stream $name: $e');
-        await NgmyDocShareStore.abortDiskReceive(rxId);
-        return null;
-      }
-    } catch (e) {
-      debugPrint('[ngmy transfer relay] pull $name: $e');
-      return null;
-    }
-  }
-
-  static Future<void> _cleanupRelay(String code, List<dynamic> files) async {
+  static Future<void> _cleanupRelay(String code, List<String> storagePaths) async {
     try {
       await Supabase.instance.client.from('ngmy_settings').delete().eq('key', _relayKey(code));
-      for (final raw in files) {
-        if (raw is Map) {
-          final path = (raw['storagePath'] ?? '').toString();
-          if (path.isNotEmpty) {
-            try {
-              await Supabase.instance.client.storage.from(_storageBucket).remove([path]);
-            } catch (_) {}
-          }
-        }
-      }
+      await ngmySupabaseRemovePaths(storagePaths);
     } catch (e) {
       debugPrint('[ngmy transfer relay] cleanup: $e');
     }

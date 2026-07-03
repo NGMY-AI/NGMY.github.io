@@ -11,7 +11,6 @@ import 'ngmy_transfer_rtc_config.dart';
 import 'ngmy_transfer_signal.dart';
 
 const int _kMaxBufferedBytes = 64 * 1024 * 1024;
-const Duration _kConnectTimeout = Duration(seconds: 120);
 
 RTCPeerConnection? _txPc;
 RTCDataChannel? _txChannel;
@@ -50,52 +49,7 @@ Future<void> _waitIceGathering(RTCPeerConnection pc) async {
       c.complete();
     }
   };
-  await c.future.timeout(const Duration(seconds: 15), onTimeout: () {});
-}
-
-Future<bool> _waitPeerConnected({
-  required RTCPeerConnection pc,
-  required Completer<RTCDataChannel> channelReady,
-  Duration timeout = _kConnectTimeout,
-}) async {
-  final deadline = DateTime.now().add(timeout);
-  var iceConnected = false;
-
-  pc.onIceConnectionState = (state) {
-    if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
-        state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
-      iceConnected = true;
-    }
-  };
-
-  while (DateTime.now().isBefore(deadline)) {
-    final iceState = pc.iceConnectionState;
-    if (iceState == RTCIceConnectionState.RTCIceConnectionStateFailed ||
-        iceState == RTCIceConnectionState.RTCIceConnectionStateClosed ||
-        iceState == RTCIceConnectionState.RTCIceConnectionStateDisconnected) {
-      debugPrint('[ngmy transfer p2p] ice failed: $iceState');
-      return false;
-    }
-    if (iceState == RTCIceConnectionState.RTCIceConnectionStateConnected ||
-        iceState == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
-      iceConnected = true;
-    }
-
-    if (channelReady.isCompleted) {
-      final channel = await channelReady.future;
-      if (channel.state == RTCDataChannelState.RTCDataChannelOpen) return true;
-    }
-
-    if (iceConnected && channelReady.isCompleted) {
-      final channel = await channelReady.future;
-      if (channel.state == RTCDataChannelState.RTCDataChannelOpen) return true;
-    }
-
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-  }
-
-  debugPrint('[ngmy transfer p2p] connect timeout (ice=$iceConnected, channel=${channelReady.isCompleted})');
-  return false;
+  await c.future.timeout(const Duration(seconds: 30), onTimeout: () {});
 }
 
 Future<String?> _loadOfferJson(String token) async {
@@ -256,7 +210,6 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   final imported = <NgmyDocShareItem>[];
   var received = 0;
   final done = Completer<List<NgmyDocShareItem>>();
-  final channelReady = Completer<RTCDataChannel>();
   Future<void> recvChain = Future<void>.value();
 
   Future<void> finalizeCurrentFile() async {
@@ -275,7 +228,6 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   }
 
   pc.onDataChannel = (channel) {
-    if (!channelReady.isCompleted) channelReady.complete(channel);
     channel.onDataChannelState = (state) {
       debugPrint('[ngmy transfer p2p] channel state: $state');
     };
@@ -341,14 +293,6 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
     final answerOk = await _stashAnswerJson(offerToken, jsonEncode({'s': answerSdp}));
     if (!answerOk) {
       debugPrint('[ngmy transfer p2p] failed to stash answer');
-      return null;
-    }
-
-    final connected = await _waitPeerConnected(pc: pc, channelReady: channelReady);
-    if (!connected) {
-      if (!done.isCompleted) done.complete([]);
-      await pc.close();
-      _rxPc = null;
       return null;
     }
 

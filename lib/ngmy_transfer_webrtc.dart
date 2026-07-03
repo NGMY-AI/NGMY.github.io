@@ -48,26 +48,21 @@ class NgmyTransferWebRtc {
             },
     );
     if (session == null) {
-      onStatus?.call(
-        'Could not link to sender. Keep Send screen open on sender phone, then try again.',
-      );
       return [];
     }
 
-    onStatus?.call('Linked — receiving files…');
+    onStatus?.call('Receiving files…');
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(
-        const Duration(hours: 6),
+        const Duration(minutes: 15),
         onTimeout: () => <NgmyDocShareItem>[],
       );
     } catch (_) {
       imported = [];
     }
 
-    if (imported.isEmpty) {
-      onStatus?.call('Transfer failed or timed out. Keep both screens open and try again.');
-    } else {
+    if (imported.isNotEmpty) {
       onStatus?.call('Received ${imported.length} file(s).');
     }
     return imported;

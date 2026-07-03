@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -6,11 +7,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_stash.dart';
+import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_network_resilience.dart';
+import 'ngmy_supabase_multipart_relay.dart';
 
 /// QR prefix — scan to send a document to this user's Doc Share inbox.
 const String kNgmyDocShareMyCodeQrPrefix = 'NGMYDOCRCV';
+
+/// Files larger than this use Supabase storage instead of settings bundle.
+const int kNgmyMyCodeStorageThresholdBytes = 8 * 1024 * 1024;
 
 String _lookupKey(String code) => 'ngmy_doc_share_my_code_lookup_v1_${code.trim().toUpperCase()}';
 
@@ -163,14 +169,45 @@ class NgmyDocShareMyCode {
       return false;
     }
 
+    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+    final useStorage = totalBytes > kNgmyMyCodeStorageThresholdBytes ||
+        items.any((i) => i.sizeBytes > kNgmyMyCodeStorageThresholdBytes);
+
+    if (useStorage) {
+      return _sendViaStorage(
+        senderEmail: senderEmail,
+        recipientEmail: recipientEmail,
+        code: code,
+        items: items,
+        onStatus: onStatus,
+      );
+    }
+
     onStatus?.call('Uploading to ${recipientEmail.split('@').first}…');
     final bundleJson = await NgmyDocShareSync.exportBundleFile(
       ownerEmail: senderEmail,
       items: items,
       deliveryVia: 'myCode',
     );
+
+    try {
+      final decoded = jsonDecode(bundleJson);
+      if (decoded is Map) {
+        final files = decoded['files'];
+        if (files is! List || files.isEmpty || files.length != items.length) {
+          onStatus?.call('Could not read file data. For large files use NGMY Transfer or try again.');
+          return false;
+        }
+      }
+    } catch (_) {
+      onStatus?.call('Could not prepare files for sending.');
+      return false;
+    }
+
     if (bundleJson.length > kNgmyDocShareCloudStashMaxBytes) {
-      onStatus?.call('File too large for My Code (${(bundleJson.length / (1024 * 1024)).toStringAsFixed(1)} MB). Use NGMY Transfer for big videos.');
+      onStatus?.call(
+        'File too large for My Code (${(bundleJson.length / (1024 * 1024)).toStringAsFixed(1)} MB). Use NGMY Transfer for big videos.',
+      );
       return false;
     }
 
@@ -189,6 +226,7 @@ class NgmyDocShareMyCode {
       recipientEmail: recipientEmail,
       delivery: {
         'id': deliveryId,
+        'type': 'stash',
         'stashToken': stash.token,
         'senderEmail': senderEmail.trim().toLowerCase(),
         'fileCount': items.length,
@@ -202,6 +240,79 @@ class NgmyDocShareMyCode {
       return false;
     }
     onStatus?.call('Sent ${items.length} file(s) to My Code $code.');
+    return true;
+  }
+
+  static Future<bool> _sendViaStorage({
+    required String senderEmail,
+    required String recipientEmail,
+    required String code,
+    required List<NgmyDocShareItem> items,
+    void Function(String status)? onStatus,
+  }) async {
+    if (!await ngmyCanReachCloud()) {
+      onStatus?.call('No internet. Large files need a connection to send via My Code.');
+      return false;
+    }
+
+    final deliveryId = 'mc_${DateTime.now().millisecondsSinceEpoch}_${Random.secure().nextInt(9999)}';
+    final sessionId = '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
+    final fileRows = <Map<String, dynamic>>[];
+    final storagePaths = <String>[];
+
+    for (final item in items) {
+      onStatus?.call('Uploading ${item.name}…');
+      final base = 'my-code-inbox/${recipientEmail.trim()}/$sessionId/${ngmySupabaseRelaySafeName(item.name)}';
+      var partCount = 0;
+
+      await for (final chunk in NgmyDocShareStore.readFileStream(senderEmail, item)) {
+        if (chunk.isEmpty) continue;
+        final partPath = '$base.part${partCount.toString().padLeft(5, '0')}';
+        await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
+              partPath,
+              chunk,
+              fileOptions: FileOptions(upsert: true, contentType: item.mime),
+            );
+        storagePaths.add(partPath);
+        partCount++;
+      }
+
+      if (partCount <= 0) {
+        onStatus?.call('Could not read ${item.name}. Try NGMY Transfer.');
+        await ngmySupabaseRemovePaths(storagePaths);
+        return false;
+      }
+
+      fileRows.add({
+        'name': item.name,
+        'mime': item.mime,
+        'sizeBytes': item.sizeBytes,
+        'storageBase': base,
+        'partCount': partCount,
+      });
+    }
+
+    final ok = await _appendInboxDelivery(
+      recipientEmail: recipientEmail,
+      delivery: {
+        'id': deliveryId,
+        'type': 'storage',
+        'senderEmail': senderEmail.trim().toLowerCase(),
+        'fileCount': items.length,
+        'fileNames': items.map((e) => e.name).toList(),
+        'files': fileRows,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'status': 'pending',
+      },
+    );
+
+    if (!ok) {
+      onStatus?.call('Delivery failed. Try again.');
+      await ngmySupabaseRemovePaths(storagePaths);
+      return false;
+    }
+
+    onStatus?.call('Sent ${items.length} large file(s) to My Code $code.');
     return true;
   }
 
@@ -233,7 +344,23 @@ class NgmyDocShareMyCode {
     for (final raw in rawList) {
       if (raw is! Map) continue;
       final delivery = Map<String, dynamic>.from(raw);
-      if ((delivery['status'] ?? '').toString() == 'done') continue;
+      if ((delivery['status'] ?? '').toString() == 'done') {
+        updated.add(delivery);
+        continue;
+      }
+
+      final type = (delivery['type'] ?? 'stash').toString();
+
+      if (type == 'storage') {
+        final count = await _importStorageDelivery(recipientEmail: email, delivery: delivery);
+        if (count > 0) {
+          imported += count;
+          delivery['status'] = 'done';
+          delivery['deliveredAt'] = DateTime.now().toUtc().toIso8601String();
+        }
+        updated.add(delivery);
+        continue;
+      }
 
       final token = (delivery['stashToken'] ?? '').toString().trim();
       if (token.isEmpty) {
@@ -265,5 +392,44 @@ class NgmyDocShareMyCode {
 
     await _saveSettingsRow(_inboxKey(email), {'deliveries': keep});
     return imported;
+  }
+
+  static Future<int> _importStorageDelivery({
+    required String recipientEmail,
+    required Map<String, dynamic> delivery,
+  }) async {
+    final files = delivery['files'];
+    if (files is! List || files.isEmpty) return 0;
+
+    final sender = (delivery['senderEmail'] ?? '').toString();
+    var count = 0;
+    final pathsToDelete = <String>[];
+
+    for (final raw in files) {
+      if (raw is! Map) continue;
+      final name = (raw['name'] ?? 'file').toString();
+      final mime = (raw['mime'] ?? 'application/octet-stream').toString();
+      final base = (raw['storageBase'] ?? '').toString();
+      final partCount = (raw['partCount'] as num?)?.toInt() ?? 0;
+      if (base.isEmpty || partCount <= 0) continue;
+
+      final partPaths = ngmySupabasePartPathsFor(base, partCount);
+      pathsToDelete.addAll(partPaths);
+
+      final saved = await ngmySupabaseDownloadToDocShare(
+        recipientEmail: recipientEmail,
+        name: name,
+        mime: mime,
+        ownerEmail: sender,
+        storagePaths: partPaths,
+        note: 'Received via My Code',
+      );
+      if (saved != null) count++;
+    }
+
+    if (count > 0) {
+      await ngmySupabaseRemovePaths(pathsToDelete);
+    }
+    return count;
   }
 }

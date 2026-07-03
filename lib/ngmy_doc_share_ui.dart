@@ -305,11 +305,30 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   bool _working = false;
   String? _status;
   final Set<String> _selected = {};
+  Timer? _inboxPoll;
 
   @override
   void initState() {
     super.initState();
     unawaited(_refresh());
+    _inboxPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_working && mounted) unawaited(_pullMyCodeInbox());
+    });
+  }
+
+  @override
+  void dispose() {
+    _inboxPoll?.cancel();
+    unawaited(NgmyDocShareSync.stopLanShare());
+    super.dispose();
+  }
+
+  Future<void> _pullMyCodeInbox() async {
+    final inboxCount = await NgmyDocShareMyCode.pullInbox(recipientEmail: widget.email);
+    if (!mounted || inboxCount <= 0) return;
+    final items = await NgmyDocShareStore.list(widget.email);
+    setState(() => _items = items.reversed.toList());
+    _toast('Received $inboxCount file(s) via My Code.');
   }
 
   Future<void> _refresh() async {
@@ -695,12 +714,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    unawaited(NgmyDocShareSync.stopLanShare());
-    super.dispose();
   }
 
   Future<void> _importBackupFile() async {

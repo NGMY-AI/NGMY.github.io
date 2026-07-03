@@ -198,37 +198,114 @@ class NgmyTransfer {
       }
     }
 
-    // WebRTC first — works browser↔phone, phone↔phone, any network.
+    // WebRTC + cloud backup run together — whichever connects first wins.
     if (offerToken.isNotEmpty) {
-      final imported = await NgmyTransferWebRtc.receive(
+      return _receiveHybrid(
+        code: normalized,
+        offerToken: offerToken,
+        recipientEmail: recipientEmail,
+        mode: mode,
+        row: row,
+        ownerEmail: ownerEmail,
+        onProgress: onProgress,
+        onBytes: onBytes,
+        onStatus: onStatus,
+      );
+    }
+
+    // LAN fallback — native app receiver on same Wi‑Fi as sender.
+    return _receiveViaLan(
+      row: row,
+      recipientEmail: recipientEmail,
+      ownerEmail: ownerEmail,
+      onProgress: onProgress,
+      onBytes: onBytes,
+      onStatus: onStatus,
+    );
+  }
+
+  static Future<List<NgmyDocShareItem>> _receiveHybrid({
+    required String code,
+    required String offerToken,
+    required String recipientEmail,
+    required String mode,
+    required Map<String, dynamic> row,
+    required String ownerEmail,
+    void Function(int received, int total)? onProgress,
+    void Function(String fileName, int receivedBytes, int? totalBytes)? onBytes,
+    void Function(String status)? onStatus,
+  }) async {
+    final winner = Completer<List<NgmyDocShareItem>>();
+    var settled = false;
+
+    void finish(List<NgmyDocShareItem> items) {
+      if (settled || items.isEmpty) return;
+      settled = true;
+      if (!winner.isCompleted) winner.complete(items);
+    }
+
+    onStatus?.call('Connecting…');
+
+    // Cloud path — instant if backup already finished uploading.
+    unawaited(() async {
+      if (await NgmyTransferCloudRelay.isReady(code)) {
+        onStatus?.call('Cloud backup ready — downloading…');
+        final items = await NgmyTransferCloudRelay.importByCode(
+          code: code,
+          recipientEmail: recipientEmail,
+          onProgress: onProgress,
+          onStatus: onStatus,
+          onBytes: onBytes,
+          skipWait: true,
+        );
+        finish(items);
+      }
+    }());
+
+    // Cloud path — wait for sender upload while receiver is connected.
+    unawaited(() async {
+      final items = await NgmyTransferCloudRelay.importByCode(
+        code: code,
+        recipientEmail: recipientEmail,
+        onProgress: onProgress,
+        onStatus: onStatus,
+        onBytes: onBytes,
+      );
+      finish(items);
+    }());
+
+    // Direct peer path.
+    unawaited(() async {
+      final items = await NgmyTransferWebRtc.receive(
         recipientEmail: recipientEmail,
         offerToken: offerToken,
         onProgress: onProgress,
         onStatus: onStatus,
         onBytes: onBytes,
       );
-      if (imported.isNotEmpty) return imported;
+      finish(items);
+    }());
 
-      onStatus?.call('Direct peer link failed — trying cloud backup…');
-      final relayed = await NgmyTransferCloudRelay.importByCode(
-        code: normalized,
-        recipientEmail: recipientEmail,
-        onProgress: onProgress,
-        onStatus: onStatus,
-        onBytes: onBytes,
+    List<NgmyDocShareItem> imported;
+    try {
+      imported = await winner.future.timeout(
+        const Duration(minutes: 25),
+        onTimeout: () => <NgmyDocShareItem>[],
       );
-      if (relayed.isNotEmpty) return relayed;
-
-      if (mode == 'webrtc' || kIsWeb) {
-        onStatus?.call(
-          'Transfer failed. Sender must keep the Send screen open while you enter the code.',
-        );
-        return [];
-      }
-      onStatus?.call('Peer transfer failed — trying direct Wi‑Fi…');
+    } catch (_) {
+      imported = [];
     }
 
-    // LAN fallback — native app receiver on same Wi‑Fi as sender.
+    if (imported.isNotEmpty) return imported;
+
+    if (mode == 'webrtc' || kIsWeb) {
+      onStatus?.call(
+        'Transfer failed. Sender must tap Start transfer and keep that screen open while you enter the code.',
+      );
+      return [];
+    }
+
+    onStatus?.call('Peer transfer failed — trying direct Wi‑Fi…');
     return _receiveViaLan(
       row: row,
       recipientEmail: recipientEmail,
