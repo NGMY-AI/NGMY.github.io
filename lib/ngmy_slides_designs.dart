@@ -19,12 +19,17 @@ class NgmySlideDesignDef {
   final void Function(NgmySlide slide) apply;
 }
 
-void _clearDesignShapes(NgmySlide slide) {
-  slide.elements.removeWhere((e) => e.fileName == '__design__');
+const _kDesignTag = '__design__';
+
+String _applyingDesignId = '';
+
+void _clearSlideDesign(NgmySlide slide) {
+  slide.elements.removeWhere((e) => e.fileName.startsWith(_kDesignTag));
+  slide.slideDesignId = '';
 }
 
 void _addDesignShape(NgmySlide slide, NgmySlideElement el) {
-  el.fileName = '__design__';
+  el.fileName = '$_kDesignTag:${_applyingDesignId.isEmpty ? 'layer' : _applyingDesignId}';
   slide.elements.insert(0, el);
 }
 
@@ -66,11 +71,10 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF1E3A8A), Color(0xFFFFFFFF)],
     apply: (s) {
-      _clearDesignShapes(s);
-      _addDesignShape(s, _shape(x: -0.08, y: 0.08, w: 0.62, h: 0.92, fill: 0xFF1E3A8A));
-      _addDesignShape(s, _shape(x: 0.48, y: 0.08, w: 0.08, h: 0.92, fill: 0xFF38BDF8));
-      _addDesignShape(s, _shape(x: -0.05, y: 0.55, w: 0.55, h: 0.5, shape: NgmySlideShapeKind.triangle, fill: 0xFF1E40AF, rotation: -0.15));
-      _addDesignShape(s, _shape(x: 0.08, y: 0.88, w: 0.35, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF38BDF8, stroke: 0xFF38BDF8, strokeW: 3));
+      _addDesignShape(s, _shape(x: 0, y: 0, w: 0.52, h: 1, fill: 0xFF1E3A8A));
+      _addDesignShape(s, _shape(x: 0.48, y: 0, w: 0.04, h: 1, fill: 0xFF38BDF8));
+      _addDesignShape(s, _shape(x: 0.52, y: 0.62, w: 0.48, h: 0.38, fill: 0xFFF1F5F9));
+      _addDesignShape(s, _shape(x: 0.08, y: 0.14, w: 0.32, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF38BDF8, stroke: 0xFF38BDF8, strokeW: 3));
       _bg(s, 0xFFFFFFFF, 0xFFF8FAFC);
     },
   ),
@@ -80,11 +84,11 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF2563EB), Color(0xFFFFFFFF)],
     apply: (s) {
-      _clearDesignShapes(s);
-      _addDesignShape(s, _shape(x: 0.62, y: 0.08, w: 0.38, h: 0.84, fill: 0xFF2563EB));
-      _addDesignShape(s, _shape(x: 0.68, y: 0.18, w: 0.32, h: 0.64, fill: 0xFF3B82F6));
-      _addDesignShape(s, _shape(x: 0.74, y: 0.28, w: 0.26, h: 0.44, shape: NgmySlideShapeKind.triangle, fill: 0xFF60A5FA, rotation: 0.5));
-      _addDesignShape(s, _shape(x: 0.06, y: 0.12, w: 0.18, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF2563EB, stroke: 0xFF2563EB, strokeW: 3));
+      _addDesignShape(s, _shape(x: 0.58, y: 0.1, w: 0.36, h: 0.8, fill: 0xFF1E40AF));
+      _addDesignShape(s, _shape(x: 0.64, y: 0.18, w: 0.28, h: 0.64, fill: 0xFF2563EB));
+      _addDesignShape(s, _shape(x: 0.7, y: 0.28, w: 0.2, h: 0.44, fill: 0xFF3B82F6));
+      _addDesignShape(s, _shape(x: 0.08, y: 0.12, w: 0.22, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF2563EB, stroke: 0xFF2563EB, strokeW: 3));
+      _addDesignShape(s, _shape(x: 0.08, y: 0.18, w: 0.38, h: 0.004, shape: NgmySlideShapeKind.line, fill: 0xFFCBD5E1, stroke: 0xFFCBD5E1, strokeW: 2));
       _bg(s, 0xFFFFFFFF, 0xFFEFF6FF);
     },
   ),
@@ -94,7 +98,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF0D9488), Color(0xFF111827)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.11, fill: 0xFF0D9488));
       _addDesignShape(s, _shape(x: 0, y: 0.89, w: 1, h: 0.11, fill: 0xFF111827));
       _addDesignShape(s, _shape(x: 0.72, y: 0.14, w: 0.28, h: 0.72, shape: NgmySlideShapeKind.parallelogram, fill: 0x330D9488));
@@ -109,7 +112,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF0F766E), Color(0xFF1E3A8A)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0.55, y: -0.05, w: 0.5, h: 0.55, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF0F766E));
       _addDesignShape(s, _shape(x: 0.62, y: 0.35, w: 0.45, h: 0.5, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF1E3A8A));
       _addDesignShape(s, _shape(x: 0.68, y: 0.55, w: 0.35, h: 0.4, shape: NgmySlideShapeKind.triangle, fill: 0xFF2563EB, rotation: 0.3));
@@ -123,7 +125,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Bold',
     previewColors: [Color(0xFF000000), Color(0xFF22D3EE)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: -0.15, y: 0.35, w: 0.75, h: 0.75, shape: NgmySlideShapeKind.triangle, fill: 0xFF111827, rotation: -0.4));
       _addDesignShape(s, _shape(x: 0.42, y: 0.38, w: 0.06, h: 0.55, fill: 0xFF22D3EE));
       _addDesignShape(s, _shape(x: 0.08, y: 0.08, w: 0.35, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF22D3EE, stroke: 0xFF22D3EE, strokeW: 3));
@@ -137,7 +138,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF0F172A), Color(0xFF64748B)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.48, fill: 0xCC0F172A));
       _addDesignShape(s, _shape(x: -0.05, y: 0.38, w: 1.1, h: 0.12, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF2563EB, rotation: -0.08));
       _addDesignShape(s, _shape(x: 0.55, y: 0.05, w: 0.42, h: 0.35, fill: 0x332563EB));
@@ -151,7 +151,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF1E3A8A), Color(0xFF059669)],
     apply: (s) {
-      _clearDesignShapes(s);
       const cols = [0xFF1E3A8A, 0xFF2563EB, 0xFF0D9488, 0xFF059669];
       for (var i = 0; i < 4; i++) {
         _addDesignShape(s, _shape(x: 0.04 + i * 0.235, y: 0.72, w: 0.21, h: 0.22, fill: cols[i], stroke: 0xFFFFFFFF, strokeW: 2));
@@ -166,7 +165,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF1E40AF), Color(0xFF93C5FD)],
     apply: (s) {
-      _clearDesignShapes(s);
       for (var i = 0; i < 4; i++) {
         _addDesignShape(s, _shape(x: 0.58 + i * 0.08, y: 0.15 + i * 0.05, w: 0.32, h: 0.7, shape: NgmySlideShapeKind.arrow, fill: Color.lerp(const Color(0xFF1E40AF), const Color(0xFF93C5FD), i / 3)!.toARGB32(), rotation: 0));
       }
@@ -180,7 +178,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF2563EB), Color(0xFFFFFFFF)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0, y: 0, w: 0.42, h: 1, fill: 0xFF2563EB));
       _addDesignShape(s, _shape(x: 0.35, y: -0.05, w: 0.18, h: 1.1, shape: NgmySlideShapeKind.triangle, fill: 0xFF1D4ED8, rotation: 1.57));
       _addDesignShape(s, _shape(x: 0.08, y: 0.85, w: 0.25, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFFFFFFFF, stroke: 0xFFFFFFFF, strokeW: 2));
@@ -193,12 +190,12 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF0C1929), Color(0xFF3B82F6)],
     apply: (s) {
-      _clearDesignShapes(s);
-      _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.12, fill: 0xFF0C1929));
-      _addDesignShape(s, _shape(x: 0, y: 0.12, w: 1, h: 0.008, fill: 0xFF3B82F6));
-      _addDesignShape(s, _shape(x: 0, y: 0.88, w: 1, h: 0.12, fill: 0xFF0C1929));
-      _addDesignShape(s, _shape(x: 0.75, y: 0.2, w: 0.2, h: 0.6, shape: NgmySlideShapeKind.parallelogram, fill: 0x223B82F6));
-      _bg(s, 0xFFFFFFFF, 0xFFEFF6FF);
+      _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.1, fill: 0xFF0C1929));
+      _addDesignShape(s, _shape(x: 0, y: 0.1, w: 1, h: 0.012, fill: 0xFF3B82F6));
+      _addDesignShape(s, _shape(x: 0.06, y: 0.14, w: 0.42, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFF3B82F6, stroke: 0xFF3B82F6, strokeW: 3));
+      _addDesignShape(s, _shape(x: 0.72, y: 0.18, w: 0.22, h: 0.68, shape: NgmySlideShapeKind.parallelogram, fill: 0x180C1929));
+      _addDesignShape(s, _shape(x: 0, y: 0.9, w: 1, h: 0.1, fill: 0xFF0C1929));
+      _bg(s, 0xFFFFFFFF, 0xFFF8FAFC);
     },
   ),
   NgmySlideDesignDef(
@@ -207,7 +204,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Bold',
     previewColors: [Color(0xFF000000), Color(0xFF06B6D4)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: -0.2, y: -0.1, w: 0.55, h: 1.2, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF111827, rotation: 0.15));
       _addDesignShape(s, _shape(x: 0.15, y: -0.05, w: 0.08, h: 1.1, fill: 0xFF06B6D4, rotation: 0.15));
       _addDesignShape(s, _shape(x: 0.55, y: 0.75, w: 0.38, h: 0.18, fill: 0x00111827, stroke: 0xFF06B6D4, strokeW: 3));
@@ -220,7 +216,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Bold',
     previewColors: [Color(0xFF450A0A), Color(0xFFDC2626)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: -0.1, y: 0.45, w: 0.65, h: 0.65, shape: NgmySlideShapeKind.triangle, fill: 0xFF450A0A, rotation: -0.2));
       _addDesignShape(s, _shape(x: 0.05, y: 0.55, w: 0.5, h: 0.5, shape: NgmySlideShapeKind.triangle, fill: 0xFFDC2626, rotation: -0.15));
       _addDesignShape(s, _shape(x: 0.55, y: 0.08, w: 0.38, h: 0.006, shape: NgmySlideShapeKind.line, fill: 0xFFDC2626, stroke: 0xFFDC2626, strokeW: 3));
@@ -233,7 +228,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF0369A1), Color(0xFF7DD3FC)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: -0.05, y: 0.7, w: 0.45, h: 0.35, shape: NgmySlideShapeKind.triangle, fill: 0xFF0369A1, rotation: 3.14));
       _addDesignShape(s, _shape(x: 0.25, y: 0.75, w: 0.4, h: 0.3, shape: NgmySlideShapeKind.triangle, fill: 0xFF0284C7, rotation: 3.14));
       _addDesignShape(s, _shape(x: 0.55, y: 0.72, w: 0.5, h: 0.32, shape: NgmySlideShapeKind.triangle, fill: 0xFF0EA5E9, rotation: 3.14));
@@ -247,7 +241,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Bold',
     previewColors: [Color(0xFF000000), Color(0xFF22D3EE)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0.02, y: 0.02, w: 0.14, h: 0.14, fill: 0xFF111827));
       _addDesignShape(s, _shape(x: 0.84, y: 0.02, w: 0.14, h: 0.14, fill: 0x0022D3EE, stroke: 0xFF22D3EE, strokeW: 3));
       _addDesignShape(s, _shape(x: -0.08, y: 0.78, w: 0.35, h: 0.28, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF111827));
@@ -262,7 +255,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Luxury',
     previewColors: [Color(0xFF1C1917), Color(0xFFEAB308)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0.04, y: 0.04, w: 0.92, h: 0.92, fill: 0x001C1917, stroke: 0xFFEAB308, strokeW: 3));
       _addDesignShape(s, _shape(x: 0.02, y: 0.02, w: 0.15, h: 0.15, shape: NgmySlideShapeKind.triangle, fill: 0x44EAB308, rotation: 0));
       _addDesignShape(s, _shape(x: 0.83, y: 0.83, w: 0.15, h: 0.15, shape: NgmySlideShapeKind.triangle, fill: 0x44EAB308, rotation: 3.14));
@@ -276,7 +268,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF0D9488), Color(0xFF5EEAD4)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0.68, y: 0.18, w: 0.14, h: 0.14, shape: NgmySlideShapeKind.hexagon, fill: 0xFF0D9488));
       _addDesignShape(s, _shape(x: 0.78, y: 0.28, w: 0.14, h: 0.14, shape: NgmySlideShapeKind.hexagon, fill: 0xFF14B8A6));
       _addDesignShape(s, _shape(x: 0.68, y: 0.38, w: 0.14, h: 0.14, shape: NgmySlideShapeKind.hexagon, fill: 0xFF2DD4BF));
@@ -292,7 +283,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Modern',
     previewColors: [Color(0xFF0F172A), Color(0xFF38BDF8)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0, y: 0, w: 1, h: 0.42, fill: 0xDD0F172A));
       _addDesignShape(s, _shape(x: 0, y: 0.38, w: 1, h: 0.06, shape: NgmySlideShapeKind.parallelogram, fill: 0xFF2563EB, rotation: -0.05));
       _addDesignShape(s, _shape(x: 0.7, y: 0.08, w: 0.25, h: 0.25, shape: NgmySlideShapeKind.circle, fill: 0x3338BDF8));
@@ -306,7 +296,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF2563EB), Color(0xFF93C5FD)],
     apply: (s) {
-      _clearDesignShapes(s);
       for (var i = 0; i < 4; i++) {
         _addDesignShape(s, _shape(x: 0.06 + i * 0.23, y: 0.78, w: 0.2, h: 0.14, shape: NgmySlideShapeKind.arrow, fill: Color.lerp(const Color(0xFF1E40AF), const Color(0xFF93C5FD), i / 3)!.toARGB32()));
       }
@@ -321,7 +310,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Minimal',
     previewColors: [Color(0xFF64748B), Color(0xFFFFFFFF)],
     apply: (s) {
-      _clearDesignShapes(s);
       for (var i = 1; i < 6; i++) {
         _addDesignShape(s, _shape(x: 0.08, y: 0.15 + i * 0.12, w: 0.55, h: 0.002, shape: NgmySlideShapeKind.line, fill: 0xFFCBD5E1, stroke: 0xFFCBD5E1));
       }
@@ -337,7 +325,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Luxury',
     previewColors: [Color(0xFF475569), Color(0xFFE2E8F0)],
     apply: (s) {
-      _clearDesignShapes(s);
       _addDesignShape(s, _shape(x: 0.05, y: 0.05, w: 0.9, h: 0.9, fill: 0x00475569, stroke: 0xFF94A3B8, strokeW: 2));
       _addDesignShape(s, _shape(x: 0.03, y: 0.03, w: 0.08, h: 0.08, fill: 0xFF475569));
       _addDesignShape(s, _shape(x: 0.89, y: 0.03, w: 0.08, h: 0.08, fill: 0xFF64748B));
@@ -353,7 +340,6 @@ final ngmySlideDesignTemplates = <NgmySlideDesignDef>[
     category: 'Corporate',
     previewColors: [Color(0xFF1E3A8A), Color(0xFFDBEAFE)],
     apply: (s) {
-      _clearDesignShapes(s);
       for (var i = 0; i < 3; i++) {
         _addDesignShape(s, _shape(x: 0.55, y: 0.14 + i * 0.24, w: 0.38, h: 0.18, fill: 0xFFFFFFFF, stroke: 0xFF2563EB, strokeW: 2));
         _addDesignShape(s, _shape(x: 0.57, y: 0.16 + i * 0.24, w: 0.06, h: 0.14, fill: Color.lerp(const Color(0xFF1E3A8A), const Color(0xFF60A5FA), i / 2)!.toARGB32()));
@@ -373,13 +359,19 @@ NgmySlide ngmySlideDesignPreview(String id) {
 }
 
 void ngmyApplySlideDesignToDeck(NgmySlideDeck deck, String designId) {
-  final def = ngmySlideDesignTemplates.firstWhere((d) => d.id == designId, orElse: () => ngmySlideDesignTemplates.first);
   for (final slide in deck.slides) {
-    def.apply(slide);
+    ngmyApplySlideDesignToCurrent(slide, designId);
   }
 }
 
 void ngmyApplySlideDesignToCurrent(NgmySlide slide, String designId) {
+  _clearSlideDesign(slide);
   final def = ngmySlideDesignTemplates.firstWhere((d) => d.id == designId, orElse: () => ngmySlideDesignTemplates.first);
-  def.apply(slide);
+  _applyingDesignId = def.id;
+  slide.slideDesignId = def.id;
+  try {
+    def.apply(slide);
+  } finally {
+    _applyingDesignId = '';
+  }
 }

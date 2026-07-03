@@ -233,6 +233,7 @@ class NgmySlide {
     this.backgroundEnd,
     this.transition = NgmySlideTransition.fade,
     this.durationSeconds = 0,
+    this.slideDesignId = '',
     List<NgmySlideElement>? elements,
   }) : elements = elements ?? [];
 
@@ -244,6 +245,8 @@ class NgmySlide {
   int? backgroundEnd;
   NgmySlideTransition transition;
   int durationSeconds;
+  /// Active slide design template id — used to replace (not stack) design layers.
+  String slideDesignId;
   List<NgmySlideElement> elements;
 
   NgmySlide copy() => NgmySlide(
@@ -255,6 +258,7 @@ class NgmySlide {
         backgroundEnd: backgroundEnd,
         transition: transition,
         durationSeconds: durationSeconds,
+        slideDesignId: slideDesignId,
         elements: elements.map((e) => e.copy()).toList(),
       );
 
@@ -267,6 +271,7 @@ class NgmySlide {
         'backgroundEnd': backgroundEnd,
         'transition': transition.name,
         'durationSeconds': durationSeconds,
+        'slideDesignId': slideDesignId,
         'elements': elements.map((e) => e.toJson()).toList(),
       };
 
@@ -279,6 +284,7 @@ class NgmySlide {
         backgroundEnd: (json['backgroundEnd'] as num?)?.toInt(),
         transition: _transitionFromJson(json['transition']),
         durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
+        slideDesignId: (json['slideDesignId'] ?? '').toString(),
         elements: (json['elements'] as List?)
                 ?.whereType<Map>()
                 .map((e) => NgmySlideElement.fromJson(Map<String, dynamic>.from(e)))

@@ -424,6 +424,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   }
 
   void _selectElement(String? id) {
+    final prevId = _selectedElementId;
+    if (prevId != null && prevId != id) {
+      final prev = _findElement(prevId);
+      if (prev != null && prev.type == NgmySlideElementType.text) {
+        final c = _textControllers[prevId];
+        if (c != null && c.text != prev.text) prev.text = c.text;
+      }
+    }
     setState(() {
       _selectedElementId = id;
       if (id != null) {
@@ -1005,7 +1013,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
 
   Widget _elementTransitionPicker(bool isDark) {
     final el = _selectedElement();
-    if (el == null || el.fileName == '__design__') return const SizedBox.shrink();
+    if (el == null || el.fileName.startsWith('__design__')) return const SizedBox.shrink();
     return Row(
       children: [
         const SizedBox(width: 8),
@@ -1520,7 +1528,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (el != null && el.fileName != '__design__') ...[
+              if (el != null && !el.fileName.startsWith('__design__')) ...[
                 Text('ELEMENT ANIMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
                 const SizedBox(height: 4),
                 transitionRow(
@@ -1590,7 +1598,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 _mutate(() => el.bulletList = !el.bulletList);
               }, isDark),
               _fontSizeStepper(el, isDark),
-              if (el != null && el.fileName != '__design__') _elementTransitionPicker(isDark),
+              if (el != null && !el.fileName.startsWith('__design__')) _elementTransitionPicker(isDark),
               _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
             ],
           ],
@@ -1878,7 +1886,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
     final selected = _selectedElementId == e.id;
     final scale = cw / 960;
-    final isDesign = e.fileName == '__design__';
+    final isDesign = e.fileName.startsWith('__design__');
     if (isDesign) {
       return Positioned(
         key: ValueKey('el_${e.id}'),
@@ -1918,7 +1926,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  border: selected ? Border.all(color: const Color(0xFF2563EB), width: 2) : null,
+                  border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.transparent, width: 2),
                   color: e.type == NgmySlideElementType.signature ? Colors.transparent : null,
                 ),
                 child: NgmySlideElementView(

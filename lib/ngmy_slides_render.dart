@@ -53,48 +53,51 @@ class NgmySlideElementView extends StatelessWidget {
       );
 
   Widget _textView() {
+    const pad = EdgeInsets.fromLTRB(6, 10, 6, 12);
+    final style = _textStyle().copyWith(height: 1.35);
+    final strut = StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true);
+    final align = _alignToAlignment(element.align);
+
+    Widget child;
     if (editing && selected && controller != null) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
-        child: TextField(
-          key: ValueKey('slide_tf_${element.id}'),
-          controller: controller,
-          maxLines: null,
-          minLines: 1,
-          style: _textStyle().copyWith(height: 1.35),
-          strutStyle: StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true),
+      child = TextField(
+        key: ValueKey('slide_tf_${element.id}'),
+        controller: controller,
+        maxLines: null,
+        minLines: 1,
+        style: style,
+        strutStyle: strut,
+        textAlign: element.align,
+        textAlignVertical: TextAlignVertical.top,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.06),
+        ),
+        onChanged: onTextChanged,
+        onTap: onTap,
+      );
+    } else {
+      child = GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Text(
+          element.text,
+          key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
+          style: style,
+          strutStyle: strut,
           textAlign: element.align,
-          textAlignVertical: TextAlignVertical.top,
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: EdgeInsets.zero,
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.06),
-          ),
-          onChanged: onTextChanged,
-          onTap: onTap,
+          softWrap: true,
+          overflow: TextOverflow.visible,
         ),
       );
     }
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
-        child: Align(
-          alignment: _alignToAlignment(element.align),
-          child: Text(
-            element.text,
-            key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
-            style: _textStyle().copyWith(height: 1.35),
-            strutStyle: StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true),
-            textAlign: element.align,
-            softWrap: true,
-            overflow: TextOverflow.visible,
-          ),
-        ),
-      ),
+
+    return Padding(
+      padding: pad,
+      child: Align(alignment: align, child: child),
     );
   }
 

@@ -7,6 +7,7 @@ import 'ngmy_network_resilience.dart';
 
 const kNgmyEssentialsShortQrPrefix = 'NGMY-ESS6';
 const kNgmyEssentialsShortCodePrefix = 'ngmy_essentials_code_v1_';
+const kNgmyEssentialsPayloadPrefix = 'NGMY-ESS:';
 
 String ngmyEssentialsShortQrPayload(String code) => '$kNgmyEssentialsShortQrPrefix:${code.trim().toUpperCase()}';
 
@@ -17,6 +18,31 @@ bool ngmyEssentialsLooksLikeShortCode(String raw) {
     return RegExp(r'^[A-Z0-9]{6}$').hasMatch(code);
   }
   return RegExp(r'^[A-Z0-9]{6}$').hasMatch(t.replaceAll(RegExp(r'[^A-Z0-9]'), ''));
+}
+
+/// Normalize any scanned/pasted Essentials QR or code into a resolvable import string.
+String? ngmyEssentialsParseScannedRaw(String raw) {
+  var t = raw.trim();
+  if (t.isEmpty) return null;
+  try {
+    t = Uri.decodeFull(t);
+  } catch (_) {}
+  final upper = t.toUpperCase();
+
+  if (upper.startsWith(kNgmyEssentialsPayloadPrefix)) return t;
+
+  final prefixMatch = RegExp(r'NGMY-ESS6:([A-Z0-9]{6})').firstMatch(upper);
+  if (prefixMatch != null) return '$kNgmyEssentialsShortQrPrefix:${prefixMatch.group(1)}';
+
+  if (upper.startsWith('$kNgmyEssentialsShortQrPrefix:')) {
+    final code = NgmyEssentialsShortCode.normalize(t);
+    return code == null ? null : '$kNgmyEssentialsShortQrPrefix:$code';
+  }
+
+  final code = NgmyEssentialsShortCode.normalize(t);
+  if (code != null) return '$kNgmyEssentialsShortQrPrefix:$code';
+
+  return null;
 }
 
 class NgmyEssentialsShortCode {

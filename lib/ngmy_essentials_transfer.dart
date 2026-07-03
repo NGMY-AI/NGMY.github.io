@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:qr_flutter/qr_flutter.dart';
+
 import 'ngmy_business_contacts.dart';
 import 'ngmy_essentials_short_code.dart';
 import 'ngmy_medicine_organizer.dart';
@@ -13,7 +15,6 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
-const kNgmyEssentialsPayloadPrefix = 'NGMY-ESS:';
 const _accent = Color(0xFF38BDF8);
 const _accent2 = Color(0xFF34D399);
 const _bg = Color(0xFF030712);
@@ -76,14 +77,10 @@ Future<void> ngmyEssentialsImportBundle(String userEmail, Map<String, dynamic> b
 }
 
 Future<String?> ngmyEssentialsResolveImportPayload(String raw) async {
-  final t = raw.trim();
-  if (t.startsWith(kNgmyEssentialsPayloadPrefix)) {
-    return t;
-  }
-  if (t.startsWith('$kNgmyEssentialsShortQrPrefix:') || ngmyEssentialsLooksLikeShortCode(t)) {
-    return NgmyEssentialsShortCode.resolvePayload(t);
-  }
-  return null;
+  final parsed = ngmyEssentialsParseScannedRaw(raw);
+  if (parsed == null) return null;
+  if (parsed.startsWith(kNgmyEssentialsPayloadPrefix)) return parsed;
+  return NgmyEssentialsShortCode.resolvePayload(parsed);
 }
 
 Future<void> showNgmyEssentialsTransferHub(BuildContext context, {required String userEmail}) {
@@ -321,7 +318,12 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    NgmyBrandedQrWidget(data: qrData, large: true, coarseScan: true),
+                    NgmyBrandedQrWidget(
+                      data: qrData,
+                      large: true,
+                      coarseScan: true,
+                      errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    ),
                     const SizedBox(height: 22),
                     Text('YOUR 6-CHARACTER CODE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
                     const SizedBox(height: 10),
@@ -461,7 +463,11 @@ class _EssentialsScanPage extends StatefulWidget {
 }
 
 class _EssentialsScanPageState extends State<_EssentialsScanPage> {
-  final _controller = MobileScannerController(detectionSpeed: DetectionSpeed.normal, facing: CameraFacing.back);
+  final _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    formats: const [BarcodeFormat.qrCode],
+  );
   var _handled = false;
   var _torch = false;
 
@@ -474,13 +480,28 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
   void _onDetect(BarcodeCapture capture) {
     if (_handled) return;
     for (final b in capture.barcodes) {
-      final raw = b.rawValue?.trim() ?? '';
-      if (raw.isEmpty) continue;
-      if (!raw.startsWith(kNgmyEssentialsShortQrPrefix) && !ngmyEssentialsLooksLikeShortCode(raw)) continue;
-      _handled = true;
-      Navigator.pop(context, raw);
+      for (final raw in [b.rawValue, b.displayValue]) {
+        if (raw == null || raw.trim().isEmpty) continue;
+        final parsed = ngmyEssentialsParseScannedRaw(raw);
+        if (parsed == null) continue;
+        _handled = true;
+        HapticFeedback.mediumImpact();
+        Navigator.pop(context, parsed);
+        return;
+      }
+    }
+  }
+
+  Future<void> _pasteCode() async {
+    final clip = await Clipboard.getData(Clipboard.kTextPlain);
+    final parsed = ngmyEssentialsParseScannedRaw(clip?.text ?? '');
+    if (parsed == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Clipboard does not contain a valid Essentials QR or code')));
+      }
       return;
     }
+    if (mounted) Navigator.pop(context, parsed);
   }
 
   Future<void> _openEnterCode() async {
@@ -497,6 +518,7 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(icon: const Icon(Icons.content_paste_rounded), tooltip: 'Paste code', onPressed: _pasteCode),
           IconButton(icon: const Icon(Icons.pin_rounded), tooltip: 'Enter code', onPressed: _openEnterCode),
           IconButton(
             icon: Icon(_torch ? Icons.flash_on_rounded : Icons.flash_off_rounded),
@@ -509,9 +531,18 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
       ),
       body: Stack(
         children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
+          MobileScanner(controller: _controller, onDetect: _onDetect, fit: BoxFit.cover),
           Center(child: Container(width: 280, height: 280, decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), border: Border.all(color: _accent, width: 4)))),
-          const Positioned(left: 0, right: 0, bottom: 36, child: Text('Big-dot NGMY QR scans fastest', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 36,
+            child: Text(
+              'Fill the frame · bright screen · big-dot NGMY QR',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );
