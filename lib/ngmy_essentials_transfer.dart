@@ -7,22 +7,23 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'ngmy_business_contacts.dart';
+import 'ngmy_essentials_short_code.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
 const kNgmyEssentialsPayloadPrefix = 'NGMY-ESS:';
-const _kEssentialsAccent = Color(0xFF38BDF8);
+const _accent = Color(0xFF38BDF8);
+const _accent2 = Color(0xFF34D399);
+const _bg = Color(0xFF030712);
+const _card = Color(0xFF0F172A);
 
 enum EssentialsTransferCategory { contacts, locations, support, medicines, all }
 
 Future<Map<String, dynamic>> ngmyEssentialsExportBundle(String userEmail, Set<EssentialsTransferCategory> cats) async {
   final all = cats.contains(EssentialsTransferCategory.all);
-  final bundle = <String, dynamic>{
-    'v': 1,
-    'exportedAt': DateTime.now().toUtc().toIso8601String(),
-  };
+  final bundle = <String, dynamic>{'v': 1, 'exportedAt': DateTime.now().toUtc().toIso8601String()};
   if (all || cats.contains(EssentialsTransferCategory.contacts)) {
     bundle['contacts'] = (await ngmyExportBusinessContacts(userEmail: userEmail)).map((e) => e.toJson()).toList();
   }
@@ -74,13 +75,20 @@ Future<void> ngmyEssentialsImportBundle(String userEmail, Map<String, dynamic> b
   }
 }
 
-bool ngmyEssentialsIsPayload(String raw) => raw.trim().startsWith(kNgmyEssentialsPayloadPrefix);
+Future<String?> ngmyEssentialsResolveImportPayload(String raw) async {
+  final t = raw.trim();
+  if (t.startsWith(kNgmyEssentialsPayloadPrefix)) {
+    return t;
+  }
+  if (t.startsWith('$kNgmyEssentialsShortQrPrefix:') || ngmyEssentialsLooksLikeShortCode(t)) {
+    return NgmyEssentialsShortCode.resolvePayload(t);
+  }
+  return null;
+}
 
 Future<void> showNgmyEssentialsTransferHub(BuildContext context, {required String userEmail}) {
   return Navigator.of(context).push<void>(
-    MaterialPageRoute(
-      builder: (_) => NgmyEssentialsTransferPage(userEmail: userEmail),
-    ),
+    MaterialPageRoute(builder: (_) => NgmyEssentialsTransferPage(userEmail: userEmail)),
   );
 }
 
@@ -119,10 +127,19 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     try {
       final bundle = await ngmyEssentialsExportBundle(widget.userEmail, _selected);
       final payload = ngmyEssentialsEncodePayload(bundle);
+      var code = NgmyEssentialsShortCode.generate();
+      for (var i = 0; i < 5; i++) {
+        final published = await NgmyEssentialsShortCode.publishPayload(ownerEmail: widget.userEmail, payload: payload, code: code);
+        if (published != null) {
+          code = published;
+          break;
+        }
+        code = NgmyEssentialsShortCode.generate();
+      }
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
-          builder: (_) => _EssentialsQrDisplayPage(payload: payload, categoryCount: _selected.length),
+          builder: (_) => _EssentialsQrDisplayPage(code: code, categoryCount: _all ? 4 : _selected.length),
         ),
       );
     } finally {
@@ -131,56 +148,33 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
   }
 
   Future<void> _scanQr() async {
-    final payload = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _EssentialsScanPage()),
-    );
-    if (payload == null || !mounted) return;
-    await _importPayload(payload);
+    final raw = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _EssentialsScanPage()));
+    if (raw == null || !mounted) return;
+    await _importRaw(raw);
   }
 
-  Future<void> _pasteCode() async {
-    final code = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final c = TextEditingController();
-        return AlertDialog(
-          backgroundColor: const Color(0xFF0B1220),
-          title: const Text('Enter transfer code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          content: TextField(
-            controller: c,
-            maxLines: 6,
-            autofocus: true,
-            style: const TextStyle(color: Colors.white, fontSize: 11),
-            decoration: InputDecoration(
-              hintText: 'Paste NGMY-ESS code here…',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.06),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('Import')),
-          ],
-        );
-      },
-    );
-    if (code == null || code.isEmpty || !mounted) return;
-    await _importPayload(code);
+  Future<void> _enterCode() async {
+    final raw = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _EssentialsEnterCodePage()));
+    if (raw == null || !mounted) return;
+    await _importRaw(raw);
   }
 
-  Future<void> _importPayload(String code) async {
-    final bundle = ngmyEssentialsDecodePayload(code);
-    if (bundle == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid transfer code')));
-      return;
-    }
+  Future<void> _importRaw(String raw) async {
     setState(() => _busy = true);
     try {
+      final payload = await ngmyEssentialsResolveImportPayload(raw);
+      if (payload == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — check the 6-character code')));
+        return;
+      }
+      final bundle = ngmyEssentialsDecodePayload(payload);
+      if (bundle == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid backup data')));
+        return;
+      }
       await ngmyEssentialsImportBundle(widget.userEmail, bundle);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Information imported successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Essentials imported successfully')));
         Navigator.pop(context, true);
       }
     } finally {
@@ -191,134 +185,130 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF030712),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Transfer Essentials', style: TextStyle(fontWeight: FontWeight.w900)),
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
-          Text(
-            'Move contacts, site map, hotlines & medicines to another phone — same QR style as Doc Share and Advisors.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 20),
-          _actionTile(
-            icon: Icons.qr_code_2_rounded,
-            title: 'Show backup QR',
-            subtitle: 'Other phone scans this branded NGMY QR code',
-            accent: _kEssentialsAccent,
-            onTap: _busy ? null : _showQr,
-          ),
-          const SizedBox(height: 10),
-          _actionTile(
-            icon: Icons.qr_code_scanner_rounded,
-            title: 'Scan QR to restore',
-            subtitle: 'Point camera at sender\'s Essentials QR',
-            accent: const Color(0xFF34D399),
-            onTap: _busy ? null : _scanQr,
-          ),
-          const SizedBox(height: 10),
-          _actionTile(
-            icon: Icons.pin_rounded,
-            title: 'Paste transfer code',
-            subtitle: 'Type or paste the NGMY-ESS code manually',
-            accent: const Color(0xFFA78BFA),
-            onTap: _busy ? null : _pasteCode,
-          ),
-          const SizedBox(height: 24),
-          Text('WHAT TO SEND', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
-          const SizedBox(height: 8),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('All information', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            value: _all,
-            activeColor: _kEssentialsAccent,
-            onChanged: (v) => setState(() => _all = v ?? true),
-          ),
-          if (!_all) ...[
-            CheckboxListTile(contentPadding: EdgeInsets.zero, title: const Text('Contacts', style: TextStyle(color: Colors.white70)), value: _contacts, activeColor: _kEssentialsAccent, onChanged: (v) => setState(() => _contacts = v ?? false)),
-            CheckboxListTile(contentPadding: EdgeInsets.zero, title: const Text('Site Map', style: TextStyle(color: Colors.white70)), value: _locations, activeColor: _kEssentialsAccent, onChanged: (v) => setState(() => _locations = v ?? false)),
-            CheckboxListTile(contentPadding: EdgeInsets.zero, title: const Text('Hotlines', style: TextStyle(color: Colors.white70)), value: _support, activeColor: _kEssentialsAccent, onChanged: (v) => setState(() => _support = v ?? false)),
-            CheckboxListTile(contentPadding: EdgeInsets.zero, title: const Text('Medicines', style: TextStyle(color: Colors.white70)), value: _medicines, activeColor: _kEssentialsAccent, onChanged: (v) => setState(() => _medicines = v ?? false)),
+      backgroundColor: _bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 12, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Text('Transfer Essentials', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.18), _card]),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _accent.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Move your essentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                        const SizedBox(height: 6),
+                        Text('Share a 6-character code or scan the big-dot NGMY QR — same style as Doc Share.', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13, height: 1.4)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _hubTile(icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Big easy-scan QR + 6-character code', color: _accent, onTap: _busy ? null : _showQr),
+                  const SizedBox(height: 10),
+                  _hubTile(icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
+                  const SizedBox(height: 10),
+                  _hubTile(icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Type or paste the code from sender', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
+                  const SizedBox(height: 24),
+                  Text('INCLUDE IN BACKUP', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                  const SizedBox(height: 8),
+                  _checkTile('All information', _all, (v) => setState(() => _all = v ?? true)),
+                  if (!_all) ...[
+                    _checkTile('Contacts', _contacts, (v) => setState(() => _contacts = v ?? false)),
+                    _checkTile('Site Map', _locations, (v) => setState(() => _locations = v ?? false)),
+                    _checkTile('Hotlines', _support, (v) => setState(() => _support = v ?? false)),
+                    _checkTile('Medicines', _medicines, (v) => setState(() => _medicines = v ?? false)),
+                  ],
+                  if (_busy) ...[const SizedBox(height: 24), const Center(child: CircularProgressIndicator(color: _accent))],
+                ],
+              ),
+            ),
           ],
-          if (_busy) ...[
-            const SizedBox(height: 20),
-            const Center(child: CircularProgressIndicator(color: _kEssentialsAccent)),
-          ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _actionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color accent,
-    required VoidCallback? onTap,
-  }) {
+  Widget _hubTile({required IconData icon, required String title, required String subtitle, required Color color, VoidCallback? onTap}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent.withValues(alpha: 0.35)),
-          ),
+          decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withValues(alpha: 0.28))),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: accent, size: 24),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: color, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-                  ],
-                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.48), fontSize: 12)),
+                ]),
               ),
-              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.35)),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3)),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _checkTile(String label, bool value, ValueChanged<bool?> onChanged) {
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label, style: TextStyle(color: value ? Colors.white : Colors.white70, fontWeight: FontWeight.w600)),
+      value: value,
+      activeColor: _accent,
+      onChanged: onChanged,
+    );
+  }
 }
 
 class _EssentialsQrDisplayPage extends StatelessWidget {
-  const _EssentialsQrDisplayPage({required this.payload, required this.categoryCount});
-  final String payload;
+  const _EssentialsQrDisplayPage({required this.code, required this.categoryCount});
+  final String code;
   final int categoryCount;
 
   @override
   Widget build(BuildContext context) {
-    final short = payload.length > 48 ? '${payload.substring(0, 44)}…' : payload;
+    final qrData = ngmyEssentialsShortQrPayload(code);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1220),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B1220),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Share Essentials QR', style: TextStyle(fontWeight: FontWeight.w900)),
-        centerTitle: true,
-        leading: IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(context)),
-      ),
+      backgroundColor: _bg,
+      appBar: AppBar(backgroundColor: _bg, foregroundColor: Colors.white, elevation: 0, centerTitle: true, title: const Text('Backup QR', style: TextStyle(fontWeight: FontWeight.w900))),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -326,73 +316,135 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
             Expanded(
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kEssentialsAccent.withValues(alpha: 0.35)),
-                ),
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(24), border: Border.all(color: _accent.withValues(alpha: 0.35))),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    NgmyBrandedQrWidget(data: payload, large: true),
-                    const SizedBox(height: 18),
-                    Text(
-                      categoryCount >= 4 ? 'All Essentials categories' : '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} selected',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                    NgmyBrandedQrWidget(data: qrData, large: true, coarseScan: true),
+                    const SizedBox(height: 22),
+                    Text('YOUR 6-CHARACTER CODE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
+                    const SizedBox(height: 10),
+                    SelectableText(
+                      code,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _kEssentialsAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text('Scan with NGMY camera', style: TextStyle(color: _kEssentialsAccent, fontWeight: FontWeight.w800, fontSize: 12)),
+                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · valid 24 hours', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: code));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('6-character code copied')));
+                          },
+                          icon: const Icon(Icons.copy_rounded, size: 18),
+                          label: const Text('Copy code'),
+                          style: FilledButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.black),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: () => Share.share('NGMY Essentials code: $code', subject: 'NGMY Essentials backup'),
+                          icon: const Icon(Icons.share_rounded, size: 18),
+                          label: const Text('Share'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Or paste code on receiving phone',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
-                    ),
-                    const SizedBox(height: 6),
-                    SelectableText(short, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10)),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: payload));
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transfer code copied')));
-                    },
-                    icon: const Icon(Icons.copy_rounded, size: 16),
-                    label: const Text('Copy code'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => Share.share(payload, subject: 'NGMY Essentials backup'),
-                    icon: const Icon(Icons.share_rounded, size: 16),
-                    label: const Text('Share'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.pop(context),
-                style: FilledButton.styleFrom(backgroundColor: _kEssentialsAccent, foregroundColor: Colors.black, minimumSize: const Size.fromHeight(48)),
-                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900)),
+              child: FilledButton(onPressed: () => Navigator.pop(context), style: FilledButton.styleFrom(backgroundColor: _accent2, foregroundColor: Colors.black, minimumSize: const Size.fromHeight(50)), child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EssentialsEnterCodePage extends StatefulWidget {
+  const _EssentialsEnterCodePage();
+
+  @override
+  State<_EssentialsEnterCodePage> createState() => _EssentialsEnterCodePageState();
+}
+
+class _EssentialsEnterCodePageState extends State<_EssentialsEnterCodePage> {
+  final _ctrl = TextEditingController();
+  var _busy = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _paste() async {
+    final clip = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clip?.text != null) _ctrl.text = clip!.text!.trim().toUpperCase();
+  }
+
+  Future<void> _submit() async {
+    final code = NgmyEssentialsShortCode.normalize(_ctrl.text);
+    if (code == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid 6-character code (letters or numbers)')));
+      return;
+    }
+    setState(() => _busy = true);
+    final payload = await NgmyEssentialsShortCode.resolvePayload(code);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (payload == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — ask sender to create a new QR')));
+      return;
+    }
+    Navigator.pop(context, payload);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(backgroundColor: _bg, foregroundColor: Colors.white, elevation: 0, centerTitle: true, title: const Text('Enter code', style: TextStyle(fontWeight: FontWeight.w900))),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Type the 6-character code from the sender', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 14)),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              maxLength: 6,
+              textCapitalization: TextCapitalization.characters,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: 10),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                counterText: '',
+                hintText: 'ABC123',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 10),
+                filled: true,
+                fillColor: _card,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: _accent.withValues(alpha: 0.35))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: _accent.withValues(alpha: 0.25))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: _accent, width: 2)),
               ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(onPressed: _paste, icon: const Icon(Icons.content_paste_rounded), label: const Text('Paste from clipboard')),
+            const Spacer(),
+            FilledButton(
+              onPressed: _busy ? null : _submit,
+              style: FilledButton.styleFrom(backgroundColor: _accent2, foregroundColor: Colors.black, minimumSize: const Size.fromHeight(52)),
+              child: _busy ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Text('Import essentials', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             ),
           ],
         ),
@@ -423,21 +475,17 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
     if (_handled) return;
     for (final b in capture.barcodes) {
       final raw = b.rawValue?.trim() ?? '';
-      if (!ngmyEssentialsIsPayload(raw)) continue;
+      if (raw.isEmpty) continue;
+      if (!raw.startsWith(kNgmyEssentialsShortQrPrefix) && !ngmyEssentialsLooksLikeShortCode(raw)) continue;
       _handled = true;
       Navigator.pop(context, raw);
       return;
     }
   }
 
-  Future<void> _pasteCode() async {
-    final clip = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = clip?.text?.trim() ?? '';
-    if (text.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copy the transfer code from sender first.')));
-      return;
-    }
-    if (mounted) Navigator.pop(context, text);
+  Future<void> _openEnterCode() async {
+    final result = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const _EssentialsEnterCodePage()));
+    if (result != null && mounted) Navigator.pop(context, result);
   }
 
   @override
@@ -449,7 +497,7 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(icon: const Icon(Icons.content_paste_rounded), tooltip: 'Paste code', onPressed: _pasteCode),
+          IconButton(icon: const Icon(Icons.pin_rounded), tooltip: 'Enter code', onPressed: _openEnterCode),
           IconButton(
             icon: Icon(_torch ? Icons.flash_on_rounded : Icons.flash_off_rounded),
             onPressed: () async {
@@ -462,26 +510,8 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
       body: Stack(
         children: [
           MobileScanner(controller: _controller, onDetect: _onDetect),
-          Center(
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _kEssentialsAccent, width: 4),
-              ),
-            ),
-          ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 32,
-            child: Text(
-              'Align the NGMY Essentials QR inside the frame',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
-            ),
-          ),
+          Center(child: Container(width: 280, height: 280, decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), border: Border.all(color: _accent, width: 4)))),
+          const Positioned(left: 0, right: 0, bottom: 36, child: Text('Big-dot NGMY QR scans fastest', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600))),
         ],
       ),
     );

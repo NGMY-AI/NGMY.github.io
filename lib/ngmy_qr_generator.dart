@@ -914,6 +914,8 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final int? errorCorrectionLevel;
   final double? sizeOverride;
   final bool showLogo;
+  /// Larger, bolder QR modules for easy phone scanning (short payloads only).
+  final bool coarseScan;
 
   const NgmyBrandedQrWidget({
     super.key,
@@ -924,6 +926,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     this.errorCorrectionLevel,
     this.sizeOverride,
     this.showLogo = true,
+    this.coarseScan = false,
   });
 
   static Future<Uint8List?> capturePng(GlobalKey key, {double pixelRatio = 4}) async {
@@ -976,9 +979,16 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                   size: size - 20,
                   padding: EdgeInsets.zero,
                   backgroundColor: Colors.white,
-                  errorCorrectionLevel: errorCorrectionLevel ?? QrErrorCorrectLevel.H,
-                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.circle, color: _ink),
-                  dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: _ink),
+                  errorCorrectionLevel: errorCorrectionLevel ?? (coarseScan ? QrErrorCorrectLevel.L : QrErrorCorrectLevel.H),
+                  eyeStyle: QrEyeStyle(
+                    eyeShape: coarseScan ? QrEyeShape.square : QrEyeShape.circle,
+                    color: _ink,
+                  ),
+                  dataModuleStyle: QrDataModuleStyle(
+                    dataModuleShape: coarseScan ? QrDataModuleShape.square : QrDataModuleShape.circle,
+                    color: _ink,
+                  ),
+                  gapless: coarseScan ? false : true,
                 ),
                 if (showLogo)
                   Container(

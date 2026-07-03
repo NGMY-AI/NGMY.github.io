@@ -168,6 +168,7 @@ import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_market_hub_screen.dart';
 import 'ngmy_item_reminder_service.dart';
+import 'ngmy_overlay_guard.dart';
 import 'ngmy_medicine_reminder_service.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
@@ -14860,6 +14861,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _runScheduledPopups() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!ngmyShouldAllowGlobalInterrupt()) return;
       final mountedAt = _mainShellMountedAt;
       if (widget.user.isAdmin &&
           mountedAt != null &&
@@ -14887,10 +14889,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _runScheduledPopups();
-      _promptPushNotificationsIfNeeded();
-      unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
-      unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
+      if (ngmyShouldAllowGlobalInterrupt()) {
+        _runScheduledPopups();
+        _promptPushNotificationsIfNeeded();
+        unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
+        unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
+      }
       if (_idx == 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {});

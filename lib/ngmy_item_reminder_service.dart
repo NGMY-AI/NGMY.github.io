@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_item_reminder_alarm.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_overlay_guard.dart';
 
 Timer? _itemReminderPollTimer;
 String? _watcherUserEmail;
@@ -36,6 +37,7 @@ Future<void> ngmyCheckItemRemindersNow({String? userEmail}) async {
 
 Future<void> _pollDueReminders() async {
   if (_alertOpen) return;
+  if (!ngmyShouldAllowGlobalInterrupt()) return;
   final email = _watcherUserEmail;
   if (email == null || email.isEmpty) return;
 
@@ -62,6 +64,7 @@ Future<void> showNgmyItemReminderAlert(
   try {
     await showGeneralDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: 0.92),
       transitionDuration: const Duration(milliseconds: 280),
@@ -150,7 +153,9 @@ Future<void> showNgmyItemReminderAlert(
                       child: FilledButton(
                         onPressed: () async {
                           await NgmyItemReminderAlarm.stop();
-                          Navigator.of(ctx).pop();
+                          if (Navigator.of(ctx, rootNavigator: true).canPop()) {
+                            Navigator.of(ctx, rootNavigator: true).pop();
+                          }
                           await deleteNgmyItemReminder(reminder.id, userEmail: userEmail);
                         },
                         style: FilledButton.styleFrom(
@@ -166,7 +171,9 @@ Future<void> showNgmyItemReminderAlert(
                     TextButton(
                       onPressed: () async {
                         await NgmyItemReminderAlarm.stop();
-                        Navigator.of(ctx).pop();
+                        if (Navigator.of(ctx, rootNavigator: true).canPop()) {
+                          Navigator.of(ctx, rootNavigator: true).pop();
+                        }
                         await snoozeNgmyItemReminder(reminder, userEmail: userEmail, snoozeBy: const Duration(minutes: 15));
                       },
                       child: const Text('Snooze 15 min', style: TextStyle(color: Color(0xFFA78BFA), fontWeight: FontWeight.w800)),

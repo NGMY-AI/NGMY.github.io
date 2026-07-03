@@ -33,7 +33,6 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   @override
   void initState() {
     super.initState();
-    ngmyStartItemReminderWatcher(widget.userEmail);
     _refreshBadges();
   }
 

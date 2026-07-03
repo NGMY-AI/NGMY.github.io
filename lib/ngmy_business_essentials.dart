@@ -102,7 +102,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                     child: Text('Business Essentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                   ),
                   IconButton(
-                    tooltip: 'Transfer / backup QR',
+                    tooltip: 'Transfer / backup',
                     onPressed: () async {
                       final imported = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(builder: (_) => NgmyEssentialsTransferPage(userEmail: widget.userEmail)),
@@ -116,7 +116,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
                       ),
-                      child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF38BDF8), size: 18),
+                      child: const Icon(Icons.sync_alt_rounded, color: Color(0xFF38BDF8), size: 18),
                     ),
                   ),
                 ],

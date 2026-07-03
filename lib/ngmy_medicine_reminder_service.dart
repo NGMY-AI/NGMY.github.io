@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_overlay_guard.dart';
 
 Timer? _medicineReminderPollTimer;
 String? _medicineWatcherEmail;
@@ -90,6 +91,7 @@ Future<void> ngmyCheckMedicineRemindersNow({String? userEmail}) async {
 
 Future<void> _pollMedicineReminders() async {
   if (_medicineAlertOpen) return;
+  if (!ngmyShouldAllowGlobalInterrupt()) return;
   final email = _medicineWatcherEmail;
   if (email == null || email.isEmpty) return;
 
@@ -116,6 +118,7 @@ Future<void> showNgmyMedicineReminderAlert(
   try {
     await showGeneralDialog<void>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: 0.94),
       transitionDuration: const Duration(milliseconds: 280),
@@ -124,7 +127,9 @@ Future<void> showNgmyMedicineReminderAlert(
         timeSlot: timeSlot,
         onDone: () async {
           await _markFiredToday(userEmail, medicine.id, timeSlot);
-          if (ctx.mounted) Navigator.of(ctx).pop();
+          if (ctx.mounted && Navigator.of(ctx, rootNavigator: true).canPop()) {
+            Navigator.of(ctx, rootNavigator: true).pop();
+          }
         },
       ),
       transitionBuilder: (ctx, anim, _, child) {
@@ -151,6 +156,7 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
   static const _blockSeconds = 5;
   var _secondsLeft = _blockSeconds;
   var _canDismiss = false;
+  var _finished = false;
   Timer? _timer;
 
   @override
@@ -170,6 +176,9 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
   }
 
   Future<void> _finish() async {
+    if (_finished) return;
+    _finished = true;
+    _timer?.cancel();
     await widget.onDone();
   }
 
