@@ -128,6 +128,20 @@ class NgmyTransferCloudRelay {
         }
 
         if (partCount <= 0) {
+          final fallback = await NgmyDocShareStore.readBytes(ownerEmail, item);
+          if (fallback != null && fallback.isNotEmpty) {
+            final partPath = '$base.part00000';
+            await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
+                  partPath,
+                  fallback,
+                  fileOptions: FileOptions(upsert: true, contentType: item.mime),
+                );
+            partCount = 1;
+            sent = fallback.length;
+          }
+        }
+
+        if (partCount <= 0) {
           final existing = await _loadRelay(normalized) ?? {};
           await _saveRelay(normalized, {
             ...existing,

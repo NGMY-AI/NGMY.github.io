@@ -101,7 +101,7 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
       setState(() {
         _starting = false;
         _error =
-            'Could not start transfer. Check internet connection, then tap Start transfer again.';
+            'Could not read this file from your library. Re-upload the document in Doc Share (+ Add), wait until it appears, then try Start transfer again.';
         _status = '';
       });
       return;

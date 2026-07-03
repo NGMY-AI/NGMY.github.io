@@ -53,6 +53,13 @@ class NgmyTransfer {
     if (items.isEmpty) return null;
 
     await stopSend();
+
+    final readable = await NgmyDocShareStore.ensureReadableForTransfer(ownerEmail, items);
+    if (!readable) {
+      debugPrint('[ngmy transfer] files not readable for send');
+      return null;
+    }
+
     unawaited(NgmyDocShareStore.preloadForTransfer(ownerEmail, items));
 
     final transferKey = NgmyTransferRendezvous.generateTransferKey();

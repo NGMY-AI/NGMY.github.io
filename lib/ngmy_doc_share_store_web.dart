@@ -94,6 +94,27 @@ Future<void> _persistBlob(String key, Uint8List bytes) async {
   await ngmyDocShareIdbPut(key, bytes);
 }
 
+Future<bool> _blobIsReadable(String key, {int minBytes = 1}) async {
+  final mem = _memoryBlobs[key];
+  if (mem != null && mem.length >= minBytes) return true;
+  final idb = await ngmyDocShareIdbGet(key);
+  if (idb != null && idb.length >= minBytes) {
+    _memoryBlobs[key] = idb;
+    return true;
+  }
+  final manifest = await _loadChunkManifest(key);
+  if (manifest != null && manifest.totalBytes >= minBytes && manifest.partKeys.isNotEmpty) {
+    for (final partKey in manifest.partKeys) {
+      final part = await ngmyDocShareIdbGet(partKey);
+      if (part != null && part.isNotEmpty) return true;
+    }
+  }
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(key);
+  if (raw != null && raw.isNotEmpty) return true;
+  return false;
+}
+
 Future<Uint8List?> _loadBlob(String key) async {
   final mem = _memoryBlobs[key];
   if (mem != null && mem.isNotEmpty) return mem;
@@ -149,7 +170,11 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
     }
     if (partKeys.isEmpty) return;
     await _persistChunkManifest(baseKey, partKeys, size);
-    _webFiles.remove(id);
+    if (await _blobIsReadable(baseKey, minBytes: size > 0 ? size : 1)) {
+      _webFiles.remove(id);
+    } else {
+      debugPrint('[doc share web persist chunked] verify failed for $id — keeping live file ref');
+    }
   } catch (e) {
     debugPrint('[doc share web persist chunked] $e');
   }
@@ -157,7 +182,7 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
 
 Future<void> _persistHtmlFile(String email, String id, html.File file) async {
   if (file.size > _webPersistMaxBytes) {
-    unawaited(_persistHtmlFileChunked(email, id, file));
+    await _persistHtmlFileChunked(email, id, file);
     return;
   }
   final key = _bytesPrefsKey(email, id);
@@ -173,7 +198,12 @@ Future<void> _persistHtmlFile(String email, String id, html.File file) async {
     final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
     if (buf == null) return;
     await _persistBlob(key, Uint8List.view(buf));
-    _webFiles.remove(id);
+    final expected = file.size.round();
+    if (await _blobIsReadable(key, minBytes: expected > 0 ? expected : 1)) {
+      _webFiles.remove(id);
+    } else {
+      debugPrint('[doc share web persist] verify failed for $id — keeping live file ref');
+    }
   } catch (e) {
     debugPrint('[doc share web persist] $e');
   }
@@ -241,7 +271,7 @@ class NgmyDocShareStore {
         shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       _webFiles[id] = entry.file;
-      unawaited(_persistHtmlFile(email, id, entry.file));
+      await _persistHtmlFile(email, id, entry.file);
       items.add(item);
       created.add(item);
     }
@@ -549,13 +579,47 @@ class NgmyDocShareStore {
     for (final item in items) {
       if (_webFiles[item.id] != null) continue;
       final key = _bytesPrefsKey(email, item.id);
-      if (await _loadChunkManifest(key) != null) continue;
-      if (_memoryBlobs.containsKey(key)) continue;
-      unawaited(readByteRange(email, item, 0, 1));
+      if (await _blobIsReadable(key, minBytes: 1)) continue;
+      unawaited(readBytes(email, item));
     }
   }
 
+  /// Waits until every file can be read from local storage (required before send).
+  static Future<bool> ensureReadableForTransfer(
+    String email,
+    List<NgmyDocShareItem> items, {
+    Duration maxWait = const Duration(seconds: 90),
+  }) async {
+    if (items.isEmpty) return false;
+    final deadline = DateTime.now().add(maxWait);
+    while (DateTime.now().isBefore(deadline)) {
+      var allOk = true;
+      for (final item in items) {
+        if (item.sizeBytes <= 0) {
+          allOk = false;
+          break;
+        }
+        var readable = false;
+        await for (final chunk in readFileStream(email, item)) {
+          if (chunk.isNotEmpty) {
+            readable = true;
+            break;
+          }
+        }
+        if (!readable) {
+          allOk = false;
+          break;
+        }
+      }
+      if (allOk) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    return false;
+  }
+
   static Stream<Uint8List> readFileStream(String email, NgmyDocShareItem item) async* {
+    var yieldedBytes = 0;
+
     final webFile = _webFiles[item.id];
     if (webFile != null) {
       const step = 1048576;
@@ -563,26 +627,43 @@ class NgmyDocShareStore {
       for (var start = 0; start < size; start += step) {
         final end = start + step < size ? start + step : size;
         final chunk = await readByteRange(email, item, start, end);
-        if (chunk != null && chunk.isNotEmpty) yield chunk;
+        if (chunk != null && chunk.isNotEmpty) {
+          yieldedBytes += chunk.length;
+          yield chunk;
+        }
       }
-      return;
+      if (yieldedBytes > 0) return;
     }
+
     final key = _bytesPrefsKey(email, item.id);
     final manifest = await _loadChunkManifest(key);
     if (manifest != null) {
       for (final partKey in manifest.partKeys) {
         final part = await ngmyDocShareIdbGet(partKey);
-        if (part != null && part.isNotEmpty) yield part;
+        if (part != null && part.isNotEmpty) {
+          yieldedBytes += part.length;
+          yield part;
+        }
       }
-      return;
+      if (yieldedBytes > 0) return;
     }
+
     final size = item.sizeBytes;
-    if (size <= 0) return;
-    const step = 1048576;
-    for (var start = 0; start < size; start += step) {
-      final end = start + step < size ? start + step : size;
-      final chunk = await readByteRange(email, item, start, end);
-      if (chunk != null && chunk.isNotEmpty) yield chunk;
+    if (size > 0) {
+      const step = 1048576;
+      for (var start = 0; start < size; start += step) {
+        final end = start + step < size ? start + step : size;
+        final chunk = await readByteRange(email, item, start, end);
+        if (chunk != null && chunk.isNotEmpty) {
+          yieldedBytes += chunk.length;
+          yield chunk;
+        }
+      }
+    }
+
+    if (yieldedBytes <= 0) {
+      final all = await readBytes(email, item);
+      if (all != null && all.isNotEmpty) yield all;
     }
   }
 
