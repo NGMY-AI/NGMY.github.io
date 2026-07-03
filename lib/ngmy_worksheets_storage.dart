@@ -72,34 +72,79 @@ String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
 class BudgetItem {
   final String id;
   final String name;
-  final double price;
+  final double quantity;
+  final double unitPrice;
+  final String unitLabel;
 
   const BudgetItem({
     required this.id,
     required this.name,
-    required this.price,
+    this.quantity = 1,
+    this.unitPrice = 0,
+    this.unitLabel = 'each',
   });
+
+  /// Line total (quantity × unit price).
+  double get lineTotal => quantity * unitPrice;
+
+  /// Legacy alias — older UI referred to line total as [price].
+  double get price => lineTotal;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'price': price,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'unitLabel': unitLabel,
+        'price': lineTotal,
       };
 
   factory BudgetItem.fromJson(Map<String, dynamic> json) {
+    final legacyPrice = (json['price'] as num?)?.toDouble() ?? 0;
+    final qty = (json['quantity'] as num?)?.toDouble();
+    final unit = (json['unitPrice'] as num?)?.toDouble();
+    if (qty != null && unit != null) {
+      return BudgetItem(
+        id: (json['id'] ?? '').toString(),
+        name: (json['name'] ?? '').toString(),
+        quantity: qty <= 0 ? 1 : qty,
+        unitPrice: unit,
+        unitLabel: (json['unitLabel'] ?? 'each').toString().trim().isEmpty
+            ? 'each'
+            : (json['unitLabel'] ?? 'each').toString(),
+      );
+    }
     return BudgetItem(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
-      price: (json['price'] as num?)?.toDouble() ?? 0,
+      quantity: 1,
+      unitPrice: legacyPrice,
+      unitLabel: 'each',
     );
   }
 
-  BudgetItem copyWith({String? name, double? price}) {
+  BudgetItem copyWith({
+    String? name,
+    double? quantity,
+    double? unitPrice,
+    String? unitLabel,
+  }) {
     return BudgetItem(
       id: id,
       name: name ?? this.name,
-      price: price ?? this.price,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      unitLabel: unitLabel ?? this.unitLabel,
     );
+  }
+
+  String get quantityLabel {
+    final q = quantity;
+    final whole = q == q.roundToDouble();
+    final qStr = whole ? q.toInt().toString() : q.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
+    final unit = unitLabel.trim().isEmpty ? 'each' : unitLabel.trim();
+    if (unit == 'each' || unit == 'pcs') return '$qStr ×';
+    return '$qStr $unit ×';
   }
 }
 
@@ -119,7 +164,7 @@ class WorksheetProject {
   });
 
   double get totalSpending =>
-      items.fold(0.0, (sum, item) => sum + item.price);
+      items.fold(0.0, (sum, item) => sum + item.lineTotal);
 
   Map<String, dynamic> toJson() => {
         'id': id,

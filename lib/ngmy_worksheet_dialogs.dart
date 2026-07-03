@@ -17,9 +17,18 @@ class CreateFamilyTreeDialogResult {
 
 class AddBudgetItemDialogResult {
   final String name;
-  final double price;
+  final double quantity;
+  final double unitPrice;
+  final String unitLabel;
 
-  const AddBudgetItemDialogResult({required this.name, required this.price});
+  const AddBudgetItemDialogResult({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    required this.unitLabel,
+  });
+
+  double get lineTotal => quantity * unitPrice;
 }
 
 Future<AddBudgetItemDialogResult?> showAddBudgetItemDialog(BuildContext context) {
@@ -418,22 +427,88 @@ class _AddBudgetItemDialog extends StatefulWidget {
   State<_AddBudgetItemDialog> createState() => _AddBudgetItemDialogState();
 }
 
+const _kBudgetUnitPresets = [
+  'each',
+  'pcs',
+  'boxes',
+  'bags',
+  'hours',
+  'days',
+  'sq ft',
+  'gallons',
+  'lbs',
+  'ft',
+  'other',
+];
+
 class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
   late final TextEditingController _nameC;
+  late final TextEditingController _qtyC;
   late final TextEditingController _priceC;
+  late final TextEditingController _customUnitC;
+  String _unit = 'each';
 
   @override
   void initState() {
     super.initState();
     _nameC = TextEditingController();
+    _qtyC = TextEditingController(text: '1');
     _priceC = TextEditingController();
+    _customUnitC = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameC.dispose();
+    _qtyC.dispose();
     _priceC.dispose();
+    _customUnitC.dispose();
     super.dispose();
+  }
+
+  double get _quantity {
+    final v = double.tryParse(_qtyC.text.trim());
+    if (v == null || v <= 0) return 1;
+    return v;
+  }
+
+  double get _unitPrice => double.tryParse(_priceC.text.trim()) ?? 0;
+
+  double get _lineTotal => _quantity * _unitPrice;
+
+  String get _resolvedUnit {
+    if (_unit == 'other') {
+      final c = _customUnitC.text.trim();
+      return c.isEmpty ? 'units' : c;
+    }
+    return _unit;
+  }
+
+  void _bumpQty(double delta) {
+    final next = (_quantity + delta).clamp(0.25, 999999);
+    final whole = next == next.roundToDouble();
+    _qtyC.text = whole ? next.toInt().toString() : next.toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '');
+    setState(() {});
+  }
+
+  InputDecoration _fieldDecoration(WorksheetPalette p, String label, {String? hint, IconData? icon}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: icon != null ? Icon(icon, size: 20, color: WorksheetPalette.green) : null,
+      filled: true,
+      fillColor: p.mutedSurface,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.cardBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: WorksheetPalette.green, width: 1.6),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
   }
 
   void _submit() {
@@ -444,8 +519,21 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
       );
       return;
     }
-    final price = double.tryParse(_priceC.text.trim()) ?? 0;
-    Navigator.pop(context, AddBudgetItemDialogResult(name: name, price: price));
+    if (_unitPrice <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a unit price greater than zero.')),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      AddBudgetItemDialogResult(
+        name: name,
+        quantity: _quantity,
+        unitPrice: _unitPrice,
+        unitLabel: _resolvedUnit,
+      ),
+    );
   }
 
   @override
@@ -453,59 +541,210 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
     final p = WorksheetPalette.of(context);
     return Dialog(
       backgroundColor: p.cardBg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Add Budget Item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _nameC,
-              autofocus: true,
-              style: TextStyle(color: p.primaryText),
-              decoration: InputDecoration(
-                labelText: 'Item name',
-                filled: true,
-                fillColor: p.mutedSurface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _priceC,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(color: p.primaryText),
-              decoration: InputDecoration(
-                labelText: 'Price (\$)',
-                filled: true,
-                fillColor: p.mutedSurface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          WorksheetPalette.green.withValues(alpha: 0.22),
+                          WorksheetPalette.teal.withValues(alpha: 0.14),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+                    ),
+                    child: const Icon(Icons.add_shopping_cart_rounded, color: WorksheetPalette.greenDark, size: 26),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Add Budget Item', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: p.primaryText)),
+                        const SizedBox(height: 2),
+                        Text('Name, units, and price per unit', style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    icon: Icon(Icons.close_rounded, color: p.secondaryText),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _submit,
-                    style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
-                    child: const Text('Add'),
+                ],
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _nameC,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w600),
+                decoration: _fieldDecoration(p, 'Item name', hint: 'Lumber, paint, labor…', icon: Icons.label_outline_rounded),
+              ),
+              const SizedBox(height: 14),
+              Text('Units', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.secondaryText, letterSpacing: 0.3)),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: p.mutedSurface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: p.cardBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _bumpQty(-1),
+                          icon: Icon(Icons.remove_rounded, color: p.primaryText, size: 20),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        SizedBox(
+                          width: 52,
+                          child: TextField(
+                            controller: _qtyC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: p.primaryText),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _bumpQty(1),
+                          icon: Icon(Icons.add_rounded, color: p.primaryText, size: 20),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _priceC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700, fontSize: 16),
+                      decoration: _fieldDecoration(p, 'Price per unit', hint: '0.00', icon: Icons.attach_money_rounded),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _kBudgetUnitPresets.map((u) {
+                  final selected = _unit == u;
+                  return FilterChip(
+                    selected: selected,
+                    label: Text(u == 'other' ? 'Other' : u, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    onSelected: (_) => setState(() => _unit = u),
+                    selectedColor: WorksheetPalette.green.withValues(alpha: 0.2),
+                    checkmarkColor: WorksheetPalette.greenDark,
+                    side: BorderSide(color: selected ? WorksheetPalette.green : p.cardBorder),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
+              ),
+              if (_unit == 'other') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _customUnitC,
+                  textCapitalization: TextCapitalization.words,
+                  style: TextStyle(color: p.primaryText),
+                  decoration: _fieldDecoration(p, 'Custom unit', hint: 'rolls, sheets, trips…'),
+                  onChanged: (_) => setState(() {}),
                 ),
               ],
-            ),
-          ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      WorksheetPalette.green.withValues(alpha: p.isDark ? 0.18 : 0.1),
+                      WorksheetPalette.teal.withValues(alpha: p.isDark ? 0.12 : 0.06),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Line total',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: p.secondaryText, letterSpacing: 0.4),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_quantity == _quantity.roundToDouble() ? _quantity.toInt() : _quantity} $_resolvedUnit × ${ngmyFormatMoney(_unitPrice)}',
+                            style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ngmyWorksheetMoneyText(_lineTotal, color: WorksheetPalette.greenDark, large: false, weight: FontWeight.w900),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        side: BorderSide(color: p.cardBorder),
+                      ),
+                      child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: p.primaryText)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WorksheetPalette.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 20),
+                      label: const Text('Add to budget', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

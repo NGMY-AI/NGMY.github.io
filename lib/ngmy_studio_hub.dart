@@ -61,34 +61,34 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
 class NgmyCreatorHubTab extends StatelessWidget {
   const NgmyCreatorHubTab({
     super.key,
-    required this.userEmail,
-    required this.bottomScrollPadding,
-    this.user,
-    this.config,
-    this.onCharge,
-    this.onDataChanged,
-    this.onPersistConfig,
-  });
+      required this.userEmail,
+      required this.bottomScrollPadding,
+      this.user,
+      this.config,
+      this.onCharge,
+      this.onDataChanged,
+      this.onPersistConfig,
+    });
 
-  final String userEmail;
-  final double bottomScrollPadding;
-  final dynamic user;
-  final dynamic config;
-  final Future<bool> Function(double amount, String description)? onCharge;
-  final VoidCallback? onDataChanged;
-  final Future<bool> Function()? onPersistConfig;
+    final String userEmail;
+    final double bottomScrollPadding;
+    final dynamic user;
+    final dynamic config;
+    final Future<bool> Function(double amount, String description)? onCharge;
+    final VoidCallback? onDataChanged;
+    final Future<bool> Function()? onPersistConfig;
 
-  @override
-  Widget build(BuildContext context) {
-    // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Play Zone → Video Studio → 3D Mechanic Lab.
-    final tools = <_CreatorTool>[
-      _CreatorTool(
-        icon: Icons.folder_shared_rounded,
-        colors: const [Color(0xFF0D9488), Color(0xFF059669)],
-        title: 'Doc Share',
-        subtitle: 'Upload & share any file',
-        onTap: () {
-          if (userEmail.trim().isEmpty) return;
+    @override
+    Widget build(BuildContext context) {
+      // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Play Zone → Video Studio → 3D Mechanic Lab.
+      final tools = <_CreatorTool>[
+        _CreatorTool(
+          icon: Icons.folder_shared_rounded,
+          colors: const [Color(0xFF0D9488), Color(0xFF059669)],
+          title: 'Doc Share',
+          subtitle: 'Upload & share any file',
+          onTap: () {
+            if (userEmail.trim().isEmpty) return;
           openNgmyDocShare(
             context: context,
             user: user ?? _HubGuestUser(userEmail),
