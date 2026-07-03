@@ -311,76 +311,83 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = WorksheetPalette.of(context);
+    final itemCount = project.items.length;
+
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           decoration: BoxDecoration(
             color: p.cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: p.cardBorder),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(color: p.shadow, blurRadius: 36, offset: const Offset(0, 14)),
+            ],
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: p.secondaryText.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+              _shareSheetHeader(context, p, itemCount),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionLabel(p, 'Send project'),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _actionTile(
+                          p,
+                          icon: Icons.qr_code_2_rounded,
+                          title: 'QR code',
+                          subtitle: 'Instant scan',
+                          iconColor: const Color(0xFF38BDF8),
+                          iconBg: const Color(0xFF38BDF8),
+                          featured: true,
+                          onTap: () => _showQr(context),
+                        ),
+                        const SizedBox(width: 10),
+                        _actionTile(
+                          p,
+                          icon: Icons.download_rounded,
+                          title: 'Backup file',
+                          subtitle: 'Full copy',
+                          iconColor: WorksheetPalette.teal,
+                          iconBg: WorksheetPalette.green,
+                          onTap: () => _download(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionLabel(p, 'Import project'),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _actionTile(
+                          p,
+                          icon: Icons.qr_code_scanner_rounded,
+                          title: 'Scan QR',
+                          subtitle: 'From camera',
+                          iconColor: const Color(0xFFA78BFA),
+                          iconBg: const Color(0xFF8B5CF6),
+                          onTap: () => _scan(context),
+                        ),
+                        const SizedBox(width: 10),
+                        _actionTile(
+                          p,
+                          icon: Icons.upload_file_rounded,
+                          title: 'Upload file',
+                          subtitle: '.json backup',
+                          iconColor: const Color(0xFFFBBF24),
+                          iconBg: const Color(0xFFF59E0B),
+                          onTap: () => _upload(context),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Share project',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '"${project.name}" — ${ngmyFormatMoney(project.totalSpending)}',
-                style: TextStyle(fontSize: 13, color: p.secondaryText),
-              ),
-              const SizedBox(height: 16),
-              _shareTile(
-                context,
-                p,
-                icon: Icons.qr_code_2_rounded,
-                label: 'Show QR code',
-                subtitle: 'Small scannable code · full project in cloud',
-                onTap: () => _showQr(context),
-                accent: true,
-              ),
-              const SizedBox(height: 8),
-              _shareTile(
-                context,
-                p,
-                icon: Icons.download_rounded,
-                label: 'Download backup file',
-                subtitle: 'Full project with thumbnail — upload on another phone',
-                onTap: () => _download(context),
-              ),
-              const SizedBox(height: 8),
-              _shareTile(
-                context,
-                p,
-                icon: Icons.qr_code_scanner_rounded,
-                label: 'Scan QR',
-                subtitle: 'Import a project someone shared',
-                onTap: () => _scan(context),
-              ),
-              const SizedBox(height: 8),
-              _shareTile(
-                context,
-                p,
-                icon: Icons.upload_file_rounded,
-                label: 'Upload backup file',
-                subtitle: 'Import a downloaded .json project file',
-                onTap: () => _upload(context),
               ),
             ],
           ),
@@ -389,44 +396,232 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
     );
   }
 
-  Widget _shareTile(
-    BuildContext context,
-    WorksheetPalette p, {
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-    bool accent = false,
-  }) {
-    return Material(
-      color: accent ? WorksheetPalette.green.withValues(alpha: 0.12) : p.mutedSurface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: accent ? WorksheetPalette.green.withValues(alpha: 0.45) : p.cardBorder,
-            ),
+  Widget _shareSheetHeader(BuildContext context, WorksheetPalette p, int itemCount) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: p.isDark
+              ? [const Color(0xFF064E3B), const Color(0xFF0F766E), const Color(0xFF047857)]
+              : [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF14B8A6)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            top: -10,
+            child: Icon(Icons.sync_alt_rounded, size: 110, color: Colors.white.withValues(alpha: 0.07)),
           ),
-          child: Row(
-            children: [
-              Icon(icon, color: accent ? WorksheetPalette.green : p.primaryText),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 12, 20),
+            child: Column(
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText)),
-                    Text(subtitle, style: TextStyle(fontSize: 11, color: p.secondaryText, height: 1.3)),
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ngmyImageOrPlaceholder(
+                        imageRef: project.thumbnailPath,
+                        width: 64,
+                        height: 64,
+                        icon: Icons.folder_special_outlined,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Share project',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            project.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              ngmyWorksheetMoneyText(project.totalSpending, large: false),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                                ),
+                                child: Text(
+                                  '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.85)),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        minimumSize: const Size(36, 36),
+                      ),
+                    ),
                   ],
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(WorksheetPalette p, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: WorksheetPalette.green,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            color: p.secondaryText,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.9,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionTile(
+    WorksheetPalette p, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+    required Color iconBg,
+    required VoidCallback onTap,
+    bool featured = false,
+  }) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: p.isDark ? const Color(0xFF1A2433) : const Color(0xFFF8FAFC),
+              border: Border.all(
+                color: featured
+                    ? const Color(0xFF38BDF8).withValues(alpha: p.isDark ? 0.45 : 0.35)
+                    : p.cardBorder.withValues(alpha: p.isDark ? 0.8 : 1),
+                width: featured ? 1.5 : 1,
               ),
-              Icon(Icons.chevron_right_rounded, color: p.secondaryText),
-            ],
+              boxShadow: featured
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: iconBg.withValues(alpha: p.isDark ? 0.22 : 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: iconColor.withValues(alpha: 0.35)),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 22),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      color: p.primaryText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: p.secondaryText,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -475,57 +670,177 @@ class _NgmyWorksheetProjectQrPageState extends State<NgmyWorksheetProjectQrPage>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
-    final card = isDark ? const Color(0xFF151B28) : Colors.white;
+    final bg = isDark ? const Color(0xFF0B1018) : const Color(0xFFF3F4F6);
     final isCloud = _payload?.startsWith('$kNgmyWorksheetProjectQrPrefixV2|') ?? false;
+    final itemCount = widget.project.items.length;
 
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        elevation: 0,
-        title: const Text('Project QR', style: TextStyle(fontWeight: FontWeight.w900)),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
         child: Column(
           children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: card,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: WorksheetPalette.green.withValues(alpha: 0.35)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.project.name,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 12, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Project QR',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 16,
+                        fontSize: 17,
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDark
+                              ? [const Color(0xFF064E3B), const Color(0xFF0F766E), const Color(0xFF047857)]
+                              : [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF14B8A6)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: WorksheetPalette.green.withValues(alpha: isDark ? 0.4 : 0.3),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            widget.project.name,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ngmyWorksheetMoneyText(widget.project.totalSpending, large: false),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    if (_error != null)
-                      Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent))
-                    else if (_payload == null)
-                      const CircularProgressIndicator(color: WorksheetPalette.green)
-                    else
-                      NgmyBrandedQrWidget(data: _payload!, large: true),
-                    const SizedBox(height: 14),
-                    Text(
-                      isCloud
-                          ? 'Scan with Worksheets → Scan QR. Includes thumbnail & all items.'
-                          : 'Offline QR — scan on the same network or use Download backup file for full copy.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF151D2B) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isCloud
+                              ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                              : WorksheetPalette.green.withValues(alpha: 0.3),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          if (_error != null)
+                            Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent))
+                          else if (_payload == null)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 48),
+                              child: CircularProgressIndicator(color: WorksheetPalette.green),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: NgmyBrandedQrWidget(data: _payload!, large: true),
+                            ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: (isCloud ? const Color(0xFF38BDF8) : WorksheetPalette.green)
+                                  .withValues(alpha: isDark ? 0.15 : 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: (isCloud ? const Color(0xFF38BDF8) : WorksheetPalette.green)
+                                    .withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isCloud ? Icons.cloud_done_rounded : Icons.wifi_off_rounded,
+                                  size: 18,
+                                  color: isCloud ? const Color(0xFF38BDF8) : WorksheetPalette.green,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    isCloud
+                                        ? 'Cloud QR — includes thumbnail and all budget items.'
+                                        : 'Offline QR — use backup file for the full project copy.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.35,
+                                      color: isDark ? Colors.white70 : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
