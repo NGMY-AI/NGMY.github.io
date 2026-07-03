@@ -24,6 +24,41 @@
 
   <script>
     (function () {
+      var embedded = '__NGMY_DEPLOY_ID__';
+      var base = window.__NGMY_BASE_PATH__ || '/';
+      var KEY = 'ngmy_deploy_id';
+      function forceRefreshForBuild(serverBuild) {
+        if (!serverBuild || serverBuild === embedded) return;
+        var onceKey = 'ngmy_force_reload_' + serverBuild;
+        if (sessionStorage.getItem(onceKey)) return;
+        sessionStorage.setItem(onceKey, '1');
+        try { localStorage.setItem(KEY, serverBuild); } catch (e) {}
+        var done = function () { location.replace(location.pathname + location.search + (location.search ? '&' : '?') + '_=' + Date.now()); };
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }).then(function () {
+            if ('caches' in window) {
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; }).map(function (k) { return caches.delete(k); }));
+              });
+            }
+          }).then(done).catch(done);
+        } else {
+          done();
+        }
+      }
+      fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (v) {
+          if (v && v.build_number) forceRefreshForBuild(v.build_number);
+        })
+        .catch(function () {});
+    })();
+  </script>
+
+  <script>
+    (function () {
       var deployId = '__NGMY_DEPLOY_ID__';
       var scope = window.__NGMY_BASE_PATH__ || '/';
       if ('serviceWorker' in navigator) {
@@ -433,6 +468,10 @@
       try {
 
         var prev = localStorage.getItem(KEY);
+
+        if (prev && prev !== CURRENT) {
+          try { sessionStorage.removeItem('ngmy_force_reload_' + CURRENT); } catch (e) {}
+        }
 
         // New deploy: let the service worker swap caches on activate — do not wipe
         // storage here or offline cold start breaks before the new shell is cached.
