@@ -24,7 +24,8 @@ const _exportWallCapSec = 300.0;
 const _mobileMaxRecordSeconds = 180.0;
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
-const _mobileExportMaxEdgePx = 1280;
+/// Keep full HD when possible; 1280 was causing blurry upscaled exports.
+const _mobileExportMaxEdgePx = 1920;
 
 bool _ngmyExportCancelled = false;
 
@@ -281,17 +282,15 @@ Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
 }
 
 void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
-  // Keep full-size in the viewport so mobile browsers decode every frame during export.
-  var w = preferW ?? (v.videoWidth > 0 ? v.videoWidth : 720);
-  var h = preferH ?? (v.videoHeight > 0 ? v.videoHeight : 1280);
-  if (_ngmyIsMobileBrowser()) {
-    final maxEdge = _mobileExportMaxEdgePx;
-    final edge = math.max(w, h);
-    if (edge > maxEdge) {
-      final scale = maxEdge / edge;
-      w = (w * scale).round();
-      h = (h * scale).round();
-    }
+  // Size from native decode resolution — not canvas size — so drawImage stays sharp.
+  var w = v.videoWidth > 0 ? v.videoWidth : (preferW ?? 720);
+  var h = v.videoHeight > 0 ? v.videoHeight : (preferH ?? 1280);
+  final maxEdge = _ngmyIsMobileBrowser() ? _mobileExportMaxEdgePx : 3840;
+  final edge = math.max(w, h);
+  if (edge > maxEdge) {
+    final scale = maxEdge / edge;
+    w = (w * scale).round();
+    h = (h * scale).round();
   }
   v
     ..style.position = 'fixed'
@@ -299,8 +298,8 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
     ..style.top = '0'
     ..style.width = '${w}px'
     ..style.height = '${h}px'
-    ..style.objectFit = 'cover'
-    ..style.opacity = '0.08'
+    ..style.objectFit = 'contain'
+    ..style.opacity = '0.12'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483640'
     ..style.transform = 'translateZ(0)';
@@ -311,7 +310,7 @@ void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH})
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
-  _stageHiddenVideoElement(v, preferW: canvasW, preferH: canvasH);
+  _stageHiddenVideoElement(v);
 }
 
 void _cleanupExportElements() {
@@ -595,11 +594,15 @@ Future<void> _syncExportVideosToWallClock(
         : target;
     final seekT = target.clamp(0.0, maxT);
     for (final v in videos) {
-      v.pause();
       v.playbackRate = 1.0;
       v.currentTime = seekT;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 16));
+    await Future<void>.delayed(const Duration(milliseconds: 24));
+    for (final v in videos) {
+      if (!v.ended && v.paused) {
+        unawaited(_playVideoForRecord(v));
+      }
+    }
   } else if (lag > 0.08) {
     primary.playbackRate = (1.0 + lag * 0.55).clamp(1.0, 1.45);
   } else {
@@ -1027,7 +1030,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 6000000 : (_ngmyIsMobileBrowser() ? 7500000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond': appleMobile ? 8000000 : (_ngmyIsMobileBrowser() ? 10000000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1161,7 +1164,6 @@ Future<List<html.Blob>> _recordCanvasExport({
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
     maxRecordedSec = math.max(maxRecordedSec, t);
     final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-    final wallSec = wallMs / 1000.0;
     if (wallMs > (_ngmyIsMobileBrowser() ? 22000 : 18000) && t < 0.04) {
       debugPrint('[studio export] video frozen at t=$t — aborting realtime attempt');
       abortedFrozen = true;
@@ -1229,12 +1231,17 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
   required List<html.VideoElement> videoList,
   required double durationSec,
   required void Function(double progress, String status) onProgress,
+  html.VideoElement? primaryVideo,
+  bool withAudio = false,
 }) async {
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile ? 5500000 : (_ngmyIsMobileBrowser() ? 7000000 : 12000000),
+    'videoBitsPerSecond': appleMobile ? 8000000 : (_ngmyIsMobileBrowser() ? 10000000 : 14000000),
   };
+  if (stream.getAudioTracks().isNotEmpty) {
+    recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
+  }
 
   final recorder = _createMediaRecorder(stream, recorderOptions);
   if (recorder == null) return const [];
@@ -1263,6 +1270,19 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
     v.pause();
     v.playbackRate = 1.0;
     v.currentTime = 0;
+  }
+
+  html.VideoElement? audioEl;
+  if (withAudio && primaryVideo != null) {
+    audioEl = await _ensureExportAudioElement(primaryVideo);
+    if (audioEl != null) {
+      audioEl
+        ..muted = false
+        ..volume = 1.0
+        ..currentTime = 0
+        ..playbackRate = 1.0;
+      await _playVideoForRecord(audioEl);
+    }
   }
 
   final fps = _exportFps();
@@ -1295,6 +1315,9 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
 
   paintFrame();
   await _awaitWallTime(wallStart, totalWallMs);
+  if (audioEl != null) {
+    audioEl.pause();
+  }
   await Future<void>.delayed(const Duration(milliseconds: 120));
   try {
     js_util.callMethod(recorder, 'requestData', const []);
@@ -1371,7 +1394,16 @@ Future<void> _attachExportAudio(html.MediaStream recordStream, html.VideoElement
 
 html.VideoElement? _pickPrimaryVideo(List<html.VideoElement> videoList) {
   if (videoList.isEmpty) return null;
-  return videoList.first;
+  html.VideoElement? best;
+  var bestDur = 0.0;
+  for (final v in videoList) {
+    final d = v.duration;
+    if (d.isFinite && d > bestDur) {
+      bestDur = d.toDouble();
+      best = v;
+    }
+  }
+  return best ?? videoList.first;
 }
 
 html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFps}) {
@@ -1583,13 +1615,21 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
     var durationSec = await _resolveRecordingDurationAsync(videos.values);
 
+    final videoList = videos.values.toList();
     html.VideoElement? primaryVideo;
+    var bestSlotDur = 0.0;
     for (final e in config.slotRects.entries) {
-      if ((config.slotKinds[e.key] ?? NgmySlotKind.video) == NgmySlotKind.video) {
-        primaryVideo = videos[e.key];
-        if (primaryVideo != null) break;
+      if ((config.slotKinds[e.key] ?? NgmySlotKind.video) != NgmySlotKind.video) continue;
+      final candidate = videos[e.key];
+      if (candidate == null) continue;
+      final d = candidate.duration;
+      final dur = d.isFinite && d > 0 ? d.toDouble() : 0.0;
+      if (dur >= bestSlotDur) {
+        bestSlotDur = dur;
+        primaryVideo = candidate;
       }
     }
+    primaryVideo ??= _pickPrimaryVideo(videoList);
 
     await _flushProgress(onProgress, 0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
 
@@ -1745,7 +1785,6 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     }
 
     usedCanvasStream = true;
-    final videoList = videos.values.toList();
     final mimeCandidates = _recorderMimeCandidates();
     if (mimeCandidates.isEmpty) {
       return _fallbackComposedExport(config, sources, reason: 'recording not supported');
@@ -1757,6 +1796,33 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     String? mimeType;
     final primaryMime = mimeCandidates.first;
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
+
+    Future<({List<html.Blob> chunks, bool hadAudio})> trySeekRecord(
+      String mime, {
+      required bool withAudio,
+    }) async {
+      if (_exportWasCancelled) return (chunks: const <html.Blob>[], hadAudio: false);
+      final recordStream = _videoOnlyStream(canvasStream);
+      var hadAudio = false;
+      if (withAudio && primaryVideo != null) {
+        await _attachExportAudio(recordStream, primaryVideo);
+        hadAudio = recordStream.getAudioTracks().isNotEmpty;
+      }
+      if (recordStream.getVideoTracks().isEmpty) return (chunks: const <html.Blob>[], hadAudio: false);
+      final seekChunks = await _recordCanvasExportSeekSync(
+        stream: recordStream,
+        mimeType: mime,
+        paintFrame: paintFrame,
+        videoList: videoList,
+        primaryVideo: primaryVideo,
+        durationSec: durationSec,
+        withAudio: hadAudio,
+        onProgress: (p, s) {
+          onProgress?.call(0.12 + p * 0.86, s);
+        },
+      );
+      return (chunks: seekChunks, hadAudio: hadAudio);
+    }
 
     Future<({List<html.Blob> chunks, bool hadAudio})> tryRecord(
       String mime, {
@@ -1807,54 +1873,69 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     List<html.Blob>? silentFallbackChunks;
     String? silentFallbackMime;
 
-    for (var i = 0; i < plans.length; i++) {
-      if (_exportWasCancelled) break;
-      final plan = plans[i];
-      await _flushProgress(
-        onProgress,
-        0.12 + (i * 0.02),
-        'Recording ${_formatDurationLabel(durationSec)}…',
-      );
-      final result = await tryRecord(
-        plan.mime,
-        withAudio: plan.audio,
-      );
-      if (_exportWasCancelled) break;
-      if (result.chunks.isEmpty) {
-        debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio}');
-        continue;
+    // Mobile browsers often freeze hidden <video> during realtime capture — bake
+    // frame-by-frame first so motion and template stay in sync with clip length.
+    if (_ngmyIsMobileBrowser()) {
+      for (var i = 0; i < [primaryMime, if (fallbackMime != primaryMime) fallbackMime].length; i++) {
+        if (_exportWasCancelled) break;
+        final mime = i == 0 ? primaryMime : fallbackMime;
+        await _flushProgress(onProgress, 0.11, 'Baking template (${_formatDurationLabel(durationSec)})…');
+        final result = await trySeekRecord(mime, withAudio: i == 0);
+        if (result.chunks.isEmpty) continue;
+        if (result.hadAudio) {
+          chunks = result.chunks;
+          mimeType = mime;
+          break;
+        }
+        silentFallbackChunks ??= result.chunks;
+        silentFallbackMime ??= mime;
       }
-      if (result.hadAudio) {
-        chunks = result.chunks;
-        mimeType = plan.mime;
-        break;
+      if (chunks.isEmpty && silentFallbackChunks != null) {
+        chunks = silentFallbackChunks;
+        mimeType = silentFallbackMime;
       }
-      silentFallbackChunks ??= result.chunks;
-      silentFallbackMime ??= plan.mime;
-      debugPrint('[studio export] video ok, no audio yet — mime=${plan.mime}');
-    }
-
-    if (chunks.isEmpty && silentFallbackChunks != null) {
-      chunks = silentFallbackChunks;
-      mimeType = silentFallbackMime;
     }
 
     if ((chunks.isEmpty || mimeType == null) && !_exportWasCancelled) {
+      for (var i = 0; i < plans.length; i++) {
+        if (_exportWasCancelled) break;
+        final plan = plans[i];
+        await _flushProgress(
+          onProgress,
+          0.12 + (i * 0.02),
+          'Recording ${_formatDurationLabel(durationSec)}…',
+        );
+        final result = await tryRecord(
+          plan.mime,
+          withAudio: plan.audio,
+        );
+        if (_exportWasCancelled) break;
+        if (result.chunks.isEmpty) {
+          debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio}');
+          continue;
+        }
+        if (result.hadAudio) {
+          chunks = result.chunks;
+          mimeType = plan.mime;
+          break;
+        }
+        silentFallbackChunks ??= result.chunks;
+        silentFallbackMime ??= plan.mime;
+        debugPrint('[studio export] video ok, no audio yet — mime=${plan.mime}');
+      }
+
+      if (chunks.isEmpty && silentFallbackChunks != null) {
+        chunks = silentFallbackChunks;
+        mimeType = silentFallbackMime;
+      }
+    }
+
+    if ((chunks.isEmpty || mimeType == null) && !_exportWasCancelled && !_ngmyIsMobileBrowser()) {
       await _flushProgress(onProgress, 0.18, 'Retrying template bake frame-by-frame…');
       final seekMime = mimeCandidates.isNotEmpty ? mimeCandidates.first : 'video/mp4';
-      final seekStream = _videoOnlyStream(canvasStream);
-      final seekChunks = await _recordCanvasExportSeekSync(
-        stream: seekStream,
-        mimeType: seekMime,
-        paintFrame: paintFrame,
-        videoList: videoList,
-        durationSec: durationSec,
-        onProgress: (p, s) {
-          onProgress?.call(0.18 + p * 0.78, s);
-        },
-      );
-      if (seekChunks.isNotEmpty) {
-        chunks = seekChunks;
+      final result = await trySeekRecord(seekMime, withAudio: true);
+      if (result.chunks.isNotEmpty) {
+        chunks = result.chunks;
         mimeType = seekMime;
         debugPrint('[studio export] seek-sync fallback succeeded');
       }

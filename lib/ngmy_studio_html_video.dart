@@ -20,6 +20,7 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
   html.VideoElement? _video;
   bool _playing = false;
   bool _ready = false;
+  bool _muted = true;
   String? _error;
 
   @override
@@ -32,17 +33,27 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
         ..controls = false
         ..preload = 'auto'
         ..loop = true
-        ..muted = false
+        ..muted = true
+        ..defaultMuted = true
+        ..autoplay = true
         ..setAttribute('playsinline', 'true')
         ..setAttribute('webkit-playsinline', 'true')
+        ..setAttribute('muted', 'true')
         ..setAttribute('x-webkit-airplay', 'deny')
         ..style.width = '100%'
         ..style.height = '100%'
         ..style.objectFit = 'cover'
         ..style.backgroundColor = '#000'
         ..style.pointerEvents = 'none';
-      _video!.onLoadedData.listen((_) {
-        if (mounted) setState(() => _ready = true);
+      _video!.onLoadedData.listen((_) async {
+        if (!mounted) return;
+        setState(() => _ready = true);
+        try {
+          await _video!.play();
+          if (mounted) setState(() => _playing = true);
+        } catch (e) {
+          debugPrint('[studio html video] autoplay: $e');
+        }
       });
       _video!.onPlay.listen((_) {
         if (mounted) setState(() => _playing = true);
@@ -87,6 +98,29 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
     }
   }
 
+  Future<void> _toggleMute() async {
+    final v = _video;
+    if (v == null) return;
+    final nextMuted = !v.muted;
+    v.muted = nextMuted;
+    v.defaultMuted = nextMuted;
+    if (nextMuted) {
+      v.setAttribute('muted', 'true');
+    } else {
+      v.removeAttribute('muted');
+      v.volume = 1.0;
+      if (v.paused) {
+        try {
+          await v.play();
+          if (mounted) setState(() => _playing = true);
+        } catch (e) {
+          debugPrint('[studio html video] unmute play: $e');
+        }
+      }
+    }
+    if (mounted) setState(() => _muted = nextMuted);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
@@ -125,6 +159,12 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
                 _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 _playing ? 'Pause' : 'Play',
                 () => unawaited(_togglePlay()),
+              ),
+              const SizedBox(width: 8),
+              _ctrl(
+                _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                _muted ? 'Sound off' : 'Sound on',
+                () => unawaited(_toggleMute()),
               ),
               const SizedBox(width: 8),
               _ctrl(Icons.replay_rounded, 'Replay', () => unawaited(_replay())),
