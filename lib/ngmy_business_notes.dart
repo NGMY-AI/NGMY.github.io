@@ -137,7 +137,74 @@ const _crossScreenPaths = <_CrossScreenPath>[
   _CrossScreenPath(start: Offset(0.85, 1.1), end: Offset(0.2, -0.1), wave: 0.038, speed: 0.18, phase: 0.91),
 ];
 
-const _textAnimEffects = ['bounce', 'pulse', 'glow', 'wave', 'shake', 'rainbow', 'fade'];
+const _textAnimEffects = [
+  'bounce', 'pulse', 'glow', 'wave', 'shake', 'rainbow', 'fade',
+  'zoom', 'spin', 'float', 'wiggle', 'blink', 'neon', 'typewriter', 'slide',
+];
+
+/// Character-range text animation stored separately from visible note body.
+class NgmyNoteTextAnim {
+  NgmyNoteTextAnim({required this.start, required this.end, required this.effect});
+  int start;
+  int end;
+  String effect;
+
+  Map<String, dynamic> toJson() => {'start': start, 'end': end, 'effect': effect};
+
+  factory NgmyNoteTextAnim.fromJson(Map<String, dynamic> json) => NgmyNoteTextAnim(
+        start: (json['start'] as num?)?.toInt() ?? 0,
+        end: (json['end'] as num?)?.toInt() ?? 0,
+        effect: (json['effect'] ?? 'bounce').toString(),
+      );
+}
+
+/// Strip legacy ⟦effect:text⟧ markers; returns cleaned body and extracted anims.
+(String, List<NgmyNoteTextAnim>) _migrateLegacyTextAnims(String body) {
+  final anims = <NgmyNoteTextAnim>[];
+  final buf = StringBuffer();
+  var i = 0;
+  while (i < body.length) {
+    if (body.startsWith('⟦', i)) {
+      final end = body.indexOf('⟧', i);
+      if (end != -1) {
+        final inner = body.substring(i + 1, end);
+        final colon = inner.indexOf(':');
+        if (colon > 0) {
+          final effect = inner.substring(0, colon);
+          final txt = inner.substring(colon + 1);
+          final start = buf.length;
+          buf.write(txt);
+          if (txt.isNotEmpty) anims.add(NgmyNoteTextAnim(start: start, end: buf.length, effect: effect));
+          i = end + 1;
+          continue;
+        }
+      }
+    }
+    // Legacy (bounce)text — optional migration
+    if (body[i] == '(') {
+      final close = body.indexOf(')', i + 1);
+      if (close != -1 && close - i < 20) {
+        final tag = body.substring(i + 1, close);
+        if (_textAnimEffects.contains(tag)) {
+          final start = buf.length;
+          var j = close + 1;
+          while (j < body.length && body[j] != '\n' && !body.startsWith('(', j)) {
+            buf.write(body[j]);
+            j++;
+          }
+          if (buf.length > start) {
+            anims.add(NgmyNoteTextAnim(start: start, end: buf.length, effect: tag));
+          }
+          i = j;
+          continue;
+        }
+      }
+    }
+    buf.write(body[i]);
+    i++;
+  }
+  return (buf.toString(), anims);
+}
 
 const _bgCategories = ['All', 'Personal', 'Work', 'Meeting', 'Ideas', 'Nature'];
 
@@ -382,11 +449,13 @@ class NgmyBusinessNote {
     this.pinned = false,
     this.icon = '📝',
     this.openInPreview = false,
+    List<NgmyNoteTextAnim>? textAnims,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+        updatedAt = updatedAt ?? DateTime.now(),
+        textAnims = textAnims ?? [];
 
   final String id;
   String title;
@@ -398,6 +467,7 @@ class NgmyBusinessNote {
   bool pinned;
   String icon;
   bool openInPreview;
+  List<NgmyNoteTextAnim> textAnims;
   final DateTime createdAt;
   DateTime updatedAt;
 
@@ -430,6 +500,7 @@ class NgmyBusinessNote {
         'pinned': pinned,
         'icon': icon,
         'openInPreview': openInPreview,
+        'textAnims': textAnims.map((a) => a.toJson()).toList(),
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
@@ -445,6 +516,11 @@ class NgmyBusinessNote {
         pinned: json['pinned'] == true,
         icon: (json['icon'] ?? '📝').toString(),
         openInPreview: json['openInPreview'] == true,
+        textAnims: (json['textAnims'] as List?)
+                ?.whereType<Map>()
+                .map((e) => NgmyNoteTextAnim.fromJson(Map<String, dynamic>.from(e)))
+                .toList() ??
+            [],
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
       );
@@ -1063,19 +1139,103 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   Timer? _autosave;
   bool _dirty = false;
   bool _previewMode = false;
+  String? _prevBody;
+  int? _growAnimIndex;
 
   @override
   void initState() {
     super.initState();
     _note = widget.note ?? NgmyBusinessNote(folder: 'Personal');
+    final migrated = _migrateLegacyTextAnims(_note.body);
+    if (migrated.$1 != _note.body || migrated.$2.isNotEmpty) {
+      _note.body = migrated.$1;
+      _note.textAnims.addAll(migrated.$2);
+    }
     _initialBody = _note.body;
     _title = TextEditingController(text: _note.title);
     _body = TextEditingController(text: _note.body);
     _bodyFocus = FocusNode();
+    _prevBody = _body.text;
     _title.addListener(_markDirty);
-    _body.addListener(_markDirty);
+    _body.addListener(_onBodyChanged);
     if (!widget.isNew && _note.openInPreview) {
       _previewMode = true;
+    }
+  }
+
+  void _onBodyChanged() {
+    final newText = _body.text;
+    if (_prevBody != null && _prevBody != newText) {
+      _reconcileTextAnims(_prevBody!, newText);
+    }
+    if (_growAnimIndex != null && _growAnimIndex! < _note.textAnims.length) {
+      final a = _note.textAnims[_growAnimIndex!];
+      final cursor = _body.selection.extentOffset.clamp(0, newText.length);
+      if (cursor >= a.start) a.end = cursor;
+      if (a.end <= a.start) {
+        _note.textAnims.removeAt(_growAnimIndex!);
+        _growAnimIndex = null;
+      }
+    }
+    _prevBody = newText;
+    _markDirty();
+  }
+
+  void _reconcileTextAnims(String old, String new_) {
+    var prefix = 0;
+    while (prefix < old.length && prefix < new_.length && old[prefix] == new_[prefix]) {
+      prefix++;
+    }
+    var oldSuffix = old.length - 1;
+    var newSuffix = new_.length - 1;
+    while (oldSuffix >= prefix && newSuffix >= prefix && old[oldSuffix] == new_[newSuffix]) {
+      oldSuffix--;
+      newSuffix--;
+    }
+    final editStart = prefix;
+    final oldEditEnd = oldSuffix + 1;
+    final delta = (newSuffix + 1 - prefix) - (oldEditEnd - prefix);
+    for (final a in _note.textAnims) {
+      if (a.end <= editStart) continue;
+      if (a.start >= oldEditEnd) {
+        a.start += delta;
+        a.end += delta;
+      } else {
+        if (a.start < editStart) {
+          a.end = math.min(a.end, editStart);
+        } else {
+          a.start = editStart;
+          a.end = editStart;
+        }
+      }
+    }
+    _note.textAnims.removeWhere((a) => a.end <= a.start);
+    if (_growAnimIndex != null && _growAnimIndex! >= _note.textAnims.length) {
+      _growAnimIndex = null;
+    }
+  }
+
+  void _applyTextEffect(String effect) {
+    final t = _body.text;
+    final sel = _body.selection;
+    final s = sel.start.clamp(0, t.length);
+    final e = sel.end.clamp(0, t.length);
+    _note.textAnims.removeWhere((a) => !(a.end <= s || a.start >= e));
+    if (s != e) {
+      _note.textAnims.add(NgmyNoteTextAnim(start: s, end: e, effect: effect));
+      _growAnimIndex = null;
+    } else {
+      _note.textAnims.add(NgmyNoteTextAnim(start: s, end: s, effect: effect));
+      _growAnimIndex = _note.textAnims.length - 1;
+    }
+    _markDirty();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(s != e ? '$effect applied — visible in Preview' : 'Type your text — $effect runs in Preview'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -1198,7 +1358,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
               const SizedBox(height: 14),
               const Text('Text animation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 6),
-              const Text('Wrap selected text with a live effect (visible in Preview)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const Text('Select text, pick an effect — only your words show while editing. Effects play in Preview.', style: TextStyle(color: Colors.white54, fontSize: 12)),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 8,
@@ -1219,20 +1379,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (effect == null) return;
-    final t = _body.text;
-    final sel = _body.selection;
-    final s = sel.start.clamp(0, t.length);
-    final e = sel.end.clamp(0, t.length);
-    if (s != e) {
-      final selected = t.substring(s, e);
-      _body.text = t.substring(0, s) + '⟦$effect:$selected⟧' + t.substring(e);
-      _body.selection = TextSelection.collapsed(offset: s + effect.length + selected.length + 3);
-    } else {
-      _insertAtCursor('⟦$effect:your text⟧');
-      final cursor = _body.selection.start;
-      _body.selection = TextSelection(baseOffset: cursor - 12, extentOffset: cursor - 1);
-    }
-    _markDirty();
+    _applyTextEffect(effect);
   }
 
   Future<void> _showEmojiPicker() async {
@@ -1631,7 +1778,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           const SizedBox(height: 8),
                           Expanded(
                             child: _previewMode
-                                ? SingleChildScrollView(child: _NoteMarkdownPreview(text: _body.text, dark: dark))
+                                ? SingleChildScrollView(child: _NoteMarkdownPreview(text: _body.text, dark: dark, textAnims: _note.textAnims))
                                 : TextField(
                                     controller: _body,
                                     focusNode: _bodyFocus,
@@ -1718,24 +1865,28 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 }
 
 class _NoteMarkdownPreview extends StatelessWidget {
-  const _NoteMarkdownPreview({required this.text, required this.dark});
+  const _NoteMarkdownPreview({required this.text, required this.dark, this.textAnims = const []});
   final String text;
   final bool dark;
+  final List<NgmyNoteTextAnim> textAnims;
 
   @override
   Widget build(BuildContext context) {
-    if (text.trim().isEmpty) {
+    if (text.trim().isEmpty && textAnims.isEmpty) {
       return Text('Nothing to preview yet', style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontStyle: FontStyle.italic));
     }
     final fg = dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155);
     final lines = text.split('\n');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: lines.map((line) => _lineWidget(line, fg)).toList(),
-    );
+    var docOffset = 0;
+    final widgets = <Widget>[];
+    for (final line in lines) {
+      widgets.add(_lineWidget(line, fg, docOffset));
+      docOffset += line.length + 1;
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 
-  Widget _lineWidget(String line, Color fg) {
+  Widget _lineWidget(String line, Color fg, int lineStart) {
     if (line.trim() == '---') {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1757,7 +1908,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
           color: fg.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: _inline(line.substring(2), fg, baseSize: 15, baseWeight: FontWeight.w500),
+        child: _inline(line.substring(2), fg, lineStart: lineStart + 2, baseSize: 15, baseWeight: FontWeight.w500),
       );
     }
     if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) {
@@ -1782,7 +1933,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('• ', style: TextStyle(fontSize: 15, color: fg.withValues(alpha: 0.6))),
-            Expanded(child: _inline(line.substring(2), fg)),
+            Expanded(child: _inline(line.substring(2), fg, lineStart: lineStart + 2)),
           ],
         ),
       );
@@ -1795,36 +1946,46 @@ class _NoteMarkdownPreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${line.substring(0, dot + 1)} ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg.withValues(alpha: 0.7))),
-            Expanded(child: _inline(line.substring(dot + 2), fg)),
+            Expanded(child: _inline(line.substring(dot + 2), fg, lineStart: lineStart + dot + 2)),
           ],
         ),
       );
     }
     if (line.trim().isEmpty) return const SizedBox(height: 10);
-    return Padding(padding: const EdgeInsets.only(bottom: 6), child: _inline(line, fg));
+    return Padding(padding: const EdgeInsets.only(bottom: 6), child: _inline(line, fg, lineStart: lineStart));
   }
 
-  Widget _inline(String raw, Color fg, {double baseSize = 15, FontWeight baseWeight = FontWeight.w400}) {
+  Widget _inline(String raw, Color fg, {required int lineStart, double baseSize = 15, FontWeight baseWeight = FontWeight.w400}) {
+    final lineEnd = lineStart + raw.length;
+    final spans = <InlineSpan>[];
+    var pos = 0;
+    final sorted = textAnims.where((a) => a.end > lineStart && a.start < lineEnd && a.end > a.start).toList()
+      ..sort((a, b) => a.start.compareTo(b.start));
+    for (final a in sorted) {
+      final ls = math.max(a.start, lineStart);
+      final le = math.min(a.end, lineEnd);
+      if (le <= ls) continue;
+      final before = raw.substring(pos, ls - lineStart);
+      if (before.isNotEmpty) spans.addAll(_markdownSpans(before, fg, baseSize: baseSize, baseWeight: baseWeight));
+      final animText = raw.substring(ls - lineStart, le - lineStart);
+      if (animText.isNotEmpty) {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: _AnimatedTextEffect(effect: a.effect, text: animText, color: fg, fontSize: baseSize, fontWeight: baseWeight),
+        ));
+      }
+      pos = le - lineStart;
+    }
+    final tail = raw.substring(pos);
+    if (tail.isNotEmpty) spans.addAll(_markdownSpans(tail, fg, baseSize: baseSize, baseWeight: baseWeight));
+    if (spans.isEmpty) return const SizedBox.shrink();
+    return RichText(text: TextSpan(children: spans));
+  }
+
+  List<InlineSpan> _markdownSpans(String raw, Color fg, {double baseSize = 15, FontWeight baseWeight = FontWeight.w400}) {
     final spans = <InlineSpan>[];
     var i = 0;
     while (i < raw.length) {
-      if (raw.startsWith('⟦', i)) {
-        final end = raw.indexOf('⟧', i);
-        if (end != -1) {
-          final inner = raw.substring(i + 1, end);
-          final colon = inner.indexOf(':');
-          if (colon > 0) {
-            final effect = inner.substring(0, colon);
-            final txt = inner.substring(colon + 1);
-            spans.add(WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: _AnimatedTextEffect(effect: effect, text: txt, color: fg, fontSize: baseSize, fontWeight: baseWeight),
-            ));
-            i = end + 1;
-            continue;
-          }
-        }
-      }
       if (raw.startsWith('**', i)) {
         final end = raw.indexOf('**', i + 2);
         if (end != -1) {
@@ -1849,16 +2010,15 @@ class _NoteMarkdownPreview extends StatelessWidget {
           continue;
         }
       }
-      final nextSpecial = _nextSpecial(raw, i);
+      final nextSpecial = _nextMarkdownSpecial(raw, i);
       spans.add(TextSpan(text: raw.substring(i, nextSpecial), style: TextStyle(color: fg, fontSize: baseSize, fontWeight: baseWeight)));
       i = nextSpecial;
     }
-    return RichText(text: TextSpan(children: spans));
+    return spans;
   }
 
-  int _nextSpecial(String s, int from) {
+  int _nextMarkdownSpecial(String s, int from) {
     final indices = [
-      if (s.indexOf('⟦', from) >= 0) s.indexOf('⟦', from),
       if (s.indexOf('**', from) >= 0) s.indexOf('**', from),
       if (s.indexOf('_', from) >= 0) s.indexOf('_', from),
       if (s.indexOf('<u>', from) >= 0) s.indexOf('<u>', from),
@@ -2528,6 +2688,26 @@ class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTic
             color = HSVColor.fromAHSV(1, (t * 360) % 360, 0.55, 0.95).toColor();
           case 'fade':
             opacity = 0.45 + math.sin(t * math.pi * 2) * 0.45;
+          case 'zoom':
+            scale = 0.88 + math.sin(t * math.pi * 2).abs() * 0.18;
+          case 'spin':
+            angle = t * math.pi * 2;
+          case 'float':
+            dy = math.sin(t * math.pi * 2) * 6;
+          case 'wiggle':
+            angle = math.sin(t * math.pi * 6) * 0.12;
+            dy = math.sin(t * math.pi * 4) * 2;
+          case 'blink':
+            opacity = (math.sin(t * math.pi * 4) > 0) ? 1.0 : 0.25;
+          case 'neon':
+            color = Color.lerp(const Color(0xFF22D3EE), const Color(0xFFE879F9), 0.5 + math.sin(t * math.pi * 2) * 0.5)!;
+            scale = 1.0 + math.sin(t * math.pi * 2) * 0.06;
+          case 'typewriter':
+            opacity = ((t * 3) % 1.0) > 0.08 ? 1.0 : 0.35;
+            scale = 0.96 + ((t * 3) % 1.0) * 0.04;
+          case 'slide':
+            dy = math.sin(t * math.pi * 2) * 5;
+            scale = 1.0 + math.cos(t * math.pi * 2) * 0.04;
           default:
             dy = -math.sin(t * math.pi * 2).abs() * 6;
         }
@@ -2545,8 +2725,8 @@ class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTic
                     fontSize: widget.fontSize,
                     fontWeight: widget.fontWeight,
                     color: color,
-                    shadows: fx == 'glow'
-                        ? [Shadow(color: color.withValues(alpha: 0.8), blurRadius: 12)]
+                    shadows: fx == 'glow' || fx == 'neon'
+                        ? [Shadow(color: color.withValues(alpha: 0.85), blurRadius: fx == 'neon' ? 16 : 12)]
                         : null,
                   ),
                 ),
