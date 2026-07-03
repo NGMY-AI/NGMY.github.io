@@ -193,7 +193,7 @@ Future<void> ngmyWriteUserLoggedOutFlag(bool loggedOut, [SharedPreferences? pref
   }
 }
 
-ThemeMode _ngmyInitialThemeMode = ThemeMode.light;
+ThemeMode _ngmyInitialThemeMode = ThemeMode.dark;
 
 ThemeMode _ngmyResolveThemeMode(ThemeMode mode) {
   if (mode != ThemeMode.system) return mode;
@@ -250,7 +250,7 @@ class NgmyLaunchBootstrap {
   final AppConfig? config;
   final List<InvestmentPlan> plans;
 
-  static const empty = NgmyLaunchBootstrap(themeMode: ThemeMode.light);
+  static const empty = NgmyLaunchBootstrap(themeMode: ThemeMode.dark);
 }
 
 String? _ngmyPrefsJson(SharedPreferences prefs, String key) {
@@ -272,7 +272,7 @@ String? _ngmyPrefsJson(SharedPreferences prefs, String key) {
 Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    var themeMode = ThemeMode.light;
+    var themeMode = ThemeMode.dark;
     final savedTheme = (prefs.getString('theme_mode') ?? '').trim();
     if (savedTheme == 'light') themeMode = ThemeMode.light;
     if (savedTheme == 'dark') themeMode = ThemeMode.dark;
