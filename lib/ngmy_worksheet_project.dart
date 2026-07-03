@@ -77,6 +77,180 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
     await _persist();
   }
 
+  void _openShare() {
+    showNgmyWorksheetProjectShareSheet(
+      context,
+      ownerEmail: widget.userEmail,
+      project: _project,
+      onImported: (imported) async {
+        await upsertWorksheetProject(widget.userEmail, imported);
+        if (!context.mounted) return;
+        NgmyNavigator.pop(context, imported);
+      },
+    );
+  }
+
+  Widget _thumbnailHero(WorksheetPalette p) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF34D399),
+              Color(0xFF10B981),
+              Color(0xFF0D9488),
+              Color(0xFF059669),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.5 : 0.38),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: WorksheetPalette.teal.withValues(alpha: 0.2),
+              blurRadius: 32,
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(5),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.18),
+                blurRadius: 10,
+                spreadRadius: -2,
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ngmyImageOrPlaceholder(
+                  imageRef: _project.thumbnailPath,
+                  width: double.infinity,
+                  height: double.infinity,
+                  icon: Icons.photo_camera_outlined,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                // Inner vignette for depth
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.06),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.22),
+                      ],
+                    ),
+                  ),
+                ),
+                // Corner accents
+                Positioned(top: 8, left: 8, child: _frameCorner(accent: true)),
+                Positioned(top: 8, right: 8, child: Transform.flip(flipX: true, child: _frameCorner(accent: true))),
+                Positioned(bottom: 8, left: 8, child: Transform.flip(flipY: true, child: _frameCorner(accent: false))),
+                Positioned(bottom: 8, right: 8, child: Transform.flip(flipX: true, flipY: true, child: _frameCorner(accent: false))),
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: FilledButton.icon(
+                    onPressed: _pickThumbnail,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.black.withValues(alpha: 0.45),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.photo_library_outlined, size: 17),
+                    label: const Text('Thumbnail', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _frameCorner({required bool accent}) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: accent ? 0.85 : 0.55), width: 2.5),
+          left: BorderSide(color: Colors.white.withValues(alpha: accent ? 0.85 : 0.55), width: 2.5),
+        ),
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(4)),
+      ),
+    );
+  }
+
+  Widget _worksheetShareButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openShare,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(color: const Color(0xFF7DD3FC).withValues(alpha: 0.75), width: 1.6),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5)),
+                  ),
+                  child: const Icon(Icons.sync_alt_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Share',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    letterSpacing: 0.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteItem(BudgetItem item) async {
     setState(() {
       _project = _project.copyWith(
@@ -119,34 +293,7 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ngmyImageOrPlaceholder(
-                            imageRef: _project.thumbnailPath,
-                            width: double.infinity,
-                            height: double.infinity,
-                            icon: Icons.photo_camera_outlined,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          Positioned(
-                            right: 10,
-                            bottom: 10,
-                            child: FilledButton.icon(
-                              onPressed: _pickThumbnail,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: WorksheetPalette.green,
-                                foregroundColor: Colors.white,
-                              ),
-                              icon: const Icon(Icons.photo_library_outlined, size: 18),
-                              label: const Text('Thumbnail'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _thumbnailHero(p),
                     const SizedBox(height: 16),
                     Text(
                       _project.name,
@@ -218,166 +365,101 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
 
   Widget _projectTotalCard(WorksheetPalette p) {
     final itemCount = _project.items.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: p.isDark
-                  ? [const Color(0xFF0F2922), const Color(0xFF134E4A), const Color(0xFF065F46)]
-                  : [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF14B8A6)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.45 : 0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: p.isDark
+              ? [const Color(0xFF0F2922), const Color(0xFF134E4A), const Color(0xFF065F46)]
+              : [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF14B8A6)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.45 : 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -24,
-                  top: -24,
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
-                    size: 120,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-                            ),
-                            child: Text(
-                              '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.3,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -24,
+              top: -24,
+              child: Icon(
+                Icons.account_balance_wallet_rounded,
+                size: 120,
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                              ),
+                              child: Text(
+                                '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.3,
+                                ),
                               ),
                             ),
-                          ),
-                          const Spacer(),
-                          Icon(Icons.trending_up_rounded, color: Colors.white.withValues(alpha: 0.55), size: 20),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'PROJECT TOTAL',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.4,
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      ngmyWorksheetMoneyText(_project.totalSpending, large: true),
-                      if (itemCount > 0) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 14),
                         Text(
-                          'Sum of all budget line items',
+                          'PROJECT TOTAL',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: Colors.white.withValues(alpha: 0.75),
                             fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.4,
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        ngmyWorksheetMoneyText(_project.totalSpending, large: true),
+                        if (itemCount > 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sum of all budget line items',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => showNgmyWorksheetProjectShareSheet(
-              context,
-              ownerEmail: widget.userEmail,
-              project: _project,
-              onImported: (imported) async {
-                await upsertWorksheetProject(widget.userEmail, imported);
-                if (!context.mounted) return;
-                NgmyNavigator.pop(context, imported);
-              },
-            ),
-            borderRadius: BorderRadius.circular(16),
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  colors: p.isDark
-                      ? [const Color(0xFF1E3A5F), const Color(0xFF2563EB)]
-                      : [const Color(0xFF3B82F6), const Color(0xFF6366F1)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.28),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
+                  const SizedBox(width: 10),
+                  _worksheetShareButton(),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.ios_share_rounded, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Share Project',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
-                          ),
-                          Text(
-                            'QR code, file, or link with budget',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 11, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.85), size: 16),
-                  ],
-                ),
-              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
