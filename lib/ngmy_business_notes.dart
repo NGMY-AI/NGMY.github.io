@@ -24,6 +24,79 @@ const _noteColors = [
 
 const _noteFolders = ['All', 'Personal', 'Work', 'Ideas', 'Meeting', 'Other'];
 
+enum _NoteBgPattern { none, rain, waves, grass, stars, grid, bokeh }
+
+class _NoteBackgroundDef {
+  const _NoteBackgroundDef({
+    required this.id,
+    required this.label,
+    required this.category,
+    required this.colors,
+    this.pattern = _NoteBgPattern.none,
+    this.emojis = const [],
+    this.darkText = false,
+  });
+
+  final String id;
+  final String label;
+  final String category;
+  final List<Color> colors;
+  final _NoteBgPattern pattern;
+  final List<String> emojis;
+  final bool darkText;
+}
+
+const _noteBackgrounds = <_NoteBackgroundDef>[
+  _NoteBackgroundDef(id: 'sunrise_meadow', label: 'Sunrise Meadow', category: 'Personal', colors: [Color(0xFFFFF7ED), Color(0xFFBBF7D0), Color(0xFF86EFAC)], pattern: _NoteBgPattern.grass, emojis: ['🌅', '🌿', '🦋']),
+  _NoteBackgroundDef(id: 'ocean_waves', label: 'Ocean Waves', category: 'Nature', colors: [Color(0xFF0EA5E9), Color(0xFF0369A1), Color(0xFF1E3A8A)], pattern: _NoteBgPattern.waves, emojis: ['🌊', '🐚'], darkText: true),
+  _NoteBackgroundDef(id: 'rainforest', label: 'Rainforest', category: 'Nature', colors: [Color(0xFF14532D), Color(0xFF166534), Color(0xFF052E16)], pattern: _NoteBgPattern.grass, emojis: ['🌳', '🦜', '🌿'], darkText: true),
+  _NoteBackgroundDef(id: 'cherry_blossom', label: 'Cherry Blossom', category: 'Personal', colors: [Color(0xFFFDF2F8), Color(0xFFFBCFE8), Color(0xFFF472B6)], pattern: _NoteBgPattern.bokeh, emojis: ['🌸', '🌷']),
+  _NoteBackgroundDef(id: 'starry_night', label: 'Starry Night', category: 'Personal', colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.stars, emojis: ['✨', '🌙'], darkText: true),
+  _NoteBackgroundDef(id: 'rain_drops', label: 'Rainy Day', category: 'Nature', colors: [Color(0xFFCBD5E1), Color(0xFF64748B), Color(0xFF334155)], pattern: _NoteBgPattern.rain, emojis: ['🌧️', '☔'], darkText: true),
+  _NoteBackgroundDef(id: 'mountain_mist', label: 'Mountain Mist', category: 'Nature', colors: [Color(0xFFE2E8F0), Color(0xFF94A3B8), Color(0xFF475569)], pattern: _NoteBgPattern.bokeh, emojis: ['🏔️', '☁️']),
+  _NoteBackgroundDef(id: 'tropical_beach', label: 'Tropical Beach', category: 'Personal', colors: [Color(0xFF67E8F9), Color(0xFF22D3EE), Color(0xFFFDE68A)], pattern: _NoteBgPattern.waves, emojis: ['🏝️', '🌴', '🐚']),
+  _NoteBackgroundDef(id: 'butterfly_garden', label: 'Butterfly Garden', category: 'Personal', colors: [Color(0xFFFEF9C3), Color(0xFFFDE68A), Color(0xFFF0ABFC)], pattern: _NoteBgPattern.bokeh, emojis: ['🦋', '🌺', '🌻']),
+  _NoteBackgroundDef(id: 'koi_pond', label: 'Koi Pond', category: 'Nature', colors: [Color(0xFF99F6E4), Color(0xFF2DD4BF), Color(0xFF0F766E)], pattern: _NoteBgPattern.waves, emojis: ['🐟', '🪷']),
+  _NoteBackgroundDef(id: 'safari_sunset', label: 'Safari Sunset', category: 'Nature', colors: [Color(0xFFFDBA74), Color(0xFFEA580C), Color(0xFF7C2D12)], pattern: _NoteBgPattern.bokeh, emojis: ['🦁', '🌅', '🦒'], darkText: true),
+  _NoteBackgroundDef(id: 'waterfall_mist', label: 'Waterfall', category: 'Nature', colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF0284C7)], pattern: _NoteBgPattern.rain, emojis: ['💧', '🌊']),
+  _NoteBackgroundDef(id: 'executive_blue', label: 'Executive Blue', category: 'Work', colors: [Color(0xFFEFF6FF), Color(0xFFBFDBFE), Color(0xFF93C5FD)], pattern: _NoteBgPattern.grid, emojis: ['💼']),
+  _NoteBackgroundDef(id: 'boardroom_slate', label: 'Boardroom', category: 'Work', colors: [Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A)], pattern: _NoteBgPattern.none, emojis: ['📊'], darkText: true),
+  _NoteBackgroundDef(id: 'graph_paper', label: 'Graph Paper', category: 'Work', colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFFE2E8F0)], pattern: _NoteBgPattern.grid, emojis: ['📐']),
+  _NoteBackgroundDef(id: 'conference_cream', label: 'Conference', category: 'Meeting', colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7), Color(0xFFFDE68A)], pattern: _NoteBgPattern.none, emojis: ['🤝', '📋']),
+  _NoteBackgroundDef(id: 'calendar_blue', label: 'Calendar', category: 'Meeting', colors: [Color(0xFFF0F9FF), Color(0xFFDBEAFE), Color(0xFFBFDBFE)], pattern: _NoteBgPattern.grid, emojis: ['📅']),
+  _NoteBackgroundDef(id: 'brainstorm_aurora', label: 'Aurora Ideas', category: 'Ideas', colors: [Color(0xFF4ADE80), Color(0xFF818CF8), Color(0xFF312E81)], pattern: _NoteBgPattern.bokeh, emojis: ['💡', '✨'], darkText: true),
+  _NoteBackgroundDef(id: 'cosmos_purple', label: 'Cosmos', category: 'Ideas', colors: [Color(0xFF581C87), Color(0xFF7E22CE), Color(0xFF1E1B4B)], pattern: _NoteBgPattern.stars, emojis: ['🌌', '🚀'], darkText: true),
+  _NoteBackgroundDef(id: 'lightning_storm', label: 'Lightning', category: 'Ideas', colors: [Color(0xFF1E293B), Color(0xFF334155), Color(0xFFCA8A04)], pattern: _NoteBgPattern.rain, emojis: ['⚡', '🌩️'], darkText: true),
+  _NoteBackgroundDef(id: 'wildlife_forest', label: 'Wildlife', category: 'Nature', colors: [Color(0xFF365314), Color(0xFF4D7C0F), Color(0xFF14532D)], pattern: _NoteBgPattern.grass, emojis: ['🦊', '🦌', '🐻'], darkText: true),
+];
+
+const _bgCategories = ['All', 'Personal', 'Work', 'Meeting', 'Ideas', 'Nature'];
+
+_NoteBackgroundDef _noteBackgroundById(String id) =>
+    _noteBackgrounds.firstWhere((b) => b.id == id, orElse: () => _noteBackgrounds.first);
+
+String _defaultBackgroundForFolder(String folder) {
+  switch (folder) {
+    case 'Work':
+      return 'executive_blue';
+    case 'Meeting':
+      return 'conference_cream';
+    case 'Ideas':
+      return 'brainstorm_aurora';
+    case 'Nature':
+      return 'ocean_waves';
+    default:
+      return 'sunrise_meadow';
+  }
+}
+
+class _NoteCreationChoice {
+  const _NoteCreationChoice({this.layout, required this.backgroundId, this.customColor});
+  final _NoteTemplate? layout;
+  final String backgroundId;
+  final int? customColor;
+}
+
 class _NoteTemplate {
   const _NoteTemplate({
     required this.id,
@@ -33,6 +106,7 @@ class _NoteTemplate {
     this.title = '',
     this.folder = 'Personal',
     this.colorIndex = 0,
+    this.backgroundId = '',
   });
 
   final String id;
@@ -42,6 +116,7 @@ class _NoteTemplate {
   final String body;
   final String folder;
   final int colorIndex;
+  final String backgroundId;
 }
 
 const _noteTemplates = <_NoteTemplate>[
@@ -233,6 +308,8 @@ class NgmyBusinessNote {
     this.body = '',
     this.folder = 'Personal',
     this.colorIndex = 0,
+    this.backgroundId = '',
+    this.customColor,
     this.pinned = false,
     this.icon = '📝',
     DateTime? createdAt,
@@ -246,6 +323,8 @@ class NgmyBusinessNote {
   String body;
   String folder;
   int colorIndex;
+  String backgroundId;
+  int? customColor;
   bool pinned;
   String icon;
   final DateTime createdAt;
@@ -257,12 +336,26 @@ class NgmyBusinessNote {
     return line.trim().isEmpty ? 'New Note' : line.trim();
   }
 
+  String get effectiveBackgroundId => backgroundId.isEmpty ? _defaultBackgroundForFolder(folder) : backgroundId;
+
+  bool get usesCustomColor => customColor != null;
+
+  bool get darkTheme {
+    if (customColor != null) {
+      final c = Color(customColor!);
+      return c.computeLuminance() < 0.45;
+    }
+    return _noteBackgroundById(effectiveBackgroundId).darkText;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'body': body,
         'folder': folder,
         'colorIndex': colorIndex,
+        'backgroundId': backgroundId,
+        if (customColor != null) 'customColor': customColor,
         'pinned': pinned,
         'icon': icon,
         'createdAt': createdAt.toUtc().toIso8601String(),
@@ -275,6 +368,8 @@ class NgmyBusinessNote {
         body: (json['body'] ?? '').toString(),
         folder: (json['folder'] ?? 'Personal').toString(),
         colorIndex: (json['colorIndex'] as num?)?.toInt().clamp(0, _noteColors.length - 1) ?? 0,
+        backgroundId: (json['backgroundId'] ?? '').toString(),
+        customColor: (json['customColor'] as num?)?.toInt(),
         pinned: json['pinned'] == true,
         icon: (json['icon'] ?? '📝').toString(),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
@@ -371,22 +466,25 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   }
 
   Future<void> _pickTemplateAndCreate() async {
-    final template = await Navigator.of(context).push<_NoteTemplate>(
+    final choice = await Navigator.of(context).push<_NoteCreationChoice>(
       PageRouteBuilder(
-        pageBuilder: (_, anim, __) => _NoteTemplatePickerPage(),
+        pageBuilder: (_, anim, __) => const _NoteTemplatePickerPage(),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: FadeTransition(opacity: anim, child: child),
         ),
       ),
     );
-    if (template == null || !mounted) return;
+    if (choice == null || !mounted) return;
+    final layout = choice.layout;
     final note = NgmyBusinessNote(
-      title: template.title,
-      body: template.body,
-      folder: template.folder,
-      colorIndex: template.colorIndex,
-      icon: template.emoji,
+      title: layout?.title ?? '',
+      body: layout?.body ?? '',
+      folder: layout?.folder ?? 'Personal',
+      colorIndex: layout?.colorIndex ?? 0,
+      backgroundId: choice.backgroundId,
+      customColor: choice.customColor,
+      icon: layout?.emoji ?? '📝',
     );
     await _openEditor(note: note, isNew: true);
   }
@@ -553,8 +651,7 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                           itemCount: visible.length,
                           itemBuilder: (_, i) {
                             final n = visible[i];
-                            final bg = _noteColors[n.colorIndex.clamp(0, _noteColors.length - 1)];
-                            final dark = n.colorIndex == 6;
+                            final dark = n.darkTheme;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: Dismissible(
@@ -575,15 +672,21 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                   child: InkWell(
                                     onTap: () => _openEditor(note: n),
                                     borderRadius: BorderRadius.circular(18),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: dark ? bg : bg.withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(18),
-                                        border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
-                                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.2 : 0.06), blurRadius: 12, offset: const Offset(0, 4))],
-                                      ),
-                                      child: Row(
+                                    child: Stack(
+                                      children: [
+                                        Positioned.fill(
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(18),
+                                            child: _NoteBackgroundLayer(note: n, compact: true),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(18),
+                                            border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
+                                          ),
+                                          child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Container(
@@ -642,6 +745,8 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                         ],
                                       ),
                                     ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -666,7 +771,34 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   }
 }
 
-class _NoteTemplatePickerPage extends StatelessWidget {
+class _NoteTemplatePickerPage extends StatefulWidget {
+  const _NoteTemplatePickerPage();
+
+  @override
+  State<_NoteTemplatePickerPage> createState() => _NoteTemplatePickerPageState();
+}
+
+class _NoteTemplatePickerPageState extends State<_NoteTemplatePickerPage> with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  String _bgCategory = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  List<_NoteBackgroundDef> get _filteredBackgrounds {
+    if (_bgCategory == 'All') return _noteBackgrounds;
+    return _noteBackgrounds.where((b) => b.category == _bgCategory).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -679,62 +811,155 @@ class _NoteTemplatePickerPage extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  ),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Choose a template', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                        Text('Start with a professional layout', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text('Create a note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                        Text('Pick a beautiful background or layout', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+            TabBar(
+              controller: _tabs,
+              indicatorColor: const Color(0xFF8B5CF6),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white54,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+              tabs: const [Tab(text: 'Designs'), Tab(text: 'Layouts')],
+            ),
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92),
-                itemCount: _noteTemplates.length,
-                itemBuilder: (_, i) {
-                  final t = _noteTemplates[i];
-                  final bg = _noteColors[t.colorIndex.clamp(0, _noteColors.length - 1)];
-                  final dark = t.colorIndex == 6;
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => Navigator.pop(context, t),
-                      borderRadius: BorderRadius.circular(18),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: dark ? bg.withValues(alpha: 0.15) : bg.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(t.emoji, style: const TextStyle(fontSize: 28)),
-                            const Spacer(),
-                            Text(t.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-                            const SizedBox(height: 4),
-                            Text(
-                              t.body.split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => 'Start fresh'),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, height: 1.3),
-                            ),
-                          ],
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  Column(
+                    children: [
+                      SizedBox(
+                        height: 42,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          itemCount: _bgCategories.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (_, i) {
+                            final c = _bgCategories[i];
+                            final sel = _bgCategory == c;
+                            return FilterChip(
+                              label: Text(c),
+                              selected: sel,
+                              onSelected: (_) => setState(() => _bgCategory = c),
+                              selectedColor: const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                              backgroundColor: Colors.white.withValues(alpha: 0.06),
+                              labelStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: sel ? Colors.white : Colors.white54),
+                              side: BorderSide(color: sel ? const Color(0xFF8B5CF6) : Colors.white12),
+                              showCheckmark: false,
+                            );
+                          },
                         ),
                       ),
-                    ),
-                  );
-                },
+                      Expanded(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.85),
+                          itemCount: _filteredBackgrounds.length,
+                          itemBuilder: (_, i) {
+                            final bg = _filteredBackgrounds[i];
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => Navigator.pop(context, _NoteCreationChoice(backgroundId: bg.id)),
+                                borderRadius: BorderRadius.circular(18),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      _NoteBackgroundPreview(backgroundId: bg.id),
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (bg.emojis.isNotEmpty) Text(bg.emojis.first, style: const TextStyle(fontSize: 24)),
+                                            const Spacer(),
+                                            Text(bg.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                                            Text(bg.category, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.92),
+                    itemCount: _noteTemplates.length,
+                    itemBuilder: (_, i) {
+                      final t = _noteTemplates[i];
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => Navigator.pop(
+                            context,
+                            _NoteCreationChoice(
+                              layout: t,
+                              backgroundId: t.backgroundId.isEmpty ? _defaultBackgroundForFolder(t.folder) : t.backgroundId,
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                _NoteBackgroundPreview(backgroundId: t.backgroundId.isEmpty ? _defaultBackgroundForFolder(t.folder) : t.backgroundId),
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  color: Colors.black.withValues(alpha: 0.28),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(t.emoji, style: const TextStyle(fontSize: 28)),
+                                      const Spacer(),
+                                      Text(t.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        t.body.split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => 'Start fresh'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11, height: 1.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -967,6 +1192,135 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
   }
 
+  Future<void> _showBackgroundPicker() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B0F19),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.72,
+        maxChildSize: 0.92,
+        builder: (_, scroll) => Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(width: 44, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Note backgrounds', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+            ),
+            Expanded(
+              child: GridView.builder(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.82),
+                itemCount: _noteBackgrounds.length,
+                itemBuilder: (_, i) {
+                  final bg = _noteBackgrounds[i];
+                  final sel = _note.effectiveBackgroundId == bg.id && !_note.usesCustomColor;
+                  return GestureDetector(
+                    onTap: () => Navigator.pop(ctx, bg.id),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _NoteBackgroundPreview(backgroundId: bg.id),
+                          if (sel) Container(color: Colors.white.withValues(alpha: 0.18), child: const Center(child: Icon(Icons.check_circle_rounded, color: Colors.white))),
+                          Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Container(
+                              width: double.infinity,
+                              color: Colors.black.withValues(alpha: 0.45),
+                              padding: const EdgeInsets.all(6),
+                              child: Text(bg.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) setState(() {
+      _note.backgroundId = picked;
+      _note.customColor = null;
+    });
+  }
+
+  Future<void> _showCustomColorPicker() async {
+    var hue = HSVColor.fromColor(_note.customColor != null ? Color(_note.customColor!) : Colors.blue).hue;
+    var sat = HSVColor.fromColor(_note.customColor != null ? Color(_note.customColor!) : Colors.blue).saturation;
+    var val = HSVColor.fromColor(_note.customColor != null ? Color(_note.customColor!) : Colors.blue).value;
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final preview = HSVColor.fromAHSV(1, hue, sat, val).toColor();
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: Container(width: 44, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  const Text('Pick any color', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 14),
+                  Container(
+                    height: 56,
+                    decoration: BoxDecoration(color: preview, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white24)),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Hue', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w700, fontSize: 11)),
+                  Slider(value: hue, min: 0, max: 360, activeColor: preview, onChanged: (v) => setLocal(() => hue = v)),
+                  Text('Saturation', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w700, fontSize: 11)),
+                  Slider(value: sat, min: 0, max: 1, activeColor: preview, onChanged: (v) => setLocal(() => sat = v)),
+                  Text('Brightness', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w700, fontSize: 11)),
+                  Slider(value: val, min: 0.1, max: 1, activeColor: preview, onChanged: (v) => setLocal(() => val = v)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in const [
+                        0xFFEF4444, 0xFFF97316, 0xFFFBBF24, 0xFF22C55E, 0xFF06B6D4, 0xFF3B82F6,
+                        0xFF8B5CF6, 0xFFEC4899, 0xFF78716C, 0xFF0F172A, 0xFFFFFFFF, 0xFFFBCFE8,
+                      ])
+                        GestureDetector(
+                          onTap: () => Navigator.pop(ctx, c),
+                          child: Container(width: 32, height: 32, decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle, border: Border.all(color: Colors.white24))),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, preview.toARGB32()),
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: const Text('Use this color', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (picked != null) setState(() {
+      _note.customColor = picked;
+      _note.backgroundId = '';
+    });
+  }
+
   Future<void> _showActions() async {
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -1018,8 +1372,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = _noteColors[_note.colorIndex.clamp(0, _noteColors.length - 1)];
-    final dark = _note.colorIndex == 6;
+    final dark = _note.darkTheme;
     final fg = dark ? Colors.white : const Color(0xFF0F172A);
     final muted = dark ? Colors.white60 : const Color(0xFF64748B);
 
@@ -1029,155 +1382,141 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         if (!didPop) _onWillPop();
       },
       child: Scaffold(
-        backgroundColor: bg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
-                      onPressed: _onWillPop,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            _NoteBackgroundLayer(note: _note),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
+                          onPressed: _onWillPop,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                          child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                        ),
+                        const Spacer(),
+                        _headerBtn(
+                          icon: _previewMode ? Icons.edit_rounded : Icons.visibility_rounded,
+                          label: _previewMode ? 'Edit' : 'Preview',
+                          fg: fg,
+                          onTap: () => setState(() => _previewMode = !_previewMode),
+                        ),
+                        IconButton(
+                          icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
+                          onPressed: () => setState(() => _note.pinned = !_note.pinned),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.more_horiz_rounded, color: muted),
+                          onPressed: _showActions,
+                        ),
+                      ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
-                      child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                    ),
-                    const Spacer(),
-                    _headerBtn(
-                      icon: _previewMode ? Icons.edit_rounded : Icons.visibility_rounded,
-                      label: _previewMode ? 'Edit' : 'Preview',
-                      fg: fg,
-                      onTap: () => setState(() => _previewMode = !_previewMode),
-                    ),
-                    IconButton(
-                      icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
-                      onPressed: () => setState(() => _note.pinned = !_note.pinned),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.more_horiz_rounded, color: muted),
-                      onPressed: _showActions,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                decoration: BoxDecoration(
-                  color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
-                      _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
-                      _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
-                      _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
-                      _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
-                      _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
-                      _tool(Icons.title_rounded, 'Heading', () => _insertLine('# '), fg),
-                      _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
-                      _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
-                      _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
-                      _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
-                      _tool(Icons.visibility_off_outlined, 'Hide', () => _insertLine('<!-- private --> '), fg),
-                      const SizedBox(width: 6),
-                      ...List.generate(_noteColors.length, (i) {
-                        final c = _noteColors[i];
-                        final sel = _note.colorIndex == i;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 5),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _note.colorIndex = i),
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: c,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: sel ? const Color(0xFF8B5CF6) : Colors.black26, width: sel ? 2.5 : 1),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
                   ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: dark ? Colors.black.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
                         children: [
-                          GestureDetector(
-                            onTap: _showEmojiPicker,
-                            child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _title,
-                              enabled: !_previewMode,
-                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
-                              decoration: InputDecoration(
-                                hintText: 'Title',
-                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
+                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
+                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
+                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
+                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
+                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
+                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
+                          _tool(Icons.title_rounded, 'Heading', () => _insertLine('# '), fg),
+                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
+                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
+                          _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
+                          _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
+                          _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
+                          _tool(Icons.palette_rounded, 'Any color', _showCustomColorPicker, fg),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _showEmojiPicker,
+                                child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
                               ),
-                              maxLines: 2,
-                            ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _title,
+                                  enabled: !_previewMode,
+                                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
+                                  decoration: InputDecoration(
+                                    hintText: 'Title',
+                                    hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: _previewMode
+                                ? SingleChildScrollView(child: _NoteMarkdownPreview(text: _body.text, dark: dark))
+                                : TextField(
+                                    controller: _body,
+                                    focusNode: _bodyFocus,
+                                    style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
+                                    decoration: InputDecoration(
+                                      hintText: 'Start writing…',
+                                      hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                      border: InputBorder.none,
+                                    ),
+                                    maxLines: null,
+                                    expands: true,
+                                    textAlignVertical: TextAlignVertical.top,
+                                  ),
                           ),
                         ],
                       ),
-                      Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: _previewMode
-                            ? SingleChildScrollView(child: _NoteMarkdownPreview(text: _body.text, dark: dark))
-                            : TextField(
-                                controller: _body,
-                                focusNode: _bodyFocus,
-                                style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
-                                decoration: InputDecoration(
-                                  hintText: 'Start writing…',
-                                  hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                  border: InputBorder.none,
-                                ),
-                                maxLines: null,
-                                expands: true,
-                                textAlignVertical: TextAlignVertical.top,
-                              ),
+                    ),
+                  ),
+                  if (_dirty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: muted)),
+                          const SizedBox(width: 8),
+                          Text('Saving…', style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                ],
               ),
-              if (_dirty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: muted)),
-                      const SizedBox(width: 8),
-                      Text('Saving…', style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1360,4 +1699,133 @@ class _NoteMarkdownPreview extends StatelessWidget {
     if (indices.isEmpty) return s.length;
     return indices.reduce((a, b) => a < b ? a : b);
   }
+}
+
+class _NoteBackgroundPreview extends StatelessWidget {
+  const _NoteBackgroundPreview({required this.backgroundId, this.compact = false});
+  final String backgroundId;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return _NoteBackgroundLayer(backgroundId: backgroundId, compact: compact);
+  }
+}
+
+class _NoteBackgroundLayer extends StatelessWidget {
+  const _NoteBackgroundLayer({this.note, this.backgroundId, this.compact = false});
+  final NgmyBusinessNote? note;
+  final String? backgroundId;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (note?.usesCustomColor == true) {
+      return ColoredBox(color: Color(note!.customColor!));
+    }
+    final id = backgroundId ?? note?.effectiveBackgroundId ?? _noteBackgrounds.first.id;
+    final def = _noteBackgroundById(id);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: def.colors,
+            ),
+          ),
+        ),
+        CustomPaint(painter: _NoteBackgroundPainter(def.pattern)),
+        ..._decorEmojis(def.emojis, compact),
+      ],
+    );
+  }
+
+  List<Widget> _decorEmojis(List<String> emojis, bool compact) {
+    if (emojis.isEmpty) return const [];
+    final positions = compact
+        ? [Alignment.topRight, Alignment.bottomLeft]
+        : [Alignment.topRight, Alignment.centerLeft, Alignment.bottomRight, Alignment.topLeft];
+    return List.generate(emojis.length.clamp(0, positions.length), (i) {
+      return Align(
+        alignment: positions[i],
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text(emojis[i], style: TextStyle(fontSize: compact ? 28 : 42, color: Colors.white.withValues(alpha: 0.18))),
+        ),
+      );
+    });
+  }
+}
+
+class _NoteBackgroundPainter extends CustomPainter {
+  _NoteBackgroundPainter(this.pattern);
+  final _NoteBgPattern pattern;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    switch (pattern) {
+      case _NoteBgPattern.rain:
+        paint.color = Colors.white.withValues(alpha: 0.18);
+        for (var x = 0.0; x < size.width; x += 14) {
+          for (var y = (x % 28) / 2; y < size.height; y += 22) {
+            canvas.drawLine(Offset(x, y), Offset(x - 3, y + 10), paint..strokeWidth = 1.4);
+          }
+        }
+      case _NoteBgPattern.waves:
+        paint.color = Colors.white.withValues(alpha: 0.14);
+        paint.style = PaintingStyle.stroke;
+        paint.strokeWidth = 2;
+        for (var i = 0; i < 5; i++) {
+          final path = Path();
+          final baseY = size.height * (0.45 + i * 0.11);
+          path.moveTo(0, baseY);
+          for (var x = 0.0; x <= size.width; x += 18) {
+            path.quadraticBezierTo(x + 9, baseY + (i.isEven ? 10 : -10), x + 18, baseY);
+          }
+          canvas.drawPath(path, paint);
+        }
+      case _NoteBgPattern.grass:
+        paint.color = Colors.white.withValues(alpha: 0.16);
+        paint.strokeWidth = 2;
+        paint.style = PaintingStyle.stroke;
+        for (var x = 0.0; x < size.width; x += 10) {
+          final h = 12 + (x % 18);
+          canvas.drawLine(Offset(x, size.height), Offset(x - 3, size.height - h), paint);
+          canvas.drawLine(Offset(x + 4, size.height), Offset(x + 7, size.height - h * 0.8), paint);
+        }
+      case _NoteBgPattern.stars:
+        paint.color = Colors.white.withValues(alpha: 0.35);
+        for (var i = 0; i < 28; i++) {
+          final dx = (i * 37.0) % size.width;
+          final dy = (i * 53.0) % size.height;
+          canvas.drawCircle(Offset(dx, dy), 1.2 + (i % 3), paint);
+        }
+      case _NoteBgPattern.grid:
+        paint.color = Colors.black.withValues(alpha: 0.05);
+        paint.strokeWidth = 1;
+        paint.style = PaintingStyle.stroke;
+        for (var x = 0.0; x < size.width; x += 18) {
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+        }
+        for (var y = 0.0; y < size.height; y += 18) {
+          canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+        }
+      case _NoteBgPattern.bokeh:
+        paint.style = PaintingStyle.fill;
+        for (var i = 0; i < 10; i++) {
+          paint.color = Colors.white.withValues(alpha: 0.08 + (i % 3) * 0.03);
+          final r = 18.0 + (i % 4) * 14;
+          canvas.drawCircle(Offset((i * 67.0) % size.width, (i * 43.0) % size.height), r, paint);
+        }
+      case _NoteBgPattern.none:
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NoteBackgroundPainter oldDelegate) => oldDelegate.pattern != pattern;
 }
