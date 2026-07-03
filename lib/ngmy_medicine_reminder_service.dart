@@ -104,6 +104,7 @@ Future<void> _pollMedicineReminders() async {
 }
 
 /// Full-screen blocking reminder — holds focus ~5 seconds, then dismisses.
+/// Shown on schedule and when the app opens while a dose is due.
 Future<void> showNgmyMedicineReminderAlert(
   BuildContext context, {
   required NgmyMedicineEntry medicine,
