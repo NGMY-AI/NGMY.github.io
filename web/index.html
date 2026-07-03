@@ -652,6 +652,63 @@
         registerServiceWorkerAndWait();
       }
 
+      function sanitizeBootstrap(code) {
+        if (!code) return code;
+        // Repair broken deploys that left invalid `});.catch(` JavaScript.
+        return code.replace(/\}\);\s*\.catch\(/g, '}).catch(');
+      }
+
+      function verifyBootstrapReady(deadlineMs) {
+        return new Promise(function (resolve, reject) {
+          var start = Date.now();
+          (function check() {
+            if (window._flutter && window._flutter.loader) {
+              resolve();
+              return;
+            }
+            if (Date.now() - start > deadlineMs) {
+              reject(new Error('bootstrap init timeout'));
+              return;
+            }
+            setTimeout(check, 120);
+          })();
+        });
+      }
+
+      function injectBootstrap(code) {
+        code = sanitizeBootstrap(code);
+        var s = document.createElement('script');
+        s.textContent = code;
+        s.async = false;
+        try {
+          document.head.appendChild(s);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+        warmOfflineCache();
+        return verifyBootstrapReady(12000);
+      }
+
+      function fetchBootstrapText(url) {
+        return fetch(url, { cache: 'no-cache' }).then(function (resp) {
+          if (!resp.ok) throw new Error('bootstrap fetch failed');
+          return resp.text();
+        });
+      }
+
+      function fallbackToOfflineCache() {
+        return openOfflineCache().then(function (cache) {
+          if (!cache) {
+            showBootstrapError();
+            return;
+          }
+          return offlineShellReady(cache).then(function (ready) {
+            if (ready) return runBootstrapFromCache(cache);
+            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. School or library Wi-Fi may block the server.');
+          });
+        });
+      }
+
       function runBootstrapFromCache(cache) {
         loadAttempts += 1;
         installCacheHooks(cache);
@@ -666,11 +723,7 @@
         }).then(function (bootHit) {
           if (!bootHit) throw new Error('bootstrap missing');
           return bootHit.text().then(function (code) {
-            var s = document.createElement('script');
-            s.textContent = code;
-            s.async = false;
-            document.head.appendChild(s);
-            warmOfflineCache();
+            return injectBootstrap(code);
           });
         }).catch(function () {
           if (loadAttempts < 2) {
@@ -680,56 +733,41 @@
         });
       }
 
-      function loadFlutterBootstrapOnline() {
-        loadAttempts += 1;
-        var s = document.createElement('script');
-        s.src = 'flutter_bootstrap.js';
-        s.async = false;
-        s.onerror = function () {
-          if (loadAttempts < 2) {
-            setTimeout(loadFlutterBootstrapOnline, 500);
-            return;
-          }
-          openOfflineCache().then(function (cache) {
-            if (cache) return runBootstrapFromCache(cache);
-            showBootstrapError();
-          });
-        };
-        document.head.appendChild(s);
-        warmOfflineCache();
-      }
-
       function bootFromNetwork() {
-        var s = document.createElement('script');
-        s.src = 'flutter_bootstrap.js?v=' + deployId;
-        s.async = false;
-        s.onload = function () { warmOfflineCache(); };
-        s.onerror = function () {
-          openOfflineCache().then(function (cache) {
-            if (cache) {
-              offlineShellReady(cache).then(function (ready) {
-                if (ready) runBootstrapFromCache(cache);
-                else showBootstrapError();
-              });
-            } else {
-              showBootstrapError();
+        loadAttempts += 1;
+        fetchBootstrapText('flutter_bootstrap.js?v=' + deployId)
+          .then(function (code) {
+            return injectBootstrap(code);
+          })
+          .catch(function () {
+            if (loadAttempts < 2) {
+              setTimeout(bootFromNetwork, 600);
+              return;
             }
+            fallbackToOfflineCache();
           });
-        };
-        document.head.appendChild(s);
-        warmOfflineCache();
       }
 
       function startApp() {
         var bootTimer = setTimeout(function () {
-          showBootstrapError('NGMY is still loading. On library or school Wi-Fi, try mobile data. Otherwise wait up to 3 minutes, then tap Reload.');
+          showBootstrapError('NGMY is still loading. If you are on school or library Wi-Fi, try home internet or mobile data, then tap Reload.');
         }, 180000);
-        window.addEventListener('flutter-first-frame', function () { clearTimeout(bootTimer); }, { once: true });
+
+        var bootstrapTimer = setTimeout(function () {
+          if (!window._flutter || !window._flutter.loader) {
+            showBootstrapError('NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
+          }
+        }, 25000);
+
+        window.addEventListener('flutter-first-frame', function () {
+          clearTimeout(bootTimer);
+          clearTimeout(bootstrapTimer);
+          window.__ngmyHideSplash && window.__ngmyHideSplash();
+        }, { once: true });
 
         registerServiceWorkerAndWait();
 
         if (navigator.onLine) {
-          window.__ngmyHideSplash && window.__ngmyHideSplash();
           bootFromNetwork();
           return;
         }
@@ -740,17 +778,15 @@
         ]).then(function (results) {
           var controlled = results[0];
           var cache = results[1];
-          window.__ngmyHideSplash && window.__ngmyHideSplash();
           if (controlled) {
             bootFromNetwork();
             return;
           }
           return offlineShellReady(cache).then(function (ready) {
             if (ready) return runBootstrapFromCache(cache);
-            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. Library Wi-Fi may block the server.');
+            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. School or library Wi-Fi may block the server.');
           });
         }).catch(function () {
-          window.__ngmyHideSplash && window.__ngmyHideSplash();
           bootFromNetwork();
         });
       }
