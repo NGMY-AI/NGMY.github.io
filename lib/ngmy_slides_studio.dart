@@ -2583,190 +2583,143 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
     }
   }
 
+  Widget _slideshowSwitcher(Widget slideContent) {
+    if (_lastTransition == NgmySlideTransition.none) {
+      return KeyedSubtree(key: ValueKey(_index), child: slideContent);
+    }
+    final duration = _slideshowTransitionDuration(_lastTransition);
+    return AnimatedSwitcher(
+      duration: duration,
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          ...previousChildren,
+          if (currentChild != null) currentChild,
+        ],
+      ),
+      transitionBuilder: (child, animation) {
+        if (animation.status == AnimationStatus.reverse) return child;
+        return _slideshowIncomingTransition(_lastTransition, child, animation);
+      },
+      child: KeyedSubtree(key: ValueKey(_index), child: slideContent),
+    );
+  }
+
+  Duration _slideshowTransitionDuration(NgmySlideTransition tr) {
+    switch (tr) {
+      case NgmySlideTransition.flip:
+      case NgmySlideTransition.flipVertical:
+      case NgmySlideTransition.rotate3d:
+      case NgmySlideTransition.cube:
+      case NgmySlideTransition.spiral:
+        return const Duration(milliseconds: 550);
+      case NgmySlideTransition.bounce:
+        return const Duration(milliseconds: 500);
+      case NgmySlideTransition.flash:
+        return const Duration(milliseconds: 350);
+      default:
+        return const Duration(milliseconds: 450);
+    }
+  }
+
+  Widget _slideshowIncomingTransition(NgmySlideTransition tr, Widget child, Animation<double> animation) {
+    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    switch (tr) {
+      case NgmySlideTransition.none:
+        return child;
+      case NgmySlideTransition.fade:
+      case NgmySlideTransition.dissolve:
+      case NgmySlideTransition.flash:
+        return FadeTransition(opacity: curved, child: child);
+      case NgmySlideTransition.slideLeft:
+      case NgmySlideTransition.push:
+        return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curved), child: child);
+      case NgmySlideTransition.slideRight:
+        return SlideTransition(position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(curved), child: child);
+      case NgmySlideTransition.slideUp:
+      case NgmySlideTransition.curtain:
+        return SlideTransition(position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved), child: child);
+      case NgmySlideTransition.slideDown:
+        return SlideTransition(position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(curved), child: child);
+      case NgmySlideTransition.zoom:
+      case NgmySlideTransition.bounce:
+        return ScaleTransition(scale: Tween<double>(begin: 0.82, end: 1).animate(curved), child: FadeTransition(opacity: curved, child: child));
+      case NgmySlideTransition.zoomOut:
+        return ScaleTransition(scale: Tween<double>(begin: 1.18, end: 1).animate(curved), child: FadeTransition(opacity: curved, child: child));
+      case NgmySlideTransition.flip:
+        return AnimatedBuilder(
+          animation: curved,
+          child: child,
+          builder: (_, c) => Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY((1 - curved.value) * 1.5708),
+            child: Opacity(opacity: curved.value, child: c),
+          ),
+        );
+      case NgmySlideTransition.flipVertical:
+        return AnimatedBuilder(
+          animation: curved,
+          child: child,
+          builder: (_, c) => Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateX((1 - curved.value) * 1.5708),
+            child: Opacity(opacity: curved.value, child: c),
+          ),
+        );
+      case NgmySlideTransition.rotate3d:
+        return AnimatedBuilder(
+          animation: curved,
+          child: child,
+          builder: (_, c) => Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.002)
+              ..rotateY(curved.value * 0.8)
+              ..rotateX(curved.value * 0.35),
+            child: Opacity(opacity: curved.value, child: c),
+          ),
+        );
+      case NgmySlideTransition.cube:
+        return AnimatedBuilder(
+          animation: curved,
+          child: child,
+          builder: (_, c) => Transform(
+            alignment: Alignment.centerRight,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0025)
+              ..rotateY(-curved.value * 1.2),
+            child: Opacity(opacity: curved.value, child: c),
+          ),
+        );
+      case NgmySlideTransition.blur:
+        return FadeTransition(opacity: curved, child: ScaleTransition(scale: Tween<double>(begin: 1.03, end: 1).animate(curved), child: child));
+      case NgmySlideTransition.wipeLeft:
+        return ClipRect(
+          clipper: _SlideWipeClipper(curved.value),
+          child: SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curved), child: child),
+        );
+      case NgmySlideTransition.wipeRight:
+        return SlideTransition(position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(curved), child: child);
+      case NgmySlideTransition.spiral:
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..rotateZ((1 - curved.value) * 2)..scale(curved.value, curved.value),
+          child: Opacity(opacity: curved.value, child: child),
+        );
+      case NgmySlideTransition.swing:
+        return Transform.rotate(angle: (1 - curved.value) * 0.2, child: FadeTransition(opacity: curved, child: child));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final slide = widget.deck.slides[_index];
-    Widget body = NgmySlideAnimatedRender(slide: slide, animate: true);
-
-    switch (_lastTransition) {
-      case NgmySlideTransition.fade:
-      case NgmySlideTransition.dissolve:
-        body = AnimatedSwitcher(duration: const Duration(milliseconds: 500), child: KeyedSubtree(key: ValueKey(_index), child: body));
-      case NgmySlideTransition.slideLeft:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.slideRight:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.slideUp:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.slideDown:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.zoom:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => ScaleTransition(scale: Tween<double>(begin: 0.75, end: 1).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.zoomOut:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 450),
-          transitionBuilder: (c, a) => ScaleTransition(scale: Tween<double>(begin: 1.25, end: 1).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.flip:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 550),
-          transitionBuilder: (c, a) {
-            final angle = Tween<double>(begin: 1.5708, end: 0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic));
-            return AnimatedBuilder(
-              animation: angle,
-              child: c,
-              builder: (_, child) => Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angle.value),
-                child: Opacity(opacity: a.value, child: child),
-              ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.flipVertical:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 550),
-          transitionBuilder: (c, a) {
-            final angle = Tween<double>(begin: 1.5708, end: 0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic));
-            return AnimatedBuilder(
-              animation: angle,
-              child: c,
-              builder: (_, child) => Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateX(angle.value),
-                child: Opacity(opacity: a.value, child: child),
-              ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.rotate3d:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 600),
-          transitionBuilder: (c, a) {
-            return AnimatedBuilder(
-              animation: a,
-              child: c,
-              builder: (_, child) => Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.002)
-                  ..rotateY(a.value * 0.8)
-                  ..rotateX(a.value * 0.35),
-                child: Opacity(opacity: a.value, child: child),
-              ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.cube:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 600),
-          transitionBuilder: (c, a) {
-            final t = CurvedAnimation(parent: a, curve: Curves.easeInOutCubic);
-            return AnimatedBuilder(
-              animation: t,
-              child: c,
-              builder: (_, child) => Transform(
-                alignment: Alignment.centerRight,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0025)
-                  ..rotateY(-t.value * 1.2),
-                child: Opacity(opacity: t.value, child: child),
-              ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.blur:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
-          transitionBuilder: (c, a) => FadeTransition(
-            opacity: a,
-            child: ScaleTransition(scale: Tween<double>(begin: 1.04, end: 1).animate(a), child: c),
-          ),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.wipeLeft:
-      case NgmySlideTransition.push:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
-          transitionBuilder: (c, a) => ClipRect(
-            clipper: _SlideWipeClipper(a.value),
-            child: SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(a), child: c),
-          ),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.wipeRight:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(-1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.bounce:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 550),
-          transitionBuilder: (c, a) => ScaleTransition(scale: Tween<double>(begin: 0.4, end: 1).animate(CurvedAnimation(parent: a, curve: Curves.bounceOut)), child: FadeTransition(opacity: a, child: c)),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.flash:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          transitionBuilder: (c, a) => FadeTransition(opacity: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: a, curve: const Interval(0.2, 1))), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.spiral:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 600),
-          transitionBuilder: (c, a) {
-            return Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()..rotateZ((1 - a.value) * 2)..scale(a.value, a.value),
-              child: Opacity(opacity: a.value, child: c),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.swing:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
-          transitionBuilder: (c, a) => Transform.rotate(angle: (1 - a.value) * 0.25, child: FadeTransition(opacity: a, child: c)),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.curtain:
-        body = AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
-          transitionBuilder: (c, a) => SlideTransition(position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)), child: c),
-          child: KeyedSubtree(key: ValueKey(_index), child: body),
-        );
-      case NgmySlideTransition.none:
-        break;
-    }
+    final slideContent = SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true));
+    final body = _slideshowSwitcher(slideContent);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0F172A),
       body: GestureDetector(
         onTapUp: (d) {
           final w = MediaQuery.sizeOf(context).width;
@@ -2776,7 +2729,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: AspectRatio(aspectRatio: widget.deck.aspectValue, child: body)),
+            Center(child: AspectRatio(aspectRatio: widget.deck.aspectValue, child: ClipRect(child: body))),
             Positioned(
               top: 12,
               left: 12,

@@ -336,7 +336,7 @@ Future<void> _showAutoDismissPreview(
   BuildContext context, {
   required String title,
   required Widget preview,
-  Duration duration = const Duration(seconds: 3),
+  Duration duration = const Duration(milliseconds: 1500),
 }) async {
   if (!context.mounted) return;
   final nav = Navigator.of(context, rootNavigator: true);
@@ -383,7 +383,7 @@ Future<void> _showAutoDismissPreview(
                           children: [
                             Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
                             const SizedBox(height: 4),
-                            Text('Applied — tap Done or wait a few seconds', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600)),
+                            Text('Applied — tap Done or wait 1.5 seconds', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -431,7 +431,7 @@ Future<void> showNgmyTransitionPreview(
   await _showAutoDismissPreview(
     context,
     title: title,
-    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 1500) : const Duration(seconds: 3),
+    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 800) : const Duration(milliseconds: 1500),
     preview: SizedBox(
       width: previewW,
       height: previewW * 0.56,
@@ -763,7 +763,7 @@ Future<void> showNgmyTextTransitionPreview(
   await _showAutoDismissPreview(
     context,
     title: title,
-    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 1500) : const Duration(seconds: 3),
+    duration: transition == NgmySlideTransition.none ? const Duration(milliseconds: 800) : const Duration(milliseconds: 1500),
     preview: SizedBox(
       width: previewW,
       height: previewW * 0.62,
