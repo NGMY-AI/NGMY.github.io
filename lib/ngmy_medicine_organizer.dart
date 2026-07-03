@@ -23,8 +23,11 @@ class NgmyMedicineEntry {
     this.category = 'Daily',
     this.startDate,
     this.endDate,
+    this.remindersEnabled = true,
+    List<String>? reminderTimes,
     DateTime? createdAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        reminderTimes = List<String>.from(reminderTimes ?? const []),
         createdAt = createdAt ?? DateTime.now();
 
   final String id;
@@ -36,6 +39,8 @@ class NgmyMedicineEntry {
   String category;
   DateTime? startDate;
   DateTime? endDate;
+  bool remindersEnabled;
+  List<String> reminderTimes;
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => {
@@ -46,6 +51,8 @@ class NgmyMedicineEntry {
         'schedule': schedule,
         'notes': notes,
         'category': category,
+        'remindersEnabled': remindersEnabled,
+        'reminderTimes': reminderTimes,
         if (startDate != null) 'startDate': startDate!.toUtc().toIso8601String(),
         if (endDate != null) 'endDate': endDate!.toUtc().toIso8601String(),
         'createdAt': createdAt.toUtc().toIso8601String(),
@@ -59,6 +66,8 @@ class NgmyMedicineEntry {
         schedule: (json['schedule'] ?? '').toString(),
         notes: (json['notes'] ?? '').toString(),
         category: (json['category'] ?? 'Daily').toString(),
+        remindersEnabled: json['remindersEnabled'] != false,
+        reminderTimes: (json['reminderTimes'] as List?)?.map((e) => e.toString()).toList() ?? const [],
         startDate: DateTime.tryParse((json['startDate'] ?? '').toString()),
         endDate: DateTime.tryParse((json['endDate'] ?? '').toString()),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
@@ -96,6 +105,24 @@ Future<void> ngmyImportMedicines({required String userEmail, required List<NgmyM
     byId[item.id] = item;
   }
   await _saveMedicines(userEmail, byId.values.toList());
+}
+
+/// Default reminder times from times-per-day when user has not set custom times.
+List<String> ngmyDefaultMedicineReminderTimes(int timesPerDay) {
+  switch (timesPerDay.clamp(1, 6)) {
+    case 1:
+      return ['08:00'];
+    case 2:
+      return ['08:00', '20:00'];
+    case 3:
+      return ['08:00', '14:00', '20:00'];
+    case 4:
+      return ['07:00', '12:00', '17:00', '21:00'];
+    case 5:
+      return ['07:00', '10:00', '13:00', '17:00', '21:00'];
+    default:
+      return ['07:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
+  }
 }
 
 Future<void> showNgmyMedicineOrganizerDialog(BuildContext context, {required String userEmail}) {
@@ -312,6 +339,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
   String _category = 'Daily';
   DateTime? _startDate;
   DateTime? _endDate;
+  bool _remindersEnabled = true;
+  List<String> _reminderTimes = [];
 
   @override
   void initState() {
@@ -325,6 +354,44 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
     _category = e?.category ?? 'Daily';
     _startDate = e?.startDate;
     _endDate = e?.endDate;
+    _remindersEnabled = e?.remindersEnabled ?? true;
+    _reminderTimes = e?.reminderTimes.isNotEmpty == true
+        ? List<String>.from(e!.reminderTimes)
+        : ngmyDefaultMedicineReminderTimes(_timesPerDay);
+  }
+
+  void _syncReminderTimesToCount() {
+    final defaults = ngmyDefaultMedicineReminderTimes(_timesPerDay);
+    if (_reminderTimes.length == defaults.length) return;
+    _reminderTimes = List<String>.from(defaults);
+  }
+
+  Future<void> _pickReminderTime(int index) async {
+    final parts = _reminderTimes[index].split(':');
+    final hour = int.tryParse(parts.first) ?? 8;
+    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: hour, minute: minute),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: _accent, surface: Color(0xFF111827))),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      _reminderTimes[index] = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    });
+  }
+
+  String _formatReminderTime(String slot) {
+    final parts = slot.split(':');
+    if (parts.length < 2) return slot;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = parts[1];
+    final hour = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+    final ampm = h >= 12 ? 'PM' : 'AM';
+    return '$hour:$m $ampm';
   }
 
   @override
@@ -353,6 +420,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
         category: _category,
         startDate: _startDate,
         endDate: _endDate,
+        remindersEnabled: _remindersEnabled,
+        reminderTimes: List<String>.from(_reminderTimes),
         createdAt: widget.existing?.createdAt,
       ),
     );
@@ -380,8 +449,59 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
             options: const ['1', '2', '3', '4', '6'],
             selected: '$_timesPerDay',
             accent: _accent,
-            onSelected: (v) => setState(() => _timesPerDay = int.parse(v)),
+            onSelected: (v) => setState(() {
+              _timesPerDay = int.parse(v);
+              _syncReminderTimesToCount();
+            }),
           ),
+          const SizedBox(height: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _remindersEnabled,
+            activeTrackColor: _accent.withValues(alpha: 0.45),
+            thumbColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? _accent : null),
+            title: const Text('Reminder alerts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+            subtitle: Text(
+              _remindersEnabled ? 'Blocking popup when it is time to take this medicine' : 'Reminders off for this medicine',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12),
+            ),
+            onChanged: (v) => setState(() => _remindersEnabled = v),
+          ),
+          if (_remindersEnabled) ...[
+            Text('REMINDER TIMES', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+            const SizedBox(height: 8),
+            ...List.generate(_reminderTimes.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _pickReminderTime(i),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _accent.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.alarm_rounded, color: _accent, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Dose ${i + 1}', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Spacer(),
+                          Text(_formatReminderTime(_reminderTimes[i]), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                          const SizedBox(width: 6),
+                          Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.35), size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
           NgmyModernField(controller: _schedule, label: 'Schedule', hint: 'Morning & evening, with food…', icon: Icons.schedule_rounded, accent: _accent),
           NgmyModernDateField(label: 'Start date', value: _startDate, accent: _accent, onChanged: (d) => setState(() => _startDate = d)),
           NgmyModernDateField(label: 'End date', value: _endDate, accent: _accent, onChanged: (d) => setState(() => _endDate = d)),

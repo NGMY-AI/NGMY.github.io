@@ -168,6 +168,7 @@ import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_market_hub_screen.dart';
 import 'ngmy_item_reminder_service.dart';
+import 'ngmy_medicine_reminder_service.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
 
@@ -14889,6 +14890,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();
       unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
+      unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
       if (_idx == 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() {});
@@ -15199,6 +15201,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenCivicEnrollDeepLink());
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     ngmyStartItemReminderWatcher(widget.user.email);
+    ngmyStartMedicineReminderWatcher(widget.user.email);
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: widget.user.email,
@@ -15325,6 +15328,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _t?.cancel();
     _onlineCheck?.cancel();
     ngmyStopItemReminderWatcher();
+    ngmyStopMedicineReminderWatcher();
     NgmyAiAppBridge.clear();
     NgmyIncomeSound.bindSession(null);
     super.dispose();

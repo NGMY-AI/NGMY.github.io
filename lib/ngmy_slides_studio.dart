@@ -625,21 +625,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               accent: const Color(0xFF2563EB),
             ),
             const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
+            Row(
               children: [
-                _actionCard(
-                  icon: Icons.add_rounded,
-                  label: 'Blank Presentation',
-                  color: const Color(0xFF2563EB),
-                  onTap: () => _createDeck(),
+                Expanded(
+                  child: _actionCard(
+                    icon: Icons.add_rounded,
+                    label: 'Blank Presentation',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => _createDeck(),
+                  ),
                 ),
-                _actionCard(
-                  icon: Icons.school_rounded,
-                  label: 'Class Template',
-                  color: const Color(0xFF059669),
-                  onTap: () => _createDeck(sample: true, name: 'Class Presentation'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _actionCard(
+                    icon: Icons.school_rounded,
+                    label: 'Class Template',
+                    color: const Color(0xFF059669),
+                    onTap: () => _createDeck(sample: true, name: 'Class Presentation'),
+                  ),
                 ),
               ],
             ),
@@ -1551,7 +1554,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 160,
+        width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.75)]),

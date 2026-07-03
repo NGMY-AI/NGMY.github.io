@@ -347,16 +347,34 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
                       ...emergency.map(
                         (e) => Padding(
                           padding: const EdgeInsets.only(bottom: 6),
-                          child: InkWell(
-                            onTap: () => _dial(e),
-                            child: Row(
-                              children: [
-                                Expanded(child: Text(e.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
-                                Text(e.phone, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700)),
-                                const SizedBox(width: 8),
-                                const Icon(Icons.call_rounded, color: Color(0xFFEF4444), size: 18),
-                              ],
-                            ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _dial(e),
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: Text(e.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                                      Text(e.phone, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.call_rounded, color: Color(0xFFEF4444), size: 18),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Edit',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => _openEditor(existing: e),
+                                icon: Icon(Icons.edit_rounded, color: Colors.white.withValues(alpha: 0.6), size: 18),
+                              ),
+                              IconButton(
+                                tooltip: 'Delete',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => _delete(e),
+                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                              ),
+                            ],
                           ),
                         ),
                       ),
