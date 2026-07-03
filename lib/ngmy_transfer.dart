@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
+import 'ngmy_transfer_cloud_relay.dart';
 import 'ngmy_transfer_download.dart';
 import 'ngmy_transfer_rendezvous.dart';
 import 'ngmy_transfer_server.dart';
@@ -116,6 +117,8 @@ class NgmyTransfer {
       offerToken: web.offerToken,
     );
 
+    NgmyTransferCloudRelay.beginUpload(code: code, ownerEmail: ownerEmail, items: items);
+
     final session = NgmyTransferSendSession(
       code: code,
       transferKey: transferKey,
@@ -137,6 +140,7 @@ class NgmyTransfer {
     await NgmyTransferWebRtc.stopSend();
     if (code != null) {
       await NgmyTransferRendezvous.unpublish(code);
+      await NgmyTransferCloudRelay.clear(code);
     }
   }
 
@@ -204,8 +208,22 @@ class NgmyTransfer {
         onBytes: onBytes,
       );
       if (imported.isNotEmpty) return imported;
+
+      onStatus?.call('Direct peer link failed — trying cloud backup…');
+      final relayed = await NgmyTransferCloudRelay.importByCode(
+        code: normalized,
+        recipientEmail: recipientEmail,
+        onProgress: onProgress,
+        onStatus: onStatus,
+        onBytes: onBytes,
+      );
+      if (relayed.isNotEmpty) return relayed;
+
       if (mode == 'webrtc' || kIsWeb) {
-        return imported;
+        onStatus?.call(
+          'Transfer failed. Sender must keep the Send screen open while you enter the code.',
+        );
+        return [];
       }
       onStatus?.call('Peer transfer failed — trying direct Wi‑Fi…');
     }

@@ -7,16 +7,11 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_webrtc_stash.dart';
+import 'ngmy_transfer_rtc_config.dart';
 import 'ngmy_transfer_signal.dart';
 
 const int _kMaxBufferedBytes = 64 * 1024 * 1024;
-
-const Map<String, dynamic> _rtcConfig = {
-  'iceServers': [
-    {'urls': 'stun:stun.l.google.com:19302'},
-    {'urls': 'stun:stun1.l.google.com:19302'},
-  ],
-};
+const Duration _kConnectTimeout = Duration(seconds: 120);
 
 RTCPeerConnection? _txPc;
 RTCDataChannel? _txChannel;
@@ -55,7 +50,52 @@ Future<void> _waitIceGathering(RTCPeerConnection pc) async {
       c.complete();
     }
   };
-  await c.future.timeout(const Duration(seconds: 10), onTimeout: () {});
+  await c.future.timeout(const Duration(seconds: 15), onTimeout: () {});
+}
+
+Future<bool> _waitPeerConnected({
+  required RTCPeerConnection pc,
+  required Completer<RTCDataChannel> channelReady,
+  Duration timeout = _kConnectTimeout,
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  var iceConnected = false;
+
+  pc.onIceConnectionState = (state) {
+    if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+        state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+      iceConnected = true;
+    }
+  };
+
+  while (DateTime.now().isBefore(deadline)) {
+    final iceState = pc.iceConnectionState;
+    if (iceState == RTCIceConnectionState.RTCIceConnectionStateFailed ||
+        iceState == RTCIceConnectionState.RTCIceConnectionStateClosed ||
+        iceState == RTCIceConnectionState.RTCIceConnectionStateDisconnected) {
+      debugPrint('[ngmy transfer p2p] ice failed: $iceState');
+      return false;
+    }
+    if (iceState == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+        iceState == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+      iceConnected = true;
+    }
+
+    if (channelReady.isCompleted) {
+      final channel = await channelReady.future;
+      if (channel.state == RTCDataChannelState.RTCDataChannelOpen) return true;
+    }
+
+    if (iceConnected && channelReady.isCompleted) {
+      final channel = await channelReady.future;
+      if (channel.state == RTCDataChannelState.RTCDataChannelOpen) return true;
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+
+  debugPrint('[ngmy transfer p2p] connect timeout (ice=$iceConnected, channel=${channelReady.isCompleted})');
+  return false;
 }
 
 Future<String?> _loadOfferJson(String token) async {
@@ -97,7 +137,7 @@ Future<String?> createTransferOffer({
   unawaited(NgmyDocShareStore.preloadForTransfer(ownerEmail, items));
 
   final token = NgmyTransferSignal.generateToken();
-  final pc = await createPeerConnection(_rtcConfig);
+  final pc = await createPeerConnection(kNgmyTransferRtcConfig);
   _txPc = pc;
   final channel = await pc.createDataChannel('ngmytransfer', RTCDataChannelInit());
   _txChannel = channel;
@@ -187,8 +227,16 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   void Function(int received, int total)? onProgress,
   void Function(String fileName, int receivedBytes, int totalBytes)? onBytes,
 }) async {
+  if (_rxPc != null) {
+    await _rxPc!.close();
+    _rxPc = null;
+  }
+
   final jsonText = await _loadOfferJson(offerToken);
-  if (jsonText == null) return null;
+  if (jsonText == null) {
+    debugPrint('[ngmy transfer p2p] offer not found for $offerToken');
+    return null;
+  }
 
   final decoded = jsonDecode(jsonText);
   if (decoded is! Map) return null;
@@ -197,7 +245,7 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   if (offerSdp.isEmpty || manifest is! List) return null;
   final total = manifest.length;
 
-  final pc = await createPeerConnection(_rtcConfig);
+  final pc = await createPeerConnection(kNgmyTransferRtcConfig);
   _rxPc = pc;
 
   var pendingName = 'file';
@@ -208,6 +256,7 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   final imported = <NgmyDocShareItem>[];
   var received = 0;
   final done = Completer<List<NgmyDocShareItem>>();
+  final channelReady = Completer<RTCDataChannel>();
   Future<void> recvChain = Future<void>.value();
 
   Future<void> finalizeCurrentFile() async {
@@ -226,6 +275,10 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
   }
 
   pc.onDataChannel = (channel) {
+    if (!channelReady.isCompleted) channelReady.complete(channel);
+    channel.onDataChannelState = (state) {
+      debugPrint('[ngmy transfer p2p] channel state: $state');
+    };
     channel.onMessage = (msg) {
       recvChain = recvChain.then((_) async {
         try {
@@ -276,16 +329,36 @@ Future<({Future<List<NgmyDocShareItem>> transfer})?> beginTransferReceive({
     };
   };
 
-  await pc.setRemoteDescription(RTCSessionDescription(offerSdp, 'offer'));
-  final answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await _waitIceGathering(pc);
+  try {
+    await pc.setRemoteDescription(RTCSessionDescription(offerSdp, 'offer'));
+    final answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await _waitIceGathering(pc);
 
-  final answerSdp = (await pc.getLocalDescription())?.sdp?.trim() ?? '';
-  if (answerSdp.isEmpty) return null;
+    final answerSdp = (await pc.getLocalDescription())?.sdp?.trim() ?? '';
+    if (answerSdp.isEmpty) return null;
 
-  final answerOk = await _stashAnswerJson(offerToken, jsonEncode({'s': answerSdp}));
-  if (!answerOk) return null;
+    final answerOk = await _stashAnswerJson(offerToken, jsonEncode({'s': answerSdp}));
+    if (!answerOk) {
+      debugPrint('[ngmy transfer p2p] failed to stash answer');
+      return null;
+    }
 
-  return (transfer: done.future);
+    final connected = await _waitPeerConnected(pc: pc, channelReady: channelReady);
+    if (!connected) {
+      if (!done.isCompleted) done.complete([]);
+      await pc.close();
+      _rxPc = null;
+      return null;
+    }
+
+    return (transfer: done.future);
+  } catch (e) {
+    debugPrint('[ngmy transfer p2p] receive setup: $e');
+    await pc.close();
+    _rxPc = null;
+    return null;
+  }
 }
+
+void unawaited(Future<void> f) {}

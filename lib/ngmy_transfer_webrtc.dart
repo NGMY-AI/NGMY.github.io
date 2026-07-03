@@ -48,11 +48,13 @@ class NgmyTransferWebRtc {
             },
     );
     if (session == null) {
-      onStatus?.call('Could not connect. Sender must tap Start transfer and keep that screen open.');
+      onStatus?.call(
+        'Could not link to sender. Keep Send screen open on sender phone, then try again.',
+      );
       return [];
     }
 
-    onStatus?.call('Receiving…');
+    onStatus?.call('Linked — receiving files…');
     var imported = <NgmyDocShareItem>[];
     try {
       imported = await session.transfer.timeout(

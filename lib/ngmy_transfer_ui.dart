@@ -371,7 +371,15 @@ class _NgmyTransferReceivePageState extends State<NgmyTransferReceivePage> {
         SnackBar(content: Text('Received ${imported.length} file(s) via $kNgmyTransferProductName')),
       );
       Navigator.of(context).pop(true);
+      return;
     }
+
+    final message = _status?.trim().isNotEmpty == true
+        ? _status!
+        : 'Transfer failed. Sender must keep the Send screen open while you enter the code.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 6)),
+    );
   }
 
   @override
