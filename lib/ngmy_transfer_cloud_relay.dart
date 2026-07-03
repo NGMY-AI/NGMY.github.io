@@ -64,6 +64,71 @@ class NgmyTransferCloudRelay {
     unawaited(_uploadAll(code: code, ownerEmail: ownerEmail, items: items));
   }
 
+  static Future<int> _readAndUploadItem({
+    required String normalized,
+    required String ownerEmail,
+    required NgmyDocShareItem item,
+    required String base,
+    required int fileIndex,
+    required int fileCount,
+    required List<Map<String, dynamic>> fileRows,
+  }) async {
+    for (var attempt = 0; attempt < 12; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(seconds: attempt < 4 ? 1 : 2));
+        await NgmyDocShareStore.preloadForTransfer(ownerEmail, [item]);
+      }
+
+      var partCount = 0;
+      var sent = 0;
+      final total = item.sizeBytes;
+
+      await for (final chunk in NgmyDocShareStore.readFileStream(ownerEmail, item)) {
+        if (chunk.isEmpty) continue;
+        final partPath = '$base.part${partCount.toString().padLeft(5, '0')}';
+        await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
+              partPath,
+              chunk,
+              fileOptions: FileOptions(upsert: true, contentType: item.mime),
+            );
+        partCount++;
+        sent += chunk.length;
+
+        final existing = await _loadRelay(normalized) ?? {};
+        final progressBase = fileIndex / fileCount;
+        final progressPart = total > 0 ? (sent / total) / fileCount : 0.0;
+        await _saveRelay(normalized, {
+          ...existing,
+          'uploadProgress': (progressBase + progressPart).clamp(0.0, 0.99),
+          'uploading': true,
+          'ready': false,
+        });
+      }
+
+      if (partCount <= 0) {
+        final fallback = await NgmyDocShareStore.readBytes(ownerEmail, item);
+        if (fallback != null && fallback.isNotEmpty) {
+          const step = 8388608;
+          for (var start = 0; start < fallback.length; start += step) {
+            final end = start + step < fallback.length ? start + step : fallback.length;
+            final slice = Uint8List.sublistView(fallback, start, end);
+            final partPath = '$base.part${partCount.toString().padLeft(5, '0')}';
+            await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
+                  partPath,
+                  slice,
+                  fileOptions: FileOptions(upsert: true, contentType: item.mime),
+                );
+            partCount++;
+            sent += slice.length;
+          }
+        }
+      }
+
+      if (partCount > 0) return partCount;
+    }
+    return 0;
+  }
+
   static Future<void> _uploadAll({
     required String code,
     required String ownerEmail,
@@ -95,51 +160,23 @@ class NgmyTransferCloudRelay {
       'createdAt': DateTime.now().toUtc().toIso8601String(),
     });
 
+    await NgmyDocShareStore.waitForTransferReady(ownerEmail, items);
+
     try {
       for (var i = 0; i < items.length; i++) {
         final item = items[i];
         final base = (fileRows[i]['storageBase'] ?? '').toString();
         if (base.isEmpty) continue;
 
-        var partCount = 0;
-        var sent = 0;
-        final total = item.sizeBytes;
-
-        await for (final chunk in NgmyDocShareStore.readFileStream(ownerEmail, item)) {
-          if (chunk.isEmpty) continue;
-          final partPath = '$base.part${partCount.toString().padLeft(5, '0')}';
-          await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
-                partPath,
-                chunk,
-                fileOptions: FileOptions(upsert: true, contentType: item.mime),
-              );
-          partCount++;
-          sent += chunk.length;
-
-          final existing = await _loadRelay(normalized) ?? {};
-          final progressBase = i / items.length;
-          final progressPart = total > 0 ? (sent / total) / items.length : 0.0;
-          await _saveRelay(normalized, {
-            ...existing,
-            'uploadProgress': (progressBase + progressPart).clamp(0.0, 0.99),
-            'uploading': true,
-            'ready': false,
-          });
-        }
-
-        if (partCount <= 0) {
-          final fallback = await NgmyDocShareStore.readBytes(ownerEmail, item);
-          if (fallback != null && fallback.isNotEmpty) {
-            final partPath = '$base.part00000';
-            await Supabase.instance.client.storage.from(kNgmySupabaseRelayBucket).uploadBinary(
-                  partPath,
-                  fallback,
-                  fileOptions: FileOptions(upsert: true, contentType: item.mime),
-                );
-            partCount = 1;
-            sent = fallback.length;
-          }
-        }
+        final partCount = await _readAndUploadItem(
+          normalized: normalized,
+          ownerEmail: ownerEmail,
+          item: item,
+          base: base,
+          fileIndex: i,
+          fileCount: items.length,
+          fileRows: fileRows,
+        );
 
         if (partCount <= 0) {
           final existing = await _loadRelay(normalized) ?? {};
@@ -220,7 +257,7 @@ class NgmyTransferCloudRelay {
 
         final err = await relayError(normalized);
         if (err != null) {
-          onStatus?.call('Cloud backup failed: $err');
+          onStatus?.call('Cloud backup unavailable — trying direct transfer…');
           return [];
         }
 

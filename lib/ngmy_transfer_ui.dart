@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_doc_share_store.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_transfer.dart';
 import 'ngmy_transfer_constants.dart';
@@ -69,8 +70,25 @@ class _NgmyTransferSendPageState extends State<NgmyTransferSendPage> {
     setState(() {
       _starting = true;
       _error = null;
-      _status = 'Starting…';
+      _status = 'Preparing files…';
     });
+
+    await NgmyDocShareStore.waitForTransferReady(widget.email, widget.items);
+    for (final item in widget.items) {
+      final reason = await NgmyDocShareStore.unreadableTransferReason(widget.email, item);
+      if (reason != null) {
+        if (!mounted) return;
+        setState(() {
+          _starting = false;
+          _error = reason;
+          _status = reason;
+        });
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _status = 'Starting…');
 
     final session = await NgmyTransfer.startSend(
       ownerEmail: widget.email,

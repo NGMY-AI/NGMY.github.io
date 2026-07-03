@@ -46,3 +46,4 @@ app.*.map.json
 
 # Prebuilt web output — committed so ngmy.org (main/docs Pages) serves the real app offline.
 # CI also publishes to gh-pages via .github/workflows/deploy-pages.yml
+_site/

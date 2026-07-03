@@ -368,6 +368,43 @@ class NgmyDocShareStore {
 
   static void clearTransferReadCache() {}
 
+  static Future<bool> isReadableForTransfer(String email, NgmyDocShareItem item) async {
+    final root = await _userDir(email);
+    final f = await _fileForId(root, item.id, nameHint: item.name);
+    if (f == null || !await f.exists()) return false;
+    try {
+      final len = await f.length();
+      return len > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<String?> unreadableTransferReason(String email, NgmyDocShareItem item) async {
+    if (await isReadableForTransfer(email, item)) return null;
+    return 'Could not read ${item.name} from your library. Re-upload the document in Doc Share (+ Add) and try again.';
+  }
+
+  static Future<void> waitForTransferReady(
+    String email,
+    List<NgmyDocShareItem> items, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    await preloadForTransfer(email, items);
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      var ready = true;
+      for (final item in items) {
+        if (!await isReadableForTransfer(email, item)) {
+          ready = false;
+          break;
+        }
+      }
+      if (ready) return;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
   static Future<void> preloadForTransfer(String email, List<NgmyDocShareItem> items) async {
     for (final item in items) {
       unawaited(readByteRange(email, item, 0, 1));

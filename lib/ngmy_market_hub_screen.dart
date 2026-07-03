@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_business_card_studio.dart';
+import 'ngmy_business_contacts.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_item_reminder_storage.dart';
-import 'ngmy_daily_tools.dart';
+import 'ngmy_quick_support.dart';
+import 'ngmy_saved_locations.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -28,6 +30,9 @@ class NgmyMarketHubScreen extends StatefulWidget {
 
 class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   int _dueReminders = 0;
+  int _contactCount = 0;
+  int _locationCount = 0;
+  int _supportCount = 0;
 
   @override
   void initState() {
@@ -42,8 +47,20 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
   }
 
   Future<void> _refreshBadges() async {
-    final due = await ngmyItemReminderDueCount(userEmail: widget.userEmail);
-    if (mounted) setState(() => _dueReminders = due);
+    final results = await Future.wait([
+      ngmyItemReminderDueCount(userEmail: widget.userEmail),
+      ngmyBusinessContactCount(userEmail: widget.userEmail),
+      ngmySavedLocationCount(userEmail: widget.userEmail),
+      ngmyQuickSupportCount(userEmail: widget.userEmail),
+    ]);
+    if (mounted) {
+      setState(() {
+        _dueReminders = results[0];
+        _contactCount = results[1];
+        _locationCount = results[2];
+        _supportCount = results[3];
+      });
+    }
   }
 
   @override
@@ -86,32 +103,44 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             const SizedBox(height: 18),
             _youtubeFrame(
               title: 'Business Contacts',
-              subtitle: 'Clients · vendors · partners — save numbers and tap to call',
+              subtitle: 'Rolodex — save clients & vendors, star favorites, tap to call',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF0C1929), Color(0xFF1E3A5F), Color(0xFF0E4D6E)],
               accent: const Color(0xFF38BDF8),
+              badge: _contactCount > 0 ? '$_contactCount saved' : null,
               preview: _DailyThumbPreview(icon: Icons.contacts_rounded, accent: Color(0xFF38BDF8), label: 'CONTACTS'),
-              onTap: () => showNgmyKeyFobVaultDialog(context, userEmail: widget.userEmail),
+              onTap: () async {
+                await showNgmyBusinessContactsDialog(context, userEmail: widget.userEmail);
+                await _refreshBadges();
+              },
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
               title: 'Saved Locations',
-              subtitle: 'Client sites · offices · deliveries — GPS pin & open in Maps',
+              subtitle: 'Site map — pin offices & delivery drops, navigate in one tap',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF022C22), Color(0xFF064E3B), Color(0xFF14532D)],
               accent: const Color(0xFF34D399),
+              badge: _locationCount > 0 ? '$_locationCount pinned' : null,
               preview: _DailyThumbPreview(icon: Icons.place_rounded, accent: Color(0xFF34D399), label: 'LOCATIONS'),
-              onTap: () => showNgmyParkMyCarDialog(context, userEmail: widget.userEmail),
+              onTap: () async {
+                await showNgmySavedLocationsDialog(context, userEmail: widget.userEmail);
+                await _refreshBadges();
+              },
             ),
             const SizedBox(height: 18),
             _youtubeFrame(
               title: 'Quick Support',
-              subtitle: 'Insurance · IT · bank · emergency — one tap to call',
+              subtitle: 'Help desk — insurance, IT, bank & emergency hotlines',
               thumbHeight: thumbH,
               gradient: const [Color(0xFF1C1400), Color(0xFF713F12), Color(0xFF422006)],
               accent: const Color(0xFFFBBF24),
+              badge: _supportCount > 0 ? '$_supportCount lines' : null,
               preview: _DailyThumbPreview(icon: Icons.support_agent_rounded, accent: Color(0xFFFBBF24), label: 'SUPPORT'),
-              onTap: () => showNgmyRoadsideReadyDialog(context, userEmail: widget.userEmail),
+              onTap: () async {
+                await showNgmyQuickSupportDialog(context, userEmail: widget.userEmail);
+                await _refreshBadges();
+              },
             ),
           ],
         ),

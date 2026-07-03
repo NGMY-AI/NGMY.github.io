@@ -491,8 +491,32 @@ class NgmyDocShareStore {
     if (stored != null && stored.isNotEmpty) return stored;
     final webFile = _webFiles[item.id];
     if (webFile != null) {
+      final cached = _transferReadCache[key];
+      if (cached != null && cached.isNotEmpty) return cached;
+      try {
+        final reader = html.FileReader();
+        final done = Completer<ByteBuffer?>();
+        reader.onLoadEnd.listen((_) {
+          final result = reader.result;
+          done.complete(result is ByteBuffer ? result : null);
+        });
+        reader.onError.listen((_) => done.complete(null));
+        reader.readAsArrayBuffer(webFile);
+        final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
+        if (buf != null) {
+          final bytes = Uint8List.view(buf);
+          if (bytes.isNotEmpty) {
+            _transferReadCache[key] = bytes;
+            unawaited(_persistBlob(key, bytes));
+            return bytes;
+          }
+        }
+      } catch (e) {
+        debugPrint('[doc share readBytes webFile] ${item.name}: $e');
+      }
       final range = await readByteRange(email, item, 0, webFile.size);
       if (range != null && range.isNotEmpty) {
+        _transferReadCache[key] = range;
         unawaited(_persistBlob(key, range));
       }
       return range;
@@ -574,6 +598,41 @@ class NgmyDocShareStore {
 
   static void clearTransferReadCache() => _transferReadCache.clear();
 
+  static Future<bool> isReadableForTransfer(String email, NgmyDocShareItem item) async {
+    if (_webFiles[item.id] != null) return true;
+    final key = _bytesPrefsKey(email, item.id);
+    if (_transferReadCache[key]?.isNotEmpty == true) return true;
+    if (await _blobIsReadable(key, minBytes: 1)) return true;
+    final probe = await readByteRange(email, item, 0, 1);
+    return probe != null && probe.isNotEmpty;
+  }
+
+  static Future<String?> unreadableTransferReason(String email, NgmyDocShareItem item) async {
+    if (await isReadableForTransfer(email, item)) return null;
+    return 'Could not read ${item.name} from your library. Re-upload the document in Doc Share (+ Add) and try again.';
+  }
+
+  static Future<void> waitForTransferReady(
+    String email,
+    List<NgmyDocShareItem> items, {
+    Duration timeout = const Duration(seconds: 90),
+  }) async {
+    await preloadForTransfer(email, items);
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      var ready = true;
+      for (final item in items) {
+        if (!await isReadableForTransfer(email, item)) {
+          ready = false;
+          break;
+        }
+      }
+      if (ready) return;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await preloadForTransfer(email, items);
+    }
+  }
+
   static Future<void> preloadForTransfer(String email, List<NgmyDocShareItem> items) async {
     for (final item in items) {
       if (_webFiles[item.id] != null) continue;
@@ -618,22 +677,15 @@ class NgmyDocShareStore {
       if (yieldedBytes > 0) return;
     }
 
-    final size = item.sizeBytes;
-    if (size > 0) {
-      const step = 1048576;
-      for (var start = 0; start < size; start += step) {
-        final end = start + step < size ? start + step : size;
-        final chunk = await readByteRange(email, item, start, end);
-        if (chunk != null && chunk.isNotEmpty) {
-          yieldedBytes += chunk.length;
-          yield chunk;
-        }
-      }
-    }
-
     if (yieldedBytes <= 0) {
       final all = await readBytes(email, item);
-      if (all != null && all.isNotEmpty) yield all;
+      if (all != null && all.isNotEmpty) {
+        const step = 1048576;
+        for (var start = 0; start < all.length; start += step) {
+          final end = start + step < all.length ? start + step : all.length;
+          yield Uint8List.sublistView(all, start, end);
+        }
+      }
     }
   }
 
