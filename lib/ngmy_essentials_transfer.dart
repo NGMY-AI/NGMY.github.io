@@ -13,14 +13,13 @@ import 'ngmy_business_notes.dart';
 import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_short_code.dart';
 import 'ngmy_medicine_organizer.dart';
+import 'ngmy_hub_form_ui.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
 const _accent = Color(0xFF38BDF8);
 const _accent2 = Color(0xFF34D399);
-const _bg = Color(0xFF030712);
-const _card = Color(0xFF0F172A);
 
 enum EssentialsTransferCategory { contacts, locations, support, medicines, notes, tasks, all }
 
@@ -201,8 +200,9 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: t.scaffold,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -215,12 +215,12 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                     onPressed: () => Navigator.pop(context),
                     icon: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                      decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18),
                     ),
                   ),
-                  const Expanded(
-                    child: Text('Transfer Essentials', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  Expanded(
+                    child: Text('Transfer Essentials', textAlign: TextAlign.center, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
                   ),
                   const SizedBox(width: 48),
                 ],
@@ -233,38 +233,38 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.18), _card]),
+                      gradient: LinearGradient(colors: [_accent.withValues(alpha: t.isDark ? 0.18 : 0.1), t.surface]),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: _accent.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Move your essentials', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                        Text('Move your essentials', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20)),
                         const SizedBox(height: 6),
-                        Text('Share a 6-character code or scan the big-dot NGMY QR — same style as Doc Share.', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13, height: 1.4)),
+                        Text('Share a 6-character code or scan the big-dot NGMY QR — same style as Doc Share.', style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.4)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _hubTile(icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Big easy-scan QR + 6-character code', color: _accent, onTap: _busy ? null : _showQr),
+                  _hubTile(context, icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Big easy-scan QR + 6-character code', color: _accent, onTap: _busy ? null : _showQr),
                   const SizedBox(height: 10),
-                  _hubTile(icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
+                  _hubTile(context, icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
                   const SizedBox(height: 10),
-                  _hubTile(icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Type or paste the code from sender', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
+                  _hubTile(context, icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Type or paste the code from sender', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
                   const SizedBox(height: 24),
-                  Text('INCLUDE IN BACKUP', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                  Text('INCLUDE IN BACKUP', style: t.sectionLabel.copyWith(letterSpacing: 1.2)),
                   const SizedBox(height: 8),
-                  _checkTile('All information', _all, (v) => setState(() => _all = v ?? true)),
+                  _checkTile(context, 'All information', _all, (v) => setState(() => _all = v ?? true)),
                   if (!_all) ...[
-                    _checkTile('Contacts', _contacts, (v) => setState(() => _contacts = v ?? false)),
-                    _checkTile('Site Map', _locations, (v) => setState(() => _locations = v ?? false)),
-                    _checkTile('Hotlines', _support, (v) => setState(() => _support = v ?? false)),
-                    _checkTile('Medicines', _medicines, (v) => setState(() => _medicines = v ?? false)),
-                    _checkTile('Notes', _notes, (v) => setState(() => _notes = v ?? false)),
-                    _checkTile('Quick Tasks', _tasks, (v) => setState(() => _tasks = v ?? false)),
+                    _checkTile(context, 'Contacts', _contacts, (v) => setState(() => _contacts = v ?? false)),
+                    _checkTile(context, 'Site Map', _locations, (v) => setState(() => _locations = v ?? false)),
+                    _checkTile(context, 'Hotlines', _support, (v) => setState(() => _support = v ?? false)),
+                    _checkTile(context, 'Medicines', _medicines, (v) => setState(() => _medicines = v ?? false)),
+                    _checkTile(context, 'Notes', _notes, (v) => setState(() => _notes = v ?? false)),
+                    _checkTile(context, 'Quick Tasks', _tasks, (v) => setState(() => _tasks = v ?? false)),
                   ],
-                  if (_busy) ...[const SizedBox(height: 24), const Center(child: CircularProgressIndicator(color: _accent))],
+                  if (_busy) ...[const SizedBox(height: 24), Center(child: CircularProgressIndicator(color: _accent))],
                 ],
               ),
             ),
@@ -274,7 +274,8 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     );
   }
 
-  Widget _hubTile({required IconData icon, required String title, required String subtitle, required Color color, VoidCallback? onTap}) {
+  Widget _hubTile(BuildContext context, {required IconData icon, required String title, required String subtitle, required Color color, VoidCallback? onTap}) {
+    final t = NgmyHubTheme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -282,7 +283,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
         borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withValues(alpha: 0.28))),
+          decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withValues(alpha: 0.28))),
           child: Row(
             children: [
               Container(
@@ -293,12 +294,12 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16)),
                   const SizedBox(height: 3),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.48), fontSize: 12)),
+                  Text(subtitle, style: TextStyle(color: t.subtitle, fontSize: 12)),
                 ]),
               ),
-              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3)),
+              Icon(Icons.chevron_right_rounded, color: t.muted),
             ],
           ),
         ),
@@ -306,10 +307,11 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     );
   }
 
-  Widget _checkTile(String label, bool value, ValueChanged<bool?> onChanged) {
+  Widget _checkTile(BuildContext context, String label, bool value, ValueChanged<bool?> onChanged) {
+    final t = NgmyHubTheme.of(context);
     return CheckboxListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(label, style: TextStyle(color: value ? Colors.white : Colors.white70, fontWeight: FontWeight.w600)),
+      title: Text(label, style: TextStyle(color: value ? t.title : t.subtitle, fontWeight: FontWeight.w600)),
       value: value,
       activeColor: _accent,
       onChanged: onChanged,
@@ -324,10 +326,11 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     final qrData = ngmyEssentialsShortQrPayload(code);
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(backgroundColor: _bg, foregroundColor: Colors.white, elevation: 0, centerTitle: true, title: const Text('Backup QR', style: TextStyle(fontWeight: FontWeight.w900))),
+      backgroundColor: t.scaffold,
+      appBar: AppBar(backgroundColor: t.scaffold, foregroundColor: t.title, elevation: 0, centerTitle: true, title: const Text('Backup QR', style: TextStyle(fontWeight: FontWeight.w900))),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -336,7 +339,7 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(24), border: Border.all(color: _accent.withValues(alpha: 0.35))),
+                decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: _accent.withValues(alpha: 0.35))),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -347,14 +350,14 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
                       errorCorrectionLevel: QrErrorCorrectLevel.H,
                     ),
                     const SizedBox(height: 22),
-                    Text('YOUR 6-CHARACTER CODE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.3)),
+                    Text('YOUR 6-CHARACTER CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
                     const SizedBox(height: 10),
                     SelectableText(
                       code,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
+                      style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
                     ),
                     const SizedBox(height: 8),
-                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · valid 24 hours', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12)),
+                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · valid 24 hours', style: TextStyle(color: t.subtitle, fontSize: 12)),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -433,31 +436,32 @@ class _EssentialsEnterCodePageState extends State<_EssentialsEnterCodePage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(backgroundColor: _bg, foregroundColor: Colors.white, elevation: 0, centerTitle: true, title: const Text('Enter code', style: TextStyle(fontWeight: FontWeight.w900))),
+      backgroundColor: t.scaffold,
+      appBar: AppBar(backgroundColor: t.scaffold, foregroundColor: t.title, elevation: 0, centerTitle: true, title: const Text('Enter code', style: TextStyle(fontWeight: FontWeight.w900))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Type the 6-character code from the sender', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 14)),
+            Text('Type the 6-character code from the sender', style: TextStyle(color: t.subtitle, fontSize: 14)),
             const SizedBox(height: 20),
             TextField(
               controller: _ctrl,
               autofocus: true,
               maxLength: 6,
               textCapitalization: TextCapitalization.characters,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: 10),
+              style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: 10),
               textAlign: TextAlign.center,
               decoration: InputDecoration(
                 counterText: '',
                 hintText: 'ABC123',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 10),
+                hintStyle: TextStyle(color: t.muted, letterSpacing: 10),
                 filled: true,
-                fillColor: _card,
+                fillColor: t.inputFill,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: _accent.withValues(alpha: 0.35))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: _accent.withValues(alpha: 0.25))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide(color: t.inputBorder)),
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: _accent, width: 2)),
               ),
               onSubmitted: (_) => _submit(),
