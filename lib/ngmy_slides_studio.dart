@@ -37,6 +37,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   bool _loading = true;
   bool _showNotes = true;
   String _ribbonTab = 'Home';
+  bool _colorApplyAllSlides = false;
   Timer? _autosaveTimer;
 
   final List<_UndoSnapshot> _undo = [];
@@ -507,8 +508,96 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     });
   }
 
-  void _applyTheme(NgmySlidesTheme theme) {
-    _mutate(() => NgmySlidesTemplates.applyThemeToDeck(_activeDeck!, theme));
+  String _colorTargetHint() {
+    final el = _selectedElement();
+    if (el?.type == NgmySlideElementType.shape) return 'Tap a design shape, then pick a color to fill it.';
+    if (el?.type == NgmySlideElementType.text) return 'Selected text — color applies to this text box.';
+    return 'No selection — color applies to the slide background.';
+  }
+
+  void _applyPickedColor(Color color, {Color? secondary}) {
+    final el = _selectedElement();
+    final slide = _currentSlide;
+    final deck = _activeDeck;
+    if (deck == null) return;
+
+    _mutate(() {
+      if (el != null) {
+        if (el.type == NgmySlideElementType.text) {
+          el.color = color.value;
+        } else if (el.type == NgmySlideElementType.shape) {
+          el.fillColor = color.value;
+          if (secondary != null) el.strokeColor = secondary.value;
+        }
+        return;
+      }
+      void applyBg(NgmySlide s) {
+        s.background = color.value;
+        s.backgroundEnd = secondary?.value;
+      }
+      if (_colorApplyAllSlides) {
+        for (final s in deck.slides) {
+          applyBg(s);
+        }
+      } else if (slide != null) {
+        applyBg(slide);
+      }
+    });
+  }
+
+  void _applyThemeColor(NgmySlidesTheme theme) {
+    final el = _selectedElement();
+    if (el != null) {
+      if (el.type == NgmySlideElementType.text) {
+        final isTitle = el.fontSize >= 28 || el.fontWeight.index >= FontWeight.w800.index;
+        _applyPickedColor(isTitle ? theme.titleColor : theme.bodyColor);
+      } else if (el.type == NgmySlideElementType.shape) {
+        _applyPickedColor(theme.accent.withValues(alpha: 0.88), secondary: theme.accent);
+      }
+      return;
+    }
+    _mutate(() {
+      final deck = _activeDeck!;
+      void applyBg(NgmySlide s) {
+        s.background = theme.slideBg.value;
+        s.backgroundEnd = theme.slideBgEnd?.value;
+      }
+      if (_colorApplyAllSlides) {
+        deck.themeId = theme.id;
+        for (final s in deck.slides) {
+          applyBg(s);
+        }
+      } else {
+        final slide = _currentSlide;
+        if (slide != null) applyBg(slide);
+      }
+    });
+  }
+
+  void _applyTextColor(int colorValue) {
+    final el = _selectedElement();
+    final slide = _currentSlide;
+    final deck = _activeDeck;
+    if (deck == null) return;
+
+    _mutate(() {
+      if (el != null && el.type == NgmySlideElementType.text) {
+        el.color = colorValue;
+        return;
+      }
+      void applyText(NgmySlide s) {
+        for (final e in s.elements.where((x) => x.type == NgmySlideElementType.text)) {
+          e.color = colorValue;
+        }
+      }
+      if (_colorApplyAllSlides) {
+        for (final s in deck.slides) {
+          applyText(s);
+        }
+      } else if (slide != null) {
+        applyText(slide);
+      }
+    });
   }
 
   void _applyLayout(NgmySlideLayout layout) {
@@ -1013,7 +1102,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
 
   Widget _elementTransitionPicker(bool isDark) {
     final el = _selectedElement();
-    if (el == null || el.fileName.startsWith('__design__')) return const SizedBox.shrink();
+    if (el == null) return const SizedBox.shrink();
     return Row(
       children: [
         const SizedBox(width: 8),
@@ -1427,17 +1516,30 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+              Row(
+                children: [
+                  _colorScopeChip('This slide', !_colorApplyAllSlides, isDark, () => setState(() => _colorApplyAllSlides = false)),
+                  const SizedBox(width: 6),
+                  _colorScopeChip('All slides', _colorApplyAllSlides, isDark, () => setState(() => _colorApplyAllSlides = true)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _colorTargetHint(),
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 8),
               Text('COLORS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
               const SizedBox(height: 4),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: NgmySlidesTemplates.themes.map((t) {
-                    final selected = _activeDeck?.themeId == t.id;
+                    final selected = _activeDeck?.themeId == t.id && _selectedElement() == null && !_colorApplyAllSlides;
                     return Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: GestureDetector(
-                        onTap: () => _applyTheme(t),
+                        onTap: () => _applyThemeColor(t),
                         child: Tooltip(
                           message: t.label,
                           child: Container(
@@ -1453,6 +1555,35 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                       ),
                     );
                   }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('TEXT COLORS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+              const SizedBox(height: 4),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final c in const [
+                      0xFF0F172A, 0xFF334155, 0xFF2563EB, 0xFF059669, 0xFFDC2626,
+                      0xFF7C3AED, 0xFFEA580C, 0xFF0891B2, 0xFFFFFFFF, 0xFFFBBF24,
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: GestureDetector(
+                          onTap: () => _applyTextColor(c),
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Color(c),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: c == 0xFFFFFFFF ? Colors.black26 : Colors.white24, width: 1.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -1542,7 +1673,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (el != null && !el.fileName.startsWith('__design__')) ...[
+              if (el != null) ...[
                 Text('ELEMENT ANIMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
                 const SizedBox(height: 4),
                 transitionRow(
@@ -1902,21 +2033,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     final selected = _selectedElementId == e.id;
     final scale = cw / 960;
     final isDesign = e.fileName.startsWith('__design__') || e.id.startsWith('design_');
-    if (isDesign) {
-      return Positioned(
-        key: ValueKey('el_${e.id}'),
-        left: e.x * cw,
-        top: e.y * ch,
-        width: e.w * cw,
-        height: e.h * ch,
-        child: IgnorePointer(
-          child: Transform.rotate(
-            angle: e.rotation,
-            child: NgmySlideElementView(element: e, scale: scale),
-          ),
-        ),
-      );
-    }
+    final accentColor = isDesign ? const Color(0xFFF97316) : const Color(0xFF2563EB);
     return Positioned(
       key: ValueKey('el_${e.id}'),
       left: e.x * cw,
@@ -1941,13 +2058,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.transparent, width: 2),
+                  border: Border.all(color: selected ? accentColor : Colors.transparent, width: 2),
                   color: e.type == NgmySlideElementType.signature ? Colors.transparent : null,
                 ),
                 child: NgmySlideElementView(
                   element: e,
                   scale: scale,
-                  editing: true,
+                  editing: e.type == NgmySlideElementType.text,
                   selected: selected,
                   controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
                   onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
@@ -1963,6 +2080,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                       setState(() {
                         e.w = (e.w + d.delta.dx / cw).clamp(0.04, 1.8);
                         e.h = (e.h + d.delta.dy / ch).clamp(0.04, 1.8);
+                        if (e.type == NgmySlideElementType.text) {
+                          e.fontSize = (e.fontSize + d.delta.dy * 0.15).clamp(10, 120);
+                        }
                       });
                       _commitDraftIfNeeded();
                       _syncDeckIntoList();
@@ -1984,7 +2104,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                       width: 22,
                       height: 22,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB),
+                        color: accentColor,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
@@ -1995,6 +2115,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _colorScopeChip(String label, bool selected, bool isDark, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF2563EB).withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.white12),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: selected ? const Color(0xFF2563EB) : (isDark ? Colors.white54 : const Color(0xFF64748B)))),
       ),
     );
   }
