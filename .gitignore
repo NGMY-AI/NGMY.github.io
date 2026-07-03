@@ -44,11 +44,5 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Prebuilt web output — only stub files in docs/ are committed (see docs/index.html).
-# CI publishes the full site via .github/workflows/deploy-pages.yml
-/docs/*
-!/docs/index.html
-!/docs/404.html
-!/docs/.nojekyll
-!/docs/CNAME
-!/docs/version.json
+# Prebuilt web output — committed so ngmy.org (main/docs Pages) serves the real app offline.
+# CI also publishes to gh-pages via .github/workflows/deploy-pages.yml
