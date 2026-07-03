@@ -1141,6 +1141,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   bool _previewMode = false;
   String? _prevBody;
   int? _growAnimIndex;
+  int? _cachedSelStart;
+  int? _cachedSelEnd;
+  int? _lastRangeSelStart;
+  int? _lastRangeSelEnd;
 
   @override
   void initState() {
@@ -1163,15 +1167,51 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
   }
 
+  void _captureBodySelection() {
+    final sel = _body.selection;
+    if (!sel.isValid) return;
+    final len = _body.text.length;
+    final s = sel.start.clamp(0, len);
+    final e = sel.end.clamp(0, len);
+    _cachedSelStart = s;
+    _cachedSelEnd = e;
+    if (s != e) {
+      _lastRangeSelStart = s;
+      _lastRangeSelEnd = e;
+    }
+  }
+
+  (int, int) _selectionForTextAnim() {
+    _captureBodySelection();
+    final len = _body.text.length;
+    var s = (_cachedSelStart ?? _body.selection.start).clamp(0, len);
+    var e = (_cachedSelEnd ?? _body.selection.extentOffset).clamp(0, len);
+    if (s == e && _lastRangeSelStart != null && _lastRangeSelEnd != null) {
+      final ls = _lastRangeSelStart!.clamp(0, len);
+      final le = _lastRangeSelEnd!.clamp(0, len);
+      if (ls < le) {
+        s = ls;
+        e = le;
+      }
+    }
+    return (s, e);
+  }
+
   void _onBodyChanged() {
+    _captureBodySelection();
     final newText = _body.text;
+    if (_growAnimIndex != null && _growAnimIndex! < _note.textAnims.length) {
+      final a = _note.textAnims[_growAnimIndex!];
+      final cursor = _body.selection.extentOffset.clamp(0, newText.length);
+      if (cursor > a.start) {
+        a.end = cursor;
+      }
+    }
     if (_prevBody != null && _prevBody != newText) {
       _reconcileTextAnims(_prevBody!, newText);
     }
     if (_growAnimIndex != null && _growAnimIndex! < _note.textAnims.length) {
       final a = _note.textAnims[_growAnimIndex!];
-      final cursor = _body.selection.extentOffset.clamp(0, newText.length);
-      if (cursor >= a.start) a.end = cursor;
       if (a.end <= a.start) {
         _note.textAnims.removeAt(_growAnimIndex!);
         _growAnimIndex = null;
@@ -1215,29 +1255,98 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
   }
 
-  void _applyTextEffect(String effect) {
+  void _applyTextEffect(String effect, {int? selStart, int? selEnd}) {
     final t = _body.text;
-    final sel = _body.selection;
-    final s = sel.start.clamp(0, t.length);
-    final e = sel.end.clamp(0, t.length);
+    var s = selStart ?? _body.selection.baseOffset;
+    var e = selEnd ?? _body.selection.extentOffset;
+    if (s < 0 || e < 0) {
+      final cursor = _body.selection.extentOffset.clamp(0, t.length);
+      s = cursor;
+      e = cursor;
+    }
+    s = s.clamp(0, t.length);
+    e = e.clamp(0, t.length);
+    if (s > e) {
+      final tmp = s;
+      s = e;
+      e = tmp;
+    }
+    if (s == e) {
+      final word = _wordRangeAt(t, s);
+      if (word != null) {
+        s = word.$1;
+        e = word.$2;
+      } else {
+        final line = _lineRangeAt(t, s);
+        if (line != null) {
+          s = line.$1;
+          e = line.$2;
+        }
+      }
+    }
     _note.textAnims.removeWhere((a) => !(a.end <= s || a.start >= e));
-    if (s != e) {
+    final applied = s != e;
+    if (applied) {
       _note.textAnims.add(NgmyNoteTextAnim(start: s, end: e, effect: effect));
       _growAnimIndex = null;
     } else {
       _note.textAnims.add(NgmyNoteTextAnim(start: s, end: s, effect: effect));
       _growAnimIndex = _note.textAnims.length - 1;
     }
-    _markDirty();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(s != e ? '$effect applied — visible in Preview' : 'Type your text — $effect runs in Preview'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    setState(() {
+      if (applied) _previewMode = true;
+    });
+    if (applied) {
+      _bodyFocus.unfocus();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$effect applied — showing Preview'), duration: const Duration(seconds: 2)),
+        );
+      }
+    } else {
+      _bodyFocus.requestFocus();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Start typing — $effect will animate in Preview'), duration: const Duration(seconds: 2)),
+        );
+      }
     }
+    _markDirty();
   }
+
+  (int, int)? _wordRangeAt(String text, int pos) {
+    if (text.isEmpty) return null;
+    pos = pos.clamp(0, text.length);
+    if (pos == text.length && pos > 0) pos--;
+    var start = pos;
+    while (start > 0 && !_isWordBreak(text[start - 1])) {
+      start--;
+    }
+    var end = pos;
+    while (end < text.length && !_isWordBreak(text[end])) {
+      end++;
+    }
+    return end > start ? (start, end) : null;
+  }
+
+  (int, int)? _lineRangeAt(String text, int pos) {
+    if (text.trim().isEmpty) return null;
+    pos = pos.clamp(0, text.length);
+    final lineStart = text.lastIndexOf('\n', pos == 0 ? 0 : pos - 1) + 1;
+    final nextBreak = text.indexOf('\n', pos);
+    final lineEnd = nextBreak == -1 ? text.length : nextBreak;
+    var s = lineStart;
+    var e = lineEnd;
+    while (s < e && _isWordBreak(text[s])) {
+      s++;
+    }
+    while (e > s && _isWordBreak(text[e - 1])) {
+      e--;
+    }
+    return e > s ? (s, e) : null;
+  }
+
+  bool _isWordBreak(String ch) => ch == ' ' || ch == '\n' || ch == '\t';
 
   bool _hasSaveableContent() {
     if (_title.text.trim().isNotEmpty) return true;
@@ -1343,6 +1452,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<void> _showTextAnimationPicker() async {
+    final saved = _selectionForTextAnim();
+    final savedBase = saved.$1;
+    final savedExtent = saved.$2;
     final effect = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1E293B),
@@ -1379,7 +1491,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (effect == null) return;
-    _applyTextEffect(effect);
+    if (savedBase >= 0 && savedExtent >= 0) {
+      _body.selection = TextSelection(baseOffset: savedBase, extentOffset: savedExtent);
+    }
+    _applyTextEffect(effect, selStart: savedBase, selEnd: savedExtent);
   }
 
   Future<void> _showEmojiPicker() async {
@@ -1722,10 +1837,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                       color: dark ? Colors.black.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
+                    child: Listener(
+                      onPointerDown: (_) => _captureBodySelection(),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
                           _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
                           _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
                           _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
@@ -1740,7 +1857,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
                           _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
                           _tool(Icons.palette_rounded, 'Any color', _showCustomColorPicker, fg),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1778,7 +1896,14 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           const SizedBox(height: 8),
                           Expanded(
                             child: _previewMode
-                                ? SingleChildScrollView(child: _NoteMarkdownPreview(text: _body.text, dark: dark, textAnims: _note.textAnims))
+                                ? SingleChildScrollView(
+                                    child: _NoteMarkdownPreview(
+                                      key: ValueKey('pv_${_body.text.hashCode}_${_note.textAnims.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
+                                      text: _body.text,
+                                      dark: dark,
+                                      textAnims: List<NgmyNoteTextAnim>.from(_note.textAnims),
+                                    ),
+                                  )
                                 : TextField(
                                     controller: _body,
                                     focusNode: _bodyFocus,
@@ -1865,7 +1990,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 }
 
 class _NoteMarkdownPreview extends StatelessWidget {
-  const _NoteMarkdownPreview({required this.text, required this.dark, this.textAnims = const []});
+  const _NoteMarkdownPreview({super.key, required this.text, required this.dark, this.textAnims = const []});
   final String text;
   final bool dark;
   final List<NgmyNoteTextAnim> textAnims;
@@ -1921,7 +2046,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
           children: [
             Icon(checked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 20, color: checked ? const Color(0xFF8B5CF6) : fg.withValues(alpha: 0.5)),
             const SizedBox(width: 8),
-            Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: fg, decoration: checked ? TextDecoration.lineThrough : null, decorationColor: fg.withValues(alpha: 0.5)))),
+            Expanded(child: _inline(label, fg, lineStart: lineStart + 6)),
           ],
         ),
       );
