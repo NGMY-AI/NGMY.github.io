@@ -46,8 +46,6 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
   final PageController _pageController = PageController();
   int _pageIndex = 0;
 
-  static const _footerOverlayHeight = 56.0;
-
   @override
   void initState() {
     super.initState();
@@ -133,69 +131,48 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     final pages = doc.effectivePages;
     final bg = ngmyMenuPageBackgroundColor(doc.pageBackground);
     final multi = pages.length > 1;
-    final showFooterBar = multi || doc.socialLinks.hasAny;
 
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Positioned.fill(
+            Expanded(
               child: multi
                   ? PageView.builder(
                       controller: _pageController,
                       itemCount: pages.length,
                       onPageChanged: (i) => setState(() => _pageIndex = i),
-                      itemBuilder: (_, i) => _menuPage(doc, i, showFooterBar),
+                      itemBuilder: (_, i) => _menuPage(doc, i),
                     )
-                  : _menuPage(doc, 0, showFooterBar),
+                  : _menuPage(doc, 0),
             ),
-            if (showFooterBar)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (multi)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: NgmyMenuPageDotsIndicator(
-                          count: pages.length,
-                          activeIndex: _pageIndex,
-                          pageBackgroundId: doc.pageBackground,
-                          seeThrough: true,
-                        ),
-                      ),
-                    NgmyMenuGuestFooter(links: doc.socialLinks),
-                  ],
+            if (multi)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
+                child: NgmyMenuPageDotsIndicator(
+                  count: pages.length,
+                  activeIndex: _pageIndex,
+                  pageBackgroundId: doc.pageBackground,
                 ),
               ),
+            if (doc.socialLinks.hasAny) NgmyMenuGuestFooter(links: doc.socialLinks),
           ],
         ),
       ),
     );
   }
 
-  Widget _menuPage(NgmyMenuDocument doc, int index, bool overlayFooter) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 480, maxHeight: constraints.maxHeight),
-              child: NgmyMenuPreview(
-                document: doc,
-                pageIndex: index,
-                footerOverlayInset: overlayFooter ? _footerOverlayHeight : 0,
-                fillHeight: true,
-              ),
-            ),
-          ),
-        );
-      },
+  Widget _menuPage(NgmyMenuDocument doc, int index) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: NgmyMenuPreview(document: doc, pageIndex: index),
+        ),
+      ),
     );
   }
 }
