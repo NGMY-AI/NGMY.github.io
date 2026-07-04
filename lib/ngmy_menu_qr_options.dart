@@ -95,7 +95,6 @@ const List<NgmyMenuQrCardTemplateOption> kNgmyMenuQrCardTemplateOptions = [
   NgmyMenuQrCardTemplateOption(id: 'art_deco', name: 'Art Deco', headerColor: Color(0xFF0A0A0A), bodyColor: Color(0xFF171717), accentColor: Color(0xFFD4AF37), icon: Icons.architecture_rounded),
   NgmyMenuQrCardTemplateOption(id: 'rooftop', name: 'Rooftop', headerColor: Color(0xFF0F172A), bodyColor: Color(0xFF152238), accentColor: Color(0xFF38BDF8), icon: Icons.apartment_rounded),
   NgmyMenuQrCardTemplateOption(id: 'garden', name: 'Garden', headerColor: Color(0xFF14532D), bodyColor: Color(0xFF15803D), accentColor: Color(0xFFBBF7D0), icon: Icons.eco_rounded),
-  NgmyMenuQrCardTemplateOption(id: 'ivory_edit', name: 'Ivory', headerColor: Color(0xFFFAFAFA), bodyColor: Color(0xFFFFFFFF), accentColor: Color(0xFF71717A), icon: Icons.menu_book_outlined),
 ];
 
 NgmyMenuQrCardTemplateOption ngmyMenuQrCardTemplateById(String id) {

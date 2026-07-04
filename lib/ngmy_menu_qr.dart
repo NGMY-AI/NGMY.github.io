@@ -260,6 +260,7 @@ class NgmyMenuQrDisplay extends StatelessWidget {
       'modern' => 'modern_gradient',
       'classic' => 'classic_border',
       'minimal' => 'minimal_clean',
+      'ivory_edit' => 'minimal_clean',
       _ => id,
     };
   }

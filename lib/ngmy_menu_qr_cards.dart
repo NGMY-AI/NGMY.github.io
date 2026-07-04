@@ -76,8 +76,6 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Center(child: NgmyMenuQrWidget(data: data, style: qrStyle, large: false)),
-                const SizedBox(height: 8),
-                Text('No login required', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accent.withValues(alpha: 0.85))),
               ],
             ),
           ),
@@ -102,7 +100,6 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
           border: Border.all(color: accent, width: 2.5),
         );
       case 'minimal_clean':
-      case 'ivory_edit':
         deco = BoxDecoration(
           color: tpl.bodyColor,
           borderRadius: BorderRadius.circular(18),
@@ -133,7 +130,7 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
   }
 
   Widget _header(NgmyMenuQrCardTemplateOption tpl, Color accent, String name) {
-    final isLightHeader = tpl.id == 'minimal_clean' || tpl.id == 'classic_border' || tpl.id == 'ivory_edit' || tpl.id == 'marble_cream';
+    final isLightHeader = tpl.id == 'minimal_clean' || tpl.id == 'classic_border' || tpl.id == 'marble_cream';
     final titleColor = isLightHeader ? const Color(0xFF18181B) : accent;
     final bg = tpl.id == 'modern_gradient' ? Colors.transparent : tpl.headerColor.withValues(alpha: tpl.id == 'modern_gradient' ? 1 : 0.95);
 
@@ -214,12 +211,12 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
   }
 
   Color _subColor(NgmyMenuQrCardTemplateOption tpl) {
-    final light = tpl.id == 'minimal_clean' || tpl.id == 'classic_border' || tpl.id == 'bistro_warm' || tpl.id == 'marble_cream' || tpl.id == 'ivory_edit';
+    final light = tpl.id == 'minimal_clean' || tpl.id == 'classic_border' || tpl.id == 'bistro_warm' || tpl.id == 'marble_cream';
     return light ? const Color(0xFF64748B) : const Color(0xFFC9B896);
   }
 
   Color _titleColor(NgmyMenuQrCardTemplateOption tpl) {
-    final light = tpl.id == 'minimal_clean' || tpl.id == 'classic_border' || tpl.id == 'ivory_edit';
+    final light = tpl.id == 'minimal_clean' || tpl.id == 'classic_border';
     return light ? const Color(0xFF0F172A) : tpl.accentColor;
   }
 }
