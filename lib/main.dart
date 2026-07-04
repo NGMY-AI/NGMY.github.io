@@ -170,6 +170,7 @@ import 'ngmy_market_hub_screen.dart';
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_overlay_guard.dart';
 import 'ngmy_medicine_reminder_service.dart';
+import 'ngmy_swahili_reminders.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
 
@@ -14896,6 +14897,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _promptPushNotificationsIfNeeded();
         unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
         unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
+        unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email));
       }
       if (_idx == 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -15208,6 +15210,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenMediaPostDeepLink());
     ngmyStartItemReminderWatcher(widget.user.email);
     ngmyStartMedicineReminderWatcher(widget.user.email);
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email)));
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: widget.user.email,

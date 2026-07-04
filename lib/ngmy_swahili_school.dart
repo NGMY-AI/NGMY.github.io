@@ -8,6 +8,39 @@ import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
 import 'ngmy_swahili_word_enrichment.dart';
 
+/// One word the user wants to see as a pop-up every time they open the app.
+class SwahiliWordReminder {
+  const SwahiliWordReminder({
+    required this.swahili,
+    required this.english,
+    this.pronunciation = '',
+  });
+
+  final String swahili;
+  final String english;
+  final String pronunciation;
+
+  Map<String, dynamic> toJson() => {
+        'swahili': swahili,
+        'english': english,
+        'pronunciation': pronunciation,
+      };
+
+  factory SwahiliWordReminder.fromJson(Map<String, dynamic> json) {
+    return SwahiliWordReminder(
+      swahili: json['swahili'] as String? ?? '',
+      english: json['english'] as String? ?? '',
+      pronunciation: json['pronunciation'] as String? ?? '',
+    );
+  }
+
+  factory SwahiliWordReminder.fromWord(SwahiliWord w) => SwahiliWordReminder(
+        swahili: w.swahili,
+        english: w.english,
+        pronunciation: w.pronunciation,
+      );
+}
+
 void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
   Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
@@ -25,6 +58,7 @@ class NgmySwahiliProgress {
     this.passedLevels = const {},
     this.studiedWords = const {},
     this.studyCalendarDay = '',
+    this.wordReminders = const [],
   });
 
   int unlockedLevelIndex;
@@ -33,6 +67,7 @@ class NgmySwahiliProgress {
   Set<String> passedLevels;
   Map<String, List<String>> studiedWords;
   String studyCalendarDay;
+  List<SwahiliWordReminder> wordReminders;
 
   static String _todayKey() {
     final n = DateTime.now();
@@ -81,6 +116,16 @@ class NgmySwahiliProgress {
 
   bool isLevelPassed(String levelId) => passedLevels.contains(levelId);
 
+  bool hasWordReminder(SwahiliWord word) =>
+      wordReminders.any((r) => r.swahili == word.swahili && r.english == word.english);
+
+  void setWordReminder(SwahiliWord word, bool enabled) {
+    wordReminders.removeWhere((r) => r.swahili == word.swahili);
+    if (enabled) {
+      wordReminders.add(SwahiliWordReminder.fromWord(word));
+    }
+  }
+
   Map<String, dynamic> toJson() => {
         'unlockedLevelIndex': unlockedLevelIndex,
         'completedDays': completedDays.toList(),
@@ -88,10 +133,12 @@ class NgmySwahiliProgress {
         'passedLevels': passedLevels.toList(),
         'studiedWords': studiedWords.map((k, v) => MapEntry(k, v)),
         'studyCalendarDay': studyCalendarDay,
+        'wordReminders': wordReminders.map((r) => r.toJson()).toList(),
       };
 
   factory NgmySwahiliProgress.fromJson(Map<String, dynamic> json) {
     final rawStudied = json['studiedWords'] as Map<String, dynamic>? ?? {};
+    final rawReminders = json['wordReminders'] as List<dynamic>? ?? [];
     return NgmySwahiliProgress(
       unlockedLevelIndex: (json['unlockedLevelIndex'] as num?)?.toInt() ?? 0,
       completedDays: (json['completedDays'] as List<dynamic>? ?? []).map((e) => e.toString()).toSet(),
@@ -102,6 +149,11 @@ class NgmySwahiliProgress {
         (k, v) => MapEntry(k.toString(), (v as List<dynamic>).map((e) => e.toString()).toList()),
       ),
       studyCalendarDay: json['studyCalendarDay'] as String? ?? '',
+      wordReminders: rawReminders
+          .whereType<Map>()
+          .map((e) => SwahiliWordReminder.fromJson(Map<String, dynamic>.from(e)))
+          .where((r) => r.swahili.isNotEmpty)
+          .toList(),
     );
   }
 }
@@ -171,75 +223,70 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
           allDaysDone: _progress.allDaysDone(level, levelIndex),
           levelPassed: _progress.isLevelPassed(level.id),
           bestScore: _progress.bestScores[level.id],
-          onDayTap: (d) {
-            Navigator.pop(context);
-            _openDay(levelIndex, d);
+          onDayTap: (d, pathCtx) {
+            Navigator.of(pathCtx).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => _buildLessonPage(levelIndex, d),
+              ),
+            ).then((_) {
+              if (mounted) setState(() {});
+            });
           },
-          onTestTap: () {
-            Navigator.pop(context);
-            _openTest(levelIndex);
+          onTestTap: (pathCtx) {
+            Navigator.of(pathCtx).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => _SwahiliTestPage(
+                  level: level,
+                  levelIndex: levelIndex,
+                  onFinished: (score, passed) async {
+                    final id = level.id;
+                    final prev = _progress.bestScores[id] ?? 0;
+                    if (score > prev) _progress.bestScores[id] = score;
+                    if (passed) {
+                      _progress.passedLevels.add(id);
+                      if (levelIndex + 1 < kSwahiliLevels.length && _progress.unlockedLevelIndex < levelIndex + 1) {
+                        _progress.unlockedLevelIndex = levelIndex + 1;
+                      }
+                    } else {
+                      _progress.completedDays.removeWhere((k) => k.startsWith('${levelIndex}_'));
+                    }
+                    await _save();
+                    if (!mounted) return;
+                    setState(() {});
+                  },
+                ),
+              ),
+            );
           },
         ),
       ),
     ).then((_) => setState(() {}));
   }
 
-  void _openDay(int levelIndex, int dayIndex) {
+  Widget _buildLessonPage(int levelIndex, int dayIndex) {
     final level = kSwahiliLevels[levelIndex];
     final day = level.days[dayIndex];
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => _SwahiliLessonPage(
-          level: level,
-          levelIndex: levelIndex,
-          dayIndex: dayIndex,
-          day: day,
-          isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
-          onWordStudied: (w) async {
-            _progress.markWordStudied(levelIndex, dayIndex, w);
-            await _save();
-          },
-          isDayDone: () => _progress.isDayDone(levelIndex, dayIndex),
-          onComplete: () async {
-            setState(() => _progress.markDayDone(levelIndex, dayIndex));
-            await _save();
-          },
-        ),
-      ),
-    ).then((_) => setState(() {}));
-  }
-
-  void _openTest(int levelIndex) {
-    final level = kSwahiliLevels[levelIndex];
-    if (!_progress.allDaysDone(level, levelIndex)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Finish all 5 days before taking the test.')),
-      );
-      return;
-    }
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => _SwahiliTestPage(
-          level: level,
-          levelIndex: levelIndex,
-          onFinished: (score, passed) async {
-            final id = level.id;
-            final prev = _progress.bestScores[id] ?? 0;
-            if (score > prev) _progress.bestScores[id] = score;
-            if (passed) {
-              _progress.passedLevels.add(id);
-              if (levelIndex + 1 < kSwahiliLevels.length && _progress.unlockedLevelIndex < levelIndex + 1) {
-                _progress.unlockedLevelIndex = levelIndex + 1;
-              }
-            } else {
-              _progress.completedDays.removeWhere((k) => k.startsWith('${levelIndex}_'));
-            }
-            await _save();
-            if (!mounted) return;
-            setState(() {});
-          },
-        ),
-      ),
+    return _SwahiliLessonPage(
+      level: level,
+      levelIndex: levelIndex,
+      dayIndex: dayIndex,
+      day: day,
+      userEmail: widget.userEmail,
+      isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
+      onWordStudied: (w) async {
+        _progress.markWordStudied(levelIndex, dayIndex, w);
+        await _save();
+      },
+      isDayDone: () => _progress.isDayDone(levelIndex, dayIndex),
+      hasWordReminder: (w) => _progress.hasWordReminder(w),
+      onWordReminderChanged: (w, on) async {
+        _progress.setWordReminder(w, on);
+        await _save();
+      },
+      onComplete: () async {
+        setState(() => _progress.markDayDone(levelIndex, dayIndex));
+        await _save();
+      },
     );
   }
 
@@ -269,14 +316,28 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
                                 icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white70 : const Color(0xFF475569)),
                               ),
                               const Spacer(),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.asset(
-                                  'assets/images/ngmy_logo.png',
-                                  width: 36,
-                                  height: 36,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.school_rounded, color: Color(0xFF2D7A4A), size: 24),
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  border: Border.all(color: const Color(0xFF4AAF6E), width: 2.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF4AAF6E).withValues(alpha: 0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/images/ngmy_logo.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Icon(Icons.school_rounded, color: Color(0xFF2D7A4A), size: 22),
+                                  ),
                                 ),
                               ),
                             ],
@@ -501,9 +562,12 @@ class _SwahiliLessonPage extends StatefulWidget {
     required this.levelIndex,
     required this.dayIndex,
     required this.day,
+    required this.userEmail,
     required this.isWordStudied,
     required this.onWordStudied,
     required this.isDayDone,
+    required this.hasWordReminder,
+    required this.onWordReminderChanged,
     required this.onComplete,
   });
 
@@ -511,9 +575,12 @@ class _SwahiliLessonPage extends StatefulWidget {
   final int levelIndex;
   final int dayIndex;
   final SwahiliLessonDay day;
+  final String? userEmail;
   final bool Function(String word) isWordStudied;
   final Future<void> Function(String word) onWordStudied;
   final bool Function() isDayDone;
+  final bool Function(SwahiliWord word) hasWordReminder;
+  final Future<void> Function(SwahiliWord word, bool enabled) onWordReminderChanged;
   final VoidCallback onComplete;
 
   @override
@@ -562,15 +629,15 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
     final key = word.swahili;
     final alreadyStudied = _isStudied(key);
     final prior = alreadyStudied ? kSwahiliMinStudySeconds : (_studySeconds[key] ?? 0);
-    final added = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _WordDetailSheet(
-        rich: enrichSwahiliWord(word),
-        isDark: Theme.of(ctx).brightness == Brightness.dark,
-        priorSeconds: prior,
-        alreadyStudied: alreadyStudied,
+    final added = await Navigator.of(context).push<int>(
+      MaterialPageRoute<int>(
+        builder: (_) => _SwahiliWordStudyPage(
+          rich: enrichSwahiliWord(word),
+          priorSeconds: prior,
+          alreadyStudied: alreadyStudied,
+          reminderEnabled: widget.hasWordReminder(word),
+          onReminderChanged: (on) => widget.onWordReminderChanged(word, on),
+        ),
       ),
     );
     if (added != null && mounted) {
@@ -784,26 +851,29 @@ class _WordCard extends StatelessWidget {
   }
 }
 
-class _WordDetailSheet extends StatefulWidget {
-  const _WordDetailSheet({
+class _SwahiliWordStudyPage extends StatefulWidget {
+  const _SwahiliWordStudyPage({
     required this.rich,
-    required this.isDark,
     required this.priorSeconds,
-    this.alreadyStudied = false,
+    required this.alreadyStudied,
+    required this.reminderEnabled,
+    required this.onReminderChanged,
   });
 
   final SwahiliRichWord rich;
-  final bool isDark;
   final int priorSeconds;
   final bool alreadyStudied;
+  final bool reminderEnabled;
+  final Future<void> Function(bool enabled) onReminderChanged;
 
   @override
-  State<_WordDetailSheet> createState() => _WordDetailSheetState();
+  State<_SwahiliWordStudyPage> createState() => _SwahiliWordStudyPageState();
 }
 
-class _WordDetailSheetState extends State<_WordDetailSheet> {
+class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
   Timer? _timer;
   int _sessionSeconds = 0;
+  late bool _reminderOn;
 
   int get _totalSeconds => widget.priorSeconds + _sessionSeconds;
 
@@ -812,6 +882,7 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
   @override
   void initState() {
     super.initState();
+    _reminderOn = widget.reminderEnabled;
     if (!widget.alreadyStudied && widget.priorSeconds < kSwahiliMinStudySeconds) {
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() => _sessionSeconds++);
@@ -828,202 +899,48 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final word = widget.rich.base;
-    final card = widget.isDark ? const Color(0xFF1A2030) : Colors.white;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
     final remaining = (kSwahiliMinStudySeconds - _totalSeconds).clamp(0, kSwahiliMinStudySeconds);
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: DraggableScrollableSheet(
-          initialChildSize: 0.88,
-          minChildSize: 0.45,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (_, scroll) => Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+    return Scaffold(
+      backgroundColor: bg,
+      appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+        elevation: 0,
+        title: const Text('Somo / Lesson', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: card,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
+                color: _studied
+                    ? const Color(0xFF059669).withValues(alpha: 0.15)
+                    : const Color(0xFFD97706).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706)),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _studied
-                                ? const Color(0xFF059669).withValues(alpha: 0.15)
-                                : const Color(0xFFD97706).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _studied ? Icons.check_circle_rounded : Icons.timer_rounded,
-                                size: 18,
-                                color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _studied
-                                      ? 'Umekamilisha kusoma — Done studying!'
-                                      : 'Soma angalau sekunde $remaining zaidi / Study $remaining more seconds',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: widget.isDark ? Colors.white70 : const Color(0xFF475569),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                  Icon(
+                    _studied ? Icons.check_circle_rounded : Icons.timer_rounded,
+                    size: 18,
+                    color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706),
                   ),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: ListView(
-                      controller: scroll,
-                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-                      children: [
-                        Text(
-                          word.swahili,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: widget.isDark ? Colors.white : const Color(0xFF1E3A5F),
-                          ),
-                        ),
-                        Text(
-                          word.english,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Tamkwa: ${word.pronunciation}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                            color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _bilingualBlock('Maelezo / Explanation', widget.rich.explanationSw, widget.rich.explanationEn),
-                        const SizedBox(height: 12),
-                        _bilingualBlock('Sarufi / Grammar', widget.rich.grammarSw, widget.rich.grammarEn),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Vidokezo / Tips',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...widget.rich.tips.map(
-                          (t) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('• ', style: TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.w900)),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(t.swahili, style: _bodyStyle.copyWith(fontWeight: FontWeight.w600)),
-                                      const SizedBox(height: 2),
-                                      Text(t.english, style: _enStyle),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Mifano / Examples',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ...widget.rich.examples.map(
-                          (ex) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: widget.isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFF1E3A5F).withValues(alpha: 0.15)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(ex.swahili, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: widget.isDark ? Colors.white : const Color(0xFF1E293B))),
-                                  const SizedBox(height: 4),
-                                  Text(ex.english, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white70 : const Color(0xFF475569))),
-                                  if (ex.partNotes.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Maneno / Words:',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8)),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    ...ex.partNotes.map(
-                                      (n) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 2),
-                                        child: Text('↳ $n', style: TextStyle(fontSize: 11, height: 1.35, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8))),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, _totalSeconds),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E3A5F),
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                      child: Text(
-                        _studied ? 'Nimeelewa — Done' : 'Funga (endelea kusoma) / Close (keep studying)',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                    child: Text(
+                      _studied
+                          ? 'Umekamilisha kusoma — Done studying!'
+                          : 'Soma angalau sekunde $remaining zaidi / Study $remaining more seconds',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
                       ),
                     ),
                   ),
@@ -1031,30 +948,176 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
               ),
             ),
           ),
-        ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              children: [
+                Text(
+                  word.swahili,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFF1E3A5F),
+                  ),
+                ),
+                Text(
+                  word.english,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tamkwa: ${word.pronunciation}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: isDark ? Colors.white54 : const Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _reminderOn,
+                  activeTrackColor: const Color(0xFF4AAF6E).withValues(alpha: 0.45),
+                  activeThumbColor: const Color(0xFF4AAF6E),
+                  title: Text(
+                    'Onyesha kila ninapofungua app',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF334155)),
+                  ),
+                  subtitle: Text(
+                    'Pop up this word every time you open NGMY / Turn off anytime',
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                  ),
+                  onChanged: (on) async {
+                    setState(() => _reminderOn = on);
+                    await widget.onReminderChanged(on);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _bilingualBlock(isDark, 'Maelezo / Explanation', widget.rich.explanationSw, widget.rich.explanationEn),
+                const SizedBox(height: 12),
+                _bilingualBlock(isDark, 'Sarufi / Grammar', widget.rich.grammarSw, widget.rich.grammarEn),
+                const SizedBox(height: 16),
+                Text(
+                  'Vidokezo / Tips',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...widget.rich.tips.map(
+                  (t) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('• ', style: TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.w900)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.swahili, style: _bodyStyle(isDark).copyWith(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              Text(t.english, style: _enStyle(isDark)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Mifano / Examples',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...widget.rich.examples.map(
+                  (ex) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A2030) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF1E3A5F).withValues(alpha: 0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(ex.swahili, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E293B))),
+                          const SizedBox(height: 4),
+                          Text(ex.english, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF475569))),
+                          if (ex.partNotes.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Maneno / Words:',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+                            ),
+                            const SizedBox(height: 4),
+                            ...ex.partNotes.map(
+                              (n) => Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text('↳ $n', style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white54 : const Color(0xFF94A3B8))),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context, _totalSeconds),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1E3A5F),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: Text(
+                _studied ? 'Nimeelewa — Done' : 'Funga (endelea kusoma) / Close (keep studying)',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  TextStyle get _bodyStyle => TextStyle(
+  static TextStyle _bodyStyle(bool isDark) => TextStyle(
         fontSize: 14,
         height: 1.5,
-        color: widget.isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
+        color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
       );
 
-  TextStyle get _enStyle => TextStyle(
+  static TextStyle _enStyle(bool isDark) => TextStyle(
         fontSize: 13,
         height: 1.45,
         fontStyle: FontStyle.italic,
-        color: widget.isDark ? Colors.white54 : const Color(0xFF64748B),
+        color: isDark ? Colors.white54 : const Color(0xFF64748B),
       );
 
-  Widget _bilingualBlock(String title, String swahili, String english) {
+  static Widget _bilingualBlock(bool isDark, String title, String swahili, String english) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2),
+        color: isDark ? const Color(0xFF1A2030) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.25)),
       ),
@@ -1063,14 +1126,15 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFFD97706))),
           const SizedBox(height: 6),
-          Text(swahili, style: _bodyStyle.copyWith(fontWeight: FontWeight.w600)),
+          Text(swahili, style: _bodyStyle(isDark).copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          Text(english, style: _enStyle),
+          Text(english, style: _enStyle(isDark)),
         ],
       ),
     );
   }
 }
+
 
 class _SwahiliTestPage extends StatefulWidget {
   const _SwahiliTestPage({

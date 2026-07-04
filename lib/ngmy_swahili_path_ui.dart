@@ -26,8 +26,8 @@ class SwahiliWeekPathPage extends StatelessWidget {
   final bool allDaysDone;
   final bool levelPassed;
   final int? bestScore;
-  final void Function(int dayIndex) onDayTap;
-  final VoidCallback? onTestTap;
+  final void Function(int dayIndex, BuildContext pathContext) onDayTap;
+  final void Function(BuildContext pathContext)? onTestTap;
 
   int get _currentDay {
     for (var d = 0; d < level.days.length; d++) {
@@ -110,7 +110,9 @@ class SwahiliWeekPathPage extends StatelessWidget {
                                         : unlocked
                                             ? _NodeState.available
                                             : _NodeState.locked,
-                                onTap: unlocked && !done ? () => onDayTap(d) : (done ? () => onDayTap(d) : null),
+                                onTap: unlocked && !done
+                                    ? () => onDayTap(d, context)
+                                    : (done ? () => onDayTap(d, context) : null),
                               ),
                             );
                           }),
@@ -130,7 +132,7 @@ class SwahiliWeekPathPage extends StatelessWidget {
                                       ? _NodeState.current
                                       : _NodeState.locked,
                               isTest: true,
-                              onTap: allDaysDone ? onTestTap : null,
+                              onTap: allDaysDone && onTestTap != null ? () => onTestTap!(context) : null,
                             ),
                           ),
                           Positioned(
