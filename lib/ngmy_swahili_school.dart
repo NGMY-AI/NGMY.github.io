@@ -934,7 +934,7 @@ class _WordCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              SwahiliWordVisualTile(visual: visual, compact: true),
+              SwahiliWordVisualTile(visual: visual, swahili: word.swahili, english: word.english, compact: true),
               if (studied) ...[
                 const SizedBox(width: 6),
                 const Icon(Icons.check_circle_rounded, color: Color(0xFFD97706), size: 20),
@@ -1053,7 +1053,7 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
               children: [
-                SwahiliWordVisualHero(visual: visual, english: word.english),
+                SwahiliWordVisualHero(visual: visual, swahili: word.swahili, english: word.english),
                 const SizedBox(height: 16),
                 Text(
                   word.swahili,
