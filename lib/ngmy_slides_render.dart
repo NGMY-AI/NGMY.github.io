@@ -16,6 +16,7 @@ class NgmySlideElementView extends StatelessWidget {
     required this.scale,
     this.editing = false,
     this.selected = false,
+    this.compactText = false,
     this.controller,
     this.onTextChanged,
     this.onTap,
@@ -25,6 +26,7 @@ class NgmySlideElementView extends StatelessWidget {
   final double scale;
   final bool editing;
   final bool selected;
+  final bool compactText;
   final TextEditingController? controller;
   final ValueChanged<String>? onTextChanged;
   final VoidCallback? onTap;
@@ -54,7 +56,7 @@ class NgmySlideElementView extends StatelessWidget {
       );
 
   Widget _textView() {
-    const pad = EdgeInsets.fromLTRB(6, 10, 6, 12);
+    final pad = compactText ? const EdgeInsets.symmetric(horizontal: 2, vertical: 1) : const EdgeInsets.fromLTRB(6, 10, 6, 12);
     final style = _textStyle().copyWith(height: 1.35);
     final strut = StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true);
     final align = _alignToAlignment(element.align);

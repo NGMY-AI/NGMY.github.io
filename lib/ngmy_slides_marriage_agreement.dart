@@ -3,6 +3,16 @@ import 'package:flutter/material.dart';
 import 'ngmy_slides_models.dart';
 
 const String kNgmyMarriageDeckKind = 'marriage_agreement';
+const String kMarriageLocked = 'marriage_locked';
+const String kMarriageFieldPrefix = 'marriage_field_';
+const String kMarriageSignPrefix = 'marriage_sign_';
+
+bool ngmyMarriageElementIsLocked(NgmySlideElement e) =>
+    e.fileName == kMarriageLocked || e.fileName.startsWith('${kMarriageLocked}_');
+
+bool ngmyMarriageElementIsField(NgmySlideElement e) => e.fileName.startsWith(kMarriageFieldPrefix);
+
+bool ngmyMarriageElementIsSignZone(NgmySlideElement e) => e.fileName.startsWith(kMarriageSignPrefix);
 
 const List<String> kNgmyMarriageUsStates = [
   'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -13,14 +23,9 @@ const List<String> kNgmyMarriageUsStates = [
   'District of Columbia',
 ];
 
-const _ink = 0xFF1C1917;
-const _gold = 0xFFB8860B;
-const _goldDark = 0xFF8B6914;
-const _parchment = 0xFFFDF6E8;
-const _parchmentDeep = 0xFFF3E4C8;
-const _congoBlue = 0xFF007FFF;
-const _congoRed = 0xFFCE1126;
-const _congoYellow = 0xFFF7D618;
+const _ink = 0xFF1A1A1A;
+const _gold = 0xFF9A7B4F;
+const _paper = 0xFFFFFBF5;
 
 String ngmyMarriageWatermarkForState(String state) => "EMO YA M'BONDO ${state.toUpperCase()}";
 
@@ -32,17 +37,17 @@ String _formatMarriageDate(DateTime d) {
   return '${months[d.month - 1]} ${d.day}, ${d.year}';
 }
 
-NgmySlideElement _marriageText(
+NgmySlideElement _lockedText(
   String text, {
   required double x,
   required double y,
   required double w,
   required double h,
-  double fontSize = 10.5,
-  FontWeight fontWeight = FontWeight.w500,
+  double fontSize = 14,
+  FontWeight fontWeight = FontWeight.w600,
   TextAlign align = TextAlign.left,
-  String fileName = '',
-  int color = _ink,
+  TextDecoration decoration = TextDecoration.none,
+  String tag = '',
 }) {
   return NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
@@ -54,206 +59,252 @@ NgmySlideElement _marriageText(
     text: text,
     fontSize: fontSize,
     fontWeight: fontWeight,
-    color: color,
+    decoration: decoration,
+    color: _ink,
     align: align,
-    fileName: fileName,
+    fileName: tag.isEmpty ? kMarriageLocked : '${kMarriageLocked}_$tag',
   );
 }
 
-NgmySlideElement _marriageField(String placeholder, double x, double y, double w, {double h = 0.028, String fileName = ''}) {
-  return _marriageText(
-    placeholder,
+NgmySlideElement _lockedShape({
+  required NgmySlideShapeKind shape,
+  required double x,
+  required double y,
+  required double w,
+  required double h,
+  int fillColor = 0x00000000,
+  int strokeColor = _gold,
+  double strokeWidth = 1.5,
+  String tag = '',
+}) {
+  return NgmySlideElement(
+    id: NgmySlidesTemplates.newId(),
+    type: NgmySlideElementType.shape,
+    shape: shape,
     x: x,
     y: y,
     w: w,
     h: h,
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    fileName: fileName,
-    color: 0xFF334155,
+    fillColor: fillColor,
+    strokeColor: strokeColor,
+    strokeWidth: strokeWidth,
+    fileName: tag.isEmpty ? kMarriageLocked : '${kMarriageLocked}_$tag',
   );
 }
 
-/// Builds a portrait marriage certificate deck editable in NGMY Slides.
+/// Box outline (locked) + editable name field inside.
+List<NgmySlideElement> _nameBox(String fieldKey, double x, double y, double w, {double h = 0.052}) {
+  return [
+    _lockedShape(
+      shape: NgmySlideShapeKind.rectangle,
+      x: x,
+      y: y,
+      w: w,
+      h: h,
+      strokeColor: 0xFF94A3B8,
+      strokeWidth: 1,
+      tag: 'box_$fieldKey',
+    ),
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.text,
+      x: x + 0.004,
+      y: y + 0.006,
+      w: w - 0.008,
+      h: h - 0.012,
+      text: '',
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      color: _ink,
+      align: TextAlign.center,
+      fileName: '$kMarriageFieldPrefix$fieldKey:${w.toStringAsFixed(3)}',
+    ),
+  ];
+}
+
+/// Pack elements on the same row closer after a name field shrinks.
+void ngmyMarriagePackRow(NgmySlide slide, double anchorY) {
+  const yTol = 0.03;
+  final items = <NgmySlideElement>[];
+  for (final e in slide.elements) {
+    if (e.fileName.startsWith('${kMarriageLocked}_box_')) continue;
+    final cy = e.y + e.h * 0.5;
+    if ((cy - anchorY).abs() < yTol) items.add(e);
+  }
+  if (items.length < 2) return;
+  items.sort((a, b) => a.x.compareTo(b.x));
+  var x = items.first.x;
+  for (final e in items) {
+    final dx = x - e.x;
+    if (dx.abs() > 0.0001) {
+      e.x = x;
+      if (ngmyMarriageElementIsField(e)) {
+        final key = e.fileName.replaceFirst(kMarriageFieldPrefix, '').split(':').first;
+        for (final b in slide.elements) {
+          if (b.fileName == '${kMarriageLocked}_box_$key') b.x += dx;
+        }
+      }
+    }
+    x += e.w + 0.006;
+  }
+}
+
+/// Shrink editable field width when user types a short name.
+void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
+  if (!ngmyMarriageElementIsField(e)) return;
+  final parts = e.fileName.split(':');
+  final maxW = parts.length > 1 ? (double.tryParse(parts.last) ?? e.w) : e.w;
+  final t = text.trim();
+  if (t.isEmpty) {
+    e.w = maxW;
+    return;
+  }
+  e.w = (t.length * 0.0115 + 0.028).clamp(0.06, maxW);
+}
+
+/// Builds a compact landscape marriage certificate matching the traditional form layout.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String state}) {
   final today = _formatMarriageDate(DateTime.now());
   final watermark = ngmyMarriageWatermarkForState(state);
+  const paperTop = 0.1;
+  const paperH = 0.68;
 
   final elements = <NgmySlideElement>[
-    // Outer gold frame
+    // Paper frame (locked) — shorter certificate, centered
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.06, y: paperTop, w: 0.88, h: paperH, strokeColor: _gold, strokeWidth: 2.5),
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.068, y: paperTop + 0.008, w: 0.864, h: paperH - 0.016, strokeColor: 0xFFD4C4A8, strokeWidth: 0.8),
+
+    // Watermark — subtle gold at bottom of paper
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
-      type: NgmySlideElementType.shape,
-      shape: NgmySlideShapeKind.rectangle,
-      x: 0.04,
-      y: 0.02,
-      w: 0.92,
-      h: 0.96,
-      fillColor: 0x00000000,
-      strokeColor: _gold,
-      strokeWidth: 3,
-    ),
-    NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
-      type: NgmySlideElementType.shape,
-      shape: NgmySlideShapeKind.rectangle,
-      x: 0.055,
-      y: 0.032,
-      w: 0.89,
-      h: 0.936,
-      fillColor: 0x00000000,
-      strokeColor: _goldDark,
-      strokeWidth: 1.2,
-    ),
-    // Watermark
-    _marriageText(
-      watermark,
-      x: 0.02,
-      y: 0.88,
-      w: 0.96,
-      h: 0.1,
-      fontSize: 22,
-      fontWeight: FontWeight.w900,
-      align: TextAlign.center,
-      fileName: 'marriage_watermark',
-      color: 0x281C1917,
-    ),
-    // Date (auto)
-    _marriageText('DATE: $today', x: 0.52, y: 0.045, w: 0.42, h: 0.03, fontSize: 9, fontWeight: FontWeight.w700, align: TextAlign.right, fileName: 'marriage_date'),
-    // Title
-    _marriageText('HATI YA NDOA', x: 0.08, y: 0.07, w: 0.84, h: 0.045, fontSize: 18, fontWeight: FontWeight.w900, align: TextAlign.center),
-    _marriageText('(Marriage Agreement Certificate)', x: 0.08, y: 0.105, w: 0.84, h: 0.028, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: 0xFF64748B),
-    // Body — corrected Swahili
-    _marriageText('Mimi', x: 0.07, y: 0.14, w: 0.08, h: 0.025, fontSize: 10),
-    _marriageField('Jina la baba...', 0.15, 0.138, 0.28, fileName: 'father_name'),
-    _marriageText('jina la', x: 0.44, y: 0.14, w: 0.12, h: 0.025, fontSize: 10),
-    _marriageField('Ukoo...', 0.55, 0.138, 0.18, fileName: 'father_clan'),
-    _marriageText(', ya', x: 0.74, y: 0.14, w: 0.06, h: 0.025, fontSize: 10),
-    _marriageField('Mahali...', 0.8, 0.138, 0.13, fileName: 'father_place'),
-    _marriageText('nimeoza binti wangu aitwaye', x: 0.07, y: 0.168, w: 0.86, h: 0.025, fontSize: 10),
-    _marriageField('Jina la binti...', 0.07, 0.192, 0.86, fileName: 'daughter_name'),
-    _marriageText('na ndugu', x: 0.07, y: 0.222, w: 0.14, h: 0.025, fontSize: 10),
-    _marriageField('Jina la mume...', 0.2, 0.22, 0.32, fileName: 'groom_name'),
-    _marriageText('wa jina la', x: 0.53, y: 0.222, w: 0.14, h: 0.025, fontSize: 10),
-    _marriageField('Ukoo wa mume...', 0.66, 0.22, 0.27, fileName: 'groom_clan'),
-    _marriageText('nyumba ya', x: 0.07, y: 0.252, w: 0.16, h: 0.025, fontSize: 10),
-    _marriageField('Nyumba / familia...', 0.22, 0.25, 0.35, fileName: 'house_name'),
-    _marriageText('kijana wa', x: 0.58, y: 0.252, w: 0.14, h: 0.025, fontSize: 10),
-    _marriageField('Mahali...', 0.71, 0.25, 0.22, fileName: 'groom_origin'),
-    // Dowry section
-    _marriageText('NIMEPOKA (Mahari / Dowry)', x: 0.07, y: 0.29, w: 0.86, h: 0.03, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center),
-    _marriageText('KICHWA CHA MTU:', x: 0.07, y: 0.322, w: 0.28, h: 0.025, fontSize: 10, fontWeight: FontWeight.w800),
-    _marriageField(r'$', 0.35, 0.32, 0.58, fileName: 'dowry_amount'),
-    _marriageField('• Mtu / bidhaa 1...', 0.1, 0.352, 0.8, fileName: 'dowry_item_1'),
-    _marriageField('• Mtu / bidhaa 2...', 0.1, 0.378, 0.8, fileName: 'dowry_item_2'),
-    _marriageField('• Mtu / bidhaa 3...', 0.1, 0.404, 0.8, fileName: 'dowry_item_3'),
-    // Witnesses header
-    _marriageText('MASHAIDI (Witnesses)', x: 0.07, y: 0.44, w: 0.86, h: 0.03, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center),
-    _marriageText('UPANDE WA MKE', x: 0.07, y: 0.472, w: 0.4, h: 0.025, fontSize: 9.5, fontWeight: FontWeight.w800, align: TextAlign.center),
-    _marriageText('UPANDE WA MME', x: 0.53, y: 0.472, w: 0.4, h: 0.025, fontSize: 9.5, fontWeight: FontWeight.w800, align: TextAlign.center),
-    // Wife side witnesses
-    for (var i = 0; i < 3; i++) ...[
-      _marriageText('${i + 1}.', x: 0.08, y: 0.5 + i * 0.085, w: 0.05, h: 0.022, fontSize: 9, fontWeight: FontWeight.w700),
-      _marriageField('Jina...', 0.13, 0.498 + i * 0.085, 0.34, fileName: 'wife_witness_${i + 1}'),
-      _marriageText('Saini:', x: 0.13, y: 0.52 + i * 0.085, w: 0.1, h: 0.018, fontSize: 8, color: 0xFF64748B),
-      NgmySlideElement(
-        id: NgmySlidesTemplates.newId(),
-        type: NgmySlideElementType.shape,
-        shape: NgmySlideShapeKind.rectangle,
-        x: 0.2,
-        y: 0.535 + i * 0.085,
-        w: 0.27,
-        h: 0.032,
-        fillColor: 0x0A1C1917,
-        strokeColor: 0xFFB8860B,
-        strokeWidth: 1,
-        fileName: 'wife_sign_${i + 1}',
-      ),
-    ],
-    // Husband side witnesses
-    for (var i = 0; i < 3; i++) ...[
-      _marriageText('${i + 1}.', x: 0.54, y: 0.5 + i * 0.085, w: 0.05, h: 0.022, fontSize: 9, fontWeight: FontWeight.w700),
-      _marriageField('Jina...', 0.59, 0.498 + i * 0.085, 0.34, fileName: 'husband_witness_${i + 1}'),
-      _marriageText('Saini:', x: 0.59, y: 0.52 + i * 0.085, w: 0.1, h: 0.018, fontSize: 8, color: 0xFF64748B),
-      NgmySlideElement(
-        id: NgmySlidesTemplates.newId(),
-        type: NgmySlideElementType.shape,
-        shape: NgmySlideShapeKind.rectangle,
-        x: 0.66,
-        y: 0.535 + i * 0.085,
-        w: 0.27,
-        h: 0.032,
-        fillColor: 0x0A1C1917,
-        strokeColor: 0xFFB8860B,
-        strokeWidth: 1,
-        fileName: 'husband_sign_${i + 1}',
-      ),
-    ],
-    // Official Congolese-style stamp
-    NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
-      type: NgmySlideElementType.shape,
-      shape: NgmySlideShapeKind.circle,
-      x: 0.38,
-      y: 0.74,
-      w: 0.24,
-      h: 0.11,
-      fillColor: 0x18CE1126,
-      strokeColor: _congoRed,
-      strokeWidth: 2.5,
-      fileName: 'marriage_stamp_ring',
-    ),
-    NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
-      type: NgmySlideElementType.shape,
-      shape: NgmySlideShapeKind.circle,
-      x: 0.41,
-      y: 0.752,
-      w: 0.18,
-      h: 0.085,
-      fillColor: 0x12F7D618,
-      strokeColor: _congoBlue,
-      strokeWidth: 1.5,
-    ),
-    _marriageText(
-      'RÉPUBLIQUE\nDÉMOCRATIQUE\nDU CONGO',
-      x: 0.39,
-      y: 0.755,
-      w: 0.22,
+      type: NgmySlideElementType.text,
+      x: 0.08,
+      y: paperTop + paperH - 0.1,
+      w: 0.84,
       h: 0.08,
-      fontSize: 6.5,
+      text: watermark,
+      fontSize: 17,
+      fontWeight: FontWeight.w800,
+      color: 0xFFBCAAA0,
+      align: TextAlign.center,
+      fileName: '${kMarriageLocked}_watermark',
+    ),
+
+    // Date
+    _lockedText('DATE: $today', x: 0.58, y: paperTop + 0.02, w: 0.34, h: 0.038, fontSize: 13, fontWeight: FontWeight.w700, align: TextAlign.right, tag: 'date'),
+
+    // Title — large, underlined
+    _lockedText(
+      'HATI YA KUHOWESHA',
+      x: 0.1,
+      y: paperTop + 0.055,
+      w: 0.8,
+      h: 0.06,
+      fontSize: 30,
       fontWeight: FontWeight.w900,
       align: TextAlign.center,
-      color: _congoRed,
-      fileName: 'marriage_stamp',
+      decoration: TextDecoration.underline,
     ),
-    _marriageText(
-      'Tradition Congolaise · NGMY',
-      x: 0.07,
-      y: 0.82,
-      w: 0.86,
-      h: 0.022,
-      fontSize: 7.5,
-      fontWeight: FontWeight.w600,
+
+    // Body line 1
+    _lockedText('Mimi', x: 0.08, y: paperTop + 0.13, w: 0.055, h: 0.038, fontSize: 15),
+    ..._nameBox('father_name', 0.135, paperTop + 0.125, 0.16, h: 0.044),
+    _lockedText('jina la', x: 0.30, y: paperTop + 0.13, w: 0.075, h: 0.038, fontSize: 15),
+    ..._nameBox('father_clan', 0.378, paperTop + 0.125, 0.12, h: 0.044),
+    _lockedText(', ya', x: 0.505, y: paperTop + 0.13, w: 0.045, h: 0.038, fontSize: 15),
+    ..._nameBox('father_place', 0.552, paperTop + 0.125, 0.14, h: 0.044),
+    _lockedText('.', x: 0.698, y: paperTop + 0.13, w: 0.02, h: 0.038, fontSize: 15),
+
+    // Body line 2
+    _lockedText('Nimehowesha binti wangu aitwaye,', x: 0.08, y: paperTop + 0.185, w: 0.38, h: 0.038, fontSize: 15),
+    ..._nameBox('daughter_name', 0.46, paperTop + 0.18, 0.42, h: 0.044),
+
+    // Body line 3
+    _lockedText('na ndugu', x: 0.08, y: paperTop + 0.24, w: 0.095, h: 0.038, fontSize: 15),
+    ..._nameBox('groom_name', 0.175, paperTop + 0.235, 0.17, h: 0.044),
+    _lockedText('wa jina la', x: 0.352, y: paperTop + 0.24, w: 0.095, h: 0.038, fontSize: 15),
+    ..._nameBox('groom_clan', 0.45, paperTop + 0.235, 0.13, h: 0.044),
+    _lockedText(', Nyumba ya', x: 0.588, y: paperTop + 0.24, w: 0.115, h: 0.038, fontSize: 15),
+    ..._nameBox('house_name', 0.705, paperTop + 0.235, 0.15, h: 0.044),
+
+    // Body line 4
+    _lockedText('Kijana wa', x: 0.08, y: paperTop + 0.295, w: 0.1, h: 0.038, fontSize: 15),
+    ..._nameBox('groom_origin', 0.182, paperTop + 0.29, 0.26, h: 0.044),
+
+    // Dowry
+    _lockedText(
+      'Nimepoyacash',
+      x: 0.08,
+      y: paperTop + 0.35,
+      w: 0.84,
+      h: 0.042,
+      fontSize: 17,
+      fontWeight: FontWeight.w900,
       align: TextAlign.center,
-      color: 0xFF64748B,
+      decoration: TextDecoration.underline,
     ),
+    _lockedText('KICHWA CHA MTU: Dollar', x: 0.08, y: paperTop + 0.395, w: 0.24, h: 0.036, fontSize: 14, fontWeight: FontWeight.w800),
+    ..._nameBox('dowry_amount', 0.32, paperTop + 0.39, 0.2, h: 0.042),
+    _lockedText('•', x: 0.1, y: paperTop + 0.44, w: 0.02, h: 0.032, fontSize: 15),
+    ..._nameBox('dowry_item_1', 0.125, paperTop + 0.435, 0.32, h: 0.04),
+    _lockedText('•', x: 0.1, y: paperTop + 0.475, w: 0.02, h: 0.032, fontSize: 15),
+    ..._nameBox('dowry_item_2', 0.125, paperTop + 0.47, 0.32, h: 0.04),
+    _lockedText('•', x: 0.1, y: paperTop + 0.51, w: 0.02, h: 0.032, fontSize: 15),
+    ..._nameBox('dowry_item_3', 0.125, paperTop + 0.505, 0.32, h: 0.04),
+
+    // Witnesses header
+    _lockedText('MASHAIDI', x: 0.42, y: paperTop + 0.545, w: 0.16, h: 0.032, fontSize: 14, fontWeight: FontWeight.w900, align: TextAlign.center),
+    _lockedText('UPANDE WA MKE', x: 0.08, y: paperTop + 0.545, w: 0.28, h: 0.032, fontSize: 13, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
+    _lockedText('UPANDE WA MME', x: 0.64, y: paperTop + 0.545, w: 0.28, h: 0.032, fontSize: 13, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
+
+    // Witness rows — name box + signature line only
+    for (var i = 0; i < 3; i++) ...[
+      _lockedText('${i + 1}.', x: 0.08, y: paperTop + 0.58 + i * 0.048, w: 0.028, h: 0.032, fontSize: 12, fontWeight: FontWeight.w700),
+      ..._nameBox('wife_witness_${i + 1}', 0.11, paperTop + 0.576 + i * 0.048, 0.2, h: 0.038),
+      _lockedShape(shape: NgmySlideShapeKind.line, x: 0.11, y: paperTop + 0.612 + i * 0.048, w: 0.2, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'wife_line_$i'),
+      NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.shape,
+        shape: NgmySlideShapeKind.rectangle,
+        x: 0.11,
+        y: paperTop + 0.598 + i * 0.048,
+        w: 0.2,
+        h: 0.024,
+        fillColor: 0x00000000,
+        strokeColor: 0x00000000,
+        fileName: '${kMarriageSignPrefix}wife_${i + 1}',
+      ),
+      _lockedText('${i + 1}.', x: 0.64, y: paperTop + 0.58 + i * 0.048, w: 0.028, h: 0.032, fontSize: 12, fontWeight: FontWeight.w700),
+      ..._nameBox('husband_witness_${i + 1}', 0.67, paperTop + 0.576 + i * 0.048, 0.2, h: 0.038),
+      _lockedShape(shape: NgmySlideShapeKind.line, x: 0.67, y: paperTop + 0.612 + i * 0.048, w: 0.2, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'husband_line_$i'),
+      NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.shape,
+        shape: NgmySlideShapeKind.rectangle,
+        x: 0.67,
+        y: paperTop + 0.598 + i * 0.048,
+        w: 0.2,
+        h: 0.024,
+        fillColor: 0x00000000,
+        strokeColor: 0x00000000,
+        fileName: '${kMarriageSignPrefix}husband_${i + 1}',
+      ),
+    ],
   ];
 
   final slide = NgmySlide(
     id: NgmySlidesTemplates.newId(),
     title: 'Marriage Certificate',
     layout: NgmySlideLayout.blank,
-    background: _parchment,
-    backgroundEnd: _parchmentDeep,
+    background: _paper,
     elements: elements,
   );
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: 'Hati ya Ndoa — $state',
+    name: 'Hati ya Kuhowesha — $state',
     themeId: 'marriage_certificate',
-    aspectRatio: NgmySlideAspectRatio.portrait916,
+    aspectRatio: NgmySlideAspectRatio.landscape169,
     deckKind: kNgmyMarriageDeckKind,
     marriageState: state,
     slides: [slide],
@@ -264,12 +315,12 @@ void ngmyUpdateMarriageWatermark(NgmySlideDeck deck, String state) {
   deck.marriageState = state;
   for (final slide in deck.slides) {
     for (final el in slide.elements) {
-      if (el.fileName == 'marriage_watermark') {
+      if (el.fileName == '${kMarriageLocked}_watermark') {
         el.text = ngmyMarriageWatermarkForState(state);
       }
     }
   }
-  deck.name = 'Hati ya Ndoa — $state';
+  deck.name = 'Hati ya Kuhowesha — $state';
 }
 
 Future<String?> showNgmyMarriageStatePicker(BuildContext context) async {
@@ -423,7 +474,7 @@ class _NgmyMarriageStatePickerSheetState extends State<_NgmyMarriageStatePickerS
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Choose your U.S. state', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                            Text('Watermark will show EMO YA M\'BONDO [STATE]', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text('Watermark: EMO YA M\'BONDO [STATE]', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                           ],
                         ),
                       ),

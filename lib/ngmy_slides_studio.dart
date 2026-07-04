@@ -176,6 +176,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     final el = _findElement(elementId);
     if (el == null || el.text == value) return;
     el.text = value;
+    if (_activeDeck?.isMarriageAgreement == true) {
+      ngmyMarriageAutoFitField(el, value);
+      final slide = _currentSlide;
+      if (slide != null) ngmyMarriagePackRow(slide, el.y + el.h * 0.5);
+    }
     _commitDraftIfNeeded();
     _syncDeckIntoList();
     _scheduleAutosave();
@@ -769,11 +774,48 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         w: 0.35,
         h: 0.22,
         imageRef: imageRef,
-        fileName: 'Signature',
+        fileName: _activeDeck?.isMarriageAgreement == true ? '${kMarriageSignPrefix}placed' : 'Signature',
       );
       _currentSlide!.elements.add(el);
       _selectedElementId = el.id;
     });
+  }
+
+  Future<void> _addMarriageSignatureAtZone(NgmySlideElement zone) async {
+    final imageRef = await ngmySlidesCaptureSignature(context);
+    if (imageRef == null || _currentSlide == null) return;
+    _mutate(() {
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.signature,
+        x: zone.x,
+        y: zone.y,
+        w: zone.w,
+        h: zone.h,
+        imageRef: imageRef,
+        fileName: '${kMarriageSignPrefix}placed_${zone.fileName.replaceFirst(kMarriageSignPrefix, '')}',
+      );
+      _currentSlide!.elements.add(el);
+      _currentSlide!.elements.removeWhere((e) => e.id == zone.id);
+      _selectedElementId = null;
+    });
+  }
+
+  bool _marriageElementMovable(NgmySlideElement e) {
+    if (_activeDeck?.isMarriageAgreement != true) return true;
+    if (ngmyMarriageElementIsLocked(e)) return false;
+    if (ngmyMarriageElementIsField(e)) return false;
+    if (ngmyMarriageElementIsSignZone(e)) return false;
+    if (e.type == NgmySlideElementType.signature && e.fileName.startsWith(kMarriageSignPrefix)) return false;
+    return false;
+  }
+
+  bool _marriageElementSelectable(NgmySlideElement e) {
+    if (_activeDeck?.isMarriageAgreement != true) return true;
+    if (ngmyMarriageElementIsLocked(e)) return false;
+    if (ngmyMarriageElementIsSignZone(e)) return false;
+    if (e.type == NgmySlideElementType.signature && e.fileName.startsWith(kMarriageSignPrefix)) return false;
+    return ngmyMarriageElementIsField(e);
   }
 
   Future<void> _addEnhancedPhoto() async {
@@ -2223,10 +2265,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   }
 
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
-    final selected = _selectedElementId == e.id;
+    final marriage = _activeDeck?.isMarriageAgreement == true;
+    final signZone = marriage && ngmyMarriageElementIsSignZone(e);
+    final selectable = !marriage || _marriageElementSelectable(e);
+    final movable = !marriage || _marriageElementMovable(e);
+    final selected = selectable && _selectedElementId == e.id;
     final scale = cw / 960;
     final isDesign = e.fileName.startsWith('__design__') || e.id.startsWith('design_');
     final accentColor = isDesign ? const Color(0xFFF97316) : const Color(0xFF2563EB);
+  final marriageField = marriage && ngmyMarriageElementIsField(e);
     return Positioned(
       key: ValueKey('el_${e.id}'),
       left: e.x * cw,
@@ -2234,16 +2281,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       width: e.w * cw,
       height: e.h * ch,
       child: GestureDetector(
-        onTap: () => _selectElement(e.id),
-        onPanUpdate: (d) {
-          setState(() {
-            e.x = (e.x + d.delta.dx / cw).clamp(-0.3, 1.2);
-            e.y = (e.y + d.delta.dy / ch).clamp(-0.3, 1.2);
-          });
-          _commitDraftIfNeeded();
-          _syncDeckIntoList();
-          _scheduleAutosave();
+        onTap: () {
+          if (signZone) {
+            unawaited(_addMarriageSignatureAtZone(e));
+            return;
+          }
+          if (selectable) _selectElement(e.id);
         },
+        onPanUpdate: movable
+            ? (d) {
+                setState(() {
+                  e.x = (e.x + d.delta.dx / cw).clamp(-0.3, 1.2);
+                  e.y = (e.y + d.delta.dy / ch).clamp(-0.3, 1.2);
+                });
+                _commitDraftIfNeeded();
+                _syncDeckIntoList();
+                _scheduleAutosave();
+              }
+            : null,
         child: Transform.rotate(
           angle: e.rotation,
           child: Stack(
@@ -2251,20 +2306,39 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: selected ? accentColor : Colors.transparent, width: 2),
-                  color: e.type == NgmySlideElementType.signature ? Colors.transparent : null,
+                  border: Border.all(
+                    color: selected ? (marriageField ? const Color(0xFFB8860B) : accentColor) : Colors.transparent,
+                    width: selected ? 2 : 0,
+                  ),
+                  color: signZone
+                      ? const Color(0xFFB8860B).withValues(alpha: 0.08)
+                      : (e.type == NgmySlideElementType.signature ? Colors.transparent : null),
                 ),
-                child: NgmySlideElementView(
-                  element: e,
-                  scale: scale,
-                  editing: e.type == NgmySlideElementType.text,
-                  selected: selected,
-                  controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
-                  onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
-                  onTap: () => _selectElement(e.id),
-                ),
+                child: signZone
+                    ? Center(
+                        child: Text(
+                          'Tap to sign',
+                          style: TextStyle(
+                            fontSize: 10 * scale,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFB8860B).withValues(alpha: 0.7),
+                          ),
+                        ),
+                      )
+                    : NgmySlideElementView(
+                        element: e,
+                        scale: scale,
+                        editing: e.type == NgmySlideElementType.text,
+                        selected: selected,
+                        compactText: marriageField,
+                        controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
+                        onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
+                        onTap: () {
+                          if (selectable) _selectElement(e.id);
+                        },
+                      ),
               ),
-              if (selected)
+              if (selected && movable)
                 Positioned(
                   right: -4,
                   bottom: -4,
@@ -2541,25 +2615,28 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         ),
         if (onTrailingTap != null) ...[
           const SizedBox(width: 8),
-          Tooltip(
-            message: 'Marriage agreement (Hati ya Ndoa)',
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onTrailingTap,
-                borderRadius: BorderRadius.circular(12),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFF8B6914)]),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: marriageAccent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Icon(Icons.description_rounded, color: Colors.white, size: 20),
+          Transform.translate(
+            offset: const Offset(0, -3),
+            child: Tooltip(
+              message: 'Marriage agreement (Hati ya Kuhowesha)',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTrailingTap,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFF8B6914)]),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(color: marriageAccent.withValues(alpha: 0.28), blurRadius: 6, offset: const Offset(0, 2)),
+                      ],
+                    ),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(Icons.description_rounded, color: Colors.white, size: 16),
+                    ),
                   ),
                 ),
               ),
