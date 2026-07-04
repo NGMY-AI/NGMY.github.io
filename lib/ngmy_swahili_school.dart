@@ -56,13 +56,19 @@ void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
 class NgmySwahiliProgress {
   NgmySwahiliProgress({
     this.unlockedLevelIndex = 0,
-    this.completedDays = const {},
-    this.bestScores = const {},
-    this.passedLevels = const {},
-    this.studiedWords = const {},
+    Set<String>? completedDays,
+    Map<String, int>? bestScores,
+    Set<String>? passedLevels,
+    Map<String, List<String>>? studiedWords,
     this.studyCalendarDay = '',
-    this.wordReminders = const [],
-  });
+    List<SwahiliWordReminder>? wordReminders,
+  })  : completedDays = completedDays != null ? Set<String>.from(completedDays) : <String>{},
+        bestScores = bestScores != null ? Map<String, int>.from(bestScores) : <String, int>{},
+        passedLevels = passedLevels != null ? Set<String>.from(passedLevels) : <String>{},
+        studiedWords = studiedWords != null
+            ? studiedWords.map((k, v) => MapEntry(k, List<String>.from(v)))
+            : <String, List<String>>{},
+        wordReminders = wordReminders != null ? List<SwahiliWordReminder>.from(wordReminders) : <SwahiliWordReminder>[];
 
   int unlockedLevelIndex;
   Set<String> completedDays;
@@ -79,35 +85,21 @@ class NgmySwahiliProgress {
 
   static String dayKey(int levelIndex, int dayIndex) => '${levelIndex}_$dayIndex';
 
-  void ensureStudyDay() {
-    final today = _todayKey();
-    if (studyCalendarDay == today) return;
-    studyCalendarDay = today;
-    studiedWords.removeWhere((dayKey, _) => !completedDays.contains(dayKey));
-  }
-
   bool isDayDone(int levelIndex, int dayIndex) => completedDays.contains(dayKey(levelIndex, dayIndex));
 
   void markDayDone(int levelIndex, int dayIndex) => completedDays.add(dayKey(levelIndex, dayIndex));
 
   bool isWordStudied(int levelIndex, int dayIndex, String word) {
-    ensureStudyDay();
     if (isDayDone(levelIndex, dayIndex)) return true;
     return studiedWords[dayKey(levelIndex, dayIndex)]?.contains(word) ?? false;
   }
 
   void markWordStudied(int levelIndex, int dayIndex, String word) {
-    ensureStudyDay();
     final k = dayKey(levelIndex, dayIndex);
     final list = List<String>.from(studiedWords[k] ?? const []);
     if (!list.contains(word)) list.add(word);
     studiedWords[k] = list;
-  }
-
-  int studiedWordCount(int levelIndex, int dayIndex) {
-    ensureStudyDay();
-    if (isDayDone(levelIndex, dayIndex)) return -1;
-    return studiedWords[dayKey(levelIndex, dayIndex)]?.length ?? 0;
+    studyCalendarDay = _todayKey();
   }
 
   bool allDaysDone(SwahiliLevel level, int levelIndex) {
@@ -161,22 +153,39 @@ class NgmySwahiliProgress {
   }
 }
 
+final Map<String, NgmySwahiliProgress> _swahiliProgressMemory = {};
+
+String _swahiliProgressStorageKey(String? email) =>
+    'ngmy_swahili_school_${(email ?? '').trim().isEmpty ? 'guest' : email!.trim().toLowerCase()}';
+
 Future<NgmySwahiliProgress> loadSwahiliProgress(String? email) async {
+  final storageKey = _swahiliProgressStorageKey(email);
+  final cached = _swahiliProgressMemory[storageKey];
+  if (cached != null) return cached;
+
   final prefs = await SharedPreferences.getInstance();
-  final key = 'ngmy_swahili_school_${(email ?? '').trim().isEmpty ? 'guest' : email!.trim().toLowerCase()}';
-  final raw = prefs.getString(key);
-  if (raw == null || raw.isEmpty) return NgmySwahiliProgress();
+  final raw = prefs.getString(storageKey);
+  if (raw == null || raw.isEmpty) {
+    final fresh = NgmySwahiliProgress();
+    _swahiliProgressMemory[storageKey] = fresh;
+    return fresh;
+  }
   try {
-    return NgmySwahiliProgress.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final progress = NgmySwahiliProgress.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    _swahiliProgressMemory[storageKey] = progress;
+    return progress;
   } catch (_) {
-    return NgmySwahiliProgress();
+    final fresh = NgmySwahiliProgress();
+    _swahiliProgressMemory[storageKey] = fresh;
+    return fresh;
   }
 }
 
 Future<void> saveSwahiliProgress(String? email, NgmySwahiliProgress progress) async {
+  final storageKey = _swahiliProgressStorageKey(email);
+  _swahiliProgressMemory[storageKey] = progress;
   final prefs = await SharedPreferences.getInstance();
-  final key = 'ngmy_swahili_school_${(email ?? '').trim().isEmpty ? 'guest' : email!.trim().toLowerCase()}';
-  await prefs.setString(key, jsonEncode(progress.toJson()));
+  await prefs.setString(storageKey, jsonEncode(progress.toJson()));
 }
 
 class NgmySwahiliSchoolPage extends StatefulWidget {
@@ -188,14 +197,36 @@ class NgmySwahiliSchoolPage extends StatefulWidget {
   State<NgmySwahiliSchoolPage> createState() => _NgmySwahiliSchoolPageState();
 }
 
-class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
+class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with WidgetsBindingObserver {
   NgmySwahiliProgress _progress = NgmySwahiliProgress();
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reloadProgressFromDisk();
+    }
+  }
+
+  Future<void> _reloadProgressFromDisk() async {
+    final storageKey = _swahiliProgressStorageKey(widget.userEmail);
+    _swahiliProgressMemory.remove(storageKey);
+    final p = await loadSwahiliProgress(widget.userEmail);
+    if (!mounted) return;
+    setState(() => _progress = p);
   }
 
   Future<void> _load() async {
@@ -595,13 +626,32 @@ class _SwahiliLessonPage extends StatefulWidget {
   State<_SwahiliLessonPage> createState() => _SwahiliLessonPageState();
 }
 
-class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
+class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBindingObserver {
   late bool _completed;
   final Map<String, int> _studySeconds = {};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncStudiedFromProgress();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _syncStudiedFromProgress();
+      setState(() {});
+    }
+  }
+
+  void _syncStudiedFromProgress() {
     _completed = widget.isDayDone();
     for (final w in widget.day.words) {
       if (widget.isWordStudied(w.swahili)) {
@@ -652,8 +702,10 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
     );
     if (added != null && mounted) {
       setState(() => _studySeconds[key] = added);
-      if (added >= kSwahiliMinStudySeconds && !widget.isWordStudied(key)) {
-        await widget.onWordStudied(key);
+      if (added >= kSwahiliMinStudySeconds) {
+        if (!widget.isWordStudied(key)) {
+          await widget.onWordStudied(key);
+        }
         await _maybeCompleteDay();
       }
     }
@@ -1017,8 +1069,13 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
                     style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                   ),
                   onChanged: (on) async {
+                    if (on == _reminderOn) return;
                     setState(() => _reminderOn = on);
-                    await widget.onReminderChanged(on);
+                    try {
+                      await widget.onReminderChanged(on);
+                    } catch (_) {
+                      if (mounted) setState(() => _reminderOn = !on);
+                    }
                   },
                 ),
                 const SizedBox(height: 8),
