@@ -174,6 +174,7 @@ import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_investment_plans.dart';
 import 'ngmy_legal_content.dart';
+import 'ngmy_auth_dialogs.dart';
 import 'ngmy_legal_ui.dart';
 
 part 'ngmy_admin_panels.dart';
@@ -13037,232 +13038,12 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Future<void> _confirmResetAppData() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Reset System?'),
-        content: const Text(
-          'This will clear all local data and log everyone out. Use only if you are getting loading errors.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('RESET', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-    final p = await SharedPreferences.getInstance();
-    await p.clear();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('System Reset. Please restart the app.')),
-    );
-  }
-
   void _showForgotPassword() {
-    final emailCtl = TextEditingController(text: _e.text);
-    final codeCtl = TextEditingController();
-    final newPwCtl = TextEditingController();
-    final confirmCtl = TextEditingController();
-    int step = 1;
-    bool isLoading = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) => StatefulBuilder(builder: (ctx, setLocal) {
-        Future<void> sendCode() async {
-          final email = emailCtl.text.toLowerCase().trim();
-          if (email.isEmpty || !email.endsWith('@gmail.com')) {
-            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter a valid Gmail address')));
-            return;
-          }
-          setLocal(() => isLoading = true);
-          try {
-            await ngmyWaitForSupabaseReady();
-            final existsInApp = widget.allUsers.any((u) => u.email.toLowerCase().trim() == email);
-            Map<String, dynamic>? row;
-            try {
-              row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
-            } catch (_) {}
-            final oauthLinked = row != null &&
-                (row['isAppLoginAccount'] == true || row['is_app_login_account'] == true);
-            var shouldCreateUser = !existsInApp && row == null;
-            if (oauthLinked || existsInApp || row != null) {
-              shouldCreateUser = false;
-            }
-            try {
-              await Supabase.instance.client.auth.signInWithOtp(
-                email: email,
-                shouldCreateUser: shouldCreateUser,
-              );
-            } catch (otpErr) {
-              if (!shouldCreateUser) {
-                await Supabase.instance.client.auth.signInWithOtp(
-                  email: email,
-                  shouldCreateUser: true,
-                );
-              } else {
-                rethrow;
-              }
-            }
-            setLocal(() {
-              isLoading = false;
-              step = 2;
-            });
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(content: Text('Verification code sent to $email. Check your inbox (and spam folder).'), backgroundColor: Colors.green, duration: const Duration(seconds: 5)),
-            );
-          } catch (e) {
-            setLocal(() => isLoading = false);
-            final err = e.toString();
-            debugPrint('signInWithOtp error: $err');
-            String msg = err;
-            if (err.toLowerCase().contains('rate') || err.toLowerCase().contains('too many') || err.toLowerCase().contains('over_email_send_rate_limit')) {
-              msg = 'Too many emails sent recently. Wait ~1 hour and try again, or configure custom SMTP in Supabase.';
-            } else if (err.toLowerCase().contains('signup') && err.toLowerCase().contains('disabled')) {
-              msg = 'Email signup is disabled in Supabase. Enable it in Authentication > Providers > Email.';
-            }
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(content: Text(msg), backgroundColor: Colors.red, duration: const Duration(seconds: 8)),
-            );
-          }
-        }
-
-        Future<void> verifyAndReset() async {
-          final email = emailCtl.text.toLowerCase().trim();
-          final code = codeCtl.text.trim();
-          final pw = newPwCtl.text;
-          final confirm = confirmCtl.text;
-
-          if (code.length < 6) {
-            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter the 6-digit verification code')));
-            return;
-          }
-          if (pw.length < 6) {
-            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
-            return;
-          }
-          if (pw != confirm) {
-            if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
-            return;
-          }
-
-          setLocal(() => isLoading = true);
-          try {
-            await Supabase.instance.client.auth.verifyOTP(
-              type: OtpType.email,
-              email: email,
-              token: code,
-            );
-
-            try {
-              await Supabase.instance.client.auth.updateUser(
-                UserAttributes(password: pw),
-              );
-            } catch (_) {}
-
-            final ok = await widget.onResetPasswordByEmail(email, _hashPassword(pw));
-
-            try { await Supabase.instance.client.auth.signOut(); } catch (_) {}
-
-            if (!ctx.mounted) return;
-            Navigator.pop(c);
-
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                    ? 'Password reset successful! Log in with your new password.'
-                    : 'Password updated but profile not found. Sign up first or contact support.'),
-                  backgroundColor: ok ? Colors.green : Colors.orange,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-          } catch (e) {
-            if (ctx.mounted) {
-              setLocal(() => isLoading = false);
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(content: Text('Verification failed: ${e.toString()}'), backgroundColor: Colors.red),
-              );
-            }
-          }
-        }
-
-        return AlertDialog(
-          title: Text(step == 1 ? 'Reset Password' : 'Enter Verification Code'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: step == 1
-                  ? [
-                      const Text(
-                        'Enter your email and we will send a 6-digit verification code to your inbox.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: emailCtl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: 'Gmail Address',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ]
-                  : [
-                      Text('Code sent to ${emailCtl.text}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: codeCtl,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        decoration: InputDecoration(
-                          labelText: '6-digit Code',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      TextField(
-                        controller: newPwCtl,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'New Password (min 6 chars)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: confirmCtl,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm New Password',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: isLoading ? null : sendCode,
-                        child: const Text('Resend code'),
-                      ),
-                    ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: isLoading ? null : () => Navigator.pop(c), child: const Text('CANCEL')),
-            ElevatedButton(
-              onPressed: isLoading ? null : (step == 1 ? sendCode : verifyAndReset),
-              child: isLoading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(step == 1 ? 'SEND CODE' : 'RESET PASSWORD'),
-            ),
-          ],
-        );
-      }),
+    showNgmyForgotPasswordDialog(
+      context,
+      initialEmail: _e.text,
+      knownEmails: widget.allUsers.map((u) => u.email),
+      onResetPasswordByEmail: widget.onResetPasswordByEmail,
     );
   }
 
@@ -13410,7 +13191,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: _confirmResetAppData,
+                      onTap: () => showNgmyResetAppDataDialog(context),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.all(4),

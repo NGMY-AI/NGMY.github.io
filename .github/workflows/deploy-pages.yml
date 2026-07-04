@@ -1,5 +1,5 @@
-# Builds Flutter web and deploys via GitHub Pages Actions.
-# A tiny docs/ stub on main keeps GitHub's built-in "pages build and deployment" from failing.
+# Builds Flutter web and deploys via GitHub Actions Pages only.
+# Do NOT commit a full Flutter build to docs/ — that triggers a conflicting legacy Pages job.
 
 name: Deploy GitHub Pages
 
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -28,18 +28,18 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     steps:
-      - name: Switch Pages to GitHub Actions (stop branch deploy failures)
-        continue-on-error: true
+      - name: Force GitHub Actions as Pages source (stops branch deploy conflicts)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -e
           api="https://api.github.com/repos/${{ github.repository }}/pages"
-          body='{"build_type":"workflow","cname":"ngmy.org"}'
+          body='{"build_type":"workflow","cname":"ngmy.org","source":{"branch":"main","path":"/"}}'
           code=$(curl -sS -o /tmp/pages.json -w "%{http_code}" -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "$api" -d "$body")
+            "$api" -d '{"build_type":"workflow","cname":"ngmy.org"}')
           echo "PUT Pages HTTP ${code}"
           cat /tmp/pages.json || true
           if [ "$code" = "404" ]; then
@@ -47,9 +47,14 @@ jobs:
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "$api" -d "$body")
+              "$api" -d '{"build_type":"workflow","cname":"ngmy.org"}')
             echo "POST Pages HTTP ${code}"
             cat /tmp/pages.json || true
+          fi
+          sleep 2
+          curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$api" | tee /tmp/pages-verify.json
+          if ! grep -q '"build_type":"workflow"' /tmp/pages-verify.json && ! grep -q '"build_type": "workflow"' /tmp/pages-verify.json; then
+            echo "::warning::Pages may still be on legacy branch deploy — set Source to GitHub Actions in repo Settings → Pages"
           fi
 
   build:
@@ -83,10 +88,8 @@ jobs:
           printf '{"build_number":"%s","deployed_at":"%s","app_name":"ngmy","version":"1.0.0","package_name":"ngmy"}\n' \
             "$DEPLOY_ID" "$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)" > _site/version.json
 
-          # SPA + guest app routes on GitHub Pages
           cp _site/index.html _site/404.html
 
-          # Disable Flutter's unregister-only service worker — ngmy_service_worker.js handles offline.
           if [ -f _site/flutter_bootstrap.js ]; then
             python3 - <<'PY'
           import pathlib, re
@@ -109,7 +112,6 @@ jobs:
             );
           });"""
 
-          # Replace the entire NGMY loader tail (avoids duplicate .catch from naive regex).
           if "// NGMY: use ngmy_service_worker" in boot:
             boot = re.sub(
               r"// NGMY: use ngmy_service_worker\.js[^\n]*\n.*",
@@ -129,11 +131,9 @@ jobs:
               flags=re.S,
             )
 
-          # Repair any prior broken deploy that left `});.catch(` (invalid JavaScript).
           boot = re.sub(r"\}\);\s*\.catch\(", "}).catch(", boot)
-
           p.write_text(boot, encoding="utf-8")
-          print("patched flutter_bootstrap.js (local CanvasKit, no Flutter SW)")
+          print("patched flutter_bootstrap.js")
           PY
           fi
           rm -f _site/flutter_service_worker.js
@@ -164,14 +164,6 @@ jobs:
           "
             fi
           done
-
-      - name: Mirror to gh-pages branch
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: _site
-          branch: gh-pages
-          clean: true
-          commit-message: 'Deploy web build from CI'
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

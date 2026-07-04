@@ -45,5 +45,7 @@ app.*.map.json
 /android/app/release
 
 # Prebuilt web output — do not commit. CI deploys via .github/workflows/deploy-pages.yml
-# docs/ on main is a tiny stub only (see .github/DEPLOY_STATUS.md).
+/build/
+_site/
+/docs/
 _site/
