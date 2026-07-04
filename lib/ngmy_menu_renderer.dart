@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_menu_models.dart';
+import 'ngmy_menu_name_styles.dart';
 import 'ngmy_menu_templates.dart';
 
 /// Renders a published or preview menu with the selected template.
@@ -161,86 +162,15 @@ class NgmyMenuPreview extends StatelessWidget {
   Widget _header(NgmyMenuTemplate t, NgmyMenuDocument doc, NgmyMenuPage page, bool showPageTitle) {
     final name = doc.restaurantName.trim().isEmpty ? 'Your Restaurant' : doc.restaurantName.trim();
     final isPlaceholder = doc.restaurantName.trim().isEmpty;
-
-    TextStyle nameStyle = switch (t.headerStyle) {
-      'ornate' => TextStyle(
-          color: t.accent,
-          fontSize: compact ? 20 : 30,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.6,
-          height: 1.1,
-        ),
-      'serif' => TextStyle(
-          color: t.textPrimary,
-          fontSize: compact ? 18 : 28,
-          fontWeight: FontWeight.w700,
-          fontFamily: 'Georgia',
-          letterSpacing: 0.6,
-        ),
-      'minimal' => TextStyle(
-          color: t.textPrimary,
-          fontSize: compact ? 16 : 24,
-          fontWeight: FontWeight.w300,
-          letterSpacing: compact ? 3 : 5,
-        ),
-      'neon' || 'jazz' => TextStyle(
-          color: t.accent,
-          fontSize: compact ? 20 : 32,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2,
-          shadows: [Shadow(color: t.accent.withValues(alpha: 0.8), blurRadius: 12)],
-        ),
-      'industrial' => TextStyle(
-          color: t.accent,
-          fontSize: compact ? 18 : 28,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 4,
-        ),
-      'retro' => TextStyle(
-          color: t.accent,
-          fontSize: compact ? 22 : 34,
-          fontWeight: FontWeight.w900,
-          fontStyle: FontStyle.italic,
-          letterSpacing: 1,
-        ),
-      'magazine' => TextStyle(
-          color: t.textPrimary,
-          fontSize: compact ? 22 : 34,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -0.5,
-          height: 1.05,
-        ),
-      'stack' => TextStyle(
-          color: t.textPrimary,
-          fontSize: compact ? 18 : 26,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 6,
-        ),
-      'grid' => TextStyle(
-          color: t.textPrimary,
-          fontSize: compact ? 16 : 22,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-        ),
-      'tile' => TextStyle(
-          color: t.accent,
-          fontSize: compact ? 20 : 28,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.4,
-        ),
-      _ => TextStyle(color: t.textPrimary, fontSize: compact ? 18 : 26, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-    };
-
-    if (isPlaceholder) {
-      nameStyle = nameStyle.copyWith(color: t.textSecondary, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600);
-    }
+    final styleKey = ngmyMenuEffectiveNameStyle(doc, t);
+    final nameStyle = ngmyMenuNameTextStyle(styleKey: styleKey, template: t, compact: compact, isPlaceholder: isPlaceholder);
 
     final align = _headerAlign(t);
 
     return Column(
       crossAxisAlignment: align == TextAlign.left ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        if (t.headerStyle == 'ornate' || t.layout == NgmyMenuLayoutStyle.ornateDots) ...[
+        if (styleKey == 'ornate' || t.layout == NgmyMenuLayoutStyle.ornateDots) ...[
           Row(
             children: [
               Expanded(child: _ornamentLine(t.accent)),
@@ -253,7 +183,7 @@ class NgmyMenuPreview extends StatelessWidget {
           ),
           SizedBox(height: compact ? 6 : 10),
         ],
-        if (t.headerStyle == 'neon' || t.headerStyle == 'jazz')
+        if (styleKey == 'neon' || styleKey == 'jazz')
           Container(
             padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: compact ? 4 : 6),
             decoration: BoxDecoration(
@@ -263,10 +193,10 @@ class NgmyMenuPreview extends StatelessWidget {
             ),
             child: Text('MENU', style: TextStyle(color: t.accent, fontSize: compact ? 9 : 11, fontWeight: FontWeight.w900, letterSpacing: 4)),
           ),
-        if (t.headerStyle == 'neon' || t.headerStyle == 'jazz') SizedBox(height: compact ? 8 : 12),
-        if (t.headerStyle == 'magazine')
+        if (styleKey == 'neon' || styleKey == 'jazz') SizedBox(height: compact ? 8 : 12),
+        if (styleKey == 'magazine')
           Text('MENU', style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: compact ? 10 : 12, letterSpacing: 3)),
-        if (t.headerStyle == 'magazine') SizedBox(height: compact ? 4 : 6),
+        if (styleKey == 'magazine') SizedBox(height: compact ? 4 : 6),
         Text(name, textAlign: align, style: nameStyle),
         if (showPageTitle && page.title.trim().isNotEmpty && page.title.trim().toLowerCase() != 'menu') ...[
           SizedBox(height: compact ? 4 : 6),
@@ -281,7 +211,7 @@ class NgmyMenuPreview extends StatelessWidget {
             ),
           ),
         ],
-        if (t.headerStyle == 'ornate') ...[
+        if (styleKey == 'ornate') ...[
           SizedBox(height: compact ? 4 : 8),
           Container(
             height: 2,
@@ -295,7 +225,7 @@ class NgmyMenuPreview extends StatelessWidget {
           SizedBox(height: compact ? 6 : 10),
           Container(height: 1, color: t.textSecondary.withValues(alpha: 0.25)),
         ],
-        if (t.headerStyle == 'retro') ...[
+        if (styleKey == 'retro') ...[
           SizedBox(height: compact ? 6 : 8),
           Row(
             children: List.generate(8, (i) => Expanded(child: Container(margin: const EdgeInsets.symmetric(horizontal: 1), height: 3, color: i.isEven ? t.accent : Colors.transparent))),

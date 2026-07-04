@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
+import 'ngmy_menu_name_styles.dart';
 import 'ngmy_menu_publish_registry.dart';
 import 'ngmy_menu_qr.dart';
 import 'ngmy_menu_renderer.dart';
@@ -683,6 +684,15 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           child: Column(
             children: [
               NgmyModernField(controller: _nameC, label: 'Restaurant name', hint: 'Your restaurant name', icon: Icons.storefront_rounded, accent: _kMenuAccent),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Name style', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13)),
+              ),
+              const SizedBox(height: 4),
+              Text('How your restaurant name appears at the top of the menu', style: TextStyle(color: t.subtitle, fontSize: 11)),
+              const SizedBox(height: 10),
+              _nameStylePicker(t, doc),
               NgmyModernField(controller: _taglineC, label: 'Tagline', hint: 'Fresh flavors · crafted daily', icon: Icons.format_quote_rounded, accent: _kMenuAccent),
               NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'your-restaurant-name', icon: Icons.link_rounded, accent: _kMenuAccent),
             ],
@@ -1281,6 +1291,17 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _nameStylePicker(NgmyHubTheme t, NgmyMenuDocument doc) {
+    final tmpl = ngmyMenuTemplateById(doc.templateId);
+    return NgmyMenuNameStylePicker(
+      selected: doc.nameStyleId,
+      template: tmpl,
+      sampleName: _nameC.text,
+      accent: _kMenuAccent,
+      onSelected: (id) => setState(() => doc.nameStyleId = id),
     );
   }
 

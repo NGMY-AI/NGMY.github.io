@@ -118,6 +118,7 @@ class NgmyMenuDocument {
     this.tagline = '',
     this.templateId = 'gold_luxe',
     this.pageBackground = 'white',
+    this.nameStyleId = 'auto',
     this.sections = const [],
     this.menuPages = const [],
     this.socialLinks = const NgmyMenuSocialLinks(),
@@ -133,6 +134,7 @@ class NgmyMenuDocument {
   String tagline;
   String templateId;
   String pageBackground;
+  String nameStyleId;
   List<NgmyMenuSection> sections;
   List<NgmyMenuPage> menuPages;
   NgmyMenuSocialLinks socialLinks;
@@ -189,6 +191,7 @@ class NgmyMenuDocument {
         'tagline': tagline,
         'templateId': templateId,
         'pageBackground': pageBackground,
+        'nameStyleId': nameStyleId,
         'sections': sections.map((s) => s.toJson()).toList(),
         'menuPages': menuPages.map((p) => p.toJson()).toList(),
         'socialLinks': socialLinks.toJson(),
@@ -226,6 +229,7 @@ class NgmyMenuDocument {
         tagline: (json['tagline'] ?? '').toString(),
         templateId: (json['templateId'] ?? 'gold_luxe').toString(),
         pageBackground: (json['pageBackground'] ?? 'white').toString(),
+        nameStyleId: (json['nameStyleId'] ?? 'auto').toString(),
         sections: pages.isNotEmpty ? pages.first.sections : legacySections,
         menuPages: pages,
         socialLinks: NgmyMenuSocialLinks.fromJson(json['socialLinks'] is Map ? Map<String, dynamic>.from(json['socialLinks'] as Map) : null),
