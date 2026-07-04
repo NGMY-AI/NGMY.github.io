@@ -90,17 +90,29 @@ class NgmyMenuSection {
 }
 
 class NgmyMenuItem {
-  NgmyMenuItem({required this.name, this.description = '', this.price = ''});
+  NgmyMenuItem({
+    required this.name,
+    this.description = '',
+    this.ingredients = '',
+    this.price = '',
+  });
 
   String name;
   String description;
+  String ingredients;
   String price;
 
-  Map<String, dynamic> toJson() => {'name': name, 'description': description, 'price': price};
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'description': description,
+        'ingredients': ingredients,
+        'price': price,
+      };
 
   factory NgmyMenuItem.fromJson(Map<String, dynamic> json) => NgmyMenuItem(
         name: (json['name'] ?? '').toString(),
         description: (json['description'] ?? '').toString(),
+        ingredients: (json['ingredients'] ?? '').toString(),
         price: (json['price'] ?? '').toString(),
       );
 }
@@ -116,6 +128,8 @@ class NgmyMenuQrStyle {
     this.cornerStyle = 'ring',
     this.centerLabel = '',
     this.showCenterLogo = true,
+    this.displayMode = 'plain',
+    this.cardTemplate = 'luxury',
   });
 
   final int foreground;
@@ -126,6 +140,10 @@ class NgmyMenuQrStyle {
   final String cornerStyle;
   final String centerLabel;
   final bool showCenterLogo;
+  /// `plain` = QR only · `card` = invoice-style card with info + QR
+  final String displayMode;
+  /// Card layout when [displayMode] is `card`: classic, modern, luxury, minimal
+  final String cardTemplate;
 
   Map<String, dynamic> toJson() => {
         'foreground': foreground,
@@ -136,6 +154,8 @@ class NgmyMenuQrStyle {
         'cornerStyle': cornerStyle,
         'centerLabel': centerLabel,
         'showCenterLogo': showCenterLogo,
+        'displayMode': displayMode,
+        'cardTemplate': cardTemplate,
       };
 
   factory NgmyMenuQrStyle.fromJson(Map<String, dynamic>? json) {
@@ -149,6 +169,8 @@ class NgmyMenuQrStyle {
       cornerStyle: (json['cornerStyle'] ?? 'ring').toString(),
       centerLabel: (json['centerLabel'] ?? '').toString(),
       showCenterLogo: json['showCenterLogo'] != false,
+      displayMode: (json['displayMode'] ?? 'plain').toString(),
+      cardTemplate: (json['cardTemplate'] ?? 'luxury').toString(),
     );
   }
 
@@ -161,6 +183,8 @@ class NgmyMenuQrStyle {
     String? cornerStyle,
     String? centerLabel,
     bool? showCenterLogo,
+    String? displayMode,
+    String? cardTemplate,
   }) =>
       NgmyMenuQrStyle(
         foreground: foreground ?? this.foreground,
@@ -171,6 +195,8 @@ class NgmyMenuQrStyle {
         cornerStyle: cornerStyle ?? this.cornerStyle,
         centerLabel: centerLabel ?? this.centerLabel,
         showCenterLogo: showCenterLogo ?? this.showCenterLogo,
+        displayMode: displayMode ?? this.displayMode,
+        cardTemplate: cardTemplate ?? this.cardTemplate,
       );
 
   static int _intColor(dynamic v, int fallback) {
@@ -194,11 +220,27 @@ NgmyMenuDocument ngmyMenuBlankDocument() => NgmyMenuDocument(
       id: ngmyMenuNewId(),
       restaurantName: '',
       tagline: '',
-      templateId: 'gold_luxe',
+      templateId: 'midnight_gold',
       sections: [
         NgmyMenuSection(
           title: 'Main',
-          items: [NgmyMenuItem(name: '', description: '', price: '')],
+          items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')],
         ),
       ],
     );
+
+/// Strip leading $ and keep digits/decimals for storage/display helpers.
+String ngmyMenuPriceDigits(String raw) {
+  var s = raw.trim().replaceAll(RegExp(r'[^\d.]'), '');
+  if (s.contains('.')) {
+    final parts = s.split('.');
+    s = '${parts.first}.${parts.skip(1).join()}';
+  }
+  return s;
+}
+
+String ngmyMenuFormatPrice(String raw) {
+  final digits = ngmyMenuPriceDigits(raw);
+  if (digits.isEmpty) return '';
+  return '\$$digits';
+}

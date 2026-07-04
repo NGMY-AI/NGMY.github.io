@@ -181,3 +181,206 @@ const List<Map<String, String>> kNgmyMenuQrPresets = [
   {'id': 'forest', 'label': 'Forest', 'fg': '0xFF14532D', 'bg': '0xFFF0FDF4', 'accent': '0xFF22C55E'},
   {'id': 'ruby', 'label': 'Ruby', 'fg': '0xFF450A0A', 'bg': '0xFFFFF1F2', 'accent': '0xFFE11D48'},
 ];
+
+/// Plain QR or invoice-style card with restaurant info + embedded QR.
+class NgmyMenuQrDisplay extends StatelessWidget {
+  const NgmyMenuQrDisplay({
+    super.key,
+    required this.data,
+    required this.style,
+    this.restaurantName = '',
+    this.tagline = '',
+    this.large = false,
+    this.captureKey,
+  });
+
+  final String data;
+  final NgmyMenuQrStyle style;
+  final String restaurantName;
+  final String tagline;
+  final bool large;
+  final GlobalKey? captureKey;
+
+  @override
+  Widget build(BuildContext context) {
+    if (style.displayMode == 'card') {
+      return RepaintBoundary(
+        key: captureKey,
+        child: _MenuQrCard(
+          data: data,
+          style: style,
+          restaurantName: restaurantName,
+          tagline: tagline,
+          large: large,
+        ),
+      );
+    }
+    return NgmyMenuQrWidget(data: data, style: style, large: large, captureKey: captureKey);
+  }
+}
+
+class _MenuQrCard extends StatelessWidget {
+  const _MenuQrCard({
+    required this.data,
+    required this.style,
+    required this.restaurantName,
+    required this.tagline,
+    required this.large,
+  });
+
+  final String data;
+  final NgmyMenuQrStyle style;
+  final String restaurantName;
+  final String tagline;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(style.accent);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tpl = style.cardTemplate;
+    final w = large ? 320.0 : 280.0;
+
+    BoxDecoration shell;
+    Widget header;
+    switch (tpl) {
+      case 'modern':
+        shell = BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.65)]),
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 10))],
+        );
+        header = Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('VIEW MENU', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 2)),
+              if (restaurantName.trim().isNotEmpty)
+                Text(restaurantName, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 14)),
+            ],
+          ),
+        );
+        break;
+      case 'minimal':
+        shell = BoxDecoration(
+          color: isDark ? const Color(0xFF18181B) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFE4E4E7)),
+        );
+        header = Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Text(
+            restaurantName.trim().isEmpty ? 'Restaurant Menu' : restaurantName,
+            style: TextStyle(color: isDark ? Colors.white : const Color(0xFF18181B), fontWeight: FontWeight.w300, fontSize: 20, letterSpacing: 1),
+          ),
+        );
+        break;
+      case 'classic':
+        shell = BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accent, width: 2),
+        );
+        header = Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+          child: Row(
+            children: [
+              Icon(Icons.restaurant_menu_rounded, color: accent, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  restaurantName.trim().isEmpty ? 'Menu' : restaurantName,
+                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        );
+        break;
+      default:
+        shell = BoxDecoration(
+          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0A0A0A), Color(0xFF1A1410)]),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.5),
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 28, offset: const Offset(0, 12))],
+        );
+        header = Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+          child: Column(
+            children: [
+              Icon(Icons.diamond_outlined, color: accent, size: 22),
+              const SizedBox(height: 8),
+              Text(
+                restaurantName.trim().isEmpty ? 'Your Restaurant' : restaurantName,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1),
+              ),
+            ],
+          ),
+        );
+    }
+
+    final bodyColor = tpl == 'modern' ? (isDark ? const Color(0xFF1E293B) : Colors.white) : (tpl == 'minimal' ? (isDark ? const Color(0xFF18181B) : Colors.white) : (isDark ? const Color(0xFF0F172A) : Colors.white));
+
+    return SizedBox(
+      width: w,
+      child: DecoratedBox(
+        decoration: shell,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(tpl == 'modern' ? 22 : (tpl == 'minimal' ? 18 : 16)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (tpl == 'modern') ...[
+                header,
+                Container(
+                  color: bodyColor,
+                  padding: const EdgeInsets.all(18),
+                  child: _cardBody(accent, isDark, tpl),
+                ),
+              ] else ...[
+                if (tpl != 'modern') header,
+                Container(
+                  color: tpl == 'luxury' ? Colors.transparent : bodyColor,
+                  padding: EdgeInsets.fromLTRB(18, tpl == 'luxury' ? 8 : 12, 18, 20),
+                  child: _cardBody(accent, isDark, tpl),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _cardBody(Color accent, bool isDark, String tpl) {
+    final subColor = tpl == 'luxury' ? const Color(0xFFC9B896) : (isDark ? Colors.white60 : Colors.black54);
+    final titleColor = tpl == 'luxury' ? accent : (isDark ? Colors.white : const Color(0xFF0F172A));
+
+    return Column(
+      children: [
+        if (tagline.trim().isNotEmpty && tpl != 'modern')
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(tagline, textAlign: TextAlign.center, style: TextStyle(color: subColor, fontSize: 12, fontStyle: FontStyle.italic)),
+          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.qr_code_scanner_rounded, color: accent, size: 18),
+            const SizedBox(width: 8),
+            Text('Scan for menu', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: titleColor)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: NgmyMenuQrWidget(data: data, style: style, large: false),
+        ),
+        const SizedBox(height: 10),
+        Text('No login required', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accent.withValues(alpha: 0.85))),
+      ],
+    );
+  }
+}

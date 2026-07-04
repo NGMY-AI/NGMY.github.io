@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_menu_models.dart';
@@ -12,15 +11,20 @@ import 'ngmy_menu_templates.dart';
 import 'ngmy_menu_urls.dart';
 import 'ngmy_qr_download.dart';
 
+const _kMenuAccent = Color(0xFFD4AF37);
+
 Future<void> showNgmyMenuStudioDialog(BuildContext context, {required String userEmail}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Menu Studio',
-    barrierColor: Colors.black.withValues(alpha: 0.88),
-    transitionDuration: const Duration(milliseconds: 320),
+    barrierColor: Colors.black.withValues(alpha: 0.92),
+    transitionDuration: const Duration(milliseconds: 340),
     pageBuilder: (_, __, ___) => _NgmyMenuStudio(userEmail: userEmail),
-    transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+    transitionBuilder: (_, anim, __, child) {
+      final slide = Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
+      return FadeTransition(opacity: anim, child: SlideTransition(position: slide, child: child));
+    },
   );
 }
 
@@ -38,6 +42,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   bool _loading = true;
   NgmyMenuDocument? _editing;
   bool _publishing = false;
+  int _tab = 0;
   final _qrCaptureKey = GlobalKey();
 
   final _nameC = TextEditingController();
@@ -53,6 +58,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   @override
   void dispose() {
+    _nameC.removeListener(_refreshPreview);
+    _taglineC.removeListener(_refreshPreview);
     _nameC.dispose();
     _taglineC.dispose();
     _slugC.dispose();
@@ -73,6 +80,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     final doc = ngmyMenuBlankDocument();
     setState(() {
       _editing = doc;
+      _tab = 0;
       _bindEditors(doc);
     });
   }
@@ -80,6 +88,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   void _openMenu(NgmyMenuDocument doc) {
     setState(() {
       _editing = doc.copy();
+      _tab = 0;
       _bindEditors(_editing!);
     });
   }
@@ -89,6 +98,18 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     _taglineC.text = doc.tagline;
     _slugC.text = doc.slug;
     _centerLabelC.text = doc.qrStyle.centerLabel;
+    _nameC.removeListener(_refreshPreview);
+    _taglineC.removeListener(_refreshPreview);
+    _nameC.addListener(_refreshPreview);
+    _taglineC.addListener(_refreshPreview);
+  }
+
+  void _refreshPreview() {
+    final doc = _editing;
+    if (doc == null) return;
+    doc.restaurantName = _nameC.text;
+    doc.tagline = _taglineC.text;
+    if (mounted) setState(() {});
   }
 
   void _syncFromEditors() {
@@ -100,6 +121,15 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     doc.qrStyle = doc.qrStyle.copyWith(centerLabel: _centerLabelC.text.trim());
   }
 
+  Future<void> _copyLink(String url) async {
+    if (url.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: url.trim()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Link copied: $url'), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 3)),
+    );
+  }
+
   Future<void> _save() async {
     final doc = _editing;
     if (doc == null) return;
@@ -107,7 +137,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
     await _reload();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Menu saved')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Menu saved'), behavior: SnackBarBehavior.floating));
   }
 
   Future<void> _publish() async {
@@ -146,17 +176,35 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Menu published!'),
-        content: SelectableText(
-          '${doc.publicUrl}\n\nAnyone can open this link — no login required.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Anyone can open this link — no login required.'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kMenuAccent.withValues(alpha: 0.35)),
+              ),
+              child: SelectableText(doc.publicUrl, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-          FilledButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: doc.publicUrl));
-              Navigator.pop(ctx);
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: doc.publicUrl));
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard!')));
+              }
             },
-            child: const Text('Copy link'),
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copy link'),
           ),
         ],
       ),
@@ -180,61 +228,182 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     if (_editing != null) return _editor(t);
     return Material(
       color: t.scaffold,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _topBar(t, title: 'Menu Studio', onBack: () => Navigator.pop(context)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                'Create restaurant menus · publish like a website · custom QR codes',
-                style: TextStyle(color: t.subtitle, fontSize: 13),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: FilledButton.icon(
-                onPressed: _newMenu,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('New menu'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFB8860B),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 240,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFF1A1410).withValues(alpha: t.isDark ? 0.95 : 0.15), t.scaffold],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _menus.isEmpty
-                      ? Center(child: Text('No menus yet', style: TextStyle(color: t.subtitle)))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: _menus.length,
-                          itemBuilder: (_, i) {
-                            final m = _menus[i];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: const Color(0xFFB8860B).withValues(alpha: 0.15),
-                                  child: const Icon(Icons.restaurant_menu_rounded, color: Color(0xFFB8860B)),
-                                ),
-                                title: Text(
-                                  m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName,
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                                subtitle: Text(m.isPublished ? m.publicUrl : 'Draft · ${m.templateId}'),
-                                trailing: m.isPublished ? const Icon(Icons.public_rounded, size: 18) : null,
-                                onTap: () => _openMenu(m),
-                              ),
-                            );
-                          },
+          ),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _homeTopBar(t),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Menu Studio', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -0.5)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Luxury menus · publish online · custom QR codes',
+                        style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _newMenu,
+                      borderRadius: BorderRadius.circular(18),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [BoxShadow(color: _kMenuAccent.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
                         ),
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.15), shape: BoxShape.circle),
+                              child: const Icon(Icons.add_rounded, color: Colors.black, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Create new menu', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('YOUR MENUS', style: t.sectionLabel),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator(color: _kMenuAccent))
+                      : _menus.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.restaurant_menu_rounded, size: 56, color: t.muted),
+                                    const SizedBox(height: 12),
+                                    Text('No menus yet', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text('Tap Create new menu to start', style: TextStyle(color: t.subtitle, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              itemCount: _menus.length,
+                              itemBuilder: (_, i) => _menuListTile(t, _menus[i]),
+                            ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeTopBar(NgmyHubTheme t) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+              child: Icon(Icons.close_rounded, color: t.iconButtonIcon, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuListTile(NgmyHubTheme t, NgmyMenuDocument m) {
+    final name = m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: t.listItemBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: t.isDark ? 0.2 : 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openMenu(m),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [_kMenuAccent.withValues(alpha: 0.25), _kMenuAccent.withValues(alpha: 0.08)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kMenuAccent.withValues(alpha: 0.35)),
+                  ),
+                  child: const Icon(Icons.restaurant_menu_rounded, color: _kMenuAccent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 15)),
+                      const SizedBox(height: 3),
+                      Text(
+                        m.isPublished ? 'Published · ${m.templateId.replaceAll('_', ' ')}' : 'Draft · ${m.templateId.replaceAll('_', ' ')}',
+                        style: TextStyle(color: t.subtitle, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                if (m.isPublished && m.publicUrl.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Copy link',
+                    onPressed: () => _copyLink(m.publicUrl),
+                    icon: Icon(Icons.link_rounded, color: _kMenuAccent, size: 20),
+                  ),
+                Icon(Icons.chevron_right_rounded, color: t.muted),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -247,52 +416,174 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
     return Material(
       color: t.scaffold,
-      child: SafeArea(
-        child: DefaultTabController(
-          length: 3,
-          child: Column(
-            children: [
-              _topBar(t, title: title, onBack: () => setState(() => _editing = null)),
-              TabBar(
-                labelColor: const Color(0xFFB8860B),
-                unselectedLabelColor: t.subtitle,
-                indicatorColor: const Color(0xFFB8860B),
-                tabs: const [
-                  Tab(text: 'Edit'),
-                  Tab(text: 'Design'),
-                  Tab(text: 'QR Code'),
-                ],
-              ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _editTab(t, doc),
-                    _designTab(t, doc),
-                    _qrTab(doc, qrUrl),
-                  ],
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 180,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_kMenuAccent.withValues(alpha: t.isDark ? 0.35 : 0.18), t.scaffold],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(onPressed: _save, child: const Text('Save')),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _publishing ? null : _publish,
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
-                        child: _publishing
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Publish'),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => setState(() => _editing = null),
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 16),
+                        ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18), overflow: TextOverflow.ellipsis),
+                      ),
+                      if (doc.publicUrl.isNotEmpty)
+                        IconButton(
+                          tooltip: 'Copy menu link',
+                          onPressed: () => _copyLink(doc.publicUrl),
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _kMenuAccent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _kMenuAccent.withValues(alpha: 0.4)),
+                            ),
+                            child: const Icon(Icons.copy_rounded, color: _kMenuAccent, size: 18),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
+                if (doc.publicUrl.isNotEmpty) _publishedLinkBar(t, doc.publicUrl),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Row(
+                    children: [
+                      _pillTab('Edit', 0, t),
+                      const SizedBox(width: 8),
+                      _pillTab('Design', 1, t),
+                      const SizedBox(width: 8),
+                      _pillTab('QR Code', 2, t),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: IndexedStack(
+                    index: _tab,
+                    children: [
+                      _editTab(t, doc),
+                      _designTab(t, doc),
+                      _qrTab(t, doc, qrUrl),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _save,
+                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                          child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _publishing ? null : _publish,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _kMenuAccent,
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: _publishing
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                              : const Text('Publish', style: TextStyle(fontWeight: FontWeight.w900)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _publishedLinkBar(NgmyHubTheme t, String url) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _kMenuAccent.withValues(alpha: t.isDark ? 0.12 : 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _kMenuAccent.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.public_rounded, color: _kMenuAccent, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(url, style: TextStyle(color: t.title, fontSize: 11, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+            ),
+            TextButton.icon(
+              onPressed: () => _copyLink(url),
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy'),
+              style: TextButton.styleFrom(foregroundColor: _kMenuAccent, visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pillTab(String label, int index, NgmyHubTheme t) {
+    final sel = _tab == index;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _tab = index),
+          borderRadius: BorderRadius.circular(24),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              gradient: sel ? const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]) : null,
+              color: sel ? null : (t.isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9)),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: sel ? _kMenuAccent : t.border),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: sel ? Colors.black : t.chipOffLabel,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -301,299 +592,418 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Widget _editTab(NgmyHubTheme t, NgmyMenuDocument doc) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
-        TextField(
-          controller: _nameC,
-          decoration: const InputDecoration(
-            labelText: 'Restaurant name',
-            hintText: 'Enter your restaurant name',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _taglineC,
-          decoration: const InputDecoration(labelText: 'Tagline', border: OutlineInputBorder()),
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _slugC,
-          decoration: const InputDecoration(
-            labelText: 'Link slug (optional)',
-            hintText: 'your-restaurant-name',
-            border: OutlineInputBorder(),
+        _panel(
+          t,
+          title: 'Restaurant info',
+          child: Column(
+            children: [
+              NgmyModernField(controller: _nameC, label: 'Restaurant name', hint: 'Your restaurant name', icon: Icons.storefront_rounded, accent: _kMenuAccent),
+              NgmyModernField(controller: _taglineC, label: 'Tagline', hint: 'Fresh flavors · crafted daily', icon: Icons.format_quote_rounded, accent: _kMenuAccent),
+              NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'your-restaurant-name', icon: Icons.link_rounded, accent: _kMenuAccent),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        Text('Menu sections', style: TextStyle(color: t.title, fontWeight: FontWeight.w900)),
-        ...doc.sections.asMap().entries.map((e) => _sectionEditor(doc, e.key, e.value)),
-        TextButton.icon(
-          onPressed: () {
-            setState(() => doc.sections.add(NgmyMenuSection(title: 'New Section', items: [NgmyMenuItem(name: 'Item', price: '\$0.00')])));
-          },
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add section'),
+        const SizedBox(height: 14),
+        _panel(
+          t,
+          title: 'Menu sections',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ...doc.sections.asMap().entries.map((e) => _sectionEditor(t, doc, e.key, e.value)),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() => doc.sections.add(NgmyMenuSection(title: 'New Section', items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')])));
+                },
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add section'),
+                style: OutlinedButton.styleFrom(foregroundColor: _kMenuAccent, side: BorderSide(color: _kMenuAccent.withValues(alpha: 0.5))),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 16),
-        Text('Preview', style: TextStyle(color: t.title, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        NgmyMenuPreview(document: doc, compact: true),
+        const SizedBox(height: 14),
+        _panel(
+          t,
+          title: 'Live preview',
+          child: NgmyMenuPreview(document: doc, compact: true),
+        ),
       ],
     );
   }
 
-  Widget _sectionEditor(NgmyMenuDocument doc, int sIdx, NgmyMenuSection section) {
-    return Card(
-      margin: const EdgeInsets.only(top: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    initialValue: section.title,
-                    decoration: const InputDecoration(labelText: 'Section title', isDense: true),
-                    onChanged: (v) => section.title = v,
+  Widget _panel(NgmyHubTheme t, {required String title, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: t.surface.withValues(alpha: t.isDark ? 0.85 : 1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title.toUpperCase(), style: t.sectionLabel.copyWith(color: _kMenuAccent.withValues(alpha: 0.9))),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionEditor(NgmyHubTheme t, NgmyMenuDocument doc, int sIdx, NgmyMenuSection section) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: t.fieldFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: t.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: section.title,
+                  style: TextStyle(color: t.title, fontWeight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    labelText: 'Section title',
+                    labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+                    border: InputBorder.none,
+                    isDense: true,
                   ),
+                  onChanged: (v) => section.title = v,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                  onPressed: () => setState(() => doc.sections.removeAt(sIdx)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                onPressed: () => setState(() => doc.sections.removeAt(sIdx)),
+              ),
+            ],
+          ),
+          const Divider(height: 1),
+          ...section.items.asMap().entries.map((e) => _itemEditor(t, section, e.key, e.value)),
+          TextButton.icon(
+            onPressed: () => setState(() => section.items.add(NgmyMenuItem(name: '', description: '', ingredients: '', price: ''))),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add item'),
+            style: TextButton.styleFrom(foregroundColor: _kMenuAccent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemEditor(NgmyHubTheme t, NgmyMenuSection section, int iIdx, NgmyMenuItem item) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  initialValue: item.name,
+                  style: TextStyle(color: t.title, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    labelText: 'Item name',
+                    labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+                    filled: true,
+                    fillColor: t.inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+                    isDense: true,
+                  ),
+                  onChanged: (v) => item.name = v,
                 ),
-              ],
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 100,
+                child: TextFormField(
+                  initialValue: ngmyMenuPriceDigits(item.price),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                  style: TextStyle(color: t.title, fontWeight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    labelText: 'Price',
+                    labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+                    prefixText: '\$ ',
+                    prefixStyle: TextStyle(color: _kMenuAccent, fontWeight: FontWeight.w900, fontSize: 15),
+                    filled: true,
+                    fillColor: t.inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+                    isDense: true,
+                  ),
+                  onChanged: (v) => item.price = ngmyMenuPriceDigits(v),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.close_rounded, size: 18, color: t.muted),
+                onPressed: () => setState(() => section.items.removeAt(iIdx)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: item.description,
+            minLines: 1,
+            maxLines: 2,
+            style: TextStyle(color: t.title, fontSize: 13),
+            decoration: InputDecoration(
+              labelText: 'Description',
+              hintText: 'Crispy, served with house sauce…',
+              labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+              filled: true,
+              fillColor: t.inputFill,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+              isDense: true,
             ),
-            ...section.items.asMap().entries.map((e) {
-              final i = e.value;
-              final iIdx = e.key;
-              return Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextFormField(
-                            initialValue: i.name,
-                            decoration: const InputDecoration(labelText: 'Item name', isDense: true),
-                            onChanged: (v) => i.name = v,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: TextFormField(
-                            initialValue: i.price,
-                            decoration: const InputDecoration(labelText: 'Price', isDense: true),
-                            onChanged: (v) => i.price = v,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          onPressed: () => setState(() => section.items.removeAt(iIdx)),
-                        ),
-                      ],
-                    ),
-                    TextFormField(
-                      initialValue: i.description,
-                      decoration: const InputDecoration(
-                        labelText: 'Description (ingredients, sides, mix-ins…)',
-                        isDense: true,
-                        alignLabelWithHint: true,
-                      ),
-                      minLines: 1,
-                      maxLines: 3,
-                      onChanged: (v) => i.description = v,
-                    ),
-                  ],
-                ),
-              );
-            }),
-            TextButton(
-              onPressed: () => setState(() => section.items.add(NgmyMenuItem(name: 'New item', description: '', price: '\$0.00'))),
-              child: const Text('+ Add item'),
+            onChanged: (v) => item.description = v,
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: item.ingredients,
+            minLines: 1,
+            maxLines: 2,
+            style: TextStyle(color: t.title, fontSize: 13),
+            decoration: InputDecoration(
+              labelText: 'Ingredients & mix-ins',
+              hintText: 'Tomato, basil, mozzarella · add truffle oil',
+              labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+              filled: true,
+              fillColor: t.inputFill,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+              isDense: true,
             ),
-          ],
-        ),
+            onChanged: (v) => item.ingredients = v,
+          ),
+        ],
       ),
     );
   }
 
   Widget _designTab(NgmyHubTheme t, NgmyMenuDocument doc) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
-        Text('Choose a template', style: TextStyle(color: t.title, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 10),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 0.85),
-          itemCount: kNgmyMenuTemplates.length,
-          itemBuilder: (_, i) {
-            final tmpl = kNgmyMenuTemplates[i];
-            final sel = doc.templateId == tmpl.id;
-            return GestureDetector(
-              onTap: () => setState(() => doc.templateId = tmpl.id),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: sel ? const Color(0xFFB8860B) : Colors.white24, width: sel ? 2.5 : 1),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Stack(
-                    fit: StackFit.expand,
+        Text('Choose a luxurious template', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 16)),
+        const SizedBox(height: 4),
+        Text('Tap to preview — each design has its own layout style', style: TextStyle(color: t.subtitle, fontSize: 12)),
+        const SizedBox(height: 14),
+        ...kNgmyMenuTemplates.map((tmpl) {
+          final sel = doc.templateId == tmpl.id;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setState(() => doc.templateId = tmpl.id),
+                borderRadius: BorderRadius.circular(18),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: sel ? _kMenuAccent : t.border, width: sel ? 2.5 : 1),
+                    boxShadow: sel ? [BoxShadow(color: _kMenuAccent.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))] : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      NgmyMenuPreview(
-                        document: NgmyMenuDocument(
-                          id: 'preview',
-                          restaurantName: tmpl.name,
-                          tagline: tmpl.category,
-                          templateId: tmpl.id,
-                          sections: [
-                            NgmyMenuSection(
-                              title: 'Sample',
-                              items: [NgmyMenuItem(name: 'Dish', price: '\$12')],
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(tmpl.name, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
+                                  Text('${tmpl.category} · ${tmpl.subtitle}', style: TextStyle(color: t.subtitle, fontSize: 11)),
+                                ],
+                              ),
                             ),
+                            if (sel) const Icon(Icons.check_circle_rounded, color: _kMenuAccent),
                           ],
                         ),
-                        compact: true,
                       ),
-                      if (sel)
-                        const Align(
-                          alignment: Alignment.topRight,
-                          child: Padding(
-                            padding: EdgeInsets.all(6),
-                            child: Icon(Icons.check_circle_rounded, color: Color(0xFFB8860B)),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                        child: SizedBox(
+                          height: 160,
+                          child: NgmyMenuPreview(
+                            document: NgmyMenuDocument(
+                              id: 'preview',
+                              restaurantName: tmpl.name,
+                              tagline: tmpl.subtitle,
+                              templateId: tmpl.id,
+                              sections: [
+                                NgmyMenuSection(
+                                  title: 'Signature',
+                                  items: [
+                                    NgmyMenuItem(
+                                      name: 'Chef\'s Special',
+                                      description: 'House favorite',
+                                      ingredients: 'Seasonal ingredients',
+                                      price: '24.00',
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            compact: true,
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        }),
       ],
     );
   }
 
-  Widget _qrTab(NgmyMenuDocument doc, String qrUrl) {
+  Widget _qrTab(NgmyHubTheme t, NgmyMenuDocument doc, String qrUrl) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
+        _panel(
+          t,
+          title: 'QR display style',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              NgmyModernChipRow(
+                options: const ['Plain QR', 'Card template'],
+                selected: doc.qrStyle.displayMode == 'card' ? 'Card template' : 'Plain QR',
+                accent: _kMenuAccent,
+                onSelected: (v) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(displayMode: v == 'Card template' ? 'card' : 'plain')),
+              ),
+              if (doc.qrStyle.displayMode == 'card') ...[
+                const SizedBox(height: 4),
+                Text('Card layout', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: kNgmyMenuQrCardTemplates.map((c) {
+                    final sel = doc.qrStyle.cardTemplate == c['id'];
+                    return ChoiceChip(
+                      label: Text(c['label']!),
+                      selected: sel,
+                      selectedColor: _kMenuAccent.withValues(alpha: 0.25),
+                      onSelected: (_) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cardTemplate: c['id'])),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
         Center(
-          child: NgmyMenuQrWidget(
+          child: NgmyMenuQrDisplay(
             data: qrUrl,
             style: doc.qrStyle,
+            restaurantName: doc.restaurantName,
+            tagline: doc.tagline,
             large: true,
             captureKey: _qrCaptureKey,
           ),
         ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _centerLabelC,
-          decoration: const InputDecoration(labelText: 'Center logo text (e.g. MC)', border: OutlineInputBorder()),
-          onChanged: (v) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(centerLabel: v)),
+        _panel(
+          t,
+          title: 'Customize QR',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _centerLabelC,
+                decoration: InputDecoration(
+                  labelText: 'Center logo text (e.g. MC)',
+                  filled: true,
+                  fillColor: t.fieldFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onChanged: (v) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(centerLabel: v)),
+              ),
+              const SizedBox(height: 12),
+              Text('Corner style', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: kNgmyMenuQrCornerStyles.map((c) {
+                  final sel = doc.qrStyle.cornerStyle == c['id'];
+                  return ChoiceChip(
+                    label: Text(c['label']!),
+                    selected: sel,
+                    onSelected: (_) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cornerStyle: c['id'])),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Text('Color presets', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: kNgmyMenuQrPresets.map((p) {
+                  return ActionChip(
+                    label: Text(p['label']!),
+                    onPressed: () => setState(() {
+                      doc.qrStyle = doc.qrStyle.copyWith(
+                        foreground: int.parse(p['fg']!),
+                        background: int.parse(p['bg']!),
+                        accent: int.parse(p['accent']!),
+                      );
+                    }),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: 14),
+        if (doc.publicUrl.isNotEmpty) _publishedLinkBar(t, doc.publicUrl),
         const SizedBox(height: 12),
-        const Text('Corner style', style: TextStyle(fontWeight: FontWeight.w800)),
-        Wrap(
-          spacing: 8,
-          children: kNgmyMenuQrCornerStyles.map((c) {
-            final sel = doc.qrStyle.cornerStyle == c['id'];
-            return ChoiceChip(
-              label: Text(c['label']!),
-              selected: sel,
-              onSelected: (_) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cornerStyle: c['id'])),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 12),
-        const Text('Color presets', style: TextStyle(fontWeight: FontWeight.w800)),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: kNgmyMenuQrPresets.map((p) {
-            return ActionChip(
-              label: Text(p['label']!),
-              onPressed: () => setState(() {
-                doc.qrStyle = doc.qrStyle.copyWith(
-                  foreground: int.parse(p['fg']!),
-                  background: int.parse(p['bg']!),
-                  accent: int.parse(p['accent']!),
-                );
-              }),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _shapeChip('Eyes: Circle', doc.qrStyle.eyeShape == 'circle', () => doc.qrStyle.copyWith(eyeShape: 'circle'))),
-            const SizedBox(width: 8),
-            Expanded(child: _shapeChip('Eyes: Square', doc.qrStyle.eyeShape == 'square', () => doc.qrStyle.copyWith(eyeShape: 'square'))),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: _shapeChip('Dots: Circle', doc.qrStyle.moduleShape == 'circle', () => doc.qrStyle.copyWith(moduleShape: 'circle'))),
-            const SizedBox(width: 8),
-            Expanded(child: _shapeChip('Dots: Square', doc.qrStyle.moduleShape == 'square', () => doc.qrStyle.copyWith(moduleShape: 'square'))),
-          ],
-        ),
-        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: _downloadQr,
                 icon: const Icon(Icons.download_rounded),
-                label: const Text('Save QR PNG'),
+                label: const Text('Save PNG'),
               ),
             ),
             if (doc.publicUrl.isNotEmpty) ...[
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => launchUrl(Uri.parse(doc.publicUrl), mode: LaunchMode.externalApplication),
-                  icon: const Icon(Icons.open_in_new_rounded),
-                  label: const Text('Open menu'),
+                  onPressed: () => _copyLink(doc.publicUrl),
+                  style: FilledButton.styleFrom(backgroundColor: _kMenuAccent, foregroundColor: Colors.black),
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copy link'),
                 ),
               ),
             ],
           ],
         ),
       ],
-    );
-  }
-
-  Widget _shapeChip(String label, bool selected, NgmyMenuQrStyle Function() apply) {
-    return FilterChip(
-      label: Text(label, style: const TextStyle(fontSize: 11)),
-      selected: selected,
-      onSelected: (_) => setState(() => _editing!.qrStyle = apply()),
-    );
-  }
-
-  Widget _topBar(NgmyHubTheme t, {required String title, required VoidCallback onBack}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
-      child: Row(
-        children: [
-          IconButton(onPressed: onBack, icon: Icon(Icons.arrow_back_rounded, color: t.title)),
-          Expanded(child: Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18), overflow: TextOverflow.ellipsis)),
-        ],
-      ),
     );
   }
 }
