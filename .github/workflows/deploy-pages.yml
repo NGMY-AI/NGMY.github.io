@@ -169,3 +169,13 @@ jobs:
           else
             echo "docs/ unchanged — skip push"
           fi
+
+          # Mirror to gh-pages branch root (ngmy.org Pages source is often gh-pages / root).
+          git checkout --orphan gh-pages-deploy
+          git rm -rf . 2>/dev/null || true
+          cp -r _site/* .
+          touch .nojekyll
+          printf '%s' 'ngmy.org' > CNAME
+          git add -A
+          git commit -m "Deploy web build to gh-pages for ngmy.org [skip ci]" || true
+          git push origin HEAD:gh-pages -f
