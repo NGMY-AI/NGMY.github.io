@@ -18,6 +18,11 @@ String ngmySwahiliPhoto(String photoId, {int w = 960, int h = 720}) {
   return 'https://images.unsplash.com/$photoId?w=$w&h=$h&fit=crop&q=92&auto=format&dpr=2';
 }
 
+/// Full-body portrait crop — use for tall / short so height is visible, not a face close-up.
+String ngmySwahiliPhotoBody(String photoId) {
+  return 'https://images.unsplash.com/$photoId?w=720&h=1080&fit=crop&crop=entropy&q=92&auto=format&dpr=2';
+}
+
 String _normSw(String s) => s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
 /// Strip punctuation so "Habari?" matches "habari".
@@ -25,19 +30,19 @@ String _normSwKey(String s) => _normSw(s).replaceAll(RegExp(r"[!?.,'""''`…]"),
 
 /// Exact Swahili phrase → accurate photo (checked before fuzzy keywords).
 final Map<String, SwahiliWordVisual> _kExactBySwahili = {
-  // Day 1 — people & descriptions (must be precise)
-  'mimi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1472099645785-5658abf4ff4e'), caption: 'I / me'),
-  'wewe / ninyi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529626455594-4ff0802cfb7e'), caption: 'You'),
-  'wewe': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529626455594-4ff0802cfb7e'), caption: 'You'),
+  // Day 1 — people & descriptions (photos must match meaning, not random portraits)
+  'mimi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1695835871463-ca6732c02551'), caption: 'I / me — pointing at self'),
+  'wewe / ninyi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'), caption: 'You — pointing at you'),
+  'wewe': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'), caption: 'You'),
   'yeye': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1507003211169-0a1dd7228f2d'), caption: 'He / she'),
   'sisi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529156069898-49953e39b3ac'), caption: 'We / us'),
-  'yeye ni mrefu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1506794778202-cad84cf45f1d'), caption: 'Tall person'),
-  'yeye ni mfupi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1519085360753-af0119f7cbe7'), caption: 'Short person'),
-  'yeye ni wangu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1532932371123-928bc0091ec0'), caption: 'Mine / belonging'),
+  'yeye ni mrefu': SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1567862140370-4ecd33c8e285'), caption: 'Tall — full height'),
+  'yeye ni mfupi': SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1738680482082-4defacddf94b'), caption: 'Short — full height'),
+  'yeye ni wangu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1519741497674-611481863552'), caption: 'Mine — my person'),
   'yeye ni daktari': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1612349317150-e413f6a5b16d'), caption: 'Doctor'),
-  'yeye ni maarufu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1492684223066-81342ee5ff30'), caption: 'Famous'),
-  'wana furaha': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1523240795612-9a054b0db644'), caption: 'They are happy'),
-  'nina furaha': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1535713875002-d1d0cf377fde'), caption: 'I am happy'),
+  'yeye ni maarufu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1772209254676-fbaa687f3060'), caption: 'Famous — paparazzi'),
+  'wana furaha': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1522075469751-3a6694fb2f61'), caption: 'They are happy'),
+  'nina furaha': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1535713875002-d1d0cf377fde'), caption: 'I am happy — big smile'),
   'tuko hapa': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1524661135-423995f22d0b'), caption: 'We are here'),
 
   // Day 2 — having things
@@ -172,15 +177,15 @@ class _VisualRule {
 final _kRules = <_VisualRule>[
   _VisualRule(['where are you going', 'unaenda wapi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1488646953014-85cb44e25828'))),
   _VisualRule(['going back home', 'ninarudi nyumbani'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1564013799919-ab600027ffc6'))),
-  _VisualRule(['they are happy', 'wana furaha'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1523240795612-9a054b0db644'))),
+  _VisualRule(['they are happy', 'wana furaha'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1522075469751-3a6694fb2f61'))),
   _VisualRule(['i am happy', 'nina furaha'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1535713875002-d1d0cf377fde'))),
-  _VisualRule(['she/he is tall', 'is tall', 'ni mrefu', 'mrefu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1506794778202-cad84cf45f1d'))),
-  _VisualRule(['she/he is short', 'is short', 'ni mfupi', 'mfupi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1519085360753-af0119f7cbe7'))),
-  _VisualRule(['she/he is mine', 'ni wangu', ' is mine'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1532932371123-928bc0091ec0'))),
+  _VisualRule(['she/he is tall', 'is tall', 'ni mrefu', 'mrefu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1567862140370-4ecd33c8e285'))),
+  _VisualRule(['she/he is short', 'is short', 'ni mfupi', 'mfupi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1738680482082-4defacddf94b'))),
+  _VisualRule(['she/he is mine', 'ni wangu', ' is mine'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1519741497674-611481863552'))),
   _VisualRule(['at work', 'kazini'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1497366216548-37526070297c'))),
   _VisualRule(['at school', 'shuleni', 'shule'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1503676260728-1c00da094a0b'))),
   _VisualRule(['doctor', 'daktari'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1612349317150-e413f6a5b16d'))),
-  _VisualRule(['famous', 'maarufu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1492684223066-81342ee5ff30'))),
+  _VisualRule(['famous', 'maarufu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1772209254676-fbaa687f3060'))),
   _VisualRule(['we are here', 'tuko hapa', 'i am here', 'niko hapa'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1524661135-423995f22d0b'))),
   _VisualRule(['at home', 'nyumbani'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1568605114967-8130f3a36994'))),
   _VisualRule(['have a friend', 'rafiki'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529156069898-49953e39b3ac'))),
@@ -240,10 +245,10 @@ final _kRules = <_VisualRule>[
   _VisualRule(['speak', 'ongea'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1472099645785-5658abf4ff4e'))),
   _VisualRule(['strong', 'nguvu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1534438327276-14e5300c3a48'))),
   _VisualRule(['weak', 'dhaifu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1544005313-94ddf0286df2'))),
-  _VisualRule([' i / me', 'mimi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1472099645785-5658abf4ff4e'))),
-  _VisualRule([' you', 'wewe'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529626455594-4ff0802cfb7e'))),
+  _VisualRule([' i / me', 'mimi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1695835871463-ca6732c02551'))),
+  _VisualRule([' you', 'wewe'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'))),
   _VisualRule([' we ', 'sisi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529156069898-49953e39b3ac'))),
-  _VisualRule([' they', 'wana'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1523240795612-9a054b0db644'))),
+  _VisualRule([' they', 'wana'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1522075469751-3a6694fb2f61'))),
   _VisualRule([' he ', ' she ', 'yeye'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1507003211169-0a1dd7228f2d'))),
   _VisualRule(['can help', 'kusaidia', 'naweza'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1521791136064-7986c2920216'))),
   _VisualRule(["can't go", 'siwezi', 'kwenda'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1488646953014-85cb44e25828'))),
