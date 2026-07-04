@@ -1541,14 +1541,6 @@ Future<bool> ngmyAdminPersistManagementConfig(AppConfig config) async {
     }
   }
 
-  if (config.termsAndConditions.trim().isNotEmpty || config.privacyPolicy.trim().isNotEmpty) {
-    unawaited(
-      _persistLegalContentToCloud(
-        config.termsAndConditions,
-        config.privacyPolicy,
-      ),
-    );
-  }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk || true;
 }
