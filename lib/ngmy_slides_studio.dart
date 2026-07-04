@@ -9,6 +9,7 @@ import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
@@ -228,6 +229,35 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       _selectedElementId = null;
       _clearTextControllers();
     });
+  }
+
+  void _openMarriageDraft(NgmySlideDeck deck) {
+    setState(() {
+      _activeDeck = deck.copy();
+      _slideIndex = 0;
+      _selectedElementId = null;
+      _isDraft = true;
+      _undo.clear();
+      _redo.clear();
+      _clearTextControllers();
+      _syncTextControllersForCurrentSlide();
+      _ribbonTab = 'Home';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tap fields to edit names & amounts. Use Sign for signatures. Print from the View tab.'),
+        duration: Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _launchMarriageAgreement() {
+    launchNgmyMarriageAgreement(
+      context: context,
+      savedDecks: _decks,
+      openDraftEditor: _openMarriageDraft,
+      openSavedDeck: _openDeck,
+    );
   }
 
   void _openDraftEditor({String? name, bool sample = false}) {
@@ -1214,6 +1244,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                   await _persistDecks();
                 },
               ),
+              onTrailingTap: _launchMarriageAgreement,
             ),
             const SizedBox(height: 18),
             Row(
@@ -1446,13 +1477,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
           height: 36,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
-            gradient: LinearGradient(colors: [const Color(0xFF2563EB), const Color(0xFF1D4ED8)]),
+            gradient: LinearGradient(
+              colors: deck.isMarriageAgreement
+                  ? [const Color(0xFFB8860B), const Color(0xFF8B6914)]
+                  : [const Color(0xFF2563EB), const Color(0xFF1D4ED8)],
+            ),
           ),
-          child: const Icon(Icons.slideshow_rounded, color: Colors.white, size: 22),
+          child: Icon(
+            deck.isMarriageAgreement ? Icons.description_rounded : Icons.slideshow_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
         ),
         title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
         subtitle: Text(
-          '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
+          deck.isMarriageAgreement
+              ? 'Marriage certificate • ${deck.marriageState ?? 'U.S.'}'
+              : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
         ),
         trailing: IconButton(
@@ -2443,7 +2484,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     required IconData icon,
     required Color accent,
     VoidCallback? onIconTap,
+    VoidCallback? onTrailingTap,
   }) {
+    const marriageAccent = Color(0xFFB8860B);
     return Row(
       children: [
         Material(
@@ -2496,6 +2539,33 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             ],
           ),
         ),
+        if (onTrailingTap != null) ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Marriage agreement (Hati ya Ndoa)',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTrailingTap,
+                borderRadius: BorderRadius.circular(12),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFF8B6914)]),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: marriageAccent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(Icons.description_rounded, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

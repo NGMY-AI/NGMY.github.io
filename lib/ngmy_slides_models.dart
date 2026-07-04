@@ -314,6 +314,8 @@ class NgmySlideDeck {
     this.themeId = 'office_blue',
     this.aspectRatio = NgmySlideAspectRatio.landscape169,
     this.autoAdvanceSeconds = 5,
+    this.deckKind,
+    this.marriageState,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -326,6 +328,11 @@ class NgmySlideDeck {
   int autoAdvanceSeconds;
   DateTime updatedAt;
   List<NgmySlide> slides;
+  /// e.g. `marriage_agreement` for Congolese marriage certificates.
+  String? deckKind;
+  String? marriageState;
+
+  bool get isMarriageAgreement => deckKind == 'marriage_agreement';
 
   double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
 
@@ -336,6 +343,8 @@ class NgmySlideDeck {
         aspectRatio: aspectRatio,
         autoAdvanceSeconds: autoAdvanceSeconds,
         updatedAt: updatedAt,
+        deckKind: deckKind,
+        marriageState: marriageState,
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -346,6 +355,8 @@ class NgmySlideDeck {
         'aspectRatio': aspectRatio.name,
         'autoAdvanceSeconds': autoAdvanceSeconds,
         'updatedAt': updatedAt.toUtc().toIso8601String(),
+        if (deckKind != null) 'deckKind': deckKind,
+        if (marriageState != null) 'marriageState': marriageState,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -356,6 +367,8 @@ class NgmySlideDeck {
         aspectRatio: _aspectFromJson(json['aspectRatio']),
         autoAdvanceSeconds: (json['autoAdvanceSeconds'] as num?)?.toInt().clamp(1, 120) ?? 5,
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
+        deckKind: json['deckKind']?.toString(),
+        marriageState: json['marriageState']?.toString(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))
