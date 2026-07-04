@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_swahili_curriculum.dart';
+import 'ngmy_swahili_word_enrichment.dart';
 
 void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
   Navigator.of(context).push<void>(
@@ -120,7 +122,6 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
             setState(() => _progress.markDayDone(levelIndex, dayIndex));
             await _save();
           },
-          onWordTap: _showWordDetail,
         ),
       ),
     ).then((_) => setState(() {}));
@@ -160,97 +161,35 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
     );
   }
 
-  void _showWordDetail(SwahiliWord word) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _WordDetailSheet(word: word, isDark: isDark),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B1018) : const Color(0xFFF0FDF4);
+    final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
 
     return Scaffold(
       backgroundColor: bg,
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF059669)))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD97706)))
           : CustomScrollView(
               slivers: [
-                SliverAppBar(
-                  expandedHeight: 200,
-                  pinned: true,
-                  backgroundColor: const Color(0xFF059669),
-                  leading: IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF047857), Color(0xFF059669), Color(0xFF14B8A6)],
-                        ),
-                      ),
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Column(
+                        children: [
+                          Row(
                             children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
-                                ),
-                                child: const Icon(Icons.person_rounded, color: Colors.white, size: 42),
+                              IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white70 : const Color(0xFF475569)),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Mwalimu Amina',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.85),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const Text(
-                                      'Kiswahili School',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        height: 1.1,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Learn step by step · Pass each test with 70%+',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.88),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              const Spacer(),
                             ],
                           ),
-                        ),
+                          _SchoolHomeHeader(isDark: isDark),
+                        ],
                       ),
                     ),
                   ),
@@ -292,6 +231,95 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _SchoolHomeHeader extends StatelessWidget {
+  const _SchoolHomeHeader({required this.isDark});
+
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = isDark ? const Color(0xFF1A2030) : Colors.white;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.45)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E3A5F), Color(0xFF2D4A6F)],
+              ),
+              border: Border.all(color: const Color(0xFFD97706), width: 2),
+            ),
+            child: const Icon(Icons.person_rounded, color: Color(0xFFFDE68A), size: 38),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'MWALIMU AMINA',
+                    style: TextStyle(
+                      color: Color(0xFFD97706),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Shule ya Kiswahili',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Jifunze hatua kwa hatua · Pita mtihani kwa 70% au zaidi',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -512,7 +540,6 @@ class _SwahiliLessonPage extends StatefulWidget {
     required this.dayIndex,
     required this.day,
     required this.onComplete,
-    required this.onWordTap,
   });
 
   final SwahiliLevel level;
@@ -520,7 +547,6 @@ class _SwahiliLessonPage extends StatefulWidget {
   final int dayIndex;
   final SwahiliLessonDay day;
   final VoidCallback onComplete;
-  final void Function(SwahiliWord word) onWordTap;
 
   @override
   State<_SwahiliLessonPage> createState() => _SwahiliLessonPageState();
@@ -528,17 +554,43 @@ class _SwahiliLessonPage extends StatefulWidget {
 
 class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
   bool _completed = false;
+  final Map<String, int> _studySeconds = {};
+
+  int get _studiedCount => widget.day.words.where((w) => _isStudied(w.swahili)).length;
+
+  bool _isStudied(String key) => (_studySeconds[key] ?? 0) >= kSwahiliMinStudySeconds;
+
+  bool get _allStudied => _studiedCount >= widget.day.words.length;
+
+  Future<void> _openWord(SwahiliWord word) async {
+    final key = word.swahili;
+    final prior = _studySeconds[key] ?? 0;
+    final added = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _WordDetailSheet(
+        rich: enrichSwahiliWord(word),
+        isDark: Theme.of(ctx).brightness == Brightness.dark,
+        priorSeconds: prior,
+      ),
+    );
+    if (added != null && mounted) {
+      setState(() => _studySeconds[key] = added);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B1018) : const Color(0xFFF8FAFC);
+    final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: widget.level.color,
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+        elevation: 0,
         title: Text(widget.day.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
       ),
       body: ListView(
@@ -547,24 +599,50 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: widget.level.color.withValues(alpha: 0.12),
+              color: isDark ? const Color(0xFF1A2030) : Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: widget.level.color.withValues(alpha: 0.3)),
+              border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.lightbulb_rounded, color: Color(0xFFF59E0B), size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${widget.day.subtitle}\nTap any word for a simple explanation.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: isDark ? Colors.white70 : const Color(0xFF475569),
-                      fontWeight: FontWeight.w600,
-                    ),
+                Text(
+                  widget.day.subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. Usikome hadi uelewe vizuri.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: widget.day.words.isEmpty ? 0 : _studiedCount / widget.day.words.length,
+                          minHeight: 8,
+                          backgroundColor: const Color(0xFFD97706).withValues(alpha: 0.15),
+                          color: const Color(0xFFD97706),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '$_studiedCount/${widget.day.words.length}',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -573,32 +651,49 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
           ...widget.day.words.map(
             (w) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _WordCard(word: w, color: widget.level.color, isDark: isDark, onTap: () => widget.onWordTap(w)),
+              child: _WordCard(
+                word: w,
+                color: widget.level.color,
+                isDark: isDark,
+                studied: _isStudied(w.swahili),
+                studySeconds: _studySeconds[w.swahili] ?? 0,
+                onTap: () => _openWord(w),
+              ),
             ),
           ),
           const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed: _completed
+            onPressed: (_completed || !_allStudied)
                 ? null
                 : () {
                     widget.onComplete();
                     setState(() => _completed = true);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Day ${widget.dayIndex + 1} complete! ${widget.dayIndex < 4 ? 'Come back for the next day.' : 'You can take the test now.'}'),
-                        backgroundColor: widget.level.color,
+                        content: Text(
+                          widget.dayIndex < 4
+                              ? 'Siku ${widget.dayIndex + 1} imekamilika! Rudi kesho kwa siku inayofuata.'
+                              : 'Siku ${widget.dayIndex + 1} imekamilika! Unaweza kufanya mtihani sasa.',
+                        ),
+                        backgroundColor: const Color(0xFFD97706),
                       ),
                     );
                   },
             style: FilledButton.styleFrom(
-              backgroundColor: widget.level.color,
+              backgroundColor: const Color(0xFFD97706),
+              disabledBackgroundColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             icon: Icon(_completed ? Icons.check_rounded : Icons.done_all_rounded),
             label: Text(
-              _completed ? 'Day marked complete' : 'I finished this day',
-              style: const TextStyle(fontWeight: FontWeight.w900),
+              _completed
+                  ? 'Siku imekamilika'
+                  : _allStudied
+                      ? 'Nimemaliza siku hii'
+                      : 'Bofya maneno yote (sek $kSwahiliMinStudySeconds kila moja)',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -612,17 +707,22 @@ class _WordCard extends StatelessWidget {
     required this.word,
     required this.color,
     required this.isDark,
+    required this.studied,
+    required this.studySeconds,
     required this.onTap,
   });
 
   final SwahiliWord word;
   final Color color;
   final bool isDark;
+  final bool studied;
+  final int studySeconds;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final card = isDark ? const Color(0xFF151D2B) : Colors.white;
+    final card = isDark ? const Color(0xFF1A2030) : Colors.white;
+    final borderColor = studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.25);
     return Material(
       color: card,
       borderRadius: BorderRadius.circular(16),
@@ -633,10 +733,16 @@ class _WordCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.25)),
+            border: Border.all(color: borderColor, width: studied ? 1.8 : 1),
           ),
           child: Row(
             children: [
+              Icon(
+                studied ? Icons.check_circle_rounded : Icons.touch_app_rounded,
+                size: 20,
+                color: studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 flex: 5,
                 child: Text(
@@ -648,7 +754,7 @@ class _WordCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded, size: 18, color: color.withValues(alpha: 0.6)),
+              Icon(Icons.arrow_forward_rounded, size: 18, color: color.withValues(alpha: 0.5)),
               Expanded(
                 flex: 5,
                 child: Text(
@@ -661,8 +767,13 @@ class _WordCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.info_outline_rounded, size: 18, color: color),
+              if (!studied && studySeconds > 0) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '${kSwahiliMinStudySeconds - studySeconds}s',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+                ),
+              ],
             ],
           ),
         ),
@@ -671,117 +782,261 @@ class _WordCard extends StatelessWidget {
   }
 }
 
-class _WordDetailSheet extends StatelessWidget {
-  const _WordDetailSheet({required this.word, required this.isDark});
+class _WordDetailSheet extends StatefulWidget {
+  const _WordDetailSheet({
+    required this.rich,
+    required this.isDark,
+    required this.priorSeconds,
+  });
 
-  final SwahiliWord word;
+  final SwahiliRichWord rich;
   final bool isDark;
+  final int priorSeconds;
+
+  @override
+  State<_WordDetailSheet> createState() => _WordDetailSheetState();
+}
+
+class _WordDetailSheetState extends State<_WordDetailSheet> {
+  Timer? _timer;
+  int _sessionSeconds = 0;
+
+  int get _totalSeconds => widget.priorSeconds + _sessionSeconds;
+
+  bool get _studied => _totalSeconds >= kSwahiliMinStudySeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _sessionSeconds++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final card = isDark ? const Color(0xFF151D2B) : Colors.white;
+    final word = widget.rich.base;
+    final card = widget.isDark ? const Color(0xFF1A2030) : Colors.white;
+    final remaining = (kSwahiliMinStudySeconds - _totalSeconds).clamp(0, kSwahiliMinStudySeconds);
+
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: card,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.88,
+          minChildSize: 0.45,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scroll) => Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Container(
+              decoration: BoxDecoration(
+                color: card,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
               ),
-              const SizedBox(height: 16),
-              Text(
-                word.swahili,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : const Color(0xFF059669),
-                ),
-              ),
-              Text(
-                word.english,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white70 : const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Say it: ${word.pronunciation}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
-                  color: isDark ? Colors.white54 : const Color(0xFF94A3B8),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _detailBlock('Easy explanation', word.explanation, isDark),
-              if (word.grammar.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _detailBlock('Grammar tip', word.grammar, isDark),
-              ],
-              if (word.example.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _detailBlock('Example', word.example, isDark),
-              ],
-              if (word.breakdown.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text('Word parts', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: word.breakdown
-                      .map(
-                        (b) => Chip(
-                          label: Text(b, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                          backgroundColor: const Color(0xFF059669).withValues(alpha: 0.12),
-                          side: BorderSide(color: const Color(0xFF059669).withValues(alpha: 0.35)),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
-                      )
-                      .toList(),
-                ),
-              ],
-            ],
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _studied
+                                ? const Color(0xFF059669).withValues(alpha: 0.15)
+                                : const Color(0xFFD97706).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _studied ? Icons.check_circle_rounded : Icons.timer_rounded,
+                                size: 18,
+                                color: _studied ? const Color(0xFF059669) : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _studied
+                                      ? 'Umekamilisha kusoma neno hili — vizuri!'
+                                      : 'Soma angalau sekunde $remaining zaidi',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: widget.isDark ? Colors.white70 : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      controller: scroll,
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                      children: [
+                        Text(
+                          word.swahili,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: widget.isDark ? Colors.white : const Color(0xFF1E3A5F),
+                          ),
+                        ),
+                        Text(
+                          word.english,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tamkwa: ${word.pronunciation}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _detailBlock('Maelezo rahisi', widget.rich.explanationSw),
+                        const SizedBox(height: 12),
+                        _detailBlock('Kidokezo cha sarufi', widget.rich.grammarSw),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Vidokezo vya kukusaidia',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...widget.rich.tipsSw.map(
+                          (t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('• ', style: TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.w900)),
+                                Expanded(child: Text(t, style: _bodyStyle)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Mifano ya matumizi',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: widget.isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...widget.rich.examples.map(
+                          (ex) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: widget.isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: const Color(0xFF1E3A5F).withValues(alpha: 0.15)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(ex.swahili, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: widget.isDark ? Colors.white : const Color(0xFF1E293B))),
+                                  const SizedBox(height: 4),
+                                  Text('Kiingereza: ${ex.english}', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : const Color(0xFF64748B))),
+                                  if (ex.partNotes.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    ...ex.partNotes.map(
+                                      (n) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 2),
+                                        child: Text('↳ $n', style: TextStyle(fontSize: 11, height: 1.35, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8))),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, _totalSeconds),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E3A5F),
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                      child: Text(
+                        _studied ? 'Nimeelewa — funga' : 'Funga (endelea kusoma)',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _detailBlock(String title, String body, bool isDark) {
+  TextStyle get _bodyStyle => TextStyle(
+        fontSize: 14,
+        height: 1.5,
+        color: widget.isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
+      );
+
+  Widget _detailBlock(String title, String body) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+        color: widget.isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.2)),
+        border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF059669))),
-          const SizedBox(height: 4),
-          Text(
-            body,
-            style: TextStyle(fontSize: 14, height: 1.45, color: isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155)),
-          ),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFFD97706))),
+          const SizedBox(height: 6),
+          Text(body, style: _bodyStyle),
         ],
       ),
     );
