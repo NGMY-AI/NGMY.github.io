@@ -54,7 +54,7 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
 - alarm — title, start (ISO local wake time), notes (optional) — sets alarm on the user's phone (notification or Clock); never tell user to keep NGMY open
-- open_tool — tool (spark_lounge, video_studio, virtual_device, mechanic_lab, ai_outfit, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
+- open_tool — tool (spark_lounge, video_studio, virtual_device, swahili_school, ai_outfit, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
 - whatsapp — name OR phone, body (optional)
@@ -72,7 +72,7 @@ Rules:
 - REQUIRED calendar block for any meeting/appointment request.
 - REQUIRED alarm block when user says wake me, set alarm, timer, remind me in X minutes/hours, or needs alarm before work/shift/meeting.
 - For relative times ("in 2 minutes", "in 2 hours") set start to now + that duration as ISO local datetime.
-- When user asks to open a NGMY feature (games, video studio, virtual phones, mechanic lab, QR, invoice), use open_tool — do NOT tell them to navigate manually.
+- When user asks to open a NGMY feature (games, video studio, virtual phones, Kiswahili school, QR, invoice), use open_tool — do NOT tell them to navigate manually.
 - start/end must be valid ISO datetimes in local timezone.
 - You cannot read private Facebook/Instagram/Messenger activity from the phone app. If asked to read activity, explain that Meta requires official account authorization/API approval, then offer to open the app/link or analyze content the user shares.
 ''';

@@ -5,7 +5,7 @@ import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_creator.dart';
 import 'ngmy_studio_hub.dart' show showNgmyStandaloneQuoteCalc;
-import 'ngmy_mechanic_studio.dart';
+import 'ngmy_swahili_school.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
@@ -40,9 +40,13 @@ void ngmyRegisterAiAppTools({
         await openNgmyVirtualDevice(context: ctx, userEmail: userEmail);
         return 'Opened Virtual Device fleet.';
       },
+      'swahili_school': (ctx) async {
+        showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
+        return 'Opened Kiswahili School — learn Swahili with Mwalimu Amina.';
+      },
       'mechanic_lab': (ctx) async {
-        showNgmyMechanicStudio(context: ctx);
-        return 'Opened 3D Mechanic Lab.';
+        showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
+        return 'Opened Kiswahili School.';
       },
       'ai_outfit': (ctx) async {
         showNgmyOutfitStudio(

@@ -13,8 +13,10 @@ List<NgmyPhoneAction> ngmyInferOpenToolActionsFromUserMessage(String userText) {
     tool = 'video_studio';
   } else if (RegExp(r'\b(virtual device|virtual phone|phone fleet|youtube fleet)\b').hasMatch(lower)) {
     tool = 'virtual_device';
+  } else if (RegExp(r'\b(swahili|kiswahili|learn swahili|swahili school)\b').hasMatch(lower)) {
+    tool = 'swahili_school';
   } else if (RegExp(r'\b(mechanic lab|3d mechanic|car mechanic)\b').hasMatch(lower)) {
-    tool = 'mechanic_lab';
+    tool = 'swahili_school';
   } else if (RegExp(r'\b(ai outfit|outfit studio|dress try)\b').hasMatch(lower)) {
     tool = 'ai_outfit';
   } else if (RegExp(r'\b(qr generator|qr code|make qr)\b').hasMatch(lower)) {

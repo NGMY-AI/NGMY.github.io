@@ -7,7 +7,7 @@ import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_creator.dart';
-import 'ngmy_mechanic_studio.dart';
+import 'ngmy_swahili_school.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
@@ -80,7 +80,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
     @override
     Widget build(BuildContext context) {
-      // Pinned order: Doc Share → Pick Two → QR Generator → AI Outfit → Play Zone → Video Studio → 3D Mechanic Lab.
+      // Pinned order: Doc Share → Quote Calc → QR Generator → AI Outfit → Play Zone → Video Studio → Kiswahili School.
       final tools = <_CreatorTool>[
         _CreatorTool(
           icon: Icons.folder_shared_rounded,
@@ -153,11 +153,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         onTap: () => showNgmyVideoStudio(context),
       ),
       _CreatorTool(
-        icon: Icons.precision_manufacturing_rounded,
-        colors: const [Color(0xFFF97316), Color(0xFF0EA5E9)],
-        title: '3D Mechanic Lab',
-        subtitle: 'Disassemble cars & learn parts',
-        onTap: () => showNgmyMechanicStudio(context: context),
+        icon: Icons.translate_rounded,
+        colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
+        title: 'Kiswahili School',
+        subtitle: 'Learn Swahili step by step · Mwalimu Amina',
+        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
       ),
       _CreatorTool(
         icon: Icons.smartphone_rounded,
