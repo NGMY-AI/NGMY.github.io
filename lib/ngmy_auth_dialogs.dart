@@ -20,7 +20,7 @@ Future<void> showNgmyResetAppDataDialog(BuildContext context) async {
   await p.clear();
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('System reset complete. Please restart the app.')),
+    const SnackBar(content: Text('Local data cleared. Please reload the app.')),
   );
 }
 
@@ -95,7 +95,7 @@ class _NgmyResetAppDataDialogState extends State<_NgmyResetAppDataDialog> with S
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'This clears saved data on this device and signs everyone out. Only use this if the app is stuck loading or login fails.',
+                            'This clears saved data on this device only. Use this if the app is stuck loading or login fails.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 13, height: 1.45),
                           ),
