@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'ngmy_menu_launch_stub.dart' if (dart.library.html) 'ngmy_menu_launch_web.dart';
+import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
+import 'ngmy_menu_launch_stub.dart' if (dart.library.html) 'ngmy_menu_launch_web.dart';
 import 'ngmy_menu_publish_registry.dart';
 import 'ngmy_menu_renderer.dart';
 
@@ -58,8 +59,10 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
       final entry = await NgmyMenuPublishRegistry.fetchBySlug(widget.slug);
       if (!mounted) return;
       if (entry != null && entry['data'] is Map) {
+        final doc = NgmyMenuDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+        doc.ensureMenuPages();
         setState(() {
-          _doc = NgmyMenuDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+          _doc = doc;
           _loading = false;
         });
         return;
@@ -113,17 +116,37 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     }
 
     final doc = _doc!;
+    final pages = doc.effectivePages;
+    final bg = ngmyMenuPageBackgroundColor(doc.pageBackground);
+
     return Scaffold(
-      backgroundColor: ngmyMenuPageBackgroundColor(doc.pageBackground),
+      backgroundColor: bg,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: NgmyMenuPreview(document: doc),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: pages.length == 1
+                  ? _menuPage(doc, 0)
+                  : PageView.builder(
+                      itemCount: pages.length,
+                      itemBuilder: (_, i) => _menuPage(doc, i),
+                    ),
             ),
-          ),
+            NgmyMenuGuestFooter(links: doc.socialLinks),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _menuPage(NgmyMenuDocument doc, int index) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: NgmyMenuPreview(document: doc, pageIndex: index),
         ),
       ),
     );

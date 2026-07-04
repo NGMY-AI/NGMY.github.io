@@ -23,6 +23,93 @@ Color ngmyMenuPageBackgroundColor(String id) {
       .color;
 }
 
+const int kNgmyMenuMaxPages = 10;
+
+/// One swipeable menu inside a published link (e.g. Lunch, Drinks).
+class NgmyMenuPage {
+  NgmyMenuPage({
+    required this.id,
+    this.title = 'Menu',
+    this.tagline = '',
+    this.templateId = '',
+    this.sections = const [],
+  });
+
+  String id;
+  String title;
+  String tagline;
+  /// Empty uses the document's [NgmyMenuDocument.templateId].
+  String templateId;
+  List<NgmyMenuSection> sections;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'tagline': tagline,
+        'templateId': templateId,
+        'sections': sections.map((s) => s.toJson()).toList(),
+      };
+
+  factory NgmyMenuPage.fromJson(Map<String, dynamic> json) => NgmyMenuPage(
+        id: (json['id'] ?? ngmyMenuNewId()).toString(),
+        title: (json['title'] ?? 'Menu').toString(),
+        tagline: (json['tagline'] ?? '').toString(),
+        templateId: (json['templateId'] ?? '').toString(),
+        sections: (json['sections'] as List?)
+                ?.map((e) => NgmyMenuSection.fromJson(Map<String, dynamic>.from(e as Map)))
+                .toList() ??
+            [],
+      );
+
+  NgmyMenuPage copy() => NgmyMenuPage.fromJson(toJson());
+}
+
+/// Optional social + website links shown at the bottom of guest menus.
+class NgmyMenuSocialLinks {
+  const NgmyMenuSocialLinks({
+    this.instagram = '',
+    this.facebook = '',
+    this.youtube = '',
+    this.website = '',
+  });
+
+  final String instagram;
+  final String facebook;
+  final String youtube;
+  final String website;
+
+  bool get hasSocial => instagram.trim().isNotEmpty || facebook.trim().isNotEmpty || youtube.trim().isNotEmpty;
+
+  bool get hasWebsite => website.trim().isNotEmpty;
+
+  bool get hasAny => hasSocial || hasWebsite;
+
+  Map<String, dynamic> toJson() => {
+        'instagram': instagram,
+        'facebook': facebook,
+        'youtube': youtube,
+        'website': website,
+      };
+
+  factory NgmyMenuSocialLinks.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const NgmyMenuSocialLinks();
+    return NgmyMenuSocialLinks(
+      instagram: (json['instagram'] ?? '').toString(),
+      facebook: (json['facebook'] ?? '').toString(),
+      youtube: (json['youtube'] ?? '').toString(),
+      website: (json['website'] ?? '').toString(),
+    );
+  }
+
+  NgmyMenuSocialLinks copyWith({String? instagram, String? facebook, String? youtube, String? website}) =>
+      NgmyMenuSocialLinks(
+        instagram: instagram ?? this.instagram,
+        facebook: facebook ?? this.facebook,
+        youtube: youtube ?? this.youtube,
+        website: website ?? this.website,
+      );
+}
+
 /// Restaurant / business menu document for NGMY Menu Studio.
 class NgmyMenuDocument {
   NgmyMenuDocument({
@@ -32,6 +119,8 @@ class NgmyMenuDocument {
     this.templateId = 'gold_luxe',
     this.pageBackground = 'white',
     this.sections = const [],
+    this.menuPages = const [],
+    this.socialLinks = const NgmyMenuSocialLinks(),
     this.slug = '',
     this.publicUrl = '',
     this.status = 'draft',
@@ -45,6 +134,8 @@ class NgmyMenuDocument {
   String templateId;
   String pageBackground;
   List<NgmyMenuSection> sections;
+  List<NgmyMenuPage> menuPages;
+  NgmyMenuSocialLinks socialLinks;
   String slug;
   String publicUrl;
   String status;
@@ -53,36 +144,98 @@ class NgmyMenuDocument {
 
   bool get isPublished => status == 'published' && slug.isNotEmpty;
 
-  Map<String, dynamic> toJson() => {
+  /// Pages guests swipe through — at least one menu.
+  List<NgmyMenuPage> get effectivePages {
+    if (menuPages.isNotEmpty) return menuPages;
+    return [
+      NgmyMenuPage(
+        id: 'main',
+        title: 'Menu',
+        tagline: tagline,
+        templateId: templateId,
+        sections: sections,
+      ),
+    ];
+  }
+
+  void ensureMenuPages() {
+    if (menuPages.isNotEmpty) return;
+    menuPages = [
+      NgmyMenuPage(
+        id: ngmyMenuNewId(),
+        title: 'Menu',
+        tagline: tagline,
+        templateId: templateId,
+        sections: sections.isNotEmpty
+            ? sections.map((s) => NgmyMenuSection(
+                  title: s.title,
+                  items: s.items.map((i) => NgmyMenuItem(name: i.name, description: i.description, ingredients: i.ingredients, price: i.price)).toList(),
+                )).toList()
+            : [NgmyMenuSection(title: 'Main', items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')])],
+      ),
+    ];
+    sections = menuPages.first.sections;
+  }
+
+  void syncLegacySectionsFromPages() {
+    if (menuPages.isNotEmpty) sections = menuPages.first.sections;
+  }
+
+  Map<String, dynamic> toJson() {
+    syncLegacySectionsFromPages();
+    return {
         'id': id,
         'restaurantName': restaurantName,
         'tagline': tagline,
         'templateId': templateId,
         'pageBackground': pageBackground,
         'sections': sections.map((s) => s.toJson()).toList(),
+        'menuPages': menuPages.map((p) => p.toJson()).toList(),
+        'socialLinks': socialLinks.toJson(),
         'slug': slug,
         'publicUrl': publicUrl,
         'status': status,
         'qrStyle': qrStyle.toJson(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
+  }
 
-  factory NgmyMenuDocument.fromJson(Map<String, dynamic> json) => NgmyMenuDocument(
+  factory NgmyMenuDocument.fromJson(Map<String, dynamic> json) {
+    final legacySections = (json['sections'] as List?)
+            ?.map((e) => NgmyMenuSection.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList() ??
+        [];
+    final pagesRaw = json['menuPages'];
+    List<NgmyMenuPage> pages = [];
+    if (pagesRaw is List && pagesRaw.isNotEmpty) {
+      pages = pagesRaw.map((e) => NgmyMenuPage.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } else if (legacySections.isNotEmpty) {
+      pages = [
+        NgmyMenuPage(
+          id: 'main',
+          title: 'Menu',
+          tagline: (json['tagline'] ?? '').toString(),
+          templateId: (json['templateId'] ?? 'gold_luxe').toString(),
+          sections: legacySections,
+        ),
+      ];
+    }
+    return NgmyMenuDocument(
         id: (json['id'] ?? '').toString(),
         restaurantName: (json['restaurantName'] ?? 'My Restaurant').toString(),
         tagline: (json['tagline'] ?? '').toString(),
         templateId: (json['templateId'] ?? 'gold_luxe').toString(),
         pageBackground: (json['pageBackground'] ?? 'white').toString(),
-        sections: (json['sections'] as List?)
-                ?.map((e) => NgmyMenuSection.fromJson(Map<String, dynamic>.from(e as Map)))
-                .toList() ??
-            [],
+        sections: pages.isNotEmpty ? pages.first.sections : legacySections,
+        menuPages: pages,
+        socialLinks: NgmyMenuSocialLinks.fromJson(json['socialLinks'] is Map ? Map<String, dynamic>.from(json['socialLinks'] as Map) : null),
         slug: (json['slug'] ?? '').toString(),
         publicUrl: (json['publicUrl'] ?? '').toString(),
         status: (json['status'] ?? 'draft').toString(),
         qrStyle: NgmyMenuQrStyle.fromJson(json['qrStyle'] is Map ? Map<String, dynamic>.from(json['qrStyle'] as Map) : null),
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
       );
+  }
 
   NgmyMenuDocument copy() => NgmyMenuDocument.fromJson(toJson());
 
@@ -279,18 +432,26 @@ String ngmyMenuSlugify(String name) {
   return s.length > 48 ? s.substring(0, 48) : s;
 }
 
-NgmyMenuDocument ngmyMenuBlankDocument() => NgmyMenuDocument(
-      id: ngmyMenuNewId(),
-      restaurantName: '',
-      tagline: '',
-      templateId: 'midnight_gold',
-      sections: [
-        NgmyMenuSection(
-          title: 'Main',
-          items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')],
-        ),
-      ],
-    );
+NgmyMenuDocument ngmyMenuBlankDocument() {
+  final page = NgmyMenuPage(
+    id: ngmyMenuNewId(),
+    title: 'Menu',
+    sections: [
+      NgmyMenuSection(
+        title: 'Main',
+        items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')],
+      ),
+    ],
+  );
+  return NgmyMenuDocument(
+    id: ngmyMenuNewId(),
+    restaurantName: '',
+    tagline: '',
+    templateId: 'midnight_gold',
+    menuPages: [page],
+    sections: page.sections,
+  );
+}
 
 /// Strip leading $ and keep digits/decimals for storage/display helpers.
 String ngmyMenuPriceDigits(String raw) {

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
 import 'ngmy_menu_publish_registry.dart';
 import 'ngmy_menu_qr.dart';
@@ -46,6 +47,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   NgmyMenuDocument? _editing;
   bool _publishing = false;
   int _tab = 0;
+  int _pageIndex = 0;
   final _qrCaptureKey = GlobalKey();
 
   final _nameC = TextEditingController();
@@ -56,6 +58,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   final _cardAddressC = TextEditingController();
   final _cardHoursC = TextEditingController();
   final _cardWebsiteC = TextEditingController();
+  final _socialInstagramC = TextEditingController();
+  final _socialFacebookC = TextEditingController();
+  final _socialYoutubeC = TextEditingController();
+  final _footerWebsiteC = TextEditingController();
 
   @override
   void initState() {
@@ -75,6 +81,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     _cardAddressC.dispose();
     _cardHoursC.dispose();
     _cardWebsiteC.dispose();
+    _socialInstagramC.dispose();
+    _socialFacebookC.dispose();
+    _socialYoutubeC.dispose();
+    _footerWebsiteC.dispose();
     super.dispose();
   }
 
@@ -92,19 +102,30 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     setState(() {
       _editing = doc;
       _tab = 0;
+      _pageIndex = 0;
       _bindEditors(doc);
     });
   }
 
   void _openMenu(NgmyMenuDocument doc) {
+    final copy = doc.copy();
+    copy.ensureMenuPages();
     setState(() {
-      _editing = doc.copy();
+      _editing = copy;
       _tab = 0;
-      _bindEditors(_editing!);
+      _pageIndex = 0;
+      _bindEditors(copy);
     });
   }
 
+  NgmyMenuPage get _activePage {
+    final doc = _editing!;
+    doc.ensureMenuPages();
+    return doc.menuPages[_pageIndex.clamp(0, doc.menuPages.length - 1)];
+  }
+
   void _bindEditors(NgmyMenuDocument doc) {
+    doc.ensureMenuPages();
     _nameC.text = doc.restaurantName;
     _taglineC.text = doc.tagline;
     _slugC.text = doc.slug;
@@ -113,6 +134,17 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     _cardAddressC.text = doc.qrStyle.cardAddress;
     _cardHoursC.text = doc.qrStyle.cardHours;
     _cardWebsiteC.text = doc.qrStyle.cardWebsite;
+    _socialInstagramC.text = doc.socialLinks.instagram;
+    _socialFacebookC.text = doc.socialLinks.facebook;
+    _socialYoutubeC.text = doc.socialLinks.youtube;
+    _footerWebsiteC.text = doc.socialLinks.website;
+    void socialPreview() {
+      if (mounted) setState(() {});
+    }
+    for (final c in [_socialInstagramC, _socialFacebookC, _socialYoutubeC, _footerWebsiteC]) {
+      c.removeListener(socialPreview);
+      c.addListener(socialPreview);
+    }
     _nameC.removeListener(_refreshPreview);
     _taglineC.removeListener(_refreshPreview);
     _nameC.addListener(_refreshPreview);
@@ -140,6 +172,13 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       cardHours: _cardHoursC.text.trim(),
       cardWebsite: _cardWebsiteC.text.trim(),
     );
+    doc.socialLinks = doc.socialLinks.copyWith(
+      instagram: _socialInstagramC.text.trim(),
+      facebook: _socialFacebookC.text.trim(),
+      youtube: _socialYoutubeC.text.trim(),
+      website: _footerWebsiteC.text.trim(),
+    );
+    doc.syncLegacySectionsFromPages();
   }
 
   Future<void> _pickCardLogo() async {
@@ -633,6 +672,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   }
 
   Widget _editTab(NgmyHubTheme t, NgmyMenuDocument doc) {
+    doc.ensureMenuPages();
+    final page = _activePage;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
@@ -650,14 +691,70 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         const SizedBox(height: 14),
         _panel(
           t,
+          title: 'Menu pages (optional)',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Add up to $kNgmyMenuMaxPages menus on one link. Guests swipe left/right — no tabs.',
+                style: TextStyle(color: t.subtitle, fontSize: 11, height: 1.35),
+              ),
+              const SizedBox(height: 10),
+              _menuPagePicker(t, doc),
+              const SizedBox(height: 10),
+              TextFormField(
+                initialValue: page.title,
+                style: TextStyle(color: t.title, fontWeight: FontWeight.w700),
+                decoration: InputDecoration(
+                  labelText: 'This menu page title',
+                  hintText: 'e.g. Lunch · Drinks · Desserts',
+                  labelStyle: TextStyle(color: t.subtitle, fontSize: 11),
+                  filled: true,
+                  fillColor: t.fieldFill,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+                ),
+                onChanged: (v) => setState(() => page.title = v),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _panel(
+          t,
+          title: 'Social & website (optional)',
+          child: Column(
+            children: [
+              Text('Shown at the bottom of your menu link. Leave blank to hide.', style: TextStyle(color: t.subtitle, fontSize: 11)),
+              const SizedBox(height: 10),
+              NgmyModernField(controller: _socialInstagramC, label: 'Instagram link', hint: 'https://instagram.com/yourpage', icon: Icons.camera_alt_outlined, accent: _kMenuAccent),
+              NgmyModernField(controller: _socialFacebookC, label: 'Facebook link', hint: 'https://facebook.com/yourpage', icon: Icons.facebook_outlined, accent: _kMenuAccent),
+              NgmyModernField(controller: _socialYoutubeC, label: 'YouTube link', hint: 'https://youtube.com/@yourchannel', icon: Icons.play_circle_outline_rounded, accent: _kMenuAccent),
+              NgmyModernField(controller: _footerWebsiteC, label: 'Website (bottom right)', hint: 'https://yourrestaurant.com', icon: Icons.language_rounded, accent: _kMenuAccent),
+              const SizedBox(height: 8),
+              NgmyMenuGuestFooter(
+                links: NgmyMenuSocialLinks(
+                  instagram: _socialInstagramC.text,
+                  facebook: _socialFacebookC.text,
+                  youtube: _socialYoutubeC.text,
+                  website: _footerWebsiteC.text,
+                ),
+                compact: true,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _panel(
+          t,
           title: 'Menu sections',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ...doc.sections.asMap().entries.map((e) => _sectionEditor(t, doc, e.key, e.value)),
+              ...page.sections.asMap().entries.map((e) => _sectionEditor(t, doc, e.key, e.value, page)),
               OutlinedButton.icon(
                 onPressed: () {
-                  setState(() => doc.sections.add(NgmyMenuSection(title: 'New Section', items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')])));
+                  setState(() => page.sections.add(NgmyMenuSection(title: 'New Section', items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')])));
                 },
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add section'),
@@ -670,11 +767,70 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         _panel(
           t,
           title: 'Live preview',
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: NgmyMenuPreview(document: doc, compact: true),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (doc.menuPages.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('Editing: ${page.title.trim().isEmpty ? 'Menu ${_pageIndex + 1}' : page.title}', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: NgmyMenuPreview(document: doc, pageIndex: _pageIndex, compact: true),
+              ),
+            ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _menuPagePicker(NgmyHubTheme t, NgmyMenuDocument doc) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ...doc.menuPages.asMap().entries.map((e) {
+          final i = e.key;
+          final p = e.value;
+          final sel = _pageIndex == i;
+          final label = p.title.trim().isEmpty ? 'Menu ${i + 1}' : p.title.trim();
+          return InputChip(
+            label: Text(label, style: TextStyle(fontWeight: sel ? FontWeight.w800 : FontWeight.w600, fontSize: 12)),
+            selected: sel,
+            onSelected: (_) => setState(() => _pageIndex = i),
+            selectedColor: _kMenuAccent.withValues(alpha: 0.25),
+            checkmarkColor: _kMenuAccent,
+            deleteIcon: doc.menuPages.length > 1 ? const Icon(Icons.close_rounded, size: 16) : null,
+            onDeleted: doc.menuPages.length > 1
+                ? () {
+                    setState(() {
+                      doc.menuPages.removeAt(i);
+                      if (_pageIndex >= doc.menuPages.length) _pageIndex = doc.menuPages.length - 1;
+                      doc.syncLegacySectionsFromPages();
+                    });
+                  }
+                : null,
+          );
+        }),
+        if (doc.menuPages.length < kNgmyMenuMaxPages)
+          ActionChip(
+            avatar: const Icon(Icons.add_rounded, size: 18, color: _kMenuAccent),
+            label: const Text('Add menu'),
+            onPressed: () {
+              setState(() {
+                doc.menuPages.add(
+                  NgmyMenuPage(
+                    id: ngmyMenuNewId(),
+                    title: 'Menu ${doc.menuPages.length + 1}',
+                    sections: [NgmyMenuSection(title: 'Main', items: [NgmyMenuItem(name: '', description: '', ingredients: '', price: '')])],
+                  ),
+                );
+                _pageIndex = doc.menuPages.length - 1;
+              });
+            },
+          ),
       ],
     );
   }
@@ -698,7 +854,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     );
   }
 
-  Widget _sectionEditor(NgmyHubTheme t, NgmyMenuDocument doc, int sIdx, NgmyMenuSection section) {
+  Widget _sectionEditor(NgmyHubTheme t, NgmyMenuDocument doc, int sIdx, NgmyMenuSection section, NgmyMenuPage page) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -727,7 +883,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                onPressed: () => setState(() => doc.sections.removeAt(sIdx)),
+                onPressed: () => setState(() => page.sections.removeAt(sIdx)),
               ),
             ],
           ),

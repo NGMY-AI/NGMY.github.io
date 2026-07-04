@@ -8,19 +8,42 @@ class NgmyMenuPreview extends StatelessWidget {
   const NgmyMenuPreview({
     super.key,
     required this.document,
+    this.pageIndex = 0,
     this.compact = false,
+    this.showPoweredBy = true,
   });
 
   final NgmyMenuDocument document;
+  final int pageIndex;
   final bool compact;
+  final bool showPoweredBy;
 
   double get _radius => compact ? 20.0 : 28.0;
 
   double get _innerRadius => compact ? 14.0 : 18.0;
 
+  NgmyMenuPage get _page {
+    final pages = document.effectivePages;
+    final idx = pageIndex.clamp(0, pages.length - 1);
+    return pages[idx];
+  }
+
+  String get _templateId {
+    final p = _page.templateId.trim();
+    return p.isNotEmpty ? p : document.templateId;
+  }
+
+  String get _displayTagline {
+    final pageTag = _page.tagline.trim();
+    if (pageTag.isNotEmpty) return pageTag;
+    return document.tagline.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final t = ngmyMenuTemplateById(document.templateId);
+    final page = _page;
+    final pages = document.effectivePages;
+    final t = ngmyMenuTemplateById(_templateId);
     final pad = compact ? 12.0 : 22.0;
     final radius = _radius;
 
@@ -94,11 +117,11 @@ class NgmyMenuPreview extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _header(t, document),
-                  if (document.tagline.trim().isNotEmpty) ...[
+                  _header(t, document, page, pages.length > 1),
+                  if (_displayTagline.isNotEmpty) ...[
                     SizedBox(height: compact ? 4 : 8),
                     Text(
-                      document.tagline,
+                      _displayTagline,
                       textAlign: _headerAlign(t),
                       style: TextStyle(
                         color: t.textSecondary,
@@ -110,14 +133,15 @@ class NgmyMenuPreview extends StatelessWidget {
                     ),
                   ],
                   SizedBox(height: compact ? 12 : 20),
-                  ...document.sections.map((s) => _section(t, s)),
+                  ...page.sections.map((s) => _section(t, s)),
                   SizedBox(height: compact ? 6 : 10),
-                  Center(
-                    child: Text(
-                      'Powered by NGMY Menu',
-                      style: TextStyle(color: t.textSecondary.withValues(alpha: 0.45), fontSize: compact ? 8 : 9, letterSpacing: 0.8),
+                  if (showPoweredBy)
+                    Center(
+                      child: Text(
+                        'Powered by NGMY Menu',
+                        style: TextStyle(color: t.textSecondary.withValues(alpha: 0.45), fontSize: compact ? 8 : 9, letterSpacing: 0.8),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -134,7 +158,7 @@ class NgmyMenuPreview extends StatelessWidget {
     };
   }
 
-  Widget _header(NgmyMenuTemplate t, NgmyMenuDocument doc) {
+  Widget _header(NgmyMenuTemplate t, NgmyMenuDocument doc, NgmyMenuPage page, bool showPageTitle) {
     final name = doc.restaurantName.trim().isEmpty ? 'Your Restaurant' : doc.restaurantName.trim();
     final isPlaceholder = doc.restaurantName.trim().isEmpty;
 
@@ -244,6 +268,19 @@ class NgmyMenuPreview extends StatelessWidget {
           Text('MENU', style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: compact ? 10 : 12, letterSpacing: 3)),
         if (t.headerStyle == 'magazine') SizedBox(height: compact ? 4 : 6),
         Text(name, textAlign: align, style: nameStyle),
+        if (showPageTitle && page.title.trim().isNotEmpty && page.title.trim().toLowerCase() != 'menu') ...[
+          SizedBox(height: compact ? 4 : 6),
+          Text(
+            page.title.trim(),
+            textAlign: align,
+            style: TextStyle(
+              color: t.accent,
+              fontWeight: FontWeight.w800,
+              fontSize: compact ? 11 : 14,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
         if (t.headerStyle == 'ornate') ...[
           SizedBox(height: compact ? 4 : 8),
           Container(
