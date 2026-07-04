@@ -44,6 +44,7 @@ New-Item -ItemType File -Path "docs\.nojekyll" -Force | Out-Null
 Set-Content -Path "docs\CNAME" -Value "ngmy.org" -Encoding ASCII -NoNewline
 
 Write-Host "`n[4/6] Stamp deploy id (cache bust for phones) ..."
+$utf8 = New-Object System.Text.UTF8Encoding $false
 $versionObj = @{
     app_name    = "ngmy"
     version     = "1.0.0"
@@ -52,16 +53,12 @@ $versionObj = @{
     deployed_at  = (Get-Date).ToUniversalTime().ToString("o")
 }
 $versionJson = $versionObj | ConvertTo-Json -Compress
-Set-Content -Path "docs\version.json" -Value $versionJson -Encoding UTF8
+[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot "docs\version.json"), $versionJson, $utf8)
 
 $indexPath = Join-Path $PSScriptRoot "docs\index.html"
-$html = Get-Content $indexPath -Raw
+$html = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "web\index.html"), $utf8)
 $html = $html.Replace("__NGMY_DEPLOY_ID__", $DeployId)
-# Keep base href="/" — web/index.html script sets __NGMY_BASE_PATH__ for github.io subpath
-if ($html -notmatch '<base href="/">') {
-    $html = $html -replace '<base href="[^"]*">', '<base href="/">'
-}
-Set-Content -Path $indexPath -Value $html -Encoding UTF8 -NoNewline
+[System.IO.File]::WriteAllText($indexPath, $html, $utf8)
 
 # SPA routing: /app/{user-slug} GitHub Pages paths load Flutter via 404.html fallback
 Copy-Item -Path $indexPath -Destination (Join-Path $PSScriptRoot "docs\404.html") -Force
