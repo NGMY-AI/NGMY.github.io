@@ -7,9 +7,9 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260704180329';
+const CACHE_NAME = CACHE_PREFIX + '20260704140634';
 
-const PRECACHE_URLS = ["./.last_build_id", "./.nojekyll", "./404.html", "./CNAME", "./assets/AssetManifest.bin", "./assets/AssetManifest.bin.json", "./assets/FontManifest.json", "./assets/NOTICES", "./assets/assets/fonts/Roboto-Bold.ttf", "./assets/assets/fonts/Roboto-Light.ttf", "./assets/assets/fonts/Roboto-Medium.ttf", "./assets/assets/fonts/Roboto-Regular.ttf", "./assets/assets/images/ngmy_document_ask_icon.png", "./assets/assets/images/ngmy_logo.png", "./assets/assets/sounds/README.md", "./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3", "./assets/assets/sounds/income_cash.mp3", "./assets/assets/video_studio/yt_news_desk.png", "./assets/assets/video_studio/yt_studio_curved.png", "./assets/fonts/MaterialIcons-Regular.otf", "./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf", "./assets/packages/flutter_map/lib/assets/flutter_map_logo.png", "./assets/shaders/ink_sparkle.frag", "./assets/shaders/stretch_effect.frag", "./canvaskit/canvaskit.js", "./canvaskit/canvaskit.js.symbols", "./canvaskit/canvaskit.wasm", "./canvaskit/chromium/canvaskit.js", "./canvaskit/chromium/canvaskit.js.symbols", "./canvaskit/chromium/canvaskit.wasm", "./canvaskit/experimental_webparagraph/canvaskit.js", "./canvaskit/experimental_webparagraph/canvaskit.js.symbols", "./canvaskit/experimental_webparagraph/canvaskit.wasm", "./canvaskit/skwasm.js", "./canvaskit/skwasm.js.symbols", "./canvaskit/skwasm.wasm", "./canvaskit/skwasm_heavy.js", "./canvaskit/skwasm_heavy.js.symbols", "./canvaskit/skwasm_heavy.wasm", "./canvaskit/wimp.js", "./canvaskit/wimp.js.symbols", "./canvaskit/wimp.wasm", "./favicon.png", "./flutter.js", "./flutter_bootstrap.js", "./icons/Icon-192.png", "./icons/Icon-512.png", "./icons/Icon-maskable-192.png", "./icons/Icon-maskable-512.png", "./index.html", "./main.dart.js", "./main.dart.js_1.part.js", "./manifest.json", "./og-share.png", "./version.json"];
+const PRECACHE_URLS = ['./','./.last_build_id','./.nojekyll','./404.html','./assets/AssetManifest.bin','./assets/AssetManifest.bin.json','./assets/assets/fonts/Roboto-Bold.ttf','./assets/assets/fonts/Roboto-Light.ttf','./assets/assets/fonts/Roboto-Medium.ttf','./assets/assets/fonts/Roboto-Regular.ttf','./assets/assets/images/ngmy_document_ask_icon.png','./assets/assets/images/ngmy_logo.png','./assets/assets/sounds/income_cash.mp3','./assets/assets/sounds/README.md','./assets/assets/sounds/YTMP3GG_YouTube_Kaching-sound-effect-sound-sounds-sounde_Media_a7Vue-A0BOY_007_128k.mp3','./assets/assets/video_studio/yt_news_desk.png','./assets/assets/video_studio/yt_studio_curved.png','./assets/FontManifest.json','./assets/fonts/MaterialIcons-Regular.otf','./assets/NOTICES','./assets/packages/cupertino_icons/assets/CupertinoIcons.ttf','./assets/packages/flutter_map/lib/assets/flutter_map_logo.png','./assets/shaders/ink_sparkle.frag','./assets/shaders/stretch_effect.frag','./canvaskit/canvaskit.js','./canvaskit/canvaskit.js.symbols','./canvaskit/canvaskit.wasm','./canvaskit/chromium/canvaskit.js','./canvaskit/chromium/canvaskit.js.symbols','./canvaskit/chromium/canvaskit.wasm','./canvaskit/experimental_webparagraph/canvaskit.js','./canvaskit/experimental_webparagraph/canvaskit.js.symbols','./canvaskit/experimental_webparagraph/canvaskit.wasm','./canvaskit/skwasm.js','./canvaskit/skwasm.js.symbols','./canvaskit/skwasm.wasm','./canvaskit/skwasm_heavy.js','./canvaskit/skwasm_heavy.js.symbols','./canvaskit/skwasm_heavy.wasm','./canvaskit/wimp.js','./canvaskit/wimp.js.symbols','./canvaskit/wimp.wasm','./CNAME','./favicon.png','./flutter.js','./flutter_bootstrap.js','./flutter_service_worker.js','./icons/Icon-192.png','./icons/Icon-512.png','./icons/Icon-maskable-192.png','./icons/Icon-maskable-512.png','./index.html','./main.dart.js','./main.dart.js_1.part.js','./manifest.json','./og-share.png','./version.json'];
 
 const CRITICAL_OFFLINE_URLS = [
   './',
@@ -162,8 +162,10 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       await restoreAllAlarms();
       const clients = await self.clients.matchAll({ type: 'window' });
+      const buildId = CACHE_NAME.replace(CACHE_PREFIX, '');
       for (const client of clients) {
         client.postMessage({ type: 'CACHE_READY' });
+        client.postMessage({ type: 'NGMY_NEW_VERSION', build: buildId });
       }
     })(),
   );
@@ -359,6 +361,18 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
+
+      // Always fetch version.json from network so phones detect new deploys.
+      if (url.pathname.endsWith('version.json')) {
+        try {
+          const net = await fetch(event.request, { cache: 'no-store' });
+          if (net && net.ok) return net;
+        } catch (_) {}
+        const cached = await cacheLookup(event.request);
+        if (cached) return cached;
+        return fetch(event.request);
+      }
+
       let cached = await cacheLookup(event.request);
       if (!cached && (isAppShellAsset(url) || isCriticalScript(url))) {
         cached = await cacheLookupByPathname(url);
@@ -398,11 +412,22 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (event.request.mode === 'navigate') {
+        // Network-first for HTML when online so deploy checks and new builds reach PWAs.
+        if (self.navigator.onLine) {
+          try {
+            const net = await fetch(event.request, { cache: 'no-store' });
+            if (net && net.status === 200) {
+              cache.put(event.request, net.clone());
+              await cacheAbsoluteShell(cache);
+              return net;
+            }
+          } catch (_) {}
+        }
         const cachedNav = await offlineDocumentAnyCache();
         if (cachedNav) {
           if (self.navigator.onLine) {
             event.waitUntil(
-              fetch(event.request)
+              fetch(event.request, { cache: 'no-store' })
                 .then((res) => {
                   if (res && res.status === 200) {
                     cache.put(event.request, res.clone());

@@ -162,8 +162,10 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       await restoreAllAlarms();
       const clients = await self.clients.matchAll({ type: 'window' });
+      const buildId = CACHE_NAME.replace(CACHE_PREFIX, '');
       for (const client of clients) {
         client.postMessage({ type: 'CACHE_READY' });
+        client.postMessage({ type: 'NGMY_NEW_VERSION', build: buildId });
       }
     })(),
   );
@@ -359,6 +361,18 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
+
+      // Always fetch version.json from network so phones detect new deploys.
+      if (url.pathname.endsWith('version.json')) {
+        try {
+          const net = await fetch(event.request, { cache: 'no-store' });
+          if (net && net.ok) return net;
+        } catch (_) {}
+        const cached = await cacheLookup(event.request);
+        if (cached) return cached;
+        return fetch(event.request);
+      }
+
       let cached = await cacheLookup(event.request);
       if (!cached && (isAppShellAsset(url) || isCriticalScript(url))) {
         cached = await cacheLookupByPathname(url);
@@ -398,11 +412,22 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (event.request.mode === 'navigate') {
+        // Network-first for HTML when online so deploy checks and new builds reach PWAs.
+        if (self.navigator.onLine) {
+          try {
+            const net = await fetch(event.request, { cache: 'no-store' });
+            if (net && net.status === 200) {
+              cache.put(event.request, net.clone());
+              await cacheAbsoluteShell(cache);
+              return net;
+            }
+          } catch (_) {}
+        }
         const cachedNav = await offlineDocumentAnyCache();
         if (cachedNav) {
           if (self.navigator.onLine) {
             event.waitUntil(
-              fetch(event.request)
+              fetch(event.request, { cache: 'no-store' })
                 .then((res) => {
                   if (res && res.status === 200) {
                     cache.put(event.request, res.clone());
