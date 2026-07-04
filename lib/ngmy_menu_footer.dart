@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -86,11 +88,14 @@ class NgmyMenuPageDotsIndicator extends StatelessWidget {
     required this.count,
     required this.activeIndex,
     required this.pageBackgroundId,
+    this.seeThrough = false,
   });
 
   final int count;
   final int activeIndex;
   final String pageBackgroundId;
+  /// When true, pill is glassy so menu content shows through while scrolling.
+  final bool seeThrough;
 
   @override
   Widget build(BuildContext context) {
@@ -98,30 +103,34 @@ class NgmyMenuPageDotsIndicator extends StatelessWidget {
 
     final bg = ngmyMenuPageBackgroundColor(pageBackgroundId);
     final isLight = bg.computeLuminance() > 0.55;
-    final frameFill = isLight ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF1A1F2E).withValues(alpha: 0.72);
-    final frameBorder = isLight ? Colors.black.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.22);
+    final frameFill = seeThrough
+        ? (isLight ? Colors.white.withValues(alpha: 0.28) : Colors.black.withValues(alpha: 0.22))
+        : (isLight ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF1A1F2E).withValues(alpha: 0.72));
+    final frameBorder = isLight ? Colors.black.withValues(alpha: seeThrough ? 0.08 : 0.10) : Colors.white.withValues(alpha: seeThrough ? 0.16 : 0.22);
     final dotActive = isLight ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
     final dotIdle = isLight ? const Color(0xFF94A3B8).withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.35);
 
-    return Container(
+    Widget pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: frameFill,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: frameBorder, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-          if (isLight)
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.9),
-              blurRadius: 4,
-              offset: const Offset(0, -1),
-            ),
-        ],
+        boxShadow: seeThrough
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+                if (isLight)
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    blurRadius: 4,
+                    offset: const Offset(0, -1),
+                  ),
+              ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -149,6 +158,18 @@ class NgmyMenuPageDotsIndicator extends StatelessWidget {
         }),
       ),
     );
+
+    if (seeThrough) {
+      pill = ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: pill,
+        ),
+      );
+    }
+
+    return pill;
   }
 }
 

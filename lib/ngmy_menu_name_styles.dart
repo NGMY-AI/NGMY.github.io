@@ -11,23 +11,27 @@ class NgmyMenuNameStyleOption {
   final String subtitle;
 }
 
-const List<NgmyMenuNameStyleOption> kNgmyMenuNameStyleOptions = [
-  NgmyMenuNameStyleOption(id: 'auto', label: 'Template', subtitle: 'Match menu design'),
-  NgmyMenuNameStyleOption(id: 'classic', label: 'Classic', subtitle: 'Bold center'),
-  NgmyMenuNameStyleOption(id: 'serif', label: 'Elegant', subtitle: 'Serif fine dining'),
-  NgmyMenuNameStyleOption(id: 'minimal', label: 'Minimal', subtitle: 'Light & spaced'),
-  NgmyMenuNameStyleOption(id: 'ornate', label: 'Luxury', subtitle: 'Gold accent'),
-  NgmyMenuNameStyleOption(id: 'neon', label: 'Neon', subtitle: 'Glow sign'),
-  NgmyMenuNameStyleOption(id: 'retro', label: 'Retro', subtitle: 'Diner italic'),
-  NgmyMenuNameStyleOption(id: 'magazine', label: 'Editorial', subtitle: 'Magazine bold'),
-  NgmyMenuNameStyleOption(id: 'industrial', label: 'Industrial', subtitle: 'Wide caps'),
-  NgmyMenuNameStyleOption(id: 'stack', label: 'Wide', subtitle: 'Spaced caps'),
+/// Premium name treatments only — templates already cover everyday styles.
+const List<NgmyMenuNameStyleOption> kNgmyMenuLuxuryNameStyles = [
+  NgmyMenuNameStyleOption(id: 'gilded', label: 'Gilded', subtitle: 'Gold gradient shine'),
+  NgmyMenuNameStyleOption(id: 'couture', label: 'Couture', subtitle: 'Fine serif spacing'),
+  NgmyMenuNameStyleOption(id: 'platinum', label: 'Platinum', subtitle: 'Silver refined'),
+  NgmyMenuNameStyleOption(id: 'royal', label: 'Royal', subtitle: 'Regal lines & crest'),
+  NgmyMenuNameStyleOption(id: 'signature', label: 'Signature', subtitle: 'Elegant script'),
+  NgmyMenuNameStyleOption(id: 'haute', label: 'Haute', subtitle: 'Editorial uppercase'),
+  NgmyMenuNameStyleOption(id: 'velvet', label: 'Velvet', subtitle: 'Rich depth shadow'),
+  NgmyMenuNameStyleOption(id: 'luminous', label: 'Luminous', subtitle: 'Soft premium glow'),
 ];
 
 String ngmyMenuEffectiveNameStyle(NgmyMenuDocument doc, NgmyMenuTemplate template) {
   final id = doc.nameStyleId.trim();
   if (id.isEmpty || id == 'auto') return template.headerStyle;
   return id;
+}
+
+bool ngmyMenuHasLuxuryNameStyle(NgmyMenuDocument doc) {
+  final id = doc.nameStyleId.trim();
+  return id.isNotEmpty && id != 'auto';
 }
 
 TextStyle ngmyMenuNameTextStyle({
@@ -38,32 +42,75 @@ TextStyle ngmyMenuNameTextStyle({
 }) {
   final t = template;
   TextStyle nameStyle = switch (styleKey) {
-    'ornate' => TextStyle(
+    'gilded' || 'ornate' => TextStyle(
         color: t.accent,
         fontSize: compact ? 20 : 30,
         fontWeight: FontWeight.w900,
-        letterSpacing: 1.6,
+        letterSpacing: 1.8,
+        height: 1.05,
+      ),
+    'couture' || 'serif' => TextStyle(
+        color: t.textPrimary,
+        fontSize: compact ? 17 : 26,
+        fontWeight: FontWeight.w300,
+        fontFamily: 'Georgia',
+        letterSpacing: compact ? 2.8 : 4.2,
+        height: 1.15,
+      ),
+    'platinum' => TextStyle(
+        color: const Color(0xFF9CA3AF),
+        fontSize: compact ? 18 : 27,
+        fontWeight: FontWeight.w500,
+        letterSpacing: compact ? 2.2 : 3.4,
         height: 1.1,
       ),
-    'serif' => TextStyle(
+    'royal' => TextStyle(
+        color: t.accent,
+        fontSize: compact ? 19 : 29,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.4,
+        height: 1.08,
+      ),
+    'signature' => TextStyle(
         color: t.textPrimary,
-        fontSize: compact ? 18 : 28,
-        fontWeight: FontWeight.w700,
+        fontSize: compact ? 22 : 34,
+        fontWeight: FontWeight.w500,
+        fontStyle: FontStyle.italic,
         fontFamily: 'Georgia',
+        letterSpacing: 0.4,
+        height: 1.05,
+      ),
+    'haute' || 'magazine' => TextStyle(
+        color: t.textPrimary,
+        fontSize: compact ? 21 : 32,
+        fontWeight: FontWeight.w900,
+        letterSpacing: compact ? 1.2 : 2.4,
+        height: 1.0,
+      ),
+    'velvet' => TextStyle(
+        color: t.textPrimary,
+        fontSize: compact ? 19 : 28,
+        fontWeight: FontWeight.w800,
         letterSpacing: 0.6,
+        shadows: [
+          Shadow(color: t.accent.withValues(alpha: 0.45), blurRadius: compact ? 8 : 14, offset: const Offset(0, 2)),
+        ],
+      ),
+    'luminous' || 'neon' || 'jazz' => TextStyle(
+        color: t.accent,
+        fontSize: compact ? 20 : 31,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.6,
+        shadows: [
+          Shadow(color: t.accent.withValues(alpha: 0.55), blurRadius: compact ? 10 : 18),
+          Shadow(color: t.accent.withValues(alpha: 0.25), blurRadius: compact ? 18 : 28),
+        ],
       ),
     'minimal' => TextStyle(
         color: t.textPrimary,
         fontSize: compact ? 16 : 24,
         fontWeight: FontWeight.w300,
         letterSpacing: compact ? 3 : 5,
-      ),
-    'neon' || 'jazz' => TextStyle(
-        color: t.accent,
-        fontSize: compact ? 20 : 32,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 2,
-        shadows: [Shadow(color: t.accent.withValues(alpha: 0.8), blurRadius: 12)],
       ),
     'industrial' => TextStyle(
         color: t.accent,
@@ -77,13 +124,6 @@ TextStyle ngmyMenuNameTextStyle({
         fontWeight: FontWeight.w900,
         fontStyle: FontStyle.italic,
         letterSpacing: 1,
-      ),
-    'magazine' => TextStyle(
-        color: t.textPrimary,
-        fontSize: compact ? 22 : 34,
-        fontWeight: FontWeight.w900,
-        letterSpacing: -0.5,
-        height: 1.05,
       ),
     'stack' => TextStyle(
         color: t.textPrimary,
@@ -107,62 +147,178 @@ TextStyle ngmyMenuNameTextStyle({
   return nameStyle;
 }
 
-/// Mini preview tile for name style picker in Menu Studio.
-class NgmyMenuNameStylePicker extends StatelessWidget {
-  const NgmyMenuNameStylePicker({
+/// Gilded gradient name — used when style is [gilded].
+Widget ngmyMenuLuxuryNameText({
+  required String name,
+  required TextStyle style,
+  required TextAlign align,
+  required NgmyMenuTemplate template,
+  required String styleKey,
+}) {
+  if (styleKey != 'gilded') {
+    final display = styleKey == 'haute' ? name.toUpperCase() : name;
+    return Text(display, textAlign: align, style: style);
+  }
+
+  return ShaderMask(
+    shaderCallback: (bounds) => LinearGradient(
+      colors: [
+        template.accent,
+        const Color(0xFFFFF8E7),
+        template.accent.withValues(alpha: 0.85),
+        const Color(0xFFD4AF37),
+      ],
+      stops: const [0.0, 0.35, 0.65, 1.0],
+    ).createShader(bounds),
+    child: Text(name, textAlign: align, style: style.copyWith(color: Colors.white)),
+  );
+}
+
+/// Small icon — opens luxury name-style sheet (keeps Restaurant info compact).
+class NgmyMenuNameStyleIconButton extends StatelessWidget {
+  const NgmyMenuNameStyleIconButton({
     super.key,
-    required this.selected,
+    required this.doc,
     required this.template,
     required this.sampleName,
     required this.accent,
-    required this.onSelected,
+    required this.onChanged,
   });
 
-  final String selected;
+  final NgmyMenuDocument doc;
   final NgmyMenuTemplate template;
   final String sampleName;
   final Color accent;
-  final ValueChanged<String> onSelected;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 2.4),
-      itemCount: kNgmyMenuNameStyleOptions.length,
-      itemBuilder: (_, i) {
-        final opt = kNgmyMenuNameStyleOptions[i];
-        final sel = selected == opt.id;
-        final styleKey = opt.id == 'auto' ? template.headerStyle : opt.id;
-        final previewStyle = ngmyMenuNameTextStyle(styleKey: styleKey, template: template, compact: true, isPlaceholder: false).copyWith(fontSize: 13);
-        final name = sampleName.trim().isEmpty ? 'Café' : (sampleName.trim().length > 12 ? '${sampleName.trim().substring(0, 12)}…' : sampleName.trim());
+    final active = ngmyMenuHasLuxuryNameStyle(doc);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openSheet(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Ink(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: active ? accent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06),
+            border: Border.all(color: active ? accent : Colors.white24),
+          ),
+          child: Icon(Icons.auto_awesome_rounded, size: 18, color: active ? accent : Colors.white70),
+        ),
+      ),
+    );
+  }
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => onSelected(opt.id),
-            borderRadius: BorderRadius.circular(12),
-            child: Ink(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: sel ? accent.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
-                border: Border.all(color: sel ? accent : Colors.white24, width: sel ? 2 : 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: previewStyle),
-                  const SizedBox(height: 4),
-                  Text(opt.label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: sel ? accent : Colors.white70)),
-                ],
-              ),
+  Future<void> _openSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF141820),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text('Luxury name styles', style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text('Premium treatments for your restaurant name', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _sheetTile(
+                          ctx,
+                          id: 'auto',
+                          label: 'Use menu template',
+                          subtitle: 'Default from your design',
+                          previewStyle: ngmyMenuNameTextStyle(styleKey: template.headerStyle, template: template, compact: true, isPlaceholder: false),
+                        ),
+                        const SizedBox(height: 8),
+                        ...kNgmyMenuLuxuryNameStyles.map(
+                          (opt) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _sheetTile(
+                              ctx,
+                              id: opt.id,
+                              label: opt.label,
+                              subtitle: opt.subtitle,
+                              previewStyle: ngmyMenuNameTextStyle(styleKey: opt.id, template: template, compact: true, isPlaceholder: false),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _sheetTile(
+    BuildContext ctx, {
+    required String id,
+    required String label,
+    required String subtitle,
+    required TextStyle previewStyle,
+  }) {
+    final sel = doc.nameStyleId == id || (id == 'auto' && !ngmyMenuHasLuxuryNameStyle(doc));
+    final name = sampleName.trim().isEmpty ? 'Your Restaurant' : sampleName.trim();
+    final previewName = id == 'haute' ? name.toUpperCase() : (name.length > 18 ? '${name.substring(0, 18)}…' : name);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          doc.nameStyleId = id;
+          onChanged();
+          Navigator.pop(ctx);
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: sel ? accent.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: sel ? accent : Colors.white24, width: sel ? 2 : 1),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(previewName, maxLines: 1, overflow: TextOverflow.ellipsis, style: previewStyle.copyWith(fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text(label, style: TextStyle(color: sel ? accent : Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                    Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  ],
+                ),
+              ),
+              if (sel) Icon(Icons.check_circle_rounded, color: accent, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

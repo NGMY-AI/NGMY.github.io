@@ -681,18 +681,16 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         _panel(
           t,
           title: 'Restaurant info',
+          trailing: NgmyMenuNameStyleIconButton(
+            doc: doc,
+            template: ngmyMenuTemplateById(doc.templateId),
+            sampleName: _nameC.text,
+            accent: _kMenuAccent,
+            onChanged: () => setState(() {}),
+          ),
           child: Column(
             children: [
               NgmyModernField(controller: _nameC, label: 'Restaurant name', hint: 'Your restaurant name', icon: Icons.storefront_rounded, accent: _kMenuAccent),
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Name style', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13)),
-              ),
-              const SizedBox(height: 4),
-              Text('How your restaurant name appears at the top of the menu', style: TextStyle(color: t.subtitle, fontSize: 11)),
-              const SizedBox(height: 10),
-              _nameStylePicker(t, doc),
               NgmyModernField(controller: _taglineC, label: 'Tagline', hint: 'Fresh flavors · crafted daily', icon: Icons.format_quote_rounded, accent: _kMenuAccent),
               NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'your-restaurant-name', icon: Icons.link_rounded, accent: _kMenuAccent),
             ],
@@ -726,6 +724,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                 ),
                 onChanged: (v) => setState(() => page.title = v),
               ),
+              const SizedBox(height: 12),
+              _pageTemplatePicker(t, doc, page),
             ],
           ),
         ),
@@ -845,7 +845,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     );
   }
 
-  Widget _panel(NgmyHubTheme t, {required String title, required Widget child}) {
+  Widget _panel(NgmyHubTheme t, {required String title, required Widget child, Widget? trailing}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -856,7 +856,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title.toUpperCase(), style: t.sectionLabel.copyWith(color: _kMenuAccent.withValues(alpha: 0.9))),
+          Row(
+            children: [
+              Expanded(child: Text(title.toUpperCase(), style: t.sectionLabel.copyWith(color: _kMenuAccent.withValues(alpha: 0.9)))),
+              if (trailing != null) trailing,
+            ],
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -1294,14 +1299,51 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     );
   }
 
-  Widget _nameStylePicker(NgmyHubTheme t, NgmyMenuDocument doc) {
-    final tmpl = ngmyMenuTemplateById(doc.templateId);
-    return NgmyMenuNameStylePicker(
-      selected: doc.nameStyleId,
-      template: tmpl,
-      sampleName: _nameC.text,
-      accent: _kMenuAccent,
-      onSelected: (id) => setState(() => doc.nameStyleId = id),
+  Widget _pageTemplatePicker(NgmyHubTheme t, NgmyMenuDocument doc, NgmyMenuPage page) {
+    final mainName = ngmyMenuTemplateById(doc.templateId).name;
+    final custom = page.templateId.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('Design for this page (optional)', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+            ),
+            if (custom)
+              TextButton(
+                onPressed: () => setState(() => page.templateId = ''),
+                style: TextButton.styleFrom(foregroundColor: _kMenuAccent, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                child: const Text('Reset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('Leave on main design or pick a different template for this menu only.', style: TextStyle(color: t.subtitle, fontSize: 11)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: custom ? page.templateId : '',
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: t.fieldFill,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.inputBorder)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          dropdownColor: t.surface,
+          style: TextStyle(color: t.title, fontWeight: FontWeight.w700, fontSize: 13),
+          items: [
+            DropdownMenuItem(value: '', child: Text('Same as main · $mainName', style: TextStyle(color: t.subtitle, fontSize: 12))),
+            ...kNgmyMenuTemplates.map(
+              (tmpl) => DropdownMenuItem(
+                value: tmpl.id,
+                child: Text('${tmpl.name} · ${tmpl.category}', style: TextStyle(color: t.title, fontSize: 12)),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => page.templateId = v ?? ''),
+        ),
+      ],
     );
   }
 

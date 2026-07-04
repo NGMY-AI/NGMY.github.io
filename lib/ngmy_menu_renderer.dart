@@ -12,12 +12,18 @@ class NgmyMenuPreview extends StatelessWidget {
     this.pageIndex = 0,
     this.compact = false,
     this.showPoweredBy = true,
+    this.footerOverlayInset = 0,
+    this.fillHeight = false,
   });
 
   final NgmyMenuDocument document;
   final int pageIndex;
   final bool compact;
   final bool showPoweredBy;
+  /// Extra scroll padding when a transparent footer floats over the menu (guest links).
+  final double footerOverlayInset;
+  /// Guest links: menu card fills height so footer overlays scrollable content.
+  final bool fillHeight;
 
   double get _radius => compact ? 20.0 : 28.0;
 
@@ -48,7 +54,7 @@ class NgmyMenuPreview extends StatelessWidget {
     final pad = compact ? 12.0 : 22.0;
     final radius = _radius;
 
-    return DecoratedBox(
+    final card = DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [t.bgStart, t.bgEnd]),
         borderRadius: BorderRadius.circular(radius),
@@ -113,7 +119,7 @@ class NgmyMenuPreview extends StatelessWidget {
                 t.layout == NgmyMenuLayoutStyle.sidebarAccent ? pad + (compact ? 6 : 10) : pad,
                 pad,
                 pad,
-                pad,
+                pad + footerOverlayInset,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,6 +156,10 @@ class NgmyMenuPreview extends StatelessWidget {
         ),
       ),
     );
+    if (fillHeight) {
+      return SizedBox(width: double.infinity, height: double.infinity, child: card);
+    }
+    return card;
   }
 
   TextAlign _headerAlign(NgmyMenuTemplate t) {
@@ -170,34 +180,38 @@ class NgmyMenuPreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: align == TextAlign.left ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        if (styleKey == 'ornate' || t.layout == NgmyMenuLayoutStyle.ornateDots) ...[
+        if (styleKey == 'gilded' || styleKey == 'ornate' || styleKey == 'royal' || t.layout == NgmyMenuLayoutStyle.ornateDots) ...[
           Row(
             children: [
               Expanded(child: _ornamentLine(t.accent)),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 10),
-                child: Icon(Icons.restaurant_menu_rounded, color: t.accent, size: compact ? 16 : 22),
+                child: Icon(
+                  styleKey == 'royal' ? Icons.diamond_outlined : Icons.restaurant_menu_rounded,
+                  color: t.accent,
+                  size: compact ? 16 : 22,
+                ),
               ),
               Expanded(child: _ornamentLine(t.accent)),
             ],
           ),
           SizedBox(height: compact ? 6 : 10),
         ],
-        if (styleKey == 'neon' || styleKey == 'jazz')
+        if (styleKey == 'luminous' || styleKey == 'neon' || styleKey == 'jazz')
           Container(
             padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: compact ? 4 : 6),
             decoration: BoxDecoration(
-              border: Border.all(color: t.accent.withValues(alpha: 0.7)),
+              border: Border.all(color: t.accent.withValues(alpha: 0.5)),
               borderRadius: BorderRadius.circular(4),
-              boxShadow: [BoxShadow(color: t.accent.withValues(alpha: 0.35), blurRadius: 16)],
+              boxShadow: [BoxShadow(color: t.accent.withValues(alpha: 0.25), blurRadius: 16)],
             ),
             child: Text('MENU', style: TextStyle(color: t.accent, fontSize: compact ? 9 : 11, fontWeight: FontWeight.w900, letterSpacing: 4)),
           ),
-        if (styleKey == 'neon' || styleKey == 'jazz') SizedBox(height: compact ? 8 : 12),
-        if (styleKey == 'magazine')
+        if (styleKey == 'luminous' || styleKey == 'neon' || styleKey == 'jazz') SizedBox(height: compact ? 8 : 12),
+        if (styleKey == 'haute' || styleKey == 'magazine')
           Text('MENU', style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: compact ? 10 : 12, letterSpacing: 3)),
-        if (styleKey == 'magazine') SizedBox(height: compact ? 4 : 6),
-        Text(name, textAlign: align, style: nameStyle),
+        if (styleKey == 'haute' || styleKey == 'magazine') SizedBox(height: compact ? 4 : 6),
+        ngmyMenuLuxuryNameText(name: name, style: nameStyle, align: align, template: t, styleKey: styleKey),
         if (showPageTitle && page.title.trim().isNotEmpty && page.title.trim().toLowerCase() != 'menu') ...[
           SizedBox(height: compact ? 4 : 6),
           Text(
@@ -211,7 +225,7 @@ class NgmyMenuPreview extends StatelessWidget {
             ),
           ),
         ],
-        if (styleKey == 'ornate') ...[
+        if (styleKey == 'gilded' || styleKey == 'ornate' || styleKey == 'royal') ...[
           SizedBox(height: compact ? 4 : 8),
           Container(
             height: 2,
