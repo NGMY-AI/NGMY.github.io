@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
+import 'ngmy_swahili_routes.dart';
 import 'ngmy_swahili_word_enrichment.dart';
 
 /// One word the user wants to see as a pop-up every time they open the app.
@@ -42,10 +43,12 @@ class SwahiliWordReminder {
 }
 
 void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
+  final bg = Theme.of(context).brightness == Brightness.dark ? kSwahiliSchoolBgDark : kSwahiliSchoolBgLight;
   Navigator.of(context).push<void>(
-    MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => NgmySwahiliSchoolPage(userEmail: userEmail),
+    ngmySwahiliInstantRoute<void>(
+      context,
+      NgmySwahiliSchoolPage(userEmail: userEmail),
+      background: bg,
     ),
   );
 }
@@ -214,8 +217,9 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
   void _openLevelPath(int levelIndex) {
     final level = kSwahiliLevels[levelIndex];
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => SwahiliWeekPathPage(
+      ngmySwahiliInstantRoute<void>(
+        context,
+        SwahiliWeekPathPage(
           level: level,
           levelIndex: levelIndex,
           isDayDone: (d) => _progress.isDayDone(levelIndex, d),
@@ -224,18 +228,18 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
           levelPassed: _progress.isLevelPassed(level.id),
           bestScore: _progress.bestScores[level.id],
           onDayTap: (d, pathCtx) {
+            final lesson = _buildLessonPage(levelIndex, d);
             Navigator.of(pathCtx).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => _buildLessonPage(levelIndex, d),
-              ),
+              ngmySwahiliInstantRoute<void>(pathCtx, lesson),
             ).then((_) {
               if (mounted) setState(() {});
             });
           },
           onTestTap: (pathCtx) {
             Navigator.of(pathCtx).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => _SwahiliTestPage(
+              ngmySwahiliInstantRoute<void>(
+                pathCtx,
+                _SwahiliTestPage(
                   level: level,
                   levelIndex: levelIndex,
                   onFinished: (score, passed) async {
@@ -259,6 +263,7 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
             );
           },
         ),
+        background: kSwahiliPathBg,
       ),
     ).then((_) => setState(() {}));
   }
@@ -295,11 +300,13 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFF5F7FA);
 
-    return Scaffold(
-      backgroundColor: bg,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF4AAF6E)))
-          : CustomScrollView(
+    return ColoredBox(
+      color: bg,
+      child: Scaffold(
+        backgroundColor: bg,
+        body: _loading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF4AAF6E)))
+            : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: SafeArea(
@@ -460,6 +467,7 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
                 ),
               ],
             ),
+      ),
     );
   }
 }
@@ -629,10 +637,12 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
     final key = word.swahili;
     final alreadyStudied = _isStudied(key);
     final prior = alreadyStudied ? kSwahiliMinStudySeconds : (_studySeconds[key] ?? 0);
+    final rich = enrichSwahiliWord(word);
     final added = await Navigator.of(context).push<int>(
-      MaterialPageRoute<int>(
-        builder: (_) => _SwahiliWordStudyPage(
-          rich: enrichSwahiliWord(word),
+      ngmySwahiliInstantRoute<int>(
+        context,
+        _SwahiliWordStudyPage(
+          rich: rich,
           priorSeconds: prior,
           alreadyStudied: alreadyStudied,
           reminderEnabled: widget.hasWordReminder(word),
@@ -652,74 +662,120 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
+    final bg = isDark ? kSwahiliLessonBgDark : kSwahiliLessonBgLight;
 
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
-        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
-        elevation: 0,
-        title: Text(widget.day.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1A2030) : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.day.subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white70 : const Color(0xFF475569),
-                  ),
+    return ColoredBox(
+      color: bg,
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(
+          backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
+          foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Text(widget.day.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        ),
+        body: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemCount: widget.day.words.length + 2,
+          cacheExtent: 1200,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1A2030) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. / Tap each word and study at least $kSwahiliMinStudySeconds seconds.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.45,
-                    color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: widget.day.words.isEmpty ? 0 : _studiedCount / widget.day.words.length,
-                          minHeight: 8,
-                          backgroundColor: const Color(0xFFD97706).withValues(alpha: 0.15),
-                          color: const Color(0xFFD97706),
-                        ),
+                    Text(
+                      widget.day.subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(height: 8),
                     Text(
-                      '$_studiedCount/${widget.day.words.length}',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                      'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. / Tap each word and study at least $kSwahiliMinStudySeconds seconds.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: widget.day.words.isEmpty ? 0 : _studiedCount / widget.day.words.length,
+                              minHeight: 8,
+                              backgroundColor: const Color(0xFFD97706).withValues(alpha: 0.15),
+                              color: const Color(0xFFD97706),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '$_studiedCount/${widget.day.words.length}',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...widget.day.words.map(
-            (w) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              );
+            }
+            if (index == widget.day.words.length + 1) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FilledButton.icon(
+                  onPressed: (_completed || !_allStudied)
+                      ? null
+                      : () {
+                          widget.onComplete();
+                          setState(() => _completed = true);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                widget.dayIndex < 4
+                                    ? 'Siku ${widget.dayIndex + 1} imekamilika! Rudi kesho kwa siku inayofuata.'
+                                    : 'Siku ${widget.dayIndex + 1} imekamilika! Unaweza kufanya mtihani sasa.',
+                              ),
+                              backgroundColor: const Color(0xFFD97706),
+                            ),
+                          );
+                        },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
+                    disabledBackgroundColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: Icon(_completed ? Icons.check_rounded : Icons.done_all_rounded),
+                  label: Text(
+                    _completed
+                        ? 'Siku imekamilika'
+                        : _allStudied
+                            ? 'Nimemaliza siku hii'
+                            : 'Bofya maneno yote (sek $kSwahiliMinStudySeconds kila moja)',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
+            final w = widget.day.words[index - 1];
+            return Padding(
+              padding: const EdgeInsets.only(top: 10),
               child: _WordCard(
                 word: w,
                 color: widget.level.color,
@@ -728,44 +784,9 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
                 studySeconds: _studySeconds[w.swahili] ?? 0,
                 onTap: () => _openWord(w),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: (_completed || !_allStudied)
-                ? null
-                : () {
-                    widget.onComplete();
-                    setState(() => _completed = true);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          widget.dayIndex < 4
-                              ? 'Siku ${widget.dayIndex + 1} imekamilika! Rudi kesho kwa siku inayofuata.'
-                              : 'Siku ${widget.dayIndex + 1} imekamilika! Unaweza kufanya mtihani sasa.',
-                        ),
-                        backgroundColor: const Color(0xFFD97706),
-                      ),
-                    );
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFD97706),
-              disabledBackgroundColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            icon: Icon(_completed ? Icons.check_rounded : Icons.done_all_rounded),
-            label: Text(
-              _completed
-                  ? 'Siku imekamilika'
-                  : _allStudied
-                      ? 'Nimemaliza siku hii'
-                      : 'Bofya maneno yote (sek $kSwahiliMinStudySeconds kila moja)',
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -903,15 +924,19 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
     final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
     final remaining = (kSwahiliMinStudySeconds - _totalSeconds).clamp(0, kSwahiliMinStudySeconds);
 
-    return Scaffold(
-      backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
-        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
-        elevation: 0,
-        title: const Text('Somo / Lesson', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-      ),
-      body: Column(
+    return ColoredBox(
+      color: bg,
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(
+          backgroundColor: isDark ? const Color(0xFF1A2030) : Colors.white,
+          foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: const Text('Somo / Lesson', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        ),
+        body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1095,6 +1120,7 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
