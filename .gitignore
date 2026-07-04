@@ -44,8 +44,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Prebuilt web output — do not commit. CI deploys via .github/workflows/deploy-pages.yml
+# Prebuilt web output — CI syncs build/web to docs/ on deploy (see deploy-pages.yml)
 /build/
-_site/
-/docs/
 _site/

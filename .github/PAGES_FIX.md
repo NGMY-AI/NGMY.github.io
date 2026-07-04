@@ -1,31 +1,32 @@
-# Fix GitHub "Run failed: pages build and deployment" emails
+# NGMY deploy (ngmy.org)
 
-## What those emails mean
+## How it works
 
-| Workflow name in email | What it is | Status |
-|------------------------|------------|--------|
-| **pages build and deployment** | GitHub built-in (branch deploy) | Was failing — now uses tiny `docs/` stub |
-| **Deploy GitHub Pages** | Our CI workflow | ✅ Builds & publishes the real app |
+One deploy path only:
 
-## One-time fix (stops failures + fixes ngmy.org)
+1. Push code to `main` → **Deploy GitHub Pages** workflow builds Flutter.
+2. CI copies the build into **`docs/`** on `main` and pushes.
+3. GitHub **pages build and deployment** publishes `docs/` → **https://ngmy.org/**
 
-Open **https://github.com/NGMY-AI/NGMY.github.io/settings/pages**
+No `actions/deploy-pages`, no `gh-pages` mirror — those caused duplicate failures and a broken custom domain.
 
-1. **Build and deployment → Source** → select **GitHub Actions**
-2. **Custom domain** → enter **`ngmy.org`** → Save
-3. Wait 3 minutes → open **https://ngmy.org/version.json** (should show a recent `build_number`, not `branch-stub`)
+## Verify
 
-## Live URLs
+After ~5 minutes:
 
-- **https://ngmy-ai.github.io/NGMY.github.io/** — always has the latest CI build
-- **https://ngmy.org/** — works after step 2 above (or redirects via stub until then)
-
-## Deploy new code
-
-```powershell
-git add lib web assets
-git commit -m "Your changes"
-git push origin main
+```text
+https://ngmy.org/version.json
 ```
 
-Wait ~5 minutes. Do **not** commit a full Flutter build to `docs/` — only the small stub files belong on `main`. CI deploys the real app via **Deploy GitHub Pages** (gh-pages + Actions Pages).
+`build_number` should be a recent UTC timestamp.
+
+## If Pages settings were changed manually
+
+**Settings → Pages:**
+
+- **Source:** Deploy from branch → **main** → folder **/docs**
+- **Custom domain:** `ngmy.org`
+
+## On your phone
+
+Hard refresh or clear site data for ngmy.org so the PWA loads the new build.

@@ -1,5 +1,5 @@
-# Builds Flutter web and deploys via GitHub Actions Pages only.
-# Do NOT commit a full Flutter build to docs/ — that triggers a conflicting legacy Pages job.
+# Builds Flutter web and publishes to ngmy.org via main/docs (single deploy path).
+# Do NOT also use actions/deploy-pages or gh-pages mirror — that causes duplicate deploy failures.
 
 name: Deploy GitHub Pages
 
@@ -16,9 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages-deploy
@@ -28,18 +26,18 @@ jobs:
   configure:
     runs-on: ubuntu-latest
     steps:
-      - name: Force GitHub Actions as Pages source (stops branch deploy conflicts)
+      - name: Point Pages at main/docs + ngmy.org (single branch deploy)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           api="https://api.github.com/repos/${{ github.repository }}/pages"
-          body='{"build_type":"workflow","cname":"ngmy.org","source":{"branch":"main","path":"/"}}'
+          body='{"source":{"branch":"main","path":"/docs"},"cname":"ngmy.org"}'
           code=$(curl -sS -o /tmp/pages.json -w "%{http_code}" -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "$api" -d '{"build_type":"workflow","cname":"ngmy.org"}')
+            "$api" -d "$body")
           echo "PUT Pages HTTP ${code}"
           cat /tmp/pages.json || true
           if [ "$code" = "404" ]; then
@@ -47,23 +45,20 @@ jobs:
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              "$api" -d '{"build_type":"workflow","cname":"ngmy.org"}')
+              "$api" -d "$body")
             echo "POST Pages HTTP ${code}"
             cat /tmp/pages.json || true
           fi
-          sleep 2
-          curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$api" | tee /tmp/pages-verify.json
-          if ! grep -q '"build_type":"workflow"' /tmp/pages-verify.json && ! grep -q '"build_type": "workflow"' /tmp/pages-verify.json; then
-            echo "::warning::Pages may still be on legacy branch deploy — set Source to GitHub Actions in repo Settings → Pages"
-          fi
 
-  build:
+  build-and-publish:
     needs: configure
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -71,16 +66,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Build web
+      - name: Build web and sync docs/
         run: |
+          set -e
           flutter pub get
           flutter build web --release --base-href=/ --no-wasm-dry-run --no-web-resources-cdn
           test -f build/web/index.html
 
-      - name: Prepare site folder
-        run: |
-          set -e
-          rm -rf _site
+          rm -rf _site docs
           cp -r build/web _site
           touch _site/.nojekyll
           printf '%s' 'ngmy.org' > _site/CNAME
@@ -165,19 +158,14 @@ jobs:
             fi
           done
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
+          cp -r _site docs
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if ! git diff --staged --quiet; then
+            git commit -m "Deploy web build to docs/ for ngmy.org [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "docs/ unchanged — skip push"
+          fi
