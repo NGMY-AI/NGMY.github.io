@@ -86,6 +86,7 @@ flutter:
   assets:
     - assets/video_studio/
     - assets/sounds/
+    - assets/images/
 
   # Roboto bundled locally so CanvasKit never fetches fonts.gstatic.com (required for iOS offline PWA).
   fonts:

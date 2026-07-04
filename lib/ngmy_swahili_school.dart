@@ -23,16 +23,54 @@ class NgmySwahiliProgress {
     this.completedDays = const {},
     this.bestScores = const {},
     this.passedLevels = const {},
+    this.studiedWords = const {},
+    this.studyCalendarDay = '',
   });
 
   int unlockedLevelIndex;
   Set<String> completedDays;
   Map<String, int> bestScores;
   Set<String> passedLevels;
+  Map<String, List<String>> studiedWords;
+  String studyCalendarDay;
 
-  bool isDayDone(int levelIndex, int dayIndex) => completedDays.contains('${levelIndex}_$dayIndex');
+  static String _todayKey() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+  }
 
-  void markDayDone(int levelIndex, int dayIndex) => completedDays.add('${levelIndex}_$dayIndex');
+  static String dayKey(int levelIndex, int dayIndex) => '${levelIndex}_$dayIndex';
+
+  void ensureStudyDay() {
+    final today = _todayKey();
+    if (studyCalendarDay == today) return;
+    studyCalendarDay = today;
+    studiedWords.removeWhere((dayKey, _) => !completedDays.contains(dayKey));
+  }
+
+  bool isDayDone(int levelIndex, int dayIndex) => completedDays.contains(dayKey(levelIndex, dayIndex));
+
+  void markDayDone(int levelIndex, int dayIndex) => completedDays.add(dayKey(levelIndex, dayIndex));
+
+  bool isWordStudied(int levelIndex, int dayIndex, String word) {
+    ensureStudyDay();
+    if (isDayDone(levelIndex, dayIndex)) return true;
+    return studiedWords[dayKey(levelIndex, dayIndex)]?.contains(word) ?? false;
+  }
+
+  void markWordStudied(int levelIndex, int dayIndex, String word) {
+    ensureStudyDay();
+    final k = dayKey(levelIndex, dayIndex);
+    final list = List<String>.from(studiedWords[k] ?? const []);
+    if (!list.contains(word)) list.add(word);
+    studiedWords[k] = list;
+  }
+
+  int studiedWordCount(int levelIndex, int dayIndex) {
+    ensureStudyDay();
+    if (isDayDone(levelIndex, dayIndex)) return -1;
+    return studiedWords[dayKey(levelIndex, dayIndex)]?.length ?? 0;
+  }
 
   bool allDaysDone(SwahiliLevel level, int levelIndex) {
     for (var d = 0; d < level.days.length; d++) {
@@ -48,15 +86,22 @@ class NgmySwahiliProgress {
         'completedDays': completedDays.toList(),
         'bestScores': bestScores,
         'passedLevels': passedLevels.toList(),
+        'studiedWords': studiedWords.map((k, v) => MapEntry(k, v)),
+        'studyCalendarDay': studyCalendarDay,
       };
 
   factory NgmySwahiliProgress.fromJson(Map<String, dynamic> json) {
+    final rawStudied = json['studiedWords'] as Map<String, dynamic>? ?? {};
     return NgmySwahiliProgress(
       unlockedLevelIndex: (json['unlockedLevelIndex'] as num?)?.toInt() ?? 0,
       completedDays: (json['completedDays'] as List<dynamic>? ?? []).map((e) => e.toString()).toSet(),
       bestScores: (json['bestScores'] as Map<String, dynamic>? ?? {})
           .map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
       passedLevels: (json['passedLevels'] as List<dynamic>? ?? []).map((e) => e.toString()).toSet(),
+      studiedWords: rawStudied.map(
+        (k, v) => MapEntry(k.toString(), (v as List<dynamic>).map((e) => e.toString()).toList()),
+      ),
+      studyCalendarDay: json['studyCalendarDay'] as String? ?? '',
     );
   }
 }
@@ -149,6 +194,12 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
           levelIndex: levelIndex,
           dayIndex: dayIndex,
           day: day,
+          isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
+          onWordStudied: (w) async {
+            _progress.markWordStudied(levelIndex, dayIndex, w);
+            await _save();
+          },
+          isDayDone: () => _progress.isDayDone(levelIndex, dayIndex),
           onComplete: () async {
             setState(() => _progress.markDayDone(levelIndex, dayIndex));
             await _save();
@@ -218,10 +269,15 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> {
                                 icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white70 : const Color(0xFF475569)),
                               ),
                               const Spacer(),
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: const Color(0xFF4AAF6E).withValues(alpha: 0.2),
-                                child: const Icon(Icons.person_rounded, color: Color(0xFF2D7A4A), size: 20),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  'assets/images/ngmy_logo.png',
+                                  width: 36,
+                                  height: 36,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.school_rounded, color: Color(0xFF2D7A4A), size: 24),
+                                ),
                               ),
                             ],
                           ),
@@ -445,6 +501,9 @@ class _SwahiliLessonPage extends StatefulWidget {
     required this.levelIndex,
     required this.dayIndex,
     required this.day,
+    required this.isWordStudied,
+    required this.onWordStudied,
+    required this.isDayDone,
     required this.onComplete,
   });
 
@@ -452,6 +511,9 @@ class _SwahiliLessonPage extends StatefulWidget {
   final int levelIndex;
   final int dayIndex;
   final SwahiliLessonDay day;
+  final bool Function(String word) isWordStudied;
+  final Future<void> Function(String word) onWordStudied;
+  final bool Function() isDayDone;
   final VoidCallback onComplete;
 
   @override
@@ -459,18 +521,47 @@ class _SwahiliLessonPage extends StatefulWidget {
 }
 
 class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
-  bool _completed = false;
+  late bool _completed;
   final Map<String, int> _studySeconds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _completed = widget.isDayDone();
+    for (final w in widget.day.words) {
+      if (widget.isWordStudied(w.swahili)) {
+        _studySeconds[w.swahili] = kSwahiliMinStudySeconds;
+      }
+    }
+  }
 
   int get _studiedCount => widget.day.words.where((w) => _isStudied(w.swahili)).length;
 
-  bool _isStudied(String key) => (_studySeconds[key] ?? 0) >= kSwahiliMinStudySeconds;
+  bool _isStudied(String key) => (_studySeconds[key] ?? 0) >= kSwahiliMinStudySeconds || widget.isWordStudied(key);
 
   bool get _allStudied => _studiedCount >= widget.day.words.length;
 
+  Future<void> _maybeCompleteDay() async {
+    if (!_allStudied || _completed) return;
+    widget.onComplete();
+    if (!mounted) return;
+    setState(() => _completed = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.dayIndex < 4
+              ? 'Siku ${widget.dayIndex + 1} imekamilika! / Day ${widget.dayIndex + 1} complete!'
+              : 'Siku ${widget.dayIndex + 1} imekamilika! Unaweza kufanya mtihani. / Day complete — take the test!',
+        ),
+        backgroundColor: const Color(0xFFD97706),
+      ),
+    );
+  }
+
   Future<void> _openWord(SwahiliWord word) async {
     final key = word.swahili;
-    final prior = _studySeconds[key] ?? 0;
+    final alreadyStudied = _isStudied(key);
+    final prior = alreadyStudied ? kSwahiliMinStudySeconds : (_studySeconds[key] ?? 0);
     final added = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -479,10 +570,15 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
         rich: enrichSwahiliWord(word),
         isDark: Theme.of(ctx).brightness == Brightness.dark,
         priorSeconds: prior,
+        alreadyStudied: alreadyStudied,
       ),
     );
     if (added != null && mounted) {
       setState(() => _studySeconds[key] = added);
+      if (added >= kSwahiliMinStudySeconds && !widget.isWordStudied(key)) {
+        await widget.onWordStudied(key);
+        await _maybeCompleteDay();
+      }
     }
   }
 
@@ -522,7 +618,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. Usikome hadi uelewe vizuri.',
+                  'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. / Tap each word and study at least $kSwahiliMinStudySeconds seconds.',
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.45,
@@ -693,11 +789,13 @@ class _WordDetailSheet extends StatefulWidget {
     required this.rich,
     required this.isDark,
     required this.priorSeconds,
+    this.alreadyStudied = false,
   });
 
   final SwahiliRichWord rich;
   final bool isDark;
   final int priorSeconds;
+  final bool alreadyStudied;
 
   @override
   State<_WordDetailSheet> createState() => _WordDetailSheetState();
@@ -709,14 +807,16 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
 
   int get _totalSeconds => widget.priorSeconds + _sessionSeconds;
 
-  bool get _studied => _totalSeconds >= kSwahiliMinStudySeconds;
+  bool get _studied => widget.alreadyStudied || _totalSeconds >= kSwahiliMinStudySeconds;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _sessionSeconds++);
-    });
+    if (!widget.alreadyStudied && widget.priorSeconds < kSwahiliMinStudySeconds) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _sessionSeconds++);
+      });
+    }
   }
 
   @override
@@ -784,8 +884,8 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                               Expanded(
                                 child: Text(
                                   _studied
-                                      ? 'Umekamilisha kusoma neno hili â€” vizuri!'
-                                      : 'Soma angalau sekunde $remaining zaidi',
+                                      ? 'Umekamilisha kusoma — Done studying!'
+                                      : 'Soma angalau sekunde $remaining zaidi / Study $remaining more seconds',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -830,12 +930,12 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _detailBlock('Maelezo rahisi', widget.rich.explanationSw),
+                        _bilingualBlock('Maelezo / Explanation', widget.rich.explanationSw, widget.rich.explanationEn),
                         const SizedBox(height: 12),
-                        _detailBlock('Kidokezo cha sarufi', widget.rich.grammarSw),
+                        _bilingualBlock('Sarufi / Grammar', widget.rich.grammarSw, widget.rich.grammarEn),
                         const SizedBox(height: 16),
                         Text(
-                          'Vidokezo vya kukusaidia',
+                          'Vidokezo / Tips',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
@@ -843,21 +943,30 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ...widget.rich.tipsSw.map(
+                        ...widget.rich.tips.map(
                           (t) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.only(bottom: 8),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('â€¢ ', style: TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.w900)),
-                                Expanded(child: Text(t, style: _bodyStyle)),
+                                const Text('• ', style: TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.w900)),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(t.swahili, style: _bodyStyle.copyWith(fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 2),
+                                      Text(t.english, style: _enStyle),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Mifano ya matumizi',
+                          'Mifano / Examples',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
@@ -881,13 +990,18 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                                 children: [
                                   Text(ex.swahili, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: widget.isDark ? Colors.white : const Color(0xFF1E293B))),
                                   const SizedBox(height: 4),
-                                  Text('Kiingereza: ${ex.english}', style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : const Color(0xFF64748B))),
+                                  Text(ex.english, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.white70 : const Color(0xFF475569))),
                                   if (ex.partNotes.isNotEmpty) ...[
                                     const SizedBox(height: 8),
+                                    Text(
+                                      'Maneno / Words:',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+                                    ),
+                                    const SizedBox(height: 4),
                                     ...ex.partNotes.map(
                                       (n) => Padding(
                                         padding: const EdgeInsets.only(bottom: 2),
-                                        child: Text('â†³ $n', style: TextStyle(fontSize: 11, height: 1.35, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8))),
+                                        child: Text('↳ $n', style: TextStyle(fontSize: 11, height: 1.35, color: widget.isDark ? Colors.white54 : const Color(0xFF94A3B8))),
                                       ),
                                     ),
                                   ],
@@ -908,7 +1022,7 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                         minimumSize: const Size(double.infinity, 48),
                       ),
                       child: Text(
-                        _studied ? 'Nimeelewa â€” funga' : 'Funga (endelea kusoma)',
+                        _studied ? 'Nimeelewa — Done' : 'Funga (endelea kusoma) / Close (keep studying)',
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
@@ -928,7 +1042,14 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
         color: widget.isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155),
       );
 
-  Widget _detailBlock(String title, String body) {
+  TextStyle get _enStyle => TextStyle(
+        fontSize: 13,
+        height: 1.45,
+        fontStyle: FontStyle.italic,
+        color: widget.isDark ? Colors.white54 : const Color(0xFF64748B),
+      );
+
+  Widget _bilingualBlock(String title, String swahili, String english) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -942,7 +1063,9 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFFD97706))),
           const SizedBox(height: 6),
-          Text(body, style: _bodyStyle),
+          Text(swahili, style: _bodyStyle.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(english, style: _enStyle),
         ],
       ),
     );
