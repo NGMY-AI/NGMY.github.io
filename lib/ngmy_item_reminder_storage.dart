@@ -204,6 +204,11 @@ Future<int> ngmyItemReminderDueCount({String userEmail = ''}) async {
   return list.where((e) => e.isDue).length;
 }
 
+Future<int> ngmyItemReminderCount({String userEmail = ''}) async {
+  final list = await loadNgmyItemReminders(userEmail: userEmail);
+  return list.length;
+}
+
 Future<List<NgmyItemReminder>> ngmyDueItemReminders({String userEmail = ''}) async {
   final list = await loadNgmyItemReminders(userEmail: userEmail);
   return list.where((e) => e.isDue).toList();

@@ -23,9 +23,12 @@ const List<String> kNgmyMarriageUsStates = [
   'District of Columbia',
 ];
 
-const _ink = 0xFF1A1A1A;
-const _gold = 0xFF9A7B4F;
-const _paper = 0xFFFFFBF5;
+const _ink = 0xFF1A1208;
+const _congoBlue = 0xFF007FFF;
+const _congoYellow = 0xFFF7D618;
+const _congoRed = 0xFFCE1021;
+const _congoGold = 0xFFC9A227;
+const _paper = 0xFFFFF8E7;
 
 String ngmyMarriageWatermarkForState(String state) => "EMO YA M'BONDO ${state.toUpperCase()}";
 
@@ -48,6 +51,7 @@ NgmySlideElement _lockedText(
   TextAlign align = TextAlign.left,
   TextDecoration decoration = TextDecoration.none,
   String tag = '',
+  int color = _ink,
 }) {
   return NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
@@ -60,7 +64,7 @@ NgmySlideElement _lockedText(
     fontSize: fontSize,
     fontWeight: fontWeight,
     decoration: decoration,
-    color: _ink,
+    color: color,
     align: align,
     fileName: tag.isEmpty ? kMarriageLocked : '${kMarriageLocked}_$tag',
   );
@@ -73,7 +77,7 @@ NgmySlideElement _lockedShape({
   required double w,
   required double h,
   int fillColor = 0x00000000,
-  int strokeColor = _gold,
+  int strokeColor = _congoGold,
   double strokeWidth = 1.5,
   String tag = '',
 }) {
@@ -101,7 +105,7 @@ List<NgmySlideElement> _nameBox(String fieldKey, double x, double y, double w, {
       y: y,
       w: w,
       h: h,
-      strokeColor: 0xFF94A3B8,
+      strokeColor: _congoBlue,
       strokeWidth: 1,
       tag: 'box_$fieldKey',
     ),
@@ -162,134 +166,162 @@ void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
   e.w = (t.length * 0.0115 + 0.028).clamp(0.06, maxW);
 }
 
-/// Builds a compact landscape marriage certificate matching the traditional form layout.
+/// Builds a portrait 9:16 Congolese marriage certificate (Hati ya Kuhowesha).
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String state}) {
   final today = _formatMarriageDate(DateTime.now());
   final watermark = ngmyMarriageWatermarkForState(state);
-  const paperTop = 0.1;
-  const paperH = 0.68;
+  const px = 0.07;
+  const pw = 0.86;
+  const py = 0.02;
+  const ph = 0.96;
 
   final elements = <NgmySlideElement>[
-    // Paper frame (locked) — shorter certificate, centered
-    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.06, y: paperTop, w: 0.88, h: paperH, strokeColor: _gold, strokeWidth: 2.5),
-    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.068, y: paperTop + 0.008, w: 0.864, h: paperH - 0.016, strokeColor: 0xFFD4C4A8, strokeWidth: 0.8),
+    // Congo tricolor accent bar
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw / 3, h: 0.012, fillColor: _congoBlue, strokeColor: _congoBlue, strokeWidth: 0, tag: 'bar_blue'),
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: px + pw / 3, y: py, w: pw / 3, h: 0.012, fillColor: _congoYellow, strokeColor: _congoYellow, strokeWidth: 0, tag: 'bar_yellow'),
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 2 * pw / 3, y: py, w: pw / 3, h: 0.012, fillColor: _congoRed, strokeColor: _congoRed, strokeWidth: 0, tag: 'bar_red'),
 
-    // Watermark — subtle gold at bottom of paper
-    NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
-      type: NgmySlideElementType.text,
-      x: 0.08,
-      y: paperTop + paperH - 0.1,
-      w: 0.84,
-      h: 0.08,
-      text: watermark,
-      fontSize: 17,
-      fontWeight: FontWeight.w800,
-      color: 0xFFBCAAA0,
-      align: TextAlign.center,
-      fileName: '${kMarriageLocked}_watermark',
-    ),
+    // Paper frame — Congolese blue & gold
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py + 0.012, w: pw, h: ph - 0.012, strokeColor: _congoBlue, strokeWidth: 3),
+    _lockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.012, y: py + 0.024, w: pw - 0.024, h: ph - 0.036, strokeColor: _congoGold, strokeWidth: 1.5),
 
     // Date
-    _lockedText('DATE: $today', x: 0.58, y: paperTop + 0.02, w: 0.34, h: 0.038, fontSize: 13, fontWeight: FontWeight.w700, align: TextAlign.right, tag: 'date'),
+    _lockedText('DATE: $today', x: px + 0.04, y: py + 0.04, w: pw - 0.08, h: 0.028, fontSize: 12, fontWeight: FontWeight.w700, align: TextAlign.right, tag: 'date'),
 
-    // Title — large, underlined
+    // Title
     _lockedText(
       'HATI YA KUHOWESHA',
-      x: 0.1,
-      y: paperTop + 0.055,
-      w: 0.8,
-      h: 0.06,
-      fontSize: 30,
+      x: px + 0.04,
+      y: py + 0.07,
+      w: pw - 0.08,
+      h: 0.05,
+      fontSize: 24,
       fontWeight: FontWeight.w900,
       align: TextAlign.center,
       decoration: TextDecoration.underline,
     ),
 
-    // Body line 1
-    _lockedText('Mimi', x: 0.08, y: paperTop + 0.13, w: 0.055, h: 0.038, fontSize: 15),
-    ..._nameBox('father_name', 0.135, paperTop + 0.125, 0.16, h: 0.044),
-    _lockedText('jina la', x: 0.30, y: paperTop + 0.13, w: 0.075, h: 0.038, fontSize: 15),
-    ..._nameBox('father_clan', 0.378, paperTop + 0.125, 0.12, h: 0.044),
-    _lockedText(', ya', x: 0.505, y: paperTop + 0.13, w: 0.045, h: 0.038, fontSize: 15),
-    ..._nameBox('father_place', 0.552, paperTop + 0.125, 0.14, h: 0.044),
-    _lockedText('.', x: 0.698, y: paperTop + 0.13, w: 0.02, h: 0.038, fontSize: 15),
+    // Body — portrait flow, tight spacing
+    _lockedText('Mimi', x: px + 0.05, y: py + 0.13, w: 0.08, h: 0.028, fontSize: 14),
+    ..._nameBox('father_name', px + 0.13, py + 0.126, 0.34, h: 0.034),
+    _lockedText('jina la', x: px + 0.05, y: py + 0.165, w: 0.14, h: 0.028, fontSize: 14),
+    ..._nameBox('father_clan', px + 0.19, py + 0.161, 0.28, h: 0.034),
+    _lockedText(', ya', x: px + 0.48, y: py + 0.165, w: 0.08, h: 0.028, fontSize: 14),
+    ..._nameBox('father_place', px + 0.55, py + 0.161, 0.32, h: 0.034),
 
-    // Body line 2
-    _lockedText('Nimehowesha binti wangu aitwaye,', x: 0.08, y: paperTop + 0.185, w: 0.38, h: 0.038, fontSize: 15),
-    ..._nameBox('daughter_name', 0.46, paperTop + 0.18, 0.42, h: 0.044),
+    _lockedText('Nimehowesha binti wangu aitwaye,', x: px + 0.05, y: py + 0.2, w: pw - 0.1, h: 0.028, fontSize: 14),
+    ..._nameBox('daughter_name', px + 0.05, py + 0.228, pw - 0.1, h: 0.034),
 
-    // Body line 3
-    _lockedText('na ndugu', x: 0.08, y: paperTop + 0.24, w: 0.095, h: 0.038, fontSize: 15),
-    ..._nameBox('groom_name', 0.175, paperTop + 0.235, 0.17, h: 0.044),
-    _lockedText('wa jina la', x: 0.352, y: paperTop + 0.24, w: 0.095, h: 0.038, fontSize: 15),
-    ..._nameBox('groom_clan', 0.45, paperTop + 0.235, 0.13, h: 0.044),
-    _lockedText(', Nyumba ya', x: 0.588, y: paperTop + 0.24, w: 0.115, h: 0.038, fontSize: 15),
-    ..._nameBox('house_name', 0.705, paperTop + 0.235, 0.15, h: 0.044),
-
-    // Body line 4
-    _lockedText('Kijana wa', x: 0.08, y: paperTop + 0.295, w: 0.1, h: 0.038, fontSize: 15),
-    ..._nameBox('groom_origin', 0.182, paperTop + 0.29, 0.26, h: 0.044),
+    _lockedText('na ndugu', x: px + 0.05, y: py + 0.27, w: 0.16, h: 0.028, fontSize: 14),
+    ..._nameBox('groom_name', px + 0.21, py + 0.266, 0.36, h: 0.034),
+    _lockedText('wa jina la', x: px + 0.05, y: py + 0.305, w: 0.16, h: 0.028, fontSize: 14),
+    ..._nameBox('groom_clan', px + 0.21, py + 0.301, 0.3, h: 0.034),
+    _lockedText(', Nyumba ya', x: px + 0.05, y: py + 0.34, w: 0.22, h: 0.028, fontSize: 14),
+    ..._nameBox('house_name', px + 0.27, py + 0.336, 0.6, h: 0.034),
+    _lockedText('Kijana wa', x: px + 0.05, y: py + 0.375, w: 0.18, h: 0.028, fontSize: 14),
+    ..._nameBox('groom_origin', px + 0.23, py + 0.371, 0.64, h: 0.034),
 
     // Dowry
     _lockedText(
       'Nimepoyacash',
-      x: 0.08,
-      y: paperTop + 0.35,
-      w: 0.84,
-      h: 0.042,
-      fontSize: 17,
+      x: px + 0.05,
+      y: py + 0.415,
+      w: pw - 0.1,
+      h: 0.032,
+      fontSize: 16,
       fontWeight: FontWeight.w900,
       align: TextAlign.center,
       decoration: TextDecoration.underline,
     ),
-    _lockedText('KICHWA CHA MTU: Dollar', x: 0.08, y: paperTop + 0.395, w: 0.24, h: 0.036, fontSize: 14, fontWeight: FontWeight.w800),
-    ..._nameBox('dowry_amount', 0.32, paperTop + 0.39, 0.2, h: 0.042),
-    _lockedText('•', x: 0.1, y: paperTop + 0.44, w: 0.02, h: 0.032, fontSize: 15),
-    ..._nameBox('dowry_item_1', 0.125, paperTop + 0.435, 0.32, h: 0.04),
-    _lockedText('•', x: 0.1, y: paperTop + 0.475, w: 0.02, h: 0.032, fontSize: 15),
-    ..._nameBox('dowry_item_2', 0.125, paperTop + 0.47, 0.32, h: 0.04),
-    _lockedText('•', x: 0.1, y: paperTop + 0.51, w: 0.02, h: 0.032, fontSize: 15),
-    ..._nameBox('dowry_item_3', 0.125, paperTop + 0.505, 0.32, h: 0.04),
+    _lockedText('KICHWA CHA MTU: Dollar', x: px + 0.05, y: py + 0.45, w: 0.5, h: 0.028, fontSize: 13, fontWeight: FontWeight.w800),
+    ..._nameBox('dowry_amount', px + 0.52, py + 0.446, 0.38, h: 0.032),
+    _lockedText('•', x: px + 0.06, y: py + 0.488, w: 0.03, h: 0.026, fontSize: 14),
+    ..._nameBox('dowry_item_1', px + 0.1, py + 0.484, pw - 0.15, h: 0.03),
+    _lockedText('•', x: px + 0.06, y: py + 0.518, w: 0.03, h: 0.026, fontSize: 14),
+    ..._nameBox('dowry_item_2', px + 0.1, py + 0.514, pw - 0.15, h: 0.03),
+    _lockedText('•', x: px + 0.06, y: py + 0.548, w: 0.03, h: 0.026, fontSize: 14),
+    ..._nameBox('dowry_item_3', px + 0.1, py + 0.544, pw - 0.15, h: 0.03),
 
-    // Witnesses header
-    _lockedText('MASHAIDI', x: 0.42, y: paperTop + 0.545, w: 0.16, h: 0.032, fontSize: 14, fontWeight: FontWeight.w900, align: TextAlign.center),
-    _lockedText('UPANDE WA MKE', x: 0.08, y: paperTop + 0.545, w: 0.28, h: 0.032, fontSize: 13, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
-    _lockedText('UPANDE WA MME', x: 0.64, y: paperTop + 0.545, w: 0.28, h: 0.032, fontSize: 13, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
+    // Witnesses
+    _lockedText('MASHAIDI', x: px + 0.3, y: py + 0.585, w: 0.4, h: 0.028, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center),
+    _lockedText('UPANDE WA MKE', x: px + 0.05, y: py + 0.615, w: 0.4, h: 0.026, fontSize: 12, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
+    _lockedText('UPANDE WA MME', x: px + 0.5, y: py + 0.615, w: 0.4, h: 0.026, fontSize: 12, fontWeight: FontWeight.w800, align: TextAlign.center, decoration: TextDecoration.underline),
 
-    // Witness rows — name box + signature line only
     for (var i = 0; i < 3; i++) ...[
-      _lockedText('${i + 1}.', x: 0.08, y: paperTop + 0.58 + i * 0.048, w: 0.028, h: 0.032, fontSize: 12, fontWeight: FontWeight.w700),
-      ..._nameBox('wife_witness_${i + 1}', 0.11, paperTop + 0.576 + i * 0.048, 0.2, h: 0.038),
-      _lockedShape(shape: NgmySlideShapeKind.line, x: 0.11, y: paperTop + 0.612 + i * 0.048, w: 0.2, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'wife_line_$i'),
+      _lockedText('${i + 1}.', x: px + 0.05, y: py + 0.645 + i * 0.038, w: 0.04, h: 0.026, fontSize: 11, fontWeight: FontWeight.w700),
+      ..._nameBox('wife_witness_${i + 1}', px + 0.09, py + 0.642 + i * 0.038, 0.34, h: 0.03),
+      _lockedShape(shape: NgmySlideShapeKind.line, x: px + 0.09, y: py + 0.672 + i * 0.038, w: 0.34, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'wife_line_$i'),
       NgmySlideElement(
         id: NgmySlidesTemplates.newId(),
         type: NgmySlideElementType.shape,
         shape: NgmySlideShapeKind.rectangle,
-        x: 0.11,
-        y: paperTop + 0.598 + i * 0.048,
-        w: 0.2,
-        h: 0.024,
+        x: px + 0.09,
+        y: py + 0.66 + i * 0.038,
+        w: 0.34,
+        h: 0.02,
         fillColor: 0x00000000,
         strokeColor: 0x00000000,
         fileName: '${kMarriageSignPrefix}wife_${i + 1}',
       ),
-      _lockedText('${i + 1}.', x: 0.64, y: paperTop + 0.58 + i * 0.048, w: 0.028, h: 0.032, fontSize: 12, fontWeight: FontWeight.w700),
-      ..._nameBox('husband_witness_${i + 1}', 0.67, paperTop + 0.576 + i * 0.048, 0.2, h: 0.038),
-      _lockedShape(shape: NgmySlideShapeKind.line, x: 0.67, y: paperTop + 0.612 + i * 0.048, w: 0.2, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'husband_line_$i'),
+      _lockedText('${i + 1}.', x: px + 0.5, y: py + 0.645 + i * 0.038, w: 0.04, h: 0.026, fontSize: 11, fontWeight: FontWeight.w700),
+      ..._nameBox('husband_witness_${i + 1}', px + 0.54, py + 0.642 + i * 0.038, 0.34, h: 0.03),
+      _lockedShape(shape: NgmySlideShapeKind.line, x: px + 0.54, y: py + 0.672 + i * 0.038, w: 0.34, h: 0.002, strokeColor: _ink, strokeWidth: 1, tag: 'husband_line_$i'),
       NgmySlideElement(
         id: NgmySlidesTemplates.newId(),
         type: NgmySlideElementType.shape,
         shape: NgmySlideShapeKind.rectangle,
-        x: 0.67,
-        y: paperTop + 0.598 + i * 0.048,
-        w: 0.2,
-        h: 0.024,
+        x: px + 0.54,
+        y: py + 0.66 + i * 0.038,
+        w: 0.34,
+        h: 0.02,
         fillColor: 0x00000000,
         strokeColor: 0x00000000,
         fileName: '${kMarriageSignPrefix}husband_${i + 1}',
       ),
     ],
+
+    // Congo official stamp
+    _lockedShape(shape: NgmySlideShapeKind.circle, x: 0.32, y: py + 0.76, w: 0.36, h: 0.065, strokeColor: _congoBlue, strokeWidth: 2.5, tag: 'stamp_outer'),
+    _lockedShape(shape: NgmySlideShapeKind.circle, x: 0.34, y: py + 0.768, w: 0.32, h: 0.058, strokeColor: _congoGold, strokeWidth: 1.2, tag: 'stamp_inner'),
+    _lockedText(
+      'RÉPUBLIQUE DÉMOCRATIQUE',
+      x: 0.28,
+      y: py + 0.775,
+      w: 0.44,
+      h: 0.02,
+      fontSize: 7,
+      fontWeight: FontWeight.w900,
+      align: TextAlign.center,
+      tag: 'stamp_line1',
+    ),
+    _lockedText(
+      'DU CONGO',
+      x: 0.32,
+      y: py + 0.793,
+      w: 0.36,
+      h: 0.02,
+      fontSize: 9,
+      fontWeight: FontWeight.w900,
+      align: TextAlign.center,
+      tag: 'stamp_line2',
+    ),
+    _lockedText('★', x: 0.46, y: py + 0.805, w: 0.08, h: 0.02, fontSize: 14, fontWeight: FontWeight.w900, color: _congoRed, align: TextAlign.center, tag: 'stamp_star'),
+
+    // State watermark
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.text,
+      x: px + 0.04,
+      y: py + ph - 0.1,
+      w: pw - 0.08,
+      h: 0.06,
+      text: watermark,
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: _congoBlue,
+      align: TextAlign.center,
+      fileName: '${kMarriageLocked}_watermark',
+    ),
   ];
 
   final slide = NgmySlide(
@@ -304,7 +336,7 @@ NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String state}) {
     id: NgmySlidesTemplates.newId(),
     name: 'Hati ya Kuhowesha — $state',
     themeId: 'marriage_certificate',
-    aspectRatio: NgmySlideAspectRatio.landscape169,
+    aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyMarriageDeckKind,
     marriageState: state,
     slides: [slide],
