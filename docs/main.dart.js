@@ -189352,7 +189352,7 @@ r=A.A(18,r.k()>>>16&255,r.k()>>>8&255,r.k()&255)
 q=A.n(8)
 p=m?B.c:B.q
 p=A.U(A.A(36,p.k()>>>16&255,p.k()>>>8&255,p.k()&255),B.o,1)
-h.push(A.b2(i.r.d+6,A.qh(A.aM(!1,B.L,!0,n,A.aV(!1,s,!0,A.u(n,A.Z(B.xv,m?B.aM:B.ci,n,n,12),B.h,n,n,new A.t(r,n,p,q,n,n,B.k),n,n,n,B.eN,n,n,n),n,!0,n,n,n,n,n,n,n,n,n,n,n,new A.bwF(a),n,n,n,n,n,n,n),B.h,B.F,0,n,n,n,n,n,B.X),n,"Reset app data",n,n),n,n,n,10,n,n))
+h.push(A.b2(i.r.d+18,A.qh(A.aM(!1,B.L,!0,n,A.aV(!1,s,!0,A.u(n,A.Z(B.xv,m?B.aM:B.ci,n,n,12),B.h,n,n,new A.t(r,n,p,q,n,n,B.k),n,n,n,B.eN,n,n,n),n,!0,n,n,n,n,n,n,n,n,n,n,n,new A.bwF(a),n,n,n,n,n,n,n),B.h,B.F,0,n,n,n,n,n,B.X),n,"Reset app data",n,n),n,n,n,22,n,n))
 return A.aPc(A.fO(A.ca(n,j,new A.aG(B.a2,n,B.am,B.m,h,n),n,!1,!1,n,n),k,!0),l,t.lu)}}
 A.bwo.prototype={
 $1(a){return B.a.i(a.a.toLowerCase())===this.a},
