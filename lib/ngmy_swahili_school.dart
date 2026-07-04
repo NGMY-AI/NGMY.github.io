@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
 import 'ngmy_swahili_routes.dart';
+import 'ngmy_swahili_visuals.dart';
 import 'ngmy_swahili_word_enrichment.dart';
 
 /// One word the user wants to see as a pop-up every time they open the app.
@@ -754,7 +755,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Bofya kila neno na soma angalau sekunde $kSwahiliMinStudySeconds. / Tap each word and study at least $kSwahiliMinStudySeconds seconds.',
+                      'Bofya kila neno — picha inaonyesha maana ya Kiingereza. / Tap each word — the picture shows what the English means.',
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.45,
@@ -830,6 +831,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
               padding: const EdgeInsets.only(top: 10),
               child: _WordCard(
                 word: w,
+                index: index,
                 color: widget.level.color,
                 isDark: isDark,
                 studied: _isStudied(w.swahili),
@@ -847,6 +849,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
 class _WordCard extends StatelessWidget {
   const _WordCard({
     required this.word,
+    required this.index,
     required this.color,
     required this.isDark,
     required this.studied,
@@ -855,6 +858,7 @@ class _WordCard extends StatelessWidget {
   });
 
   final SwahiliWord word;
+  final int index;
   final Color color;
   final bool isDark;
   final bool studied;
@@ -865,6 +869,8 @@ class _WordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = isDark ? const Color(0xFF1A2030) : Colors.white;
     final borderColor = studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.25);
+    final visual = resolveSwahiliWordVisual(swahili: word.swahili, english: word.english);
+
     return Material(
       color: card,
       borderRadius: BorderRadius.circular(16),
@@ -872,49 +878,66 @@ class _WordCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor, width: studied ? 1.8 : 1),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(
-                studied ? Icons.check_circle_rounded : Icons.touch_app_rounded,
-                size: 20,
-                color: studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.6),
-              ),
+              SwahiliLessonNumberBadge(number: index, color: studied ? const Color(0xFFD97706) : color),
               const SizedBox(width: 10),
               Expanded(
-                flex: 5,
-                child: Text(
-                  word.swahili,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      word.swahili,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        height: 1.2,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(Icons.arrow_right_alt_rounded, color: Color(0xFFDC2626), size: 18),
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            word.english,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              height: 1.25,
+                              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!studied && studySeconds > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${kSwahiliMinStudySeconds - studySeconds}s left',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded, size: 18, color: color.withValues(alpha: 0.5)),
-              Expanded(
-                flex: 5,
-                child: Text(
-                  word.english,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : const Color(0xFF64748B),
-                  ),
-                ),
-              ),
-              if (!studied && studySeconds > 0) ...[
+              const SizedBox(width: 10),
+              SwahiliWordVisualTile(visual: visual, compact: true),
+              if (studied) ...[
                 const SizedBox(width: 6),
-                Text(
-                  '${kSwahiliMinStudySeconds - studySeconds}s',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
-                ),
+                const Icon(Icons.check_circle_rounded, color: Color(0xFFD97706), size: 20),
               ],
             ],
           ),
@@ -972,6 +995,7 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
   @override
   Widget build(BuildContext context) {
     final word = widget.rich.base;
+    final visual = resolveSwahiliWordVisual(swahili: word.swahili, english: word.english);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFFAF7F2);
     final remaining = (kSwahiliMinStudySeconds - _totalSeconds).clamp(0, kSwahiliMinStudySeconds);
@@ -1029,6 +1053,8 @@ class _SwahiliWordStudyPageState extends State<_SwahiliWordStudyPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
               children: [
+                SwahiliWordVisualHero(visual: visual, english: word.english),
+                const SizedBox(height: 16),
                 Text(
                   word.swahili,
                   style: TextStyle(
