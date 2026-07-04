@@ -43,11 +43,19 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
   NgmyMenuDocument? _doc;
   String? _error;
   bool _loading = true;
+  final PageController _pageController = PageController();
+  int _pageIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -64,7 +72,11 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
         setState(() {
           _doc = doc;
           _loading = false;
+          _pageIndex = 0;
         });
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(0);
+        }
         return;
       }
       if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
@@ -118,6 +130,7 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     final doc = _doc!;
     final pages = doc.effectivePages;
     final bg = ngmyMenuPageBackgroundColor(doc.pageBackground);
+    final multi = pages.length > 1;
 
     return Scaffold(
       backgroundColor: bg,
@@ -126,14 +139,37 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: pages.length == 1
-                  ? _menuPage(doc, 0)
-                  : PageView.builder(
+              child: multi
+                  ? PageView.builder(
+                      controller: _pageController,
                       itemCount: pages.length,
+                      onPageChanged: (i) => setState(() => _pageIndex = i),
                       itemBuilder: (_, i) => _menuPage(doc, i),
-                    ),
+                    )
+                  : _menuPage(doc, 0),
             ),
-            NgmyMenuGuestFooter(links: doc.socialLinks),
+            SizedBox(
+              height: multi || doc.socialLinks.hasAny ? 52 : 8,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: NgmyMenuGuestFooter(links: doc.socialLinks),
+                  ),
+                  if (multi)
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: NgmyMenuPageDotsIndicator(
+                        count: pages.length,
+                        activeIndex: _pageIndex,
+                        pageBackgroundId: doc.pageBackground,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

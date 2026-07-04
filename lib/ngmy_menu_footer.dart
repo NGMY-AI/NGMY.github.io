@@ -14,11 +14,11 @@ class NgmyMenuGuestFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!links.hasAny) return const SizedBox.shrink();
 
-    final size = compact ? 36.0 : 42.0;
-    final iconSize = compact ? 18.0 : 20.0;
+    final size = compact ? 28.0 : 32.0;
+    final iconSize = compact ? 14.0 : 16.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, compact ? 8 : 12, compact ? 8 : 12, compact ? 4 : 8),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, compact ? 6 : 8, compact ? 8 : 10, compact ? 2 : 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -79,6 +79,79 @@ class NgmyMenuGuestFooter extends StatelessWidget {
   }
 }
 
+/// Small glassy pill — page dots for multi-menu guest links.
+class NgmyMenuPageDotsIndicator extends StatelessWidget {
+  const NgmyMenuPageDotsIndicator({
+    super.key,
+    required this.count,
+    required this.activeIndex,
+    required this.pageBackgroundId,
+  });
+
+  final int count;
+  final int activeIndex;
+  final String pageBackgroundId;
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 1) return const SizedBox.shrink();
+
+    final bg = ngmyMenuPageBackgroundColor(pageBackgroundId);
+    final isLight = bg.computeLuminance() > 0.55;
+    final frameFill = isLight ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF1A1F2E).withValues(alpha: 0.72);
+    final frameBorder = isLight ? Colors.black.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.22);
+    final dotActive = isLight ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
+    final dotIdle = isLight ? const Color(0xFF94A3B8).withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.35);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: frameFill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: frameBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+          if (isLight)
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.9),
+              blurRadius: 4,
+              offset: const Offset(0, -1),
+            ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(count, (i) {
+          final active = i == activeIndex.clamp(0, count - 1);
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            margin: EdgeInsets.only(left: i == 0 ? 0 : 5),
+            width: active ? 7 : 5,
+            height: active ? 7 : 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: active ? dotActive : dotIdle,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: dotActive.withValues(alpha: 0.35),
+                        blurRadius: 4,
+                      ),
+                    ]
+                  : null,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
 class _SocialIconButton extends StatelessWidget {
   const _SocialIconButton({
     required this.size,
@@ -97,11 +170,11 @@ class _SocialIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: 6),
       child: Material(
         color: Colors.white,
-        elevation: 2,
-        shadowColor: Colors.black26,
+        elevation: 1,
+        shadowColor: Colors.black12,
         shape: const CircleBorder(),
         child: InkWell(
           onTap: onTap,
