@@ -37,7 +37,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   List<NgmyMenuDocument> _menus = [];
   bool _loading = true;
   NgmyMenuDocument? _editing;
-  int _tab = 0;
   bool _publishing = false;
   final _qrCaptureKey = GlobalKey();
 
@@ -71,10 +70,9 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   }
 
   void _newMenu() {
-    final doc = ngmyMenuSampleDocument();
+    final doc = ngmyMenuBlankDocument();
     setState(() {
       _editing = doc;
-      _tab = 0;
       _bindEditors(doc);
     });
   }
@@ -82,7 +80,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   void _openMenu(NgmyMenuDocument doc) {
     setState(() {
       _editing = doc.copy();
-      _tab = 0;
       _bindEditors(_editing!);
     });
   }
@@ -97,7 +94,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   void _syncFromEditors() {
     final doc = _editing;
     if (doc == null) return;
-    doc.restaurantName = _nameC.text.trim().isEmpty ? 'My Restaurant' : _nameC.text.trim();
+    doc.restaurantName = _nameC.text.trim();
     doc.tagline = _taglineC.text.trim();
     doc.slug = _slugC.text.trim().toLowerCase();
     doc.qrStyle = doc.qrStyle.copyWith(centerLabel: _centerLabelC.text.trim());
@@ -225,7 +222,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                                   backgroundColor: const Color(0xFFB8860B).withValues(alpha: 0.15),
                                   child: const Icon(Icons.restaurant_menu_rounded, color: Color(0xFFB8860B)),
                                 ),
-                                title: Text(m.restaurantName, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                title: Text(
+                                  m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName,
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                                ),
                                 subtitle: Text(m.isPublished ? m.publicUrl : 'Draft · ${m.templateId}'),
                                 trailing: m.isPublished ? const Icon(Icons.public_rounded, size: 18) : null,
                                 onTap: () => _openMenu(m),
@@ -242,54 +242,58 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Widget _editor(NgmyHubTheme t) {
     final doc = _editing!;
+    final title = doc.restaurantName.trim().isEmpty ? 'New menu' : doc.restaurantName.trim();
     final qrUrl = doc.publicUrl.isNotEmpty ? doc.publicUrl : ngmyMenuPublicUrlForSlug(doc.slug.isEmpty ? 'preview' : doc.slug);
 
     return Material(
       color: t.scaffold,
       child: SafeArea(
-        child: Column(
-          children: [
-            _topBar(t, title: doc.restaurantName, onBack: () => setState(() => _editing = null)),
-            TabBar(
-              labelColor: const Color(0xFFB8860B),
-              tabs: const [
-                Tab(text: 'Edit'),
-                Tab(text: 'Design'),
-                Tab(text: 'QR Code'),
-              ],
-              onTap: (i) => setState(() => _tab = i),
-            ),
-            Expanded(
-              child: IndexedStack(
-                index: _tab,
-                children: [
-                  _editTab(t, doc),
-                  _designTab(t, doc),
-                  _qrTab(doc, qrUrl),
+        child: DefaultTabController(
+          length: 3,
+          child: Column(
+            children: [
+              _topBar(t, title: title, onBack: () => setState(() => _editing = null)),
+              TabBar(
+                labelColor: const Color(0xFFB8860B),
+                unselectedLabelColor: t.subtitle,
+                indicatorColor: const Color(0xFFB8860B),
+                tabs: const [
+                  Tab(text: 'Edit'),
+                  Tab(text: 'Design'),
+                  Tab(text: 'QR Code'),
                 ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(onPressed: _save, child: const Text('Save')),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _publishing ? null : _publish,
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
-                      child: _publishing
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Publish'),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _editTab(t, doc),
+                    _designTab(t, doc),
+                    _qrTab(doc, qrUrl),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(onPressed: _save, child: const Text('Save')),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _publishing ? null : _publish,
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
+                        child: _publishing
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text('Publish'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -301,7 +305,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       children: [
         TextField(
           controller: _nameC,
-          decoration: const InputDecoration(labelText: 'Restaurant name', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            labelText: 'Restaurant name',
+            hintText: 'Enter your restaurant name',
+            border: OutlineInputBorder(),
+          ),
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 10),
@@ -315,7 +323,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           controller: _slugC,
           decoration: const InputDecoration(
             labelText: 'Link slug (optional)',
-            hintText: 'mcdonalds-downtown',
+            hintText: 'your-restaurant-name',
             border: OutlineInputBorder(),
           ),
         ),

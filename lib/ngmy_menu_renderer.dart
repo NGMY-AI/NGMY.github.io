@@ -92,7 +92,14 @@ class NgmyMenuPreview extends StatelessWidget {
             ],
           ),
         SizedBox(height: compact ? 8 : 12),
-        Text(doc.restaurantName, textAlign: TextAlign.center, style: nameStyle),
+        Text(
+          doc.restaurantName.trim().isEmpty ? 'Your Restaurant' : doc.restaurantName,
+          textAlign: TextAlign.center,
+          style: nameStyle.copyWith(
+            color: doc.restaurantName.trim().isEmpty ? t.textSecondary : nameStyle.color,
+            fontStyle: doc.restaurantName.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
+          ),
+        ),
         if (t.headerStyle == 'ornate') ...[
           const SizedBox(height: 6),
           Container(

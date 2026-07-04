@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_business_essentials.dart';
-import 'ngmy_business_card_studio.dart';
 import 'ngmy_hub_form_ui.dart';
-import 'ngmy_item_reminder.dart';
-import 'ngmy_item_reminder_service.dart';
-import 'ngmy_item_reminder_storage.dart';
+import 'ngmy_menu_studio.dart';
+import 'ngmy_menu_storage.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -28,7 +26,7 @@ class NgmyMarketHubScreen extends StatefulWidget {
 }
 
 class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
-  int _dueReminders = 0;
+  int _menuCount = 0;
   int _essentialsCount = 0;
 
   @override
@@ -44,12 +42,12 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
 
   Future<void> _refreshBadges() async {
     final results = await Future.wait([
-      ngmyItemReminderDueCount(userEmail: widget.userEmail),
+      ngmyMenuCount(userEmail: widget.userEmail),
       ngmyBusinessEssentialsTotalCount(userEmail: widget.userEmail),
     ]);
     if (mounted) {
       setState(() {
-        _dueReminders = results[0];
+        _menuCount = results[0];
         _essentialsCount = results[1];
       });
     }
@@ -71,30 +69,17 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
           children: [
             _youtubeFrame(
               t: t,
-              title: 'Business Card Creator',
-              subtitle: '37 luxurious templates · drag · save PNG',
+              title: 'Menu Studio',
+              subtitle: 'Restaurant menus · publish online · custom QR codes',
               thumbHeight: thumbH,
-              darkGradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
-              lightGradient: const [Color(0xFFE2E8F0), Color(0xFFD1FAE5), Color(0xFFECFDF5)],
-              accent: const Color(0xFF22C55E),
-              preview: _BusinessCardThumbPreview(accent: const Color(0xFF22C55E), isDark: t.isDark),
-              onTap: () => showNgmyBusinessCardStudioDialog(context, userEmail: widget.userEmail),
-            ),
-            const SizedBox(height: 18),
-            _youtubeFrame(
-              t: t,
-              title: 'Where I Put It',
-              subtitle: 'Keys · wallet · kids bag — schedule reminders',
-              thumbHeight: thumbH,
-              darkGradient: const [Color(0xFF0B1020), Color(0xFF3B0764), Color(0xFF1E1B4B)],
-              lightGradient: const [Color(0xFFE2E8F0), Color(0xFFEDE9FE), Color(0xFFF5F3FF)],
-              accent: const Color(0xFFA78BFA),
-              badge: _dueReminders > 0 ? '$_dueReminders due' : null,
-              preview: _ReminderThumbPreview(accent: const Color(0xFFA78BFA), isDark: t.isDark),
+              darkGradient: const [Color(0xFF1A1410), Color(0xFF3D2E1F), Color(0xFF0F172A)],
+              lightGradient: const [Color(0xFFFFF8E7), Color(0xFFFEF3C7), Color(0xFFFDE68A)],
+              accent: const Color(0xFFB8860B),
+              badge: _menuCount > 0 ? '$_menuCount saved' : null,
+              preview: _MenuStudioThumbPreview(accent: const Color(0xFFB8860B), isDark: t.isDark),
               onTap: () async {
-                await showNgmyItemReminderDialog(context, userEmail: widget.userEmail);
+                await showNgmyMenuStudioDialog(context, userEmail: widget.userEmail);
                 await _refreshBadges();
-                await ngmyCheckItemRemindersNow(userEmail: widget.userEmail);
               },
             ),
             const SizedBox(height: 18),
@@ -206,6 +191,46 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             const SizedBox(height: 3),
             Text(subtitle, style: TextStyle(color: t.muted, fontSize: 12, height: 1.25)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuStudioThumbPreview extends StatelessWidget {
+  const _MenuStudioThumbPreview({required this.accent, required this.isDark});
+
+  final Color accent;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Transform.rotate(
+        angle: -0.04,
+        child: Container(
+          width: 200,
+          height: 114,
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: isDark ? const [Color(0xFF1A1410), Color(0xFF0A0A0A)] : const [Color(0xFFFFF8E7), Color(0xFFFEF3C7)],
+            ),
+            border: Border.all(color: accent.withValues(alpha: 0.65)),
+            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12))],
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.restaurant_menu_rounded, color: accent, size: 22),
+              const SizedBox(height: 8),
+              Text('YOUR MENU', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2)),
+              const Spacer(),
+              Text('Burgers · Drinks · QR', style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF64748B), fontSize: 9)),
+            ],
+          ),
         ),
       ),
     );

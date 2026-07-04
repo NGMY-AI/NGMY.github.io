@@ -8,8 +8,6 @@ import 'ngmy_hub_form_ui.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
-import 'ngmy_menu_studio.dart';
-import 'ngmy_menu_storage.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
@@ -22,7 +20,6 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessNotesCount(userEmail: userEmail),
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
-    ngmyMenuCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -63,7 +60,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _notes = 0;
   int _tasks = 0;
   int _reminders = 0;
-  int _menus = 0;
   bool _loading = true;
 
   @override
@@ -81,7 +77,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessNotesCount(userEmail: widget.userEmail),
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
-      ngmyMenuCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -92,7 +87,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _notes = results[4];
       _tasks = results[5];
       _reminders = results[6];
-      _menus = results[7];
       _loading = false;
     });
   }
@@ -150,7 +144,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
               child: Text(
-                'Organize contacts, menus, reminders, notes & more — all saved locally',
+                'Organize contacts, reminders, notes, tasks & more — all saved locally',
                 style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
               ),
             ),
@@ -213,13 +207,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                       accent: const Color(0xFFA78BFA),
                       count: _reminders,
                       onTap: () => _openCategory((ctx) => showNgmyItemReminderDialog(ctx, userEmail: widget.userEmail)),
-                    ),
-                    _CompactCategoryCard(
-                      title: 'Menu Studio',
-                      icon: Icons.restaurant_menu_rounded,
-                      accent: const Color(0xFFB8860B),
-                      count: _menus,
-                      onTap: () => _openCategory((ctx) => showNgmyMenuStudioDialog(ctx, userEmail: widget.userEmail)),
                     ),
                   ],
                 ),

@@ -190,25 +190,15 @@ String ngmyMenuSlugify(String name) {
   return s.length > 48 ? s.substring(0, 48) : s;
 }
 
-NgmyMenuDocument ngmyMenuSampleDocument() => NgmyMenuDocument(
+NgmyMenuDocument ngmyMenuBlankDocument() => NgmyMenuDocument(
       id: ngmyMenuNewId(),
-      restaurantName: 'McDonald\'s',
-      tagline: 'I\'m lovin\' it',
+      restaurantName: '',
+      tagline: '',
       templateId: 'gold_luxe',
       sections: [
         NgmyMenuSection(
-          title: 'Burgers',
-          items: [
-            NgmyMenuItem(name: 'Big Mac', description: 'Two all-beef patties, special sauce', price: '\$7.99'),
-            NgmyMenuItem(name: 'Quarter Pounder', description: 'Fresh beef, melted cheese', price: '\$6.49'),
-          ],
-        ),
-        NgmyMenuSection(
-          title: 'Drinks',
-          items: [
-            NgmyMenuItem(name: 'Coca-Cola', description: 'Medium fountain drink', price: '\$2.19'),
-            NgmyMenuItem(name: 'McFlurry', description: 'Oreo or M&M\'s', price: '\$4.29'),
-          ],
+          title: 'Main',
+          items: [NgmyMenuItem(name: '', description: '', price: '')],
         ),
       ],
     );
