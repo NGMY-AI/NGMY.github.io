@@ -74,6 +74,21 @@ List<NgmyLegalSection> parseNgmyLegalSections(String raw) {
   return sections.where((s) => s.title.isNotEmpty || s.body.isNotEmpty).toList();
 }
 
+/// Contact section body often lists email/phone in text — keep intro only for the card UI.
+String ngmyLegalContactIntroText(String body) {
+  final lines = body.split('\n');
+  final kept = <String>[];
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+    final lower = trimmed.toLowerCase();
+    if (lower.startsWith('email:') || lower.startsWith('phone:')) continue;
+    if (trimmed == kNgmyLegalEmail || trimmed == kNgmyLegalPhone) continue;
+    kept.add(trimmed);
+  }
+  return kept.join('\n').trim();
+}
+
 String _phoneTelUri(String phone) {
   final digits = phone.replaceAll(RegExp(r'[^\d+]'), '');
   if (digits.startsWith('+')) return 'tel:$digits';
@@ -144,8 +159,6 @@ class NgmyLegalContactRow extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: accent,
-                        decoration: TextDecoration.underline,
-                        decorationColor: accent.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -182,7 +195,7 @@ Widget ngmyLegalLinkifiedText(String text, bool isDark, Color accent) {
         baseline: TextBaseline.alphabetic,
         child: GestureDetector(
           onTap: () => _openUri(Uri(scheme: 'mailto', path: v)),
-          child: Text(v, style: TextStyle(color: accent, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+          child: Text(v, style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
         ),
       ));
       i += v.length;
@@ -195,7 +208,7 @@ Widget ngmyLegalLinkifiedText(String text, bool isDark, Color accent) {
         baseline: TextBaseline.alphabetic,
         child: GestureDetector(
           onTap: () => _openUri(Uri.parse(_phoneTelUri(v))),
-          child: Text(v, style: TextStyle(color: accent, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+          child: Text(v, style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
         ),
       ));
       i += v.length;
@@ -320,16 +333,13 @@ class NgmyLegalDocumentPage extends StatelessWidget {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  if (index == sections.length) {
-                    return _contactFooter(context, isDark, accent);
-                  }
                   final section = sections[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _sectionCard(section, isDark, accent),
                   );
                 },
-                childCount: sections.length + 1,
+                childCount: sections.length,
               ),
             ),
           ),
@@ -381,76 +391,46 @@ class NgmyLegalDocumentPage extends StatelessWidget {
           ),
           if (section.body.isNotEmpty) ...[
             const SizedBox(height: 10),
-            if (isContact)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ngmyLegalLinkifiedText(section.body, isDark, accent),
-                  const SizedBox(height: 8),
-                  NgmyLegalContactRow(
-                    icon: Icons.email_outlined,
-                    label: 'Email',
-                    value: kNgmyLegalEmail,
-                    isEmail: true,
-                    isDark: isDark,
-                    accent: accent,
-                  ),
-                  NgmyLegalContactRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone',
-                    value: kNgmyLegalPhone,
-                    isEmail: false,
-                    isDark: isDark,
-                    accent: accent,
-                  ),
-                ],
-              )
-            else
+            if (isContact) ...[
+              Builder(builder: (context) {
+                final intro = ngmyLegalContactIntroText(section.body);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (intro.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          intro,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.62,
+                            color: isDark ? Colors.white.withValues(alpha: 0.82) : const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    NgmyLegalContactRow(
+                      icon: Icons.email_outlined,
+                      label: 'Email',
+                      value: kNgmyLegalEmail,
+                      isEmail: true,
+                      isDark: isDark,
+                      accent: accent,
+                    ),
+                    NgmyLegalContactRow(
+                      icon: Icons.phone_outlined,
+                      label: 'Phone',
+                      value: kNgmyLegalPhone,
+                      isEmail: false,
+                      isDark: isDark,
+                      accent: accent,
+                    ),
+                  ],
+                );
+              }),
+            ] else
               ngmyLegalLinkifiedText(section.body, isDark, accent),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _contactFooter(BuildContext context, bool isDark, Color accent) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: isDark ? 0.14 : 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Contact NGMY',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tap to email or call. Use the copy icon to save contact details.',
-            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 8),
-          NgmyLegalContactRow(
-            icon: Icons.email_outlined,
-            label: 'Email',
-            value: kNgmyLegalEmail,
-            isEmail: true,
-            isDark: isDark,
-            accent: accent,
-          ),
-          NgmyLegalContactRow(
-            icon: Icons.phone_outlined,
-            label: 'Phone',
-            value: kNgmyLegalPhone,
-            isEmail: false,
-            isDark: isDark,
-            accent: accent,
-          ),
         ],
       ),
     );
