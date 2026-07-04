@@ -173,6 +173,8 @@ import 'ngmy_medicine_reminder_service.dart';
 import 'ngmy_swahili_reminders.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
+import 'ngmy_legal_content.dart';
+import 'ngmy_legal_ui.dart';
 
 part 'ngmy_admin_panels.dart';
 part 'ngmy_admin_management.dart';
@@ -1594,8 +1596,8 @@ class AppConfig {
   AppConfig({
     this.officialCashApp = 'NGMYpay',
     this.officialBitcoin = 'bc1q...',
-    this.termsAndConditions = 'Welcome to NGMY. By using our services, you agree to...',
-    this.privacyPolicy = 'We value your privacy. We collect data only to...',
+    this.termsAndConditions = kNgmyTermsAndConditions,
+    this.privacyPolicy = kNgmyPrivacyPolicy,
     this.loanPhone = '706-623-7963',
     this.loanHowItWorks = '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     this.geminiApiKey = '',
@@ -1863,8 +1865,8 @@ class AppConfig {
     return AppConfig(
     officialCashApp: (json['officialCashApp'] ?? json['official_cash_app'] ?? 'NGMYpay').toString(),
     officialBitcoin: (json['officialBitcoin'] ?? json['official_bitcoin'] ?? 'bc1q...').toString(),
-    termsAndConditions: json['termsAndConditions'] ?? 'Welcome to NGMY. By using our services, you agree to...',
-    privacyPolicy: json['privacyPolicy'] ?? 'We value your privacy. We collect data only to...',
+    termsAndConditions: json['termsAndConditions'] ?? kNgmyTermsAndConditions,
+    privacyPolicy: json['privacyPolicy'] ?? kNgmyPrivacyPolicy,
     loanPhone: json['loanPhone'] ?? '706-623-7963',
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     geminiApiKey: _geminiKeyFromMap(json),
@@ -4708,28 +4710,14 @@ void _mergeLegalFromRemoteRecord(AppConfig config, Map<String, dynamic> remoteMa
   }
 }
 
-/// Only overwrites legal text when the remote row actually includes those columns.
+/// Legal text is bundled in the app — always use official NGMY documents.
 Future<void> _applyRemoteLegalToConfig(
   AppConfig config,
   Map<String, dynamic> remoteMap, {
   AppConfig? keep,
 }) async {
-  if (await _hasRecentAdminLegalLocalSave()) {
-    await _applyLocalAdminLegalBackupToConfig(config);
-    return;
-  }
-  if (keep != null) {
-    _mergeLegalFromRemoteRecord(config, remoteMap, keep);
-    return;
-  }
-  if (remoteMap.containsKey('termsAndConditions')) {
-    final terms = (remoteMap['termsAndConditions'] ?? '').toString().trim();
-    if (terms.isNotEmpty) config.termsAndConditions = terms;
-  }
-  if (remoteMap.containsKey('privacyPolicy')) {
-    final privacy = (remoteMap['privacyPolicy'] ?? '').toString().trim();
-    if (privacy.isNotEmpty) config.privacyPolicy = privacy;
-  }
+  config.termsAndConditions = kNgmyTermsAndConditions;
+  config.privacyPolicy = kNgmyPrivacyPolicy;
 }
 
 const _kNgmySettingsTermsKey = 'terms_and_conditions';
@@ -4930,67 +4918,10 @@ Future<List<Map<String, dynamic>>> _fetchPlansViaStoreListings() async {
 }
 
 Future<Map<String, String>> _fetchAuthoritativeLegalContent() async {
-  var terms = '';
-  var privacy = '';
-  DateTime? termsAt;
-  DateTime? privacyAt;
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final savedAt = prefs.getString(_kNgmyAdminLegalSavedAtPrefs);
-    final savedTerms = (prefs.getString(_kNgmyAdminLegalTermsPrefs) ?? '').trim();
-    final savedPrivacy = (prefs.getString(_kNgmyAdminLegalPrivacyPrefs) ?? '').trim();
-    final at = savedAt != null ? DateTime.tryParse(savedAt) : null;
-    if (at != null) {
-      if (savedTerms.isNotEmpty) {
-        terms = savedTerms;
-        termsAt = at;
-      }
-      if (savedPrivacy.isNotEmpty) {
-        privacy = savedPrivacy;
-        privacyAt = at;
-      }
-    }
-  } catch (e) {
-    debugPrint('[legal] prefs authoritative: $e');
-  }
-
-  void considerTerms(String content, DateTime? at) {
-    final c = content.trim();
-    if (c.isEmpty) return;
-    if (termsAt == null || (at != null && !at.isBefore(termsAt!))) {
-      terms = c;
-      termsAt = at ?? DateTime.now();
-    }
-  }
-
-  void considerPrivacy(String content, DateTime? at) {
-    final c = content.trim();
-    if (c.isEmpty) return;
-    if (privacyAt == null || (at != null && !at.isBefore(privacyAt!))) {
-      privacy = c;
-      privacyAt = at ?? DateTime.now();
-    }
-  }
-
-  final settingsTerms = await _fetchNgmySettingSafe(_kNgmySettingsTermsKey);
-  if (settingsTerms != null) {
-    considerTerms((settingsTerms['content'] ?? '').toString(), _parseSettingUpdatedAt(settingsTerms['updatedAt']));
-  }
-  final settingsPrivacy = await _fetchNgmySettingSafe(_kNgmySettingsPrivacyKey);
-  if (settingsPrivacy != null) {
-    considerPrivacy((settingsPrivacy['content'] ?? '').toString(), _parseSettingUpdatedAt(settingsPrivacy['updatedAt']));
-  }
-
-  final storeLegal = await _fetchLegalViaStoreListings();
-  considerTerms(storeLegal['terms'] ?? '', null);
-  considerPrivacy(storeLegal['privacy'] ?? '', null);
-
-  final configLegal = await _fetchRemoteLegalContent();
-  considerTerms(configLegal['terms'] ?? '', null);
-  considerPrivacy(configLegal['privacy'] ?? '', null);
-
-  return {'terms': terms, 'privacy': privacy};
+  return {
+    'terms': kNgmyTermsAndConditions,
+    'privacy': kNgmyPrivacyPolicy,
+  };
 }
 
 Future<List<Map<String, dynamic>>> _fetchAuthoritativeInvestmentPlans() async {
@@ -13698,7 +13629,8 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       const SizedBox(height: 6),
       _buildAuthModeSwitchGlassCard(isDark),
-      const SizedBox(height: 50),
+      const NgmyLegalFooterLinks(),
+      const SizedBox(height: 20),
       TextButton(
         onPressed: () async {
           final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: const Text('Reset System?'), content: const Text('This will clear all local data and log everyone out. Use only if you are getting loading errors.'), actions: [TextButton(onPressed:()=>Navigator.pop(c, false), child: const Text('CANCEL')), TextButton(onPressed:()=>Navigator.pop(c, true), child: const Text('RESET', style: TextStyle(color: Colors.red)))]));
@@ -20133,14 +20065,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _adminHome(isDark),
       _adminUsers(isDark),
       _adminInvest(isDark),
-      _adminLegal(isDark),
       _adminWallet(isDark),
       _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 6)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 5)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -20176,9 +20107,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _navItem(0, Icons.home_outlined, 'Home', isDark, frameBg, frameBorder),
             _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
             _navItem(2, Icons.trending_up_rounded, 'Invest', isDark, frameBg, frameBorder),
-            _navItem(3, Icons.edit_note_rounded, 'Creator', isDark, frameBg, frameBorder),
             _navItem(
-              4,
+              3,
               Icons.account_balance_wallet_outlined,
               'Wallet',
               isDark,
@@ -20186,8 +20116,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
               frameBorder,
               badgeCount: _adminWalletPendingCount(),
             ),
-            _navItem(5, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(6, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(4, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(5, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -20302,7 +20232,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "CREATOR", "WALLET", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "WALLET", "STORE", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -22326,23 +22256,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-
-  Widget _adminLegal(bool isDark) => NgmyAdminLegalTab(
-        isDark: isDark,
-        terms: widget.config.termsAndConditions,
-        privacy: widget.config.privacyPolicy,
-        onSave: (terms, privacy) async {
-          setState(() {
-            widget.config.termsAndConditions = terms;
-            widget.config.privacyPolicy = privacy;
-          });
-          if (widget.onSaveLegalContent != null) {
-            return widget.onSaveLegalContent!(terms, privacy);
-          }
-          widget.onDataChanged();
-          return false;
-        },
-      );
 
   Widget _adminInvest(bool isDark) {
     final plans = _investmentPlansFromMaps(widget.config.investmentPlans);
@@ -27327,22 +27240,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.description_outlined,
                 title: 'Terms & Conditions',
                 iconBg: const Color(0xFF3B82F6),
-                onTap: () async {
-                  await widget.onRefreshLegalContent?.call();
-                  if (!ctx.mounted) return;
-                  _showLegal(ctx, 'Terms & Conditions', widget.config.termsAndConditions);
-                },
+                onTap: () => showNgmyLegalDocument(
+                  ctx,
+                  title: 'Terms & Conditions',
+                  body: kNgmyTermsAndConditions,
+                ),
               ),
               const SizedBox(height: 10),
               _legalTile(
                 icon: Icons.privacy_tip_outlined,
                 title: 'Privacy Policy',
                 iconBg: const Color(0xFF8B5CF6),
-                onTap: () async {
-                  await widget.onRefreshLegalContent?.call();
-                  if (!ctx.mounted) return;
-                  _showLegal(ctx, 'Privacy Policy', widget.config.privacyPolicy);
-                },
+                onTap: () => showNgmyLegalDocument(
+                  ctx,
+                  title: 'Privacy Policy',
+                  body: kNgmyPrivacyPolicy,
+                ),
               ),
             ],
           ),

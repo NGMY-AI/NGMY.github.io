@@ -1,4 +1,4 @@
-part of 'main.dart';
+﻿part of 'main.dart';
 
 InputDecoration ngmyAdminInputDecoration({
   required String label,
@@ -24,7 +24,7 @@ InputDecoration ngmyAdminInputDecoration({
   );
 }
 
-/// Rebuilt admin Wallet tab — pending approvals, history, payment settings, cloud sync.
+/// Rebuilt admin Wallet tab â€” pending approvals, history, payment settings, cloud sync.
 class NgmyAdminWalletTab extends StatefulWidget {
   const NgmyAdminWalletTab({
     super.key,
@@ -136,10 +136,10 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
         SnackBar(
           content: Text(
             ok
-                ? 'Cash App and Bitcoin saved — all users will see these payment addresses.'
+                ? 'Cash App and Bitcoin saved â€” all users will see these payment addresses.'
                 : btc.isEmpty
-                    ? 'Saved locally — enter a Bitcoin address and connect internet to sync.'
-                    : 'Saved locally — connect internet and tap Save again to sync Bitcoin & Cash App.',
+                    ? 'Saved locally â€” enter a Bitcoin address and connect internet to sync.'
+                    : 'Saved locally â€” connect internet and tap Save again to sync Bitcoin & Cash App.',
           ),
           backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
           duration: const Duration(seconds: 6),
@@ -181,7 +181,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
             children: [
               Expanded(
                 child: Text(
-                  'Wallet admin — approve requests, sync balances to Supabase.',
+                  'Wallet admin â€” approve requests, sync balances to Supabase.',
                   style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
                 ),
               ),
@@ -287,7 +287,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
               child: ElevatedButton(
                 onPressed: _savingPayments ? null : _savePayments,
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
-                child: Text(_savingPayments ? 'Saving…' : 'SAVE TO CLOUD'),
+                child: Text(_savingPayments ? 'Savingâ€¦' : 'SAVE TO CLOUD'),
               ),
             ),
           ],
@@ -338,7 +338,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                 ),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text('\$${formatCurrency(t.amount)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                  Text('${t.status.name.toUpperCase()}${archived ? ' · ARCHIVE' : ''}', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
+                  Text('${t.status.name.toUpperCase()}${archived ? ' Â· ARCHIVE' : ''}', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
                 ]),
               ],
             ),
@@ -359,12 +359,12 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                           children: [
                             if (isInvestment)
                               Text(
-                                'Investment: ${meta['plan'] ?? ''} · \$${meta['amount'] ?? ''}',
+                                'Investment: ${meta['plan'] ?? ''} Â· \$${meta['amount'] ?? ''}',
                                 style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.orangeAccent : Colors.orange.shade800, fontSize: 12),
                               )
                             else
                               Text(
-                                'Method: ${t.method.name.toUpperCase()} · ${t.sourceDetails ?? 'N/A'}',
+                                'Method: ${t.method.name.toUpperCase()} Â· ${t.sourceDetails ?? 'N/A'}',
                                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
                               ),
                             if (t.verificationCode != null && t.verificationCode!.trim().isNotEmpty) ...[
@@ -416,12 +416,12 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(onPressed: _processingTxnId == t.id ? null : () => _process(t, false), child: Text(_processingTxnId == t.id ? '…' : 'REJECT')),
+                      TextButton(onPressed: _processingTxnId == t.id ? null : () => _process(t, false), child: Text(_processingTxnId == t.id ? 'â€¦' : 'REJECT')),
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: _processingTxnId == t.id ? null : () => _process(t, true),
                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                        child: Text(_processingTxnId == t.id ? 'SAVING…' : 'APPROVE'),
+                        child: Text(_processingTxnId == t.id ? 'SAVINGâ€¦' : 'APPROVE'),
                       ),
                     ],
                   ),
@@ -467,7 +467,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
           ]),
           Text(user.email, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
           const SizedBox(height: 8),
-          Text('Send to user: \$${formatCurrency(net)} · Fee ${(feeRate * 100).toInt()}% · ${t.status.name.toUpperCase()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
+          Text('Send to user: \$${formatCurrency(net)} Â· Fee ${(feeRate * 100).toInt()}% Â· ${t.status.name.toUpperCase()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
           Text('Payout: ${t.sourceDetails ?? t.method.name}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
           if (showActions && pending) ...[
             const SizedBox(height: 10),
@@ -479,7 +479,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                 ElevatedButton(
                   onPressed: _processingTxnId == t.id ? null : () => _process(t, true),
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                  child: Text(_processingTxnId == t.id ? 'SAVING…' : 'APPROVE'),
+                  child: Text(_processingTxnId == t.id ? 'SAVINGâ€¦' : 'APPROVE'),
                 ),
               ],
             ),
@@ -490,7 +490,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
   }
 }
 
-/// Rebuilt admin Invest tab — plans CRUD with immediate Supabase sync.
+/// Rebuilt admin Invest tab â€” plans CRUD with immediate Supabase sync.
 class NgmyAdminInvestTab extends StatefulWidget {
   const NgmyAdminInvestTab({
     super.key,
@@ -568,7 +568,7 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                   const SizedBox(height: 10),
                   TextField(controller: priceC, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setDlg(() {}), decoration: const InputDecoration(labelText: 'Price (\$)')),
                   const SizedBox(height: 12),
-                  Text('ROI fixed 2.86% · Daily \$${formatCurrency(daily)} · Total \$${formatCurrency(total)}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
+                  Text('ROI fixed 2.86% Â· Daily \$${formatCurrency(daily)} Â· Total \$${formatCurrency(total)}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
                 ],
               ),
             ),
@@ -626,7 +626,7 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
     if (mounted) {
       setState(() => _busyPlanKey = null);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(saved ? 'Plan removed from cloud.' : 'Removed locally — sync when online.'), backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange),
+        SnackBar(content: Text(saved ? 'Plan removed from cloud.' : 'Removed locally â€” sync when online.'), backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange),
       );
     }
   }
@@ -647,7 +647,7 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Investment plans sync to Supabase for every user.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
                   if (_pendingInvestDeposits > 0)
-                    Text('$_pendingInvestDeposits pending investment deposit(s) — approve in Wallet tab.', style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w700)),
+                    Text('$_pendingInvestDeposits pending investment deposit(s) â€” approve in Wallet tab.', style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w700)),
                 ]),
               ),
               IconButton(
@@ -692,7 +692,7 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                       child: ListTile(
                         title: Text(pl.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black)),
                         subtitle: Text(
-                          '\$${formatCurrency(pl.price)} · Daily \$${formatCurrency(pl.dailyIncome)} · 261d \$${formatCurrency(pl.totalReturn)}',
+                          '\$${formatCurrency(pl.price)} Â· Daily \$${formatCurrency(pl.dailyIncome)} Â· 261d \$${formatCurrency(pl.totalReturn)}',
                           style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
                         ),
                         trailing: busy
@@ -710,168 +710,6 @@ class _NgmyAdminInvestTabState extends State<NgmyAdminInvestTab> {
                 ),
         ),
       ],
-    );
-  }
-}
-
-/// Admin Creator tab — Terms & Conditions and Privacy Policy editor.
-class NgmyAdminLegalTab extends StatefulWidget {
-  const NgmyAdminLegalTab({
-    super.key,
-    required this.isDark,
-    required this.terms,
-    required this.privacy,
-    required this.onSave,
-  });
-
-  final bool isDark;
-  final String terms;
-  final String privacy;
-  final Future<bool> Function(String terms, String privacy) onSave;
-
-  @override
-  State<NgmyAdminLegalTab> createState() => _NgmyAdminLegalTabState();
-}
-
-class _NgmyAdminLegalTabState extends State<NgmyAdminLegalTab> {
-  late final TextEditingController _termsC;
-  late final TextEditingController _privacyC;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _termsC = TextEditingController(text: widget.terms);
-    _privacyC = TextEditingController(text: widget.privacy);
-  }
-
-  @override
-  void didUpdateWidget(covariant NgmyAdminLegalTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.terms != widget.terms && _termsC.text != widget.terms) {
-      _termsC.text = widget.terms;
-    }
-    if (oldWidget.privacy != widget.privacy && _privacyC.text != widget.privacy) {
-      _privacyC.text = widget.privacy;
-    }
-  }
-
-  @override
-  void dispose() {
-    _termsC.dispose();
-    _privacyC.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_saving) return;
-    final terms = _termsC.text.trim();
-    final privacy = _privacyC.text.trim();
-    setState(() => _saving = true);
-    try {
-      final saved = await widget.onSave(terms, privacy);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(saved
-              ? 'Terms & Privacy saved to database for all users.'
-              : ngmySupabaseSaveFailureMessage(_ngmyLastSupabasePersistError)),
-          backgroundColor: saved ? const Color(0xFF00B25A) : Colors.orange,
-          duration: const Duration(seconds: 8),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Widget _editorBox(String label, TextEditingController controller) {
-    final isDark = widget.isDark;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.22 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-              color: isDark ? Colors.white70 : const Color(0xFF334155),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: controller,
-            maxLines: 6,
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: isDark ? const Color(0xFF0F111A) : Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFD1D5DB)),
-              ),
-              focusedBorder: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-                borderSide: BorderSide(color: Color(0xFF3B82F6), width: 1.4),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Legal Content Editor',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: isDark ? Colors.white : Colors.black),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Changes sync to Supabase so every user sees updated Terms & Privacy in Profile.',
-            style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
-          ),
-          const SizedBox(height: 20),
-          _editorBox('Terms & Conditions', _termsC),
-          const SizedBox(height: 20),
-          _editorBox('Privacy Policy', _privacyC),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: _saving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00B25A),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 55),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
-            child: _saving
-                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('SAVE ALL CHANGES'),
-          ),
-        ],
-      ),
     );
   }
 }

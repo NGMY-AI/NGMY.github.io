@@ -1,0 +1,240 @@
+/// Official NGMY legal documents — bundled in the app.
+const String kNgmyLegalEffectiveDate = 'July 4, 2026';
+const String kNgmyLegalEmail = 'ngmypay@gmail.com';
+const String kNgmyLegalPhone = '(706) 623-7963';
+
+const String kNgmyTermsAndConditions = '''
+NGMY Terms and Conditions
+
+Effective Date: $kNgmyLegalEffectiveDate
+
+Welcome to NGMY ("App," "Platform," "Services"). By accessing or using NGMY, you agree to comply with these Terms and Conditions. If you do not agree with these terms, please do not use our services.
+
+1. Acceptance of Terms
+
+By downloading, accessing, registering for, or using NGMY, you agree to be bound by these Terms and all applicable laws and regulations.
+
+2. About NGMY Services
+
+NGMY provides digital tools and services including, but not limited to:
+
+• QR code generation and data transfer
+• Business card creation
+• Professional invoice generation
+• File sharing and transfer
+• Notes and document creation
+• Presentation creation for school or professional use
+• Advisory and information assistance through NGMY Advisors
+• Compatibility and relationship-based entertainment tools
+• Money transfer assistance and helper services
+• Delivery, moving, repair, and general support services
+
+NGMY may add, modify, or remove features at any time.
+
+3. Local Storage and User Responsibility
+
+NGMY is designed to operate primarily using local device storage. Approximately 98% of user data may remain stored locally on the user's device unless transferred or backed up.
+
+Users are fully responsible for protecting and transferring important data before:
+
+• Deleting the application
+• Resetting their device
+• Changing phones
+• Losing access to a device
+
+NGMY strongly recommends using the built-in QR code transfer system to securely transfer important data from one device to another.
+
+Failure to transfer data before deleting the app or losing a device may result in permanent data loss. NGMY is not responsible for lost local data.
+
+4. User Accounts
+
+Some services may require account registration. Users are responsible for:
+
+• Providing accurate information
+• Protecting account credentials
+• Activities performed under their account
+
+Users must notify NGMY of unauthorized access.
+
+5. Acceptable Use
+
+Users agree not to:
+
+• Use NGMY for illegal activities
+• Upload malicious software or harmful files
+• Harass, threaten, abuse, or impersonate others
+• Commit fraud or deception
+• Attempt unauthorized access to systems or data
+• Misuse payment, transfer, or helper services
+
+Violation may result in suspension or permanent termination.
+
+6. QR Code Services
+
+NGMY offers QR code services for various forms of information, including contact information, personal data, and business information.
+
+Users are responsible for ensuring information shared through QR codes is accurate and lawful. NGMY is not responsible for misuse of shared QR data by third parties.
+
+7. File Transfer Services
+
+NGMY allows users to transfer files for convenience, including situations where email access may be limited.
+
+Users are responsible for all files sent through the platform and must ensure they do not contain illegal, harmful, or copyrighted content without permission.
+
+8. Financial and Helper Services
+
+Certain NGMY services may involve financial assistance, money transfer support, repair help, moving assistance, delivery, or general helper services.
+
+Availability may vary by location. NGMY does not guarantee immediate service availability or completion timelines.
+
+9. Intellectual Property
+
+All NGMY branding, software, designs, technology, templates, and proprietary systems remain the intellectual property of NGMY unless otherwise stated.
+
+Users may not copy, reverse engineer, distribute, or reproduce NGMY systems without written permission.
+
+10. Service Availability
+
+NGMY may update, suspend, restrict, or discontinue any feature without prior notice.
+
+We do not guarantee uninterrupted access.
+
+11. Limitation of Liability
+
+NGMY shall not be liable for:
+
+• Data loss
+• Device failures
+• Service interruptions
+• Indirect damages
+• User misuse of services
+• Loss caused by failure to back up local data
+
+Users accept use of the platform at their own risk.
+
+12. Changes to Terms
+
+NGMY may revise these Terms at any time. Continued use after updates means acceptance of revised Terms.
+
+13. Contact
+
+For legal or service-related questions, contact NGMY at:
+
+Email: $kNgmyLegalEmail
+Phone: $kNgmyLegalPhone
+''';
+
+const String kNgmyPrivacyPolicy = '''
+NGMY Privacy Policy
+
+Effective Date: $kNgmyLegalEffectiveDate
+
+NGMY values your privacy and is committed to protecting user information. This Privacy Policy explains how information is collected, used, stored, and protected.
+
+1. Information We Collect
+
+Depending on the features used, NGMY may collect:
+
+• Name
+• Email address
+• Phone number
+• Contact information
+• Files uploaded or transferred
+• Notes and created documents
+• QR code data generated by users
+• Business card information
+• Invoice information
+• Device and usage information
+
+2. Local Data Storage
+
+NGMY is designed primarily as a local-storage platform.
+
+Approximately 98% of user data remains stored directly on the user's device rather than centralized cloud storage.
+
+Because of this architecture:
+
+• Users maintain greater control over their data
+• Most information remains on the device unless intentionally shared or transferred
+
+3. QR Code Data Transfers
+
+NGMY uses QR codes as a major method of transferring information between devices.
+
+Data transferred through QR codes is initiated by the user and shared only when the user chooses to do so.
+
+Users are responsible for verifying recipients before sharing sensitive information.
+
+4. Risk of Local Data Loss
+
+Because most data is stored locally, deleting the app, losing a device, or resetting a device may permanently erase stored information.
+
+Users are strongly encouraged to transfer important data to another device before uninstalling the app.
+
+NGMY is not responsible for loss of locally stored data.
+
+5. How We Use Information
+
+Information may be used to:
+
+• Provide app functionality
+• Generate QR codes
+• Enable file transfer
+• Create invoices and business cards
+• Improve features and performance
+• Provide support and helper services
+• Improve security and prevent abuse
+
+6. Sharing of Information
+
+NGMY does not sell personal information.
+
+Information is shared only:
+
+• When users intentionally share data
+• To provide requested services
+• To comply with legal obligations
+• To protect safety and platform security
+
+7. Security
+
+We implement reasonable technical and organizational measures to protect user information.
+
+However, no digital system is completely secure.
+
+Users are encouraged to protect their devices, passwords, and QR code access.
+
+8. Third-Party Services
+
+Some features may rely on third-party providers for infrastructure, payments, messaging, or notifications, including services such as:
+
+• Supabase
+• Firebase
+• Stripe (if payments are enabled)
+
+Third-party providers operate under their own privacy policies.
+
+9. User Rights
+
+Where permitted by law, users may request to:
+
+• Access stored information
+• Correct information
+• Delete account data
+• Request closure of account
+
+10. Children's Privacy
+
+NGMY is not intended for children under 13 without parental consent where required by law.
+
+11. Policy Updates
+
+This Privacy Policy may be updated periodically. Updated versions will be published within the app or website.
+
+12. Contact
+
+For privacy-related inquiries, contact NGMY at:
+
+Email: $kNgmyLegalEmail
+Phone: $kNgmyLegalPhone
+''';
