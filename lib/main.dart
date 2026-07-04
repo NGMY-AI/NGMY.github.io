@@ -12974,8 +12974,9 @@ class _AuthScreenState extends State<AuthScreen> {
     return Center(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: ngmyClipBackdrop(
+          borderRadius: BorderRadius.circular(14),
+          sigma: 8,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -15744,7 +15745,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _homePastelBackdrop(bool isLight) {
     final baseColors = isLight
         ? const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)]
-        : const [Color(0xFF0B1020), Color(0xFF111827), Color(0xFF201336)];
+        : const [Color(0xFF0B1020), Color(0xFF111827), Color(0xFF151B28)];
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -15753,14 +15754,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           colors: baseColors,
         ),
       ),
-      child: Stack(
-        children: [
-          _pastelOrb(top: 48, left: -26, size: 118, colors: const [Color(0xFF8EEBFF), Color(0xFFE3B3FF)]),
-          _pastelOrb(top: 82, right: -18, size: 96, colors: const [Color(0xFFFFD7B8), Color(0xFFFFA7DD)]),
-          _pastelOrb(top: 250, left: 18, size: 76, colors: const [Color(0xFFD8F8A9), Color(0xFF8FE7FF)]),
-          _pastelOrb(top: 360, right: 22, size: 112, colors: const [Color(0xFFC4B5FD), Color(0xFF67E8F9)]),
-        ],
-      ),
+      child: ngmyCrispUi
+          ? const SizedBox.shrink()
+          : Stack(
+              children: [
+                _pastelOrb(top: 48, left: -26, size: 118, colors: const [Color(0xFF8EEBFF), Color(0xFFE3B3FF)]),
+                _pastelOrb(top: 82, right: -18, size: 96, colors: const [Color(0xFFFFD7B8), Color(0xFFFFA7DD)]),
+                _pastelOrb(top: 250, left: 18, size: 76, colors: const [Color(0xFFD8F8A9), Color(0xFF8FE7FF)]),
+                _pastelOrb(top: 360, right: 22, size: 112, colors: const [Color(0xFFC4B5FD), Color(0xFF67E8F9)]),
+              ],
+            ),
     );
   }
 
@@ -15797,12 +15800,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final panel = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: (isLight ? Colors.white : const Color(0xFF111827)).withOpacity(isLight ? 0.72 : 0.70),
+        color: ngmyCrispSurfaceColor(context, elevated: true),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: Colors.white.withOpacity(isLight ? 0.72 : 0.18), width: 1.2),
+        border: Border.all(color: ngmyCrispBorderColor(context), width: 1.2),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF8B5CF6).withOpacity(isLight ? 0.10 : 0.18), blurRadius: 24, offset: const Offset(0, 12)),
-          BoxShadow(color: Colors.white.withOpacity(isLight ? 0.58 : 0.05), blurRadius: 8, offset: const Offset(-3, -4)),
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: isLight ? 0.06 : 0.12),
+            blurRadius: ngmyCrispUi ? 6 : 24,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: child,
@@ -15870,9 +15876,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(isLight ? 0.68 : 0.10),
-            border: Border.all(color: Colors.white.withOpacity(isLight ? 0.8 : 0.20)),
-            boxShadow: [BoxShadow(color: const Color(0xFF60A5FA).withOpacity(0.16), blurRadius: 14, offset: const Offset(0, 6))],
+            color: ngmyCrispSurfaceColor(context),
+            border: Border.all(color: ngmyCrispBorderColor(context)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF60A5FA).withValues(alpha: 0.10),
+                blurRadius: ngmyCrispUi ? 4 : 14,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Icon(icon, color: isLight ? const Color(0xFF4A55D9) : const Color(0xFFA5B4FC), size: 21),
         ),
@@ -15974,9 +15986,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             constraints: const BoxConstraints(minHeight: 54),
             padding: const EdgeInsets.only(left: 18, right: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(isLight ? 0.76 : 0.10),
+              color: ngmyCrispSurfaceColor(context),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withOpacity(isLight ? 0.84 : 0.16)),
+              border: Border.all(color: ngmyCrispBorderColor(context)),
             ),
             child: Row(
               children: [
@@ -16026,8 +16038,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }) {
     final isUser = role == 'user';
     final bubbleColor = isUser
-        ? const Color(0xFF8B5CF6).withOpacity(isLight ? 0.14 : 0.26)
-        : Colors.white.withOpacity(isLight ? 0.70 : 0.08);
+        ? (isLight ? const Color(0xFFEDE9FE) : const Color(0xFF312E81))
+        : ngmyCrispSurfaceColor(context);
     final textColor = isLight ? const Color(0xFF171633) : Colors.white;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -16043,7 +16055,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             bottomLeft: Radius.circular(isUser ? 16 : 4),
             bottomRight: Radius.circular(isUser ? 4 : 16),
           ),
-          border: Border.all(color: Colors.white.withOpacity(isLight ? 0.6 : 0.12)),
+          border: Border.all(color: ngmyCrispBorderColor(context)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -16069,9 +16081,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(isLight ? 0.70 : 0.08),
+          color: ngmyCrispSurfaceColor(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(isLight ? 0.6 : 0.12)),
+          border: Border.all(color: ngmyCrispBorderColor(context)),
         ),
         child: SizedBox(
           width: 30,

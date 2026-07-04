@@ -77,14 +77,14 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Color(0xFFFFFFFF),
+        backgroundColor: Color(0xFF121212),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
+              CircularProgressIndicator(color: Color(0xFFD4AF37)),
               SizedBox(height: 16),
-              Text('Opening menu…', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text('Opening menu…', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white70)),
             ],
           ),
         ),

@@ -202,8 +202,7 @@
             if (v === 'light') return true;
           }
         } catch (e) {}
-        var h = new Date().getHours();
-        return h >= 9 && h < 20;
+        return false;
       }
       function ngmyApplyLightChromeEarly() {
         var root = document.documentElement;
@@ -274,21 +273,27 @@
 
       height: 100%;
 
-      background-color: #ffffff;
+      background-color: #121212;
+
+      color-scheme: dark;
 
       overscroll-behavior-x: none;
+
+      -webkit-font-smoothing: antialiased;
+
+      -moz-osx-font-smoothing: grayscale;
 
     }
 
     @media (prefers-color-scheme: light) {
 
-      html, body { background-color: #ffffff; }
+      html.ngmy-app-light, html.ngmy-app-light body { background-color: #ffffff; }
 
     }
 
     flutter-view, flt-glass-pane {
 
-      background-color: #ffffff;
+      background-color: #121212;
 
       -webkit-user-select: text;
 
@@ -306,7 +311,7 @@
 
     @media (prefers-color-scheme: light) {
 
-      html, body, flutter-view, flt-glass-pane {
+      html.ngmy-app-light, html.ngmy-app-light body, html.ngmy-app-light flutter-view, html.ngmy-app-light flt-glass-pane {
 
         background-color: #ffffff !important;
 
@@ -409,15 +414,23 @@
 
       gap: 12px;
 
-      background: #ffffff;
+      background: #121212;
 
-      color: #121212;
+      color: #ffffff;
 
       font-family: system-ui, sans-serif;
 
       font-size: 16px;
 
       font-weight: 600;
+
+    }
+
+    html.ngmy-app-light #ngmy-splash {
+
+      background: #ffffff;
+
+      color: #121212;
 
     }
 
@@ -464,7 +477,7 @@
 <body>
 
   <div id="ngmy-splash" aria-live="polite">
-    <div style="width:36px;height:36px;border:3px solid rgba(124,58,237,0.25);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
+    <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
     <div>Loading NGMY…</div>
   </div>
   <style>
