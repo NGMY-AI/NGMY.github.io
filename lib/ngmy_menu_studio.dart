@@ -373,35 +373,51 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
               final iIdx = e.key;
               return Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        initialValue: i.name,
-                        decoration: const InputDecoration(labelText: 'Item', isDense: true),
-                        onChanged: (v) => i.name = v,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            initialValue: i.name,
+                            decoration: const InputDecoration(labelText: 'Item name', isDense: true),
+                            onChanged: (v) => i.name = v,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            initialValue: i.price,
+                            decoration: const InputDecoration(labelText: 'Price', isDense: true),
+                            onChanged: (v) => i.price = v,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () => setState(() => section.items.removeAt(iIdx)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        initialValue: i.price,
-                        decoration: const InputDecoration(labelText: 'Price', isDense: true),
-                        onChanged: (v) => i.price = v,
+                    TextFormField(
+                      initialValue: i.description,
+                      decoration: const InputDecoration(
+                        labelText: 'Description (ingredients, sides, mix-ins…)',
+                        isDense: true,
+                        alignLabelWithHint: true,
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      onPressed: () => setState(() => section.items.removeAt(iIdx)),
+                      minLines: 1,
+                      maxLines: 3,
+                      onChanged: (v) => i.description = v,
                     ),
                   ],
                 ),
               );
             }),
             TextButton(
-              onPressed: () => setState(() => section.items.add(NgmyMenuItem(name: 'New item', price: '\$0.00'))),
+              onPressed: () => setState(() => section.items.add(NgmyMenuItem(name: 'New item', description: '', price: '\$0.00'))),
               child: const Text('+ Add item'),
             ),
           ],

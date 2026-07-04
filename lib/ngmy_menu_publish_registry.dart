@@ -64,11 +64,14 @@ class NgmyMenuPublishRegistry {
   static Future<Map<String, dynamic>?> fetchBySlug(String slug) async {
     final target = _normSlug(slug);
     if (target.isEmpty) return null;
+
+    // REST works for anonymous guests even when the reachability probe fails.
     final viaRest = await _fetchRegistryValueViaRest();
     if (viaRest != null) {
       final entry = _entriesFromValue(viaRest)[target];
       if (entry != null) return entry;
     }
+
     final value = await _fetchRegistryValue();
     if (value == null) return null;
     return _entriesFromValue(value)[target];

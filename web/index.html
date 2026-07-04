@@ -96,6 +96,39 @@
     })();
   </script>
 
+  <script>
+    (function () {
+      function ngmyExtractGuestMenuSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/menu\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        var parts = path.split("/").filter(Boolean);
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === "menu" && parts[i + 1]) {
+            return parts[i + 1].trim().toLowerCase();
+          }
+        }
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_menu");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("menu/") === 0) {
+          var part = hash.substring(5).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var menuSlug = ngmyExtractGuestMenuSlug();
+      if (menuSlug) {
+        try { sessionStorage.setItem("ngmy_guest_menu_slug", menuSlug); } catch (e) {}
+        try { document.title = "Loading menu…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_menu_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
 
 
   <meta charset="UTF-8">

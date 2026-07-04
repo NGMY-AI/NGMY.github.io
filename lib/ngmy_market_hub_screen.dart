@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_business_card_studio.dart';
 import 'ngmy_business_essentials.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_menu_studio.dart';
@@ -67,6 +68,18 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
           children: [
+            _youtubeFrame(
+              t: t,
+              title: 'Business Card Creator',
+              subtitle: '37 luxurious templates · drag · save PNG',
+              thumbHeight: thumbH,
+              darkGradient: const [Color(0xFF0B1020), Color(0xFF065F46), Color(0xFF134E4A)],
+              lightGradient: const [Color(0xFFE2E8F0), Color(0xFFD1FAE5), Color(0xFFECFDF5)],
+              accent: const Color(0xFF22C55E),
+              preview: _BusinessCardThumbPreview(accent: const Color(0xFF22C55E), isDark: t.isDark),
+              onTap: () => showNgmyBusinessCardStudioDialog(context, userEmail: widget.userEmail),
+            ),
+            const SizedBox(height: 18),
             _youtubeFrame(
               t: t,
               title: 'Menu Studio',
