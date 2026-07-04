@@ -28,4 +28,4 @@ git commit -m "Your changes"
 git push origin main
 ```
 
-Wait ~5 minutes. Do **not** run `publish-web.ps1` and commit `docs/` (only the small stub files belong in git).
+Wait ~5 minutes. Do **not** commit a full Flutter build to `docs/` — only the small stub files belong on `main`. CI deploys the real app via **Deploy GitHub Pages** (gh-pages + Actions Pages).

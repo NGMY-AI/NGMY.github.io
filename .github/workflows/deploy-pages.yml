@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: pages-deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   configure:
@@ -164,17 +164,6 @@ jobs:
           "
             fi
           done
-
-          # Keep main/docs in sync so ngmy.org works when Pages source is main/docs.
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -rf docs
-          cp -r _site docs
-          git add docs .gitignore || true
-          if ! git diff --staged --quiet; then
-            git commit -m "Sync docs/ from CI for ngmy.org branch Pages [skip ci]"
-            git push origin HEAD:main
-          fi
 
       - name: Mirror to gh-pages branch
         uses: JamesIves/github-pages-deploy-action@v4

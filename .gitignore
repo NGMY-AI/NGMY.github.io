@@ -44,6 +44,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Prebuilt web output — committed so ngmy.org (main/docs Pages) serves the real app offline.
-# CI also publishes to gh-pages via .github/workflows/deploy-pages.yml
+# Prebuilt web output — do not commit. CI deploys via .github/workflows/deploy-pages.yml
+# docs/ on main is a tiny stub only (see .github/DEPLOY_STATUS.md).
 _site/
