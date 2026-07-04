@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -13403,19 +13403,29 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               Positioned(
-                right: 6,
-                bottom: 6,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _confirmResetAppData,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.restart_alt_rounded,
-                        size: 14,
-                        color: isDark ? Colors.white38 : Colors.black38,
+                right: 10,
+                bottom: MediaQuery.of(context).padding.bottom + 6,
+                child: Tooltip(
+                  message: 'Reset app data',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _confirmResetAppData,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: (isDark ? Colors.white : Colors.black).withOpacity(0.07),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.14),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.restart_alt_rounded,
+                          size: 12,
+                          color: isDark ? Colors.white60 : Colors.black45,
+                        ),
                       ),
                     ),
                   ),
@@ -19776,12 +19786,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final pages = [
       _adminHome(isDark),
       _adminUsers(isDark),
-      _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 3)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 2)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -19816,8 +19825,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _navItem(0, Icons.home_outlined, 'Home', isDark, frameBg, frameBorder),
             _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
-            _navItem(2, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(3, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(2, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -19920,7 +19928,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -19938,140 +19946,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _adminStore(bool isDark) => _adminStoreLegacy(isDark);
-
-  Widget _adminStoreLegacy(bool isDark) {
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
-    final sellers = widget.allUsers.where((u) => u.isAdmin || u.canSellOnStore).toList();
-    final filtered = widget.allUsers.where((u) {
-      final q = _query.trim();
-      if (q.isEmpty) return true;
-      return u.email.toLowerCase().contains(q) || u.username.toLowerCase().contains(q);
-    }).toList()
-      ..sort((a, b) {
-        final aSell = a.isAdmin || a.canSellOnStore;
-        final bSell = b.isAdmin || b.canSellOnStore;
-        if (aSell != bSell) return aSell ? -1 : 1;
-        return a.username.compareTo(b.username);
-      });
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(15, 15, 15, 8),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: panelBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: frameBorder, width: 1.4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.storefront_rounded, color: Colors.deepPurple.shade400, size: 22),
-                    const SizedBox(width: 8),
-                    Text('NGMY Store Sell Access', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Only admins can post items by default. Grant "Sell Item" to specific users so they can list products for sale.',
-                  style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
-                ),
-                const SizedBox(height: 10),
-                Text('${sellers.length} user${sellers.length == 1 ? '' : 's'} can sell now', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF7C3AED))),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: TextField(
-            controller: _search,
-            style: TextStyle(color: isDark ? Colors.white : Colors.black),
-            decoration: InputDecoration(
-              hintText: 'Search users to grant sell access...',
-              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
-              prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey),
-              filled: true,
-              fillColor: panelBg,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: frameBorder)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: frameBorder)),
-            ),
-            onChanged: (v) => setState(() => _query = v.toLowerCase()),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
-            itemCount: filtered.length,
-            itemBuilder: (_, i) {
-              final u = filtered[i];
-              final adminAlways = u.isAdmin;
-              final canSell = adminAlways || u.canSellOnStore;
-              return Card(
-                elevation: 0,
-                color: panelBg,
-                margin: const EdgeInsets.only(bottom: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: canSell ? const Color(0xFF7C3AED).withOpacity(0.45) : frameBorder)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: canSell ? const Color(0xFF7C3AED) : (isDark ? Colors.white24 : Colors.grey.shade300),
-                    child: Icon(adminAlways ? Icons.admin_panel_settings : Icons.person, color: Colors.white, size: 20),
-                  ),
-                  title: Text(u.username, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black87)),
-                  subtitle: Text(
-                    adminAlways ? '${u.email}\nAdmin — always can sell' : u.email,
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-                  ),
-                  isThreeLine: adminAlways,
-                  trailing: adminAlways
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(color: const Color(0xFF7C3AED).withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
-                          child: const Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF7C3AED))),
-                        )
-                      : Switch(
-                          value: u.canSellOnStore,
-                          activeColor: const Color(0xFF7C3AED),
-                          onChanged: (on) async {
-                            _updateStoreSellAccessGrant(widget.config, u, on);
-                            widget.onDataChanged();
-                            setState(() {});
-                            final ok = await ngmyPersistStoreSellAccessAuthoritative(widget.config);
-                            unawaited(_pushUserCanSellOnStore(u));
-                            unawaited(_pushUserToCloudFast(u, includeFreeTrial: true));
-                            _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  ok
-                                      ? (on
-                                          ? '${u.username} can now use Sell Item in NGMY Store.'
-                                          : 'Sell Item removed for ${u.username}.')
-                                      : 'Saved on this device — retry when online to sync store access.',
-                                ),
-                                backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _adminHome(bool isDark) => SingleChildScrollView(
     padding: const EdgeInsets.all(20),
@@ -20090,14 +19964,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           crossAxisSpacing: 15,
           childAspectRatio: 1.1,
           children: [
-            _menuFrame('Loan Center', Icons.handshake_outlined, Colors.teal, () => unawaited(_openLoanAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications)),
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
             _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
             _menuFrame('NGMY AI', Icons.auto_awesome_rounded, const Color(0xFF3B82F6), () => unawaited(_openNgmyAiAdmin(isDark)), isDark),
             _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
-            _menuFrame('Help Center', Icons.support_agent_rounded, const Color(0xFF00B4D8), () => unawaited(_openHelpCenterAdmin(isDark)), isDark),
           ],
         ),
         const SizedBox(height: 28),
@@ -20163,30 +20035,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<void> _openHelpCenterAdmin(bool isDark) async {
-    _showHelpCenterAdmin(isDark);
-    unawaited(_refreshManagementInBackground());
-  }
-
-  void _showHelpCenterAdmin(bool isDark) {
-    showNgmyHelpCenterAdminSheet(
-      context: context,
-      isDark: isDark,
-      initialConfig: widget.config.helpCenterHub,
-      onSave: (map) async {
-        widget.config.helpCenterHub = Map<String, dynamic>.from(map);
-        widget.onDataChanged();
-        final ok = await ngmyPersistHelpCenterHubSettings(widget.config);
-        if (!context.mounted) return ok;
-        ngmyAdminShowCloudSaveSnackBar(
-          context,
-          cloudOk: ok,
-          success: 'Help Center saved for all users.',
-        );
-        return ok;
-      },
-    );
-  }
 
   Future<void> _openPaymentsAdmin(bool isDark) async {
     _showPaymentsAdmin(isDark);
@@ -21462,100 +21310,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
   );
 
-  Future<void> _openLoanAdmin(bool isDark) async {
-    await ngmyHydrateManagementListsFromAllBackups(widget.config);
-    await NgmyLoanStatusStore.applyTo(widget.config.loanApplications);
-    if (mounted) setState(() {});
-    _showLoanAdmin(isDark);
-  }
-
-  void _showLoanAdmin(bool isDark) {
-    showNgmyLoanAdminSheet(
-      context,
-      config: ngmyLoanConfigBridge(widget.config),
-      onDataChanged: widget.onDataChanged,
-      onPersistNow: () => _persistManagementConfig(),
-      onRefreshLoans: () => ngmyRefreshUserLoanApplications(widget.config),
-      isDark: isDark,
-      onEditSettings: () => _showLoanSettingsEditor(isDark),
-    );
-  }
-
-  void _showLoanSettingsEditor(bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (c) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F111A) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 20),
-            const Text('Loan settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            Expanded(child: SingleChildScrollView(child: _addressEditor(isDark))),
-            ElevatedButton(onPressed: () => Navigator.pop(c), child: const Text('CLOSE')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _statCard(String t, String v, IconData i, Color c, bool isDark) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: isDark ? Colors.black.withOpacity(0.24) : c.withOpacity(0.05), blurRadius: 10)]),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(i, color: c), const SizedBox(height: 10),
-      Text(t, style: TextStyle(color: isDark ? Colors.white38 : Colors.grey, fontSize: 12)),
-      Text(v, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: isDark ? Colors.white : Colors.black)),
-    ]),
-  );
-
-  Widget _addressEditor(bool isDark) {
-    final cTag = TextEditingController(text: widget.config.officialCashApp);
-    final bAddr = TextEditingController(text: widget.config.officialBitcoin);
-    final lPhone = TextEditingController(text: widget.config.loanPhone);
-    final lHow = TextEditingController(text: widget.config.loanHowItWorks);
-    final lZelle = TextEditingController(text: widget.config.loanCompanyZelle);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF1C1F2E) : Colors.white, borderRadius: BorderRadius.circular(20)),
-      child: Column(children: [
-        TextField(controller: cTag, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Cash App Tag', isDark: isDark)),
-        const SizedBox(height: 15),
-        TextField(controller: bAddr, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Admin Bitcoin Address', isDark: isDark)),
-        const SizedBox(height: 15),
-        TextField(controller: lZelle, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan payments — Zelle (email/phone)', isDark: isDark)),
-        const SizedBox(height: 15),
-        TextField(controller: lPhone, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan Support Phone', isDark: isDark)),
-        const SizedBox(height: 15),
-        TextField(controller: lHow, maxLines: 5, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: _adminInputDecoration(label: 'Loan - How It Works Text', isDark: isDark)),
-        const SizedBox(height: 20),
-        ElevatedButton(onPressed: () async {
-          setState(() {
-            widget.config.officialCashApp = cTag.text.trim();
-            widget.config.officialBitcoin = bAddr.text.trim();
-            widget.config.loanCompanyZelle = lZelle.text.trim();
-            widget.config.loanPhone = lPhone.text.trim();
-            widget.config.loanHowItWorks = lHow.text.trim();
-          });
-          final ok = await _persistManagementConfig();
-          if (!context.mounted) return;
-          ngmyAdminShowCloudSaveSnackBar(
-            context,
-            cloudOk: ok,
-            success: 'Loan settings saved for all users.',
-          );
-        }, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white), child: const Text('SAVE ALL SETTINGS'))
-      ]),
-    );
-  }
 
   Widget _adminMedia(bool isDark) {
     final limitC = TextEditingController(text: widget.config.maxMediaPostsPerWeek.toString());
