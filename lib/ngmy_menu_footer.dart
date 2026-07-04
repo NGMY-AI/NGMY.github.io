@@ -1,11 +1,9 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_menu_models.dart';
 
-/// Bottom row: social icons (left) · website (right). All optional.
+/// Bottom row: social icons (left) · website (right). All optional — no bar background.
 class NgmyMenuGuestFooter extends StatelessWidget {
   const NgmyMenuGuestFooter({super.key, required this.links, this.compact = false});
 
@@ -20,7 +18,7 @@ class NgmyMenuGuestFooter extends StatelessWidget {
     final iconSize = compact ? 14.0 : 16.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, compact ? 6 : 8, compact ? 8 : 10, compact ? 2 : 4),
+      padding: EdgeInsets.fromLTRB(compact ? 12 : 16, compact ? 2 : 4, compact ? 12 : 16, compact ? 4 : 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -60,10 +58,10 @@ class NgmyMenuGuestFooter extends StatelessWidget {
               iconSize: iconSize,
               label: 'Website',
               onTap: () => _open(links.website),
-              child: Icon(Icons.language_rounded, size: iconSize, color: const Color(0xFF334155)),
+              child: _WebsiteGlyph(size: iconSize),
             )
           else
-            const SizedBox(width: 8),
+            const SizedBox.shrink(),
         ],
       ),
     );
@@ -81,21 +79,18 @@ class NgmyMenuGuestFooter extends StatelessWidget {
   }
 }
 
-/// Small glassy pill — page dots for multi-menu guest links.
+/// Small centered pill — page dots for multi-menu guest links.
 class NgmyMenuPageDotsIndicator extends StatelessWidget {
   const NgmyMenuPageDotsIndicator({
     super.key,
     required this.count,
     required this.activeIndex,
     required this.pageBackgroundId,
-    this.seeThrough = false,
   });
 
   final int count;
   final int activeIndex;
   final String pageBackgroundId;
-  /// When true, pill is glassy so menu content shows through while scrolling.
-  final bool seeThrough;
 
   @override
   Widget build(BuildContext context) {
@@ -103,73 +98,59 @@ class NgmyMenuPageDotsIndicator extends StatelessWidget {
 
     final bg = ngmyMenuPageBackgroundColor(pageBackgroundId);
     final isLight = bg.computeLuminance() > 0.55;
-    final frameFill = seeThrough
-        ? (isLight ? Colors.white.withValues(alpha: 0.28) : Colors.black.withValues(alpha: 0.22))
-        : (isLight ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF1A1F2E).withValues(alpha: 0.72));
-    final frameBorder = isLight ? Colors.black.withValues(alpha: seeThrough ? 0.08 : 0.10) : Colors.white.withValues(alpha: seeThrough ? 0.16 : 0.22);
+    final frameFill = isLight ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF1A1F2E).withValues(alpha: 0.72);
+    final frameBorder = isLight ? Colors.black.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.22);
     final dotActive = isLight ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
     final dotIdle = isLight ? const Color(0xFF94A3B8).withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.35);
 
-    Widget pill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: frameFill,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: frameBorder, width: 1.2),
-        boxShadow: seeThrough
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.18),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-                if (isLight)
-                  BoxShadow(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    blurRadius: 4,
-                    offset: const Offset(0, -1),
-                  ),
-              ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(count, (i) {
-          final active = i == activeIndex.clamp(0, count - 1);
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            margin: EdgeInsets.only(left: i == 0 ? 0 : 5),
-            width: active ? 7 : 5,
-            height: active ? 7 : 5,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active ? dotActive : dotIdle,
-              boxShadow: active
-                  ? [
-                      BoxShadow(
-                        color: dotActive.withValues(alpha: 0.35),
-                        blurRadius: 4,
-                      ),
-                    ]
-                  : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+          if (isLight)
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.9),
+              blurRadius: 4,
+              offset: const Offset(0, -1),
             ),
-          );
-        }),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(count, (i) {
+            final active = i == activeIndex.clamp(0, count - 1);
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              margin: EdgeInsets.only(left: i == 0 ? 0 : 5),
+              width: active ? 7 : 5,
+              height: active ? 7 : 5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: active ? dotActive : dotIdle,
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: dotActive.withValues(alpha: 0.35),
+                          blurRadius: 4,
+                        ),
+                      ]
+                    : null,
+              ),
+            );
+          }),
+        ),
       ),
     );
-
-    if (seeThrough) {
-      pill = ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: pill,
-        ),
-      );
-    }
-
-    return pill;
   }
 }
 
@@ -192,19 +173,13 @@ class _SocialIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: Material(
-        color: Colors.white,
-        elevation: 1,
-        shadowColor: Colors.black12,
-        shape: const CircleBorder(),
+      child: Semantics(
+        label: label,
+        button: true,
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: Semantics(label: label, button: true, child: Center(child: child)),
-          ),
+          child: SizedBox(width: size, height: size, child: Center(child: child)),
         ),
       ),
     );
@@ -219,8 +194,8 @@ class _InstagramGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size + 2,
-      height: size + 2,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
@@ -244,8 +219,8 @@ class _FacebookGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size + 2,
-      height: size + 2,
+      width: size,
+      height: size,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1877F2)),
       child: Center(
         child: Text(
@@ -265,14 +240,35 @@ class _YoutubeGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size + 2,
-      height: size + 2,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: const Color(0xFFFF0000),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Center(
         child: Icon(Icons.play_arrow_rounded, size: size * 0.78, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _WebsiteGlyph extends StatelessWidget {
+  const _WebsiteGlyph({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF334155).withValues(alpha: 0.35), width: 1.2),
+      ),
+      child: Center(
+        child: Icon(Icons.language_rounded, size: size * 0.62, color: const Color(0xFF334155)),
       ),
     );
   }

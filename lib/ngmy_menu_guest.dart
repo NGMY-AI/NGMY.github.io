@@ -131,6 +131,8 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     final pages = doc.effectivePages;
     final bg = ngmyMenuPageBackgroundColor(doc.pageBackground);
     final multi = pages.length > 1;
+    final hasSocial = doc.socialLinks.hasAny;
+    final showFooter = multi || hasSocial;
 
     return Scaffold(
       backgroundColor: bg,
@@ -148,16 +150,30 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
                     )
                   : _menuPage(doc, 0),
             ),
-            if (multi)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 4),
-                child: NgmyMenuPageDotsIndicator(
-                  count: pages.length,
-                  activeIndex: _pageIndex,
-                  pageBackgroundId: doc.pageBackground,
+            if (showFooter)
+              SizedBox(
+                height: multi && hasSocial ? 52 : (multi ? 28 : 40),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (hasSocial)
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: NgmyMenuGuestFooter(links: doc.socialLinks),
+                      ),
+                    if (multi)
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: NgmyMenuPageDotsIndicator(
+                          count: pages.length,
+                          activeIndex: _pageIndex,
+                          pageBackgroundId: doc.pageBackground,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            if (doc.socialLinks.hasAny) NgmyMenuGuestFooter(links: doc.socialLinks),
           ],
         ),
       ),
