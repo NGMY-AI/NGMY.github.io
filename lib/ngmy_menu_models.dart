@@ -129,7 +129,13 @@ class NgmyMenuQrStyle {
     this.centerLabel = '',
     this.showCenterLogo = true,
     this.displayMode = 'plain',
-    this.cardTemplate = 'luxury',
+    this.cardTemplate = 'luxury_gold',
+    this.logoBase64 = '',
+    this.cardPhone = '',
+    this.cardAddress = '',
+    this.cardHours = '',
+    this.cardWebsite = '',
+    this.showCardLogo = true,
   });
 
   final int foreground;
@@ -142,8 +148,14 @@ class NgmyMenuQrStyle {
   final bool showCenterLogo;
   /// `plain` = QR only · `card` = invoice-style card with info + QR
   final String displayMode;
-  /// Card layout when [displayMode] is `card`: classic, modern, luxury, minimal
+  /// Card layout when [displayMode] is `card`.
   final String cardTemplate;
+  final String logoBase64;
+  final String cardPhone;
+  final String cardAddress;
+  final String cardHours;
+  final String cardWebsite;
+  final bool showCardLogo;
 
   Map<String, dynamic> toJson() => {
         'foreground': foreground,
@@ -156,6 +168,12 @@ class NgmyMenuQrStyle {
         'showCenterLogo': showCenterLogo,
         'displayMode': displayMode,
         'cardTemplate': cardTemplate,
+        'logoBase64': logoBase64,
+        'cardPhone': cardPhone,
+        'cardAddress': cardAddress,
+        'cardHours': cardHours,
+        'cardWebsite': cardWebsite,
+        'showCardLogo': showCardLogo,
       };
 
   factory NgmyMenuQrStyle.fromJson(Map<String, dynamic>? json) {
@@ -170,7 +188,13 @@ class NgmyMenuQrStyle {
       centerLabel: (json['centerLabel'] ?? '').toString(),
       showCenterLogo: json['showCenterLogo'] != false,
       displayMode: (json['displayMode'] ?? 'plain').toString(),
-      cardTemplate: (json['cardTemplate'] ?? 'luxury').toString(),
+      cardTemplate: (json['cardTemplate'] ?? 'luxury_gold').toString(),
+      logoBase64: (json['logoBase64'] ?? '').toString(),
+      cardPhone: (json['cardPhone'] ?? '').toString(),
+      cardAddress: (json['cardAddress'] ?? '').toString(),
+      cardHours: (json['cardHours'] ?? '').toString(),
+      cardWebsite: (json['cardWebsite'] ?? '').toString(),
+      showCardLogo: json['showCardLogo'] != false,
     );
   }
 
@@ -185,6 +209,12 @@ class NgmyMenuQrStyle {
     bool? showCenterLogo,
     String? displayMode,
     String? cardTemplate,
+    String? logoBase64,
+    String? cardPhone,
+    String? cardAddress,
+    String? cardHours,
+    String? cardWebsite,
+    bool? showCardLogo,
   }) =>
       NgmyMenuQrStyle(
         foreground: foreground ?? this.foreground,
@@ -197,6 +227,12 @@ class NgmyMenuQrStyle {
         showCenterLogo: showCenterLogo ?? this.showCenterLogo,
         displayMode: displayMode ?? this.displayMode,
         cardTemplate: cardTemplate ?? this.cardTemplate,
+        logoBase64: logoBase64 ?? this.logoBase64,
+        cardPhone: cardPhone ?? this.cardPhone,
+        cardAddress: cardAddress ?? this.cardAddress,
+        cardHours: cardHours ?? this.cardHours,
+        cardWebsite: cardWebsite ?? this.cardWebsite,
+        showCardLogo: showCardLogo ?? this.showCardLogo,
       );
 
   static int _intColor(dynamic v, int fallback) {

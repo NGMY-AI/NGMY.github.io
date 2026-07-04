@@ -190,10 +190,3 @@ List<NgmyMenuTemplate> ngmyMenuTemplatesForCategory(String category) {
   if (category == 'all') return kNgmyMenuTemplates;
   return kNgmyMenuTemplates.where((t) => t.category.toLowerCase() == category.toLowerCase()).toList();
 }
-
-const List<Map<String, String>> kNgmyMenuQrCardTemplates = [
-  {'id': 'luxury', 'label': 'Luxury Gold'},
-  {'id': 'modern', 'label': 'Modern Gradient'},
-  {'id': 'classic', 'label': 'Classic Border'},
-  {'id': 'minimal', 'label': 'Minimal Clean'},
-];

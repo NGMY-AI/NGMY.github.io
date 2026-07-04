@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_menu_models.dart';
@@ -49,6 +52,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   final _taglineC = TextEditingController();
   final _slugC = TextEditingController();
   final _centerLabelC = TextEditingController();
+  final _cardPhoneC = TextEditingController();
+  final _cardAddressC = TextEditingController();
+  final _cardHoursC = TextEditingController();
+  final _cardWebsiteC = TextEditingController();
 
   @override
   void initState() {
@@ -64,6 +71,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     _taglineC.dispose();
     _slugC.dispose();
     _centerLabelC.dispose();
+    _cardPhoneC.dispose();
+    _cardAddressC.dispose();
+    _cardHoursC.dispose();
+    _cardWebsiteC.dispose();
     super.dispose();
   }
 
@@ -98,6 +109,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     _taglineC.text = doc.tagline;
     _slugC.text = doc.slug;
     _centerLabelC.text = doc.qrStyle.centerLabel;
+    _cardPhoneC.text = doc.qrStyle.cardPhone;
+    _cardAddressC.text = doc.qrStyle.cardAddress;
+    _cardHoursC.text = doc.qrStyle.cardHours;
+    _cardWebsiteC.text = doc.qrStyle.cardWebsite;
     _nameC.removeListener(_refreshPreview);
     _taglineC.removeListener(_refreshPreview);
     _nameC.addListener(_refreshPreview);
@@ -118,7 +133,34 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     doc.restaurantName = _nameC.text.trim();
     doc.tagline = _taglineC.text.trim();
     doc.slug = _slugC.text.trim().toLowerCase();
-    doc.qrStyle = doc.qrStyle.copyWith(centerLabel: _centerLabelC.text.trim());
+    doc.qrStyle = doc.qrStyle.copyWith(
+      centerLabel: _centerLabelC.text.trim(),
+      cardPhone: _cardPhoneC.text.trim(),
+      cardAddress: _cardAddressC.text.trim(),
+      cardHours: _cardHoursC.text.trim(),
+      cardWebsite: _cardWebsiteC.text.trim(),
+    );
+  }
+
+  Future<void> _pickCardLogo() async {
+    final doc = _editing;
+    if (doc == null) return;
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512, imageQuality: 88);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      setState(() {
+        doc.qrStyle = doc.qrStyle.copyWith(logoBase64: base64Encode(bytes), showCardLogo: true);
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not pick logo: $e')));
+    }
+  }
+
+  void _removeCardLogo() {
+    final doc = _editing;
+    if (doc == null) return;
+    setState(() => doc.qrStyle = doc.qrStyle.copyWith(logoBase64: '', showCardLogo: false));
   }
 
   Future<void> _copyLink(String url) async {
@@ -878,6 +920,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   }
 
   Widget _qrTab(NgmyHubTheme t, NgmyMenuDocument doc, String qrUrl) {
+    final qs = doc.qrStyle;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
@@ -887,28 +930,20 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              NgmyModernChipRow(
-                options: const ['Plain QR', 'Card template'],
-                selected: doc.qrStyle.displayMode == 'card' ? 'Card template' : 'Plain QR',
-                accent: _kMenuAccent,
-                onSelected: (v) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(displayMode: v == 'Card template' ? 'card' : 'plain')),
+              Row(
+                children: [
+                  Expanded(child: _displayModeTile(t, doc, 'plain', Icons.qr_code_2_rounded, 'Plain QR')),
+                  const SizedBox(width: 10),
+                  Expanded(child: _displayModeTile(t, doc, 'card', Icons.badge_outlined, 'Card')),
+                ],
               ),
-              if (doc.qrStyle.displayMode == 'card') ...[
-                const SizedBox(height: 4),
+              if (qs.displayMode == 'card') ...[
+                const SizedBox(height: 14),
                 Text('Card layout', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: kNgmyMenuQrCardTemplates.map((c) {
-                    final sel = doc.qrStyle.cardTemplate == c['id'];
-                    return ChoiceChip(
-                      label: Text(c['label']!),
-                      selected: sel,
-                      selectedColor: _kMenuAccent.withValues(alpha: 0.25),
-                      onSelected: (_) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cardTemplate: c['id'])),
-                    );
-                  }).toList(),
+                NgmyQrCardTemplatePicker(
+                  selected: qs.cardTemplate,
+                  onSelected: (id) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cardTemplate: id)),
                 ),
               ],
             ],
@@ -918,14 +953,66 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         Center(
           child: NgmyMenuQrDisplay(
             data: qrUrl,
-            style: doc.qrStyle,
+            style: qs,
             restaurantName: doc.restaurantName,
             tagline: doc.tagline,
             large: true,
             captureKey: _qrCaptureKey,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+        if (qs.displayMode == 'card')
+          _panel(
+            t,
+            title: 'Card info (optional)',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickCardLogo,
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.fieldFill,
+                          border: Border.all(color: _kMenuAccent.withValues(alpha: 0.5), width: 2),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: qs.logoBase64.isNotEmpty
+                            ? _logoThumb(qs.logoBase64)
+                            : Icon(Icons.add_a_photo_outlined, color: _kMenuAccent, size: 28),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _pickCardLogo,
+                            icon: const Icon(Icons.image_rounded, size: 18),
+                            label: const Text('Restaurant logo'),
+                            style: FilledButton.styleFrom(backgroundColor: _kMenuAccent, foregroundColor: Colors.black),
+                          ),
+                          if (qs.logoBase64.isNotEmpty)
+                            TextButton(onPressed: _removeCardLogo, child: const Text('Remove logo')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _cardField(t, _cardPhoneC, Icons.phone_rounded, 'Phone', '555-123-4567', (v) => doc.qrStyle = doc.qrStyle.copyWith(cardPhone: v)),
+                _cardField(t, _cardAddressC, Icons.location_on_outlined, 'Address', '123 Main St, City', (v) => doc.qrStyle = doc.qrStyle.copyWith(cardAddress: v)),
+                _cardField(t, _cardHoursC, Icons.schedule_rounded, 'Hours', 'Mon–Sat 11am–10pm', (v) => doc.qrStyle = doc.qrStyle.copyWith(cardHours: v)),
+                _cardField(t, _cardWebsiteC, Icons.language_rounded, 'Website', 'yourrestaurant.com', (v) => doc.qrStyle = doc.qrStyle.copyWith(cardWebsite: v)),
+              ],
+            ),
+          ),
+        if (qs.displayMode == 'card') const SizedBox(height: 14),
         _panel(
           t,
           title: 'Customize QR',
@@ -935,45 +1022,48 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
               TextField(
                 controller: _centerLabelC,
                 decoration: InputDecoration(
-                  labelText: 'Center logo text (e.g. MC)',
+                  labelText: 'Center logo text (optional)',
+                  hintText: 'MC',
                   filled: true,
                   fillColor: t.fieldFill,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onChanged: (v) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(centerLabel: v)),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text('Corner style', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: kNgmyMenuQrCornerStyles.map((c) {
-                  final sel = doc.qrStyle.cornerStyle == c['id'];
-                  return ChoiceChip(
-                    label: Text(c['label']!),
-                    selected: sel,
-                    onSelected: (_) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cornerStyle: c['id'])),
-                  );
-                }).toList(),
+              NgmyQrCornerIconPicker(
+                selected: qs.cornerStyle,
+                accent: _kMenuAccent,
+                onSelected: (id) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(cornerStyle: id)),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text('Color presets', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: kNgmyMenuQrPresets.map((p) {
-                  return ActionChip(
-                    label: Text(p['label']!),
-                    onPressed: () => setState(() {
-                      doc.qrStyle = doc.qrStyle.copyWith(
-                        foreground: int.parse(p['fg']!),
-                        background: int.parse(p['bg']!),
-                        accent: int.parse(p['accent']!),
-                      );
-                    }),
-                  );
-                }).toList(),
+              NgmyQrColorSwatchPicker(
+                style: qs,
+                onSelected: (p) => setState(() {
+                  doc.qrStyle = doc.qrStyle.copyWith(foreground: p.fg, background: p.bg, accent: p.accent);
+                }),
+              ),
+              const SizedBox(height: 14),
+              Text('QR eye shape', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 8),
+              NgmyQrEyeIconPicker(
+                options: kNgmyMenuQrEyeOptions,
+                selected: qs.eyeShape,
+                accent: _kMenuAccent,
+                onSelected: (id) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(eyeShape: id)),
+              ),
+              const SizedBox(height: 10),
+              Text('Dot shape', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 8),
+              NgmyQrEyeIconPicker(
+                options: kNgmyMenuQrModuleOptions,
+                selected: qs.moduleShape,
+                accent: _kMenuAccent,
+                onSelected: (id) => setState(() => doc.qrStyle = doc.qrStyle.copyWith(moduleShape: id)),
               ),
             ],
           ),
@@ -1005,5 +1095,61 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         ),
       ],
     );
+  }
+
+  Widget _displayModeTile(NgmyHubTheme t, NgmyMenuDocument doc, String mode, IconData icon, String label) {
+    final sel = doc.qrStyle.displayMode == mode;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => doc.qrStyle = doc.qrStyle.copyWith(displayMode: mode)),
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: sel ? const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]) : null,
+            color: sel ? null : t.fieldFill,
+            border: Border.all(color: sel ? _kMenuAccent : t.border),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: sel ? Colors.black : t.subtitle, size: 28),
+              const SizedBox(height: 6),
+              Text(label, style: TextStyle(color: sel ? Colors.black : t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _cardField(NgmyHubTheme t, TextEditingController c, IconData icon, String label, String hint, ValueChanged<String> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: c,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon, color: _kMenuAccent, size: 20),
+          filled: true,
+          fillColor: t.fieldFill,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onChanged: (v) {
+          onChanged(v);
+          setState(() {});
+        },
+      ),
+    );
+  }
+
+  Widget _logoThumb(String b64) {
+    try {
+      return Image.memory(base64Decode(b64), fit: BoxFit.cover);
+    } catch (_) {
+      return Icon(Icons.broken_image_outlined, color: _kMenuAccent);
+    }
   }
 }
