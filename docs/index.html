@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html>
 
 <head>
 
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <script>
     (function () {
@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260704125440';
+      var embedded = '20260704130603';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild) {
@@ -59,7 +59,7 @@
 
   <script>
     (function () {
-      var deployId = '20260704125440';
+      var deployId = '20260704130603';
       var scope = window.__NGMY_BASE_PATH__ || '/';
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: scope }).catch(function (e) {
@@ -89,7 +89,7 @@
       var slug = ngmyExtractGuestAppSlug();
       if (slug) {
         try { sessionStorage.setItem("ngmy_guest_app_slug", slug); } catch (e) {}
-        try { document.title = "Loading appâ€¦"; } catch (e2) {}
+        try { document.title = "Loading app…"; } catch (e2) {}
       } else {
         try { sessionStorage.removeItem("ngmy_guest_app_slug"); } catch (e3) {}
       }
@@ -414,7 +414,7 @@
 
   <div id="ngmy-splash" aria-live="polite">
     <div style="width:36px;height:36px;border:3px solid rgba(124,58,237,0.25);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
-    <div>Loading NGMYâ€¦</div>
+    <div>Loading NGMY…</div>
   </div>
   <style>
     @keyframes ngmy-spin { to { transform: rotate(360deg); } }
@@ -436,7 +436,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260704125440";
+      var CURRENT = "20260704130603";
 
       function showError(msg) {
 
@@ -450,7 +450,7 @@
 
         if (err) err.style.display = "flex";
 
-        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps â€” try mobile data or home internet.";
+        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps — try mobile data or home internet.";
 
       }
 
@@ -473,7 +473,7 @@
           try { sessionStorage.removeItem('ngmy_force_reload_' + CURRENT); } catch (e) {}
         }
 
-        // New deploy: let the service worker swap caches on activate â€” do not wipe
+        // New deploy: let the service worker swap caches on activate — do not wipe
         // storage here or offline cold start breaks before the new shell is cached.
 
         try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
@@ -497,7 +497,7 @@
 
   <script>
     (function () {
-      var deployId = '20260704125440';
+      var deployId = '20260704130603';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -515,7 +515,7 @@
       ];
 
       function showBootstrapError(hint) {
-        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login â€” try home internet or cellular data.';
+        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login — try home internet or cellular data.';
         window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
       }
 
