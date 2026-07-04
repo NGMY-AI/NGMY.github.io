@@ -173,6 +173,7 @@ import 'ngmy_medicine_reminder_service.dart';
 import 'ngmy_swahili_reminders.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
+import 'ngmy_investment_plans.dart';
 import 'ngmy_legal_content.dart';
 import 'ngmy_legal_ui.dart';
 
@@ -283,19 +284,7 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     if (savedTheme == 'dark') themeMode = ThemeMode.dark;
     if (savedTheme == 'system') themeMode = ThemeMode.system;
 
-    var plans = <InvestmentPlan>[];
-    final plansJson = _ngmyPrefsJson(prefs, 'investment_plans');
-    if (plansJson != null) {
-      try {
-        final decoded = jsonDecode(plansJson);
-        if (decoded is List) {
-          plans = decoded.map((e) => InvestmentPlan.fromJson(e)).toList();
-          for (final pl in plans) {
-            pl.applyFixedRoi();
-          }
-        }
-      } catch (_) {}
-    }
+    final plans = _bundledInvestmentPlans();
 
     AppConfig? config;
     final configJson = _ngmyPrefsJson(prefs, 'app_config');
@@ -3870,6 +3859,12 @@ List<InvestmentPlan> _investmentPlansFromMaps(List<Map<String, dynamic>> maps) {
 List<Map<String, dynamic>> _investmentPlansToMaps(List<InvestmentPlan> plans) =>
     plans.map((e) => e.toJson()).toList();
 
+void _applyBundledInvestmentPlansToConfig(AppConfig config) {
+  config.investmentPlans = kNgmyInvestmentPlansMaps.map((e) => Map<String, dynamic>.from(e)).toList();
+}
+
+List<InvestmentPlan> _bundledInvestmentPlans() => _investmentPlansFromMaps(kNgmyInvestmentPlansMaps);
+
 Future<List<Map<String, dynamic>>> _fetchRemoteInvestmentPlans() async {
   try {
     final cfg = await _fetchNgmyConfigRow(columns: 'investmentPlans');
@@ -4925,29 +4920,7 @@ Future<Map<String, String>> _fetchAuthoritativeLegalContent() async {
 }
 
 Future<List<Map<String, dynamic>>> _fetchAuthoritativeInvestmentPlans() async {
-  List<Map<String, dynamic>>? best;
-  DateTime? bestAt;
-
-  void consider(List<Map<String, dynamic>> plans, DateTime? at) {
-    if (plans.isEmpty) return;
-    if (best == null || bestAt == null || (at != null && !at.isBefore(bestAt!))) {
-      best = plans;
-      bestAt = at ?? DateTime.now();
-    }
-  }
-
-  final settingsPlans = await _fetchNgmySettingSafe(_kNgmySettingsPlansKey);
-  if (settingsPlans != null) {
-    final raw = settingsPlans['plans'];
-    if (raw is List) {
-      consider(raw.map((e) => Map<String, dynamic>.from(e as Map)).toList(), _parseSettingUpdatedAt(settingsPlans['updatedAt']));
-    }
-  }
-
-  consider(await _fetchPlansViaStoreListings(), null);
-  consider(await _fetchRemoteInvestmentPlans(), null);
-
-  return best ?? [];
+  return kNgmyInvestmentPlansMaps;
 }
 
 Future<bool> _persistLegalContentToCloud(String terms, String privacy) async {
@@ -7487,14 +7460,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   String? _cloudUserRowEnsuredForEmail;
   Timer? _cloudUserRowResyncTimer;
   AppConfig _config = AppConfig();
-  List<InvestmentPlan> _globalPlans = [
-    InvestmentPlan(name: 'Starter Plan', price: 5.0, roi: 0.0286),
-    InvestmentPlan(name: 'Starter Plan', price: 20.0, roi: 0.0286),
-    InvestmentPlan(name: 'Basic Plan', price: 30.0, roi: 0.0286),
-    InvestmentPlan(name: 'Bronze Plan', price: 50.0, roi: 0.0286),
-    InvestmentPlan(name: 'Bronze Plan', price: 100.0, roi: 0.0286),
-    InvestmentPlan(name: 'Gold Plan', price: 200.0, roi: 0.0286)
-  ];
+  List<InvestmentPlan> _globalPlans = _investmentPlansFromMaps(kNgmyInvestmentPlansMaps);
   List<MediaPost> _allMedia = [];
   List<Announcement> _allAnnouncements = [];
   Set<String> _tombstonedMediaIds = {};
@@ -8064,13 +8030,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _refreshAdminInvestmentPlans() async {
     if (_shouldDeferRemoteConfigOverwrite()) return;
-    if (!await ngmyCanReachCloud()) return;
-    final remote = await _fetchAuthoritativeInvestmentPlans();
-    if (remote.isEmpty) return;
     if (!mounted) return;
     setState(() {
-      _globalPlans = _investmentPlansFromMaps(remote);
-      _config.investmentPlans = remote;
+      _applyBundledInvestmentPlansToConfig(_config);
+      _globalPlans = _bundledInvestmentPlans();
     });
     await _persistLocalOnly();
   }
@@ -8093,9 +8056,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _applyRemoteInvestmentPlansToApp(List<Map<String, dynamic>> plans) {
-    if (plans.isEmpty) return;
-    _config.investmentPlans = plans.map((e) => Map<String, dynamic>.from(e)).toList();
-    _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
+    _applyBundledInvestmentPlansToConfig(_config);
+    _globalPlans = _bundledInvestmentPlans();
   }
 
   Future<void> _refreshAdminDashboardFromCloud() async {
@@ -8623,7 +8585,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (b.media.isNotEmpty) _allMedia = List<MediaPost>.from(b.media);
     if (b.announcements.isNotEmpty) _allAnnouncements = List<Announcement>.from(b.announcements);
     if (b.config != null) _config = b.config!;
-    if (b.plans.isNotEmpty) _globalPlans = List<InvestmentPlan>.from(b.plans);
+    _applyBundledInvestmentPlansToConfig(_config);
+    _globalPlans = _bundledInvestmentPlans();
     for (final a in _allAnnouncements) {
       _seenRealtimeAnnouncementIds.add(a.id);
     }
@@ -9590,12 +9553,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final remoteVideoPopups = (cfgMap['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
         next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
-        if (next.investmentPlans.isNotEmpty) {
-          _globalPlans = _investmentPlansFromMaps(next.investmentPlans);
-        } else if (keepPlans.isNotEmpty) {
-          next.investmentPlans = keepPlans;
-          _globalPlans = _investmentPlansFromMaps(keepPlans);
-        }
+        _applyBundledInvestmentPlansToConfig(next);
+        _globalPlans = _bundledInvestmentPlans();
         await ngmyApplyGameCenterSettingsBackup(
           apply: (limits, dice, invites) {
             next.gameTimeLimits = _mergeGameTimeLimitsPreferCustom(next.gameTimeLimits, limits);
@@ -11050,17 +11009,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
         }
         _mergeOperationalManagementListsIntoConfig(next, keepConfig);
-        if (record.containsKey('investmentPlans')) {
-          final raw = record['investmentPlans'];
-          final remotePlans = raw is List
-              ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
-              : <Map<String, dynamic>>[];
-          next.investmentPlans = remotePlans;
-          _globalPlans = _investmentPlansFromMaps(remotePlans);
-        } else if (keepPlans.isNotEmpty) {
-          next.investmentPlans = keepPlans;
-          _globalPlans = _investmentPlansFromMaps(keepPlans);
-        }
+        _applyBundledInvestmentPlansToConfig(next);
+        _globalPlans = _bundledInvestmentPlans();
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -19992,7 +19942,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (pending > _lastSeenPendingWalletCount && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('New wallet request ($pending pending). Open Wallet tab to approve.'),
+          content: Text('New wallet request ($pending pending).'),
           backgroundColor: const Color(0xFF7C3AED),
           duration: const Duration(seconds: 5),
         ),
@@ -20064,14 +20014,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final pages = [
       _adminHome(isDark),
       _adminUsers(isDark),
-      _adminInvest(isDark),
-      _adminWallet(isDark),
       _adminStore(isDark),
       NgmyAdminDomainCalendarPanel(isDark: isDark),
     ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 5)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 3)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -20106,18 +20054,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _navItem(0, Icons.home_outlined, 'Home', isDark, frameBg, frameBorder),
             _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
-            _navItem(2, Icons.trending_up_rounded, 'Invest', isDark, frameBg, frameBorder),
-            _navItem(
-              3,
-              Icons.account_balance_wallet_outlined,
-              'Wallet',
-              isDark,
-              frameBg,
-              frameBorder,
-              badgeCount: _adminWalletPendingCount(),
-            ),
-            _navItem(4, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
-            _navItem(5, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(2, Icons.storefront_rounded, 'Store', isDark, frameBg, frameBorder),
+            _navItem(3, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -20232,7 +20170,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "PLANS", "WALLET", "STORE", "CALENDAR"][_idx];
+  String _menuName() => ["DASHBOARD", "USERS", "STORE", "CALENDAR"][_idx];
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -20408,9 +20346,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
             _menuFrame('NGMY AI', Icons.auto_awesome_rounded, const Color(0xFF3B82F6), () => unawaited(_openNgmyAiAdmin(isDark)), isDark),
             _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark),
-            _menuFrame('Job Apps', Icons.assignment_ind_outlined, Colors.deepPurple, () => unawaited(_openJobApplicationsAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingJobWorkerApplications(widget.config.jobWorkerApplications)),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
-            _menuFrame('Games', Icons.sports_esports_rounded, Colors.deepPurple, () => unawaited(_openGamesAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingGameInvites(widget.config.gameInvites)),
             _menuFrame('Help Center', Icons.support_agent_rounded, const Color(0xFF00B4D8), () => unawaited(_openHelpCenterAdmin(isDark)), isDark),
           ],
         ),
