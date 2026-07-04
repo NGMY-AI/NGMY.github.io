@@ -11,6 +11,7 @@ import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
+import 'ngmy_slides_transfer.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// PowerPoint-style presentation studio for students — slides, text, shapes,
@@ -1200,6 +1201,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
               icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
+              onIconTap: () => showNgmySlidesTransferHub(
+                context,
+                ownerEmail: widget.userEmail,
+                decks: _decks,
+                onImported: (imported) async {
+                  setState(() {
+                    for (final d in imported) {
+                      _decks.insert(0, d);
+                    }
+                  });
+                  await _persistDecks();
+                },
+              ),
             ),
             const SizedBox(height: 18),
             Row(
@@ -2428,14 +2442,49 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     required String subtitle,
     required IconData icon,
     required Color accent,
+    VoidCallback? onIconTap,
   }) {
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: Colors.white, size: 26),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onIconTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Ink(
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(color: accent.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 5)),
+                ],
+              ),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 26),
+                    if (onIconTap != null)
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: accent, width: 1.2),
+                          ),
+                          child: Icon(Icons.sync_alt_rounded, size: 10, color: accent),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
