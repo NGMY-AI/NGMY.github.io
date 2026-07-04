@@ -43,7 +43,7 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tpl = ngmyMenuQrCardTemplateById(qrStyle.cardTemplate);
-    final w = large ? 340.0 : 300.0;
+    final w = large ? 260.0 : 240.0;
     final accent = tpl.accentColor;
     final name = info.restaurantName.trim().isEmpty ? 'Your Restaurant' : info.restaurantName.trim();
 
@@ -55,7 +55,7 @@ class NgmyMenuQrCardWidget extends StatelessWidget {
         children: [
           _header(tpl, accent, name),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 20),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
             child: Column(
               children: [
                 if (info.showLogo) _logoCircle(accent, tpl.bodyColor),

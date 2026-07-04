@@ -1,12 +1,36 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
+
+/// Background behind the menu when guests open the public link.
+class NgmyMenuPageBackgroundOption {
+  const NgmyMenuPageBackgroundOption({required this.id, required this.label, required this.color});
+
+  final String id;
+  final String label;
+  final Color color;
+}
+
+const List<NgmyMenuPageBackgroundOption> kNgmyMenuPageBackgrounds = [
+  NgmyMenuPageBackgroundOption(id: 'white', label: 'White', color: Color(0xFFFFFFFF)),
+  NgmyMenuPageBackgroundOption(id: 'cream', label: 'Cream', color: Color(0xFFFAF7F2)),
+  NgmyMenuPageBackgroundOption(id: 'mist', label: 'Soft gray', color: Color(0xFFF1F5F9)),
+];
+
+Color ngmyMenuPageBackgroundColor(String id) {
+  return kNgmyMenuPageBackgrounds
+      .firstWhere((o) => o.id == id, orElse: () => kNgmyMenuPageBackgrounds.first)
+      .color;
+}
+
 /// Restaurant / business menu document for NGMY Menu Studio.
 class NgmyMenuDocument {
   NgmyMenuDocument({
     required this.id,
     this.restaurantName = 'My Restaurant',
-    this.tagline = 'Fresh food · Great taste',
+    this.tagline = '',
     this.templateId = 'gold_luxe',
+    this.pageBackground = 'white',
     this.sections = const [],
     this.slug = '',
     this.publicUrl = '',
@@ -19,6 +43,7 @@ class NgmyMenuDocument {
   String restaurantName;
   String tagline;
   String templateId;
+  String pageBackground;
   List<NgmyMenuSection> sections;
   String slug;
   String publicUrl;
@@ -33,6 +58,7 @@ class NgmyMenuDocument {
         'restaurantName': restaurantName,
         'tagline': tagline,
         'templateId': templateId,
+        'pageBackground': pageBackground,
         'sections': sections.map((s) => s.toJson()).toList(),
         'slug': slug,
         'publicUrl': publicUrl,
@@ -46,6 +72,7 @@ class NgmyMenuDocument {
         restaurantName: (json['restaurantName'] ?? 'My Restaurant').toString(),
         tagline: (json['tagline'] ?? '').toString(),
         templateId: (json['templateId'] ?? 'gold_luxe').toString(),
+        pageBackground: (json['pageBackground'] ?? 'white').toString(),
         sections: (json['sections'] as List?)
                 ?.map((e) => NgmyMenuSection.fromJson(Map<String, dynamic>.from(e as Map)))
                 .toList() ??

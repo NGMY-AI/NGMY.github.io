@@ -670,7 +670,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         _panel(
           t,
           title: 'Live preview',
-          child: NgmyMenuPreview(document: doc, compact: true),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: NgmyMenuPreview(document: doc, compact: true),
+          ),
         ),
       ],
     );
@@ -841,6 +844,19 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
+        _panel(
+          t,
+          title: 'Guest page background',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Background when customers open your menu link', style: TextStyle(color: t.subtitle, fontSize: 11)),
+              const SizedBox(height: 10),
+              _pageBackgroundPicker(t, doc),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
         Text('Choose a luxurious template', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 16)),
         const SizedBox(height: 4),
         Text('Tap to preview — each design has its own layout style', style: TextStyle(color: t.subtitle, fontSize: 12)),
@@ -880,31 +896,34 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                           ],
                         ),
                       ),
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-                        child: SizedBox(
-                          height: 160,
-                          child: NgmyMenuPreview(
-                            document: NgmyMenuDocument(
-                              id: 'preview',
-                              restaurantName: tmpl.name,
-                              tagline: tmpl.subtitle,
-                              templateId: tmpl.id,
-                              sections: [
-                                NgmyMenuSection(
-                                  title: 'Signature',
-                                  items: [
-                                    NgmyMenuItem(
-                                      name: 'Chef\'s Special',
-                                      description: 'House favorite',
-                                      ingredients: 'Seasonal ingredients',
-                                      price: '24.00',
-                                    ),
-                                  ],
-                                ),
-                              ],
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: SizedBox(
+                            height: 160,
+                            child: NgmyMenuPreview(
+                              document: NgmyMenuDocument(
+                                id: 'preview',
+                                restaurantName: tmpl.name,
+                                tagline: tmpl.subtitle,
+                                templateId: tmpl.id,
+                                sections: [
+                                  NgmyMenuSection(
+                                    title: 'Signature',
+                                    items: [
+                                      NgmyMenuItem(
+                                        name: 'Chef\'s Special',
+                                        description: 'House favorite',
+                                        ingredients: 'Seasonal ingredients',
+                                        price: '24.00',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              compact: true,
                             ),
-                            compact: true,
                           ),
                         ),
                       ),
@@ -956,8 +975,20 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
             style: qs,
             restaurantName: doc.restaurantName,
             tagline: doc.tagline,
-            large: true,
+            large: qs.displayMode == 'card',
             captureKey: _qrCaptureKey,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _panel(
+          t,
+          title: 'Restaurant subtitle',
+          child: NgmyModernField(
+            controller: _taglineC,
+            label: 'Line under restaurant name',
+            hint: 'Fresh flavors · open daily · scan to order',
+            icon: Icons.format_quote_rounded,
+            accent: _kMenuAccent,
           ),
         ),
         const SizedBox(height: 14),
@@ -1094,6 +1125,45 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _pageBackgroundPicker(NgmyHubTheme t, NgmyMenuDocument doc) {
+    return Row(
+      children: kNgmyMenuPageBackgrounds.map((opt) {
+        final sel = doc.pageBackground == opt.id;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: opt.id == kNgmyMenuPageBackgrounds.last.id ? 0 : 8),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setState(() => doc.pageBackground = opt.id),
+                borderRadius: BorderRadius.circular(14),
+                child: Ink(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: opt.color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: sel ? _kMenuAccent : t.border, width: sel ? 2.5 : 1),
+                    boxShadow: sel ? [BoxShadow(color: _kMenuAccent.withValues(alpha: 0.25), blurRadius: 8)] : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      opt.label,
+                      style: TextStyle(
+                        color: opt.id == 'white' ? const Color(0xFF334155) : const Color(0xFF475569),
+                        fontWeight: sel ? FontWeight.w900 : FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

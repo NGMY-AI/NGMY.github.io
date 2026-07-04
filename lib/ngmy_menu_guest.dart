@@ -77,6 +77,7 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
+        backgroundColor: Color(0xFFFFFFFF),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -113,7 +114,7 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
 
     final doc = _doc!;
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: ngmyMenuPageBackgroundColor(doc.pageBackground),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

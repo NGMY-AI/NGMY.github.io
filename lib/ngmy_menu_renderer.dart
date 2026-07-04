@@ -14,11 +14,15 @@ class NgmyMenuPreview extends StatelessWidget {
   final NgmyMenuDocument document;
   final bool compact;
 
+  double get _radius => compact ? 20.0 : 28.0;
+
+  double get _innerRadius => compact ? 14.0 : 18.0;
+
   @override
   Widget build(BuildContext context) {
     final t = ngmyMenuTemplateById(document.templateId);
     final pad = compact ? 12.0 : 22.0;
-    final radius = compact ? 14.0 : 22.0;
+    final radius = _radius;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -293,7 +297,7 @@ class NgmyMenuPreview extends StatelessWidget {
           padding: EdgeInsets.all(compact ? 8 : 12),
           decoration: BoxDecoration(
             color: t.cardBg.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(compact ? 10 : 14),
+            borderRadius: BorderRadius.circular(_innerRadius),
             border: Border.all(color: t.accent.withValues(alpha: 0.55), width: 1.5),
             boxShadow: [BoxShadow(color: t.accent.withValues(alpha: 0.2), blurRadius: 14)],
           ),
@@ -491,7 +495,7 @@ class NgmyMenuPreview extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: t.cardBg.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(compact ? 10 : 14),
+        borderRadius: BorderRadius.circular(_innerRadius),
         border: Border.all(color: t.accent.withValues(alpha: 0.18)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
       ),
@@ -512,7 +516,7 @@ class NgmyMenuPreview extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
                   decoration: BoxDecoration(
                     color: t.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(compact ? 10 : 12),
                     border: Border.all(color: t.accent.withValues(alpha: 0.35)),
                   ),
                   child: Text(price, style: TextStyle(color: t.accent, fontWeight: FontWeight.w900, fontSize: compact ? 11 : 13)),
@@ -532,7 +536,7 @@ class NgmyMenuPreview extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: compact ? 8 : 10),
       decoration: BoxDecoration(
         color: t.cardBg.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(compact ? 8 : 10),
+        borderRadius: BorderRadius.circular(_innerRadius),
         border: Border.all(color: t.accent.withValues(alpha: 0.45), width: 1.5),
       ),
       child: Row(
@@ -544,7 +548,7 @@ class NgmyMenuPreview extends StatelessWidget {
             margin: EdgeInsets.only(right: compact ? 8 : 10),
             decoration: BoxDecoration(
               color: t.accent,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(6),
             ),
           ),
           Expanded(
@@ -578,6 +582,7 @@ class NgmyMenuPreview extends StatelessWidget {
       margin: EdgeInsets.only(bottom: compact ? 10 : 14),
       decoration: BoxDecoration(
         color: t.cardBg.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(_innerRadius),
         border: Border(left: BorderSide(color: t.accent, width: 3)),
       ),
       child: Stack(
@@ -606,6 +611,7 @@ class NgmyMenuPreview extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: compact ? 4 : 5),
                   decoration: BoxDecoration(
                     color: t.accent,
+                    borderRadius: BorderRadius.circular(compact ? 8 : 10),
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4, offset: const Offset(2, 2))],
                   ),
                   child: Text(
@@ -627,7 +633,7 @@ class NgmyMenuPreview extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 8 : 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: t.headerStyle == 'stack' ? 0.95 : 0.88),
-        borderRadius: BorderRadius.circular(2),
+        borderRadius: BorderRadius.circular(_innerRadius),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: Offset(compact ? 3 : 5, compact ? 3 : 5)),
         ],
@@ -640,6 +646,7 @@ class NgmyMenuPreview extends StatelessWidget {
             decoration: BoxDecoration(
               color: t.accent.withValues(alpha: 0.2),
               border: Border.all(color: t.accent.withValues(alpha: 0.35)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(_innerRadius - 2)),
             ),
             child: Center(child: Icon(Icons.restaurant_rounded, color: t.accent.withValues(alpha: 0.6), size: compact ? 16 : 20)),
           ),

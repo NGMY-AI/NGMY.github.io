@@ -231,7 +231,7 @@ class _NgmyQrCardTemplatePickerState extends State<NgmyQrCardTemplatePicker> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 0.72),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 6, crossAxisSpacing: 6, childAspectRatio: 1.05),
           itemCount: visible.length,
           itemBuilder: (_, i) {
             final t = visible[i];
@@ -254,7 +254,7 @@ class _NgmyQrCardTemplatePickerState extends State<NgmyQrCardTemplatePicker> {
                         child: Container(
                           width: double.infinity,
                           color: t.headerColor,
-                          child: Icon(t.icon, color: t.accentColor, size: 16),
+                          child: Icon(t.icon, color: t.accentColor, size: 11),
                         ),
                       ),
                       Expanded(
@@ -264,12 +264,12 @@ class _NgmyQrCardTemplatePickerState extends State<NgmyQrCardTemplatePicker> {
                           color: t.bodyColor,
                           child: Center(
                             child: Container(
-                              width: 18,
-                              height: 18,
+                              width: 12,
+                              height: 12,
                               decoration: BoxDecoration(
                                 color: t.accentColor.withValues(alpha: 0.2),
                                 border: Border.all(color: t.accentColor),
-                                borderRadius: BorderRadius.circular(3),
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ),
