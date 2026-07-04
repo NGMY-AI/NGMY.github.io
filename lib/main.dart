@@ -13184,8 +13184,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               Positioned(
-                right: 10,
-                bottom: MediaQuery.of(context).padding.bottom + 6,
+                right: 22,
+                bottom: MediaQuery.of(context).padding.bottom + 18,
                 child: Tooltip(
                   message: 'Reset app data',
                   child: Material(
