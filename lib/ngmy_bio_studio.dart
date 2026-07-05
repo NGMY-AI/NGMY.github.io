@@ -243,13 +243,6 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     Icon(Icons.visibility_rounded, size: 16, color: t.muted),
                     const SizedBox(width: 6),
                     Text('Live preview', style: TextStyle(color: t.subtitle, fontWeight: FontWeight.w700, fontSize: 12)),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _openFullPreview,
-                      icon: const Icon(Icons.fullscreen_rounded, size: 16),
-                      label: const Text('View full'),
-                      style: TextButton.styleFrom(foregroundColor: _kBioAccent, textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                    ),
                   ],
                 ),
               ),
@@ -298,13 +291,6 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                         Text(
                           _previewExpanded ? 'Hide preview' : 'Show preview',
                           style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13),
-                        ),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: _openFullPreview,
-                          icon: const Icon(Icons.visibility_rounded, size: 16),
-                          label: const Text('View'),
-                          style: TextButton.styleFrom(foregroundColor: _kBioAccent, padding: const EdgeInsets.symmetric(horizontal: 8)),
                         ),
                       ],
                     ),
@@ -397,19 +383,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   Widget _tabBody(NgmyHubTheme t, String qrUrl) {
     return Column(
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(
-            children: [
-              _pill('Profile', 0, t),
-              _pill('Links', 1, t),
-              _pill('Design', 2, t),
-              _pill('Social', 3, t),
-              _pill('QR', 4, t),
-            ],
-          ),
-        ),
+        _tabNavBar(t),
         Expanded(
           child: IndexedStack(
             index: _tab,
@@ -426,16 +400,59 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
-  Widget _pill(String label, int i, NgmyHubTheme t) {
-    final sel = _tab == i;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: FilterChip(
-        label: Text(label, style: TextStyle(fontWeight: sel ? FontWeight.w800 : FontWeight.w600, fontSize: 12)),
-        selected: sel,
-        onSelected: (_) => setState(() => _tab = i),
-        selectedColor: _kBioAccent.withValues(alpha: 0.2),
-        checkmarkColor: _kBioAccent,
+  static const _tabMeta = [
+    (Icons.person_outline_rounded, 'Profile'),
+    (Icons.link_rounded, 'Links'),
+    (Icons.palette_outlined, 'Design'),
+    (Icons.share_outlined, 'Social'),
+    (Icons.qr_code_2_rounded, 'QR'),
+  ];
+
+  Widget _tabNavBar(NgmyHubTheme t) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: t.listItemBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: t.border),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        children: List.generate(_tabMeta.length, (i) {
+          final sel = _tab == i;
+          final (icon, label) = _tabMeta[i];
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _tab = i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: sel ? _kBioAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: sel ? [BoxShadow(color: _kBioAccent.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))] : null,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18, color: sel ? Colors.white : t.muted),
+                    const SizedBox(height: 3),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                        color: sel ? Colors.white : t.subtitle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -651,16 +668,13 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   Widget _designTab(NgmyHubTheme t) {
-    final luxuryRings = kNgmyBioRingStyles.where((r) => r.luxury).toList();
-    final standardRings = kNgmyBioRingStyles.where((r) => !r.luxury).toList();
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _sectionCard(
           t,
           title: 'Templates',
-          subtitle: '20 unique layouts — curves, waves, gold accents, and more.',
+          subtitle: 'Pick a layout — curves flow into the same page color.',
           child: Wrap(
             spacing: 10,
             runSpacing: 12,
@@ -685,21 +699,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         ),
         _sectionCard(
           t,
-          title: 'Luxury profile rings',
-          subtitle: 'Gold, diamond, rose gold, and ornate frames.',
+          title: 'Profile ring',
+          subtitle: 'Frame around your profile photo.',
           child: Wrap(
             spacing: 12,
             runSpacing: 14,
-            children: luxuryRings.map((ring) => _ringChip(t, ring)).toList(),
-          ),
-        ),
-        _sectionCard(
-          t,
-          title: 'Classic rings',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 14,
-            children: standardRings.map((ring) => _ringChip(t, ring)).toList(),
+            children: kNgmyBioRingStyles.map((ring) => _ringChip(t, ring)).toList(),
           ),
         ),
       ],
