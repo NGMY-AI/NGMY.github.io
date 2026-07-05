@@ -396,73 +396,8 @@ void main() async {
   };
 
   final oauthReturn = kIsWeb && ngmyUriHasOAuthCallback();
-  if (oauthReturn) {
-    await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
-    await ngmyRecoverOAuthSessionIfNeeded();
-  }
 
-  var launchBootstrap = await ngmyLoadLaunchBootstrap();
-  final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
-  if (launchLoggedOut) {
-    try {
-      await ngmyEnsureSupabaseAuthInitialized();
-      await Supabase.instance.client.auth.signOut();
-    } catch (_) {}
-  }
-  if (oauthReturn && !launchLoggedOut) {
-    try {
-      final authUser = Supabase.instance.client.auth.currentUser;
-      final email = authUser?.email?.toLowerCase().trim() ?? '';
-      if (email.isNotEmpty) {
-        final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
-        final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
-        final users = List<UserData>.from(launchBootstrap.users);
-        final idx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
-        if (idx == -1) {
-          users.add(UserData(
-            email: email,
-            username: fullName.isNotEmpty ? fullName : email.split('@').first,
-            isAdmin: admins.contains(email),
-            passwordHash: '',
-          ));
-        } else if (fullName.isNotEmpty) {
-          users[idx].username = fullName;
-        }
-        final currentIdx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
-        launchBootstrap = NgmyLaunchBootstrap(
-          themeMode: launchBootstrap.themeMode,
-          currentUser: users[currentIdx],
-          users: users,
-          transactions: launchBootstrap.transactions,
-          media: launchBootstrap.media,
-          announcements: launchBootstrap.announcements,
-          config: launchBootstrap.config,
-          plans: launchBootstrap.plans,
-        );
-      }
-    } catch (e) {
-      debugPrint('[ngmy_oauth] bootstrap session merge: $e');
-    }
-    if (launchBootstrap.currentUser != null) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final u = launchBootstrap.currentUser!;
-        await prefs.setString('current_user', jsonEncode(u.toJson()));
-        await prefs.setString('ngmy_last_session_email', u.email.toLowerCase().trim());
-        await prefs.setString('all_users', jsonEncode(launchBootstrap.users.map((e) => e.toJson()).toList()));
-      } catch (e) {
-        debugPrint('[ngmy_oauth] session persist: $e');
-      }
-    }
-    ngmyMarkSupabaseReady();
-  }
-
-  ngmyCaptureCivicEnrollLaunchIntent();
-  ngmyCaptureMediaPostLaunchIntent();
-  ngmyCaptureReferralLaunchIntent();
-  _ngmyInitialThemeMode = launchBootstrap.themeMode;
-  _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
-
+  // Public /bio, /menu, etc. links should not wait on full local bootstrap.
   final guestAppSlug = kIsWeb ? ngmyPublishedAppSlugFromLaunch() : null;
   final isGuestPublishedApp = guestAppSlug != null && guestAppSlug.trim().isNotEmpty;
   final guestInvoiceSlug = kIsWeb && !isGuestPublishedApp ? ngmyPublishedInvoiceSlugFromLaunch() : null;
@@ -471,6 +406,77 @@ void main() async {
   final isGuestPublishedMenu = guestMenuSlug != null && guestMenuSlug.trim().isNotEmpty;
   final guestBioSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu ? ngmyPublishedBioSlugFromLaunch() : null;
   final isGuestPublishedBio = guestBioSlug != null && guestBioSlug.trim().isNotEmpty;
+  final isGuestLink = isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio;
+
+  var launchBootstrap = NgmyLaunchBootstrap.empty;
+  if (!isGuestLink) {
+    if (oauthReturn) {
+      await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
+      await ngmyRecoverOAuthSessionIfNeeded();
+    }
+
+    launchBootstrap = await ngmyLoadLaunchBootstrap();
+    final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
+    if (launchLoggedOut) {
+      try {
+        await ngmyEnsureSupabaseAuthInitialized();
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {}
+    }
+    if (oauthReturn && !launchLoggedOut) {
+      try {
+        final authUser = Supabase.instance.client.auth.currentUser;
+        final email = authUser?.email?.toLowerCase().trim() ?? '';
+        if (email.isNotEmpty) {
+          final fullName = (authUser?.userMetadata?['full_name'] ?? authUser?.userMetadata?['name'] ?? '').toString().trim();
+          final admins = ['kbpabloqr@gmail.com', 'ngumoyaking@gmail.com', 'appbusiness321@gmail.com', 'appbusiness84@gmail.com'];
+          final users = List<UserData>.from(launchBootstrap.users);
+          final idx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
+          if (idx == -1) {
+            users.add(UserData(
+              email: email,
+              username: fullName.isNotEmpty ? fullName : email.split('@').first,
+              isAdmin: admins.contains(email),
+              passwordHash: '',
+            ));
+          } else if (fullName.isNotEmpty) {
+            users[idx].username = fullName;
+          }
+          final currentIdx = users.indexWhere((u) => u.email.toLowerCase().trim() == email);
+          launchBootstrap = NgmyLaunchBootstrap(
+            themeMode: launchBootstrap.themeMode,
+            currentUser: users[currentIdx],
+            users: users,
+            transactions: launchBootstrap.transactions,
+            media: launchBootstrap.media,
+            announcements: launchBootstrap.announcements,
+            config: launchBootstrap.config,
+            plans: launchBootstrap.plans,
+          );
+        }
+      } catch (e) {
+        debugPrint('[ngmy_oauth] bootstrap session merge: $e');
+      }
+      if (launchBootstrap.currentUser != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final u = launchBootstrap.currentUser!;
+          await prefs.setString('current_user', jsonEncode(u.toJson()));
+          await prefs.setString('ngmy_last_session_email', u.email.toLowerCase().trim());
+          await prefs.setString('all_users', jsonEncode(launchBootstrap.users.map((e) => e.toJson()).toList()));
+        } catch (e) {
+          debugPrint('[ngmy_oauth] session persist: $e');
+        }
+      }
+      ngmyMarkSupabaseReady();
+    }
+
+    ngmyCaptureCivicEnrollLaunchIntent();
+    ngmyCaptureMediaPostLaunchIntent();
+    ngmyCaptureReferralLaunchIntent();
+    _ngmyInitialThemeMode = launchBootstrap.themeMode;
+    _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
+  }
 
   Future<void> initSupabase() async {
     try {
@@ -483,8 +489,10 @@ void main() async {
     }
   }
 
-  // Guest app/invoice links need cloud registry — init Supabase before first load attempt.
-  if (isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio) {
+  if (isGuestPublishedBio) {
+    // Bio guests load via REST per-slug — paint immediately, init cloud in background.
+    unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 8)));
+  } else if (isGuestLink) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
   }
 
@@ -511,7 +519,7 @@ void main() async {
     debugPrint('[zone] $e\n$st');
   });
 
-  if (!isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu && !isGuestPublishedBio) {
+  if (!isGuestLink) {
     // Never block first frame on cloud — cold start offline must show cached home immediately.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12)));
   }
@@ -8503,7 +8511,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (nextSig == _appShellSig) return;
       _appShellSig = nextSig;
       if (_currentUser != null) {
-        setState(() {});
+      setState(() {});
       }
     });
   }
@@ -9201,7 +9209,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _markTransactionDirty(dirtyTransactionId);
     _dataChangedUiDebounce?.cancel();
     _dataChangedUiDebounce = Timer(const Duration(milliseconds: 150), () {
-      if (mounted) setState(() {});
+    if (mounted) setState(() {});
     });
     final isAdmin = _ngmySessionIsAdmin(_currentUser);
     if (isAdmin) {
@@ -14381,7 +14389,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           mountedAt != null &&
           DateTime.now().difference(mountedAt) < const Duration(seconds: 12)) {
         Future<void>.delayed(const Duration(seconds: 12), () {
-          if (!mounted) return;
+      if (!mounted) return;
           NgmyPopupOrchestrator.handleAppOpen(
             context,
             popupsRaw: widget.config.ngmyPopups,
@@ -14404,8 +14412,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (ngmyShouldAllowGlobalInterrupt()) {
-        _runScheduledPopups();
-        _promptPushNotificationsIfNeeded();
+      _runScheduledPopups();
+      _promptPushNotificationsIfNeeded();
         unawaited(ngmyCheckItemRemindersNow(userEmail: widget.user.email));
         unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
         unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email));
@@ -14566,7 +14574,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } else if (oldWidget.allTransactions.length != widget.allTransactions.length) {
       _invalidateTransactionCaches();
       if (_idx != 0) {
-        _warmTransactionCacheAfterFrame();
+      _warmTransactionCacheAfterFrame();
       }
     }
     if (oldWidget.user.username != widget.user.username ||
@@ -14920,46 +14928,46 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) return;
     _ngmyReconcileClockInSession(widget.user, _userClockInTransactions());
     if (widget.user.isClockedIn) return;
-    final activeElsewhere =
+        final activeElsewhere =
         _ngmyActiveClockInStartFromTransactions(widget.user.email, _userClockInTransactions());
     if (activeElsewhere != null) {
-      setState(() {
-        widget.user.isClockedIn = true;
-        widget.user.clockInStartTime = activeElsewhere;
-      });
-      unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
-      widget.onDataChanged();
-      return;
-    }
+            setState(() {
+              widget.user.isClockedIn = true;
+              widget.user.clockInStartTime = activeElsewhere;
+            });
+            unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
+            widget.onDataChanged();
+          return;
+        }
     if (!onTrial && !_ngmyIsClockInWindowOpen(now)) return;
-    final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
-    final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
-    setState(() {
-      widget.user.isClockedIn = true;
-      widget.user.clockInStartTime = now;
-      widget.user.clockInPenaltyPercent = penalty;
-    });
-    widget.onAddTransaction(AppTransaction(
-      id: sessionId,
-      userEmail: widget.user.email,
-      amount: 0,
-      type: TransactionType.reimbursement,
-      method: PaymentMethod.system,
+        final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
+        final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
+        setState(() {
+          widget.user.isClockedIn = true;
+          widget.user.clockInStartTime = now;
+          widget.user.clockInPenaltyPercent = penalty;
+        });
+        widget.onAddTransaction(AppTransaction(
+          id: sessionId,
+          userEmail: widget.user.email,
+          amount: 0,
+          type: TransactionType.reimbursement,
+          method: PaymentMethod.system,
       sourceDetails: 'Clock-in session started (auto)',
-      status: TransactionStatus.approved,
-      timestamp: now,
-    ));
-    if (!kNgmySuppressClockInPopups) {
-      unawaited(ngmyInAppNotify?.call(
+          status: TransactionStatus.approved,
+          timestamp: now,
+        ));
+        if (!kNgmySuppressClockInPopups) {
+          unawaited(ngmyInAppNotify?.call(
         title: 'Earning started',
-        body: onTrial
-            ? 'Free trial session running — earnings accrue until payout.'
+            body: onTrial
+                ? 'Free trial session running — earnings accrue until payout.'
             : 'Today\'s earning session is active. Earnings show in Today and Transaction History.',
-        tag: 'clockin_start_$sessionId',
-      ) ?? Future.value());
-    }
-    unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
-    widget.onDataChanged();
+            tag: 'clockin_start_$sessionId',
+          ) ?? Future.value());
+        }
+        unawaited(widget.onPushUserToCloud?.call(widget.user) ?? Future.value());
+        widget.onDataChanged();
   }
 
   Future<void> _openAdminDashboardFromHome() async {
@@ -14969,30 +14977,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       AdminDashboard(
         user: widget.user,
         allTransactions: widget.allTransactions,
-        onProcess: widget.onProcessTransaction,
-        allUsers: widget.allUsers,
-        globalPlans: widget.globalPlans,
-        onAddPlan: widget.onAddPlan,
-        onAddTransaction: widget.onAddTransaction,
-        onDataChanged: widget.onDataChanged,
-        config: widget.config,
-        allMedia: widget.allMedia,
-        allAnnouncements: widget.allAnnouncements,
-        onAddAnnouncement: widget.onAddAnnouncement,
-        onDeleteAnnouncement: widget.onDeleteAnnouncement,
-        onClearAllAnnouncements: widget.onClearAllAnnouncements,
-        onSavePopups: widget.onSavePopups,
-        onUploadPopupVideo: widget.onUploadPopupVideo,
-        onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
-        onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
-        onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
-        onRefreshAdminData: widget.onRefreshAdminData,
-        onDeleteMedia: widget.onDeleteMedia,
-        onPushUserToCloud: widget.onPushUserToCloud,
-        onPersistManagementConfig: widget.onPersistManagementConfig,
-        onRefreshManagementData: widget.onRefreshManagementData,
-        onRefreshAdminMedia: widget.onRefreshAdminMedia,
-        onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
+      onProcess: widget.onProcessTransaction,
+      allUsers: widget.allUsers,
+      globalPlans: widget.globalPlans,
+      onAddPlan: widget.onAddPlan,
+      onAddTransaction: widget.onAddTransaction,
+      onDataChanged: widget.onDataChanged,
+      config: widget.config,
+      allMedia: widget.allMedia,
+      allAnnouncements: widget.allAnnouncements,
+      onAddAnnouncement: widget.onAddAnnouncement,
+      onDeleteAnnouncement: widget.onDeleteAnnouncement,
+      onClearAllAnnouncements: widget.onClearAllAnnouncements,
+      onSavePopups: widget.onSavePopups,
+      onUploadPopupVideo: widget.onUploadPopupVideo,
+      onSyncAdminMediaPost: widget.onSyncAdminMediaPost,
+      onSyncAdminUserMedia: widget.onSyncAdminUserMedia,
+      onEnqueueMediaDelivery: widget.onEnqueueMediaDelivery,
+      onRefreshAdminData: widget.onRefreshAdminData,
+      onDeleteMedia: widget.onDeleteMedia,
+      onPushUserToCloud: widget.onPushUserToCloud,
+      onPersistManagementConfig: widget.onPersistManagementConfig,
+      onRefreshManagementData: widget.onRefreshManagementData,
+      onRefreshAdminMedia: widget.onRefreshAdminMedia,
+      onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
       ),
       routeName: 'AdminDashboard',
     );
@@ -15012,7 +15020,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _tabPagesKey = cacheKey;
     _tabContentBuilders = {
       1: () => NgmyMarketHubScreen(
-        userEmail: widget.user.email,
+                userEmail: widget.user.email,
         username: widget.user.username,
       ),
       2: () => NgmySlidesStudioScreen(
@@ -15187,22 +15195,22 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             }
             final sorted = _sortedTransactions();
             final tabs = Stack(
-              children: [
-                if (!isDark)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: MediaQuery.of(context).padding.top,
-                    child: ColoredBox(color: shellBg),
-                  ),
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: shellBg,
+          children: [
+            if (!isDark)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: MediaQuery.of(context).padding.top,
+                child: ColoredBox(color: shellBg),
+              ),
+            Positioned.fill(
+              child: ColoredBox(
+                color: shellBg,
                     child: _buildMainTabBody(sorted),
-                  ),
-                ),
-              ],
+              ),
+            ),
+          ],
             );
             return Stack(
               fit: StackFit.expand,
@@ -15727,13 +15735,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 Positioned.fill(child: _homePastelBackdrop(isLight)),
                 Padding(
-                  padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
-                  child: Column(
+          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+          child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+            children: [
                       _buildAiHomeHeader(isLight),
-                      if (widget.user.isOnFreeTrial) ...[
-                        const SizedBox(height: 12),
+              if (widget.user.isOnFreeTrial) ...[
+                const SizedBox(height: 12),
                         _buildFreeTrialGlassBanner(isLight),
                       ],
                       const SizedBox(height: 16),
@@ -15754,17 +15762,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ? const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)]
         : const [Color(0xFF0B1020), Color(0xFF111827), Color(0xFF151B28)];
     return DecoratedBox(
-      decoration: BoxDecoration(
+            decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
           colors: baseColors,
         ),
       ),
       child: ngmyCrispUi
           ? const SizedBox.shrink()
           : Stack(
-              children: [
+        children: [
                 _pastelOrb(top: 48, left: -26, size: 118, colors: const [Color(0xFF8EEBFF), Color(0xFFE3B3FF)]),
                 _pastelOrb(top: 82, right: -18, size: 96, colors: const [Color(0xFFFFD7B8), Color(0xFFFFA7DD)]),
                 _pastelOrb(top: 250, left: 18, size: 76, colors: const [Color(0xFFD8F8A9), Color(0xFF8FE7FF)]),
@@ -15826,44 +15834,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildAiHomeHeader(bool isLight) {
     return Row(
-      children: [
+            children: [
         widget.homeLeadingOverride ??
             _roundGlassButton(
               icon: Icons.attach_money_rounded,
               tooltip: 'Loan Service',
               onTap: () => NgmyNavigator.push(
-                context,
+                                context,
                 LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
                 routeName: 'LoanServiceScreen',
               ),
             ),
         const SizedBox(width: 10),
-        Expanded(
+                    Expanded(
           child: GestureDetector(
             onTap: widget.onOpenAdminDashboard,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
                   widget.isLocalGrowthIncome ? 'Local Growth' : 'NGMY Assistant',
                   style: TextStyle(color: isLight ? const Color(0xFF38A7C7) : const Color(0xFF67E8F9), fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
-                Text(
+                          Text(
                   widget.homeTitleOverride ?? 'NGMY AI HOME',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                            style: TextStyle(
                     color: isLight ? const Color(0xFF171633) : Colors.white,
-                    fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w900,
                     fontSize: 18,
-                    letterSpacing: 0.4,
+                                  letterSpacing: 0.4,
                   ),
-                ),
-              ],
-            ),
-          ),
+                            ),
+                          ],
+                        ),
+                      ),
         ),
         const SizedBox(width: 10),
         _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
@@ -15908,7 +15916,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           const Icon(Icons.card_giftcard_rounded, color: Color(0xFF8B5CF6), size: 22),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
+              child: Text(
               'FREE TRIAL ACTIVE — \$${formatCurrency(widget.user.freeTrialDailyAmount)}/day bonus · no withdraw fee',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isLight ? const Color(0xFF4C1D95) : const Color(0xFFE9D5FF), height: 1.3),
             ),
@@ -15925,7 +15933,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+              children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -15945,7 +15953,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
           const SizedBox(height: 8),
-          Expanded(
+                    Expanded(
             child: hasChat
                 ? ListView.builder(
                     controller: _assistantScrollCtrl,
@@ -15965,7 +15973,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 : Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
+                  children: [
                         Text(
                           'Hello there, $name.\nHow can I assist you?',
                           textAlign: TextAlign.center,
@@ -15992,7 +16000,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           Container(
             constraints: const BoxConstraints(minHeight: 54),
             padding: const EdgeInsets.only(left: 18, right: 6),
-            decoration: BoxDecoration(
+                decoration: BoxDecoration(
               color: ngmyCrispSurfaceColor(context),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: ngmyCrispBorderColor(context)),
@@ -16013,13 +16021,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
                 ),
+              ),
+            ),
                 InkWell(
                   onTap: _askAssistant,
                   customBorder: const CircleBorder(),
-                  child: Container(
+                child: Container(
                     width: 44,
                     height: 44,
                     decoration: const BoxDecoration(
@@ -16027,10 +16035,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       gradient: LinearGradient(colors: [Color(0xFF67E8F9), Color(0xFF8B5CF6)]),
                     ),
                     child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
+              ),
             ),
+          ],
+        ),
           ),
         ],
       ),
@@ -16050,11 +16058,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final textColor = isLight ? const Color(0xFF171633) : Colors.white;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+                child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
-        decoration: BoxDecoration(
+                  decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
@@ -16064,30 +16072,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           border: Border.all(color: ngmyCrispBorderColor(context)),
         ),
-        child: Column(
+                child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+                mainAxisSize: MainAxisSize.min,
+                children: [
             Text(text, style: TextStyle(color: textColor, fontSize: 13.5, height: 1.32, fontWeight: FontWeight.w600)),
             if (!isUser && actions.isNotEmpty)
               ngmyPhoneActionChips(
                 actions: actions,
                 isDark: !isLight,
                 onTap: _tapHomePhoneAction,
-              ),
-          ],
-        ),
-      ),
+                                ),
+                              ],
+                            ),
+                          ),
     );
   }
 
   Widget _assistantTypingBubble(bool isLight) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
+                                    child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
+                                      decoration: BoxDecoration(
           color: ngmyCrispSurfaceColor(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: ngmyCrispBorderColor(context)),
@@ -16106,16 +16114,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   final scale = 0.5 + 0.5 * math.sin(phase * 2 * math.pi).abs();
                   return Opacity(
                     opacity: 0.4 + 0.6 * scale,
-                    child: Container(
+                                                child: Container(
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(shape: BoxShape.circle, color: isLight ? const Color(0xFF8B5CF6) : const Color(0xFF67E8F9)),
                     ),
                   );
                 }),
-              );
-            },
-          ),
+                    );
+                  },
+                ),
         ),
       ),
     );
@@ -16123,13 +16131,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _aiOrb() {
     return AnimatedBuilder(
-      animation: _smokeCtrl,
-      builder: (context, _) {
+            animation: _smokeCtrl,
+            builder: (context, _) {
         final t = _smokeCtrl.value;
-        return Container(
+              return Container(
           width: 112,
           height: 112,
-          decoration: BoxDecoration(
+                decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: SweepGradient(
               transform: GradientRotation(t * 2 * math.pi),
@@ -16139,9 +16147,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Color(0xFFFF9ED8),
                 Color(0xFF8EF6D6),
                 Color(0xFF9AE6FF),
-              ],
-            ),
-            boxShadow: [
+                    ],
+                  ),
+                  boxShadow: [
               BoxShadow(color: const Color(0xFF8B5CF6).withOpacity(0.22), blurRadius: 22, offset: const Offset(0, 8)),
               BoxShadow(color: Colors.white.withOpacity(0.72), blurRadius: 12, offset: const Offset(-4, -5)),
             ],
@@ -16155,9 +16163,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 gradient: RadialGradient(colors: [Colors.white.withOpacity(0.62), Colors.white.withOpacity(0.08)]),
               ),
             ),
-          ),
-        );
-      },
+                ),
+              );
+            },
     );
   }
 
@@ -22176,15 +22184,15 @@ class _InvestScreenState extends State<InvestScreen> {
             children: [
               const FloatingTitle(title: 'INVESTMENT PLANS'),
               const SizedBox(height: 20),
-              if (user.activeInvestment != null) ...[
-                const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 15),
-                _activeCard(context, user.activeInvestment!, user),
-                const SizedBox(height: 30),
-              ],
+      if (user.activeInvestment != null) ...[
+        const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 15),
+        _activeCard(context, user.activeInvestment!, user),
+        const SizedBox(height: 30),
+      ],
               const Text('AVAILABLE PLANS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 15),
-              ...plans.map((p) => _planRow(context, p)),
+      ...plans.map((p) => _planRow(context, p)),
             ],
           ),
         ),
@@ -42865,12 +42873,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           skipConfirmation: true,
         );
         if (!mounted || result == null) continue;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
             content: Text(result),
-            backgroundColor: const Color(0xFFF97316),
+                backgroundColor: const Color(0xFFF97316),
             duration: const Duration(seconds: 9),
-          ),
+              ),
         );
         continue;
       }
@@ -42925,8 +42933,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         userEmail: widget.user.email,
         skipConfirmation: true,
       );
-      if (!mounted || result == null) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+          if (!mounted || result == null) return;
+          ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result),
           backgroundColor: const Color(0xFFF97316),

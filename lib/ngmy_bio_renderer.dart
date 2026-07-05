@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,12 +17,14 @@ class NgmyBioPreview extends StatelessWidget {
     this.compact = false,
     this.maxWidth = 420,
     this.interactive = true,
+    this.lightweight = false,
   });
 
   final NgmyBioDocument document;
   final bool compact;
   final double maxWidth;
   final bool interactive;
+  final bool lightweight;
 
   @override
   Widget build(BuildContext context) {
@@ -415,37 +418,41 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _glassFloat(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+    final panel = Container(
+      padding: EdgeInsets.all(pad + 4),
+      decoration: BoxDecoration(
+        color: lightweight || kIsWeb ? tpl.panelBg.withValues(alpha: 0.92) : tpl.panelBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tpl.cardBorder),
+      ),
+      child: Column(
+        children: [
+          if (tpl.headerGradient != null)
+            Container(
+              height: compact ? 70 : 90,
+              width: double.infinity,
+              margin: EdgeInsets.only(bottom: compact ? 14 : 18),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), gradient: LinearGradient(colors: tpl.headerGradient!)),
+            ),
+          _avatar(document.avatarImageBase64, avatarSize, ring),
+          SizedBox(height: compact ? 10 : 14),
+          _nameBlock(tpl, name, tagline),
+          SizedBox(height: compact ? 14 : 18),
+          _linksColumn(links, tpl, 0),
+        ],
+      ),
+    );
+
     return Padding(
       padding: EdgeInsets.all(pad),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: EdgeInsets.all(pad + 4),
-            decoration: BoxDecoration(
-              color: tpl.panelBg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: tpl.cardBorder),
-            ),
-            child: Column(
-              children: [
-                if (tpl.headerGradient != null)
-                  Container(
-                    height: compact ? 70 : 90,
-                    width: double.infinity,
-                    margin: EdgeInsets.only(bottom: compact ? 14 : 18),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), gradient: LinearGradient(colors: tpl.headerGradient!)),
-                  ),
-                _avatar(document.avatarImageBase64, avatarSize, ring),
-                SizedBox(height: compact ? 10 : 14),
-                _nameBlock(tpl, name, tagline),
-                SizedBox(height: compact ? 14 : 18),
-                _linksColumn(links, tpl, 0),
-              ],
-            ),
-          ),
-        ),
+        child: lightweight || kIsWeb
+            ? panel
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: panel,
+              ),
       ),
     );
   }
@@ -883,11 +890,27 @@ class NgmyBioPreview extends StatelessWidget {
     }
   }
 
-  static Widget _bioImage(String ref, {double? width, double? height, BoxFit fit = BoxFit.contain}) {
+  Widget _bioImage(String ref, {double? width, double? height, BoxFit fit = BoxFit.contain}) {
     try {
       if (!ref.startsWith('data:image')) return const SizedBox.shrink();
       final bytes = base64Decode(ref.split(',').last);
-      return Image.memory(bytes, width: width, height: height, fit: fit, gaplessPlayback: true, errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined));
+      int? cacheW;
+      int? cacheH;
+      if (lightweight) {
+        cacheW = width != null ? (width * 2).round().clamp(80, 720) : 640;
+        cacheH = height != null ? (height * 2).round().clamp(80, 720) : null;
+      }
+      return Image.memory(
+        bytes,
+        width: width,
+        height: height,
+        fit: fit,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
+      );
     } catch (_) {
       return const Icon(Icons.broken_image_outlined);
     }

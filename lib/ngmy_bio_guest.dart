@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_bio_models.dart';
@@ -52,19 +54,27 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _doc = null;
     });
-    for (var attempt = 0; attempt < 4; attempt++) {
-      final entry = await NgmyBioPublishRegistry.fetchBySlug(widget.slug);
-      if (!mounted) return;
-      if (entry != null && entry['data'] is Map) {
-        setState(() {
-          _doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
-          _loading = false;
-        });
-        return;
+
+    try {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final entry = await NgmyBioPublishRegistry.fetchBySlugForGuest(widget.slug)
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+        if (!mounted) return;
+        if (entry != null && entry['data'] is Map) {
+          setState(() {
+            _doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+            _loading = false;
+          });
+          return;
+        }
+        if (attempt == 0) await Future<void>.delayed(const Duration(milliseconds: 400));
       }
-      if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+    } on TimeoutException {
+      // handled below
     }
+
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -76,7 +86,17 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
+        backgroundColor: Color(0xFF111827),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF2563EB)),
+              SizedBox(height: 16),
+              Text('Opening bio…', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       );
     }
     if (_doc == null || _error != null) {
@@ -97,6 +117,6 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
         ),
       );
     }
-    return Scaffold(body: NgmyBioPreview(document: _doc!));
+    return Scaffold(body: NgmyBioPreview(document: _doc!, lightweight: true));
   }
 }
