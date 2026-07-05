@@ -69,18 +69,6 @@ class NgmyBioPreview extends StatelessWidget {
                     child: NgmyMenuGuestFooter(links: document.socialLinks, compact: compact),
                   ),
                 ),
-              Positioned(
-                left: pad * 0.5,
-                top: 0,
-                bottom: 0,
-                child: Container(width: 1, color: tpl.accent.withValues(alpha: 0.22)),
-              ),
-              Positioned(
-                right: pad * 0.5,
-                top: 0,
-                bottom: 0,
-                child: Container(width: 1, color: tpl.accent.withValues(alpha: 0.22)),
-              ),
             ],
           ),
         ),
@@ -197,7 +185,7 @@ class NgmyBioPreview extends StatelessWidget {
                   bottom: compact ? 44 : 56,
                   left: 0,
                   right: 0,
-                  child: Container(height: 3, color: tpl.accent.withValues(alpha: 0.85)),
+                  child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
                 ),
             ],
           ),
@@ -299,7 +287,7 @@ class NgmyBioPreview extends StatelessWidget {
               decoration: BoxDecoration(
                 color: softPanel ? tpl.panelBg.withValues(alpha: 0.95) : tpl.panelBg,
                 borderRadius: BorderRadius.circular(roundedPanel ? 24 : (softPanel ? 20 : 0)),
-                border: softPanel ? Border.all(color: tpl.cardBorder.withValues(alpha: 0.5)) : null,
+                border: null,
               ),
               child: Column(
                 children: [
@@ -359,8 +347,7 @@ class NgmyBioPreview extends StatelessWidget {
         decoration: BoxDecoration(
           color: tpl.panelBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: tpl.accent.withValues(alpha: 0.4), width: 1),
-          boxShadow: [BoxShadow(color: tpl.accent.withValues(alpha: 0.15), blurRadius: 24, spreadRadius: 2)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 6), spreadRadius: -4)],
         ),
         child: Column(
           children: [
@@ -392,7 +379,7 @@ class NgmyBioPreview extends StatelessWidget {
         SizedBox(height: compact ? 12 : 20),
         _avatar(document.avatarImageBase64, avatarSize, ring),
         SizedBox(height: compact ? 10 : 14),
-        Container(width: 48, height: 2, color: tpl.accent, margin: EdgeInsets.only(bottom: compact ? 10 : 14)),
+        Container(width: 48, height: 1, color: tpl.accent.withValues(alpha: 0.35), margin: EdgeInsets.only(bottom: compact ? 10 : 14)),
         _nameBlock(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
         _framedLinks(links, tpl, pad),
@@ -432,7 +419,7 @@ class NgmyBioPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: lightweight || kIsWeb ? tpl.panelBg.withValues(alpha: 0.92) : tpl.panelBg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tpl.cardBorder),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 18, offset: const Offset(0, 4), spreadRadius: -2)],
       ),
       child: Column(
         children: [
@@ -686,7 +673,7 @@ class NgmyBioPreview extends StatelessWidget {
                 height: avatarSize + 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: tpl.accent.withValues(alpha: 0.4), width: 1),
+                  boxShadow: [BoxShadow(color: tpl.accent.withValues(alpha: 0.12), blurRadius: 12, spreadRadius: 2)],
                 ),
               ),
               _avatar(document.avatarImageBase64, avatarSize, ring),
@@ -695,7 +682,7 @@ class NgmyBioPreview extends StatelessWidget {
           SizedBox(height: compact ? 12 : 16),
           _nameBlock(tpl, name, tagline),
           SizedBox(height: compact ? 6 : 8),
-          Container(width: 32, height: 1, color: tpl.subtitleColor.withValues(alpha: 0.4)),
+          Container(width: 32, height: 1, color: tpl.subtitleColor.withValues(alpha: 0.2)),
           SizedBox(height: compact ? 14 : 18),
           _linksColumn(links, tpl, 0),
         ],
@@ -708,18 +695,37 @@ class NgmyBioPreview extends StatelessWidget {
   Widget _framedLinks(List<NgmyBioLink> links, NgmyBioTemplate tpl, double pad) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: pad),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: tpl.accent.withValues(alpha: 0.45), width: 1.5),
-            right: BorderSide(color: tpl.accent.withValues(alpha: 0.45), width: 1.5),
-          ),
+      child: _linksColumn(links, tpl, 0),
+    );
+  }
+
+  bool _isDarkBg(Color c) => c.computeLuminance() < 0.45;
+
+  /// Soft glass lift — no hard outline borders.
+  BoxDecoration _glassyLinkDecoration(NgmyBioTemplate tpl, double radius, {bool glow = false}) {
+    final r = radius.clamp(4.0, 999.0);
+    final dark = _isDarkBg(tpl.pageBg);
+    final fill = Color.alphaBlend(
+      (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.09 : 0.04),
+      tpl.cardBg,
+    );
+    return BoxDecoration(
+      color: fill,
+      borderRadius: BorderRadius.circular(r),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: dark ? 0.28 : 0.1),
+          blurRadius: 16,
+          offset: const Offset(0, 5),
+          spreadRadius: -2,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: _linksColumn(links, tpl, 0),
+        BoxShadow(
+          color: Colors.white.withValues(alpha: dark ? 0.05 : 0.2),
+          blurRadius: 2,
+          offset: const Offset(0, -1),
         ),
-      ),
+        if (glow) BoxShadow(color: tpl.accent.withValues(alpha: 0.12), blurRadius: 18, spreadRadius: -4),
+      ],
     );
   }
 
@@ -846,8 +852,6 @@ class NgmyBioPreview extends StatelessWidget {
     if (tpl.linkStyle == NgmyBioLinkStyle.goldBar) {
       content = Row(
         children: [
-          Container(width: 4, height: compactPad ? 36 : 44, color: tpl.accent),
-          SizedBox(width: compactPad ? 10 : 12),
           Expanded(
             child: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: compactPad ? 14 : 16, color: tpl.linkTextColor)),
           ),
@@ -881,37 +885,15 @@ class NgmyBioPreview extends StatelessWidget {
   BoxDecoration _linkDecoration(NgmyBioTemplate tpl, double radius) {
     switch (tpl.linkStyle) {
       case NgmyBioLinkStyle.outline:
-      case NgmyBioLinkStyle.neonOutline:
-        return BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(radius.clamp(4, 999)),
-          border: Border.all(color: tpl.linkStyle == NgmyBioLinkStyle.neonOutline ? tpl.accent : tpl.cardBorder, width: 1.5),
-          boxShadow: tpl.linkStyle == NgmyBioLinkStyle.neonOutline ? [BoxShadow(color: tpl.accent.withValues(alpha: 0.25), blurRadius: 8)] : null,
-        );
-      case NgmyBioLinkStyle.glass:
-        return BoxDecoration(
-          color: tpl.cardBg,
-          borderRadius: BorderRadius.circular(radius.clamp(4, 999)),
-          border: Border.all(color: tpl.cardBorder),
-        );
-      case NgmyBioLinkStyle.minimalLine:
-        return BoxDecoration(
-          border: Border(bottom: BorderSide(color: tpl.cardBorder)),
-        );
-      case NgmyBioLinkStyle.goldBar:
-        return BoxDecoration(
-          color: tpl.cardBg,
-          borderRadius: BorderRadius.circular(radius.clamp(2, 999)),
-          border: Border.all(color: tpl.cardBorder.withValues(alpha: 0.5)),
-        );
-      case NgmyBioLinkStyle.pill:
       case NgmyBioLinkStyle.rowIcon:
-        return BoxDecoration(
-          color: tpl.cardBg,
-          borderRadius: BorderRadius.circular(radius.clamp(4, 999)),
-          border: Border.all(color: tpl.cardBorder, width: tpl.cardBorder.a > 0 ? 1 : 0),
-          boxShadow: tpl.cardShadow ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))] : null,
-        );
+      case NgmyBioLinkStyle.pill:
+      case NgmyBioLinkStyle.goldBar:
+      case NgmyBioLinkStyle.glass:
+        return _glassyLinkDecoration(tpl, radius);
+      case NgmyBioLinkStyle.neonOutline:
+        return _glassyLinkDecoration(tpl, radius, glow: true);
+      case NgmyBioLinkStyle.minimalLine:
+        return _glassyLinkDecoration(tpl, radius.clamp(4.0, 12.0));
     }
   }
 
