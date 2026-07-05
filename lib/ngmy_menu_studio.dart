@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_bio_models.dart';
+import 'ngmy_bio_storage.dart';
+import 'ngmy_bio_studio.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
@@ -44,6 +47,9 @@ class _NgmyMenuStudio extends StatefulWidget {
 
 class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   List<NgmyMenuDocument> _menus = [];
+  List<NgmyBioDocument> _bios = [];
+  String _homeMode = 'menus';
+  NgmyBioDocument? _editingBio;
   bool _loading = true;
   NgmyMenuDocument? _editing;
   bool _publishing = false;
@@ -90,12 +96,24 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   }
 
   Future<void> _reload() async {
-    final list = await loadNgmyMenus(userEmail: widget.userEmail);
+    final results = await Future.wait([
+      loadNgmyMenus(userEmail: widget.userEmail),
+      loadNgmyBios(userEmail: widget.userEmail),
+    ]);
     if (!mounted) return;
     setState(() {
-      _menus = list;
+      _menus = results[0] as List<NgmyMenuDocument>;
+      _bios = results[1] as List<NgmyBioDocument>;
       _loading = false;
     });
+  }
+
+  void _newBio() {
+    setState(() => _editingBio = ngmyBioBlankDocument());
+  }
+
+  void _openBio(NgmyBioDocument doc) {
+    setState(() => _editingBio = doc.copy());
   }
 
   void _newMenu() {
@@ -307,6 +325,14 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
+    if (_editingBio != null) {
+      return NgmyBioStudioEditor(
+        userEmail: widget.userEmail,
+        document: _editingBio!,
+        onBack: () => setState(() => _editingBio = null),
+        onSaved: _reload,
+      );
+    }
     if (_editing != null) return _editor(t);
     return Material(
       color: t.scaffold,
@@ -340,12 +366,24 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                       Text('Menu Studio', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -0.5)),
                       const SizedBox(height: 6),
                       Text(
-                        'Luxury menus · publish online · custom QR codes',
+                        'Luxury menus · Bio pages · publish online · QR codes',
                         style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
                       ),
                     ],
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(child: _homeModeChip('Menus', 'menus', t)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _homeModeChip('Bio', 'bio', t)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (_homeMode == 'menus') ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Material(
@@ -407,10 +445,147 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                               itemBuilder: (_, i) => _menuListTile(t, _menus[i]),
                             ),
                 ),
+                ] else ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _newBio,
+                      borderRadius: BorderRadius.circular(18),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 8))],
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                              child: const Icon(Icons.add_link_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Create new Bio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('YOUR BIO PAGES', style: t.sectionLabel),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                      : _bios.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.link_rounded, size: 56, color: t.muted),
+                                    const SizedBox(height: 12),
+                                    Text('No Bio pages yet', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text('Create a link-in-bio page with photos & links', style: TextStyle(color: t.subtitle, fontSize: 13), textAlign: TextAlign.center),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              itemCount: _bios.length,
+                              itemBuilder: (_, i) => _bioListTile(t, _bios[i]),
+                            ),
+                ),
+                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _homeModeChip(String label, String mode, NgmyHubTheme t) {
+    final sel = _homeMode == mode;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _homeMode = mode),
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: sel ? (mode == 'bio' ? const Color(0xFF2563EB).withValues(alpha: 0.15) : _kMenuAccent.withValues(alpha: 0.15)) : t.listItemBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: sel ? (mode == 'bio' ? const Color(0xFF2563EB) : _kMenuAccent) : t.border, width: sel ? 2 : 1),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: Text(label, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: sel ? (mode == 'bio' ? const Color(0xFF2563EB) : _kMenuAccent) : t.subtitle)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bioListTile(NgmyHubTheme t, NgmyBioDocument b) {
+    final name = b.displayName.trim().isEmpty ? 'Untitled Bio' : b.displayName.trim();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: t.listItemBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openBio(b),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+                  ),
+                  child: const Icon(Icons.link_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, color: t.title)),
+                      Text('${b.links.length} links${b.isPublished ? ' · Live' : ''}', style: TextStyle(fontSize: 11, color: t.subtitle)),
+                    ],
+                  ),
+                ),
+                if (b.publicUrl.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Copy link',
+                    onPressed: () => _copyLink(b.publicUrl),
+                    icon: Icon(Icons.copy_rounded, color: const Color(0xFF2563EB), size: 20),
+                  ),
+                Icon(Icons.chevron_right_rounded, color: t.muted),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

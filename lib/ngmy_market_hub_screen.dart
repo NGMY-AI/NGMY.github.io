@@ -83,7 +83,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             _youtubeFrame(
               t: t,
               title: 'Menu Studio',
-              subtitle: 'Restaurant menus · publish online · custom QR codes',
+              subtitle: 'Restaurant menus · Bio pages · publish online · QR codes',
               thumbHeight: thumbH,
               darkGradient: const [Color(0xFF1A1410), Color(0xFF3D2E1F), Color(0xFF0F172A)],
               lightGradient: const [Color(0xFFFFF8E7), Color(0xFFFEF3C7), Color(0xFFFDE68A)],

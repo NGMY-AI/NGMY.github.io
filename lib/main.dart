@@ -41,6 +41,7 @@ import 'ngmy_price_product_scanner.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
+import 'ngmy_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
@@ -468,6 +469,8 @@ void main() async {
   final isGuestPublishedInvoice = guestInvoiceSlug != null && guestInvoiceSlug.trim().isNotEmpty;
   final guestMenuSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice ? ngmyPublishedMenuSlugFromLaunch() : null;
   final isGuestPublishedMenu = guestMenuSlug != null && guestMenuSlug.trim().isNotEmpty;
+  final guestBioSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu ? ngmyPublishedBioSlugFromLaunch() : null;
+  final isGuestPublishedBio = guestBioSlug != null && guestBioSlug.trim().isNotEmpty;
 
   Future<void> initSupabase() async {
     try {
@@ -481,7 +484,7 @@ void main() async {
   }
 
   // Guest app/invoice links need cloud registry — init Supabase before first load attempt.
-  if (isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu) {
+  if (isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
   }
 
@@ -498,13 +501,17 @@ void main() async {
       runApp(NgmyGuestPublishedMenu(slug: guestMenuSlug.trim().toLowerCase()));
       return;
     }
+    if (isGuestPublishedBio) {
+      runApp(NgmyGuestPublishedBio(slug: guestBioSlug.trim().toLowerCase()));
+      return;
+    }
     final app = NGMYApp(launchBootstrap: launchBootstrap);
     runApp(NgmyWebViewportGuard(child: app));
   }, (e, st) {
     debugPrint('[zone] $e\n$st');
   });
 
-  if (!isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu) {
+  if (!isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu && !isGuestPublishedBio) {
     // Never block first frame on cloud — cold start offline must show cached home immediately.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12)));
   }
