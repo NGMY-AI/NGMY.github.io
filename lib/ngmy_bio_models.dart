@@ -45,8 +45,9 @@ class NgmyBioDocument {
     required this.id,
     this.displayName = '',
     this.tagline = '',
-    this.templateId = 'classic_white',
-    this.ringStyleId = 'white',
+    this.templateId = 'gold_curved',
+    this.ringStyleId = 'gold',
+    this.profileScale = 1.0,
     this.headerImageBase64 = '',
     this.avatarImageBase64 = '',
     this.backgroundImageBase64 = '',
@@ -64,6 +65,7 @@ class NgmyBioDocument {
   String tagline;
   String templateId;
   String ringStyleId;
+  double profileScale;
   String headerImageBase64;
   String avatarImageBase64;
   String backgroundImageBase64;
@@ -85,6 +87,7 @@ class NgmyBioDocument {
         'tagline': tagline,
         'templateId': templateId,
         'ringStyleId': ringStyleId,
+        'profileScale': profileScale,
         'headerImageBase64': headerImageBase64,
         'avatarImageBase64': avatarImageBase64,
         'backgroundImageBase64': backgroundImageBase64,
@@ -101,8 +104,9 @@ class NgmyBioDocument {
         id: (json['id'] ?? ngmyBioNewId()).toString(),
         displayName: (json['displayName'] ?? '').toString(),
         tagline: (json['tagline'] ?? '').toString(),
-        templateId: (json['templateId'] ?? 'classic_white').toString(),
-        ringStyleId: (json['ringStyleId'] ?? 'white').toString(),
+        templateId: (json['templateId'] ?? 'gold_curved').toString(),
+        ringStyleId: (json['ringStyleId'] ?? 'gold').toString(),
+        profileScale: ((json['profileScale'] as num?)?.toDouble() ?? 1.0).clamp(0.65, 1.6),
         headerImageBase64: (json['headerImageBase64'] ?? '').toString(),
         avatarImageBase64: (json['avatarImageBase64'] ?? '').toString(),
         backgroundImageBase64: (json['backgroundImageBase64'] ?? '').toString(),
