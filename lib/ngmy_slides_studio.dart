@@ -642,6 +642,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     _mutate(() => NgmySlidesTemplates.applyLayout(slide, layout, _theme));
   }
 
+  Future<void> _downloadPdf() async {
+    final deck = _activeDeck;
+    if (deck == null) return;
+    _syncDeckIntoList();
+    try {
+      final msg = await ngmySlidesDownloadDeckPdf(deck);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
+    }
+  }
+
   Future<void> _shareOutline() async {
     final deck = _activeDeck;
     if (deck == null) return;
@@ -867,8 +881,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         unawaited(_enhanceSelectedImage());
         return;
       case 'print':
-        final deck = _activeDeck;
-        if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
+        unawaited(_downloadPdf());
         return;
       case 'rotate':
         final el = _selectedElement();
@@ -1403,6 +1416,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              _deckActionRow(ctx, Icons.picture_as_pdf_outlined, 'Download PDF', 'Visual PDF like your slides', const Color(0xFF2563EB), 'pdf'),
+              const SizedBox(height: 10),
               _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
               const SizedBox(height: 10),
               _deckActionRow(ctx, Icons.content_copy_rounded, 'Duplicate', 'Create a copy you can edit', const Color(0xFF059669), 'duplicate'),
@@ -1425,7 +1440,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       ),
     );
     if (action == null || !mounted) return;
-    if (action == 'delete') {
+    if (action == 'pdf') {
+      try {
+        final msg = await ngmySlidesDownloadDeckPdf(deck);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
+      }
+    } else if (action == 'delete') {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1648,7 +1672,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(value: 'undo', enabled: _undo.isNotEmpty, child: const Text('Undo')),
               PopupMenuItem(value: 'redo', enabled: _redo.isNotEmpty, child: const Text('Redo')),
-              const PopupMenuItem(value: 'share', child: Text('Share outline')),
+              const PopupMenuItem(value: 'share', child: Text('Share text outline')),
               PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
             ],
           ),
@@ -1934,6 +1958,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         return Row(
           children: [
             _ribbonBtn(Icons.notes_rounded, _showNotes ? 'Hide Notes' : 'Show Notes', () => setState(() => _showNotes = !_showNotes), isDark),
+            _ribbonBtn(Icons.picture_as_pdf_outlined, 'Download PDF', () => unawaited(_downloadPdf()), isDark),
             _ribbonBtn(Icons.print_rounded, 'Print deck', () {
               final deck = _activeDeck;
               if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));

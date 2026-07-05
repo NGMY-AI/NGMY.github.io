@@ -3,9 +3,12 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_invoice_signature.dart';
+import 'ngmy_slides_download.dart';
+import 'ngmy_slides_export.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_print_stub.dart' if (dart.library.html) 'ngmy_slides_print_web.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -43,6 +46,8 @@ int ngmySlidesEstimatePdfPages(Uint8List bytes) {
 /// Enhance image clarity — contrast + sharpen for school photos / scans.
 Future<String?> ngmySlidesEnhanceImage(String dataUrl) async {
   if (!dataUrl.startsWith('data:image')) return dataUrl;
+  // Canvas filters often render black frames on Flutter web/PWA — keep the original photo.
+  if (kIsWeb) return dataUrl;
   try {
     final payload = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
     final bytes = base64Decode(payload);
@@ -191,22 +196,32 @@ Future<void> ngmySlidesOpenPrintPreview(BuildContext context, NgmySlideDeck deck
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: const Color(0xFF0C1220),
-      title: const Text('Print preview', style: TextStyle(color: Colors.white)),
+      title: const Text('Export presentation', style: TextStyle(color: Colors.white)),
       content: SizedBox(
         width: 320,
         child: Text(
-          'Use your browser Print dialog (Ctrl/Cmd+P) after tapping Open print view. ${deck.slides.length} slide(s) ready.',
+          'Download a PDF that looks like your slides (${deck.slides.length} page${deck.slides.length == 1 ? '' : 's'}), or open the print view in your browser.',
           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13),
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
+        TextButton(
+          onPressed: () async {
             Navigator.pop(ctx);
             ngmySlidesLaunchPrintHtml(html, title: deck.name);
           },
-          child: const Text('Open print view'),
+          child: const Text('Print view'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            final msg = await ngmySlidesDownloadDeckPdf(deck);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+            }
+          },
+          child: const Text('Download PDF'),
         ),
       ],
     ),
@@ -220,7 +235,14 @@ void ngmySlidesLaunchPrintHtml(String html, {required String title}) {
 Future<String?> ngmySlidesPickAndEnhancePhoto() async {
   final ref = await ngmyPickImageBase64(imageQuality: 92, maxWidth: 2400);
   if (ref == null) return null;
-  return ngmySlidesEnhanceImage(ref);
+  final enhanced = await ngmySlidesEnhanceImage(ref);
+  return enhanced ?? ref;
+}
+
+/// Download a visual PDF that matches the slide canvas layout.
+Future<String> ngmySlidesDownloadDeckPdf(NgmySlideDeck deck) async {
+  final bytes = await ngmySlidesExportPdfBytes(deck);
+  return saveNgmySlidesPdf(bytes, ngmySlidesExportPdfFilename(deck));
 }
 
 List<(String, NgmySlideLayout)> get ngmySlidesSchoolLayouts => const [

@@ -15,7 +15,7 @@ const ngmySlidesDocumentTools = <NgmySlidesDocToolDef>[
   NgmySlidesDocToolDef(id: 'sign_paper', icon: Icons.draw_rounded, label: 'Sign Paper'),
   NgmySlidesDocToolDef(id: 'hd_photo', icon: Icons.hd_rounded, label: 'HD Photo'),
   NgmySlidesDocToolDef(id: 'sharpen', icon: Icons.auto_fix_high_rounded, label: 'Sharpen'),
-  NgmySlidesDocToolDef(id: 'print', icon: Icons.print_rounded, label: 'Print'),
+  NgmySlidesDocToolDef(id: 'print', icon: Icons.picture_as_pdf_rounded, label: 'Download PDF'),
   NgmySlidesDocToolDef(id: 'rotate', icon: Icons.crop_rotate_rounded, label: 'Rotate'),
   NgmySlidesDocToolDef(id: 'text_box', icon: Icons.text_fields_rounded, label: 'Text Box'),
   NgmySlidesDocToolDef(id: 'picture', icon: Icons.image_rounded, label: 'Picture'),
