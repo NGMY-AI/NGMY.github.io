@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_games.dart';
+import 'ngmy_cloud_policy.dart';
 
 /// Supabase config row id (TEXT).
 const String kNgmyGameCenterConfigRowId = '1';
@@ -38,6 +39,7 @@ Future<void> _backupGameCenterLocal(Map<String, dynamic> payload) async {
 }
 
 Future<void> _backupGameCenterCloud(Map<String, dynamic> payload) async {
+  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return;
   try {
     await Supabase.instance.client.from('ngmy_settings').upsert([
       {
@@ -64,6 +66,7 @@ Future<bool> ngmyPersistGameCenterSettings({
     'savedAt': DateTime.now().toUtc().toIso8601String(),
   };
   await _backupGameCenterLocal(payload);
+  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return true;
   if (!await _canReachCloud()) return false;
 
   await _backupGameCenterCloud(payload);

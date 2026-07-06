@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+import 'ngmy_cloud_policy.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_config.dart';
 
@@ -121,6 +122,7 @@ class NgmyMenuPublishRegistry {
       value['menus'] = entries;
       value['savedAt'] = DateTime.now().toUtc().toIso8601String();
 
+      if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return null;
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': settingsKey,

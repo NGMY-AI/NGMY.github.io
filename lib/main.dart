@@ -94,6 +94,7 @@ import 'ngmy_media_cloud.dart';
 import 'ngmy_media_reward_tracker.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_network_resilience.dart';
+import 'ngmy_cloud_policy.dart';
 import 'ngmy_store_gift_celebration.dart';
 import 'ngmy_store_listing_extras.dart';
 import 'ngmy_store_payment_notification.dart';
@@ -102,7 +103,6 @@ import 'ngmy_document_scan_payments.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_oauth.dart';
-import 'ngmy_live_support.dart';
 import 'ngmy_worksheets.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
@@ -1418,6 +1418,7 @@ Future<bool> _safeUpsertTransactionRows(
   List<Map<String, dynamic>> rows, {
   bool requireStatus = false,
 }) async {
+  if (!NgmyCloudPolicy.persistTransactionsToCloud) return true;
   if (rows.isEmpty) return true;
   var working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
   for (var i = 0; i < 12; i++) {
@@ -1449,7 +1450,8 @@ Future<bool> _safeUpsertTransactionRows(
 
 Future<bool> _safeUpsertUserRow(Map<String, dynamic> row) async {
   if (row.isEmpty) return true;
-  var working = Map<String, dynamic>.from(row);
+  var working = NgmyCloudPolicy.filterUserRowForCloud(row);
+  if (working.isEmpty || !working.containsKey('email')) return true;
   for (var i = 0; i < 12; i++) {
     try {
       // users.id is the table's primary key, but every row here is keyed by
@@ -2485,21 +2487,7 @@ Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
 }
 
 Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
-  if (!await ngmyCanReachCloud()) return;
-  final email = u.email.trim();
-  if (email.isEmpty) return;
-  try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': email,
-      'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
-      'isCivicRegistryKing': u.isCivicRegistryKing,
-      'isCivicRegistryAdmin': u.isCivicRegistryAdmin,
-      'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
-      'civicRegistryAnchorState': u.civicRegistryAnchorState,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
-  } catch (e) {
-    debugPrint('[user] civic registrar profile upsert: $e');
-  }
+  // Registrar grants live in config.civicRegistrarApplications (cloud) and local users.
 }
 
 Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
@@ -3265,61 +3253,30 @@ Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
 Timer? _operationalConfigCloudDebounce;
 String? _lastOperationalConfigCloudSig;
 
-/// Admin menu + user requests (loans, help, store messages, registrar apps) — not the full config blob.
+/// Store + civic registry slices of config — everything else stays on device.
 Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return false;
-  var loans = config.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList();
-  final remoteLists = await _fetchManagementOperationalListsCloud();
-  if (remoteLists != null) {
-    final raw = remoteLists['loanApplications'];
-    if (raw is List && raw.isNotEmpty) {
-      final remoteLoans = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      loans = _mergeLoanApplicationsLists(loans, remoteLoans);
-    }
-  }
-  await NgmyLoanStatusCloud.fetchAndApply(loans);
-  config.loanApplications = loans;
-  var row = <String, dynamic>{
+  _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
+  var row = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
     'storeInquiries': config.storeInquiries,
     'storeOrders': config.storeOrders,
     'storeListings': config.storeListings,
-    'loanApplications': loans,
-    'helpHelperApplications': config.helpHelperApplications,
-    'helpRequests': config.helpRequests,
-    'helpBusinesses': config.helpBusinesses,
-    'helpCampaignSpendings': config.helpCampaignSpendings,
-    'helpModeActive': config.helpModeActive,
-    'helpPurpose': config.helpPurpose,
-    'helpCashApp': config.helpCashApp,
-    'helpZelle': config.helpZelle,
-    'helpPhone': config.helpPhone,
-    'helpScopeType': config.helpScopeType,
-    'helpScopeValue': config.helpScopeValue,
-    'helpState': config.helpState,
-    'helpCampaignId': config.helpCampaignId,
-    'helpCampaignStartedAt': config.helpCampaignStartedAt,
-    'helpCampaignClosures': config.helpCampaignClosures,
     'civicRegistrarApplications': config.civicRegistrarApplications,
-    'jobPosts': config.jobPosts,
-    'jobWorkerApplications': config.jobWorkerApplications,
+    'civicRegistryMembers': config.civicRegistryMembers,
+    'civicRegistryPin': config.civicRegistryPin,
+    'civicRegistryPinsByState': config.civicRegistryPinsByState,
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+    'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'cities': config.cities,
     'rooms': config.rooms,
-    'termsAndConditions': config.termsAndConditions,
-    'privacyPolicy': config.privacyPolicy,
-    'investmentPlans': config.investmentPlans,
-    'officialCashApp': config.officialCashApp,
-    'officialBitcoin': config.officialBitcoin,
+    'storeSellAccessEmails': config.storeSellAccessEmails,
+    'ngmyPopups': config.ngmyPopups,
+    'ngmyVideoPopups': config.ngmyVideoPopups,
     'familyTreeCreateFee': config.familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
-    'loanPhone': config.loanPhone,
-    'loanHowItWorks': config.loanHowItWorks,
-    'loanCompanyZelle': config.loanCompanyZelle,
-    'maxMediaPostsPerWeek': config.maxMediaPostsPerWeek,
-    'ngmyHelperDailyMessageLimit': config.ngmyHelperDailyMessageLimit,
-    'logoUrl': config.logoUrl.trim(),
-  };
+    'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
+  });
   final sig = jsonEncode(row);
   if (sig == _lastOperationalConfigCloudSig) return true;
   for (var i = 0; i < 12; i++) {
@@ -3358,15 +3315,10 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   final shouldWriteRegistrarApps =
       registrarApps.isNotEmpty || remoteRegistrarApps.isNotEmpty || localRegistrarBefore.isNotEmpty;
   final client = Supabase.instance.client;
-  final combined = <String, dynamic>{
+  final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
-    'gameTimeLimits': config.gameTimeLimits,
-    'diceSettings': config.diceSettings,
-    'gameInvites': config.gameInvites,
     'civicRegistryPin': config.civicRegistryPin,
     'civicRegistryPinsByState': config.civicRegistryPinsByState,
-    'jobPosts': config.jobPosts,
-    'jobWorkerApplications': config.jobWorkerApplications,
     'storeSellAccessEmails': config.storeSellAccessEmails,
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': config.familyTreeCreateFee,
@@ -3374,10 +3326,9 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'cities': config.cities,
-  };
-  if (shouldWriteRegistrarApps) {
-    combined['civicRegistrarApplications'] = registrarApps;
-  }
+    'civicRegistryMembers': config.civicRegistryMembers,
+    if (shouldWriteRegistrarApps) 'civicRegistrarApplications': registrarApps,
+  });
   try {
     await client.from('config').upsert(combined);
   } catch (e) {
@@ -3402,22 +3353,19 @@ Future<void> ngmyPersistAdminConfigNow(AppConfig config) async {
   await ngmyAdminPersistManagementConfig(config);
 }
 
-/// Game Center timers/dice — must hit Supabase immediately (admin + players).
+/// Game Center timers/dice — local only (no cloud sync).
 Future<bool> ngmyPersistGameCenterConfigNow(AppConfig config) async {
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   final invites = config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
-  final ok = await ngmyPersistGameCenterSettings(
+  return ngmyPersistGameCenterSettings(
     gameTimeLimits: Map<String, int>.from(config.gameTimeLimits),
     diceSettings: Map<String, dynamic>.from(config.diceSettings),
     gameInvites: invites,
   );
-  if (await ngmyCanReachCloud()) {
-    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
-  }
-  return ok;
 }
 
 Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
+  if (!NgmyCloudPolicy.persistTransactionsToCloud) return;
   if (!await ngmyCanReachCloud()) return;
   try {
     final row = await _transactionRowForCloudPrepared(t);
@@ -3431,32 +3379,11 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
 }
 
 Future<bool> _pushUserPhoneToCloud(UserData u) async {
-  if (!await ngmyCanReachCloud()) return false;
-  final email = u.email.trim();
-  final phone = u.phone.trim();
-  if (email.isEmpty || !ngmyUserPhoneOnFile(phone)) return false;
-  try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': email,
-      'phone': phone,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
-    return true;
-  } catch (e) {
-    debugPrint('[user] phone upsert: $e');
-    return false;
-  }
+  return true;
 }
 
 Future<bool> _pushUserProfileBasicsToCloud(UserData u) async {
-  if (!await ngmyCanReachCloud()) return false;
-  final email = u.email.trim();
-  if (email.isEmpty) return false;
-  final username = u.username.trim().isEmpty ? email.split('@').first : u.username.trim();
-  return _safeUpsertUserRow({
-    'email': email,
-    'username': username,
-    'phone': u.phone.trim(),
-  });
+  return true;
 }
 
 Future<bool> _pushUserProfilePictureToCloud(UserData u) async {
@@ -3501,27 +3428,7 @@ Future<void> _hydrateUserCrownBadgeFromCloud(UserData u) async {
 }
 
 Future<bool> _pushUserAdminAccountFieldsToCloud(UserData u) async {
-  if (!await ngmyCanReachCloud()) return false;
-  final email = u.email.trim();
-  if (email.isEmpty) return false;
-  final row = <String, dynamic>{
-    'email': email,
-    'username': u.username.trim().isEmpty ? email.split('@').first : u.username.trim(),
-    'status': u.status.trim().isEmpty ? 'active' : u.status,
-    'crownBadge': u.crownBadge,
-    'forceLogout': u.forceLogout,
-    'isApprovedWorker': u.isApprovedWorker,
-    'isApprovedHelper': u.isApprovedHelper,
-    'freeFixCredit': u.freeFixCredit,
-    'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
-    'isCivicRegistryKing': u.isCivicRegistryKing,
-    'canSellOnStore': u.canSellOnStore,
-  };
-  final fullName = (u.fullName ?? '').trim();
-  if (fullName.isNotEmpty) row['fullName'] = fullName;
-  final phone = u.phone.trim();
-  if (phone.isNotEmpty) row['phone'] = phone;
-  return _safeUpsertUserRow(row);
+  return true;
 }
 
 Future<bool> _deleteUserFromCloud(String email) async {
@@ -3548,7 +3455,7 @@ Map<String, dynamic> _userSignupRowForCloud(UserData u) {
   };
 }
 
-/// Saves a new or returning account to Supabase — minimal row first, then full profile.
+/// Saves a new or returning account to Supabase so admin can see app signups.
 Future<bool> _pushSignupUserToCloudReliable(UserData u, {bool includeFreeTrial = false}) async {
   if (u.email.trim().isEmpty) return false;
   ngmyMarkUserAsAppLoginAccount(u);
@@ -3561,47 +3468,19 @@ Future<bool> _pushSignupUserToCloudReliable(UserData u, {bool includeFreeTrial =
     if (i == 7) return false;
     await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
   }
-  for (var i = 0; i < 6; i++) {
-    if (!await ngmyCanReachCloud()) {
-      await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
-      continue;
-    }
-    final ok = await _pushUserToCloudFast(u, includeFreeTrial: includeFreeTrial);
-    if (ok) return true;
-    await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+  final photo = (u.profilePicturePath ?? '').trim();
+  if (photo.isNotEmpty && !photo.startsWith('data:image')) {
+    await _pushUserProfilePictureToCloud(u);
   }
-  return false;
+  return true;
 }
 
 Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false, bool includeBalance = false}) async {
-  if (!await ngmyCanReachCloud()) return false;
-  final row = _userRowForBulkSync(u, includeFreeTrial: includeFreeTrial, includeBalance: includeBalance);
-  final photo = (row['profilePicturePath'] ?? '').toString().trim();
-  if (photo.startsWith('data:image')) {
-    row.remove('profilePicturePath');
-  }
-  final ok = await _safeUpsertUserRow(row);
-  if (ok) unawaited(ngmyRegisterReferralCodesForUser(u));
-  return ok;
+  return _pushUserProfilePictureToCloud(u);
 }
 
 Future<bool> _pushUserMediaProfileFast(UserData u) async {
-  if (!await ngmyCanReachCloud()) return false;
-  try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': u.email,
-      'username': u.username,
-      'mediaFollowers': u.mediaFollowers,
-      'mediaFollowing': u.mediaFollowing,
-      'mediaBio': u.mediaBio ?? '',
-      'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
-      'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
-    return true;
-  } catch (e) {
-    debugPrint('[user media] fast upsert: $e');
-    return false;
-  }
+  return true;
 }
 
 void _mergeUserMediaProfileFields(UserData local, UserData remote) {
@@ -4331,6 +4210,7 @@ Future<bool> _upsertUserMediaSocialFields(UserData u) async {
 }
 
 Future<bool> _upsertMediaRowSafe(Map<String, dynamic> row) async {
+  if (!NgmyCloudPolicy.persistMediaPostsToCloud) return true;
   if (!await ngmyCanReachCloud()) return false;
   var working = ngmyMediaRowForCloud(row);
   final url = (working['videoUrl'] ?? '').toString();
@@ -4735,6 +4615,7 @@ bool _isNgmySystemStoreListingId(String id) => id.startsWith('ngmy:system:');
 DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').toString());
 
 Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
+  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return true;
   final row = <String, dynamic>{
     'key': key,
     'value': value,
@@ -8280,7 +8161,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startUserTransactionSync() {
     _userTxnSyncTimer?.cancel();
-    if (_currentUser == null) return;
+    if (_currentUser == null || !NgmyCloudPolicy.persistTransactionsToCloud) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
     _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused) return;
@@ -8345,6 +8226,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<List<AppTransaction>> _fetchCloudApprovedContributions() => ngmyFetchApprovedContributionsFromCloud();
 
   Future<void> _refreshUserTransactionsFromCloud({bool force = false}) async {
+    if (!NgmyCloudPolicy.persistTransactionsToCloud) return;
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
     final now = DateTime.now();
     if (!force &&
@@ -8712,61 +8594,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       final email = _currentUser!.email.trim();
       if (email.isEmpty) return;
-      final row = await supabase.from('users').select().eq('email', email).maybeSingle().timeout(kNgmyCloudLoadTimeout);
-      if (row == null || !mounted) return;
-      final rowMap = Map<String, dynamic>.from(row);
-      final remote = UserData.fromJson(rowMap);
-      final key = email.toLowerCase().trim();
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
-      await _applyAuthoritativeCloudProfile(remote);
-      if (!mounted) return;
-      if ((remote.profilePicturePath ?? '').trim().isEmpty) {
-        try {
-          final photoRow = await supabase
-              .from('users')
-              .select('profilePicturePath')
-              .eq('email', email)
-              .maybeSingle()
-              .timeout(kNgmyCloudLoadTimeout);
-          if (photoRow != null) {
-            final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
-            if (_ngmyIsCloudProfilePhoto(cloudPhoto)) {
-              remote.profilePicturePath = cloudPhoto;
-            }
-          }
-        } catch (e) {
-          debugPrint('[user] profile photo fetch: $e');
-        }
-      }
-      if (!mounted) return;
-      await _refreshUserTransactionsFromCloud(force: true);
-      if (!mounted) return;
+      final photoRow = await supabase
+          .from('users')
+          .select('profilePicturePath')
+          .eq('email', email)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (photoRow == null || !mounted) return;
+      final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
+      if (!_ngmyIsCloudProfilePhoto(cloudPhoto)) return;
       setState(() {
+        _currentUser!.profilePicturePath = cloudPhoto;
+        final key = email.toLowerCase().trim();
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-        if (idx >= 0) {
-          final local = _allUsers[idx];
-          final grant = _canSellOnStoreForEmail(_config, key);
-          remote.canSellOnStore = grant || remote.canSellOnStore;
-          if (grant && !remote.canSellOnStore) remote.canSellOnStore = true;
-          _preserveLocalSessionState(local, remote);
-          _mergeUserMediaProfileFields(local, remote);
-          _ngmyReconcileClockInSession(remote, _allTransactions);
-          _allUsers[idx] = remote;
-        }
-        final grant = _canSellOnStoreForEmail(_config, key);
-        remote.canSellOnStore = grant || remote.canSellOnStore;
-        if (grant && !remote.canSellOnStore) remote.canSellOnStore = true;
-        _preserveLocalSessionState(_currentUser!, remote);
-        _ngmyReconcileClockInSession(remote, _allTransactions);
-        ngmyReconcileUserAccountBalance(remote, _allTransactions);
-        _currentUser = remote;
-        if (idx >= 0) _allUsers[idx] = remote;
+        if (idx >= 0) _allUsers[idx].profilePicturePath = cloudPhoto;
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
     } catch (e) {
-      debugPrint('[user] refresh from cloud: $e');
+      debugPrint('[user] profile refresh from cloud: $e');
     }
   }
 
@@ -10543,72 +10391,46 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _appSyncChannel = null;
         return;
       }
-      final isAdmin = _ngmySessionIsAdmin(_currentUser);
-
-      if (isAdmin) {
-        final channelName = 'ngmy-admin-sync-${sessionEmail.toLowerCase().hashCode}';
-        _appSyncChannel = supabase
-            .channel(channelName)
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'users',
-              callback: (payload) => _onUsersChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'transactions',
-              callback: (payload) => _onTransactionsChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'config',
-              callback: (payload) => _onConfigChange(payload),
-            )
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'ngmy_settings',
-              callback: (payload) => _onNgmySettingsChange(payload),
-            )
-            .subscribe();
-        debugPrint('Realtime: admin users + transactions + config ($channelName)');
+      if (!NgmyCloudPolicy.realtimeForRegularUsers && !_ngmySessionIsAdmin(_currentUser)) {
+        _appSyncChannel = null;
+        debugPrint('Realtime: disabled for regular users (local-first)');
+        return;
+      }
+      if (!_ngmySessionIsAdmin(_currentUser)) {
+        _appSyncChannel = null;
         return;
       }
 
-      // Quota-safe for regular users: only this user's row + their transactions.
-      final channelName = 'ngmy-sync-${sessionEmail.toLowerCase().hashCode}';
+      final channelName = 'ngmy-admin-scoped-${sessionEmail.toLowerCase().hashCode}';
       _appSyncChannel = supabase
           .channel(channelName)
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
-            table: 'users',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'email',
-              value: sessionEmail,
-            ),
-            callback: (payload) => _onUsersChange(payload),
+            table: 'config',
+            callback: (payload) => _onConfigChange(payload),
           )
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
-            table: 'transactions',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'userEmail',
-              value: sessionEmail,
-            ),
-            callback: (payload) => _onTransactionsChange(payload),
+            table: 'store_listings',
+            callback: (payload) => _onStoreListingsChange(payload),
           )
           .subscribe();
-      debugPrint('Realtime: own user + transactions only ($channelName)');
+      debugPrint('Realtime: admin civic + store + popups ($channelName)');
     } catch (e) {
       debugPrint('Realtime subscribe error: $e');
     }
+  }
+
+  void _onStoreListingsChange(PostgresChangePayload payload) {
+    if (!_ngmySessionIsAdmin(_currentUser)) return;
+    unawaited(_reloadStoreFromSupabase().then((_) {
+      if (mounted) {
+        setState(() {});
+        NgmyAdminLiveRefresh.notify();
+      }
+    }));
   }
 
   void _onAnnouncementsChange(PostgresChangePayload payload) {
@@ -10795,8 +10617,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _onConfigChange(PostgresChangePayload payload) {
     try {
+      if (!_ngmySessionIsAdmin(_currentUser)) return;
       if (payload.eventType != PostgresChangeEvent.delete) {
         if (_shouldDeferRemoteConfigOverwrite()) return;
+        final fullRecord = Map<String, dynamic>.from(payload.newRecord);
+        final record = NgmyCloudPolicy.filterConfigFromRemote(fullRecord);
+        if (record.isEmpty) return;
         final keepListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
         final keepInquiries = List<Map<String, dynamic>>.from(_config.storeInquiries.map((e) => Map<String, dynamic>.from(e)));
         final keepHelpApps = List<Map<String, dynamic>>.from(_config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)));
@@ -10807,14 +10633,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final keepRegistrarApps = List<Map<String, dynamic>>.from(
           _config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
         );
-        final keepGeminiKey = _config.geminiApiKey.trim();
-        final remoteGemini = _geminiKeyFromMap(Map<String, dynamic>.from(payload.newRecord));
-        final record = Map<String, dynamic>.from(payload.newRecord);
         final keepConfig = AppConfig.fromJson(_config.toJson());
         final next = AppConfig.fromJson({..._config.toJson(), ...record});
         _applyRemoteConfigMerge(next, record, keepConfig);
-        _mergeLegalFromRemoteRecord(next, record, keepConfig);
-        _applyNgmyChatClosedFromRemote(next, record, localClosed: _config.ngmyChatClosed);
         if (next.storeOrders.isEmpty && keepOrders.isNotEmpty) next.storeOrders = keepOrders;
         else next.storeOrders = _mergeStoreOrdersLists(keepOrders, next.storeOrders);
         next.storeOrders = _mutableStoreOrdersCopy(next.storeOrders);
@@ -10828,25 +10649,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
-        final keepLoans = List<Map<String, dynamic>>.from(_config.loanApplications.map((e) => Map<String, dynamic>.from(e)));
-        if (next.loanApplications.isEmpty && keepLoans.isNotEmpty) {
-          next.loanApplications = keepLoans;
-        } else {
-          next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
-        }
-        final keepJobPosts = List<Map<String, dynamic>>.from(_config.jobPosts.map((e) => Map<String, dynamic>.from(e)));
-        final keepJobWorkerApps =
-            List<Map<String, dynamic>>.from(_config.jobWorkerApplications.map((e) => Map<String, dynamic>.from(e)));
-        if (next.jobPosts.isEmpty && keepJobPosts.isNotEmpty) {
-          next.jobPosts = keepJobPosts;
-        } else {
-          next.jobPosts = _mergeJobPostsLists(keepJobPosts, next.jobPosts);
-        }
-        if (next.jobWorkerApplications.isEmpty && keepJobWorkerApps.isNotEmpty) {
-          next.jobWorkerApplications = keepJobWorkerApps;
-        } else {
-          next.jobWorkerApplications = _mergeJobWorkerApplicationsLists(keepJobWorkerApps, next.jobWorkerApplications);
-        }
         if (next.civicRegistrarApplications.isEmpty && keepRegistrarApps.isNotEmpty) {
           next.civicRegistrarApplications = keepRegistrarApps;
         } else {
@@ -10855,20 +10657,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             next.civicRegistrarApplications,
           );
         }
-        _mergeOperationalManagementListsIntoConfig(next, keepConfig);
-        _applyBundledInvestmentPlansToConfig(next);
-        _globalPlans = _bundledInvestmentPlans();
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
         final remotePopups = (record['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         final remoteVideoPopups = (record['ngmyVideoPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         next.ngmyPopups = _mergeNgmyPopupsFromRemote(keepPopups, remotePopups, NgmyPopupDefaults.ensurePopups);
         next.ngmyVideoPopups = _mergeNgmyPopupsFromRemote(keepVideoPopups, remoteVideoPopups, NgmyPopupDefaults.ensureVideoPopups);
-        if (remoteGemini.isNotEmpty) {
-          next.geminiApiKey = remoteGemini;
-        } else if (next.geminiApiKey.trim().isEmpty && keepGeminiKey.isNotEmpty) {
-          next.geminiApiKey = keepGeminiKey;
-        }
         unawaited(_finishRemoteConfigChangeApply(next));
       }
     } catch (e) {
@@ -11804,22 +11598,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _allUsers = localUsersBeforeFetch.values.toList();
           }
         } else if (sessionEmail.isNotEmpty) {
-          final row = await supabase.from('users').select().eq('email', sessionEmail).maybeSingle();
-          if (row != null) {
-            final remote = UserData.fromJson(Map<String, dynamic>.from(row));
-            ngmyRegisterAppLoginUser(sessionEmail);
-            final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
-            final localBefore = idx >= 0 ? _allUsers[idx] : localUsersBeforeFetch[sessionEmail];
-            if (localBefore != null) {
-              _preserveLocalSessionState(localBefore, remote);
+          try {
+            final row = await supabase
+                .from('users')
+                .select('email,profilePicturePath')
+                .eq('email', sessionEmail)
+                .maybeSingle();
+            if (row != null) {
+              final photo = (row['profilePicturePath'] ?? '').toString().trim();
+              if (photo.isNotEmpty) {
+                final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
+                if (idx >= 0) {
+                  _allUsers[idx].profilePicturePath = photo;
+                } else if (localCurrent != null) {
+                  localCurrent.profilePicturePath = photo;
+                  _allUsers.add(localCurrent);
+                }
+              }
             }
-            if (idx >= 0) {
-              _allUsers[idx] = remote;
-            } else {
-              _allUsers.add(remote);
-            }
-            _reconcileAllUserBalances();
-            unawaited(ngmyRegisterReferralCodesForUser(remote));
+          } catch (e) {
+            debugPrint('[user] profile photo bootstrap: $e');
           }
         }
         for (final u in _allUsers) {
@@ -11843,10 +11641,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
 
         final List<AppTransaction> remoteTransactions;
-        if (bootstrapAdmin || sessionEmail.isEmpty) {
-          remoteTransactions = await _fetchAdminTransactionsFromCloud(limit: 10000);
+        if (NgmyCloudPolicy.persistTransactionsToCloud &&
+            (bootstrapAdmin || sessionEmail.isNotEmpty)) {
+          if (bootstrapAdmin) {
+            remoteTransactions = await _fetchAdminTransactionsFromCloud(limit: 10000);
+          } else {
+            remoteTransactions = await _fetchCloudTransactionsForEmail(sessionEmail);
+          }
         } else {
-          remoteTransactions = await _fetchCloudTransactionsForEmail(sessionEmail);
+          remoteTransactions = const [];
         }
         if (remoteTransactions.isNotEmpty || !bootstrapAdmin) {
           await _refreshWalletDecisionLedger();
@@ -11903,8 +11706,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (fullCfg != null) cfgMap.addAll(fullCfg);
         }
         if (cfgMap.isNotEmpty) {
-          final next = AppConfig.fromJson({..._config.toJson(), ...cfgMap});
-          _applyRemoteConfigMerge(next, cfgMap, localConfigSnapshot);
+          final scopedCfg = NgmyCloudPolicy.filterConfigFromRemote(cfgMap);
+          final next = AppConfig.fromJson({..._config.toJson(), ...scopedCfg});
+          _applyRemoteConfigMerge(next, scopedCfg, localConfigSnapshot);
           _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
           await ngmyHydrateManagementListsFromAllBackups(_config);
@@ -11932,7 +11736,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
           );
-          await _applyRemoteLegalToConfig(_config, cfgMap, keep: localConfigSnapshot);
+          await _applyRemoteLegalToConfig(_config, scopedCfg, keep: localConfigSnapshot);
           _mergeStoreListingsIntoConfig(localStoreListings);
           _mergeStoreInquiriesIntoConfig(localStoreInquiries);
           _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
@@ -12366,6 +12170,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteAnnouncementById(String id) async {
+    if (!NgmyCloudPolicy.persistAnnouncementsToCloud) return;
     try {
       await supabase.from('announcements').delete().eq('id', id);
     } catch (e) {
@@ -15196,50 +15001,31 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           child: Scaffold(
         extendBody: true,
         backgroundColor: shellBg,
-        body: ValueListenableBuilder<bool>(
-          valueListenable: ngmyIsSharingLiveHelp,
-          builder: (context, sharing, _) {
-            if (_idx == 0) {
-              final home = _buildHomeTabWidget();
-              if (!sharing) return home;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Positioned.fill(
-                    child: RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: home),
-                  ),
-                  ngmyLiveSupportBannerOverlay(),
-                ],
-              );
-            }
-            final sorted = _sortedTransactions();
-            final tabs = Stack(
-          children: [
-            if (!isDark)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.of(context).padding.top,
-                child: ColoredBox(color: shellBg),
+        body: _idx == 0
+            ? _buildHomeTabWidget()
+            : Builder(
+                builder: (context) {
+                  final sorted = _sortedTransactions();
+                  return Stack(
+                    children: [
+                      if (!isDark)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: MediaQuery.of(context).padding.top,
+                          child: ColoredBox(color: shellBg),
+                        ),
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: shellBg,
+                          child: _buildMainTabBody(sorted),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-            Positioned.fill(
-              child: ColoredBox(
-                color: shellBg,
-                    child: _buildMainTabBody(sorted),
-              ),
-            ),
-          ],
-            );
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                sharing ? RepaintBoundary(key: ngmyLiveSupportRepaintKey, child: tabs) : tabs,
-                ngmyLiveSupportBannerOverlay(),
-              ],
-            );
-          },
-        ),
         bottomNavigationBar: Material(
           type: MaterialType.transparency,
           elevation: 0,
@@ -42439,6 +42225,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   }
 
   Future<void> _pollNewsFromCloud() async {
+    if (!NgmyCloudPolicy.persistAnnouncementsToCloud) return;
     if (!mounted || !await ngmyCanReachCloud()) return;
     try {
       final rows = await Supabase.instance.client

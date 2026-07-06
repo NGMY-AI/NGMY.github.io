@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+import 'ngmy_cloud_policy.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_config.dart';
 
@@ -181,6 +182,7 @@ class NgmyBioPublishRegistry {
       value['bios'] = entries;
       value['savedAt'] = publishedAt;
 
+      if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return null;
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': _slugSettingsKey(clean),
