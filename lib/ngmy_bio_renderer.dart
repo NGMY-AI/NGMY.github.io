@@ -173,11 +173,11 @@ class NgmyBioPreview extends StatelessWidget {
   /// Same color from curve through the bottom — no contrasting panel block.
   Color _seamlessBody(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
 
-  Widget _headerBanner(NgmyBioTemplate tpl, double headerH, {bool curved = true}) {
+  Widget _headerBanner(NgmyBioTemplate tpl, double headerH, {bool curved = true, double curveDepth = 48}) {
     Widget image = _headerImageOrGradient(tpl, headerH);
     if (curved) {
       image = ClipPath(
-        clipper: _NgmyBioHeaderCurveClipper(),
+        clipper: _NgmyBioHeaderCurveClipper(curveDepth: curveDepth),
         child: image,
       );
     }
@@ -245,22 +245,24 @@ class NgmyBioPreview extends StatelessWidget {
     bool accentBar = false,
     double minPageHeight = 0,
   }) {
-    final avatarLift = avatarSize * 0.44;
-    final contentTop = headerH - avatarLift + avatarSize + (compact ? 4 : 8);
+    final curveDepth = curveH;
+    final avatarCenterY = headerH - curveDepth * 0.5;
+    final avatarTop = avatarCenterY - avatarSize * 0.5;
+    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 6 : 10);
 
     final stack = Stack(
       clipBehavior: Clip.none,
       children: [
-        _headerBanner(tpl, headerH),
+        _headerBanner(tpl, headerH, curveDepth: curveDepth),
         if (accentBar)
           Positioned(
-            top: headerH - curveH - 1,
+            top: headerH - curveDepth,
             left: 0,
             right: 0,
             child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.2)),
           ),
         Positioned(
-          top: headerH - avatarLift,
+          top: avatarTop,
           left: 0,
           right: 0,
           child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
@@ -843,18 +845,21 @@ class NgmyBioPreview extends StatelessWidget {
 
   bool _isDarkBg(Color c) => c.computeLuminance() < 0.45;
 
+  bool _isLightTemplate(NgmyBioTemplate tpl) => !_isDarkBg(tpl.pageBgEnd ?? tpl.pageBg);
+
   /// Soft glass lift — no hard outline borders.
   BoxDecoration _glassyLinkDecoration(NgmyBioTemplate tpl, double radius, {bool glow = false, bool frosted = false}) {
     final r = radius.clamp(4.0, 999.0);
-    final dark = _isDarkBg(tpl.pageBg);
+    final dark = !_isLightTemplate(tpl);
     if (frosted) {
       if (!dark) {
         return BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.94),
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(r),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.06), width: 0.5),
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4), spreadRadius: -2),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 3)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 2, offset: const Offset(0, 1)),
           ],
         );
       }
@@ -1007,7 +1012,7 @@ class NgmyBioPreview extends StatelessWidget {
     final usePill = isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
     final radius = usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0);
     final compactPad = compact;
-    final thumbSize = compactPad ? 44.0 : 52.0;
+    final thumbSize = compactPad ? 36.0 : 42.0;
     final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
 
     Widget thumb = ClipOval(
@@ -1033,7 +1038,7 @@ class NgmyBioPreview extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: tpl.serifTitle ? 'Georgia' : null,
-              fontSize: compactPad ? 13 : 15,
+              fontSize: compactPad ? 12 : 14,
               fontWeight: FontWeight.w700,
               letterSpacing: isGlass && isDark ? 0.6 : 0,
               height: 1.2,
@@ -1048,7 +1053,7 @@ class NgmyBioPreview extends StatelessWidget {
     final decoration = _linkDecoration(tpl, radius);
     final borderRadius = BorderRadius.circular(radius.clamp(8, 999));
     final padded = Padding(
-      padding: EdgeInsets.symmetric(horizontal: compactPad ? 12 : 14, vertical: compactPad ? 11 : 13),
+      padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 12, vertical: compactPad ? 8 : 10),
       child: content,
     );
 
@@ -1162,17 +1167,25 @@ class _BioLinkTapState extends State<_BioLinkTap> {
 }
 
 class _NgmyBioHeaderCurveClipper extends CustomClipper<Path> {
+  _NgmyBioHeaderCurveClipper({this.curveDepth = 48});
+
+  final double curveDepth;
+
   @override
   Path getClip(Size size) {
+    // Sides higher, center dips down — classic link-in-bio downward arc.
+    final sideY = size.height - curveDepth;
+    final peakY = size.height;
     return Path()
-      ..lineTo(0, size.height * 0.72)
-      ..quadraticBezierTo(size.width * 0.5, size.height * 1.02, size.width, size.height * 0.72)
+      ..moveTo(0, 0)
       ..lineTo(size.width, 0)
+      ..lineTo(size.width, sideY)
+      ..quadraticBezierTo(size.width * 0.5, peakY, 0, sideY)
       ..close();
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+  bool shouldReclip(covariant _NgmyBioHeaderCurveClipper old) => old.curveDepth != curveDepth;
 }
 
 class _AngularClipper extends CustomClipper<Path> {

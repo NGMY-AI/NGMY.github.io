@@ -938,13 +938,19 @@ class NgmyBioTemplateThumb extends StatelessWidget {
 
   Widget _thumbLink(NgmyBioTemplate t, double h) {
     final isGlass = t.linkStyle == NgmyBioLinkStyle.glass;
+    final light = (t.pageBgEnd ?? t.pageBg).computeLuminance() > 0.55;
     final r = t.linkStyle == NgmyBioLinkStyle.pill || isGlass ? h / 2 : t.cardRadius.clamp(2.0, 8.0);
     return Container(
       height: h,
       decoration: BoxDecoration(
-        color: isGlass ? Colors.white.withValues(alpha: 0.12) : (t.linkStyle == NgmyBioLinkStyle.outline || t.linkStyle == NgmyBioLinkStyle.neonOutline ? Colors.transparent : t.cardBg),
+        color: isGlass
+            ? (light ? Colors.white : Colors.white.withValues(alpha: 0.12))
+            : (t.linkStyle == NgmyBioLinkStyle.outline || t.linkStyle == NgmyBioLinkStyle.neonOutline ? Colors.transparent : t.cardBg),
         borderRadius: BorderRadius.circular(r),
-        border: isGlass ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.5) : Border.all(color: t.linkStyle == NgmyBioLinkStyle.goldBar ? t.accent : t.cardBorder, width: t.linkStyle == NgmyBioLinkStyle.outline ? 1 : 0.5),
+        border: isGlass
+            ? Border.all(color: light ? const Color(0xFFCBD5E1) : Colors.white.withValues(alpha: 0.2), width: light ? 1 : 0.5)
+            : Border.all(color: t.linkStyle == NgmyBioLinkStyle.goldBar ? t.accent : t.cardBorder, width: t.linkStyle == NgmyBioLinkStyle.outline ? 1 : 0.5),
+        boxShadow: light && isGlass ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 3, offset: const Offset(0, 1))] : null,
       ),
     );
   }
@@ -958,8 +964,8 @@ class _CurvedPanelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
     final path = Path()
-      ..moveTo(0, size.height * 0.45)
-      ..quadraticBezierTo(size.width * 0.5, 0, size.width, size.height * 0.45)
+      ..moveTo(0, size.height * 0.42)
+      ..quadraticBezierTo(size.width * 0.5, size.height * 0.56, size.width, size.height * 0.42)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
