@@ -1559,7 +1559,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
         title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
         subtitle: Text(
           deck.isMarriageAgreement
-              ? 'Marriage certificate • ${deck.marriageState ?? 'U.S.'}'
+              ? 'Marriage agreement • ${deck.marriageState ?? 'U.S.'}'
               : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
         ),
