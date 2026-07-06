@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_bio_effects.dart';
 import 'ngmy_bio_models.dart';
-import 'ngmy_bio_ring_animations.dart';
+import 'ngmy_bio_ring_frames.dart';
 import 'ngmy_bio_social.dart';
 import 'ngmy_bio_templates.dart';
 
@@ -173,12 +173,65 @@ class NgmyBioPreview extends StatelessWidget {
   /// Same color from curve through the bottom — no contrasting panel block.
   Color _seamlessBody(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
 
-  Color _bodyFillColor(NgmyBioTemplate tpl) {
-    if (tpl.sceneEffect != NgmyBioSceneEffect.none) return Colors.transparent;
-    return _seamlessBody(tpl);
+  Widget _headerBanner(NgmyBioTemplate tpl, double headerH, {bool curved = true}) {
+    Widget image = _headerImageOrGradient(tpl, headerH);
+    if (curved) {
+      image = ClipPath(
+        clipper: _NgmyBioHeaderCurveClipper(),
+        child: image,
+      );
+    }
+    return SizedBox(
+      height: headerH,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          image,
+          Positioned.fill(child: _headerEffectOverlay(tpl)),
+        ],
+      ),
+    );
   }
 
-  Color _curveFillColor(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
+  Widget _headerEffectOverlay(NgmyBioTemplate tpl) {
+    final royal = tpl.accent == const Color(0xFFD4AF37) || tpl.name.toLowerCase().contains('royal') || tpl.name.toLowerCase().contains('imperial');
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: royal ? 0.08 : 0.04),
+                  Colors.transparent,
+                  (tpl.pageBgEnd ?? tpl.pageBg).withValues(alpha: 0),
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
+          ),
+          if (royal)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFD4AF37).withValues(alpha: 0.06),
+                    Colors.transparent,
+                    const Color(0xFFD4AF37).withValues(alpha: 0.04),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _overlapHeaderSection({
     required NgmyBioTemplate tpl,
@@ -192,78 +245,38 @@ class NgmyBioPreview extends StatelessWidget {
     bool accentBar = false,
     double minPageHeight = 0,
   }) {
-    final bodyColor = _bodyFillColor(tpl);
-    final curveColor = _curveFillColor(tpl);
-    final header = SizedBox(
-      height: headerH,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _headerImageOrGradient(tpl, headerH),
+    final avatarLift = avatarSize * 0.44;
+    final contentTop = headerH - avatarLift + avatarSize + (compact ? 4 : 8);
+
+    final stack = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _headerBanner(tpl, headerH),
+        if (accentBar)
           Positioned(
+            top: headerH - curveH - 1,
             left: 0,
             right: 0,
-            bottom: 0,
-            child: LayoutBuilder(
-              builder: (context, constraints) => CustomPaint(
-                size: Size(constraints.maxWidth, curveH),
-                painter: curvePainter(curveColor),
-              ),
-            ),
+            child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.2)),
           ),
-          if (accentBar)
-            Positioned(
-              bottom: curveH,
-              left: 0,
-              right: 0,
-              child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
-            ),
-        ],
-      ),
-    );
-
-    final body = ColoredBox(
-      color: bodyColor,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: pad),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(height: compact ? 10 : 14),
-            Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
-            SizedBox(height: compact ? 10 : 14),
-            if (minPageHeight > 0)
-              Expanded(child: belowAvatar())
-            else
-              belowAvatar(),
-          ],
+        Positioned(
+          top: headerH - avatarLift,
+          left: 0,
+          right: 0,
+          child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
         ),
-      ),
+        Positioned(
+          top: contentTop,
+          left: pad,
+          right: pad,
+          bottom: pad,
+          child: belowAvatar(),
+        ),
+      ],
     );
 
-    if (minPageHeight <= 0) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [header, body],
-      );
-    }
-
-    final headerBlock = headerH + (compact ? 10 : 14) + avatarSize + (compact ? 10 : 14);
-    final bodyMin = math.max(0.0, minPageHeight - headerBlock);
-    return SizedBox(
-      height: minPageHeight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          header,
-          SizedBox(
-            height: bodyMin,
-            child: body,
-          ),
-        ],
-      ),
-    );
+    if (minPageHeight <= 0) return stack;
+    return SizedBox(height: minPageHeight, width: double.infinity, child: stack);
   }
 
   Widget _curvedOverlap(
@@ -969,33 +982,22 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _avatar(String ref, double size, NgmyBioRingStyle ring) {
-    final pad = ring.id == 'none' ? 0.0 : (size > 100 ? 5.0 : 4.0);
-    final inner = size - pad * 2;
-    final core = Container(
-      width: size,
-      height: size,
-      padding: pad > 0 ? EdgeInsets.all(pad) : null,
-      decoration: ring.buildRing(size),
-      child: ClipOval(
-        child: ref.isNotEmpty
-            ? _bioImage(ref, fit: BoxFit.cover, width: inner, height: inner)
-            : Container(
-                width: inner,
-                height: inner,
-                color: const Color(0xFFE5E7EB),
-                child: Icon(Icons.person_rounded, size: inner * 0.5, color: const Color(0xFF9CA3AF)),
-              ),
-      ),
+    final inner = ClipOval(
+      child: ref.isNotEmpty
+          ? _bioImage(ref, fit: BoxFit.cover, width: size, height: size)
+          : Container(
+              width: size,
+              height: size,
+              color: const Color(0xFFE5E7EB),
+              child: Icon(Icons.person_rounded, size: size * 0.5, color: const Color(0xFF9CA3AF)),
+            ),
     );
-    if (ring.ringAnimation != NgmyBioRingAnimation.none) {
-      return NgmyBioRingAura(
-        animation: ring.ringAnimation,
-        size: size,
-        accent: ring.auraColor ?? const Color(0xFFD4AF37),
-        child: core,
-      );
-    }
-    return core;
+    return NgmyBioRingFrame(
+      ringId: ring.id,
+      size: size,
+      accent: ring.auraColor ?? const Color(0xFFD4AF37),
+      child: SizedBox(width: size, height: size, child: inner),
+    );
   }
 
   Widget _linkCard(NgmyBioLink link, NgmyBioTemplate tpl) {
@@ -1157,6 +1159,20 @@ class _BioLinkTapState extends State<_BioLinkTap> {
       ),
     );
   }
+}
+
+class _NgmyBioHeaderCurveClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..lineTo(0, size.height * 0.72)
+      ..quadraticBezierTo(size.width * 0.5, size.height * 1.02, size.width, size.height * 0.72)
+      ..lineTo(size.width, 0)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class _AngularClipper extends CustomClipper<Path> {

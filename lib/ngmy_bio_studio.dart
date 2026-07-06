@@ -9,6 +9,7 @@ import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
 import 'ngmy_bio_storage.dart';
+import 'ngmy_bio_ring_frames.dart';
 import 'ngmy_bio_templates.dart';
 import 'ngmy_bio_urls.dart';
 import 'ngmy_hub_form_ui.dart';
@@ -763,18 +764,18 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       child: Column(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: sel ? _kBioAccent : Colors.transparent, width: 2.5),
               boxShadow: sel ? [BoxShadow(color: _kBioAccent.withValues(alpha: 0.2), blurRadius: 8)] : null,
             ),
-            padding: const EdgeInsets.all(2),
-            child: Container(
-              decoration: ring.buildRing(46),
-              padding: const EdgeInsets.all(3),
-              child: const CircleAvatar(backgroundColor: Color(0xFFE5E7EB), child: Icon(Icons.person, size: 14)),
+            child: NgmyBioRingFrame(
+              ringId: ring.id,
+              size: 36,
+              accent: ring.auraColor ?? _kBioAccent,
+              child: const CircleAvatar(radius: 18, backgroundColor: Color(0xFFE5E7EB), child: Icon(Icons.person, size: 14)),
             ),
           ),
           const SizedBox(height: 4),
