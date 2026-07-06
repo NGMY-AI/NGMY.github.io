@@ -8,6 +8,10 @@ import 'ngmy_bio_models.dart';
 import 'ngmy_bio_storage.dart';
 import 'ngmy_bio_studio.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_local_bio_storage.dart';
+import 'ngmy_local_menu_publish_registry.dart';
+import 'ngmy_local_menu_storage.dart';
+import 'ngmy_local_menu_urls.dart';
 import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
 import 'ngmy_menu_name_styles.dart';
@@ -18,17 +22,27 @@ import 'ngmy_menu_storage.dart';
 import 'ngmy_menu_templates.dart';
 import 'ngmy_menu_urls.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_studio_backend.dart';
 
 const _kMenuAccent = Color(0xFFD4AF37);
 
-Future<void> showNgmyMenuStudioDialog(BuildContext context, {required String userEmail}) {
+Future<void> showNgmyMenuStudioDialog(
+  BuildContext context, {
+  required String userEmail,
+  NgmyStudioPublishBackend backend = NgmyStudioPublishBackend.cloud,
+  NgmyStudioHomeFilter homeFilter = NgmyStudioHomeFilter.all,
+}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Menu Studio',
+    barrierLabel: backend == NgmyStudioPublishBackend.localDevice ? 'Local Menu Studio' : 'Menu Studio',
     barrierColor: Colors.black.withValues(alpha: 0.92),
     transitionDuration: const Duration(milliseconds: 340),
-    pageBuilder: (_, __, ___) => _NgmyMenuStudio(userEmail: userEmail),
+    pageBuilder: (_, __, ___) => _NgmyMenuStudio(
+      userEmail: userEmail,
+      backend: backend,
+      homeFilter: homeFilter,
+    ),
     transitionBuilder: (_, anim, __, child) {
       final slide = Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
       return FadeTransition(opacity: anim, child: SlideTransition(position: slide, child: child));
@@ -37,9 +51,17 @@ Future<void> showNgmyMenuStudioDialog(BuildContext context, {required String use
 }
 
 class _NgmyMenuStudio extends StatefulWidget {
-  const _NgmyMenuStudio({required this.userEmail});
+  const _NgmyMenuStudio({
+    required this.userEmail,
+    this.backend = NgmyStudioPublishBackend.cloud,
+    this.homeFilter = NgmyStudioHomeFilter.all,
+  });
 
   final String userEmail;
+  final NgmyStudioPublishBackend backend;
+  final NgmyStudioHomeFilter homeFilter;
+
+  bool get _isLocal => backend == NgmyStudioPublishBackend.localDevice;
 
   @override
   State<_NgmyMenuStudio> createState() => _NgmyMenuStudioState();
@@ -73,6 +95,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   @override
   void initState() {
     super.initState();
+    _homeMode = switch (widget.homeFilter) {
+      NgmyStudioHomeFilter.menusOnly => 'menus',
+      NgmyStudioHomeFilter.biosOnly => 'bio',
+      NgmyStudioHomeFilter.all => 'menus',
+    };
     _reload();
   }
 
@@ -97,8 +124,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Future<void> _reload() async {
     final results = await Future.wait([
-      loadNgmyMenus(userEmail: widget.userEmail),
-      loadNgmyBios(userEmail: widget.userEmail),
+      widget._isLocal
+          ? loadNgmyLocalMenus(userEmail: widget.userEmail)
+          : loadNgmyMenus(userEmail: widget.userEmail),
+      widget._isLocal
+          ? loadNgmyLocalBios(userEmail: widget.userEmail)
+          : loadNgmyBios(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -234,7 +265,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     final doc = _editing;
     if (doc == null) return;
     _syncFromEditors();
-    await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
+    if (widget._isLocal) {
+      await saveNgmyLocalMenu(userEmail: widget.userEmail, doc: doc);
+    } else {
+      await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
+    }
     await _reload();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Menu saved'), behavior: SnackBarBehavior.floating));
@@ -250,22 +285,35 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     }
 
     setState(() => _publishing = true);
-    final slugs = await NgmyMenuPublishRegistry.fetchAllSlugs();
+    final slugs = widget._isLocal
+        ? await NgmyLocalMenuPublishRegistry.fetchAllSlugs()
+        : await NgmyMenuPublishRegistry.fetchAllSlugs();
     if (doc.slug.isEmpty) {
-      doc.slug = ngmyBuildUniqueMenuSlug(doc.restaurantName, slugs);
+      doc.slug = widget._isLocal
+          ? ngmyBuildUniqueLocalMenuSlug(doc.restaurantName, slugs)
+          : ngmyBuildUniqueMenuSlug(doc.restaurantName, slugs);
       _slugC.text = doc.slug;
     }
 
-    final err = await NgmyMenuPublishRegistry.publish(
-      slug: doc.slug,
-      data: doc.toJson(),
-      createdByEmail: widget.userEmail,
-    );
+    final String? err;
+    if (widget._isLocal) {
+      err = await NgmyLocalMenuPublishRegistry.publish(slug: doc.slug, data: doc.toJson());
+    } else {
+      err = await NgmyMenuPublishRegistry.publish(
+        slug: doc.slug,
+        data: doc.toJson(),
+        createdByEmail: widget.userEmail,
+      );
+    }
     if (err == null) {
-      doc.publicUrl = ngmyMenuPublicUrlForSlug(doc.slug);
+      doc.publicUrl = widget._isLocal ? ngmyLocalMenuPublicUrlForSlug(doc.slug) : ngmyMenuPublicUrlForSlug(doc.slug);
       doc.status = 'published';
     }
-    await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
+    if (widget._isLocal) {
+      await saveNgmyLocalMenu(userEmail: widget.userEmail, doc: doc);
+    } else {
+      await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
+    }
     if (!mounted) return;
     setState(() => _publishing = false);
 
@@ -277,12 +325,16 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Menu published!'),
+        title: Text(widget._isLocal ? 'Local menu published!' : 'Menu published!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Anyone can open this link — no login required.'),
+            Text(
+              widget._isLocal
+                  ? 'This link is saved on this device only — it will not open on other phones or browsers.'
+                  : 'Anyone can open this link — no login required.',
+            ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -331,6 +383,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       return NgmyBioStudioEditor(
         userEmail: widget.userEmail,
         document: _editingBio!,
+        backend: widget.backend,
         onBack: () => setState(() => _editingBio = null),
         onSaved: _reload,
       );
@@ -365,26 +418,37 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Menu Studio', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -0.5)),
+                      Text(
+                        widget._isLocal
+                            ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly ? 'Local Bio (Test)' : 'Local Menu (Test)')
+                            : 'Menu Studio',
+                        style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -0.5),
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                        'Luxury menus · Bio pages · publish online · QR codes',
+                        widget._isLocal
+                            ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly
+                                ? 'Link-in-bio pages · publish on this device · no cloud'
+                                : 'Restaurant menus · publish on this device · no cloud')
+                            : 'Luxury menus · Bio pages · publish online · QR codes',
                         style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(child: _homeModeChip('Menus', 'menus', t)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _homeModeChip('Bio', 'bio', t)),
-                    ],
+                if (widget.homeFilter == NgmyStudioHomeFilter.all)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(child: _homeModeChip('Menus', 'menus', t)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _homeModeChip('Bio', 'bio', t)),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                if (widget.homeFilter == NgmyStudioHomeFilter.all) const SizedBox(height: 14),
+                if (widget.homeFilter != NgmyStudioHomeFilter.all) const SizedBox(height: 4),
                 if (_homeMode == 'menus') ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -671,7 +735,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   Widget _editor(NgmyHubTheme t) {
     final doc = _editing!;
     final title = doc.restaurantName.trim().isEmpty ? 'New menu' : doc.restaurantName.trim();
-    final qrUrl = doc.publicUrl.isNotEmpty ? doc.publicUrl : ngmyMenuPublicUrlForSlug(doc.slug.isEmpty ? 'preview' : doc.slug);
+    final qrUrl = doc.publicUrl.isNotEmpty
+        ? doc.publicUrl
+        : (widget._isLocal
+            ? ngmyLocalMenuPublicUrlForSlug(doc.slug.isEmpty ? 'preview' : doc.slug)
+            : ngmyMenuPublicUrlForSlug(doc.slug.isEmpty ? 'preview' : doc.slug));
 
     return Material(
       color: t.scaffold,

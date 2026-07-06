@@ -9,6 +9,9 @@ import 'ngmy_paper_trace.dart';
 import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
+import 'ngmy_local_bio_storage.dart';
+import 'ngmy_local_menu_storage.dart';
+import 'ngmy_local_studio.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -23,6 +26,8 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyPaperTraceCount(userEmail: userEmail),
+    ngmyLocalMenuCount(userEmail: userEmail),
+    ngmyLocalBioCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -64,6 +69,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _tasks = 0;
   int _reminders = 0;
   int _traces = 0;
+  int _localMenus = 0;
+  int _localBios = 0;
   bool _loading = true;
 
   @override
@@ -82,6 +89,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyPaperTraceCount(userEmail: widget.userEmail),
+      ngmyLocalMenuCount(userEmail: widget.userEmail),
+      ngmyLocalBioCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -93,6 +102,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _tasks = results[5];
       _reminders = results[6];
       _traces = results[7];
+      _localMenus = results[8];
+      _localBios = results[9];
       _loading = false;
     });
   }
@@ -220,6 +231,20 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                       accent: const Color(0xFFF97316),
                       count: _traces,
                       onTap: () => _openCategory((ctx) => showNgmyPaperTraceDialog(ctx, userEmail: widget.userEmail)),
+                    ),
+                    _CompactCategoryCard(
+                      title: 'Local Menu (Test)',
+                      icon: Icons.restaurant_menu_rounded,
+                      accent: const Color(0xFF0EA5E9),
+                      count: _localMenus,
+                      onTap: () => _openCategory((ctx) => showNgmyLocalMenuStudioDialog(ctx, userEmail: widget.userEmail)),
+                    ),
+                    _CompactCategoryCard(
+                      title: 'Local Bio (Test)',
+                      icon: Icons.link_rounded,
+                      accent: const Color(0xFF6366F1),
+                      count: _localBios,
+                      onTap: () => _openCategory((ctx) => showNgmyLocalBioStudioDialog(ctx, userEmail: widget.userEmail)),
                     ),
                   ],
                 ),

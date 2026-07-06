@@ -9,10 +9,14 @@ import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
 import 'ngmy_bio_storage.dart';
+import 'ngmy_local_bio_publish_registry.dart';
+import 'ngmy_local_bio_storage.dart';
+import 'ngmy_local_bio_urls.dart';
 import 'ngmy_bio_ring_frames.dart';
 import 'ngmy_bio_templates.dart';
 import 'ngmy_bio_urls.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_studio_backend.dart';
 import 'ngmy_bio_qr.dart';
 import 'ngmy_menu_qr.dart' show NgmyMenuQrWidget;
 import 'ngmy_qr_download.dart';
@@ -25,14 +29,18 @@ class NgmyBioStudioEditor extends StatefulWidget {
     super.key,
     required this.userEmail,
     required this.document,
+    this.backend = NgmyStudioPublishBackend.cloud,
     required this.onBack,
     required this.onSaved,
   });
 
   final String userEmail;
   final NgmyBioDocument document;
+  final NgmyStudioPublishBackend backend;
   final VoidCallback onBack;
   final VoidCallback onSaved;
+
+  bool get _isLocal => backend == NgmyStudioPublishBackend.localDevice;
 
   @override
   State<NgmyBioStudioEditor> createState() => _NgmyBioStudioEditorState();
@@ -106,7 +114,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Future<void> _save() async {
     _sync();
-    await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+    if (widget._isLocal) {
+      await saveNgmyLocalBio(userEmail: widget.userEmail, doc: _doc);
+    } else {
+      await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+    }
     widget.onSaved();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bio saved')));
@@ -119,17 +131,30 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       return;
     }
     setState(() => _publishing = true);
-    final slugs = await NgmyBioPublishRegistry.fetchAllSlugs();
+    final slugs = widget._isLocal
+        ? await NgmyLocalBioPublishRegistry.fetchAllSlugs()
+        : await NgmyBioPublishRegistry.fetchAllSlugs();
     if (_doc.slug.isEmpty) {
-      _doc.slug = ngmyBuildUniqueBioSlug(_doc.displayName, slugs);
+      _doc.slug = widget._isLocal
+          ? ngmyBuildUniqueLocalBioSlug(_doc.displayName, slugs)
+          : ngmyBuildUniqueBioSlug(_doc.displayName, slugs);
       _slugC.text = _doc.slug;
     }
-    final err = await NgmyBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson(), createdByEmail: widget.userEmail);
+    final String? err;
+    if (widget._isLocal) {
+      err = await NgmyLocalBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson());
+    } else {
+      err = await NgmyBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson(), createdByEmail: widget.userEmail);
+    }
     if (err == null) {
-      _doc.publicUrl = ngmyBioPublicUrlForSlug(_doc.slug);
+      _doc.publicUrl = widget._isLocal ? ngmyLocalBioPublicUrlForSlug(_doc.slug) : ngmyBioPublicUrlForSlug(_doc.slug);
       _doc.status = 'published';
     }
-    await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+    if (widget._isLocal) {
+      await saveNgmyLocalBio(userEmail: widget.userEmail, doc: _doc);
+    } else {
+      await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+    }
     setState(() => _publishing = false);
     widget.onSaved();
     if (!mounted) return;
@@ -144,7 +169,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     if (url.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Published! Link copied: $url')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        widget._isLocal ? 'Published on this device! Link copied: $url' : 'Published! Link copied: $url',
+      ),
+    ));
   }
 
   void _openFullPreview() {
@@ -212,7 +241,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
-    final qrUrl = _doc.publicUrl.isNotEmpty ? _doc.publicUrl : ngmyBioPublicUrlForSlug(_doc.slug.isEmpty ? 'preview' : _doc.slug);
+    final qrUrl = _doc.publicUrl.isNotEmpty
+        ? _doc.publicUrl
+        : (widget._isLocal
+            ? ngmyLocalBioPublicUrlForSlug(_doc.slug.isEmpty ? 'preview' : _doc.slug)
+            : ngmyBioPublicUrlForSlug(_doc.slug.isEmpty ? 'preview' : _doc.slug));
     final wide = MediaQuery.sizeOf(context).width > 720;
 
     return Material(

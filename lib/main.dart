@@ -42,6 +42,8 @@ import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
 import 'ngmy_bio_guest.dart';
+import 'ngmy_local_menu_guest.dart';
+import 'ngmy_local_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
@@ -406,7 +408,25 @@ void main() async {
   final isGuestPublishedMenu = guestMenuSlug != null && guestMenuSlug.trim().isNotEmpty;
   final guestBioSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu ? ngmyPublishedBioSlugFromLaunch() : null;
   final isGuestPublishedBio = guestBioSlug != null && guestBioSlug.trim().isNotEmpty;
-  final isGuestLink = isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio;
+  final guestLocalMenuSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu && !isGuestPublishedBio
+      ? ngmyPublishedLocalMenuSlugFromLaunch()
+      : null;
+  final isGuestLocalPublishedMenu = guestLocalMenuSlug != null && guestLocalMenuSlug.trim().isNotEmpty;
+  final guestLocalBioSlug = kIsWeb &&
+          !isGuestPublishedApp &&
+          !isGuestPublishedInvoice &&
+          !isGuestPublishedMenu &&
+          !isGuestPublishedBio &&
+          !isGuestLocalPublishedMenu
+      ? ngmyPublishedLocalBioSlugFromLaunch()
+      : null;
+  final isGuestLocalPublishedBio = guestLocalBioSlug != null && guestLocalBioSlug.trim().isNotEmpty;
+  final isGuestLink = isGuestPublishedApp ||
+      isGuestPublishedInvoice ||
+      isGuestPublishedMenu ||
+      isGuestPublishedBio ||
+      isGuestLocalPublishedMenu ||
+      isGuestLocalPublishedBio;
 
   var launchBootstrap = NgmyLaunchBootstrap.empty;
   const deferBootstrapLoad = false;
@@ -491,8 +511,8 @@ void main() async {
     }
   }
 
-  if (isGuestPublishedBio) {
-    // Bio guests load via REST per-slug — paint immediately, init cloud in background.
+  if (isGuestPublishedBio || isGuestLocalPublishedMenu || isGuestLocalPublishedBio) {
+    // Device-local and bio guests load without blocking on Supabase.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 8)));
   } else if (isGuestLink) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
@@ -513,6 +533,14 @@ void main() async {
     }
     if (isGuestPublishedBio) {
       runApp(NgmyGuestPublishedBio(slug: guestBioSlug.trim().toLowerCase()));
+      return;
+    }
+    if (isGuestLocalPublishedMenu) {
+      runApp(NgmyGuestLocalPublishedMenu(slug: guestLocalMenuSlug.trim().toLowerCase()));
+      return;
+    }
+    if (isGuestLocalPublishedBio) {
+      runApp(NgmyGuestLocalPublishedBio(slug: guestLocalBioSlug.trim().toLowerCase()));
       return;
     }
     final app = NGMYApp(launchBootstrap: launchBootstrap, deferBootstrapLoad: deferBootstrapLoad);
