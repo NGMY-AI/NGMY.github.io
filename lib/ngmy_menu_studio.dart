@@ -255,14 +255,16 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       doc.slug = ngmyBuildUniqueMenuSlug(doc.restaurantName, slugs);
       _slugC.text = doc.slug;
     }
-    doc.publicUrl = ngmyMenuPublicUrlForSlug(doc.slug);
-    doc.status = 'published';
 
     final err = await NgmyMenuPublishRegistry.publish(
       slug: doc.slug,
       data: doc.toJson(),
       createdByEmail: widget.userEmail,
     );
+    if (err == null) {
+      doc.publicUrl = ngmyMenuPublicUrlForSlug(doc.slug);
+      doc.status = 'published';
+    }
     await saveNgmyMenu(userEmail: widget.userEmail, doc: doc);
     if (!mounted) return;
     setState(() => _publishing = false);

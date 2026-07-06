@@ -1,13 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_network_resilience.dart';
 import 'ngmy_cloud_policy.dart';
+import 'ngmy_network_resilience.dart';
+import 'ngmy_settings_cloud.dart';
 import 'ngmy_supabase_auth.dart';
-import 'ngmy_supabase_config.dart';
 
 /// Cloud registry for public menu links — https://ngmy.org/menu/{slug}
 ///
@@ -34,22 +31,8 @@ class NgmyMenuPublishRegistry {
     return Map<String, dynamic>.from(value);
   }
 
-  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(String key) async {
-    try {
-      final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings?key=eq.$key&select=value');
-      final resp = await http.get(uri, headers: {
-        'apikey': kNgmySupabaseAnonKey,
-        'Authorization': 'Bearer $kNgmySupabaseAnonKey',
-      }).timeout(_guestFetchTimeout);
-      if (resp.statusCode != 200) return null;
-      final decoded = jsonDecode(resp.body);
-      if (decoded is! List || decoded.isEmpty) return null;
-      return _entryFromSettingsRow(decoded.first);
-    } catch (e) {
-      debugPrint('[menu registry] rest fetch $key: $e');
-      return null;
-    }
-  }
+  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(String key) =>
+      ngmyFetchSettingsValueViaRest(key, timeout: _guestFetchTimeout);
 
   static Future<Map<String, dynamic>?> _fetchRegistryValueViaRest() async {
     return _fetchSettingsRowViaRest(settingsKey);
@@ -80,7 +63,7 @@ class NgmyMenuPublishRegistry {
     if (target.isEmpty) return null;
 
     final perSlug = await _fetchSettingsRowViaRest(_slugSettingsKey(target));
-    if (perSlug != null) return perSlug;
+    if (perSlug != null && perSlug['data'] is Map) return perSlug;
 
     final viaRest = await _fetchRegistryValueViaRest();
     if (viaRest != null) {
@@ -104,14 +87,16 @@ class NgmyMenuPublishRegistry {
           .timeout(_guestFetchTimeout);
       if (row != null) {
         final entry = _entryFromSettingsRow(row);
-        if (entry != null) return entry;
+        if (entry != null && entry['data'] is Map) return entry;
       }
     } catch (e) {
       debugPrint('[menu registry] slug fetch $target: $e');
     }
     final value = await _fetchRegistryValue();
     if (value == null) return null;
-    return _entriesFromValue(value)[target];
+    final entry = _entriesFromValue(value)[target];
+    if (entry != null && entry['data'] is Map) return entry;
+    return null;
   }
 
   static Future<Map<String, dynamic>?> fetchBySlug(String slug) async {
@@ -175,21 +160,25 @@ class NgmyMenuPublishRegistry {
       value['menus'] = entries;
       value['savedAt'] = publishedAt;
 
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _slugSettingsKey(clean),
-          'value': slugPayload,
-          'updated_at': publishedAt,
-        },
-        {
-          'key': settingsKey,
-          'value': value,
-          'updated_at': publishedAt,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return null;
+      final slugKey = _slugSettingsKey(clean);
+      final slugOk = await ngmyUpsertSettingsRowReliable(slugKey, slugPayload, updatedAt: publishedAt);
+      if (!slugOk) {
+        return 'Could not publish menu to cloud. Check connection and try again.';
+      }
+      final indexOk = await ngmyUpsertSettingsRowReliable(settingsKey, value, updatedAt: publishedAt);
+      if (!indexOk) {
+        debugPrint('[menu registry] publish $clean: index row failed after slug row saved');
+      }
+
+      for (var attempt = 0; attempt < 4; attempt++) {
+        final verify = await ngmyFetchSettingsValueViaRest(slugKey, timeout: _guestFetchTimeout);
+        if (verify != null && verify['data'] is Map) return null;
+        if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+      }
+      return 'Menu saved locally but the public link is not live yet. Try Publish again in a few seconds.';
     } catch (e) {
       debugPrint('[menu registry] publish $clean: $e');
+      ngmyInvalidateCloudReachabilityCache();
       return 'Could not publish menu to cloud. Check connection and try again.';
     }
   }

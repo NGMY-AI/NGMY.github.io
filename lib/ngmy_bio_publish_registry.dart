@@ -1,13 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_network_resilience.dart';
 import 'ngmy_cloud_policy.dart';
+import 'ngmy_network_resilience.dart';
+import 'ngmy_settings_cloud.dart';
 import 'ngmy_supabase_auth.dart';
-import 'ngmy_supabase_config.dart';
 
 /// Cloud registry for public Bio links — https://ngmy.org/bio/{slug}
 ///
@@ -27,29 +24,8 @@ class NgmyBioPublishRegistry {
     return entries.map((k, v) => MapEntry(k.toString(), v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{}));
   }
 
-  static Map<String, dynamic>? _entryFromSettingsRow(dynamic row) {
-    if (row is! Map) return null;
-    final value = row['value'];
-    if (value is! Map) return null;
-    return Map<String, dynamic>.from(value);
-  }
-
-  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(String key) async {
-    try {
-      final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings?key=eq.$key&select=value');
-      final resp = await http.get(uri, headers: {
-        'apikey': kNgmySupabaseAnonKey,
-        'Authorization': 'Bearer $kNgmySupabaseAnonKey',
-      }).timeout(_guestFetchTimeout);
-      if (resp.statusCode != 200) return null;
-      final decoded = jsonDecode(resp.body);
-      if (decoded is! List || decoded.isEmpty) return null;
-      return _entryFromSettingsRow(decoded.first);
-    } catch (e) {
-      debugPrint('[bio registry] rest fetch $key: $e');
-      return null;
-    }
-  }
+  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(String key) =>
+      ngmyFetchSettingsValueViaRest(key, timeout: _guestFetchTimeout);
 
   static Future<Map<String, dynamic>?> _fetchRegistryValueViaRest() async {
     return _fetchSettingsRowViaRest(settingsKey);
@@ -79,15 +55,14 @@ class NgmyBioPublishRegistry {
     final target = _normSlug(slug);
     if (target.isEmpty) return null;
 
-    // Fast path — one bio per row (small payload for guests).
     final perSlug = await _fetchSettingsRowViaRest(_slugSettingsKey(target));
-    if (perSlug != null) return perSlug;
+    if (perSlug != null && perSlug['data'] is Map) return perSlug;
 
     // Legacy path — entire registry blob (may be large).
     final viaRest = await _fetchRegistryValueViaRest();
     if (viaRest != null) {
       final entry = _entriesFromValue(viaRest)[target];
-      if (entry != null) return entry;
+      if (entry != null && entry['data'] is Map) return entry;
     }
     return null;
   }
@@ -106,7 +81,10 @@ class NgmyBioPublishRegistry {
           .timeout(_guestFetchTimeout);
       if (row != null) {
         final value = row['value'];
-        if (value is Map) return Map<String, dynamic>.from(value);
+        if (value is Map) {
+          final entry = Map<String, dynamic>.from(value);
+          if (entry['data'] is Map) return entry;
+        }
       }
     } catch (e) {
       debugPrint('[bio registry] supabase slug fetch $target: $e');
@@ -114,7 +92,9 @@ class NgmyBioPublishRegistry {
 
     final value = await _fetchRegistryValue();
     if (value == null) return null;
-    return _entriesFromValue(value)[target];
+    final entry = _entriesFromValue(value)[target];
+    if (entry != null && entry['data'] is Map) return entry;
+    return null;
   }
 
   /// Guest-facing fetch — REST first, short timeout, no double download.
@@ -145,6 +125,10 @@ class NgmyBioPublishRegistry {
     if (clean.isEmpty) return 'Bio needs a link slug before publishing.';
     if (!await ngmyCanReachCloud()) {
       return 'No internet — publish again when online so guests can open your Bio.';
+    }
+    if (!NgmyCloudPolicy.allowNgmySettingsKey(settingsKey) ||
+        !NgmyCloudPolicy.allowNgmySettingsKey(_slugSettingsKey(clean))) {
+      return 'Could not publish Bio to cloud. Try again in a moment.';
     }
     await ngmyWaitForSupabaseReady();
     try {
@@ -182,25 +166,25 @@ class NgmyBioPublishRegistry {
       value['bios'] = entries;
       value['savedAt'] = publishedAt;
 
-      if (!NgmyCloudPolicy.allowNgmySettingsKey(settingsKey) ||
-          !NgmyCloudPolicy.allowNgmySettingsKey(_slugSettingsKey(clean))) {
-        return 'Could not publish Bio to cloud. Try again in a moment.';
+      final slugKey = _slugSettingsKey(clean);
+      final slugOk = await ngmyUpsertSettingsRowReliable(slugKey, slugPayload, updatedAt: publishedAt);
+      if (!slugOk) {
+        return 'Could not publish Bio to cloud. Check connection and try again.';
       }
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _slugSettingsKey(clean),
-          'value': slugPayload,
-          'updated_at': publishedAt,
-        },
-        {
-          'key': settingsKey,
-          'value': value,
-          'updated_at': publishedAt,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return null;
+      final indexOk = await ngmyUpsertSettingsRowReliable(settingsKey, value, updatedAt: publishedAt);
+      if (!indexOk) {
+        debugPrint('[bio registry] publish $clean: index row failed after slug row saved');
+      }
+
+      for (var attempt = 0; attempt < 4; attempt++) {
+        final verify = await ngmyFetchSettingsValueViaRest(slugKey, timeout: _guestFetchTimeout);
+        if (verify != null && verify['data'] is Map) return null;
+        if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+      }
+      return 'Bio saved locally but the public link is not live yet. Try Publish again in a few seconds.';
     } catch (e) {
       debugPrint('[bio registry] publish $clean: $e');
+      ngmyInvalidateCloudReachabilityCache();
       return 'Could not publish Bio to cloud. Check connection and try again.';
     }
   }
