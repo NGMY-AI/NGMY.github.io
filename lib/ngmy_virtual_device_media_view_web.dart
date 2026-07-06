@@ -41,28 +41,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
 
   bool get _showUnmuteHint => widget.startMuted && !_userUnmuted && !_loading && !_failed;
 
-  String _youtubeEmbedFor(String url, {required bool muted}) {
-    final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
-    if (ytId != null) {
-      return NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted);
-    }
-    return url;
-  }
-
   void _applySrc(html.IFrameElement frame, String url) {
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
     final muted = widget.startMuted && !_userUnmuted;
 
     if (ytId != null && widget.useEmbedHtml) {
-      if (widget.notifyOnEnd) {
-        frame
-          ..removeAttribute('src')
-          ..srcdoc = NgmyVirtualDeviceEmbed.youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true);
-      } else {
-        frame
-          ..removeAttribute('srcdoc')
-          ..src = _youtubeEmbedFor(url, muted: muted);
-      }
+      // Direct youtube.com iframe — srcdoc/IFrame API breaks inside HtmlElementView on mobile PWA.
+      frame
+        ..removeAttribute('srcdoc')
+        ..src = NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted);
       return;
     }
 
@@ -228,6 +215,24 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
                     ),
                   ),
                 ),
+              ),
+            ),
+          ),
+        if (!widget.compact && NgmyVirtualDeviceEmbed.extractYouTubeVideoId(widget.playUrl) != null)
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: TextButton.icon(
+              onPressed: () {
+                final id = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(widget.playUrl);
+                if (id == null) return;
+                html.window.open(NgmyVirtualDeviceEmbed.youtubeWatchUrl(id), '_blank');
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 16, color: Colors.white70),
+              label: const Text('Open in YouTube', style: TextStyle(color: Colors.white70, fontSize: 11)),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.black.withValues(alpha: 0.55),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               ),
             ),
           ),

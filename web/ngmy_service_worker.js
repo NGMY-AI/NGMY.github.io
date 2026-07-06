@@ -162,10 +162,8 @@ self.addEventListener('activate', (event) => {
       await self.clients.claim();
       await restoreAllAlarms();
       const clients = await self.clients.matchAll({ type: 'window' });
-      const buildId = CACHE_NAME.replace(CACHE_PREFIX, '');
       for (const client of clients) {
         client.postMessage({ type: 'CACHE_READY' });
-        client.postMessage({ type: 'NGMY_NEW_VERSION', build: buildId });
       }
     })(),
   );

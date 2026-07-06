@@ -409,13 +409,17 @@ void main() async {
   final isGuestLink = isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio;
 
   var launchBootstrap = NgmyLaunchBootstrap.empty;
+  var deferBootstrapLoad = false;
   if (!isGuestLink) {
     if (oauthReturn) {
       await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
       await ngmyRecoverOAuthSessionIfNeeded();
+      launchBootstrap = await ngmyLoadLaunchBootstrap();
+    } else {
+      deferBootstrapLoad = true;
     }
 
-    launchBootstrap = await ngmyLoadLaunchBootstrap();
+    if (!deferBootstrapLoad) {
     final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
     if (launchLoggedOut) {
       try {
@@ -471,11 +475,13 @@ void main() async {
       ngmyMarkSupabaseReady();
     }
 
+    _ngmyInitialThemeMode = launchBootstrap.themeMode;
+    _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
+    }
+
     ngmyCaptureCivicEnrollLaunchIntent();
     ngmyCaptureMediaPostLaunchIntent();
     ngmyCaptureReferralLaunchIntent();
-    _ngmyInitialThemeMode = launchBootstrap.themeMode;
-    _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
   }
 
   Future<void> initSupabase() async {
@@ -513,7 +519,7 @@ void main() async {
       runApp(NgmyGuestPublishedBio(slug: guestBioSlug.trim().toLowerCase()));
       return;
     }
-    final app = NGMYApp(launchBootstrap: launchBootstrap);
+    final app = NGMYApp(launchBootstrap: launchBootstrap, deferBootstrapLoad: deferBootstrapLoad);
     runApp(NgmyWebViewportGuard(child: app));
   }, (e, st) {
     debugPrint('[zone] $e\n$st');
@@ -7406,9 +7412,10 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
 }
 
 class NGMYApp extends StatefulWidget {
-  const NGMYApp({super.key, required this.launchBootstrap});
+  const NGMYApp({super.key, required this.launchBootstrap, this.deferBootstrapLoad = false});
 
   final NgmyLaunchBootstrap launchBootstrap;
+  final bool deferBootstrapLoad;
 
   @override State<NGMYApp> createState() => _NGMYAppState();
 }
@@ -8534,6 +8541,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     NgmyNavigator.install();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
+    if (widget.deferBootstrapLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(() async {
+          final bootstrap = await ngmyLoadLaunchBootstrap();
+          if (!mounted) return;
+          _hydrateFromLaunchBootstrap(bootstrap);
+          _ngmyInitialThemeMode = bootstrap.themeMode;
+          _ngmyApplySystemChromeForThemeMode(bootstrap.themeMode);
+          _scheduleDeferredStartupRebuild();
+        }());
+      });
+    }
     unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -15480,11 +15499,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) {
-      if (!ngmyPreferLightGraphics && !_smokeCtrl.isAnimating) {
-        _smokeCtrl.repeat();
-      }
-      setState(() {});
+    if (state == AppLifecycleState.resumed && mounted && !ngmyPreferLightGraphics) {
+      if (!_smokeCtrl.isAnimating) _smokeCtrl.repeat();
     }
   }
 
@@ -16130,6 +16146,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _aiOrb() {
+    if (ngmyCrispUi) {
+      return Container(
+        width: 112,
+        height: 112,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF67E8F9), Color(0xFF8B5CF6)],
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2.5),
+          boxShadow: const [
+            BoxShadow(color: Color(0x1A8B5CF6), blurRadius: 4, offset: Offset(0, 2)),
+          ],
+        ),
+        child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 42),
+      );
+    }
     return AnimatedBuilder(
             animation: _smokeCtrl,
             builder: (context, _) {

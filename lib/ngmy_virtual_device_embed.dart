@@ -12,8 +12,8 @@ class NgmyVirtualDeviceEmbed {
     return 'https://ngmy.org';
   }
 
-  /// Builds a mobile-friendly YouTube embed URL (nocookie endpoint works in PWA iframes).
-  /// When [useJsApi] is false, omits origin/enablejsapi params so simple iframes play reliably.
+  /// Builds a mobile-friendly YouTube embed URL.
+  /// [useJsApi] adds origin params — only use on direct iframe src, not srcdoc.
   static String youtubeEmbedUrl(
     String videoId, {
     bool autoplay = true,
@@ -21,6 +21,7 @@ class NgmyVirtualDeviceEmbed {
     bool useJsApi = false,
     String? origin,
   }) {
+    final host = useJsApi ? 'https://www.youtube.com' : 'https://www.youtube.com';
     if (!useJsApi) {
       final params = <String>[
         if (autoplay) 'autoplay=1',
@@ -30,7 +31,7 @@ class NgmyVirtualDeviceEmbed {
         'iv_load_policy=3',
         if (muted) 'mute=1',
       ];
-      return 'https://www.youtube-nocookie.com/embed/$videoId?${params.join('&')}';
+      return '$host/embed/$videoId?${params.join('&')}';
     }
     final hostOrigin = origin ?? embedOrigin;
     final params = <String>[
@@ -44,8 +45,10 @@ class NgmyVirtualDeviceEmbed {
       'iv_load_policy=3',
       if (muted) 'mute=1',
     ];
-    return 'https://www.youtube-nocookie.com/embed/$videoId?${params.join('&')}';
+    return '$host/embed/$videoId?${params.join('&')}';
   }
+
+  static String youtubeWatchUrl(String videoId) => 'https://www.youtube.com/watch?v=$videoId';
 
   static String? extractYouTubeVideoId(String url) {
     final m = RegExp(
