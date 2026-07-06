@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_bio_effects.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_social.dart';
 import 'ngmy_bio_templates.dart';
@@ -46,6 +47,14 @@ class NgmyBioPreview extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              if (tpl.sceneEffect != NgmyBioSceneEffect.none && document.backgroundImageBase64.isEmpty)
+                Positioned.fill(
+                  child: NgmyBioSceneLayer(
+                    effect: tpl.sceneEffect,
+                    accent: tpl.accent,
+                    animate: true,
+                  ),
+                ),
               if (document.backgroundImageBase64.isNotEmpty)
                 Positioned.fill(
                   child: Stack(

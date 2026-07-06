@@ -35,87 +35,170 @@ Future<void> ngmyHandleSlidesPdfDownloadResult(BuildContext context, String msg,
 
 Future<void> ngmyShowIosSlidesPdfDialog(BuildContext context, {required String deckName}) async {
   final name = ngmyStagedSlidesPdfName ?? '$deckName.pdf';
-  await showDialog<void>(
+  await showModalBottomSheet<void>(
     context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1A1A2E),
-      title: const Text('Save your PDF', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-      content: Text(
-        'Your presentation PDF is ready.\n\n'
-        '• Tap Download — then choose Save to Files.\n'
-        '• Tap Share to send it to someone.\n'
-        '• Tap Safari to open it in the browser (use Share ↗ at the bottom to save).\n\n'
-        'File: $name',
-        style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            ngmyClearStagedSlidesPdf();
-            Navigator.pop(ctx);
-          },
-          child: const Text('Cancel'),
-        ),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final opened = await ngmyOpenStagedSlidesPdfInSafari();
-            if (!context.mounted) return;
-            if (ctx.mounted) Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  opened
-                      ? 'PDF opened in Safari — tap Share ↗ at the bottom, then Save to Files.'
-                      : 'Could not open in Safari. Try Download instead.',
-                ),
-                duration: const Duration(seconds: 9),
-              ),
-            );
-          },
-          icon: const Icon(Icons.language_rounded, size: 18),
-          label: const Text('Safari'),
-        ),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final shared = await ngmyShareStagedSlidesPdf();
-            if (!context.mounted) return;
-            if (ctx.mounted) Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  shared
-                      ? 'Choose Save to Files or send to someone from the share menu.'
-                      : 'Share unavailable — try Download or Safari.',
-                ),
-                duration: const Duration(seconds: 9),
-              ),
-            );
-          },
-          icon: const Icon(Icons.ios_share_rounded, size: 18),
-          label: const Text('Share'),
-        ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
-          onPressed: () async {
-            final saved = await ngmyDownloadStagedSlidesPdf();
-            if (!context.mounted) return;
-            if (ctx.mounted) Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  saved
-                      ? 'On the next screen, tap Save to Files to keep your PDF.'
-                      : 'Download did not start — try Share or Safari.',
-                ),
-                duration: const Duration(seconds: 9),
-              ),
-            );
-          },
-          icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('Download'),
-        ),
-      ],
-    ),
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    isDismissible: false,
+    builder: (ctx) => _NgmySlidesPdfSaveSheet(fileName: name),
   );
+}
+
+class _NgmySlidesPdfSaveSheet extends StatelessWidget {
+  const _NgmySlidesPdfSaveSheet({required this.fileName});
+
+  final String fileName;
+
+  Future<void> _finish(BuildContext context, Future<bool> Function() action, String okMsg, String failMsg) async {
+    final ok = await action();
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? okMsg : failMsg), duration: const Duration(seconds: 8)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+              decoration: BoxDecoration(
+                color: const Color(0xFF12182A),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 8))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Save your PDF', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 6),
+                  Text(
+                    fileName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _PdfActionTile(
+                          icon: Icons.download_rounded,
+                          label: 'Download',
+                          accent: const Color(0xFFB8860B),
+                          filled: true,
+                          onTap: () => _finish(
+                            context,
+                            ngmyDownloadStagedSlidesPdf,
+                            'Tap Save to Files on the next screen.',
+                            'Download did not start — try Share.',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _PdfActionTile(
+                          icon: Icons.ios_share_rounded,
+                          label: 'Share',
+                          accent: const Color(0xFF2563EB),
+                          onTap: () => _finish(
+                            context,
+                            ngmyShareStagedSlidesPdf,
+                            'Pick Save to Files or send from the share menu.',
+                            'Share unavailable — try Download.',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _PdfActionTile(
+                          icon: Icons.language_rounded,
+                          label: 'Safari',
+                          accent: const Color(0xFF059669),
+                          onTap: () => _finish(
+                            context,
+                            ngmyOpenStagedSlidesPdfInSafari,
+                            'PDF opened — use Share ↗ at the bottom of Safari.',
+                            'Could not open Safari — try Download.',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextButton(
+                    onPressed: () {
+                      ngmyClearStagedSlidesPdf();
+                      Navigator.pop(context);
+                    },
+                    child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PdfActionTile extends StatelessWidget {
+  const _PdfActionTile({
+    required this.icon,
+    required this.label,
+    required this.accent,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            color: filled ? accent.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: filled ? accent.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: filled ? accent : Colors.white, size: 26),
+              const SizedBox(height: 8),
+              Text(label, style: TextStyle(color: Colors.white, fontWeight: filled ? FontWeight.w900 : FontWeight.w700, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

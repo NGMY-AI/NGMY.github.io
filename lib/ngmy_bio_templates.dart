@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_bio_effects.dart';
+
 /// Structural layout — each template uses a distinct shape / composition.
 enum NgmyBioLayoutStyle {
   curvedOverlap,
@@ -53,6 +55,7 @@ class NgmyBioTemplate {
     this.cardRadius = 12,
     this.cardShadow = true,
     this.serifTitle = true,
+    this.sceneEffect = NgmyBioSceneEffect.none,
   });
 
   final String id;
@@ -72,6 +75,7 @@ class NgmyBioTemplate {
   final double cardRadius;
   final bool cardShadow;
   final bool serifTitle;
+  final NgmyBioSceneEffect sceneEffect;
 }
 
 // ── Luxurious rings ─────────────────────────────────────────────────────────
@@ -166,7 +170,7 @@ NgmyBioRingStyle ngmyBioRingById(String id) {
   return kNgmyBioRingStyles.firstWhere((r) => r.id == resolved, orElse: () => kNgmyBioRingStyles.firstWhere((r) => r.id == 'gold'));
 }
 
-// ── 20 unique luxurious templates ───────────────────────────────────────────
+// ── 23 premium bio templates with scene effects ─────────────────────────────
 
 const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
@@ -185,6 +189,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF2C2416), Color(0xFF1A1410)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'wave_ocean',
@@ -202,6 +207,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF0369A1), Color(0xFF0C4A6E)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.oceanRipple,
   ),
   NgmyBioTemplate(
     id: 'outline_wire',
@@ -219,6 +225,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.neonMesh,
   ),
   NgmyBioTemplate(
     id: 'royal_marble',
@@ -255,6 +262,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF6366F1), Color(0xFF7C3AED), Color(0xFF0B0B1A)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.aurora,
   ),
   NgmyBioTemplate(
     id: 'sunset_arc',
@@ -273,6 +281,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFFEA580C), Color(0xFF9A3412)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'velvet_purple',
@@ -291,6 +300,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF4C1D95), Color(0xFF2E1065)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.aurora,
   ),
   NgmyBioTemplate(
     id: 'rose_quartz',
@@ -308,6 +318,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'angular_noir',
@@ -325,6 +336,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.neonMesh,
   ),
   NgmyBioTemplate(
     id: 'glass_float',
@@ -342,6 +354,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.rainBokeh,
   ),
   NgmyBioTemplate(
     id: 'editorial',
@@ -377,6 +390,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'midnight_glow',
@@ -394,6 +408,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.rainBokeh,
   ),
   NgmyBioTemplate(
     id: 'split_gold',
@@ -412,6 +427,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF8B6914), Color(0xFF1A1410)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'pill_modern',
@@ -429,6 +445,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.rain,
   ),
   NgmyBioTemplate(
     id: 'diamond_white',
@@ -465,6 +482,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFFDC2626), Color(0xFF111827)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.neonMesh,
   ),
   NgmyBioTemplate(
     id: 'photo_immersive',
@@ -499,6 +517,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF8B6914), Color(0xFF4A3728)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
   NgmyBioTemplate(
     id: 'ocean_wave',
@@ -516,6 +535,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.oceanRipple,
   ),
   NgmyBioTemplate(
     id: 'classic_curved',
@@ -534,6 +554,62 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     headerGradient: [Color(0xFF374151), Color(0xFF111827)],
     cardRadius: 28,
     cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.neonMesh,
+  ),
+  // ── New premium scene templates ───────────────────────────────────────────
+  NgmyBioTemplate(
+    id: 'rainy_night',
+    name: 'Rainy Night',
+    layout: NgmyBioLayoutStyle.pillStack,
+    pageBg: Color(0xFF010409),
+    pageBgEnd: Color(0xFF0A1628),
+    panelBg: Color(0xFF0A1628),
+    cardBg: Color(0x14FFFFFF),
+    cardBorder: Color(0x30FFFFFF),
+    accent: Color(0xFF22D3EE),
+    titleColor: Colors.white,
+    subtitleColor: Color(0xFFBAE6FD),
+    linkTextColor: Colors.white,
+    linkStyle: NgmyBioLinkStyle.glass,
+    cardRadius: 28,
+    cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.rainBokeh,
+  ),
+  NgmyBioTemplate(
+    id: 'aurora_sky',
+    name: 'Aurora Sky',
+    layout: NgmyBioLayoutStyle.pillStack,
+    pageBg: Color(0xFF050816),
+    pageBgEnd: Color(0xFF1A0B2E),
+    panelBg: Color(0xFF1A0B2E),
+    cardBg: Color(0x16FFFFFF),
+    cardBorder: Color(0x33FFFFFF),
+    accent: Color(0xFF818CF8),
+    titleColor: Colors.white,
+    subtitleColor: Color(0xFFC4B5FD),
+    linkTextColor: Colors.white,
+    linkStyle: NgmyBioLinkStyle.glass,
+    cardRadius: 28,
+    cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.aurora,
+  ),
+  NgmyBioTemplate(
+    id: 'cyber_city',
+    name: 'Cyber City',
+    layout: NgmyBioLayoutStyle.pillStack,
+    pageBg: Color(0xFF020617),
+    pageBgEnd: Color(0xFF0F172A),
+    panelBg: Color(0xFF0F172A),
+    cardBg: Color(0x12FFFFFF),
+    cardBorder: Color(0x28FFFFFF),
+    accent: Color(0xFF06B6D4),
+    titleColor: Colors.white,
+    subtitleColor: Color(0xFF67E8F9),
+    linkTextColor: Colors.white,
+    linkStyle: NgmyBioLinkStyle.glass,
+    cardRadius: 28,
+    cardShadow: false,
+    sceneEffect: NgmyBioSceneEffect.neonMesh,
   ),
 ];
 
@@ -581,6 +657,12 @@ class NgmyBioTemplateThumb extends StatelessWidget {
               color: t.pageBgEnd == null ? t.pageBg : null,
             ),
           ),
+          if (t.sceneEffect != NgmyBioSceneEffect.none)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: NgmyBioScenePainter(effect: t.sceneEffect, accent: t.accent, phase: 0.4),
+              ),
+            ),
           if (t.headerGradient != null)
             Align(
               alignment: Alignment.topCenter,

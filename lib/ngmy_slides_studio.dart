@@ -1563,29 +1563,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(Icons.picture_as_pdf_outlined, color: isDark ? const Color(0xFFB8860B) : const Color(0xFF2563EB)),
-              tooltip: 'Download PDF',
-              onPressed: () async {
-                try {
-                  final msg = await ngmySlidesDownloadDeckPdf(deck);
-                  if (!context.mounted) return;
-                  await ngmyHandleSlidesPdfDownloadResult(context, msg, deckName: deck.name);
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
-                }
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
-              tooltip: 'Project options',
-              onPressed: () => _showDeckActionsSheet(deck, isDark),
-            ),
-          ],
+        trailing: IconButton(
+          icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+          tooltip: 'Project options',
+          onPressed: () => _showDeckActionsSheet(deck, isDark),
         ),
         onTap: () => _openDeck(deck),
       ),
