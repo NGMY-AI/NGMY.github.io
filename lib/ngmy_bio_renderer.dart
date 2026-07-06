@@ -103,6 +103,9 @@ class NgmyBioPreview extends StatelessWidget {
     if (doc.backgroundImageBase64.isNotEmpty && tpl.layout == NgmyBioLayoutStyle.photoImmersive) {
       return const BoxDecoration(color: Colors.black);
     }
+    if (tpl.layout == NgmyBioLayoutStyle.bioSiteClassic) {
+      return BoxDecoration(color: tpl.pageBgEnd ?? tpl.pageBg);
+    }
     if (tpl.pageBgEnd != null) {
       return BoxDecoration(
         gradient: LinearGradient(
@@ -165,6 +168,8 @@ class NgmyBioPreview extends StatelessWidget {
         return _photoImmersive(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.diamondWhite:
         return _diamondWhite(tpl, ring, avatarSize, pad, name, tagline, links);
+      case NgmyBioLayoutStyle.bioSiteClassic:
+        return _bioSiteClassic(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
     }
   }
 
@@ -555,6 +560,160 @@ class NgmyBioPreview extends StatelessWidget {
       belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 12 : 16),
     );
   }
+
+  /// bio.site reference — upward curve through avatar center, white body, left-aligned links.
+  Widget _bioSiteClassic(
+    NgmyBioTemplate tpl,
+    NgmyBioRingStyle ring,
+    double avatarSize,
+    double pad,
+    String name,
+    String tagline,
+    List<NgmyBioLink> links, {
+    double minPageHeight = 0,
+  }) {
+    final headerH = compact ? 172.0 : 228.0;
+    final curveDepth = compact ? 52.0 : 68.0;
+    final bodyColor = tpl.pageBgEnd ?? tpl.pageBg;
+    final avatarCenterY = headerH - curveDepth * 0.5;
+    final avatarTop = avatarCenterY - avatarSize * 0.5;
+    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 10 : 14);
+    final bodyTop = headerH - curveDepth;
+    final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
+
+    final stack = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: bodyTop,
+          left: 0,
+          right: 0,
+          child: ClipPath(
+            clipper: _BioSiteBodyTopClipper(curveDepth: curveDepth),
+            child: ColoredBox(
+              color: bodyColor,
+              child: SizedBox(width: double.infinity, height: bodyHeight),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: headerH,
+          width: double.infinity,
+          child: ClipPath(
+            clipper: _BioSiteHeaderBottomClipper(curveDepth: curveDepth),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _headerImageOrGradient(tpl, headerH),
+                _headerEffectOverlay(tpl),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          top: avatarTop,
+          left: 0,
+          right: 0,
+          child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+        ),
+        Positioned(
+          top: contentTop,
+          left: pad,
+          right: pad,
+          bottom: minPageHeight > 0 ? pad : null,
+          child: _bioSiteBelowAvatar(tpl, name, tagline, links, pad, minPageHeight: minPageHeight),
+        ),
+      ],
+    );
+
+    if (minPageHeight <= 0) return stack;
+    return SizedBox(height: minPageHeight, width: double.infinity, child: stack);
+  }
+
+  Widget _bioSiteBelowAvatar(
+    NgmyBioTemplate tpl,
+    String name,
+    String tagline,
+    List<NgmyBioLink> links,
+    double pad, {
+    double minPageHeight = 0,
+  }) {
+    final intro = Column(
+      children: [
+        _bioSiteNameBlock(tpl, name, tagline),
+        SizedBox(height: compact ? 16 : 22),
+      ],
+    );
+    if (minPageHeight <= 0) {
+      return Column(
+        children: [
+          intro,
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        intro,
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _framedLinks(links, tpl, pad),
+                SizedBox(height: math.max(120.0, minPageHeight * 0.15)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _bioSiteNameBlock(NgmyBioTemplate tpl, String name, String tagline) {
+    return Column(
+      children: [
+        Text(
+          name,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compact ? 22 : 28,
+            fontWeight: FontWeight.w800,
+            color: tpl.titleColor,
+            letterSpacing: -0.3,
+            height: 1.1,
+          ),
+        ),
+        if (tagline.isNotEmpty) ...[
+          SizedBox(height: compact ? 6 : 8),
+          Text(
+            tagline.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: compact ? 11 : 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 1.4,
+              color: tpl.subtitleColor,
+            ),
+          ),
+        ],
+        if (document.socialLinks.hasAny) ...[
+          SizedBox(height: compact ? 10 : 12),
+          NgmyBioSocialRow(
+            links: document.socialLinks,
+            compact: compact,
+            lightBackground: true,
+          ),
+        ],
+      ],
+    );
+  }
+
+  bool _isBioSiteLayout(NgmyBioTemplate tpl) => tpl.layout == NgmyBioLayoutStyle.bioSiteClassic;
 
   Widget _angularHero(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
     final headerH = compact ? 100.0 : 130.0;
@@ -1008,9 +1167,10 @@ class NgmyBioPreview extends StatelessWidget {
   Widget _linkCard(NgmyBioLink link, NgmyBioTemplate tpl) {
     final rawTitle = link.title.trim().isEmpty ? 'Link' : link.title.trim();
     final isDark = _isDarkBg(tpl.pageBg);
-    final isGlass = tpl.linkStyle == NgmyBioLinkStyle.glass || tpl.linkStyle == NgmyBioLinkStyle.pill || tpl.linkStyle == NgmyBioLinkStyle.neonOutline;
-    final usePill = isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
-    final radius = usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0);
+    final bioSite = _isBioSiteLayout(tpl);
+    final isGlass = !bioSite && (tpl.linkStyle == NgmyBioLinkStyle.glass || tpl.linkStyle == NgmyBioLinkStyle.pill || tpl.linkStyle == NgmyBioLinkStyle.neonOutline);
+    final usePill = bioSite || isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
+    final radius = bioSite ? 14.0 : (usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0));
     final compactPad = compact;
     final thumbSize = compactPad ? 36.0 : 42.0;
     final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
@@ -1035,18 +1195,18 @@ class NgmyBioPreview extends StatelessWidget {
             displayTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+            textAlign: bioSite ? TextAlign.left : TextAlign.center,
             style: TextStyle(
-              fontFamily: tpl.serifTitle ? 'Georgia' : null,
+              fontFamily: bioSite ? 'Georgia' : (tpl.serifTitle ? 'Georgia' : null),
               fontSize: compactPad ? 12 : 14,
               fontWeight: FontWeight.w700,
-              letterSpacing: isGlass && isDark ? 0.6 : 0,
+              letterSpacing: isGlass && isDark ? 0.6 : (bioSite ? 0.15 : 0),
               height: 1.2,
               color: tpl.linkTextColor,
             ),
           ),
         ),
-        SizedBox(width: thumbSize),
+        if (!bioSite) SizedBox(width: thumbSize),
       ],
     );
 
@@ -1083,6 +1243,17 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   BoxDecoration _linkDecoration(NgmyBioTemplate tpl, double radius) {
+    if (_isBioSiteLayout(tpl)) {
+      return BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(radius.clamp(8.0, 20.0)),
+        border: Border.all(color: const Color(0xFFE8ECF1), width: 1),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 2, offset: const Offset(0, 1)),
+        ],
+      );
+    }
     switch (tpl.linkStyle) {
       case NgmyBioLinkStyle.glass:
       case NgmyBioLinkStyle.pill:
@@ -1164,6 +1335,46 @@ class _BioLinkTapState extends State<_BioLinkTap> {
       ),
     );
   }
+}
+
+class _BioSiteHeaderBottomClipper extends CustomClipper<Path> {
+  _BioSiteHeaderBottomClipper({this.curveDepth = 64});
+
+  final double curveDepth;
+
+  @override
+  Path getClip(Size size) {
+    final sideY = size.height;
+    final peakY = size.height - curveDepth;
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, sideY)
+      ..quadraticBezierTo(size.width * 0.5, peakY, 0, sideY)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant _BioSiteHeaderBottomClipper old) => old.curveDepth != curveDepth;
+}
+
+class _BioSiteBodyTopClipper extends CustomClipper<Path> {
+  _BioSiteBodyTopClipper({this.curveDepth = 64});
+
+  final double curveDepth;
+
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(0, curveDepth)
+      ..quadraticBezierTo(size.width * 0.5, 0, size.width, curveDepth)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant _BioSiteBodyTopClipper old) => old.curveDepth != curveDepth;
 }
 
 class _NgmyBioHeaderCurveClipper extends CustomClipper<Path> {

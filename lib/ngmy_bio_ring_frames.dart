@@ -27,7 +27,7 @@ class _NgmyBioRingFrameState extends State<NgmyBioRingFrame> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tick = AnimationController(vsync: this, duration: const Duration(milliseconds: 4800))..repeat();
+    _tick = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat();
   }
 
   @override
@@ -40,7 +40,7 @@ class _NgmyBioRingFrameState extends State<NgmyBioRingFrame> with SingleTickerPr
   Widget build(BuildContext context) {
     if (widget.ringId == 'none') return widget.child;
 
-    final pad = widget.size * 0.11;
+    final pad = widget.size * 0.18;
     final outer = widget.size + pad * 2;
     return SizedBox(
       width: outer,
@@ -78,80 +78,98 @@ class NgmyBioRingFramePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final o = Offset(size.width / 2, size.height / 2);
     final r = coreSize / 2;
+    const boost = 1.55;
+    double ringR(double extra) => r + extra * boost;
+    double ringW(double w) => w * boost;
+
     switch (ringId) {
       case 'none':
         break;
       case 'white':
-        _luxBand(canvas, o, r + 3, [Colors.white, const Color(0xFFF1F5F9)], 3);
-        _softShadow(canvas, o, r + 4, Colors.black.withValues(alpha: 0.12));
+        _vibePulse(canvas, o, ringR(5), Colors.white.withValues(alpha: 0.35), phase);
+        _luxBand(canvas, o, ringR(4), [Colors.white, const Color(0xFFF1F5F9), Colors.white], ringW(4.5));
+        _softShadow(canvas, o, ringR(6), Colors.black.withValues(alpha: 0.14));
       case 'gold':
-        _luxBand(canvas, o, r + 4, const [Color(0xFFFFF8DC), Color(0xFFD4AF37), Color(0xFF8B6914)], 3.5);
-        _shimmerArc(canvas, o, r + 5, const Color(0xFFFFF3C4));
+        _warmPulse(canvas, o, ringR(7), const Color(0xFFD4AF37));
+        _luxBand(canvas, o, ringR(5), const [Color(0xFFFFF8DC), Color(0xFFD4AF37), Color(0xFF8B6914), Color(0xFFD4AF37)], ringW(5));
+        _shimmerArc(canvas, o, ringR(6), const Color(0xFFFFF3C4), ringW(3));
       case 'silver':
-        _luxBand(canvas, o, r + 4, const [Color(0xFFF8FAFC), Color(0xFFCBD5E1), Color(0xFF64748B)], 3);
-        _luxBand(canvas, o, r + 1.5, const [Color(0xFFFFFFFF), Color(0xFFE2E8F0)], 1.5);
+        _vibePulse(canvas, o, ringR(6), const Color(0xFFCBD5E1), phase);
+        _luxBand(canvas, o, ringR(5), const [Color(0xFFF8FAFC), Color(0xFFCBD5E1), Color(0xFF64748B), Color(0xFFE2E8F0)], ringW(4.5));
+        _luxBand(canvas, o, ringR(2), const [Color(0xFFFFFFFF), Color(0xFFE2E8F0)], ringW(2));
       case 'rose_gold':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFFFF1F2), Color(0xFFE8B4B8), Color(0xFFB76E79)], 3);
-        _pearlDots(canvas, o, r + 6, 6, const Color(0xFFFDF2F8));
+        _warmPulse(canvas, o, ringR(7), const Color(0xFFE8B4B8));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFFF1F2), Color(0xFFE8B4B8), Color(0xFFB76E79)], ringW(4.5));
+        _pearlDots(canvas, o, ringR(8), 8, const Color(0xFFFDF2F8), phase);
       case 'emerald':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFA7F3D0), Color(0xFF059669), Color(0xFF064E3B)], 3);
-        _gemFacet(canvas, o, r + 5, const Color(0xFF34D399));
+        _warmPulse(canvas, o, ringR(7), const Color(0xFF34D399));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFA7F3D0), Color(0xFF059669), Color(0xFF064E3B)], ringW(4.5));
+        _gemFacet(canvas, o, ringR(6.5), const Color(0xFF34D399));
       case 'midnight':
-        _glowRing(canvas, o, r + 3, const Color(0xFF6366F1), 0.35);
-        _luxBand(canvas, o, r + 3, const [Color(0xFF1E293B), Color(0xFF0F172A)], 2.5);
+        _glowRing(canvas, o, ringR(6), const Color(0xFF6366F1), 0.35 + math.sin(phase * math.pi * 2) * 0.12);
+        _luxBand(canvas, o, ringR(4), const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF312E81)], ringW(4));
       case 'double':
-        _stroke(canvas, o, r + 6, Colors.white.withValues(alpha: 0.9), 1.8);
-        _stroke(canvas, o, r + 2.5, Colors.white.withValues(alpha: 0.7), 1.8);
+        _vibePulse(canvas, o, ringR(8), Colors.white.withValues(alpha: 0.5), phase);
+        _stroke(canvas, o, ringR(7), Colors.white.withValues(alpha: 0.95), ringW(2.5));
+        _stroke(canvas, o, ringR(3), Colors.white.withValues(alpha: 0.8), ringW(2.5));
       case 'ornate':
-        _braidRing(canvas, o, r + 4, const Color(0xFFD4AF37));
-        _pearlDots(canvas, o, r + 7, 8, const Color(0xFFFFF8E7));
+        _braidRing(canvas, o, ringR(5), const Color(0xFFD4AF37), ringW(1.8));
+        _pearlDots(canvas, o, ringR(9), 10, const Color(0xFFFFF8E7), phase);
       case 'thin_gold':
-        _stroke(canvas, o, r + 2, const Color(0xFFD4AF37), 1.2);
-        _shimmerArc(canvas, o, r + 2.5, const Color(0xFFD4AF37));
+        _glowRing(canvas, o, ringR(5), const Color(0xFFD4AF37), 0.25 + math.sin(phase * math.pi * 2) * 0.15);
+        _stroke(canvas, o, ringR(3), const Color(0xFFD4AF37), ringW(2.5));
+        _shimmerArc(canvas, o, ringR(3.5), const Color(0xFFD4AF37), ringW(3));
       case 'glow_blue':
-        _glowRing(canvas, o, r + 5, const Color(0xFF38BDF8), 0.45 + math.sin(phase * math.pi * 2) * 0.1);
-        _stroke(canvas, o, r + 2.5, const Color(0xFF38BDF8), 1.5);
+        _glowRing(canvas, o, ringR(7), const Color(0xFF38BDF8), 0.45 + math.sin(phase * math.pi * 2) * 0.15);
+        _stroke(canvas, o, ringR(3.5), const Color(0xFF38BDF8), ringW(2.5));
+        _rainbowWaves(canvas, o, ringR(9), phase, const Color(0xFF38BDF8));
       case 'sapphire':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFDBEAFE), Color(0xFF2563EB), Color(0xFF1E3A8A)], 3);
-        _cardinalGems(canvas, o, r + 5, const Color(0xFF3B82F6));
+        _shimmerArc(canvas, o, ringR(6), const Color(0xFF93C5FD), ringW(3));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFDBEAFE), Color(0xFF2563EB), Color(0xFF1E3A8A)], ringW(4.5));
+        _cardinalGems(canvas, o, ringR(6.5), const Color(0xFF3B82F6));
       case 'amethyst':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFEDE9FE), Color(0xFF8B5CF6), Color(0xFF5B21B6)], 3);
-        _orbitBeads(canvas, o, r + 7, 5, const Color(0xFFC4B5FD));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFEDE9FE), Color(0xFF8B5CF6), Color(0xFF5B21B6)], ringW(4.5));
+        _orbitBeads(canvas, o, ringR(9), 6, const Color(0xFFC4B5FD), phase);
       case 'fire':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFFEF3C7), Color(0xFFF97316), Color(0xFFDC2626)], 3);
-        _warmPulse(canvas, o, r + 5, const Color(0xFFFB923C));
+        _warmPulse(canvas, o, ringR(8), const Color(0xFFFB923C));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFEF3C7), Color(0xFFF97316), Color(0xFFDC2626)], ringW(4.5));
       case 'ice':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFF0F9FF), Color(0xFF7DD3FC), Color(0xFF0284C7)], 2.5);
-        _frostSparkle(canvas, o, r + 5, const Color(0xFFBAE6FD));
+        _frostSparkle(canvas, o, ringR(7), const Color(0xFFBAE6FD), phase);
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFF0F9FF), Color(0xFF7DD3FC), Color(0xFF0284C7)], ringW(4));
       case 'rainbow':
-        _spectrumRing(canvas, o, r + 4);
+        _rainbowWaves(canvas, o, ringR(10), phase);
+        _spectrumRingRotating(canvas, o, ringR(5.5), phase, ringW(5.5));
       case 'neon_pink':
-        _glowRing(canvas, o, r + 5, const Color(0xFFEC4899), 0.4);
-        _stroke(canvas, o, r + 3, const Color(0xFFEC4899), 2);
+        _glowRing(canvas, o, ringR(7), const Color(0xFFEC4899), 0.4 + math.sin(phase * math.pi * 2) * 0.2);
+        _stroke(canvas, o, ringR(4), const Color(0xFFEC4899), ringW(3));
+        _rainbowWaves(canvas, o, ringR(9), phase, const Color(0xFFEC4899));
       case 'sunburst':
-        _fineRays(canvas, o, r + 5, 24, const Color(0xFFF59E0B));
-        _luxBand(canvas, o, r + 3, const [Color(0xFFFDE68A), Color(0xFFD97706)], 2);
+        _fineRays(canvas, o, ringR(6), 28, const Color(0xFFF59E0B), phase);
+        _luxBand(canvas, o, ringR(4), const [Color(0xFFFDE68A), Color(0xFFD97706)], ringW(3.5));
       case 'moonlight':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFE2E8F0), Color(0xFF94A3B8), Color(0xFF475569)], 2.5);
-        _glowRing(canvas, o, r + 6, const Color(0xFFCBD5E1), 0.25);
+        _moonlightRing(canvas, o, ringR(5), phase);
       case 'olive':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFECFCCB), Color(0xFF65A30D), Color(0xFF365314)], 3);
+        _vibePulse(canvas, o, ringR(6), const Color(0xFF84CC16), phase);
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFECFCCB), Color(0xFF65A30D), Color(0xFF365314)], ringW(4.5));
       case 'coral':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFFFE4E6), Color(0xFFFB7185), Color(0xFFE11D48)], 3);
-        _softShadow(canvas, o, r + 4, const Color(0xFFFDA4AF).withValues(alpha: 0.3));
+        _warmPulse(canvas, o, ringR(7), const Color(0xFFFB7185));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFFE4E6), Color(0xFFFB7185), Color(0xFFE11D48)], ringW(4.5));
       case 'lavender':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFF5F3FF), Color(0xFFC4B5FD), Color(0xFF7C3AED)], 3);
-        _shimmerArc(canvas, o, r + 4.5, const Color(0xFFDDD6FE));
+        _shimmerArc(canvas, o, ringR(6), const Color(0xFFDDD6FE), ringW(3));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFF5F3FF), Color(0xFFC4B5FD), Color(0xFF7C3AED)], ringW(4.5));
       case 'bronze':
-        _luxBand(canvas, o, r + 3.5, const [Color(0xFFFEF3C7), Color(0xFFB45309), Color(0xFF78350F)], 3);
-        _microStuds(canvas, o, r + 4.5, 12, const Color(0xFFFDE68A));
+        _vibePulse(canvas, o, ringR(6), const Color(0xFFB45309), phase);
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFEF3C7), Color(0xFFB45309), Color(0xFF78350F)], ringW(4.5));
+        _microStuds(canvas, o, ringR(6), 14, const Color(0xFFFDE68A));
       case 'carbon':
-        _stroke(canvas, o, r + 3, const Color(0xFF3F3F46), 2.5);
-        _stroke(canvas, o, r + 5.5, const Color(0xFF71717A), 1);
+        _vibePulse(canvas, o, ringR(6), const Color(0xFF71717A), phase);
+        _stroke(canvas, o, ringR(4), const Color(0xFF3F3F46), ringW(3.5));
+        _stroke(canvas, o, ringR(7), const Color(0xFF71717A), ringW(2));
       case 'holo':
-        _holoBand(canvas, o, r + 4, phase);
+        _holoBand(canvas, o, ringR(5), phase, ringW(5));
       default:
-        _stroke(canvas, o, r + 2.5, accent, 2);
+        _vibePulse(canvas, o, ringR(5), accent, phase);
+        _stroke(canvas, o, ringR(3.5), accent, ringW(3));
     }
   }
 
@@ -185,24 +203,25 @@ class NgmyBioRingFramePainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
   }
 
-  void _shimmerArc(Canvas c, Offset o, double radius, Color color) {
+  void _shimmerArc(Canvas c, Offset o, double radius, Color color, [double strokeW = 2.5]) {
     c.drawArc(
       Rect.fromCircle(center: o, radius: radius),
       phase * math.pi * 2,
-      math.pi * 0.4,
+      math.pi * 0.45,
       false,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = color.withValues(alpha: 0.85),
+        ..strokeWidth = strokeW
+        ..color = color.withValues(alpha: 0.9),
     );
   }
 
-  void _pearlDots(Canvas c, Offset o, double radius, int n, Color color) {
+  void _pearlDots(Canvas c, Offset o, double radius, int n, Color color, [double animPhase = 0]) {
     for (var i = 0; i < n; i++) {
-      final a = (i / n) * math.pi * 2 - math.pi / 2;
+      final a = (i / n) * math.pi * 2 - math.pi / 2 + animPhase * math.pi * 0.5;
       final p = o + Offset(math.cos(a) * radius, math.sin(a) * radius);
-      c.drawCircle(p, 2, Paint()..color = color);
+      final dot = 2.5 + math.sin(animPhase * math.pi * 2 + i) * 0.6;
+      c.drawCircle(p, dot, Paint()..color = color);
     }
   }
 
@@ -215,9 +234,9 @@ class NgmyBioRingFramePainter extends CustomPainter {
     }
   }
 
-  void _braidRing(Canvas c, Offset o, double radius, Color color) {
+  void _braidRing(Canvas c, Offset o, double radius, Color color, [double w = 1.2]) {
     for (var i = 0; i < 3; i++) {
-      _stroke(c, o, radius + i * 1.8, color.withValues(alpha: 0.7 - i * 0.15), 1.2);
+      _stroke(c, o, radius + i * 2.2, color.withValues(alpha: 0.75 - i * 0.12), w);
     }
   }
 
@@ -229,11 +248,11 @@ class NgmyBioRingFramePainter extends CustomPainter {
     }
   }
 
-  void _orbitBeads(Canvas c, Offset o, double radius, int n, Color color) {
+  void _orbitBeads(Canvas c, Offset o, double radius, int n, Color color, [double animPhase = 0]) {
     for (var i = 0; i < n; i++) {
-      final a = phase * math.pi * 2 + (i / n) * math.pi * 2;
+      final a = animPhase * math.pi * 2 + (i / n) * math.pi * 2;
       final p = o + Offset(math.cos(a) * radius, math.sin(a) * radius);
-      c.drawCircle(p, 2.2, Paint()..color = color);
+      c.drawCircle(p, 3, Paint()..color = color);
     }
   }
 
@@ -242,34 +261,97 @@ class NgmyBioRingFramePainter extends CustomPainter {
     _glowRing(c, o, radius, color, a);
   }
 
-  void _frostSparkle(Canvas c, Offset o, double radius, Color color) {
-    for (var i = 0; i < 6; i++) {
-      final a = (i / 6) * math.pi * 2 + phase;
+  void _frostSparkle(Canvas c, Offset o, double radius, Color color, [double animPhase = 0]) {
+    for (var i = 0; i < 8; i++) {
+      final a = (i / 8) * math.pi * 2 + animPhase * math.pi * 2;
       final p = o + Offset(math.cos(a) * radius, math.sin(a) * radius);
-      c.drawCircle(p, 1.5, Paint()..color = color.withValues(alpha: 0.8));
+      c.drawCircle(p, 2 + math.sin(animPhase * math.pi * 4 + i) * 0.8, Paint()..color = color.withValues(alpha: 0.9));
     }
   }
 
-  void _spectrumRing(Canvas c, Offset o, double radius) {
-    const colors = [Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFEAB308), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFF8B5CF6)];
-    final rect = Rect.fromCircle(center: o, radius: radius);
-    for (var i = 0; i < colors.length; i++) {
-      c.drawArc(rect, (i / colors.length) * math.pi * 2, math.pi * 2 / colors.length, false, Paint()
+  void _vibePulse(Canvas c, Offset o, double radius, Color color, double animPhase) {
+    final a = 0.12 + (math.sin(animPhase * math.pi * 2) + 1) * 0.14;
+    _glowRing(c, o, radius, color, a);
+  }
+
+  void _rainbowWaves(Canvas c, Offset o, double radius, double animPhase, [Color? tint]) {
+    for (var i = 0; i < 3; i++) {
+      final wave = radius + i * 4 + math.sin(animPhase * math.pi * 2 + i) * 2;
+      final alpha = 0.35 - i * 0.08;
+      c.drawCircle(
+        o,
+        wave,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = (tint ?? const Color(0xFF8B5CF6)).withValues(alpha: alpha),
+      );
+    }
+  }
+
+  void _spectrumRingRotating(Canvas c, Offset o, double radius, double animPhase, double strokeW) {
+    c.drawCircle(
+      o,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW
+        ..shader = SweepGradient(
+          colors: const [
+            Color(0xFFEF4444),
+            Color(0xFFF97316),
+            Color(0xFFEAB308),
+            Color(0xFF22C55E),
+            Color(0xFF3B82F6),
+            Color(0xFF8B5CF6),
+            Color(0xFFEC4899),
+            Color(0xFFEF4444),
+          ],
+          transform: GradientRotation(animPhase * math.pi * 2),
+        ).createShader(Rect.fromCircle(center: o, radius: radius + strokeW)),
+    );
+  }
+
+  void _moonlightRing(Canvas c, Offset o, double radius, double animPhase) {
+    final pulse = 0.2 + math.sin(animPhase * math.pi * 2) * 0.15;
+    _glowRing(c, o, radius + 10, const Color(0xFF94A3B8), pulse);
+    _glowRing(c, o, radius + 6, const Color(0xFFE2E8F0), pulse * 0.7);
+    _luxBand(
+      c,
+      o,
+      radius,
+      const [Color(0xFFFFFFFF), Color(0xFFCBD5E1), Color(0xFF64748B), Color(0xFFCBD5E1), Color(0xFFFFFFFF)],
+      5,
+    );
+    final moonR = radius + 7;
+    final moonCenter = o + Offset(math.cos(animPhase * math.pi * 2) * 2, math.sin(animPhase * math.pi * 2) * 2);
+    c.drawArc(
+      Rect.fromCircle(center: moonCenter, radius: moonR),
+      -math.pi * 0.35,
+      math.pi * 1.1,
+      false,
+      Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3
-        ..color = colors[i]);
+        ..color = const Color(0xFFF8FAFC).withValues(alpha: 0.9),
+    );
+    for (var i = 0; i < 5; i++) {
+      final a = animPhase * math.pi * 2 + (i / 5) * math.pi * 2;
+      final p = o + Offset(math.cos(a) * (radius + 12), math.sin(a) * (radius + 12));
+      c.drawCircle(p, 1.8, Paint()..color = const Color(0xFFF1F5F9).withValues(alpha: 0.7 + math.sin(a * 3) * 0.2));
     }
   }
 
-  void _fineRays(Canvas c, Offset o, double radius, int rays, Color color) {
+  void _fineRays(Canvas c, Offset o, double radius, int rays, Color color, [double animPhase = 0]) {
     for (var i = 0; i < rays; i++) {
-      final a = (i / rays) * math.pi * 2;
+      final a = (i / rays) * math.pi * 2 + animPhase * math.pi * 0.25;
+      final len = 6 + math.sin(animPhase * math.pi * 2 + i) * 2;
       c.drawLine(
         o + Offset(math.cos(a) * (radius - 2), math.sin(a) * (radius - 2)),
-        o + Offset(math.cos(a) * (radius + 6), math.sin(a) * (radius + 6)),
+        o + Offset(math.cos(a) * (radius + len), math.sin(a) * (radius + len)),
         Paint()
-          ..strokeWidth = 1
-          ..color = color.withValues(alpha: 0.35),
+          ..strokeWidth = 1.2
+          ..color = color.withValues(alpha: 0.35 + math.sin(animPhase * math.pi * 2 + i) * 0.15),
       );
     }
   }
@@ -282,18 +364,19 @@ class NgmyBioRingFramePainter extends CustomPainter {
     }
   }
 
-  void _holoBand(Canvas c, Offset o, double radius, double t) {
+  void _holoBand(Canvas c, Offset o, double radius, double t, [double strokeW = 3]) {
     c.drawCircle(
       o,
       radius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
+        ..strokeWidth = strokeW
         ..shader = SweepGradient(
           colors: const [Color(0xFF22D3EE), Color(0xFFA78BFA), Color(0xFFF472B6), Color(0xFFFBBF24), Color(0xFF22D3EE)],
           transform: GradientRotation(t * math.pi * 2),
         ).createShader(Rect.fromCircle(center: o, radius: radius)),
     );
+    _glowRing(c, o, radius + 4, const Color(0xFF22D3EE), 0.15 + math.sin(t * math.pi * 2) * 0.1);
   }
 
   @override

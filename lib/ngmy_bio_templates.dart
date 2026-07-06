@@ -25,6 +25,7 @@ enum NgmyBioLayoutStyle {
   boldStripe,
   photoImmersive,
   diamondWhite,
+  bioSiteClassic,
 }
 
 enum NgmyBioLinkStyle { rowIcon, outline, pill, goldBar, minimalLine, glass, neonOutline }
@@ -494,7 +495,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
     id: 'editorial',
     name: 'Clean Studio',
-    layout: NgmyBioLayoutStyle.marbleCream,
+    layout: NgmyBioLayoutStyle.bioSiteClassic,
     pageBg: Color(0xFFFFFFFF),
     pageBgEnd: Color(0xFFF8FAFC),
     panelBg: Color(0xFFFFFFFF),
@@ -586,7 +587,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
     id: 'diamond_white',
     name: 'Pure Light',
-    layout: NgmyBioLayoutStyle.marbleCream,
+    layout: NgmyBioLayoutStyle.bioSiteClassic,
     pageBg: Color(0xFFFFFFFF),
     pageBgEnd: Color(0xFFF8FAFC),
     panelBg: Color(0xFFFFFFFF),
@@ -771,7 +772,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
     id: 'pearl_marble',
     name: 'Pearl Curve',
-    layout: NgmyBioLayoutStyle.curvedOverlap,
+    layout: NgmyBioLayoutStyle.bioSiteClassic,
     pageBg: Color(0xFFFFFBF5),
     pageBgEnd: Color(0xFFF5F0E8),
     panelBg: Color(0xFFFFFBF5),
@@ -781,7 +782,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     titleColor: Color(0xFF292524),
     subtitleColor: Color(0xFF78716C),
     linkTextColor: Color(0xFF44403C),
-    linkStyle: NgmyBioLinkStyle.glass,
+    linkStyle: NgmyBioLinkStyle.pill,
     headerGradient: [Color(0xFFD6D3D1), Color(0xFFF5F0E8)],
     cardRadius: 28,
     cardShadow: false,
@@ -790,7 +791,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
     id: 'silver_mist',
     name: 'Platinum Mist',
-    layout: NgmyBioLayoutStyle.curvedOverlap,
+    layout: NgmyBioLayoutStyle.bioSiteClassic,
     pageBg: Color(0xFFF1F5F9),
     pageBgEnd: Color(0xFFE2E8F0),
     panelBg: Color(0xFFF1F5F9),
@@ -800,7 +801,7 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     titleColor: Color(0xFF0F172A),
     subtitleColor: Color(0xFF64748B),
     linkTextColor: Color(0xFF334155),
-    linkStyle: NgmyBioLinkStyle.glass,
+    linkStyle: NgmyBioLinkStyle.pill,
     headerGradient: [Color(0xFF94A3B8), Color(0xFFCBD5E1), Color(0xFFF1F5F9)],
     cardRadius: 28,
     cardShadow: false,
@@ -889,7 +890,8 @@ class NgmyBioTemplateThumb extends StatelessWidget {
           if (t.layout == NgmyBioLayoutStyle.curvedOverlap ||
               t.layout == NgmyBioLayoutStyle.waveHeader ||
               t.layout == NgmyBioLayoutStyle.sunsetArc ||
-              t.layout == NgmyBioLayoutStyle.marbleCream)
+              t.layout == NgmyBioLayoutStyle.marbleCream ||
+              t.layout == NgmyBioLayoutStyle.bioSiteClassic)
             Positioned(
               top: size * 0.28,
               left: 0,
@@ -964,8 +966,8 @@ class _CurvedPanelPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
     final path = Path()
-      ..moveTo(0, size.height * 0.42)
-      ..quadraticBezierTo(size.width * 0.5, size.height * 0.56, size.width, size.height * 0.42)
+      ..moveTo(0, size.height * 0.45)
+      ..quadraticBezierTo(size.width * 0.5, 0, size.width, size.height * 0.45)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
