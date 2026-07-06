@@ -142,10 +142,11 @@ class NgmySlideElementView extends StatelessWidget {
   Widget _buildImageMemory(String ref) {
     try {
       final bytes = base64Decode(ref.split(',').last);
+      final coverBg = element.fileName == 'marriage_locked_bg' || element.fileName.endsWith('_bg');
       return Image.memory(
         bytes,
         key: ValueKey('img_${element.id}_${bytes.length}'),
-        fit: BoxFit.contain,
+        fit: coverBg ? BoxFit.cover : BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)),
       );

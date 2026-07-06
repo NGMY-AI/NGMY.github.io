@@ -54,10 +54,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     final muted = widget.startMuted && !_userUnmuted;
 
     if (ytId != null && widget.useEmbedHtml) {
-      // Direct nocookie embed — srcdoc + IFrame API breaks inside Flutter HtmlElementView on iOS PWA.
-      frame
-        ..removeAttribute('srcdoc')
-        ..src = _youtubeEmbedFor(url, muted: muted);
+      if (widget.notifyOnEnd) {
+        frame
+          ..removeAttribute('src')
+          ..srcdoc = NgmyVirtualDeviceEmbed.youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true);
+      } else {
+        frame
+          ..removeAttribute('srcdoc')
+          ..src = _youtubeEmbedFor(url, muted: muted);
+      }
       return;
     }
 

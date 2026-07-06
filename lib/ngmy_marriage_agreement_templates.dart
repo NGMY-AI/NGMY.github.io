@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_render.dart';
 
 // Shared with ngmy_slides_marriage_agreement.dart (keep in sync)
 const _kLocked = 'marriage_locked';
@@ -29,6 +31,7 @@ class NgmyMarriagePaperTemplate {
     required this.id,
     required this.name,
     required this.description,
+    required this.paperStyle,
     required this.background,
     required this.ink,
     required this.titleGreen,
@@ -37,13 +40,13 @@ class NgmyMarriagePaperTemplate {
     required this.husbandColor,
     required this.wifeColor,
     required this.previewColors,
-    required this.decorations,
     this.isDark = false,
   });
 
   final String id;
   final String name;
   final String description;
+  final NgmyMarriagePaperStyle paperStyle;
   final int background;
   final int ink;
   final int titleGreen;
@@ -53,7 +56,6 @@ class NgmyMarriagePaperTemplate {
   final int wifeColor;
   final List<Color> previewColors;
   final bool isDark;
-  final List<NgmySlideElement> Function(double px, double py, double pw, double ph) decorations;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,6 +114,62 @@ NgmySlideElement _mLockedShape({
     strokeWidth: strokeWidth,
     fileName: tag.isEmpty ? _kLocked : '${_kLocked}_$tag',
   );
+}
+
+NgmySlideElement _mBgImage(String dataUrl) {
+  return NgmySlideElement(
+    id: NgmySlidesTemplates.newId(),
+    type: NgmySlideElementType.image,
+    x: 0,
+    y: 0,
+    w: 1,
+    h: 1,
+    imageRef: dataUrl,
+    fileName: '${_kLocked}_bg',
+  );
+}
+
+NgmySlideElement _mRule(double x, double y, double w, int color, {String tag = 'rule'}) {
+  return _mLockedShape(
+    shape: NgmySlideShapeKind.line,
+    x: x,
+    y: y,
+    w: w,
+    h: 0.002,
+    strokeColor: color,
+    strokeWidth: 1.2,
+    tag: tag,
+  );
+}
+
+List<NgmySlideElement> _mPartyColumn({
+  required String prefix,
+  required String heading,
+  required double x,
+  required double y,
+  required double w,
+  required int accent,
+  required int ink,
+  required int panelFill,
+}) {
+  return [
+    _mLockedShape(
+      shape: NgmySlideShapeKind.rectangle,
+      x: x,
+      y: y,
+      w: w,
+      h: 0.138,
+      fillColor: panelFill,
+      strokeColor: accent,
+      strokeWidth: 1.2,
+      tag: 'panel_$prefix',
+    ),
+    _mLockedText(heading, x: x + 0.01, y: y + 0.006, w: w - 0.02, h: 0.024, fontSize: 9, fontWeight: FontWeight.w900, color: accent, align: TextAlign.center, tag: 'hdr_$prefix'),
+    ..._mField('${prefix}_name', 'Full Name:', x + 0.012, y + 0.032, w - 0.024, labelColor: accent, lineColor: accent, textColor: ink, labelW: 0.24, fontSize: 8),
+    ..._mField('${prefix}_dob', 'Date of Birth:', x + 0.012, y + 0.058, w - 0.024, labelColor: accent, lineColor: accent, textColor: ink, labelW: 0.3, fontSize: 8),
+    ..._mField('${prefix}_pob', 'Place of Birth:', x + 0.012, y + 0.084, w - 0.024, labelColor: accent, lineColor: accent, textColor: ink, labelW: 0.3, fontSize: 8),
+    ..._mField('${prefix}_address', 'Address:', x + 0.012, y + 0.11, w - 0.024, labelColor: accent, lineColor: accent, textColor: ink, labelW: 0.22, fontSize: 8),
+  ];
 }
 
 List<NgmySlideElement> _mField(
@@ -201,146 +259,6 @@ List<NgmySlideElement> _drcSeal(double x, double y, double size, {int outer = _c
   ];
 }
 
-void _diamondBand(List<NgmySlideElement> out, double x, double y, double w, double h) {
-  const colors = [_congoRed, _congoYellow, _forest, _gold, _congoBlue];
-  const cols = 12;
-  final dw = w / cols;
-  for (var i = 0; i < cols; i++) {
-    out.add(_mLockedShape(
-      shape: NgmySlideShapeKind.rectangle,
-      x: x + i * dw,
-      y: y,
-      w: dw * 0.85,
-      h: h,
-      fillColor: colors[i % colors.length],
-      strokeColor: colors[i % colors.length],
-      strokeWidth: 0,
-      tag: 'band_$i',
-    ));
-  }
-}
-
-void _flagCorners(List<NgmySlideElement> out, double px, double py, double pw, double ph) {
-  const s = 0.028;
-  for (final corner in [
-    (px, py),
-    (px + pw - s, py),
-    (px, py + ph - s),
-    (px + pw - s, py + ph - s),
-  ]) {
-    out.add(_mLockedShape(shape: NgmySlideShapeKind.rectangle, x: corner.$1, y: corner.$2, w: s, h: s * 0.33, fillColor: _congoBlue, strokeWidth: 0, tag: 'fc_b'));
-    out.add(_mLockedShape(shape: NgmySlideShapeKind.rectangle, x: corner.$1, y: corner.$2 + s * 0.33, w: s, h: s * 0.33, fillColor: _congoYellow, strokeWidth: 0, tag: 'fc_y'));
-    out.add(_mLockedShape(shape: NgmySlideShapeKind.rectangle, x: corner.$1, y: corner.$2 + s * 0.66, w: s, h: s * 0.34, fillColor: _congoRed, strokeWidth: 0, tag: 'fc_r'));
-  }
-}
-
-// ── Decoration builders ────────────────────────────────────────────────────────
-
-List<NgmySlideElement> _decoCongoHeritage(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _gold, strokeWidth: 3, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.01, y: py + 0.01, w: pw - 0.02, h: ph - 0.02, strokeColor: _gold, strokeWidth: 1, tag: 'frame2'),
-    _mLockedShape(shape: NgmySlideShapeKind.circle, x: px + pw * 0.38, y: py + 0.22, w: pw * 0.24, h: ph * 0.08, strokeColor: _gold, strokeWidth: 1.5, fillColor: 0x18D4AF37, tag: 'map'),
-    _mLockedText('♥', x: px + pw * 0.42, y: py + 0.03, w: pw * 0.16, h: 0.04, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: _gold, tag: 'heart'),
-  ];
-  _diamondBand(out, px, py + ph - 0.025, pw, 0.025);
-  return out;
-}
-
-List<NgmySlideElement> _decoClassicParchment(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _crimson, strokeWidth: 2.5, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.008, y: py + 0.008, w: pw - 0.016, h: ph - 0.016, strokeColor: _forest, strokeWidth: 1, tag: 'frame2'),
-  ];
-  _diamondBand(out, px, py + 0.01, 0.04, ph - 0.02);
-  out.add(_mLockedText('🤝', x: px + pw * 0.4, y: py + 0.2, w: pw * 0.2, h: 0.05, fontSize: 28, align: TextAlign.center, tag: 'hands'));
-  return out;
-}
-
-List<NgmySlideElement> _decoOfficialCream(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _gold, strokeWidth: 3, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.012, y: py + 0.012, w: pw - 0.024, h: ph - 0.024, strokeColor: _forest, strokeWidth: 1, tag: 'frame2'),
-    _mLockedText('♥♥', x: px + pw * 0.38, y: py + 0.025, w: pw * 0.24, h: 0.035, fontSize: 16, fontWeight: FontWeight.w900, align: TextAlign.center, color: _gold, tag: 'hearts'),
-    _mLockedText('∞', x: px + pw * 0.42, y: py + 0.055, w: pw * 0.16, h: 0.03, fontSize: 18, align: TextAlign.center, color: _gold, tag: 'rings'),
-  ];
-  _flagCorners(out, px, py, pw, ph);
-  out.add(_mLockedShape(shape: NgmySlideShapeKind.circle, x: px + pw * 0.36, y: py + 0.2, w: pw * 0.28, h: ph * 0.09, strokeColor: _gold, strokeWidth: 1, fillColor: 0x10D4AF37, tag: 'map'));
-  return out;
-}
-
-List<NgmySlideElement> _decoCeremonialDiamond(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.015, y: py + 0.015, w: pw - 0.03, h: ph - 0.03, strokeColor: _gold, strokeWidth: 1.5, tag: 'inner'),
-  ];
-  _diamondBand(out, px, py, pw, 0.018);
-  _diamondBand(out, px, py + ph - 0.018, pw, 0.018);
-  _diamondBand(out, px, py, 0.018, ph);
-  _diamondBand(out, px + pw - 0.018, py, 0.018, ph);
-  out.add(_mLockedText('🤝', x: px + pw * 0.38, y: py + 0.03, w: pw * 0.24, h: 0.04, fontSize: 24, align: TextAlign.center, tag: 'hands'));
-  out.add(_mLockedShape(shape: NgmySlideShapeKind.circle, x: px + pw * 0.3, y: py + 0.18, w: pw * 0.4, h: ph * 0.12, strokeColor: 0x30D4AF37, strokeWidth: 1, fillColor: 0x08D4AF37, tag: 'watermark'));
-  return out;
-}
-
-List<NgmySlideElement> _decoForestGold(double px, double py, double pw, double ph) {
-  return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _gold, strokeWidth: 4, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.018, y: py + 0.018, w: pw - 0.036, h: ph - 0.036, strokeColor: _gold, strokeWidth: 1, tag: 'frame2'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: 0.014, fillColor: _congoBlue, strokeWidth: 0, tag: 'bar_b'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py + 0.014, w: pw, h: 0.014, fillColor: _congoYellow, strokeWidth: 0, tag: 'bar_y'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py + 0.028, w: pw, h: 0.014, fillColor: _congoRed, strokeWidth: 0, tag: 'bar_r'),
-    _mLockedText('✦', x: px + pw * 0.44, y: py + 0.04, w: pw * 0.12, h: 0.03, fontSize: 18, align: TextAlign.center, color: _gold, tag: 'star'),
-  ];
-}
-
-List<NgmySlideElement> _decoIvoryElegance(double px, double py, double pw, double ph) {
-  return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.02, y: py + 0.02, w: pw - 0.04, h: ph - 0.04, strokeColor: _darkGold, strokeWidth: 1, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.03, y: py + 0.03, w: pw - 0.06, h: ph - 0.06, strokeColor: _forest, strokeWidth: 0.8, tag: 'frame2'),
-    _mLockedText('— ✦ —', x: px + pw * 0.3, y: py + 0.045, w: pw * 0.4, h: 0.025, fontSize: 12, align: TextAlign.center, color: _darkGold, tag: 'flourish'),
-  ];
-}
-
-List<NgmySlideElement> _decoCrimsonTradition(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _crimson, strokeWidth: 3, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.01, y: py + 0.01, w: pw - 0.02, h: ph - 0.02, strokeColor: _forest, strokeWidth: 1.5, tag: 'frame2'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py + ph - 0.02, w: pw, h: 0.02, fillColor: _crimson, strokeWidth: 0, tag: 'bottom'),
-  ];
-  _diamondBand(out, px, py, pw, 0.012);
-  return out;
-}
-
-List<NgmySlideElement> _decoGoldenFrame(double px, double py, double pw, double ph) {
-  return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _gold, strokeWidth: 5, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.008, y: py + 0.008, w: pw - 0.016, h: ph - 0.016, strokeColor: _darkGold, strokeWidth: 2, tag: 'frame2'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.016, y: py + 0.016, w: pw - 0.032, h: ph - 0.032, strokeColor: _gold, strokeWidth: 1, tag: 'frame3'),
-    _mLockedText('◆', x: px + pw * 0.44, y: py + 0.035, w: pw * 0.12, h: 0.03, fontSize: 16, align: TextAlign.center, color: _gold, tag: 'diamond'),
-  ];
-}
-
-List<NgmySlideElement> _decoUnityHands(double px, double py, double pw, double ph) {
-  return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _forest, strokeWidth: 2, tag: 'frame'),
-    _mLockedText('🤝', x: px + pw * 0.35, y: py + 0.025, w: pw * 0.3, h: 0.05, fontSize: 32, align: TextAlign.center, tag: 'hands'),
-    _mLockedShape(shape: NgmySlideShapeKind.circle, x: px + pw * 0.32, y: py + 0.2, w: pw * 0.36, h: ph * 0.1, strokeColor: _forest, strokeWidth: 1, fillColor: 0x081D4D2B, tag: 'map'),
-    _mLockedText('UNITY • RESPECT • LOVE', x: px + pw * 0.15, y: py + ph - 0.04, w: pw * 0.7, h: 0.022, fontSize: 7, fontWeight: FontWeight.w800, align: TextAlign.center, color: _forest, tag: 'motto'),
-  ];
-}
-
-List<NgmySlideElement> _decoNgmyOfficial(double px, double py, double pw, double ph) {
-  final out = <NgmySlideElement>[
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw, h: ph, strokeColor: _congoBlue, strokeWidth: 3, tag: 'frame'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 0.01, y: py + 0.01, w: pw - 0.02, h: ph - 0.02, strokeColor: _gold, strokeWidth: 1.5, tag: 'frame2'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px, y: py, w: pw / 3, h: 0.01, fillColor: _congoBlue, strokeWidth: 0, tag: 'bar_b'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + pw / 3, y: py, w: pw / 3, h: 0.01, fillColor: _congoYellow, strokeWidth: 0, tag: 'bar_y'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: px + 2 * pw / 3, y: py, w: pw / 3, h: 0.01, fillColor: _congoRed, strokeWidth: 0, tag: 'bar_r'),
-  ];
-  out.addAll(_drcSeal(px + pw - 0.18, py + ph - 0.11, 0.16, outer: _congoBlue, inner: _gold, textColor: _ink));
-  return out;
-}
-
 // ── Template registry ──────────────────────────────────────────────────────────
 
 const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
@@ -348,6 +266,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     id: 'congo_heritage',
     name: 'Congo Heritage',
     description: 'Dark green cultural paper with gold accents and African border.',
+    paperStyle: NgmyMarriagePaperStyle.congoHeritage,
     background: _deepGreen,
     ink: _white,
     titleGreen: _congoYellow,
@@ -357,12 +276,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     wifeColor: _congoRed,
     previewColors: [Color(_deepGreen), Color(_gold), Color(_congoRed)],
     isDark: true,
-    decorations: _decoCongoHeritage,
   ),
   NgmyMarriagePaperTemplate(
     id: 'classic_parchment',
     name: 'Classic Parchment',
     description: 'Aged parchment with red & green title and diamond side border.',
+    paperStyle: NgmyMarriagePaperStyle.classicParchment,
     background: _parchment,
     ink: _ink,
     titleGreen: _forest,
@@ -371,12 +290,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_parchment), Color(_forest), Color(_crimson)],
-    decorations: _decoClassicParchment,
   ),
   NgmyMarriagePaperTemplate(
     id: 'official_cream',
     name: 'Official Cream',
     description: 'Clean cream paper with gold frame and DRC flag corners.',
+    paperStyle: NgmyMarriagePaperStyle.officialCream,
     background: _cream,
     ink: _ink,
     titleGreen: _forest,
@@ -385,12 +304,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_cream), Color(_gold), Color(_forest)],
-    decorations: _decoOfficialCream,
   ),
   NgmyMarriagePaperTemplate(
     id: 'ceremonial_diamond',
     name: 'Ceremonial Diamond',
     description: 'Formal parchment surrounded by colorful diamond pattern border.',
+    paperStyle: NgmyMarriagePaperStyle.ceremonialDiamond,
     background: _parchment,
     ink: _ink,
     titleGreen: _forest,
@@ -399,12 +318,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_parchment), Color(_congoRed), Color(_gold)],
-    decorations: _decoCeremonialDiamond,
   ),
   NgmyMarriagePaperTemplate(
     id: 'forest_gold',
     name: 'Forest & Gold',
     description: 'Rich forest green panel with Congo tricolor bar and gold frame.',
+    paperStyle: NgmyMarriagePaperStyle.forestGold,
     background: _forest,
     ink: _white,
     titleGreen: _congoYellow,
@@ -414,12 +333,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     wifeColor: 0xFFFF9999,
     previewColors: [Color(_forest), Color(_gold), Color(_congoBlue)],
     isDark: true,
-    decorations: _decoForestGold,
   ),
   NgmyMarriagePaperTemplate(
     id: 'ivory_elegance',
     name: 'Ivory Elegance',
     description: 'Bright ivory formal paper with delicate gold double lines.',
+    paperStyle: NgmyMarriagePaperStyle.ivoryElegance,
     background: 0xFFFFFAF0,
     ink: _ink,
     titleGreen: _forest,
@@ -428,12 +347,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(0xFFFFFAF0), Color(_darkGold), Color(_forest)],
-    decorations: _decoIvoryElegance,
   ),
   NgmyMarriagePaperTemplate(
     id: 'crimson_tradition',
     name: 'Crimson Tradition',
     description: 'Traditional parchment with bold crimson frame and border band.',
+    paperStyle: NgmyMarriagePaperStyle.crimsonTradition,
     background: _paper,
     ink: _ink,
     titleGreen: _forest,
@@ -442,12 +361,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_paper), Color(_crimson), Color(_forest)],
-    decorations: _decoCrimsonTradition,
   ),
   NgmyMarriagePaperTemplate(
     id: 'golden_frame',
     name: 'Golden Frame',
     description: 'Premium triple gold frame on warm paper — very formal.',
+    paperStyle: NgmyMarriagePaperStyle.goldenFrame,
     background: _paper,
     ink: _ink,
     titleGreen: _forest,
@@ -456,12 +375,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_paper), Color(_gold), Color(_darkGold)],
-    decorations: _decoGoldenFrame,
   ),
   NgmyMarriagePaperTemplate(
     id: 'unity_hands',
     name: 'Unity & Hands',
     description: 'Handshake motif with Congo map watermark — unity focused.',
+    paperStyle: NgmyMarriagePaperStyle.unityHands,
     background: _cream,
     ink: _ink,
     titleGreen: _forest,
@@ -470,12 +389,12 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_cream), Color(_forest), Color(_gold)],
-    decorations: _decoUnityHands,
   ),
   NgmyMarriagePaperTemplate(
     id: 'ngmy_official',
     name: 'NGMY Official',
     description: 'Official NGMY stamp with Congo tricolor — state-ready document.',
+    paperStyle: NgmyMarriagePaperStyle.ngmyOfficial,
     background: _paper,
     ink: _ink,
     titleGreen: _congoBlue,
@@ -484,7 +403,6 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     husbandColor: _forest,
     wifeColor: _crimson,
     previewColors: [Color(_paper), Color(_congoBlue), Color(_gold)],
-    decorations: _decoNgmyOfficial,
   ),
 ];
 
@@ -498,71 +416,64 @@ NgmyMarriagePaperTemplate? ngmyMarriageTemplateById(String id) {
 // ── Paper content builder ──────────────────────────────────────────────────────
 
 List<NgmySlideElement> _buildPaperContent(NgmyMarriagePaperTemplate tpl, String state) {
-  const px = 0.06;
-  const pw = 0.88;
-  const py = 0.02;
-  const ph = 0.96;
+  const cx = 0.10;
+  const cw = 0.80;
   final ink = tpl.ink;
   final gold = tpl.gold;
   final hColor = tpl.husbandColor;
   final wColor = tpl.wifeColor;
+  final panelFill = tpl.isDark ? 0x18FFFFFF : 0x30FFFFFF;
+
+  final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
 
   final elements = <NgmySlideElement>[
-    ...tpl.decorations(px, py, pw, ph),
+    _mBgImage(bgUrl),
 
-    // Title
-    _mLockedText('MARRIAGE', x: px + 0.04, y: py + 0.07, w: pw - 0.08, h: 0.038, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.titleGreen, tag: 'title_m'),
-    _mLockedText('AGREEMENT', x: px + 0.04, y: py + 0.1, w: pw - 0.08, h: 0.038, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.titleRed, tag: 'title_a'),
+    // Title block
+    _mLockedText('MARRIAGE', x: cx, y: 0.095, w: cw, h: 0.036, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.titleGreen, tag: 'title_m'),
+    _mLockedText('AGREEMENT', x: cx, y: 0.125, w: cw, h: 0.036, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.titleRed, tag: 'title_a'),
+    _mRule(cx + 0.08, 0.162, cw - 0.16, gold, tag: 'title_rule'),
 
-    // Intro
+    // Intro date
     _mLockedText(
       'This Marriage Agreement is made and entered into on this',
-      x: px + 0.04,
-      y: py + 0.145,
-      w: pw - 0.08,
-      h: 0.022,
-      fontSize: 8.5,
+      x: cx,
+      y: 0.172,
+      w: cw,
+      h: 0.02,
+      fontSize: 8,
       fontWeight: FontWeight.w600,
       align: TextAlign.center,
       color: ink,
       tag: 'intro1',
     ),
-    ..._mField('date_day', '', px + 0.18, py + 0.168, 0.1, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 9),
-    _mLockedText('day of', x: px + 0.29, y: py + 0.168, w: 0.1, h: 0.022, fontSize: 8.5, fontWeight: FontWeight.w600, color: ink, tag: 'intro2'),
-    ..._mField('date_month', '', px + 0.38, py + 0.168, 0.28, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 9),
-    _mLockedText(', 20', x: px + 0.67, y: py + 0.168, w: 0.06, h: 0.022, fontSize: 8.5, fontWeight: FontWeight.w600, color: ink, tag: 'intro3'),
-    ..._mField('date_year', '', px + 0.72, py + 0.168, 0.12, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 9),
-    _mLockedText('by and between:', x: px + 0.04, y: py + 0.192, w: pw - 0.08, h: 0.022, fontSize: 8.5, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'intro4'),
+    ..._mField('date_day', '', cx + 0.14, 0.194, 0.09, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8.5),
+    _mLockedText('day of', x: cx + 0.24, y: 0.194, w: 0.1, h: 0.02, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'intro2'),
+    ..._mField('date_month', '', cx + 0.33, 0.194, 0.26, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8.5),
+    _mLockedText(', 20', x: cx + 0.60, y: 0.194, w: 0.06, h: 0.02, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'intro3'),
+    ..._mField('date_year', '', cx + 0.65, 0.194, 0.11, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8.5),
+    _mLockedText('by and between:', x: cx, y: 0.216, w: cw, h: 0.02, fontSize: 8, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'intro4'),
 
-    // Party A
-    _mLockedText('PARTY A (HUSBAND)', x: px + 0.02, y: py + 0.218, w: 0.4, h: 0.024, fontSize: 9.5, fontWeight: FontWeight.w900, color: hColor, tag: 'party_a'),
-    ..._mField('husband_name', 'Full Name:', px + 0.02, py + 0.244, 0.42, labelColor: hColor, lineColor: hColor, textColor: ink, labelW: 0.22, fontSize: 8.5),
-    ..._mField('husband_dob', 'Date of Birth:', px + 0.02, py + 0.272, 0.42, labelColor: hColor, lineColor: hColor, textColor: ink, labelW: 0.28, fontSize: 8.5),
-    ..._mField('husband_pob', 'Place of Birth:', px + 0.02, py + 0.3, 0.42, labelColor: hColor, lineColor: hColor, textColor: ink, labelW: 0.28, fontSize: 8.5),
-    ..._mField('husband_address', 'Address:', px + 0.02, py + 0.328, 0.42, labelColor: hColor, lineColor: hColor, textColor: ink, labelW: 0.2, fontSize: 8.5),
-
-    // Party B
-    _mLockedText('PARTY B (WIFE)', x: px + 0.48, y: py + 0.218, w: 0.4, h: 0.024, fontSize: 9.5, fontWeight: FontWeight.w900, color: wColor, tag: 'party_b'),
-    ..._mField('wife_name', 'Full Name:', px + 0.48, py + 0.244, 0.42, labelColor: wColor, lineColor: wColor, textColor: ink, labelW: 0.22, fontSize: 8.5),
-    ..._mField('wife_dob', 'Date of Birth:', px + 0.48, py + 0.272, 0.42, labelColor: wColor, lineColor: wColor, textColor: ink, labelW: 0.28, fontSize: 8.5),
-    ..._mField('wife_pob', 'Place of Birth:', px + 0.48, py + 0.3, 0.42, labelColor: wColor, lineColor: wColor, textColor: ink, labelW: 0.28, fontSize: 8.5),
-    ..._mField('wife_address', 'Address:', px + 0.48, py + 0.328, 0.42, labelColor: wColor, lineColor: wColor, textColor: ink, labelW: 0.2, fontSize: 8.5),
+    // Party columns
+    ..._mPartyColumn(prefix: 'husband', heading: 'PARTY A (HUSBAND)', x: cx, y: 0.238, w: 0.38, accent: hColor, ink: ink, panelFill: panelFill),
+    ..._mPartyColumn(prefix: 'wife', heading: 'PARTY B (WIFE)', x: cx + 0.42, y: 0.238, w: 0.38, accent: wColor, ink: ink, panelFill: panelFill),
 
     // Terms
-    _mLockedText('WE, THE UNDERSIGNED, AGREE AS FOLLOWS:', x: px + 0.04, y: py + 0.362, w: pw - 0.08, h: 0.024, fontSize: 9, fontWeight: FontWeight.w900, color: tpl.titleGreen, tag: 'terms_hdr'),
-    ..._mClause(1, 'Purpose of the Agreement', px + 0.04, py + 0.388, pw - 0.08, ink: ink, gold: gold),
-    ..._mClause(2, 'Property & Assets', px + 0.04, py + 0.414, pw - 0.08, ink: ink, gold: gold),
-    ..._mClause(3, 'Responsibilities', px + 0.04, py + 0.44, pw - 0.08, ink: ink, gold: gold),
-    ..._mClause(4, 'Financial Matters', px + 0.04, py + 0.466, pw - 0.08, ink: ink, gold: gold),
-    ..._mClause(5, 'Other Provisions', px + 0.04, py + 0.492, pw - 0.08, ink: ink, gold: gold),
+    _mLockedText('WE, THE UNDERSIGNED, AGREE AS FOLLOWS:', x: cx, y: 0.382, w: cw, h: 0.022, fontSize: 8.5, fontWeight: FontWeight.w900, color: tpl.titleGreen, align: TextAlign.center, tag: 'terms_hdr'),
+    _mRule(cx, 0.404, cw, gold, tag: 'terms_rule'),
+    ..._mClause(1, 'Purpose of the Agreement', cx, 0.412, cw, ink: ink, gold: gold),
+    ..._mClause(2, 'Property & Assets', cx, 0.436, cw, ink: ink, gold: gold),
+    ..._mClause(3, 'Responsibilities', cx, 0.460, cw, ink: ink, gold: gold),
+    ..._mClause(4, 'Financial Matters', cx, 0.484, cw, ink: ink, gold: gold),
+    ..._mClause(5, 'Other Provisions', cx, 0.508, cw, ink: ink, gold: gold),
 
     // Affirmation
     _mLockedText(
       'We affirm that this Agreement is made in good faith, with mutual understanding, respect and love, in accordance with the laws and customs of the Democratic Republic of Congo.',
-      x: px + 0.05,
-      y: py + 0.525,
-      w: pw - 0.1,
-      h: 0.05,
+      x: cx + 0.02,
+      y: 0.538,
+      w: cw - 0.04,
+      h: 0.048,
       fontSize: 7.5,
       fontWeight: FontWeight.w600,
       align: TextAlign.center,
@@ -571,27 +482,27 @@ List<NgmySlideElement> _buildPaperContent(NgmyMarriagePaperTemplate tpl, String 
     ),
 
     // Signatures
-    ..._mSignBlock('husband', 'PARTY A (HUSBAND)', px + 0.02, py + 0.58, 0.28, color: hColor, signKey: 'husband'),
-    _mLockedText('WITNESSES', x: px + 0.34, y: py + 0.58, w: 0.28, h: 0.024, fontSize: 9, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'witness_hdr'),
-    _mLockedText('1.', x: px + 0.34, y: py + 0.61, w: 0.04, h: 0.02, fontSize: 9, fontWeight: FontWeight.w700, color: ink, tag: 'w1n'),
-    ..._mField('witness_1', '', px + 0.37, py + 0.608, 0.24, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8.5),
-    _mLockedText('2.', x: px + 0.34, y: py + 0.638, w: 0.04, h: 0.02, fontSize: 9, fontWeight: FontWeight.w700, color: ink, tag: 'w2n'),
-    ..._mField('witness_2', '', px + 0.37, py + 0.636, 0.24, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8.5),
-    ..._mSignBlock('wife', 'PARTY B (WIFE)', px + 0.62, py + 0.58, 0.28, color: wColor, signKey: 'wife'),
+    ..._mSignBlock('husband', 'PARTY A (HUSBAND)', cx, 0.592, 0.24, color: hColor, signKey: 'husband'),
+    _mLockedText('WITNESSES', x: cx + 0.28, y: 0.592, w: 0.24, h: 0.022, fontSize: 8.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'witness_hdr'),
+    _mLockedText('1.', x: cx + 0.28, y: 0.622, w: 0.04, h: 0.02, fontSize: 8.5, fontWeight: FontWeight.w700, color: ink, tag: 'w1n'),
+    ..._mField('witness_1', '', cx + 0.31, 0.620, 0.2, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8),
+    _mLockedText('2.', x: cx + 0.28, y: 0.648, w: 0.04, h: 0.02, fontSize: 8.5, fontWeight: FontWeight.w700, color: ink, tag: 'w2n'),
+    ..._mField('witness_2', '', cx + 0.31, 0.646, 0.2, labelColor: ink, lineColor: ink, textColor: ink, labelW: 0, fontSize: 8),
+    ..._mSignBlock('wife', 'PARTY B (WIFE)', cx + 0.56, 0.592, 0.24, color: wColor, signKey: 'wife'),
 
-    // Seal (if not ngmy_official which has it in decorations)
-    if (tpl.id != 'ngmy_official') ..._drcSeal(px + pw - 0.2, py + ph - 0.1, 0.18, outer: tpl.titleRed, inner: gold, textColor: tpl.isDark ? _white : _ink),
+    // Seal (skip for ngmy_official — baked into SVG)
+    if (tpl.id != 'ngmy_official') ..._drcSeal(cx + cw - 0.16, 0.72, 0.15, outer: tpl.titleRed, inner: gold, textColor: tpl.isDark ? _white : _ink),
 
     // State watermark
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.text,
-      x: px + 0.04,
-      y: py + ph - 0.055,
-      w: pw - 0.08,
-      h: 0.04,
+      x: cx,
+      y: 0.88,
+      w: cw,
+      h: 0.035,
       text: _watermarkForState(state),
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: FontWeight.w800,
       color: tpl.isDark ? gold : _congoBlue,
       align: TextAlign.center,
@@ -600,6 +511,36 @@ List<NgmySlideElement> _buildPaperContent(NgmyMarriagePaperTemplate tpl, String 
   ];
 
   return elements;
+}
+
+/// Miniature live preview of a marriage template (matches editor document).
+Widget ngmyMarriageTemplateLivePreview(String templateId) {
+  final slide = ngmyBuildMarriageAgreementDeck(templateId: templateId, state: 'STATE').slides.first;
+  return LayoutBuilder(
+    builder: (context, c) {
+      final w = c.maxWidth;
+      final h = c.maxHeight;
+      final scale = w / 360;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: ColoredBox(
+          color: Color(slide.background),
+          child: Stack(
+            children: [
+              for (final e in slide.elements)
+                Positioned(
+                  left: e.x * w,
+                  top: e.y * h,
+                  width: e.w * w,
+                  height: e.h * h,
+                  child: NgmySlideElementView(element: e, scale: scale, compactText: true),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// Builds a portrait Marriage Agreement deck from a paper template.
@@ -724,7 +665,7 @@ class _NgmyMarriageTemplatePickerSheet extends StatelessWidget {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 0.56,
                 ),
                 itemCount: kNgmyMarriagePaperTemplates.length,
                 itemBuilder: (_, i) {
@@ -765,51 +706,10 @@ class _TemplateCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Color(template.background),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Color(template.gold).withValues(alpha: 0.6), width: 1.5),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: template.previewColors,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'MARRIAGE',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: Color(template.titleGreen),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        'AGREEMENT',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: Color(template.titleRed),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Color(template.gold), width: 1.5),
-                        ),
-                        child: Center(
-                          child: Text('NGMY', style: TextStyle(fontSize: 5, fontWeight: FontWeight.w900, color: Color(template.gold))),
-                        ),
-                      ),
-                    ],
+                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: AspectRatio(
+                    aspectRatio: 9 / 16,
+                    child: ngmyMarriageTemplateLivePreview(template.id),
                   ),
                 ),
               ),

@@ -13,12 +13,25 @@ class NgmyVirtualDeviceEmbed {
   }
 
   /// Builds a mobile-friendly YouTube embed URL (nocookie endpoint works in PWA iframes).
+  /// When [useJsApi] is false, omits origin/enablejsapi params so simple iframes play reliably.
   static String youtubeEmbedUrl(
     String videoId, {
     bool autoplay = true,
     bool muted = false,
+    bool useJsApi = false,
     String? origin,
   }) {
+    if (!useJsApi) {
+      final params = <String>[
+        if (autoplay) 'autoplay=1',
+        'playsinline=1',
+        'rel=0',
+        'modestbranding=1',
+        'iv_load_policy=3',
+        if (muted) 'mute=1',
+      ];
+      return 'https://www.youtube-nocookie.com/embed/$videoId?${params.join('&')}';
+    }
     final hostOrigin = origin ?? embedOrigin;
     final params = <String>[
       if (autoplay) 'autoplay=1',
@@ -88,7 +101,7 @@ class NgmyVirtualDeviceEmbed {
           onStateChange: function (e) {
             if (e.data === YT.PlayerState.ENDED) ngmyNotifyEnded();
           }
-        },'''
+        }'''
         : '';
     return '''
 <!DOCTYPE html>
@@ -129,7 +142,8 @@ class NgmyVirtualDeviceEmbed {
           enablejsapi: 1,
           origin: '$hostOrigin',
           mute: $muteFlag
-        }$eventsBlock
+        }${notifyOnEnd ? ',' : ''}
+        $eventsBlock
       });
     }
     window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
@@ -144,7 +158,7 @@ class NgmyVirtualDeviceEmbed {
     final ytId = extractYouTubeVideoId(playUrl);
     if (ytId != null) {
       if (notifyOnEnd) {
-        return youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true);
+        return youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true, origin: embedOrigin);
       }
       return genericIframeHtml(youtubeEmbedUrl(ytId, muted: muted));
     }
