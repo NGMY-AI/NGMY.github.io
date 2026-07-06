@@ -7,6 +7,8 @@ import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
 
+const _kBioGold = Color(0xFFB8860B);
+
 String? ngmyPublishedBioSlugFromLaunch() => ngmyReadBioSlugFromLaunchUrl();
 
 bool ngmyIsGuestPublishedBioLaunch() {
@@ -24,7 +26,7 @@ class NgmyGuestPublishedBio extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Bio',
-      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2563EB))),
+      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: _kBioGold)),
       home: NgmyGuestBioHostScreen(slug: slug),
     );
   }
@@ -39,15 +41,23 @@ class NgmyGuestBioHostScreen extends StatefulWidget {
   State<NgmyGuestBioHostScreen> createState() => _NgmyGuestBioHostScreenState();
 }
 
-class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
+class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with SingleTickerProviderStateMixin {
   NgmyBioDocument? _doc;
   String? _error;
   bool _loading = true;
+  late final AnimationController _unfold;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _unfold = AnimationController(vsync: this, duration: const Duration(milliseconds: 950));
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _unfold.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -56,6 +66,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       _error = null;
       _doc = null;
     });
+    _unfold.reset();
 
     try {
       for (var attempt = 0; attempt < 2; attempt++) {
@@ -67,6 +78,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
             _doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
             _loading = false;
           });
+          await _unfold.forward();
           return;
         }
         if (attempt == 0) await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -91,7 +103,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Color(0xFF2563EB)),
+              CircularProgressIndicator(color: _kBioGold),
               SizedBox(height: 16),
               Text('Opening bio…', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
             ],
@@ -117,6 +129,27 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
         ),
       );
     }
-    return Scaffold(body: NgmyBioPreview(document: _doc!, lightweight: true));
+
+    return Scaffold(
+      body: AnimatedBuilder(
+        animation: _unfold,
+        builder: (context, child) {
+          final t = Curves.easeOutCubic.transform(_unfold.value);
+          final fold = (1 - t).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: (t * 1.1).clamp(0.0, 1.0),
+            child: Transform(
+              alignment: Alignment.topCenter,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateX(fold * 0.65)
+                ..translateByDouble(0.0, fold * 48.0, 0.0, 1.0),
+              child: child,
+            ),
+          );
+        },
+        child: NgmyBioPreview(document: _doc!, lightweight: true),
+      ),
+    );
   }
 }

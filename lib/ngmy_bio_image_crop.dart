@@ -100,13 +100,13 @@ class _NgmyBioBannerCropDialogState extends State<_NgmyBioBannerCropDialog> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(Icons.swap_vert_rounded, size: 18, color: Color(0xFF2563EB)),
+                  const Icon(Icons.swap_vert_rounded, size: 18, color: Color(0xFFB8860B)),
                   Expanded(
                     child: Slider(
                       value: _focusY,
                       min: 0,
                       max: 1,
-                      activeColor: const Color(0xFF2563EB),
+                      activeColor: const Color(0xFFB8860B),
                       onChanged: (v) => setState(() => _focusY = v),
                     ),
                   ),
@@ -120,7 +120,7 @@ class _NgmyBioBannerCropDialogState extends State<_NgmyBioBannerCropDialog> {
                     flex: 2,
                     child: FilledButton(
                       onPressed: () => Navigator.pop(context, _focusY),
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
                       child: const Text('Use banner'),
                     ),
                   ),

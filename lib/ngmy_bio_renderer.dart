@@ -364,19 +364,51 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _marblePanel(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+    final bodyColor = tpl.pageBg;
     final headerH = compact ? 150.0 : 190.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (document.headerImageBase64.isNotEmpty)
-          SizedBox(height: headerH, width: double.infinity, child: _headerImageOrGradient(tpl, headerH)),
-        SizedBox(height: compact ? 12 : 20),
-        _avatar(document.avatarImageBase64, avatarSize, ring),
-        SizedBox(height: compact ? 10 : 14),
-        _belowName(tpl, name, tagline),
-        SizedBox(height: compact ? 12 : 16),
-        _framedLinks(links, tpl, pad),
-        SizedBox(height: pad),
+        SizedBox(
+          height: headerH,
+          width: double.infinity,
+          child: Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
+              _headerImageOrGradient(tpl, headerH),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: CustomPaint(
+                  size: Size(maxWidth, compact ? 44 : 56),
+                  painter: ngmyBioCurvedPanelPainter(bodyColor),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: -(avatarSize * 0.42),
+                child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+              ),
+            ],
+          ),
+        ),
+        ColoredBox(
+          color: bodyColor,
+          child: Padding(
+            padding: EdgeInsets.only(top: avatarSize * 0.5),
+            child: Column(
+              children: [
+                _belowName(tpl, name, tagline),
+                SizedBox(height: compact ? 12 : 16),
+                _framedLinks(links, tpl, pad),
+                SizedBox(height: pad),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -696,9 +728,20 @@ class NgmyBioPreview extends StatelessWidget {
   bool _isDarkBg(Color c) => c.computeLuminance() < 0.45;
 
   /// Soft glass lift — no hard outline borders.
-  BoxDecoration _glassyLinkDecoration(NgmyBioTemplate tpl, double radius, {bool glow = false}) {
+  BoxDecoration _glassyLinkDecoration(NgmyBioTemplate tpl, double radius, {bool glow = false, bool frosted = false}) {
     final r = radius.clamp(4.0, 999.0);
     final dark = _isDarkBg(tpl.pageBg);
+    if (frosted) {
+      return BoxDecoration(
+        color: Colors.white.withValues(alpha: dark ? 0.1 : 0.14),
+        borderRadius: BorderRadius.circular(r),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 14, offset: const Offset(0, 4), spreadRadius: -4),
+          if (glow) BoxShadow(color: tpl.accent.withValues(alpha: 0.15), blurRadius: 16, spreadRadius: -4),
+        ],
+      );
+    }
     final fill = Color.alphaBlend(
       (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.09 : 0.04),
       tpl.cardBg,
@@ -876,12 +919,24 @@ class NgmyBioPreview extends StatelessWidget {
     }
 
     final decoration = _linkDecoration(tpl, radius);
-
-    final child = Container(
-      decoration: decoration,
+    final borderRadius = BorderRadius.circular(radius.clamp(4, 999));
+    final padded = Padding(
       padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 12, vertical: compactPad ? 10 : 12),
       child: content,
     );
+
+    Widget card;
+    if (tpl.linkStyle == NgmyBioLinkStyle.glass && !lightweight) {
+      card = ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: DecoratedBox(decoration: decoration, child: padded),
+        ),
+      );
+    } else {
+      card = DecoratedBox(decoration: decoration, child: padded);
+    }
 
     return Padding(
       padding: EdgeInsets.only(bottom: compactPad ? 8 : 10),
@@ -890,21 +945,22 @@ class NgmyBioPreview extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => _openUrl(link.url),
-                borderRadius: BorderRadius.circular(radius.clamp(4, 999)),
-                child: Ink(decoration: decoration, padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 12, vertical: compactPad ? 10 : 12), child: content),
+                borderRadius: borderRadius,
+                child: card,
               ),
             )
-          : child,
+          : card,
     );
   }
 
   BoxDecoration _linkDecoration(NgmyBioTemplate tpl, double radius) {
     switch (tpl.linkStyle) {
+      case NgmyBioLinkStyle.glass:
+        return _glassyLinkDecoration(tpl, radius, frosted: true);
       case NgmyBioLinkStyle.outline:
       case NgmyBioLinkStyle.rowIcon:
       case NgmyBioLinkStyle.pill:
       case NgmyBioLinkStyle.goldBar:
-      case NgmyBioLinkStyle.glass:
         return _glassyLinkDecoration(tpl, radius);
       case NgmyBioLinkStyle.neonOutline:
         return _glassyLinkDecoration(tpl, radius, glow: true);

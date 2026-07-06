@@ -10,6 +10,7 @@ import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_marriage_agreement.dart';
+import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
@@ -649,7 +650,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
     try {
       final msg = await ngmySlidesDownloadDeckPdf(deck);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      await ngmyHandleSlidesPdfDownloadResult(context, msg, deckName: deck.name);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
@@ -1444,7 +1445,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
       try {
         final msg = await ngmySlidesDownloadDeckPdf(deck);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        await ngmyHandleSlidesPdfDownloadResult(context, msg, deckName: deck.name);
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
@@ -1988,6 +1989,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
                 });
               }
             }, isDark),
+            _ribbonBtn(Icons.picture_as_pdf_outlined, 'Download PDF', () => unawaited(_downloadPdf()), isDark),
             if (el != null) ...[
               const SizedBox(width: 8),
               _ribbonBtn(Icons.format_bold, 'Bold', () {

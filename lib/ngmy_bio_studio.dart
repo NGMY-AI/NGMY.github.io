@@ -12,10 +12,11 @@ import 'ngmy_bio_storage.dart';
 import 'ngmy_bio_templates.dart';
 import 'ngmy_bio_urls.dart';
 import 'ngmy_hub_form_ui.dart';
-import 'ngmy_menu_qr.dart';
+import 'ngmy_bio_qr.dart';
+import 'ngmy_menu_qr.dart' show NgmyMenuQrWidget;
 import 'ngmy_qr_download.dart';
 
-const _kBioAccent = Color(0xFF2563EB);
+const _kBioAccent = Color(0xFFB8860B);
 
 /// Bio page editor — opened from Menu Studio.
 class NgmyBioStudioEditor extends StatefulWidget {
@@ -679,26 +680,48 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           t,
           title: 'Templates',
           subtitle: 'Pick a layout — curves flow into the same page color.',
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 12,
-            children: kNgmyBioTemplates.map((tpl) {
-              final sel = _doc.templateId == tpl.id;
-              return GestureDetector(
-                onTap: () => setState(() => _doc.templateId = tpl.id),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NgmyBioTemplateThumb(template: tpl, selected: sel, size: 72),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: 72,
-                      child: Text(tpl.name, style: TextStyle(fontSize: 9, fontWeight: sel ? FontWeight.w900 : FontWeight.w600, color: sel ? _kBioAccent : t.subtitle), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    ),
-                  ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const cols = 4;
+              const gap = 8.0;
+              final cellW = (constraints.maxWidth - gap * (cols - 1)) / cols;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  crossAxisSpacing: gap,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: cellW / (cellW * 1.28 + 20),
                 ),
+                itemCount: kNgmyBioTemplates.length,
+                itemBuilder: (context, i) {
+                  final tpl = kNgmyBioTemplates[i];
+                  final sel = _doc.templateId == tpl.id;
+                  return GestureDetector(
+                    onTap: () => setState(() => _doc.templateId = tpl.id),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        NgmyBioTemplateThumb(template: tpl, selected: sel, size: cellW),
+                        const SizedBox(height: 3),
+                        Text(
+                          tpl.name,
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: sel ? FontWeight.w900 : FontWeight.w600,
+                            color: sel ? _kBioAccent : t.subtitle,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
-            }).toList(),
+            },
           ),
         ),
         _sectionCard(
@@ -781,14 +804,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           child: Column(
             children: [
               Center(
-                child: NgmyMenuQrDisplay(
-                  data: qrUrl,
-                  style: _doc.qrStyle,
-                  restaurantName: _doc.displayName,
-                  tagline: _doc.tagline,
-                  large: false,
-                  captureKey: _qrCaptureKey,
-                ),
+                child: NgmyBioQrWidget(data: qrUrl, captureKey: _qrCaptureKey),
               ),
               const SizedBox(height: 16),
               SizedBox(

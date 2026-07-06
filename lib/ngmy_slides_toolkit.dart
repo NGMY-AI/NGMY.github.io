@@ -10,6 +10,7 @@ import 'ngmy_invoice_signature.dart';
 import 'ngmy_slides_download.dart';
 import 'ngmy_slides_export.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_print_stub.dart' if (dart.library.html) 'ngmy_slides_print_web.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -218,7 +219,7 @@ Future<void> ngmySlidesOpenPrintPreview(BuildContext context, NgmySlideDeck deck
             Navigator.pop(ctx);
             final msg = await ngmySlidesDownloadDeckPdf(deck);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              await ngmyHandleSlidesPdfDownloadResult(context, msg, deckName: deck.name);
             }
           },
           child: const Text('Download PDF'),

@@ -327,18 +327,18 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     id: 'glass_float',
     name: 'Glass Float',
     layout: NgmyBioLayoutStyle.glassFloat,
-    pageBg: Color(0xFF1E3A8A),
-    pageBgEnd: Color(0xFF4338CA),
-    panelBg: Color(0xFF4338CA),
-    cardBg: Color(0x33FFFFFF),
-    cardBorder: Color(0x80FFFFFF),
-    accent: Colors.white,
+    pageBg: Color(0xFF0F172A),
+    pageBgEnd: Color(0xFF1E293B),
+    panelBg: Color(0x661E293B),
+    cardBg: Color(0x1AFFFFFF),
+    cardBorder: Color(0x33FFFFFF),
+    accent: Color(0xFFD4AF37),
     titleColor: Colors.white,
-    subtitleColor: Color(0xFFE0E7FF),
+    subtitleColor: Color(0xFFCBD5E1),
     linkTextColor: Colors.white,
     linkStyle: NgmyBioLinkStyle.glass,
-    headerGradient: [Color(0xFF4338CA), Color(0xFF1E3A8A)],
-    cardRadius: 16,
+    headerGradient: [Color(0xFF334155), Color(0xFF0F172A)],
+    cardRadius: 28,
     cardShadow: false,
   ),
   NgmyBioTemplate(
@@ -410,17 +410,18 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
   ),
   NgmyBioTemplate(
     id: 'pill_modern',
-    name: 'Pill Modern',
+    name: 'Night Glass',
     layout: NgmyBioLayoutStyle.pillStack,
-    pageBg: Color(0xFF111827),
-    panelBg: Color(0xFF111827),
-    cardBg: Color(0xFF1F2937),
-    cardBorder: Color(0xFF374151),
-    accent: Color(0xFF2563EB),
+    pageBg: Color(0xFF041E1E),
+    pageBgEnd: Color(0xFF0D3B3B),
+    panelBg: Color(0xFF0D3B3B),
+    cardBg: Color(0x1AFFFFFF),
+    cardBorder: Color(0x33FFFFFF),
+    accent: Color(0xFFD4AF37),
     titleColor: Colors.white,
-    subtitleColor: Color(0xFF9CA3AF),
+    subtitleColor: Color(0xFF99F6E4),
     linkTextColor: Colors.white,
-    linkStyle: NgmyBioLinkStyle.pill,
+    linkStyle: NgmyBioLinkStyle.glass,
     cardRadius: 28,
     cardShadow: false,
   ),
@@ -463,14 +464,14 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     layout: NgmyBioLayoutStyle.photoImmersive,
     pageBg: Color(0xFF111827),
     panelBg: Color(0xCC111827),
-    cardBg: Color(0xFF1F2937),
-    cardBorder: Color(0xFF374151),
-    accent: Color(0xFF2563EB),
+    cardBg: Color(0x1AFFFFFF),
+    cardBorder: Color(0x33FFFFFF),
+    accent: Color(0xFFD4AF37),
     titleColor: Colors.white,
     subtitleColor: Color(0xFF9CA3AF),
     linkTextColor: Colors.white,
-    linkStyle: NgmyBioLinkStyle.outline,
-    cardRadius: 14,
+    linkStyle: NgmyBioLinkStyle.glass,
+    cardRadius: 28,
     cardShadow: false,
   ),
   NgmyBioTemplate(
@@ -538,7 +539,9 @@ NgmyBioTemplate ngmyBioTemplateById(String id) {
 
 /// Mini wireframe for template picker.
 class NgmyBioTemplateThumb extends StatelessWidget {
-  const NgmyBioTemplateThumb({super.key, required this.template, this.selected = false, this.size = 88});
+  const NgmyBioTemplateThumb({super.key, required this.template, this.selected = false, this.size = 72});
+
+  static const _gold = Color(0xFFB8860B);
 
   final NgmyBioTemplate template;
   final bool selected;
@@ -547,13 +550,14 @@ class NgmyBioTemplateThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = template;
+    final avatarD = size * 0.22;
     return Container(
       width: size,
-      height: size * 1.35,
+      height: size * 1.28,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: selected ? const Color(0xFF2563EB) : t.cardBorder.withValues(alpha: 0.5), width: selected ? 2.5 : 1),
-        boxShadow: selected ? [BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: 0.25), blurRadius: 10)] : null,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: selected ? _gold : t.cardBorder.withValues(alpha: 0.45), width: selected ? 2 : 1),
+        boxShadow: selected ? [BoxShadow(color: _gold.withValues(alpha: 0.28), blurRadius: 8)] : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -571,46 +575,54 @@ class NgmyBioTemplateThumb extends StatelessWidget {
             Align(
               alignment: Alignment.topCenter,
               child: Container(
-                height: size * 0.35,
+                height: size * 0.42,
                 decoration: BoxDecoration(gradient: LinearGradient(colors: t.headerGradient!)),
               ),
             ),
-          if (t.layout == NgmyBioLayoutStyle.curvedOverlap || t.layout == NgmyBioLayoutStyle.waveHeader || t.layout == NgmyBioLayoutStyle.sunsetArc)
+          if (t.layout == NgmyBioLayoutStyle.curvedOverlap ||
+              t.layout == NgmyBioLayoutStyle.waveHeader ||
+              t.layout == NgmyBioLayoutStyle.sunsetArc ||
+              t.layout == NgmyBioLayoutStyle.marbleCream)
             Positioned(
-              top: size * 0.22,
+              top: size * 0.28,
               left: 0,
               right: 0,
               child: CustomPaint(
-                size: Size(size, size * 0.2),
+                size: Size(size, size * 0.18),
                 painter: _CurvedPanelPainter(color: t.pageBgEnd ?? t.pageBg),
               ),
             ),
           Positioned(
-            top: size * 0.18,
-            left: size * 0.5 - 10,
+            top: size * 0.28 - avatarD * 0.35,
+            left: size * 0.5 - avatarD / 2,
             child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: t.accent, width: 2), color: t.panelBg),
+              width: avatarD,
+              height: avatarD,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: t.panelBg,
+                border: Border.all(color: t.accent, width: 1.5),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
+              ),
             ),
           ),
           Positioned(
-            top: size * 0.42,
-            left: size * 0.2,
-            right: size * 0.2,
-            child: Container(height: 4, decoration: BoxDecoration(color: t.titleColor.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
-          ),
-          Positioned(
             top: size * 0.52,
-            left: size * 0.15,
-            right: size * 0.15,
-            child: _thumbLink(t, size * 0.12),
+            left: size * 0.22,
+            right: size * 0.22,
+            child: Container(height: 3, decoration: BoxDecoration(color: t.titleColor.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(2))),
           ),
           Positioned(
-            top: size * 0.68,
-            left: size * 0.15,
-            right: size * 0.15,
-            child: _thumbLink(t, size * 0.12),
+            top: size * 0.6,
+            left: size * 0.14,
+            right: size * 0.14,
+            child: _thumbLink(t, size * 0.11),
+          ),
+          Positioned(
+            top: size * 0.76,
+            left: size * 0.14,
+            right: size * 0.14,
+            child: _thumbLink(t, size * 0.11),
           ),
         ],
       ),
@@ -618,13 +630,14 @@ class NgmyBioTemplateThumb extends StatelessWidget {
   }
 
   Widget _thumbLink(NgmyBioTemplate t, double h) {
-    final r = t.linkStyle == NgmyBioLinkStyle.pill ? h / 2 : t.cardRadius.clamp(2.0, 8.0);
+    final isGlass = t.linkStyle == NgmyBioLinkStyle.glass;
+    final r = t.linkStyle == NgmyBioLinkStyle.pill || isGlass ? h / 2 : t.cardRadius.clamp(2.0, 8.0);
     return Container(
       height: h,
       decoration: BoxDecoration(
-        color: t.linkStyle == NgmyBioLinkStyle.outline || t.linkStyle == NgmyBioLinkStyle.neonOutline ? Colors.transparent : t.cardBg,
+        color: isGlass ? Colors.white.withValues(alpha: 0.12) : (t.linkStyle == NgmyBioLinkStyle.outline || t.linkStyle == NgmyBioLinkStyle.neonOutline ? Colors.transparent : t.cardBg),
         borderRadius: BorderRadius.circular(r),
-        border: Border.all(color: t.linkStyle == NgmyBioLinkStyle.goldBar ? t.accent : t.cardBorder, width: t.linkStyle == NgmyBioLinkStyle.outline ? 1.5 : 1),
+        border: isGlass ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 0.5) : Border.all(color: t.linkStyle == NgmyBioLinkStyle.goldBar ? t.accent : t.cardBorder, width: t.linkStyle == NgmyBioLinkStyle.outline ? 1 : 0.5),
       ),
     );
   }
