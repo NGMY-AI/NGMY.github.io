@@ -24,15 +24,16 @@
 
   <script>
     (function () {
-      var embedded = '20260706124423';
+      var embedded = '20260706132156';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild) {
         if (!serverBuild) return;
-        var stored = '';
-        try { stored = localStorage.getItem(KEY) || ''; } catch (e) {}
-        // Up to date: HTML embed, server, and last applied build all match.
-        if (serverBuild === embedded && stored === serverBuild) return;
+        // Up to date: live HTML shell matches server — never reload on SW activate alone.
+        if (serverBuild === embedded) {
+          try { localStorage.setItem(KEY, serverBuild); } catch (e) {}
+          return;
+        }
         var onceKey = 'ngmy_force_reload_' + serverBuild;
         if (sessionStorage.getItem(onceKey)) return;
         sessionStorage.setItem(onceKey, '1');
@@ -64,24 +65,12 @@
 
   <script>
     (function () {
-      var deployId = '20260706124423';
-      var scope = window.__NGMY_BASE_PATH__ || '/';
+      // Service worker registers once in startApp() — avoids double install/activate reload storms.
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('ngmy_service_worker.js?v=' + deployId, { scope: scope }).catch(function (e) {
-          console.warn('[ngmy] early service worker register', e);
-        });
         navigator.serviceWorker.addEventListener('message', function (ev) {
           if (ev.data && ev.data.type === 'NGMY_NEW_VERSION' && ev.data.build && window.__ngmyForceRefreshForBuild) {
             window.__ngmyForceRefreshForBuild(ev.data.build);
           }
-        });
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          fetch((window.__NGMY_BASE_PATH__ || '/') + 'version.json?_=' + Date.now(), { cache: 'no-store' })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (v) {
-              if (v && v.build_number && window.__ngmyForceRefreshForBuild) window.__ngmyForceRefreshForBuild(v.build_number);
-            })
-            .catch(function () {});
         });
       }
     })();
@@ -457,6 +446,10 @@
 
       font-weight: 600;
 
+      -webkit-font-smoothing: antialiased;
+
+      text-rendering: optimizeLegibility;
+
     }
 
     html.ngmy-app-light #ngmy-splash {
@@ -533,7 +526,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260706124423";
+      var CURRENT = "20260706132156";
 
       function showError(msg) {
 
@@ -564,15 +557,6 @@
 
       try {
 
-        var prev = localStorage.getItem(KEY);
-
-        if (prev && prev !== CURRENT) {
-          try { sessionStorage.removeItem('ngmy_force_reload_' + CURRENT); } catch (e) {}
-        }
-
-        // New deploy: let the service worker swap caches on activate — do not wipe
-        // storage here or offline cold start breaks before the new shell is cached.
-
         try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
 
       } catch (e) {}
@@ -594,7 +578,7 @@
 
   <script>
     (function () {
-      var deployId = '20260706124423';
+      var deployId = '20260706132156';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
