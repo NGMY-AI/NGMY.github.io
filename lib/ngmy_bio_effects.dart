@@ -84,15 +84,17 @@ class _NgmyBioSceneLayerState extends State<NgmyBioSceneLayer> with SingleTicker
   @override
   Widget build(BuildContext context) {
     if (widget.effect == NgmyBioSceneEffect.none) return const SizedBox.shrink();
-    return AnimatedBuilder(
-      animation: _tick,
-      builder: (context, _) => CustomPaint(
-        painter: NgmyBioScenePainter(
-          effect: widget.effect,
-          accent: widget.accent,
-          phase: widget.animate ? _tick.value : 0.35,
+    return SizedBox.expand(
+      child: AnimatedBuilder(
+        animation: _tick,
+        builder: (context, _) => CustomPaint(
+          painter: NgmyBioScenePainter(
+            effect: widget.effect,
+            accent: widget.accent,
+            phase: widget.animate ? _tick.value : 0.35,
+          ),
+          child: const SizedBox.expand(),
         ),
-        size: Size.infinite,
       ),
     );
   }

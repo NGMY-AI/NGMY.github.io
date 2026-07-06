@@ -41,19 +41,26 @@ class NgmyBioPreview extends StatelessWidget {
     final name = document.displayName.trim().isEmpty ? 'Your Name' : document.displayName.trim();
     final tagline = document.tagline.trim();
     final links = document.activeLinks;
-    final minPageHeight = (!compact && fullBleed) ? MediaQuery.sizeOf(context).height : 0.0;
+    final viewportH = MediaQuery.sizeOf(context).height;
+    final minPageHeight = (!compact && fullBleed) ? viewportH : 0.0;
+    final sceneBackdrop = _usesSceneBackdrop(tpl);
 
-    final pageStack = Stack(
+    final layoutChild = minPageHeight > 0
+        ? SizedBox(
+            height: minPageHeight,
+            width: double.infinity,
+            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight),
+          )
+        : SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: pad + 20),
+            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: 0),
+          );
+
+    Widget pageStack = Stack(
       clipBehavior: Clip.none,
       children: [
-        if (tpl.sceneEffect != NgmyBioSceneEffect.none && document.backgroundImageBase64.isEmpty)
-          Positioned.fill(
-            child: NgmyBioSceneLayer(
-              effect: tpl.sceneEffect,
-              accent: tpl.accent,
-              animate: true,
-            ),
-          ),
+        if (!sceneBackdrop && document.backgroundImageBase64.isEmpty)
+          Positioned.fill(child: DecoratedBox(decoration: _pageDecoration(tpl, document), child: const SizedBox.shrink())),
         if (document.backgroundImageBase64.isNotEmpty)
           Positioned.fill(
             child: Stack(
@@ -64,39 +71,86 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        if (minPageHeight > 0)
-          SizedBox(
-            height: minPageHeight,
-            width: double.infinity,
-            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight),
-          )
-        else
-          SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: pad + 20),
-            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: 0),
-          ),
+        layoutChild,
       ],
     );
 
     if (fullBleed) {
       return SizedBox.expand(
-        child: DecoratedBox(
-          decoration: _pageDecoration(tpl, document),
-          child: pageStack,
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            if (sceneBackdrop)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: viewportH,
+                child: _sceneBackdrop(tpl, document),
+              ),
+            pageStack,
+          ],
         ),
       );
     }
 
-    return Container(
-      decoration: _pageDecoration(tpl, document),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: pageStack,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final backdropH = constraints.maxHeight.isFinite && constraints.maxHeight > 100 ? constraints.maxHeight : viewportH * 0.9;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Container(
+              decoration: sceneBackdrop ? null : _pageDecoration(tpl, document),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (sceneBackdrop)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: backdropH,
+                      child: _sceneBackdrop(tpl, document),
+                    ),
+                  pageStack,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  bool _usesSceneBackdrop(NgmyBioTemplate tpl) =>
+      tpl.sceneEffect != NgmyBioSceneEffect.none && document.backgroundImageBase64.isEmpty;
+
+  Widget _sceneBackdrop(NgmyBioTemplate tpl, NgmyBioDocument doc) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(decoration: _pageDecoration(tpl, doc), child: const SizedBox.expand()),
+        NgmyBioSceneLayer(
+          effect: tpl.sceneEffect,
+          accent: tpl.accent,
+          animate: !lightweight,
+        ),
+      ],
+    );
+  }
+
+  double _ringClearance(double avatarSize) => avatarSize * 0.2 + (compact ? 16.0 : 22.0);
+
+  Color _layoutBodyFill(NgmyBioTemplate tpl) {
+    if (_usesSceneBackdrop(tpl)) return Colors.transparent;
+    final base = tpl.pageBgEnd ?? tpl.pageBg;
+    if (tpl.layout == NgmyBioLayoutStyle.bioSiteClassic) {
+      return base.withValues(alpha: 0.94);
+    }
+    return base;
   }
 
   BoxDecoration _pageDecoration(NgmyBioTemplate tpl, NgmyBioDocument doc) {
@@ -182,7 +236,7 @@ class NgmyBioPreview extends StatelessWidget {
     Widget image = _headerImageOrGradient(tpl, headerH);
     if (curved) {
       image = ClipPath(
-        clipper: _NgmyBioHeaderCurveClipper(curveDepth: curveDepth),
+        clipper: _BioSiteHeaderBottomClipper(curveDepth: curveDepth),
         child: image,
       );
     }
@@ -253,11 +307,26 @@ class NgmyBioPreview extends StatelessWidget {
     final curveDepth = curveH;
     final avatarCenterY = headerH - curveDepth * 0.5;
     final avatarTop = avatarCenterY - avatarSize * 0.5;
-    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 6 : 10);
+    final contentTop = avatarCenterY + avatarSize * 0.5 + _ringClearance(avatarSize);
+    final bodyTop = headerH - curveDepth;
+    final bodyColor = _layoutBodyFill(tpl);
+    final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
 
     final stack = Stack(
       clipBehavior: Clip.none,
       children: [
+        Positioned(
+          top: bodyTop,
+          left: 0,
+          right: 0,
+          child: ClipPath(
+            clipper: _BioSiteBodyTopClipper(curveDepth: curveDepth),
+            child: ColoredBox(
+              color: bodyColor,
+              child: SizedBox(width: double.infinity, height: bodyHeight),
+            ),
+          ),
+        ),
         _headerBanner(tpl, headerH, curveDepth: curveDepth),
         if (accentBar)
           Positioned(
@@ -574,10 +643,10 @@ class NgmyBioPreview extends StatelessWidget {
   }) {
     final headerH = compact ? 172.0 : 228.0;
     final curveDepth = compact ? 52.0 : 68.0;
-    final bodyColor = tpl.pageBgEnd ?? tpl.pageBg;
+    final bodyColor = _layoutBodyFill(tpl);
     final avatarCenterY = headerH - curveDepth * 0.5;
     final avatarTop = avatarCenterY - avatarSize * 0.5;
-    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 10 : 14);
+    final contentTop = avatarCenterY + avatarSize * 0.5 + _ringClearance(avatarSize);
     final bodyTop = headerH - curveDepth;
     final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
 
@@ -1023,11 +1092,12 @@ class NgmyBioPreview extends StatelessWidget {
         );
       }
       return BoxDecoration(
-        color: Colors.white.withValues(alpha: dark ? 0.1 : 0.14),
+        color: Colors.white.withValues(alpha: dark ? 0.16 : 0.14),
         borderRadius: BorderRadius.circular(r),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 0.5),
+        border: Border.all(color: Colors.white.withValues(alpha: dark ? 0.42 : 0.18), width: dark ? 1.2 : 0.5),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 14, offset: const Offset(0, 4), spreadRadius: -4),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 4), spreadRadius: -2),
+          BoxShadow(color: tpl.accent.withValues(alpha: 0.12), blurRadius: 12, spreadRadius: -4),
           if (glow) BoxShadow(color: tpl.accent.withValues(alpha: 0.15), blurRadius: 16, spreadRadius: -4),
         ],
       );
@@ -1375,28 +1445,6 @@ class _BioSiteBodyTopClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant _BioSiteBodyTopClipper old) => old.curveDepth != curveDepth;
-}
-
-class _NgmyBioHeaderCurveClipper extends CustomClipper<Path> {
-  _NgmyBioHeaderCurveClipper({this.curveDepth = 48});
-
-  final double curveDepth;
-
-  @override
-  Path getClip(Size size) {
-    // Sides higher, center dips down — classic link-in-bio downward arc.
-    final sideY = size.height - curveDepth;
-    final peakY = size.height;
-    return Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, sideY)
-      ..quadraticBezierTo(size.width * 0.5, peakY, 0, sideY)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant _NgmyBioHeaderCurveClipper old) => old.curveDepth != curveDepth;
 }
 
 class _AngularClipper extends CustomClipper<Path> {

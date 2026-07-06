@@ -160,7 +160,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   constraints: const BoxConstraints(maxWidth: 420, maxHeight: 780),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: NgmyBioPreview(document: _doc, compact: false, interactive: false),
+                    child: NgmyBioPreview(document: _doc, compact: false, interactive: false, fullBleed: true),
                   ),
                 ),
               ),
@@ -259,7 +259,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: RepaintBoundary(
-                    child: NgmyBioPreview(document: _doc, compact: false),
+                    child: NgmyBioPreview(document: _doc, compact: false, fullBleed: true),
                   ),
                 ),
               ),

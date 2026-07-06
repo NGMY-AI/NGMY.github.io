@@ -109,9 +109,7 @@ class NgmyBioRingFramePainter extends CustomPainter {
         _glowRing(canvas, o, ringR(6), const Color(0xFF6366F1), 0.35 + math.sin(phase * math.pi * 2) * 0.12);
         _luxBand(canvas, o, ringR(4), const [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF312E81)], ringW(4));
       case 'double':
-        _vibePulse(canvas, o, ringR(8), Colors.white.withValues(alpha: 0.5), phase);
-        _stroke(canvas, o, ringR(7), Colors.white.withValues(alpha: 0.95), ringW(2.5));
-        _stroke(canvas, o, ringR(3), Colors.white.withValues(alpha: 0.8), ringW(2.5));
+        _doubleOrbitRing(canvas, o, ringR(7.5), ringR(3.5), phase, ringW(3));
       case 'ornate':
         _braidRing(canvas, o, ringR(5), const Color(0xFFD4AF37), ringW(1.8));
         _pearlDots(canvas, o, ringR(9), 10, const Color(0xFFFFF8E7), phase);
@@ -152,8 +150,7 @@ class NgmyBioRingFramePainter extends CustomPainter {
         _vibePulse(canvas, o, ringR(6), const Color(0xFF84CC16), phase);
         _luxBand(canvas, o, ringR(4.5), const [Color(0xFFECFCCB), Color(0xFF65A30D), Color(0xFF365314)], ringW(4.5));
       case 'coral':
-        _warmPulse(canvas, o, ringR(7), const Color(0xFFFB7185));
-        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFFE4E6), Color(0xFFFB7185), Color(0xFFE11D48)], ringW(4.5));
+        _coralReefRing(canvas, o, ringR(5.5), phase, ringW(5));
       case 'lavender':
         _shimmerArc(canvas, o, ringR(6), const Color(0xFFDDD6FE), ringW(3));
         _luxBand(canvas, o, ringR(4.5), const [Color(0xFFF5F3FF), Color(0xFFC4B5FD), Color(0xFF7C3AED)], ringW(4.5));
@@ -166,7 +163,7 @@ class NgmyBioRingFramePainter extends CustomPainter {
         _stroke(canvas, o, ringR(4), const Color(0xFF3F3F46), ringW(3.5));
         _stroke(canvas, o, ringR(7), const Color(0xFF71717A), ringW(2));
       case 'holo':
-        _holoBand(canvas, o, ringR(5), phase, ringW(5));
+        _prismFacetRing(canvas, o, ringR(5.5), phase, ringW(5.5));
       default:
         _vibePulse(canvas, o, ringR(5), accent, phase);
         _stroke(canvas, o, ringR(3.5), accent, ringW(3));
@@ -364,7 +361,54 @@ class NgmyBioRingFramePainter extends CustomPainter {
     }
   }
 
-  void _holoBand(Canvas c, Offset o, double radius, double t, [double strokeW = 3]) {
+  void _doubleOrbitRing(Canvas c, Offset o, double outerR, double innerR, double animPhase, double strokeW) {
+    _glowRing(c, o, outerR + 3, Colors.white, 0.18 + math.sin(animPhase * math.pi * 2) * 0.08);
+    for (var i = 0; i < 16; i++) {
+      final a = animPhase * math.pi * 2 + (i / 16) * math.pi * 2;
+      final dash = i.isEven;
+      if (!dash) continue;
+      final p1 = o + Offset(math.cos(a) * (outerR - 2), math.sin(a) * (outerR - 2));
+      final p2 = o + Offset(math.cos(a) * (outerR + 5), math.sin(a) * (outerR + 5));
+      c.drawLine(p1, p2, Paint()
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: 0.75));
+    }
+    _stroke(c, o, outerR, Colors.white.withValues(alpha: 0.95), strokeW);
+    _stroke(c, o, innerR, const Color(0xFFE2E8F0).withValues(alpha: 0.9), strokeW * 0.85);
+    for (var i = 0; i < 3; i++) {
+      final a = -animPhase * math.pi * 2 + (i / 3) * math.pi * 2;
+      final p = o + Offset(math.cos(a) * outerR, math.sin(a) * outerR);
+      c.drawCircle(p, 3.5, Paint()..color = Colors.white);
+    }
+  }
+
+  void _coralReefRing(Canvas c, Offset o, double radius, double animPhase, double strokeW) {
+    _warmPulse(c, o, radius + 8, const Color(0xFFFB7185));
+    const colors = [Color(0xFFFFF1F2), Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFE11D48)];
+    for (var i = 0; i < 14; i++) {
+      final a = (i / 14) * math.pi * 2 + animPhase * 0.4;
+      final bump = radius + 4 + math.sin(i * 1.7 + animPhase * math.pi * 2) * 3;
+      final p = o + Offset(math.cos(a) * bump, math.sin(a) * bump);
+      c.drawCircle(p, 3.2, Paint()..color = colors[i % colors.length]);
+    }
+    _luxBand(c, o, radius, const [Color(0xFFFFE4E6), Color(0xFFFB7185), Color(0xFFE11D48), Color(0xFFFB7185)], strokeW);
+    for (var i = 0; i < 5; i++) {
+      final a = animPhase * math.pi * 1.5 + (i / 5) * math.pi * 2;
+      final p = o + Offset(math.cos(a) * (radius - 6), math.sin(a) * (radius - 6));
+      c.drawCircle(p, 2, Paint()..color = const Color(0xFFFFF1F2).withValues(alpha: 0.9));
+    }
+  }
+
+  void _prismFacetRing(Canvas c, Offset o, double radius, double animPhase, double strokeW) {
+    _glowRing(c, o, radius + 8, const Color(0xFF22D3EE), 0.2 + math.sin(animPhase * math.pi * 2) * 0.12);
+    for (var i = 0; i < 6; i++) {
+      final a = (i / 6) * math.pi * 2 + animPhase * math.pi * 0.5;
+      final p1 = o + Offset(math.cos(a) * (radius - 3), math.sin(a) * (radius - 3));
+      final p2 = o + Offset(math.cos(a + math.pi / 3) * (radius - 3), math.sin(a + math.pi / 3) * (radius - 3));
+      c.drawLine(p1, p2, Paint()
+        ..strokeWidth = 1.5
+        ..color = const Color(0xFFA78BFA).withValues(alpha: 0.55));
+    }
     c.drawCircle(
       o,
       radius,
@@ -372,11 +416,18 @@ class NgmyBioRingFramePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeW
         ..shader = SweepGradient(
-          colors: const [Color(0xFF22D3EE), Color(0xFFA78BFA), Color(0xFFF472B6), Color(0xFFFBBF24), Color(0xFF22D3EE)],
-          transform: GradientRotation(t * math.pi * 2),
-        ).createShader(Rect.fromCircle(center: o, radius: radius)),
+          colors: const [
+            Color(0xFF22D3EE),
+            Color(0xFF34D399),
+            Color(0xFFFBBF24),
+            Color(0xFFF472B6),
+            Color(0xFFA78BFA),
+            Color(0xFF22D3EE),
+          ],
+          transform: GradientRotation(animPhase * math.pi * 2),
+        ).createShader(Rect.fromCircle(center: o, radius: radius + strokeW)),
     );
-    _glowRing(c, o, radius + 4, const Color(0xFF22D3EE), 0.15 + math.sin(t * math.pi * 2) * 0.1);
+    _shimmerArc(c, o, radius + 2, const Color(0xFFFFFFFF), strokeW * 0.55);
   }
 
   @override
