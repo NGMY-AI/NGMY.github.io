@@ -99,7 +99,7 @@ class _NgmyGuestLocalBioHostScreenState extends State<NgmyGuestLocalBioHostScree
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _error = 'We could not open this Bio page. Ask the host to publish again while online.';
+      _error = 'We could not open this Bio page. Ask the host to copy the full published link and try again.';
     });
   }
 

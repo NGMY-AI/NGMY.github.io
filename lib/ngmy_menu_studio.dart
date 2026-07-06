@@ -306,7 +306,10 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       );
     }
     if (err == null) {
-      doc.publicUrl = widget._isLocal ? ngmyLocalMenuPublicUrlForSlug(doc.slug) : ngmyMenuPublicUrlForSlug(doc.slug);
+      final base = widget._isLocal ? ngmyLocalMenuPublicUrlForSlug(doc.slug) : ngmyMenuPublicUrlForSlug(doc.slug);
+      doc.publicUrl = widget._isLocal
+          ? NgmyLocalMenuPublishRegistry.publicUrlFor(doc.slug, doc.toJson(), baseUrl: base)
+          : base;
       doc.status = 'published';
     }
     if (widget._isLocal) {
@@ -332,7 +335,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           children: [
             Text(
               widget._isLocal
-                  ? 'Your phone is the host. Anyone can open this link on any device after you publish online.'
+                  ? 'Your phone hosts this menu. Copy the full link — it works on any device.'
                   : 'Anyone can open this link — no login required.',
             ),
             const SizedBox(height: 12),

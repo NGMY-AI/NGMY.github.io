@@ -147,7 +147,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       err = await NgmyBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson(), createdByEmail: widget.userEmail);
     }
     if (err == null) {
-      _doc.publicUrl = widget._isLocal ? ngmyLocalBioPublicUrlForSlug(_doc.slug) : ngmyBioPublicUrlForSlug(_doc.slug);
+      final base = widget._isLocal ? ngmyLocalBioPublicUrlForSlug(_doc.slug) : ngmyBioPublicUrlForSlug(_doc.slug);
+      _doc.publicUrl = widget._isLocal
+          ? NgmyLocalBioPublishRegistry.publicUrlFor(_doc.slug, _doc.toJson(), baseUrl: base)
+          : base;
       _doc.status = 'published';
     }
     if (widget._isLocal) {
