@@ -171,7 +171,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
-        widget._isLocal ? 'Published on this device! Link copied: $url' : 'Published! Link copied: $url',
+        widget._isLocal ? 'Published! Anyone can open this link.' : 'Published! Link copied: $url',
       ),
     ));
   }

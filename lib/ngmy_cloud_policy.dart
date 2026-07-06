@@ -46,6 +46,8 @@ class NgmyCloudPolicy {
     final k = key.trim();
     if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
     if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;
+    if (k == 'ngmy_local_menu_publish_registry' || k.startsWith('ngmy_local_menu_pub_')) return true;
+    if (k == 'ngmy_local_bio_publish_registry' || k.startsWith('ngmy_local_bio_pub_')) return true;
     return false;
   }
 

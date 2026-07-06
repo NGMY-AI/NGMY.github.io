@@ -80,23 +80,26 @@ class _NgmyGuestLocalBioHostScreenState extends State<NgmyGuestLocalBioHostScree
     ngmyApplyBioPageChrome(Colors.white);
     SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(Colors.white));
 
-    final entry = await NgmyLocalBioPublishRegistry.fetchBySlug(widget.slug);
-    if (!mounted) return;
-    if (entry != null && entry['data'] is Map) {
-      final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
-      setState(() {
-        _doc = doc;
-        _loading = false;
-      });
-      _applyTemplateChrome(doc);
-      await _unfold.forward();
-      return;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      final entry = await NgmyLocalBioPublishRegistry.fetchBySlugForGuest(widget.slug);
+      if (!mounted) return;
+      if (entry != null && entry['data'] is Map) {
+        final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+        setState(() {
+          _doc = doc;
+          _loading = false;
+        });
+        _applyTemplateChrome(doc);
+        await _unfold.forward();
+        return;
+      }
+      if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
     }
 
+    if (!mounted) return;
     setState(() {
       _loading = false;
-      _error =
-          'This local Bio link only works on the phone or browser that published it. Open the link on the same device, or publish again from Local Bio (Test) in Business Essentials.';
+      _error = 'We could not open this Bio page. Ask the host to publish again while online.';
     });
   }
 

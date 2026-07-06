@@ -63,25 +63,28 @@ class _NgmyGuestLocalMenuHostScreenState extends State<NgmyGuestLocalMenuHostScr
       _loading = true;
       _error = null;
     });
-    final entry = await NgmyLocalMenuPublishRegistry.fetchBySlug(widget.slug);
-    if (!mounted) return;
-    if (entry != null && entry['data'] is Map) {
-      final doc = NgmyMenuDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
-      doc.ensureMenuPages();
-      setState(() {
-        _doc = doc;
-        _loading = false;
-        _pageIndex = 0;
-      });
-      if (_pageController.hasClients) {
-        _pageController.jumpToPage(0);
+    for (var attempt = 0; attempt < 4; attempt++) {
+      final entry = await NgmyLocalMenuPublishRegistry.fetchBySlugForGuest(widget.slug);
+      if (!mounted) return;
+      if (entry != null && entry['data'] is Map) {
+        final doc = NgmyMenuDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+        doc.ensureMenuPages();
+        setState(() {
+          _doc = doc;
+          _loading = false;
+          _pageIndex = 0;
+        });
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(0);
+        }
+        return;
       }
-      return;
+      if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
     }
+    if (!mounted) return;
     setState(() {
       _loading = false;
-      _error =
-          'This local menu link only works on the phone or browser that published it. Open the link on the same device, or publish again from Local Menu (Test) in Business Essentials.';
+      _error = 'We could not open this menu. Ask the host to publish again while online.';
     });
   }
 

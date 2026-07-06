@@ -332,7 +332,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
           children: [
             Text(
               widget._isLocal
-                  ? 'This link is saved on this device only — it will not open on other phones or browsers.'
+                  ? 'Your phone is the host. Anyone can open this link on any device after you publish online.'
                   : 'Anyone can open this link — no login required.',
             ),
             const SizedBox(height: 12),
@@ -428,8 +428,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                       Text(
                         widget._isLocal
                             ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly
-                                ? 'Link-in-bio pages · publish on this device · no cloud'
-                                : 'Restaurant menus · publish on this device · no cloud')
+                                ? 'Link-in-bio · your phone hosts · works on any device'
+                                : 'Restaurant menus · your phone hosts · works on any device')
                             : 'Luxury menus · Bio pages · publish online · QR codes',
                         style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
                       ),
