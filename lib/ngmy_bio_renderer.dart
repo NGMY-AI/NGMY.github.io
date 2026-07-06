@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_bio_models.dart';
+import 'ngmy_bio_social.dart';
 import 'ngmy_bio_templates.dart';
-import 'ngmy_menu_footer.dart';
 
 /// Link-in-bio page preview (studio + guest).
 class NgmyBioPreview extends StatelessWidget {
@@ -57,18 +57,9 @@ class NgmyBioPreview extends StatelessWidget {
                   ),
                 ),
               SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: pad + (document.socialLinks.hasAny ? 56 : 20)),
+                padding: EdgeInsets.only(bottom: pad + 20),
                 child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links),
               ),
-              if (document.socialLinks.hasAny)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: NgmyMenuGuestFooter(links: document.socialLinks, compact: compact),
-                  ),
-                ),
             ],
           ),
         ),
@@ -198,7 +189,7 @@ class NgmyBioPreview extends StatelessWidget {
               children: [
                 _avatar(document.avatarImageBase64, avatarSize, ring),
                 SizedBox(height: compact ? 10 : 14),
-                _nameBlock(tpl, name, tagline),
+                _belowName(tpl, name, tagline),
                 SizedBox(height: compact ? 14 : 18),
                 _framedLinks(links, tpl, pad),
                 SizedBox(height: pad),
@@ -243,7 +234,7 @@ class NgmyBioPreview extends StatelessWidget {
               children: [
                 _avatar(document.avatarImageBase64, avatarSize, ring),
                 SizedBox(height: compact ? 8 : 12),
-                _nameBlock(tpl, name, tagline),
+                _belowName(tpl, name, tagline),
                 SizedBox(height: compact ? 14 : 18),
                 _framedLinks(links, tpl, pad),
                 SizedBox(height: pad),
@@ -291,14 +282,14 @@ class NgmyBioPreview extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _nameBlock(tpl, name, tagline),
+                  _belowName(tpl, name, tagline),
                   SizedBox(height: compact ? 12 : 16),
                   _linksColumn(links, tpl, 0),
                 ],
               ),
             )
           else ...[
-            _nameBlock(tpl, name, tagline),
+            _belowName(tpl, name, tagline),
             SizedBox(height: compact ? 14 : 18),
             _linksColumn(links, tpl, 0),
           ],
@@ -328,7 +319,7 @@ class NgmyBioPreview extends StatelessWidget {
             children: [
               _avatar(document.avatarImageBase64, avatarSize, ring),
               SizedBox(height: compact ? 10 : 14),
-              _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
               SizedBox(height: compact ? 12 : 16),
               _framedLinks(links, tpl, pad),
               SizedBox(height: pad),
@@ -363,7 +354,7 @@ class NgmyBioPreview extends StatelessWidget {
               ),
             _avatar(document.avatarImageBase64, avatarSize, ring),
             SizedBox(height: compact ? 10 : 14),
-            _nameBlock(tpl, name, tagline),
+            _belowName(tpl, name, tagline),
             SizedBox(height: compact ? 14 : 18),
             _linksColumn(links, tpl, 0),
           ],
@@ -373,14 +364,16 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _marblePanel(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+    final headerH = compact ? 150.0 : 190.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (document.headerImageBase64.isNotEmpty)
+          SizedBox(height: headerH, width: double.infinity, child: _headerImageOrGradient(tpl, headerH)),
         SizedBox(height: compact ? 12 : 20),
         _avatar(document.avatarImageBase64, avatarSize, ring),
         SizedBox(height: compact ? 10 : 14),
-        Container(width: 48, height: 1, color: tpl.accent.withValues(alpha: 0.35), margin: EdgeInsets.only(bottom: compact ? 10 : 14)),
-        _nameBlock(tpl, name, tagline),
+        _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 12 : 16),
         _framedLinks(links, tpl, pad),
         SizedBox(height: pad),
@@ -402,7 +395,7 @@ class NgmyBioPreview extends StatelessWidget {
             children: [
               _avatar(document.avatarImageBase64, avatarSize, ring),
               SizedBox(height: compact ? 8 : 12),
-              _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
               SizedBox(height: compact ? 14 : 18),
               Padding(padding: EdgeInsets.symmetric(horizontal: pad), child: _linksColumn(links, tpl, 0)),
             ],
@@ -432,7 +425,7 @@ class NgmyBioPreview extends StatelessWidget {
             ),
           _avatar(document.avatarImageBase64, avatarSize, ring),
           SizedBox(height: compact ? 10 : 14),
-          _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
           SizedBox(height: compact ? 14 : 18),
           _linksColumn(links, tpl, 0),
         ],
@@ -468,6 +461,7 @@ class NgmyBioPreview extends StatelessWidget {
               Expanded(child: _nameBlock(tpl, name, tagline, align: TextAlign.left)),
             ],
           ),
+          NgmyBioSocialRow(links: document.socialLinks, compact: compact),
           SizedBox(height: compact ? 16 : 24),
           Container(width: 48, height: 2, color: tpl.accent),
           SizedBox(height: compact ? 12 : 16),
@@ -492,7 +486,7 @@ class NgmyBioPreview extends StatelessWidget {
             children: [
               _avatar(document.avatarImageBase64, avatarSize, ring),
               SizedBox(height: compact ? 8 : 12),
-              _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
               SizedBox(height: compact ? 14 : 18),
               Padding(padding: EdgeInsets.symmetric(horizontal: pad), child: _linksColumn(links, tpl, 0)),
             ],
@@ -517,7 +511,7 @@ class NgmyBioPreview extends StatelessWidget {
             child: _avatar(document.avatarImageBase64, avatarSize, ring),
           ),
           SizedBox(height: compact ? 14 : 18),
-          _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
           SizedBox(height: compact ? 14 : 18),
           _linksColumn(links, tpl, 0),
         ],
@@ -558,7 +552,7 @@ class NgmyBioPreview extends StatelessWidget {
               children: [
                 _avatar(document.avatarImageBase64, avatarSize, ring),
                 SizedBox(height: compact ? 8 : 12),
-                _nameBlock(tpl, name, tagline),
+                _belowName(tpl, name, tagline),
                 SizedBox(height: compact ? 14 : 18),
                 _framedLinks(links, tpl, pad),
                 SizedBox(height: pad),
@@ -588,7 +582,7 @@ class NgmyBioPreview extends StatelessWidget {
               children: [
                 _avatar(document.avatarImageBase64, avatarSize, ring),
                 SizedBox(height: compact ? 8 : 12),
-                _nameBlock(tpl, name, tagline),
+                _belowName(tpl, name, tagline),
                 SizedBox(height: compact ? 14 : 18),
                 _framedLinks(links, tpl, pad),
                 SizedBox(height: pad),
@@ -612,7 +606,7 @@ class NgmyBioPreview extends StatelessWidget {
         SizedBox(height: compact ? 20 : 28),
         _avatar(document.avatarImageBase64, avatarSize, ring),
         SizedBox(height: compact ? 10 : 14),
-        _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 14 : 18),
         _framedLinks(links, tpl, pad),
         SizedBox(height: pad),
@@ -625,7 +619,7 @@ class NgmyBioPreview extends StatelessWidget {
     return Column(
       children: [
         if (hasHeader)
-          SizedBox(height: compact ? 140 : 180, width: double.infinity, child: _bioImage(document.headerImageBase64, fit: BoxFit.cover))
+          SizedBox(height: compact ? 140 : 180, width: double.infinity, child: _headerImageOrGradient(tpl, compact ? 140 : 180))
         else
           SizedBox(height: compact ? 60 : 80),
         Transform.translate(
@@ -647,7 +641,7 @@ class NgmyBioPreview extends StatelessWidget {
                 else
                   const SizedBox.shrink(),
                 if (hasHeader) SizedBox(height: compact ? 10 : 14),
-                _nameBlock(tpl, name, tagline),
+                _belowName(tpl, name, tagline),
                 SizedBox(height: compact ? 12 : 16),
                 _linksColumn(links, tpl, 0),
               ],
@@ -680,7 +674,7 @@ class NgmyBioPreview extends StatelessWidget {
             ],
           ),
           SizedBox(height: compact ? 12 : 16),
-          _nameBlock(tpl, name, tagline),
+              _belowName(tpl, name, tagline),
           SizedBox(height: compact ? 6 : 8),
           Container(width: 32, height: 1, color: tpl.subtitleColor.withValues(alpha: 0.2)),
           SizedBox(height: compact ? 14 : 18),
@@ -731,11 +725,24 @@ class NgmyBioPreview extends StatelessWidget {
 
   Widget _headerImageOrGradient(NgmyBioTemplate tpl, double height) {
     if (document.headerImageBase64.isNotEmpty) {
-      return SizedBox(
-        height: height,
-        width: double.infinity,
-        child: _bioImage(document.headerImageBase64, fit: BoxFit.cover, height: height, alignment: Alignment.topCenter),
-      );
+      try {
+        if (document.headerImageBase64.startsWith('data:image')) {
+          final bytes = base64Decode(document.headerImageBase64.split(',').last);
+          return SizedBox(
+            height: height,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: MemoryImage(bytes),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                ),
+              ),
+            ),
+          );
+        }
+      } catch (_) {}
     }
     if (tpl.headerGradient != null) {
       return Container(
@@ -750,6 +757,15 @@ class NgmyBioPreview extends StatelessWidget {
           colors: [tpl.accent.withValues(alpha: 0.35), tpl.pageBg.withValues(alpha: 0.1)],
         ),
       ),
+    );
+  }
+
+  Widget _belowName(NgmyBioTemplate tpl, String name, String tagline, {TextAlign align = TextAlign.center}) {
+    return Column(
+      children: [
+        _nameBlock(tpl, name, tagline, align: align),
+        NgmyBioSocialRow(links: document.socialLinks, compact: compact),
+      ],
     );
   }
 

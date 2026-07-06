@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_bio_image_crop.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
@@ -534,7 +535,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             children: [
               _photoTile(t, label: 'Profile photo', hint: 'Square photo — shown in the ring', hasImage: _doc.avatarImageBase64.isNotEmpty, onPick: () => _pickImage((b) => _doc.avatarImageBase64 = b, maxSize: 800), onClear: () => setState(() => _doc.avatarImageBase64 = '')),
               const SizedBox(height: 10),
-              _photoTile(t, label: 'Header banner', hint: 'Wide image behind your profile', hasImage: _doc.headerImageBase64.isNotEmpty, onPick: () => _pickImage((b) => _doc.headerImageBase64 = b), onClear: () => setState(() => _doc.headerImageBase64 = '')),
+              _photoTile(t, label: 'Header banner', hint: 'Wide banner — crop to fit', hasImage: _doc.headerImageBase64.isNotEmpty, onPick: () async {
+                final url = await ngmyBioPickBannerImage(context);
+                if (url != null) setState(() => _doc.headerImageBase64 = url);
+              }, onClear: () => setState(() => _doc.headerImageBase64 = '')),
               const SizedBox(height: 10),
               _photoTile(t, label: 'Page background', hint: 'Optional full-page backdrop', hasImage: _doc.backgroundImageBase64.isNotEmpty, onPick: () => _pickImage((b) => _doc.backgroundImageBase64 = b), onClear: () => setState(() => _doc.backgroundImageBase64 = '')),
             ],
