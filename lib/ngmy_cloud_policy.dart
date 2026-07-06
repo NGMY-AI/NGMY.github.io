@@ -1,19 +1,12 @@
 /// Which features may use Supabase Realtime vs cloud persistence.
-///
-/// Realtime is admin-only and limited to civic registry, store, popups, and
-/// store payment orders. Everything else is local-first with optional polling.
 library;
 
 class NgmyCloudPolicy {
   NgmyCloudPolicy._();
 
-  /// Regular users never open Supabase Realtime channels.
   static const bool realtimeForRegularUsers = false;
-
-  /// Admin Realtime watches `config` (scoped fields) and `store_listings`.
   static const Set<String> adminRealtimeTables = {'config', 'store_listings'};
 
-  /// `config` row keys written to / read from Supabase.
   static const Set<String> cloudConfigKeys = {
     'civicRegistrarApplications',
     'civicRegistryMembers',
@@ -34,7 +27,6 @@ class NgmyCloudPolicy {
     'familyTreePhotoAccessUntilByEmail',
   };
 
-  /// Minimal user row for admin signup roster + profile avatars (not balances).
   static const Set<String> cloudUserKeys = {
     'email',
     'username',
@@ -48,7 +40,14 @@ class NgmyCloudPolicy {
   static const bool persistTransactionsToCloud = false;
   static const bool persistMediaPostsToCloud = false;
   static const bool persistAnnouncementsToCloud = false;
-  static const bool persistNgmySettingsToCloud = false;
+
+  /// Published bio/menu pages must reach Supabase so guest links work.
+  static bool allowNgmySettingsKey(String key) {
+    final k = key.trim();
+    if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
+    if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;
+    return false;
+  }
 
   static Map<String, dynamic> filterConfigForCloud(Map<String, dynamic> row) {
     final out = <String, dynamic>{};
@@ -74,9 +73,5 @@ class NgmyCloudPolicy {
       if (cloudUserKeys.contains(e.key)) out[e.key] = e.value;
     }
     return out;
-  }
-
-  static bool userRowHasCloudFields(Map<String, dynamic> row) {
-    return row.keys.any((k) => cloudUserKeys.contains(k) && k != 'email');
   }
 }

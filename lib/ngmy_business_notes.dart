@@ -1407,14 +1407,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     if (_syncingBody) return;
     final newDisplay = _body.text;
     final oldDisplay = _lastBodyView.display;
-    final displayCursor = _body.selection.baseOffset;
     if (newDisplay != oldDisplay) {
-      final cursorCanon = _canonicalFromDisplay(_lastBodyView, displayCursor);
-      final oldStored = _storedBody;
-      _storedBody = _mergeDisplayEdit(_storedBody, _lastBodyView, oldDisplay, newDisplay);
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _note.body = _storedBody;
       var start = 0;
       while (start < oldDisplay.length && start < newDisplay.length && oldDisplay[start] == newDisplay[start]) {
         start++;
@@ -1425,8 +1418,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         oldTail--;
         newTail--;
       }
-      final netInsert = (newTail - start) - (oldTail - start);
-      final newCursorCanon = (cursorCanon + netInsert).clamp(0, _storedBody.length);
+      final oldStored = _storedBody;
+      final cStartBefore = start < _lastBodyView.d2c.length ? _lastBodyView.d2c[start] : oldStored.length;
+      _storedBody = _mergeDisplayEdit(_storedBody, _lastBodyView, oldDisplay, newDisplay);
+      _reconcileTextAnims(oldStored, _storedBody);
+      _syncAnimRangesFromParens();
+      _note.body = _storedBody;
+      final newCursorCanon = (cStartBefore + (newTail - start)).clamp(0, _storedBody.length);
       _refreshBodyDisplay(putCursorCanonical: newCursorCanon);
     } else {
       _onBodySelectionChanged();

@@ -39,7 +39,7 @@ Future<void> _backupGameCenterLocal(Map<String, dynamic> payload) async {
 }
 
 Future<void> _backupGameCenterCloud(Map<String, dynamic> payload) async {
-  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return;
+  if (!NgmyCloudPolicy.allowNgmySettingsKey(kNgmyGameCenterSettingsCloudKey)) return;
   try {
     await Supabase.instance.client.from('ngmy_settings').upsert([
       {
@@ -66,7 +66,7 @@ Future<bool> ngmyPersistGameCenterSettings({
     'savedAt': DateTime.now().toUtc().toIso8601String(),
   };
   await _backupGameCenterLocal(payload);
-  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return true;
+  if (!NgmyCloudPolicy.allowNgmySettingsKey(kNgmyGameCenterSettingsCloudKey)) return true;
   if (!await _canReachCloud()) return false;
 
   await _backupGameCenterCloud(payload);

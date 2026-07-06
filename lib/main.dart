@@ -409,17 +409,14 @@ void main() async {
   final isGuestLink = isGuestPublishedApp || isGuestPublishedInvoice || isGuestPublishedMenu || isGuestPublishedBio;
 
   var launchBootstrap = NgmyLaunchBootstrap.empty;
-  var deferBootstrapLoad = false;
+  const deferBootstrapLoad = false;
   if (!isGuestLink) {
     if (oauthReturn) {
       await ngmyIgnoreTimeout(ngmyEnsureSupabaseAuthInitialized, timeout: const Duration(seconds: 15));
       await ngmyRecoverOAuthSessionIfNeeded();
-      launchBootstrap = await ngmyLoadLaunchBootstrap();
-    } else {
-      deferBootstrapLoad = true;
     }
+    launchBootstrap = await ngmyLoadLaunchBootstrap();
 
-    if (!deferBootstrapLoad) {
     final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
     if (launchLoggedOut) {
       try {
@@ -477,7 +474,6 @@ void main() async {
 
     _ngmyInitialThemeMode = launchBootstrap.themeMode;
     _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
-    }
 
     ngmyCaptureCivicEnrollLaunchIntent();
     ngmyCaptureMediaPostLaunchIntent();
@@ -4615,7 +4611,7 @@ bool _isNgmySystemStoreListingId(String id) => id.startsWith('ngmy:system:');
 DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').toString());
 
 Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
-  if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return true;
+  if (!NgmyCloudPolicy.allowNgmySettingsKey(key)) return true;
   final row = <String, dynamic>{
     'key': key,
     'value': value,
@@ -8423,18 +8419,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     NgmyNavigator.install();
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
-    if (widget.deferBootstrapLoad) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(() async {
-          final bootstrap = await ngmyLoadLaunchBootstrap();
-          if (!mounted) return;
-          _hydrateFromLaunchBootstrap(bootstrap);
-          _ngmyInitialThemeMode = bootstrap.themeMode;
-          _ngmyApplySystemChromeForThemeMode(bootstrap.themeMode);
-          _scheduleDeferredStartupRebuild();
-        }());
-      });
-    }
     unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {

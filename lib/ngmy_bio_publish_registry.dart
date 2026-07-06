@@ -182,7 +182,10 @@ class NgmyBioPublishRegistry {
       value['bios'] = entries;
       value['savedAt'] = publishedAt;
 
-      if (!NgmyCloudPolicy.persistNgmySettingsToCloud) return null;
+      if (!NgmyCloudPolicy.allowNgmySettingsKey(settingsKey) ||
+          !NgmyCloudPolicy.allowNgmySettingsKey(_slugSettingsKey(clean))) {
+        return 'Could not publish Bio to cloud. Try again in a moment.';
+      }
       await Supabase.instance.client.from('ngmy_settings').upsert([
         {
           'key': _slugSettingsKey(clean),
