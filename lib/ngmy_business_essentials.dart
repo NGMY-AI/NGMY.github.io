@@ -5,6 +5,8 @@ import 'ngmy_business_notes.dart';
 import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_transfer.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_paper_trace.dart';
+import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
@@ -20,6 +22,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessNotesCount(userEmail: userEmail),
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
+    ngmyPaperTraceCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -60,6 +63,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _notes = 0;
   int _tasks = 0;
   int _reminders = 0;
+  int _traces = 0;
   bool _loading = true;
 
   @override
@@ -77,6 +81,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessNotesCount(userEmail: widget.userEmail),
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
+      ngmyPaperTraceCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -87,6 +92,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _notes = results[4];
       _tasks = results[5];
       _reminders = results[6];
+      _traces = results[7];
       _loading = false;
     });
   }
@@ -207,6 +213,13 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                       accent: const Color(0xFFA78BFA),
                       count: _reminders,
                       onTap: () => _openCategory((ctx) => showNgmyItemReminderDialog(ctx, userEmail: widget.userEmail)),
+                    ),
+                    _CompactCategoryCard(
+                      title: 'Paper Trace',
+                      icon: Icons.draw_rounded,
+                      accent: const Color(0xFFF97316),
+                      count: _traces,
+                      onTap: () => _openCategory((ctx) => showNgmyPaperTraceDialog(ctx, userEmail: widget.userEmail)),
                     ),
                   ],
                 ),
