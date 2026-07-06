@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMotionUsageDescription</key>
+	<string>NGMY Paper Trace uses motion sensors to keep your reference image aligned on paper while you trace.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>NGMY uses the camera to scan product barcodes in Purchases.</string>
 	<key>NSAppTransportSecurity</key>

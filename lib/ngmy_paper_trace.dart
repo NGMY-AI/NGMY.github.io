@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_paper_trace_orientation.dart';
 import 'ngmy_paper_trace_storage.dart';
 
 Future<void> showNgmyPaperTraceDialog(BuildContext context, {required String userEmail}) {
@@ -122,7 +123,7 @@ class _PaperTraceHubState extends State<_PaperTraceHub> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Text(
-                  'Upload a picture, align it on your paper, then lock it. The image stays fixed on screen while you move your phone and draw.',
+                  'Upload a picture, line it up on your paper, then tap the pin. The image stays on the paper as you move your phone — draw on the paper with a pen.',
                   style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
                 ),
               ),
@@ -266,13 +267,22 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
   final _strokes = <_DrawStroke>[];
   _DrawStroke? _active;
 
+  final _anchor = PaperTraceAnchor();
+  late final PaperTraceOrientationStream _orientation;
+  StreamSubscription<PaperTiltSample>? _orientSub;
+  PaperTiltSample? _lastTilt;
+
   Offset _imageOffset = Offset.zero;
+  Offset _displayOffset = Offset.zero;
   double _imageScale = 1;
+  double _displayScale = 1;
   double _scaleGestureStart = 1;
   Offset _panGestureStart = Offset.zero;
   double _imageOpacity = 0.55;
-  /// When true the reference image is pinned to the screen — it does not move when the phone moves.
+  double _trackStrength = 1.0;
+  /// When true, overlay follows paper using phone tilt (not glued to screen).
   bool _imageLocked = false;
+  bool _screenSketch = false;
   bool _eraser = false;
   Color _brushColor = Colors.black;
   double _brushWidth = 3;
@@ -286,7 +296,19 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
   void initState() {
     super.initState();
     _loadImage();
+    _orientation = PaperTraceOrientationStream()..start();
+    _orientSub = _orientation.stream.listen(_onTilt);
     WidgetsBinding.instance.addPostFrameCallback((_) => _showAlignHint());
+  }
+
+  void _onTilt(PaperTiltSample s) {
+    _lastTilt = s;
+    _anchor.ingest(s);
+    if (!_imageLocked || !mounted) return;
+    setState(() {
+      _displayOffset = _anchor.displayOffset(_trackStrength);
+      _displayScale = _anchor.displayScale();
+    });
   }
 
   void _showAlignHint() {
@@ -295,7 +317,7 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         duration: Duration(seconds: 4),
-        content: Text('Hold phone over paper. Drag/pinch the image to match, then tap the pin to lock before drawing.'),
+        content: Text('Hold phone over your paper. Drag/pinch the image to match, then tap the pin — it will stick to the paper while you move the phone.'),
       ),
     );
   }
@@ -310,12 +332,37 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
 
   @override
   void dispose() {
+    _orientSub?.cancel();
+    _orientation.dispose();
     _camera.dispose();
     super.dispose();
   }
 
+  void _lockToPaper() {
+    final gain = MediaQuery.sizeOf(context).height * 0.92;
+    _anchor.panGain = gain;
+    _anchor.lock(offset: _imageOffset, scale: _imageScale, at: _lastTilt);
+    setState(() {
+      _imageLocked = true;
+      _displayOffset = _anchor.displayOffset(_trackStrength);
+      _displayScale = _anchor.displayScale();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Anchored to paper. Move your phone — the image stays on the page. Draw with a pen on the paper.')),
+    );
+  }
+
+  void _unlockFromPaper() {
+    _anchor.unlock();
+    setState(() {
+      _imageLocked = false;
+      _imageOffset = _displayOffset;
+      _imageScale = _displayScale;
+    });
+  }
+
   void _onDrawStart(Offset local) {
-    if (!_imageLocked) return;
+    if (!_imageLocked || !_screenSketch) return;
     setState(() {
       _active = _DrawStroke(
         color: _eraser ? Colors.transparent : _brushColor,
@@ -331,7 +378,7 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
   }
 
   void _onDrawUpdate(Offset local) {
-    if (!_imageLocked || _active == null) return;
+    if (!_imageLocked || !_screenSketch || _active == null) return;
     setState(() => _active!.points.add(local));
   }
 
@@ -370,6 +417,8 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
     final size = MediaQuery.sizeOf(context);
     final baseW = size.width * 0.82;
     final baseH = size.height * 0.48;
+    final offset = _imageLocked ? _displayOffset : _imageOffset;
+    final scale = _imageLocked ? _displayScale : _imageScale;
 
     Widget img = Opacity(
       opacity: _imageOpacity,
@@ -377,8 +426,8 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
     );
 
     img = Transform.translate(
-      offset: _imageOffset,
-      child: Transform.scale(scale: _imageScale, child: img),
+      offset: offset,
+      child: Transform.scale(scale: scale, child: img),
     );
 
     if (!_imageLocked) {
@@ -432,19 +481,17 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
               children: [
                 if (_imageBytes != null)
                   _buildReferenceOverlay(),
-                Listener(
-                  onPointerDown: (e) => _onDrawStart(e.localPosition),
-                  onPointerMove: (e) => _onDrawUpdate(e.localPosition),
-                  onPointerUp: (_) => _onDrawEnd(),
-                  onPointerCancel: (_) => _onDrawEnd(),
-                  child: IgnorePointer(
-                    ignoring: !_imageLocked,
+                if (_screenSketch)
+                  Listener(
+                    onPointerDown: (e) => _onDrawStart(e.localPosition),
+                    onPointerMove: (e) => _onDrawUpdate(e.localPosition),
+                    onPointerUp: (_) => _onDrawEnd(),
+                    onPointerCancel: (_) => _onDrawEnd(),
                     child: CustomPaint(
                       painter: _SketchPainter(strokes: _strokes, active: _active, eraser: _eraser),
                       child: const SizedBox.expand(),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -463,8 +510,8 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
                 Expanded(
                   child: Text(
                     _imageLocked
-                        ? 'Pinned — image stays on screen; move phone to re-align on paper'
-                        : 'Align image on paper, then tap pin to lock',
+                        ? 'Anchored to paper — image follows the page'
+                        : 'Align on paper, then tap pin to anchor',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -489,16 +536,24 @@ class _PaperTraceStudioState extends State<_PaperTraceStudio> {
               brushWidth: _brushWidth,
               eraser: _eraser,
               locked: _imageLocked,
+              screenSketch: _screenSketch,
+              trackStrength: _trackStrength,
               color: _brushColor,
               onOpacity: (v) => setState(() => _imageOpacity = v),
               onBrush: (v) => setState(() => _brushWidth = v),
               onEraser: (v) => setState(() => _eraser = v),
+              onTrack: (v) => setState(() {
+                _trackStrength = v;
+                if (_imageLocked) {
+                  _displayOffset = _anchor.displayOffset(_trackStrength);
+                }
+              }),
+              onScreenSketch: (v) => setState(() => _screenSketch = v),
               onLock: (v) {
-                setState(() => _imageLocked = v);
                 if (v) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Image locked. It will stay in place while you draw.')),
-                  );
+                  _lockToPaper();
+                } else {
+                  _unlockFromPaper();
                 }
               },
               onColor: (c) => setState(() {
@@ -595,10 +650,14 @@ class _TraceToolbar extends StatelessWidget {
     required this.brushWidth,
     required this.eraser,
     required this.locked,
+    required this.screenSketch,
+    required this.trackStrength,
     required this.color,
     required this.onOpacity,
     required this.onBrush,
     required this.onEraser,
+    required this.onTrack,
+    required this.onScreenSketch,
     required this.onLock,
     required this.onColor,
     required this.onClear,
@@ -608,10 +667,14 @@ class _TraceToolbar extends StatelessWidget {
   final double brushWidth;
   final bool eraser;
   final bool locked;
+  final bool screenSketch;
+  final double trackStrength;
   final Color color;
   final ValueChanged<double> onOpacity;
   final ValueChanged<double> onBrush;
   final ValueChanged<bool> onEraser;
+  final ValueChanged<double> onTrack;
+  final ValueChanged<bool> onScreenSketch;
   final ValueChanged<bool> onLock;
   final ValueChanged<Color> onColor;
   final VoidCallback onClear;
@@ -642,14 +705,36 @@ class _TraceToolbar extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: locked ? 'Unlock to move image' : 'Lock image on screen',
+                  tooltip: locked ? 'Unlock to realign' : 'Anchor image to paper',
                   onPressed: () => onLock(!locked),
                   icon: Icon(locked ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: locked ? const Color(0xFF34D399) : Colors.white),
                 ),
               ],
             ),
+            if (locked)
+              Row(
+                children: [
+                  const Icon(Icons.tune_rounded, color: Colors.white70, size: 16),
+                  Expanded(
+                    child: Slider(
+                      value: trackStrength,
+                      min: 0.55,
+                      max: 1.45,
+                      onChanged: onTrack,
+                      activeColor: const Color(0xFF34D399),
+                    ),
+                  ),
+                  const Text('Track', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                ],
+              ),
             Row(
               children: [
+                IconButton(
+                  tooltip: screenSketch ? 'Screen sketch on' : 'Draw on paper with a pen (recommended)',
+                  onPressed: () => onScreenSketch(!screenSketch),
+                  icon: Icon(Icons.draw_rounded, color: screenSketch ? const Color(0xFFF97316) : Colors.white54, size: 20),
+                ),
+                if (screenSketch) ...[
                 _colorDot(const Color(0xFF0F172A), color, onColor),
                 _colorDot(const Color(0xFFDC2626), color, onColor),
                 _colorDot(const Color(0xFF2563EB), color, onColor),
@@ -672,6 +757,7 @@ class _TraceToolbar extends StatelessWidget {
                   onPressed: onClear,
                   icon: const Icon(Icons.delete_sweep_outlined, color: Colors.white70, size: 20),
                 ),
+                ],
               ],
             ),
           ],
