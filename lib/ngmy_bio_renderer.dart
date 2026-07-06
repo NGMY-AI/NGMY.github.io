@@ -103,7 +103,7 @@ class NgmyBioPreview extends StatelessWidget {
       case NgmyBioLayoutStyle.goldLuxe:
         return _goldLuxe(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.pillStack:
-        return _centeredStack(tpl, ring, avatarSize, pad, name, tagline, links, headerH: compact ? 60 : 80, roundedPanel: true);
+        return _pillGlassLayout(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.darkNeon:
         return _neonLayout(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.marbleCream:
@@ -242,6 +242,29 @@ class NgmyBioPreview extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _pillGlassLayout(
+    NgmyBioTemplate tpl,
+    NgmyBioRingStyle ring,
+    double avatarSize,
+    double pad,
+    String name,
+    String tagline,
+    List<NgmyBioLink> links,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: compact ? 28 : 40),
+        Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+        SizedBox(height: compact ? 14 : 18),
+        _belowName(tpl, name, tagline),
+        SizedBox(height: compact ? 18 : 24),
+        _framedLinks(links, tpl, pad),
+        SizedBox(height: pad + 8),
       ],
     );
   }
@@ -732,6 +755,16 @@ class NgmyBioPreview extends StatelessWidget {
     final r = radius.clamp(4.0, 999.0);
     final dark = _isDarkBg(tpl.pageBg);
     if (frosted) {
+      if (!dark) {
+        return BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(r),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.06), width: 0.5),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4), spreadRadius: -2),
+          ],
+        );
+      }
       return BoxDecoration(
         color: Colors.white.withValues(alpha: dark ? 0.1 : 0.14),
         borderRadius: BorderRadius.circular(r),
@@ -771,16 +804,18 @@ class NgmyBioPreview extends StatelessWidget {
       try {
         if (document.headerImageBase64.startsWith('data:image')) {
           final bytes = base64Decode(document.headerImageBase64.split(',').last);
-          return SizedBox(
-            height: height,
-            width: double.infinity,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: MemoryImage(bytes),
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
+          return RepaintBoundary(
+            child: SizedBox(
+              height: height,
+              width: double.infinity,
+              child: Image.memory(
+                bytes,
+                key: ValueKey('bio_hdr_${bytes.length}_${bytes.isNotEmpty ? bytes[0] : 0}'),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: lightweight ? 900 : null,
               ),
             ),
           );
@@ -871,57 +906,54 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _linkCard(NgmyBioLink link, NgmyBioTemplate tpl) {
-    final title = link.title.trim().isEmpty ? 'Link' : link.title.trim();
-    final radius = tpl.linkStyle == NgmyBioLinkStyle.pill ? 999.0 : tpl.cardRadius;
+    final rawTitle = link.title.trim().isEmpty ? 'Link' : link.title.trim();
+    final isDark = _isDarkBg(tpl.pageBg);
+    final isGlass = tpl.linkStyle == NgmyBioLinkStyle.glass || tpl.linkStyle == NgmyBioLinkStyle.pill || tpl.linkStyle == NgmyBioLinkStyle.neonOutline;
+    final usePill = isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
+    final radius = usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0);
     final compactPad = compact;
+    final thumbSize = compactPad ? 44.0 : 52.0;
+    final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
 
-    Widget content = Row(
+    Widget thumb = ClipOval(
+      child: link.imageBase64.isNotEmpty
+          ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
+          : Container(
+              width: thumbSize,
+              height: thumbSize,
+              color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
+              child: Icon(Icons.link_rounded, color: tpl.subtitleColor, size: compactPad ? 20 : 22),
+            ),
+    );
+
+    final content = Row(
       children: [
-        if (tpl.linkStyle != NgmyBioLinkStyle.minimalLine && tpl.linkStyle != NgmyBioLinkStyle.goldBar)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(tpl.linkStyle == NgmyBioLinkStyle.pill ? 999 : 8),
-            child: link.imageBase64.isNotEmpty
-                ? _bioImage(link.imageBase64, width: compactPad ? 40 : 48, height: compactPad ? 40 : 48, fit: BoxFit.cover)
-                : Container(
-                    width: compactPad ? 40 : 48,
-                    height: compactPad ? 40 : 48,
-                    color: tpl.subtitleColor.withValues(alpha: 0.12),
-                    child: Icon(Icons.link_rounded, color: tpl.subtitleColor, size: compactPad ? 20 : 22),
-                  ),
-          ),
-        if (tpl.linkStyle != NgmyBioLinkStyle.minimalLine && tpl.linkStyle != NgmyBioLinkStyle.goldBar) SizedBox(width: compactPad ? 10 : 12),
+        thumb,
+        SizedBox(width: compactPad ? 12 : 14),
         Expanded(
           child: Text(
-            title,
+            displayTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: tpl.serifTitle ? 'Georgia' : null,
-              fontSize: compactPad ? 14 : 16,
-              fontWeight: FontWeight.w600,
+              fontSize: compactPad ? 13 : 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: isGlass && isDark ? 0.6 : 0,
+              height: 1.2,
               color: tpl.linkTextColor,
             ),
           ),
         ),
-        if (tpl.linkStyle == NgmyBioLinkStyle.minimalLine)
-          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: tpl.subtitleColor),
+        SizedBox(width: thumbSize),
       ],
     );
 
-    if (tpl.linkStyle == NgmyBioLinkStyle.goldBar) {
-      content = Row(
-        children: [
-          Expanded(
-            child: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: compactPad ? 14 : 16, color: tpl.linkTextColor)),
-          ),
-        ],
-      );
-    }
-
     final decoration = _linkDecoration(tpl, radius);
-    final borderRadius = BorderRadius.circular(radius.clamp(4, 999));
+    final borderRadius = BorderRadius.circular(radius.clamp(8, 999));
     final padded = Padding(
-      padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 12, vertical: compactPad ? 10 : 12),
+      padding: EdgeInsets.symmetric(horizontal: compactPad ? 12 : 14, vertical: compactPad ? 11 : 13),
       child: content,
     );
 
@@ -930,7 +962,7 @@ class NgmyBioPreview extends StatelessWidget {
       card = ClipRRect(
         borderRadius: borderRadius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: DecoratedBox(decoration: decoration, child: padded),
         ),
       );
@@ -939,15 +971,12 @@ class NgmyBioPreview extends StatelessWidget {
     }
 
     return Padding(
-      padding: EdgeInsets.only(bottom: compactPad ? 8 : 10),
+      padding: EdgeInsets.only(bottom: compactPad ? 10 : 12),
       child: interactive
-          ? Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _openUrl(link.url),
-                borderRadius: borderRadius,
-                child: card,
-              ),
+          ? _BioLinkTap(
+              onTap: () => _openUrl(link.url),
+              borderRadius: borderRadius,
+              child: card,
             )
           : card,
     );
@@ -956,16 +985,15 @@ class NgmyBioPreview extends StatelessWidget {
   BoxDecoration _linkDecoration(NgmyBioTemplate tpl, double radius) {
     switch (tpl.linkStyle) {
       case NgmyBioLinkStyle.glass:
+      case NgmyBioLinkStyle.pill:
+      case NgmyBioLinkStyle.neonOutline:
         return _glassyLinkDecoration(tpl, radius, frosted: true);
       case NgmyBioLinkStyle.outline:
       case NgmyBioLinkStyle.rowIcon:
-      case NgmyBioLinkStyle.pill:
       case NgmyBioLinkStyle.goldBar:
-        return _glassyLinkDecoration(tpl, radius);
-      case NgmyBioLinkStyle.neonOutline:
-        return _glassyLinkDecoration(tpl, radius, glow: true);
+        return _glassyLinkDecoration(tpl, radius, frosted: _isDarkBg(tpl.pageBg));
       case NgmyBioLinkStyle.minimalLine:
-        return _glassyLinkDecoration(tpl, radius.clamp(4.0, 12.0));
+        return _glassyLinkDecoration(tpl, radius.clamp(8.0, 28.0), frosted: false);
     }
   }
 
@@ -981,6 +1009,7 @@ class NgmyBioPreview extends StatelessWidget {
       }
       return Image.memory(
         bytes,
+        key: ValueKey('bio_img_${bytes.length}_${bytes.isNotEmpty ? bytes[0] : 0}'),
         width: width,
         height: height,
         fit: fit,
@@ -1003,6 +1032,37 @@ class NgmyBioPreview extends StatelessWidget {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class _BioLinkTap extends StatefulWidget {
+  const _BioLinkTap({required this.onTap, required this.borderRadius, required this.child});
+
+  final VoidCallback onTap;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  @override
+  State<_BioLinkTap> createState() => _BioLinkTapState();
+}
+
+class _BioLinkTapState extends State<_BioLinkTap> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
   }
 }
 

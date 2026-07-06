@@ -257,7 +257,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16)],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: NgmyBioPreview(document: _doc, compact: false),
+                  child: RepaintBoundary(
+                    child: NgmyBioPreview(document: _doc, compact: false),
+                  ),
                 ),
               ),
             ],
@@ -304,7 +306,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   child: Container(
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
                     clipBehavior: Clip.antiAlias,
-                    child: NgmyBioPreview(document: _doc, compact: true),
+                    child: RepaintBoundary(
+                      child: NgmyBioPreview(document: _doc, compact: true),
+                    ),
                   ),
                 ),
             ],

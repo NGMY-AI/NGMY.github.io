@@ -1563,10 +1563,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
         ),
-        trailing: IconButton(
-          icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
-          tooltip: 'Project options',
-          onPressed: () => _showDeckActionsSheet(deck, isDark),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.picture_as_pdf_outlined, color: isDark ? const Color(0xFFB8860B) : const Color(0xFF2563EB)),
+              tooltip: 'Download PDF',
+              onPressed: () async {
+                try {
+                  final msg = await ngmySlidesDownloadDeckPdf(deck);
+                  if (!context.mounted) return;
+                  await ngmyHandleSlidesPdfDownloadResult(context, msg, deckName: deck.name);
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
+                }
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+              tooltip: 'Project options',
+              onPressed: () => _showDeckActionsSheet(deck, isDark),
+            ),
+          ],
         ),
         onTap: () => _openDeck(deck),
       ),
@@ -1635,6 +1654,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
             ),
+          ),
+          IconButton(
+            tooltip: 'Download PDF',
+            onPressed: () => unawaited(_downloadPdf()),
+            icon: Icon(Icons.picture_as_pdf_outlined, color: isDark ? const Color(0xFFB8860B) : const Color(0xFF2563EB)),
           ),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white70 : const Color(0xFF475569)),

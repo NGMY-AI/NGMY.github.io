@@ -10,6 +10,8 @@ void ngmyClearStagedSlidesPdfImpl() {}
 
 Future<bool> ngmyShareStagedSlidesPdfImpl() async => false;
 
+Future<bool> ngmyDownloadStagedSlidesPdfImpl() async => false;
+
 Future<bool> ngmyOpenStagedSlidesPdfInSafariImpl() async => false;
 
 Future<String> saveNgmySlidesPdfWithIosSupportImpl(Uint8List bytes, String filename) =>

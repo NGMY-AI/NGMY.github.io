@@ -15,6 +15,8 @@ void ngmyClearStagedSlidesPdf() => ngmyClearStagedSlidesPdfImpl();
 
 Future<bool> ngmyShareStagedSlidesPdf() => ngmyShareStagedSlidesPdfImpl();
 
+Future<bool> ngmyDownloadStagedSlidesPdf() => ngmyDownloadStagedSlidesPdfImpl();
+
 Future<bool> ngmyOpenStagedSlidesPdfInSafari() => ngmyOpenStagedSlidesPdfInSafariImpl();
 
 /// Save PDF bytes — on iPhone web stages for share sheet; elsewhere downloads directly.
@@ -41,8 +43,9 @@ Future<void> ngmyShowIosSlidesPdfDialog(BuildContext context, {required String d
       title: const Text('Save your PDF', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       content: Text(
         'Your presentation PDF is ready.\n\n'
-        '• Tap Share to save to Files or send to someone.\n'
-        '• Tap Safari to open the PDF in your browser.\n\n'
+        '• Tap Download — then choose Save to Files.\n'
+        '• Tap Share to send it to someone.\n'
+        '• Tap Safari to open it in the browser (use Share ↗ at the bottom to save).\n\n'
         'File: $name',
         style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
       ),
@@ -57,36 +60,60 @@ Future<void> ngmyShowIosSlidesPdfDialog(BuildContext context, {required String d
         OutlinedButton.icon(
           onPressed: () async {
             final opened = await ngmyOpenStagedSlidesPdfInSafari();
-            if (ctx.mounted) Navigator.pop(ctx);
             if (!context.mounted) return;
+            if (ctx.mounted) Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(opened ? 'PDF opened — use Share ↗ then Save to Files.' : 'Could not open PDF. Try Share instead.'),
-                duration: const Duration(seconds: 8),
+                content: Text(
+                  opened
+                      ? 'PDF opened in Safari — tap Share ↗ at the bottom, then Save to Files.'
+                      : 'Could not open in Safari. Try Download instead.',
+                ),
+                duration: const Duration(seconds: 9),
               ),
             );
           },
           icon: const Icon(Icons.language_rounded, size: 18),
           label: const Text('Safari'),
         ),
-        FilledButton.icon(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
+        OutlinedButton.icon(
           onPressed: () async {
             final shared = await ngmyShareStagedSlidesPdf();
-            if (ctx.mounted) Navigator.pop(ctx);
             if (!context.mounted) return;
+            if (ctx.mounted) Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(shared ? 'Tap Save to Files or share from the menu.' : 'Share unavailable — try Safari.'),
-                duration: const Duration(seconds: 8),
+                content: Text(
+                  shared
+                      ? 'Choose Save to Files or send to someone from the share menu.'
+                      : 'Share unavailable — try Download or Safari.',
+                ),
+                duration: const Duration(seconds: 9),
               ),
             );
-            if (!shared) {
-              await ngmyOpenStagedSlidesPdfInSafari();
-            }
           },
           icon: const Icon(Icons.ios_share_rounded, size: 18),
           label: const Text('Share'),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB8860B)),
+          onPressed: () async {
+            final saved = await ngmyDownloadStagedSlidesPdf();
+            if (!context.mounted) return;
+            if (ctx.mounted) Navigator.pop(ctx);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  saved
+                      ? 'On the next screen, tap Save to Files to keep your PDF.'
+                      : 'Download did not start — try Share or Safari.',
+                ),
+                duration: const Duration(seconds: 9),
+              ),
+            );
+          },
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('Download'),
         ),
       ],
     ),
