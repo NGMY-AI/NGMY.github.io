@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_bio_effects.dart';
+import 'ngmy_bio_ring_animations.dart';
 
 /// Structural layout — each template uses a distinct shape / composition.
 enum NgmyBioLayoutStyle {
@@ -29,11 +30,19 @@ enum NgmyBioLayoutStyle {
 enum NgmyBioLinkStyle { rowIcon, outline, pill, goldBar, minimalLine, glass, neonOutline }
 
 class NgmyBioRingStyle {
-  const NgmyBioRingStyle({required this.id, required this.label, required this.buildRing});
+  const NgmyBioRingStyle({
+    required this.id,
+    required this.label,
+    required this.buildRing,
+    this.ringAnimation = NgmyBioRingAnimation.none,
+    this.auraColor,
+  });
 
   final String id;
   final String label;
   final BoxDecoration Function(double size) buildRing;
+  final NgmyBioRingAnimation ringAnimation;
+  final Color? auraColor;
 }
 
 class NgmyBioTemplate {
@@ -143,15 +152,51 @@ BoxDecoration _ringGlow(double s) => BoxDecoration(
 const List<NgmyBioRingStyle> kNgmyBioRingStyles = [
   NgmyBioRingStyle(id: 'none', label: 'None', buildRing: _ringNone),
   NgmyBioRingStyle(id: 'white', label: 'Clean White', buildRing: _ringWhite),
-  NgmyBioRingStyle(id: 'gold', label: 'Gold', buildRing: _ringGold),
+  NgmyBioRingStyle(
+    id: 'gold',
+    label: 'Gold',
+    buildRing: _ringGold,
+    ringAnimation: NgmyBioRingAnimation.shimmer,
+    auraColor: Color(0xFFD4AF37),
+  ),
   NgmyBioRingStyle(id: 'silver', label: 'Silver', buildRing: _ringSilver),
-  NgmyBioRingStyle(id: 'rose_gold', label: 'Rose Gold', buildRing: _ringRoseGold),
-  NgmyBioRingStyle(id: 'emerald', label: 'Emerald', buildRing: _ringEmerald),
+  NgmyBioRingStyle(
+    id: 'rose_gold',
+    label: 'Rose Gold',
+    buildRing: _ringRoseGold,
+    ringAnimation: NgmyBioRingAnimation.smoke,
+    auraColor: Color(0xFFE8B4B8),
+  ),
+  NgmyBioRingStyle(
+    id: 'emerald',
+    label: 'Emerald',
+    buildRing: _ringEmerald,
+    ringAnimation: NgmyBioRingAnimation.smoke,
+    auraColor: Color(0xFF059669),
+  ),
   NgmyBioRingStyle(id: 'midnight', label: 'Midnight', buildRing: _ringMidnight),
   NgmyBioRingStyle(id: 'double', label: 'Double Line', buildRing: _ringDouble),
-  NgmyBioRingStyle(id: 'ornate', label: 'Ornate', buildRing: _ringOrnate),
-  NgmyBioRingStyle(id: 'thin_gold', label: 'Gold Line', buildRing: _ringThinAccent),
-  NgmyBioRingStyle(id: 'glow_blue', label: 'Blue Glow', buildRing: _ringGlow),
+  NgmyBioRingStyle(
+    id: 'ornate',
+    label: 'Ornate',
+    buildRing: _ringOrnate,
+    ringAnimation: NgmyBioRingAnimation.orbit,
+    auraColor: Color(0xFFD4AF37),
+  ),
+  NgmyBioRingStyle(
+    id: 'thin_gold',
+    label: 'Gold Line',
+    buildRing: _ringThinAccent,
+    ringAnimation: NgmyBioRingAnimation.shimmer,
+    auraColor: Color(0xFFD4AF37),
+  ),
+  NgmyBioRingStyle(
+    id: 'glow_blue',
+    label: 'Blue Glow',
+    buildRing: _ringGlow,
+    ringAnimation: NgmyBioRingAnimation.pulse,
+    auraColor: Color(0xFF38BDF8),
+  ),
 ];
 
 NgmyBioRingStyle ngmyBioRingById(String id) {
@@ -170,7 +215,7 @@ NgmyBioRingStyle ngmyBioRingById(String id) {
   return kNgmyBioRingStyles.firstWhere((r) => r.id == resolved, orElse: () => kNgmyBioRingStyles.firstWhere((r) => r.id == 'gold'));
 }
 
-// ── 23 premium bio templates with scene effects ─────────────────────────────
+// ── 26 premium bio templates with scene effects ─────────────────────────────
 
 const List<NgmyBioTemplate> kNgmyBioTemplates = [
   NgmyBioTemplate(
@@ -610,6 +655,63 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     cardRadius: 28,
     cardShadow: false,
     sceneEffect: NgmyBioSceneEffect.neonMesh,
+  ),
+  NgmyBioTemplate(
+    id: 'cloud_dream',
+    name: 'Cloud Dream',
+    layout: NgmyBioLayoutStyle.pillStack,
+    pageBg: Color(0xFFF8FAFC),
+    pageBgEnd: Color(0xFFE0F2FE),
+    panelBg: Color(0xFFF8FAFC),
+    cardBg: Color(0xE6FFFFFF),
+    cardBorder: Color(0xFFBAE6FD),
+    accent: Color(0xFF38BDF8),
+    titleColor: Color(0xFF0F172A),
+    subtitleColor: Color(0xFF64748B),
+    linkTextColor: Color(0xFF1E293B),
+    linkStyle: NgmyBioLinkStyle.glass,
+    cardRadius: 28,
+    cardShadow: false,
+    serifTitle: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
+  ),
+  NgmyBioTemplate(
+    id: 'pearl_marble',
+    name: 'Pearl Marble',
+    layout: NgmyBioLayoutStyle.marbleCream,
+    pageBg: Color(0xFFF5F5F4),
+    pageBgEnd: Color(0xFFFFFFFF),
+    panelBg: Color(0xFFFFFFFF),
+    cardBg: Color(0xFFF5F5F4),
+    cardBorder: Color(0xFFE7E5E4),
+    accent: Color(0xFF78716C),
+    titleColor: Color(0xFF292524),
+    subtitleColor: Color(0xFF78716C),
+    linkTextColor: Color(0xFF44403C),
+    linkStyle: NgmyBioLinkStyle.pill,
+    headerGradient: [Color(0xFFD6D3D1), Color(0xFFA8A29E)],
+    cardRadius: 28,
+    cardShadow: false,
+  ),
+  NgmyBioTemplate(
+    id: 'silver_mist',
+    name: 'Silver Mist',
+    layout: NgmyBioLayoutStyle.curvedOverlap,
+    pageBg: Color(0xFFE2E8F0),
+    pageBgEnd: Color(0xFFF1F5F9),
+    panelBg: Color(0xFFF1F5F9),
+    cardBg: Color(0xE6FFFFFF),
+    cardBorder: Color(0xFFCBD5E1),
+    accent: Color(0xFF64748B),
+    titleColor: Color(0xFF0F172A),
+    subtitleColor: Color(0xFF64748B),
+    linkTextColor: Color(0xFF334155),
+    linkStyle: NgmyBioLinkStyle.glass,
+    headerGradient: [Color(0xFF94A3B8), Color(0xFFCBD5E1)],
+    cardRadius: 28,
+    cardShadow: false,
+    serifTitle: false,
+    sceneEffect: NgmyBioSceneEffect.sparkle,
   ),
 ];
 

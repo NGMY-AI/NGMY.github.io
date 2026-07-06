@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_bio_effects.dart';
 import 'ngmy_bio_models.dart';
+import 'ngmy_bio_ring_animations.dart';
 import 'ngmy_bio_social.dart';
 import 'ngmy_bio_templates.dart';
 
@@ -19,6 +20,7 @@ class NgmyBioPreview extends StatelessWidget {
     this.maxWidth = 420,
     this.interactive = true,
     this.lightweight = false,
+    this.fullBleed = false,
   });
 
   final NgmyBioDocument document;
@@ -26,6 +28,7 @@ class NgmyBioPreview extends StatelessWidget {
   final double maxWidth;
   final bool interactive;
   final bool lightweight;
+  final bool fullBleed;
 
   @override
   Widget build(BuildContext context) {
@@ -38,39 +41,50 @@ class NgmyBioPreview extends StatelessWidget {
     final tagline = document.tagline.trim();
     final links = document.activeLinks;
 
+    final pageStack = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (tpl.sceneEffect != NgmyBioSceneEffect.none && document.backgroundImageBase64.isEmpty)
+          Positioned.fill(
+            child: NgmyBioSceneLayer(
+              effect: tpl.sceneEffect,
+              accent: tpl.accent,
+              animate: true,
+            ),
+          ),
+        if (document.backgroundImageBase64.isNotEmpty)
+          Positioned.fill(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _bioImage(document.backgroundImageBase64, fit: BoxFit.cover, alignment: Alignment.topCenter),
+                Container(color: Colors.black.withValues(alpha: tpl.layout == NgmyBioLayoutStyle.photoImmersive ? 0.25 : 0.4)),
+              ],
+            ),
+          ),
+        SingleChildScrollView(
+          padding: EdgeInsets.only(bottom: pad + 20),
+          child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links),
+        ),
+      ],
+    );
+
+    if (fullBleed) {
+      return SizedBox.expand(
+        child: DecoratedBox(
+          decoration: _pageDecoration(tpl, document),
+          child: pageStack,
+        ),
+      );
+    }
+
     return Container(
       decoration: _pageDecoration(tpl, document),
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (tpl.sceneEffect != NgmyBioSceneEffect.none && document.backgroundImageBase64.isEmpty)
-                Positioned.fill(
-                  child: NgmyBioSceneLayer(
-                    effect: tpl.sceneEffect,
-                    accent: tpl.accent,
-                    animate: true,
-                  ),
-                ),
-              if (document.backgroundImageBase64.isNotEmpty)
-                Positioned.fill(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _bioImage(document.backgroundImageBase64, fit: BoxFit.cover, alignment: Alignment.topCenter),
-                      Container(color: Colors.black.withValues(alpha: tpl.layout == NgmyBioLayoutStyle.photoImmersive ? 0.25 : 0.4)),
-                    ],
-                  ),
-                ),
-              SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: pad + 20),
-                child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links),
-              ),
-            ],
-          ),
+          child: pageStack,
         ),
       ),
     );
@@ -149,6 +163,71 @@ class NgmyBioPreview extends StatelessWidget {
   /// Same color from curve through the bottom — no contrasting panel block.
   Color _seamlessBody(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
 
+  Widget _overlapHeaderSection({
+    required NgmyBioTemplate tpl,
+    required NgmyBioRingStyle ring,
+    required double avatarSize,
+    required double headerH,
+    required double curveH,
+    required CustomPainter Function(Color bodyColor) curvePainter,
+    required Widget Function() belowAvatar,
+    bool accentBar = false,
+  }) {
+    final bodyColor = _seamlessBody(tpl);
+    final overlap = avatarSize * 0.52;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox(
+              height: headerH,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _headerImageOrGradient(tpl, headerH),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => CustomPaint(
+                        size: Size(constraints.maxWidth, curveH),
+                        painter: curvePainter(bodyColor),
+                      ),
+                    ),
+                  ),
+                  if (accentBar)
+                    Positioned(
+                      bottom: curveH,
+                      left: 0,
+                      right: 0,
+                      child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: headerH - overlap,
+              child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+            ),
+          ],
+        ),
+        ColoredBox(
+          color: bodyColor,
+          child: Padding(
+            padding: EdgeInsets.only(top: overlap),
+            child: belowAvatar(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _curvedOverlap(
     NgmyBioTemplate tpl,
     NgmyBioRingStyle ring,
@@ -159,99 +238,47 @@ class NgmyBioPreview extends StatelessWidget {
     List<NgmyBioLink> links, {
     bool accentBar = false,
   }) {
-    final bodyColor = _seamlessBody(tpl);
     final headerH = compact ? 140.0 : 180.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: headerH,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _headerImageOrGradient(tpl, headerH),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: CustomPaint(
-                  size: Size(maxWidth, compact ? 44 : 56),
-                  painter: ngmyBioCurvedPanelPainter(bodyColor),
-                ),
-              ),
-              if (accentBar)
-                Positioned(
-                  bottom: compact ? 44 : 56,
-                  left: 0,
-                  right: 0,
-                  child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
-                ),
-            ],
-          ),
-        ),
-        ColoredBox(
-          color: bodyColor,
-          child: Transform.translate(
-            offset: Offset(0, -avatarSize * 0.45),
-            child: Column(
-              children: [
-                _avatar(document.avatarImageBase64, avatarSize, ring),
-                SizedBox(height: compact ? 10 : 14),
-                _belowName(tpl, name, tagline),
-                SizedBox(height: compact ? 14 : 18),
-                _framedLinks(links, tpl, pad),
-                SizedBox(height: pad),
-              ],
-            ),
-          ),
-        ),
-      ],
+    final curveH = compact ? 44.0 : 56.0;
+    return _overlapHeaderSection(
+      tpl: tpl,
+      ring: ring,
+      avatarSize: avatarSize,
+      headerH: headerH,
+      curveH: curveH,
+      curvePainter: ngmyBioCurvedPanelPainter,
+      accentBar: accentBar,
+      belowAvatar: () => Column(
+        children: [
+          SizedBox(height: compact ? 10 : 14),
+          _belowName(tpl, name, tagline),
+          SizedBox(height: compact ? 14 : 18),
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad),
+        ],
+      ),
     );
   }
 
   Widget _waveHeader(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
-    final bodyColor = _seamlessBody(tpl);
     final headerH = compact ? 150.0 : 190.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: headerH,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _headerImageOrGradient(tpl, headerH),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: CustomPaint(
-                  size: Size(maxWidth, compact ? 40 : 52),
-                  painter: ngmyBioWavePanelPainter(bodyColor),
-                ),
-              ),
-            ],
-          ),
-        ),
-        ColoredBox(
-          color: bodyColor,
-          child: Transform.translate(
-            offset: Offset(0, -avatarSize * 0.48),
-            child: Column(
-              children: [
-                _avatar(document.avatarImageBase64, avatarSize, ring),
-                SizedBox(height: compact ? 8 : 12),
-                _belowName(tpl, name, tagline),
-                SizedBox(height: compact ? 14 : 18),
-                _framedLinks(links, tpl, pad),
-                SizedBox(height: pad),
-              ],
-            ),
-          ),
-        ),
-      ],
+    final curveH = compact ? 40.0 : 52.0;
+    return _overlapHeaderSection(
+      tpl: tpl,
+      ring: ring,
+      avatarSize: avatarSize,
+      headerH: headerH,
+      curveH: curveH,
+      curvePainter: ngmyBioWavePanelPainter,
+      belowAvatar: () => Column(
+        children: [
+          SizedBox(height: compact ? 8 : 12),
+          _belowName(tpl, name, tagline),
+          SizedBox(height: compact ? 14 : 18),
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad),
+        ],
+      ),
     );
   }
 
@@ -396,52 +423,24 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _marblePanel(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
-    final bodyColor = tpl.pageBg;
     final headerH = compact ? 150.0 : 190.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: headerH,
-          width: double.infinity,
-          child: Stack(
-            clipBehavior: Clip.none,
-            fit: StackFit.expand,
-            children: [
-              _headerImageOrGradient(tpl, headerH),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: CustomPaint(
-                  size: Size(maxWidth, compact ? 44 : 56),
-                  painter: ngmyBioCurvedPanelPainter(bodyColor),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: -(avatarSize * 0.42),
-                child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
-              ),
-            ],
-          ),
-        ),
-        ColoredBox(
-          color: bodyColor,
-          child: Padding(
-            padding: EdgeInsets.only(top: avatarSize * 0.5),
-            child: Column(
-              children: [
-                _belowName(tpl, name, tagline),
-                SizedBox(height: compact ? 12 : 16),
-                _framedLinks(links, tpl, pad),
-                SizedBox(height: pad),
-              ],
-            ),
-          ),
-        ),
-      ],
+    final curveH = compact ? 44.0 : 56.0;
+    return _overlapHeaderSection(
+      tpl: tpl,
+      ring: ring,
+      avatarSize: avatarSize,
+      headerH: headerH,
+      curveH: curveH,
+      curvePainter: ngmyBioCurvedPanelPainter,
+      belowAvatar: () => Column(
+        children: [
+          SizedBox(height: compact ? 10 : 14),
+          _belowName(tpl, name, tagline),
+          SizedBox(height: compact ? 12 : 16),
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad),
+        ],
+      ),
     );
   }
 
@@ -525,7 +524,11 @@ class NgmyBioPreview extends StatelessWidget {
               Expanded(child: _nameBlock(tpl, name, tagline, align: TextAlign.left)),
             ],
           ),
-          NgmyBioSocialRow(links: document.socialLinks, compact: compact),
+          NgmyBioSocialRow(
+            links: document.socialLinks,
+            compact: compact,
+            lightBackground: !_isDarkBg(tpl.pageBg),
+          ),
           SizedBox(height: compact ? 16 : 24),
           Container(width: 48, height: 2, color: tpl.accent),
           SizedBox(height: compact ? 12 : 16),
@@ -584,47 +587,24 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _sunsetArc(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
-    final bodyColor = _seamlessBody(tpl);
     final headerH = compact ? 140.0 : 180.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: headerH,
-          width: double.infinity,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _headerImageOrGradient(tpl, headerH),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: CustomPaint(
-                  size: Size(maxWidth, compact ? 44 : 56),
-                  painter: ngmyBioCurvedPanelPainter(bodyColor),
-                ),
-              ),
-            ],
-          ),
-        ),
-        ColoredBox(
-          color: bodyColor,
-          child: Transform.translate(
-            offset: Offset(0, -avatarSize * 0.45),
-            child: Column(
-              children: [
-                _avatar(document.avatarImageBase64, avatarSize, ring),
-                SizedBox(height: compact ? 8 : 12),
-                _belowName(tpl, name, tagline),
-                SizedBox(height: compact ? 14 : 18),
-                _framedLinks(links, tpl, pad),
-                SizedBox(height: pad),
-              ],
-            ),
-          ),
-        ),
-      ],
+    final curveH = compact ? 44.0 : 56.0;
+    return _overlapHeaderSection(
+      tpl: tpl,
+      ring: ring,
+      avatarSize: avatarSize,
+      headerH: headerH,
+      curveH: curveH,
+      curvePainter: ngmyBioCurvedPanelPainter,
+      belowAvatar: () => Column(
+        children: [
+          SizedBox(height: compact ? 8 : 12),
+          _belowName(tpl, name, tagline),
+          SizedBox(height: compact ? 14 : 18),
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad),
+        ],
+      ),
     );
   }
 
@@ -851,7 +831,11 @@ class NgmyBioPreview extends StatelessWidget {
     return Column(
       children: [
         _nameBlock(tpl, name, tagline, align: align),
-        NgmyBioSocialRow(links: document.socialLinks, compact: compact),
+        NgmyBioSocialRow(
+          links: document.socialLinks,
+          compact: compact,
+          lightBackground: !_isDarkBg(tpl.pageBg),
+        ),
       ],
     );
   }
@@ -896,7 +880,7 @@ class NgmyBioPreview extends StatelessWidget {
   Widget _avatar(String ref, double size, NgmyBioRingStyle ring) {
     final pad = ring.id == 'none' ? 0.0 : (size > 100 ? 5.0 : 4.0);
     final inner = size - pad * 2;
-    return Container(
+    final core = Container(
       width: size,
       height: size,
       padding: pad > 0 ? EdgeInsets.all(pad) : null,
@@ -912,6 +896,15 @@ class NgmyBioPreview extends StatelessWidget {
               ),
       ),
     );
+    if (ring.ringAnimation != NgmyBioRingAnimation.none) {
+      return NgmyBioRingAura(
+        animation: ring.ringAnimation,
+        size: size,
+        accent: ring.auraColor ?? const Color(0xFFD4AF37),
+        child: core,
+      );
+    }
+    return core;
   }
 
   Widget _linkCard(NgmyBioLink link, NgmyBioTemplate tpl) {

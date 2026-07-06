@@ -5,10 +5,16 @@ import 'ngmy_menu_models.dart';
 
 /// Social icons row — centered under bio tagline (not page bottom).
 class NgmyBioSocialRow extends StatelessWidget {
-  const NgmyBioSocialRow({super.key, required this.links, this.compact = false});
+  const NgmyBioSocialRow({
+    super.key,
+    required this.links,
+    this.compact = false,
+    this.lightBackground = false,
+  });
 
   final NgmyMenuSocialLinks links;
   final bool compact;
+  final bool lightBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -16,53 +22,72 @@ class NgmyBioSocialRow extends StatelessWidget {
 
     final size = compact ? 34.0 : 38.0;
     final iconSize = compact ? 16.0 : 18.0;
+    final websiteColor = lightBackground ? const Color(0xFF475569) : Colors.white;
 
     Widget? chip(String url, Widget glyph) {
       if (url.trim().isEmpty) return null;
-      return _BioSocialCircle(size: size, onTap: () => _open(url), child: glyph);
+      return _BioSocialCircle(
+        size: size,
+        lightBackground: lightBackground,
+        onTap: () => _open(url),
+        child: glyph,
+      );
     }
 
     final items = <Widget>[
       if (links.instagram.trim().isNotEmpty)
         chip(
           links.instagram,
-          Container(
-            width: iconSize,
-            height: iconSize,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFFFEDA75), Color(0xFFFA7E1E), Color(0xFFD62976), Color(0xFF962FBF)],
+          ClipOval(
+            child: Container(
+              width: iconSize,
+              height: iconSize,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFEDA75), Color(0xFFFA7E1E), Color(0xFFD62976), Color(0xFF962FBF)],
+                ),
               ),
+              child: Icon(Icons.camera_alt_outlined, size: iconSize * 0.62, color: Colors.white),
             ),
-            child: Icon(Icons.camera_alt_outlined, size: iconSize * 0.62, color: Colors.white),
           ),
         )!,
       if (links.facebook.trim().isNotEmpty)
         chip(
           links.facebook,
-          Container(
-            width: iconSize,
-            height: iconSize,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1877F2)),
-            alignment: Alignment.center,
-            child: Text('f', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: iconSize * 0.85, height: 1)),
+          ClipOval(
+            child: Container(
+              width: iconSize,
+              height: iconSize,
+              color: const Color(0xFF1877F2),
+              alignment: Alignment.center,
+              child: Text(
+                'f',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: iconSize * 0.85,
+                  height: 1,
+                ),
+              ),
+            ),
           ),
         )!,
       if (links.youtube.trim().isNotEmpty)
         chip(
           links.youtube,
-          Container(
-            width: iconSize,
-            height: iconSize,
-            decoration: BoxDecoration(color: const Color(0xFFFF0000), borderRadius: BorderRadius.circular(4)),
-            child: Icon(Icons.play_arrow_rounded, size: iconSize * 0.78, color: Colors.white),
+          ClipOval(
+            child: Container(
+              width: iconSize,
+              height: iconSize,
+              color: const Color(0xFFFF0000),
+              child: Icon(Icons.play_arrow_rounded, size: iconSize * 0.78, color: Colors.white),
+            ),
           ),
         )!,
       if (links.website.trim().isNotEmpty)
         chip(
           links.website,
-          Icon(Icons.language_rounded, size: iconSize, color: Colors.white),
+          Icon(Icons.language_rounded, size: iconSize, color: websiteColor),
         )!,
     ];
 
@@ -88,11 +113,17 @@ class NgmyBioSocialRow extends StatelessWidget {
 }
 
 class _BioSocialCircle extends StatelessWidget {
-  const _BioSocialCircle({required this.size, required this.onTap, required this.child});
+  const _BioSocialCircle({
+    required this.size,
+    required this.onTap,
+    required this.child,
+    required this.lightBackground,
+  });
 
   final double size;
   final VoidCallback onTap;
   final Widget child;
+  final bool lightBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -106,8 +137,17 @@ class _BioSocialCircle extends StatelessWidget {
           height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.14),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))],
+            color: lightBackground ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.14),
+            border: Border.all(
+              color: lightBackground ? Colors.black.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.22),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: lightBackground ? 0.08 : 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Center(child: child),
         ),

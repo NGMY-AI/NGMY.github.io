@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import 'ngmy_bio_chrome.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
+import 'ngmy_bio_templates.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
 
 const _kBioGold = Color(0xFFB8860B);
@@ -26,7 +29,7 @@ class NgmyGuestPublishedBio extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Bio',
-      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: _kBioGold)),
+      theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: Colors.white),
       home: NgmyGuestBioHostScreen(slug: slug),
     );
   }
@@ -60,6 +63,13 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
     super.dispose();
   }
 
+  void _applyTemplateChrome(NgmyBioDocument doc) {
+    final tpl = ngmyBioTemplateById(doc.templateId);
+    final chrome = ngmyBioPageChromeColor(tpl);
+    ngmyApplyBioPageChrome(chrome);
+    SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(chrome));
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -67,6 +77,8 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
       _doc = null;
     });
     _unfold.reset();
+    ngmyApplyBioPageChrome(Colors.white);
+    SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(Colors.white));
 
     try {
       for (var attempt = 0; attempt < 2; attempt++) {
@@ -74,10 +86,12 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
             .timeout(const Duration(seconds: 10), onTimeout: () => null);
         if (!mounted) return;
         if (entry != null && entry['data'] is Map) {
+          final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
           setState(() {
-            _doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+            _doc = doc;
             _loading = false;
           });
+          _applyTemplateChrome(doc);
           await _unfold.forward();
           return;
         }
@@ -97,23 +111,32 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF111827),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: _kBioGold),
-              SizedBox(height: 16),
-              Text('Opening bio…', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-            ],
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: ngmyBioSystemUiOverlay(Colors.white),
+        child: const Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: _kBioGold),
+                SizedBox(height: 16),
+                Text('Opening bio…', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+              ],
+            ),
           ),
         ),
       );
     }
     if (_doc == null || _error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Bio not found')),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0,
+          title: const Text('Bio not found'),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -130,25 +153,32 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
       );
     }
 
-    return Scaffold(
-      body: AnimatedBuilder(
-        animation: _unfold,
-        builder: (context, child) {
-          final t = Curves.easeOutCubic.transform(_unfold.value);
-          final fold = (1 - t).clamp(0.0, 1.0);
-          return Opacity(
-            opacity: (t * 1.1).clamp(0.0, 1.0),
-            child: Transform(
-              alignment: Alignment.topCenter,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0012)
-                ..rotateX(fold * 0.65)
-                ..translateByDouble(0.0, fold * 48.0, 0.0, 1.0),
-              child: child,
-            ),
-          );
-        },
-        child: NgmyBioPreview(document: _doc!, lightweight: true),
+    final tpl = ngmyBioTemplateById(_doc!.templateId);
+    final chrome = ngmyBioPageChromeColor(tpl);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: ngmyBioSystemUiOverlay(chrome),
+      child: Scaffold(
+        backgroundColor: chrome,
+        body: AnimatedBuilder(
+          animation: _unfold,
+          builder: (context, child) {
+            final t = Curves.easeOutCubic.transform(_unfold.value);
+            final fold = (1 - t).clamp(0.0, 1.0);
+            return Opacity(
+              opacity: (t * 1.1).clamp(0.0, 1.0),
+              child: Transform(
+                alignment: Alignment.topCenter,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.0012)
+                  ..rotateX(fold * 0.65)
+                  ..translateByDouble(0.0, fold * 48.0, 0.0, 1.0),
+                child: child,
+              ),
+            );
+          },
+          child: NgmyBioPreview(document: _doc!, lightweight: true, fullBleed: true),
+        ),
       ),
     );
   }
