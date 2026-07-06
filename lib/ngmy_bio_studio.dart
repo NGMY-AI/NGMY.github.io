@@ -732,10 +732,24 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           t,
           title: 'Profile ring',
           subtitle: 'Frame around your profile photo.',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 14,
-            children: kNgmyBioRingStyles.map((ring) => _ringChip(t, ring)).toList(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const cols = 5;
+              const gap = 8.0;
+              final cellW = (constraints.maxWidth - gap * (cols - 1)) / cols;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  crossAxisSpacing: gap,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: cellW / 72,
+                ),
+                itemCount: kNgmyBioRingStyles.length,
+                itemBuilder: (context, i) => _ringChip(t, kNgmyBioRingStyles[i]),
+              );
+            },
           ),
         ),
       ],

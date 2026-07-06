@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -40,6 +41,7 @@ class NgmyBioPreview extends StatelessWidget {
     final name = document.displayName.trim().isEmpty ? 'Your Name' : document.displayName.trim();
     final tagline = document.tagline.trim();
     final links = document.activeLinks;
+    final minPageHeight = (!compact && fullBleed) ? MediaQuery.sizeOf(context).height : 0.0;
 
     final pageStack = Stack(
       clipBehavior: Clip.none,
@@ -62,10 +64,17 @@ class NgmyBioPreview extends StatelessWidget {
               ],
             ),
           ),
-        SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: pad + 20),
-          child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links),
-        ),
+        if (minPageHeight > 0)
+          SizedBox(
+            height: minPageHeight,
+            width: double.infinity,
+            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight),
+          )
+        else
+          SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: pad + 20),
+            child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: 0),
+          ),
       ],
     );
 
@@ -113,26 +122,27 @@ class NgmyBioPreview extends StatelessWidget {
     double pad,
     String name,
     String tagline,
-    List<NgmyBioLink> links,
-  ) {
+    List<NgmyBioLink> links, {
+    double minPageHeight = 0,
+  }) {
     switch (tpl.layout) {
       case NgmyBioLayoutStyle.curvedOverlap:
-        return _curvedOverlap(tpl, ring, avatarSize, pad, name, tagline, links);
+        return _curvedOverlap(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.waveHeader:
       case NgmyBioLayoutStyle.oceanWave:
-        return _waveHeader(tpl, ring, avatarSize, pad, name, tagline, links);
+        return _waveHeader(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.outlineMinimal:
         return _centeredStack(tpl, ring, avatarSize, pad, name, tagline, links, headerH: 0, panel: false);
       case NgmyBioLayoutStyle.goldLuxe:
         return _goldLuxe(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.pillStack:
-        return _pillGlassLayout(tpl, ring, avatarSize, pad, name, tagline, links);
+        return _pillGlassLayout(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.darkNeon:
         return _neonLayout(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.marbleCream:
-        return _marblePanel(tpl, ring, avatarSize, pad, name, tagline, links);
+        return _marblePanel(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.splitGradient:
-        return _curvedOverlap(tpl, ring, avatarSize, pad, name, tagline, links, accentBar: true);
+        return _curvedOverlap(tpl, ring, avatarSize, pad, name, tagline, links, accentBar: true, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.angularHero:
         return _angularHero(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.glassFloat:
@@ -146,7 +156,7 @@ class NgmyBioPreview extends StatelessWidget {
       case NgmyBioLayoutStyle.midnightGlow:
         return _glowLayout(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.sunsetArc:
-        return _sunsetArc(tpl, ring, avatarSize, pad, name, tagline, links);
+        return _sunsetArc(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.forestOrganic:
         return _organicHeader(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.boldStripe:
@@ -163,68 +173,96 @@ class NgmyBioPreview extends StatelessWidget {
   /// Same color from curve through the bottom — no contrasting panel block.
   Color _seamlessBody(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
 
+  Color _bodyFillColor(NgmyBioTemplate tpl) {
+    if (tpl.sceneEffect != NgmyBioSceneEffect.none) return Colors.transparent;
+    return _seamlessBody(tpl);
+  }
+
+  Color _curveFillColor(NgmyBioTemplate tpl) => tpl.pageBgEnd ?? tpl.pageBg;
+
   Widget _overlapHeaderSection({
     required NgmyBioTemplate tpl,
     required NgmyBioRingStyle ring,
     required double avatarSize,
+    required double pad,
     required double headerH,
     required double curveH,
     required CustomPainter Function(Color bodyColor) curvePainter,
     required Widget Function() belowAvatar,
     bool accentBar = false,
+    double minPageHeight = 0,
   }) {
-    final bodyColor = _seamlessBody(tpl);
-    final overlap = avatarSize * 0.52;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            SizedBox(
-              height: headerH,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _headerImageOrGradient(tpl, headerH),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => CustomPaint(
-                        size: Size(constraints.maxWidth, curveH),
-                        painter: curvePainter(bodyColor),
-                      ),
-                    ),
-                  ),
-                  if (accentBar)
-                    Positioned(
-                      bottom: curveH,
-                      left: 0,
-                      right: 0,
-                      child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
-                    ),
-                ],
+    final bodyColor = _bodyFillColor(tpl);
+    final curveColor = _curveFillColor(tpl);
+    final header = SizedBox(
+      height: headerH,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _headerImageOrGradient(tpl, headerH),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: LayoutBuilder(
+              builder: (context, constraints) => CustomPaint(
+                size: Size(constraints.maxWidth, curveH),
+                painter: curvePainter(curveColor),
               ),
             ),
+          ),
+          if (accentBar)
             Positioned(
+              bottom: curveH,
               left: 0,
               right: 0,
-              top: headerH - overlap,
-              child: Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+              child: Container(height: 1, color: tpl.accent.withValues(alpha: 0.25)),
             ),
+        ],
+      ),
+    );
+
+    final body = ColoredBox(
+      color: bodyColor,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: pad),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: compact ? 10 : 14),
+            Center(child: _avatar(document.avatarImageBase64, avatarSize, ring)),
+            SizedBox(height: compact ? 10 : 14),
+            if (minPageHeight > 0)
+              Expanded(child: belowAvatar())
+            else
+              belowAvatar(),
           ],
         ),
-        ColoredBox(
-          color: bodyColor,
-          child: Padding(
-            padding: EdgeInsets.only(top: overlap),
-            child: belowAvatar(),
+      ),
+    );
+
+    if (minPageHeight <= 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [header, body],
+      );
+    }
+
+    final headerBlock = headerH + (compact ? 10 : 14) + avatarSize + (compact ? 10 : 14);
+    final bodyMin = math.max(0.0, minPageHeight - headerBlock);
+    return SizedBox(
+      height: minPageHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          SizedBox(
+            height: bodyMin,
+            child: body,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -237,6 +275,7 @@ class NgmyBioPreview extends StatelessWidget {
     String tagline,
     List<NgmyBioLink> links, {
     bool accentBar = false,
+    double minPageHeight = 0,
   }) {
     final headerH = compact ? 140.0 : 180.0;
     final curveH = compact ? 44.0 : 56.0;
@@ -244,41 +283,74 @@ class NgmyBioPreview extends StatelessWidget {
       tpl: tpl,
       ring: ring,
       avatarSize: avatarSize,
+      pad: pad,
       headerH: headerH,
       curveH: curveH,
       curvePainter: ngmyBioCurvedPanelPainter,
       accentBar: accentBar,
-      belowAvatar: () => Column(
-        children: [
-          SizedBox(height: compact ? 10 : 14),
-          _belowName(tpl, name, tagline),
-          SizedBox(height: compact ? 14 : 18),
-          _framedLinks(links, tpl, pad),
-          SizedBox(height: pad),
-        ],
-      ),
+      minPageHeight: minPageHeight,
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight),
     );
   }
 
-  Widget _waveHeader(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+  Widget _waveHeader(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
     final headerH = compact ? 150.0 : 190.0;
     final curveH = compact ? 40.0 : 52.0;
     return _overlapHeaderSection(
       tpl: tpl,
       ring: ring,
       avatarSize: avatarSize,
+      pad: pad,
       headerH: headerH,
       curveH: curveH,
       curvePainter: ngmyBioWavePanelPainter,
-      belowAvatar: () => Column(
+      minPageHeight: minPageHeight,
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 8 : 12),
+    );
+  }
+
+  Widget _belowAvatarLinks(
+    NgmyBioTemplate tpl,
+    String name,
+    String tagline,
+    List<NgmyBioLink> links,
+    double pad, {
+    double minPageHeight = 0,
+    double? nameGap,
+  }) {
+    final gap = nameGap ?? (compact ? 14.0 : 18.0);
+    final intro = Column(
+      children: [
+        _belowName(tpl, name, tagline),
+        SizedBox(height: gap),
+      ],
+    );
+    if (minPageHeight <= 0) {
+      return Column(
         children: [
-          SizedBox(height: compact ? 8 : 12),
-          _belowName(tpl, name, tagline),
-          SizedBox(height: compact ? 14 : 18),
+          intro,
           _framedLinks(links, tpl, pad),
           SizedBox(height: pad),
         ],
-      ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        intro,
+        Expanded(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _framedLinks(links, tpl, pad),
+                SizedBox(height: math.max(120.0, minPageHeight * 0.15)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -289,9 +361,10 @@ class NgmyBioPreview extends StatelessWidget {
     double pad,
     String name,
     String tagline,
-    List<NgmyBioLink> links,
-  ) {
-    return Column(
+    List<NgmyBioLink> links, {
+    double minPageHeight = 0,
+  }) {
+    final top = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(height: compact ? 28 : 40),
@@ -299,9 +372,39 @@ class NgmyBioPreview extends StatelessWidget {
         SizedBox(height: compact ? 14 : 18),
         _belowName(tpl, name, tagline),
         SizedBox(height: compact ? 18 : 24),
-        _framedLinks(links, tpl, pad),
-        SizedBox(height: pad + 8),
       ],
+    );
+    if (minPageHeight <= 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          top,
+          _framedLinks(links, tpl, pad),
+          SizedBox(height: pad + 8),
+        ],
+      );
+    }
+    return SizedBox(
+      height: minPageHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          top,
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _framedLinks(links, tpl, pad),
+                  SizedBox(height: math.max(120.0, minPageHeight * 0.15)),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: pad),
+        ],
+      ),
     );
   }
 
@@ -422,25 +525,19 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  Widget _marblePanel(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+  Widget _marblePanel(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
     final headerH = compact ? 150.0 : 190.0;
     final curveH = compact ? 44.0 : 56.0;
     return _overlapHeaderSection(
       tpl: tpl,
       ring: ring,
       avatarSize: avatarSize,
+      pad: pad,
       headerH: headerH,
       curveH: curveH,
       curvePainter: ngmyBioCurvedPanelPainter,
-      belowAvatar: () => Column(
-        children: [
-          SizedBox(height: compact ? 10 : 14),
-          _belowName(tpl, name, tagline),
-          SizedBox(height: compact ? 12 : 16),
-          _framedLinks(links, tpl, pad),
-          SizedBox(height: pad),
-        ],
-      ),
+      minPageHeight: minPageHeight,
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 12 : 16),
     );
   }
 
@@ -586,25 +683,19 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  Widget _sunsetArc(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links) {
+  Widget _sunsetArc(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
     final headerH = compact ? 140.0 : 180.0;
     final curveH = compact ? 44.0 : 56.0;
     return _overlapHeaderSection(
       tpl: tpl,
       ring: ring,
       avatarSize: avatarSize,
+      pad: pad,
       headerH: headerH,
       curveH: curveH,
       curvePainter: ngmyBioCurvedPanelPainter,
-      belowAvatar: () => Column(
-        children: [
-          SizedBox(height: compact ? 8 : 12),
-          _belowName(tpl, name, tagline),
-          SizedBox(height: compact ? 14 : 18),
-          _framedLinks(links, tpl, pad),
-          SizedBox(height: pad),
-        ],
-      ),
+      minPageHeight: minPageHeight,
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 8 : 12),
     );
   }
 
