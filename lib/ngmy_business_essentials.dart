@@ -61,23 +61,23 @@ class _BusinessEssentialsHub extends StatefulWidget {
 }
 
 class _CategoryArt {
-  const _CategoryArt({required this.emoji, required this.accent, required this.gradient});
-  final String emoji;
+  const _CategoryArt({required this.icon, required this.accent, required this.gradient});
+  final IconData icon;
   final Color accent;
   final List<Color> gradient;
 }
 
 const _categoryArt = <String, _CategoryArt>{
-  'Contacts': _CategoryArt(emoji: '👥', accent: Color(0xFF38BDF8), gradient: [Color(0xFF0EA5E9), Color(0xFF38BDF8)]),
-  'Site Map': _CategoryArt(emoji: '🗺️', accent: Color(0xFF34D399), gradient: [Color(0xFF10B981), Color(0xFF34D399)]),
-  'Hotlines': _CategoryArt(emoji: '📞', accent: Color(0xFFFBBF24), gradient: [Color(0xFFF59E0B), Color(0xFFFBBF24)]),
-  'Medicines': _CategoryArt(emoji: '💊', accent: Color(0xFFEC4899), gradient: [Color(0xFFDB2777), Color(0xFFEC4899)]),
-  'Notes': _CategoryArt(emoji: '📝', accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
-  'Quick Tasks': _CategoryArt(emoji: '✅', accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
-  'Where I Put It': _CategoryArt(emoji: '📍', accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
-  'Paper Trace': _CategoryArt(emoji: '✍️', accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
-  'Local Menu (Test)': _CategoryArt(emoji: '🍽️', accent: Color(0xFF0EA5E9), gradient: [Color(0xFF0284C7), Color(0xFF0EA5E9)]),
-  'Local Bio (Test)': _CategoryArt(emoji: '🔗', accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
+  'Contacts': _CategoryArt(icon: Icons.groups_rounded, accent: Color(0xFF38BDF8), gradient: [Color(0xFF0EA5E9), Color(0xFF38BDF8)]),
+  'Site Map': _CategoryArt(icon: Icons.map_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF10B981), Color(0xFF34D399)]),
+  'Hotlines': _CategoryArt(icon: Icons.phone_in_talk_rounded, accent: Color(0xFFFBBF24), gradient: [Color(0xFFF59E0B), Color(0xFFFBBF24)]),
+  'Medicines': _CategoryArt(icon: Icons.medication_liquid_rounded, accent: Color(0xFFEC4899), gradient: [Color(0xFFDB2777), Color(0xFFEC4899)]),
+  'Notes': _CategoryArt(icon: Icons.note_alt_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
+  'Quick Tasks': _CategoryArt(icon: Icons.task_alt_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
+  'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
+  'Paper Trace': _CategoryArt(icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
+  'Local Menu (Test)': _CategoryArt(icon: Icons.restaurant_menu_rounded, accent: Color(0xFF0EA5E9), gradient: [Color(0xFF0284C7), Color(0xFF0EA5E9)]),
+  'Local Bio (Test)': _CategoryArt(icon: Icons.link_rounded, accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
 };
 
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
@@ -326,7 +326,7 @@ class _CompactCategoryCard extends StatelessWidget {
                     ],
                   ),
                   child: Center(
-                    child: Text(art.emoji, style: const TextStyle(fontSize: 26, height: 1)),
+                    child: Icon(art.icon, color: Colors.white, size: 26),
                   ),
                 ),
                 const SizedBox(height: 10),

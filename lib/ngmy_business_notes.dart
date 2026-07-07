@@ -1488,7 +1488,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     if (_syncingBody || _previewMode) return;
     final cursorCanon = _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
     final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
-    if (view.display == _lastBodyView.display) return;
+    if (view.display == _lastBodyView.display) {
+      _lastBodyView = view;
+      return;
+    }
     final displayCursor = _displayFromCanonical(view, cursorCanon).clamp(0, view.display.length);
     _syncingBody = true;
     _body.value = TextEditingValue(
@@ -1800,6 +1803,36 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       line = line.replaceFirst('- [x] ', '- [ ] ');
     } else {
       line = '- [ ] $line';
+    }
+    final oldStored = _storedBody;
+    _storedBody = '${_storedBody.substring(0, lineStart)}$line${_storedBody.substring(lineEnd)}';
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _refreshBodyDisplay(putCursorCanonical: lineStart + line.length);
+    _bodyFocus.requestFocus();
+    _markDirty();
+  }
+
+  void _toggleHeadingOnCurrentLine() {
+    const headingSize = 22;
+    final start = _body.selection.start.clamp(0, _body.text.length);
+    final cStart = _canonicalFromDisplay(_lastBodyView, start);
+    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
+    final lineEndIdx = _storedBody.indexOf('\n', cStart);
+    final lineEnd = lineEndIdx == -1 ? _storedBody.length : lineEndIdx;
+    var line = _storedBody.substring(lineStart, lineEnd);
+    final headingOpen = RegExp(r'^<s:\d+>');
+    final headingClose = RegExp(r'</s>$');
+    final hashHeading = RegExp(r'^# ');
+    if (headingOpen.hasMatch(line) && headingClose.hasMatch(line)) {
+      line = line.replaceFirst(headingOpen, '').replaceFirst(headingClose, '');
+    } else if (hashHeading.hasMatch(line)) {
+      line = line.replaceFirst(hashHeading, '');
+    } else if (line.trim().isEmpty) {
+      return;
+    } else {
+      line = '<s:$headingSize>**${line.trim()}</s>';
     }
     final oldStored = _storedBody;
     _storedBody = '${_storedBody.substring(0, lineStart)}$line${_storedBody.substring(lineEnd)}';
@@ -2264,29 +2297,23 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         IconButton(
                           icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
                           onPressed: _onWillPop,
                         ),
-                        if (!_previewMode) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                        if (_previewMode) ...[
+                          Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.72)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _title.text.trim().isEmpty ? 'Untitled' : _title.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3),
+                            ),
                           ),
-                        ],
-                        const Spacer(),
-                        if (!_previewMode) ...[
-                          IconButton(
-                            icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
-                            onPressed: () => setState(() => _note.pinned = !_note.pinned),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.more_horiz_rounded, color: muted),
-                            onPressed: _showActions,
-                          ),
-                        ] else
                           _headerBtn(
                             icon: Icons.edit_rounded,
                             label: 'Edit',
@@ -2297,9 +2324,69 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                               _refreshBodyDisplay();
                             }),
                           ),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
+                            onPressed: () => setState(() => _note.pinned = !_note.pinned),
+                          ),
+                          _headerBtn(
+                            icon: Icons.visibility_rounded,
+                            label: 'View',
+                            fg: fg,
+                            onTap: () => setState(() => _previewMode = true),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.more_horiz_rounded, color: muted),
+                            onPressed: _showActions,
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  if (!_previewMode)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: _showEmojiPicker,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85, height: 1)),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _title,
+                              style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5, height: 1.2),
+                              decoration: InputDecoration(
+                                hintText: 'Title',
+                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              maxLines: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!_previewMode)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
                   if (!_previewMode)
                   Container(
                     margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
@@ -2321,7 +2408,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLineCanonical('• '), fg),
                           _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLineCanonical('1. '), fg),
                           _tool(Icons.check_box_outlined, 'Check', _toggleCheckboxCanonical, fg),
-                          _tool(Icons.title_rounded, 'Heading', () => _insertLineCanonical('# '), fg),
+                          _tool(Icons.title_rounded, 'Heading', _toggleHeadingOnCurrentLine, fg),
                           _tool(Icons.format_quote_rounded, 'Quote', () => _insertLineCanonical('> '), fg),
                           _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursorCanonical('\n---\n'), fg),
                           _sizeSliderChip(
@@ -2364,22 +2451,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85)),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        _title.text.trim().isEmpty ? 'Untitled' : _title.text,
-                                        style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Padding(
                                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                                 child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                               ),
@@ -2398,82 +2469,19 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             ],
                           )
                         : Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: _showEmojiPicker,
-                                      child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85)),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _title,
-                                        style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
-                                        decoration: InputDecoration(
-                                          hintText: 'Title',
-                                          hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                          border: InputBorder.none,
-                                          isDense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                        ),
-                                        maxLines: 2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 8),
-                                Expanded(
-                                  child: Stack(
-                                    children: [
-                                      Positioned.fill(
-                                        child: SingleChildScrollView(
-                                          padding: const EdgeInsets.only(top: 2),
-                                          child: _NoteMarkdownPreview(
-                                            key: ValueKey('live_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}_${_note.titleFontSize}_${_note.leadFontSize}'),
-                                            text: public.$1,
-                                            dark: dark,
-                                            textAnims: public.$2,
-                                            leadFontSize: _note.leadFontSize,
-                                          ),
-                                        ),
-                                      ),
-                                      Positioned.fill(
-                                        child: Theme(
-                                          data: Theme.of(context).copyWith(
-                                            textSelectionTheme: TextSelectionThemeData(
-                                              cursorColor: fg,
-                                              selectionColor: fg.withValues(alpha: 0.22),
-                                            ),
-                                          ),
-                                          child: TextField(
-                                            controller: _body,
-                                            focusNode: _bodyFocus,
-                                            onTap: _onBodySelectionChanged,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              height: 1.55,
-                                              color: Colors.transparent,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: 'Start writing…',
-                                              hintStyle: TextStyle(color: dark ? Colors.white24 : const Color(0xFFCBD5E1).withValues(alpha: 0.45)),
-                                              border: InputBorder.none,
-                                            ),
-                                            maxLines: null,
-                                            expands: true,
-                                            textAlignVertical: TextAlignVertical.top,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                            child: TextField(
+                              controller: _body,
+                              focusNode: _bodyFocus,
+                              style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
+                              decoration: InputDecoration(
+                                hintText: 'Start writing…',
+                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                border: InputBorder.none,
+                              ),
+                              maxLines: null,
+                              expands: true,
+                              textAlignVertical: TextAlignVertical.top,
                             ),
                           ),
                   ),
