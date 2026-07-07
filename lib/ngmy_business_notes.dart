@@ -102,6 +102,73 @@ const _noteBackgrounds = <_NoteBackgroundDef>[
   _NoteBackgroundDef(id: 'northern_lights', label: 'Northern Lights', category: 'Nature', colors: [Color(0xFF020617), Color(0xFF064E3B), Color(0xFF312E81), Color(0xFF0F172A)], pattern: _NoteBgPattern.aurora, overlay: _NoteBgAnimOverlay.aurora, emojis: ['🌌'], floatingEmojis: ['✨', '🌌', '⭐'], darkText: true),
 ];
 
+IconData _bgOfflineIcon(String id) {
+  switch (id) {
+    case 'sunrise_meadow': return Icons.wb_sunny_rounded;
+    case 'ocean_waves': return Icons.waves_rounded;
+    case 'rainforest': return Icons.park_rounded;
+    case 'cherry_blossom': return Icons.local_florist_rounded;
+    case 'starry_night': return Icons.nightlight_round_rounded;
+    case 'rain_drops': return Icons.grain_rounded;
+    case 'mountain_mist': return Icons.terrain_rounded;
+    case 'tropical_beach': return Icons.beach_access_rounded;
+    case 'butterfly_garden': return Icons.flutter_dash_rounded;
+    case 'koi_pond': return Icons.water_drop_rounded;
+    case 'safari_sunset': return Icons.filter_hdr_rounded;
+    case 'waterfall_mist': return Icons.water_rounded;
+    case 'executive_blue': return Icons.business_center_rounded;
+    case 'boardroom_slate': return Icons.meeting_room_rounded;
+    case 'graph_paper': return Icons.grid_on_rounded;
+    case 'conference_cream': return Icons.groups_rounded;
+    case 'calendar_blue': return Icons.calendar_month_rounded;
+    case 'brainstorm_aurora': return Icons.lightbulb_rounded;
+    case 'cosmos_purple': return Icons.rocket_launch_rounded;
+    case 'lightning_storm': return Icons.bolt_rounded;
+    case 'wildlife_forest': return Icons.forest_rounded;
+    case 'lavender_fields': return Icons.spa_rounded;
+    case 'snowy_peaks': return Icons.ac_unit_rounded;
+    case 'hummingbird': return Icons.egg_rounded;
+    case 'coral_reef': return Icons.scuba_diving_rounded;
+    case 'desert_dusk': return Icons.wb_twilight_rounded;
+    case 'bamboo_grove': return Icons.grass_rounded;
+    case 'firefly_night': return Icons.brightness_3_rounded;
+    case 'rose_garden': return Icons.favorite_rounded;
+    case 'moonlit_lake': return Icons.brightness_2_rounded;
+    case 'zen_garden': return Icons.self_improvement_rounded;
+    case 'eagle_sky': return Icons.air_rounded;
+    case 'penguin_ice': return Icons.severe_cold_rounded;
+    case 'dolphin_bay': return Icons.sailing_rounded;
+    case 'sunflower_field': return Icons.wb_sunny_outlined;
+    case 'startup_pitch': return Icons.trending_up_rounded;
+    case 'finance_green': return Icons.savings_rounded;
+    case 'legal_brief': return Icons.gavel_rounded;
+    case 'workshop_notes': return Icons.build_rounded;
+    case 'podcast_studio': return Icons.mic_rounded;
+    case 'art_studio': return Icons.palette_rounded;
+    case 'northern_lights': return Icons.auto_awesome_rounded;
+    default: return Icons.landscape_rounded;
+  }
+}
+
+const _bgFloatingIcons = <String, List<IconData>>{
+  'sunrise_meadow': [Icons.wb_sunny_rounded, Icons.grass_rounded, Icons.flutter_dash_rounded],
+  'ocean_waves': [Icons.waves_rounded, Icons.water_drop_rounded, Icons.sailing_rounded],
+  'rainforest': [Icons.park_rounded, Icons.forest_rounded, Icons.eco_rounded],
+  'cherry_blossom': [Icons.local_florist_rounded, Icons.spa_rounded, Icons.favorite_rounded],
+  'starry_night': [Icons.star_rounded, Icons.nightlight_round_rounded, Icons.auto_awesome_rounded],
+  'butterfly_garden': [Icons.flutter_dash_rounded, Icons.local_florist_rounded, Icons.eco_rounded],
+  'koi_pond': [Icons.water_drop_rounded, Icons.set_meal_rounded, Icons.spa_rounded],
+  'wildlife_forest': [Icons.pets_rounded, Icons.forest_rounded, Icons.eco_rounded],
+  'firefly_night': [Icons.brightness_3_rounded, Icons.star_rounded, Icons.auto_awesome_rounded],
+  'northern_lights': [Icons.auto_awesome_rounded, Icons.star_rounded, Icons.brightness_3_rounded],
+};
+
+IconData _offlineFloatingIcon(String bgId, int index) {
+  final list = _bgFloatingIcons[bgId];
+  if (list != null && list.isNotEmpty) return list[index % list.length];
+  return _bgOfflineIcon(bgId);
+}
+
 int _gridCountTwoPerRow(int itemCount) => itemCount.isOdd ? itemCount + 1 : itemCount;
 
 const _kFloatingEmojiCount = 3;
@@ -259,6 +326,23 @@ bool _showAnimParensInEditor(int cursorCanon, int open, int closeParen, String t
 }
 
 String _notePublicBody(String body, List<NgmyNoteTextAnim> anims) => _notePublicView(body, anims).$1;
+
+/// Clean plain text for note cards and list previews — no markup visible.
+String _notePlainText(String body, List<NgmyNoteTextAnim> anims) {
+  var text = _buildNoteBodyView(body, anims, -1).display;
+  final lines = text.split('\n');
+  text = lines.map((line) {
+    if (line.startsWith('# ')) return line.substring(2);
+    if (line.startsWith('> ')) return line.substring(2);
+    if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) return line.substring(6);
+    if (line.startsWith('• ')) return line.substring(2);
+    if (line.startsWith('- ')) return line.substring(2);
+    final numbered = RegExp(r'^(\d+)\. (.*)$').firstMatch(line);
+    if (numbered != null) return numbered.group(2) ?? line;
+    return line;
+  }).join('\n');
+  return text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+}
 
 _BodyViewMap _buildNoteBodyView(String canonical, List<NgmyNoteTextAnim> anims, int cursorCanon) {
   final sorted = List<NgmyNoteTextAnim>.from(anims)..sort((a, b) => a.start.compareTo(b.start));
@@ -741,10 +825,10 @@ class NgmyBusinessNote {
     if (title.trim().isNotEmpty) return title.trim();
     final line = body.split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
     if (line.trim().isEmpty) return 'New Note';
-    return _notePublicBody(line, textAnims).trim();
+    return _notePlainText(line, textAnims).trim();
   }
 
-  String get displayBody => _notePublicBody(body, textAnims);
+  String get displayBody => _notePlainText(body, textAnims);
 
   String get effectiveBackgroundId => backgroundId.isEmpty ? _defaultBackgroundForFolder(folder) : backgroundId;
 
@@ -1122,7 +1206,7 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                               color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04),
                                               borderRadius: BorderRadius.circular(12),
                                             ),
-                                            child: Text(n.icon.isEmpty ? '📝' : n.icon, style: const TextStyle(fontSize: 22)),
+                                            child: Icon(Icons.note_alt_rounded, size: 22, color: dark ? Colors.white70 : const Color(0xFF64748B)),
                                           ),
                                           const SizedBox(width: 14),
                                           Expanded(
@@ -1319,7 +1403,8 @@ class _NoteTemplatePickerPageState extends State<_NoteTemplatePickerPage> with S
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            if (bg.emojis.isNotEmpty) Text(bg.emojis.first, style: const TextStyle(fontSize: 24)),
+                                            if (bg.emojis.isNotEmpty)
+                                              Icon(_bgOfflineIcon(bg.id), size: 24, color: Colors.white.withValues(alpha: 0.85)),
                                             const Spacer(),
                                             Text(bg.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
                                             Text(bg.category, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 10, fontWeight: FontWeight.w600)),
@@ -1431,7 +1516,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       _note.textAnims.addAll(migrated.$2);
     }
     _ensureParenMarkersInBody(_note);
-    _ensureAnimsForParens(_note);
     _storedBody = _note.body;
     _initialBody = _storedBody;
     _title = TextEditingController(text: _note.title);
@@ -1733,13 +1817,23 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   void _markDirty() {
     _dirty = true;
     _autosave?.cancel();
-    _autosave = Timer(const Duration(milliseconds: 800), _persist);
+    _autosave = Timer(const Duration(milliseconds: 120), _persist);
   }
 
   Future<void> _persist() async {
     _note.title = _title.text;
     _note.body = _storedBody;
     _note.updatedAt = DateTime.now();
+    try {
+      final items = await _loadNotes(widget.userEmail);
+      final i = items.indexWhere((e) => e.id == _note.id);
+      if (i >= 0) {
+        items[i] = _note;
+      } else {
+        items.insert(0, _note);
+      }
+      await _saveNotes(widget.userEmail, items);
+    } catch (_) {}
     _dirty = false;
     if (mounted) setState(() {});
   }
@@ -2304,7 +2398,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           onPressed: _onWillPop,
                         ),
                         if (_previewMode) ...[
-                          Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.72)),
+                          Icon(_bgOfflineIcon(_note.effectiveBackgroundId), size: 20, color: fg.withValues(alpha: 0.7)),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -2325,12 +2419,27 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             }),
                           ),
                         ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                          GestureDetector(
+                            onTap: _showEmojiPicker,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Icon(Icons.emoji_emotions_outlined, color: fg.withValues(alpha: 0.75), size: 22),
+                            ),
                           ),
-                          const Spacer(),
+                          Expanded(
+                            child: TextField(
+                              controller: _title,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3, height: 1.2),
+                              decoration: InputDecoration(
+                                hintText: 'Title',
+                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1), fontSize: 17),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
                           IconButton(
                             icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
                             onPressed: () => setState(() => _note.pinned = !_note.pinned),
@@ -2339,7 +2448,11 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             icon: Icons.visibility_rounded,
                             label: 'View',
                             fg: fg,
-                            onTap: () => setState(() => _previewMode = true),
+                            onTap: () async {
+                              await _persist();
+                              if (!mounted) return;
+                              setState(() => _previewMode = true);
+                            },
                           ),
                           IconButton(
                             icon: Icon(Icons.more_horiz_rounded, color: muted),
@@ -2351,40 +2464,17 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                   ),
                   if (!_previewMode)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          GestureDetector(
-                            onTap: _showEmojiPicker,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85, height: 1)),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: _title,
-                              style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5, height: 1.2),
-                              decoration: InputDecoration(
-                                hintText: 'Title',
-                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              maxLines: 2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (!_previewMode)
-                    Padding(
                       padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                        ],
                       ),
                     ),
                   if (!_previewMode)
@@ -2601,11 +2691,13 @@ class _NoteMarkdownPreview extends StatelessWidget {
     required this.dark,
     this.textAnims = const [],
     this.leadFontSize = 16,
+    this.animateText = false,
   });
   final String text;
   final bool dark;
   final List<NgmyNoteTextAnim> textAnims;
   final double leadFontSize;
+  final bool animateText;
 
   @override
   Widget build(BuildContext context) {
@@ -2724,10 +2816,17 @@ class _NoteMarkdownPreview extends StatelessWidget {
       final animSlice = raw.substring(ls - lineStart, le - lineStart);
       if (animSlice.isNotEmpty) {
         final parsed = _stripNoteColorMarkup(animSlice, fg);
-        spans.add(WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: _AnimatedTextEffect(effect: a.effect, text: parsed.$1, color: parsed.$2 ?? fg, fontSize: baseSize, fontWeight: baseWeight),
-        ));
+        if (animateText) {
+          spans.add(WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: _AnimatedTextEffect(effect: a.effect, text: parsed.$1, color: parsed.$2 ?? fg, fontSize: baseSize, fontWeight: baseWeight),
+          ));
+        } else {
+          spans.add(TextSpan(
+            text: parsed.$1,
+            style: TextStyle(color: parsed.$2 ?? fg, fontSize: baseSize, fontWeight: FontWeight.w700),
+          ));
+        }
       }
       pos = le - lineStart;
     }
@@ -2942,7 +3041,11 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
         alignment: Alignment.topLeft,
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Text(emojis.first, style: TextStyle(fontSize: widget.compact ? 22 : 32, color: Colors.white.withValues(alpha: 0.22))),
+          child: Icon(
+            _bgOfflineIcon(backgroundId),
+            size: widget.compact ? 22 : 32,
+            color: Colors.white.withValues(alpha: 0.22),
+          ),
         ),
       ),
     ];
@@ -2958,21 +3061,19 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
 
   List<Widget> _floatingThemeEmojis(_NoteBackgroundDef def, double t) {
     if (def.floatingEmojis.isEmpty) return const [];
-    final emojis = def.floatingEmojis;
     return List.generate(_kFloatingEmojiCount, (i) {
-      final emoji = emojis[i % emojis.length];
       final path = _crossScreenPaths[i % _crossScreenPaths.length];
       final pos = path.at(t);
       final size = (widget.compact ? 26.0 : 42.0) + (i % 3) * 5;
-      return _FloatingEmoji(
+      return _FloatingIcon(
         key: ValueKey('${def.id}_float_$i'),
-        emoji: emoji,
+        icon: _offlineFloatingIcon(def.id, i),
         normalizedPos: pos,
         size: size,
         t: t,
         phase: path.phase,
-        flapsWings: _emojiFlapsWings(emoji),
-        swims: _emojiSwims(emoji),
+        flapsWings: i.isEven,
+        swims: i.isOdd,
       );
     });
   }
@@ -2992,7 +3093,7 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
                   offset: Offset(x, y),
                   child: Opacity(
                     opacity: glow.clamp(0.15, 0.95),
-                    child: Text('✨', style: TextStyle(fontSize: widget.compact ? 10 : 14, shadows: [Shadow(color: Colors.yellow.withValues(alpha: 0.8), blurRadius: 8)])),
+                    child: Icon(Icons.star_rounded, size: widget.compact ? 10 : 14, color: Colors.yellow.withValues(alpha: glow.clamp(0.15, 0.95))),
                   ),
                 );
               },
@@ -3014,16 +3115,6 @@ class _NoteAnimatedBackgroundLayerState extends State<_NoteAnimatedBackgroundLay
       case _NoteBgAnimOverlay.none:
         return const [];
     }
-  }
-
-  bool _emojiFlapsWings(String emoji) {
-    const flappers = {'🦋', '🐦', '🦅', '🕊️', '🦜', '🐬', '🐟', '🐠', '🐧'};
-    return flappers.contains(emoji);
-  }
-
-  bool _emojiSwims(String emoji) {
-    const swimmers = {'🐟', '🐠', '🐬', '🐧'};
-    return swimmers.contains(emoji);
   }
 
   _NoteBgAnimOverlay _overlayFromPattern(_NoteBgPattern p) {
@@ -3348,11 +3439,11 @@ class _NoteAnimatedBackgroundPainter extends CustomPainter {
       oldDelegate.t != t || oldDelegate.pattern != pattern || oldDelegate.backgroundId != backgroundId;
 }
 
-/// Background emoji that travels across the screen (never blocks text taps).
-class _FloatingEmoji extends StatelessWidget {
-  const _FloatingEmoji({
+/// Background icon that travels across the screen (offline — bundled Material icons).
+class _FloatingIcon extends StatelessWidget {
+  const _FloatingIcon({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.normalizedPos,
     required this.size,
     required this.t,
@@ -3361,7 +3452,7 @@ class _FloatingEmoji extends StatelessWidget {
     required this.swims,
   });
 
-  final String emoji;
+  final IconData icon;
   final Offset normalizedPos;
   final double size;
   final double t;
@@ -3384,12 +3475,11 @@ class _FloatingEmoji extends StatelessWidget {
               child: Transform.scale(
                 scaleX: flap,
                 scaleY: 1.0,
-                child: Text(
-                  emoji,
-                  style: TextStyle(
-                    fontSize: size,
-                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 5)],
-                  ),
+                child: Icon(
+                  icon,
+                  size: size,
+                  color: Colors.white.withValues(alpha: 0.32),
+                  shadows: [Shadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 5)],
                 ),
               ),
             );
