@@ -264,33 +264,121 @@ _BodyViewMap _buildNoteBodyView(String canonical, List<NgmyNoteTextAnim> anims, 
   final sorted = List<NgmyNoteTextAnim>.from(anims)..sort((a, b) => a.start.compareTo(b.start));
   final buf = StringBuffer();
   final d2c = <int>[];
-  var pos = 0;
-  for (final a in sorted) {
-    final open = a.start - 1;
-    final closeParen = a.end;
-    if (open < 0 || closeParen >= canonical.length || canonical[open] != '(' || canonical[closeParen] != ')') {
+  var i = 0;
+
+  bool showEmptyMarkers(int open, int close) => cursorCanon >= open && cursorCanon <= close + 1;
+
+  void emitRange(int from, int to) {
+    for (var j = from; j < to; j++) {
+      buf.write(canonical[j]);
+      d2c.add(j);
+    }
+  }
+
+  while (i < canonical.length) {
+    NgmyNoteTextAnim? animAt;
+    for (final a in sorted) {
+      final open = a.start - 1;
+      if (open == i && open >= 0 && a.end < canonical.length && canonical[open] == '(' && canonical[a.end] == ')') {
+        animAt = a;
+        break;
+      }
+    }
+    if (animAt != null) {
+      final open = animAt.start - 1;
+      final close = animAt.end;
+      if (_showAnimParensInEditor(cursorCanon, open, close, canonical)) {
+        emitRange(open, close + 1);
+      } else {
+        emitRange(open + 1, close);
+      }
+      i = close + 1;
       continue;
     }
-    for (var i = pos; i < open; i++) {
-      buf.write(canonical[i]);
-      d2c.add(i);
-    }
-    if (_showAnimParensInEditor(cursorCanon, open, closeParen, canonical)) {
-      for (var i = open; i <= closeParen; i++) {
-        buf.write(canonical[i]);
-        d2c.add(i);
+
+    if (canonical.startsWith('**', i)) {
+      final end = canonical.indexOf('**', i + 2);
+      if (end != -1) {
+        final contentStart = i + 2;
+        final contentEnd = end;
+        if (contentStart >= contentEnd) {
+          if (showEmptyMarkers(i, end + 1)) emitRange(i, i + 2);
+        } else {
+          emitRange(contentStart, contentEnd);
+        }
+        i = end + 2;
+        continue;
       }
-    } else {
-      for (var i = open + 1; i < closeParen; i++) {
-        buf.write(canonical[i]);
-        d2c.add(i);
+    }
+
+    if (canonical[i] == '_' && (i + 1 >= canonical.length || canonical[i + 1] != '_')) {
+      final end = canonical.indexOf('_', i + 1);
+      if (end != -1 && (end + 1 >= canonical.length || canonical[end + 1] != '_')) {
+        final contentStart = i + 1;
+        final contentEnd = end;
+        if (contentStart >= contentEnd) {
+          if (showEmptyMarkers(i, end)) emitRange(i, i + 1);
+        } else {
+          emitRange(contentStart, contentEnd);
+        }
+        i = end + 1;
+        continue;
       }
     }
-    pos = closeParen + 1;
-  }
-  for (var i = pos; i < canonical.length; i++) {
+
+    if (canonical.startsWith('<u>', i)) {
+      final end = canonical.indexOf('</u>', i);
+      if (end != -1) {
+        final contentStart = i + 3;
+        final contentEnd = end;
+        final closeEnd = end + 4;
+        if (contentStart >= contentEnd) {
+          if (showEmptyMarkers(i, closeEnd - 1)) emitRange(i, contentStart);
+        } else {
+          emitRange(contentStart, contentEnd);
+        }
+        i = closeEnd;
+        continue;
+      }
+    }
+
+    if (canonical.startsWith('<c:#', i)) {
+      final endTag = canonical.indexOf('>', i);
+      final close = canonical.indexOf('</c>', i);
+      if (endTag != -1 && close != -1 && close > endTag) {
+        final contentStart = endTag + 1;
+        final contentEnd = close;
+        final closeEnd = close + 4;
+        if (contentStart >= contentEnd) {
+          if (showEmptyMarkers(i, closeEnd - 1)) emitRange(i, contentStart);
+        } else {
+          emitRange(contentStart, contentEnd);
+        }
+        i = closeEnd;
+        continue;
+      }
+    }
+
+    if (canonical.startsWith('<s:', i)) {
+      final endTag = canonical.indexOf('>', i);
+      final close = canonical.indexOf('</s>', i);
+      if (endTag != -1 && close != -1 && close > endTag) {
+        final contentStart = endTag + 1;
+        final contentEnd = close;
+        final closeEnd = close + 4;
+        if (contentStart >= contentEnd) {
+          if (showEmptyMarkers(i, closeEnd - 1)) emitRange(i, contentStart);
+        } else {
+          emitRange(contentStart, contentEnd);
+        }
+        i = closeEnd;
+        continue;
+      }
+    }
+
     buf.write(canonical[i]);
     d2c.add(i);
+    i++;
   }
   return _BodyViewMap(display: buf.toString(), d2c: d2c);
 }
@@ -623,6 +711,8 @@ class NgmyBusinessNote {
     this.pinned = false,
     this.icon = '📝',
     this.openInPreview = false,
+    this.titleFontSize = 28,
+    this.leadFontSize = 16,
     List<NgmyNoteTextAnim>? textAnims,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -641,6 +731,8 @@ class NgmyBusinessNote {
   bool pinned;
   String icon;
   bool openInPreview;
+  double titleFontSize;
+  double leadFontSize;
   List<NgmyNoteTextAnim> textAnims;
   final DateTime createdAt;
   DateTime updatedAt;
@@ -677,6 +769,8 @@ class NgmyBusinessNote {
         'pinned': pinned,
         'icon': icon,
         'openInPreview': openInPreview,
+        'titleFontSize': titleFontSize,
+        'leadFontSize': leadFontSize,
         'textAnims': textAnims.map((a) => a.toJson()).toList(),
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -693,6 +787,8 @@ class NgmyBusinessNote {
         pinned: json['pinned'] == true,
         icon: (json['icon'] ?? '📝').toString(),
         openInPreview: json['openInPreview'] == true,
+        titleFontSize: (json['titleFontSize'] as num?)?.toDouble().clamp(18, 44) ?? 28,
+        leadFontSize: (json['leadFontSize'] as num?)?.toDouble().clamp(12, 32) ?? 16,
         textAnims: (json['textAnims'] as List?)
                 ?.whereType<Map>()
                 .map((e) => NgmyNoteTextAnim.fromJson(Map<String, dynamic>.from(e)))
@@ -1665,58 +1761,39 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     return false;
   }
 
-  void _insertAtCursor(String text) {
-    final t = _body.text;
-    final sel = _body.selection;
-    final start = sel.start.clamp(0, t.length);
-    final end = sel.end.clamp(0, t.length);
-    _body.text = t.substring(0, start) + text + t.substring(end);
-    _body.selection = TextSelection.collapsed(offset: start + text.length);
+  void _insertAtCursorCanonical(String text) {
+    final cPos = _canonicalFromDisplay(_lastBodyView, _body.selection.start.clamp(0, _body.text.length));
+    final oldStored = _storedBody;
+    _storedBody = '${_storedBody.substring(0, cPos)}$text${_storedBody.substring(cPos)}';
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _refreshBodyDisplay(putCursorCanonical: cPos + text.length);
     _bodyFocus.requestFocus();
     _markDirty();
   }
 
-  void _wrapSelection(String left, String right) {
-    final t = _body.text;
-    final sel = _body.selection;
-    if (!sel.isValid) {
-      _insertAtCursor('$left$right');
-      _body.selection = TextSelection.collapsed(offset: sel.start.clamp(0, t.length) + left.length);
-      return;
-    }
-    final s = sel.start.clamp(0, t.length);
-    final e = sel.end.clamp(0, t.length);
-    if (s == e) {
-      _insertAtCursor('$left$right');
-      _body.selection = TextSelection.collapsed(offset: s + left.length);
-      return;
-    }
-    final selected = t.substring(s, e);
-    _body.text = t.substring(0, s) + left + selected + right + t.substring(e);
-    _body.selection = TextSelection(baseOffset: s + left.length, extentOffset: e + left.length);
+  void _insertLineCanonical(String prefix) {
+    final start = _body.selection.start.clamp(0, _body.text.length);
+    final cStart = _canonicalFromDisplay(_lastBodyView, start);
+    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
+    final oldStored = _storedBody;
+    _storedBody = '${_storedBody.substring(0, lineStart)}$prefix${_storedBody.substring(lineStart)}';
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _refreshBodyDisplay(putCursorCanonical: lineStart + prefix.length);
+    _bodyFocus.requestFocus();
     _markDirty();
   }
 
-  void _insertLine(String prefix) {
-    final t = _body.text;
-    final sel = _body.selection;
-    final start = sel.start.clamp(0, t.length);
-    final lineStart = t.lastIndexOf('\n', start - 1) + 1;
-    final before = t.substring(0, lineStart);
-    final after = t.substring(lineStart);
-    _body.text = before + prefix + after;
-    _body.selection = TextSelection.collapsed(offset: (before + prefix).length);
-    _markDirty();
-  }
-
-  void _toggleCheckbox() {
-    final t = _body.text;
-    final sel = _body.selection;
-    final start = sel.start.clamp(0, t.length);
-    final lineStart = t.lastIndexOf('\n', start - 1) + 1;
-    final lineEnd = t.indexOf('\n', start);
-    final end = lineEnd == -1 ? t.length : lineEnd;
-    var line = t.substring(lineStart, end);
+  void _toggleCheckboxCanonical() {
+    final start = _body.selection.start.clamp(0, _body.text.length);
+    final cStart = _canonicalFromDisplay(_lastBodyView, start);
+    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
+    final lineEndIdx = _storedBody.indexOf('\n', cStart);
+    final lineEnd = lineEndIdx == -1 ? _storedBody.length : lineEndIdx;
+    var line = _storedBody.substring(lineStart, lineEnd);
     if (line.startsWith('- [ ] ')) {
       line = line.replaceFirst('- [ ] ', '- [x] ');
     } else if (line.startsWith('- [x] ')) {
@@ -1724,7 +1801,39 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     } else {
       line = '- [ ] $line';
     }
-    _body.text = t.substring(0, lineStart) + line + t.substring(end);
+    final oldStored = _storedBody;
+    _storedBody = '${_storedBody.substring(0, lineStart)}$line${_storedBody.substring(lineEnd)}';
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _refreshBodyDisplay(putCursorCanonical: lineStart + line.length);
+    _bodyFocus.requestFocus();
+    _markDirty();
+  }
+
+  void _applyLeadSizeToFirstParagraph(double size) {
+    final rounded = size.round();
+    final lines = _storedBody.split('\n');
+    var idx = 0;
+    for (; idx < lines.length; idx++) {
+      if (lines[idx].trim().isNotEmpty && lines[idx].trim() != '---') break;
+    }
+    if (idx >= lines.length) return;
+    var line = lines[idx];
+    final sizeOpen = RegExp(r'^<s:\d+>');
+    final closeTag = RegExp(r'</s>$');
+    if (sizeOpen.hasMatch(line) && closeTag.hasMatch(line)) {
+      line = line.replaceFirst(sizeOpen, '<s:$rounded>');
+    } else {
+      line = '<s:$rounded>$line</s>';
+    }
+    lines[idx] = line;
+    final oldStored = _storedBody;
+    _storedBody = lines.join('\n');
+    _reconcileTextAnims(oldStored, _storedBody);
+    _syncAnimRangesFromParens();
+    _note.body = _storedBody;
+    _refreshBodyDisplay();
     _markDirty();
   }
 
@@ -1836,7 +1945,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
     if (picked != null) {
       if (_bodyFocus.hasFocus || _body.text.isNotEmpty) {
-        _insertAtCursor(picked);
+        _insertAtCursorCanonical(picked);
       } else {
         setState(() => _note.icon = picked);
       }
@@ -1881,7 +1990,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (t != null) {
-      _insertAtCursor('\n\n--- ${t.label} ---\n${t.body}\n');
+      _insertAtCursorCanonical('\n\n--- ${t.label} ---\n${t.body}\n');
     }
   }
 
@@ -2014,11 +2123,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     if (picked == null) return;
     final hex = (picked & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
     _wrapCanonicalSelection('<c:#$hex>', '</c>');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Text color applied — visible in Preview'), duration: Duration(seconds: 2)),
-      );
-    }
   }
 
   Future<void> _showCustomColorPicker() async {
@@ -2173,18 +2277,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           ),
                         ],
                         const Spacer(),
-                        _headerBtn(
-                          icon: _previewMode ? Icons.edit_rounded : Icons.visibility_rounded,
-                          label: _previewMode ? 'Edit' : 'Preview',
-                          fg: fg,
-                          onTap: () => setState(() {
-                            _previewMode = !_previewMode;
-                            if (!_previewMode) {
-                              _note.openInPreview = false;
-                              _refreshBodyDisplay();
-                            }
-                          }),
-                        ),
                         if (!_previewMode) ...[
                           IconButton(
                             icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
@@ -2194,7 +2286,17 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             icon: Icon(Icons.more_horiz_rounded, color: muted),
                             onPressed: _showActions,
                           ),
-                        ],
+                        ] else
+                          _headerBtn(
+                            icon: Icons.edit_rounded,
+                            label: 'Edit',
+                            fg: fg,
+                            onTap: () => setState(() {
+                              _previewMode = false;
+                              _note.openInPreview = false;
+                              _refreshBodyDisplay();
+                            }),
+                          ),
                       ],
                     ),
                   ),
@@ -2212,16 +2314,40 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
-                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
-                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
+                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapCanonicalSelection('**', '**'), fg),
+                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapCanonicalSelection('_', '_'), fg),
+                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapCanonicalSelection('<u>', '</u>'), fg),
                           _tool(Icons.format_color_text_rounded, 'Text color', _showTextColorPicker, fg),
-                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
-                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
-                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
-                          _tool(Icons.title_rounded, 'Heading', () => _insertLine('# '), fg),
-                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
-                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
+                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLineCanonical('• '), fg),
+                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLineCanonical('1. '), fg),
+                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckboxCanonical, fg),
+                          _tool(Icons.title_rounded, 'Heading', () => _insertLineCanonical('# '), fg),
+                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLineCanonical('> '), fg),
+                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursorCanonical('\n---\n'), fg),
+                          _sizeSliderChip(
+                            label: 'Title',
+                            value: _note.titleFontSize,
+                            min: 18,
+                            max: 40,
+                            fg: fg,
+                            onChanged: (v) => setState(() {
+                              _note.titleFontSize = v;
+                              _markDirty();
+                            }),
+                          ),
+                          _sizeSliderChip(
+                            label: 'Lead',
+                            value: _note.leadFontSize,
+                            min: 12,
+                            max: 32,
+                            fg: fg,
+                            onChanged: (v) {
+                              setState(() {
+                                _note.leadFontSize = v;
+                                _applyLeadSizeToFirstParagraph(v);
+                              });
+                            },
+                          ),
                           _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
                           _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
                           _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
@@ -2242,12 +2368,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
+                                    Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85)),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         _title.text.trim().isEmpty ? 'Untitled' : _title.text,
-                                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
+                                        style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
                                       ),
                                     ),
                                   ],
@@ -2261,10 +2387,11 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                                   child: _NoteMarkdownPreview(
-                                    key: ValueKey('pv_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}'),
+                                    key: ValueKey('pv_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}_${_note.leadFontSize}'),
                                     text: public.$1,
                                     dark: dark,
                                     textAnims: public.$2,
+                                    leadFontSize: _note.leadFontSize,
                                   ),
                                 ),
                               ),
@@ -2279,13 +2406,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                   children: [
                                     GestureDetector(
                                       onTap: _showEmojiPicker,
-                                      child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: const TextStyle(fontSize: 28)),
+                                      child: Text(_note.icon.isEmpty ? '📝' : _note.icon, style: TextStyle(fontSize: _note.titleFontSize * 0.85)),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: TextField(
                                         controller: _title,
-                                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
+                                        style: TextStyle(fontSize: _note.titleFontSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.5),
                                         decoration: InputDecoration(
                                           hintText: 'Title',
                                           hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
@@ -2301,19 +2428,49 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                 Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 8),
                                 Expanded(
-                                  child: TextField(
-                                    controller: _body,
-                                    focusNode: _bodyFocus,
-                                    onTap: _onBodySelectionChanged,
-                                    style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
-                                    decoration: InputDecoration(
-                                      hintText: 'Start writing…',
-                                      hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                      border: InputBorder.none,
-                                    ),
-                                    maxLines: null,
-                                    expands: true,
-                                    textAlignVertical: TextAlignVertical.top,
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: SingleChildScrollView(
+                                          padding: const EdgeInsets.only(top: 2),
+                                          child: _NoteMarkdownPreview(
+                                            key: ValueKey('live_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}_${_note.titleFontSize}_${_note.leadFontSize}'),
+                                            text: public.$1,
+                                            dark: dark,
+                                            textAnims: public.$2,
+                                            leadFontSize: _note.leadFontSize,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned.fill(
+                                        child: Theme(
+                                          data: Theme.of(context).copyWith(
+                                            textSelectionTheme: TextSelectionThemeData(
+                                              cursorColor: fg,
+                                              selectionColor: fg.withValues(alpha: 0.22),
+                                            ),
+                                          ),
+                                          child: TextField(
+                                            controller: _body,
+                                            focusNode: _bodyFocus,
+                                            onTap: _onBodySelectionChanged,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              height: 1.55,
+                                              color: Colors.transparent,
+                                            ),
+                                            decoration: InputDecoration(
+                                              hintText: 'Start writing…',
+                                              hintStyle: TextStyle(color: dark ? Colors.white24 : const Color(0xFFCBD5E1).withValues(alpha: 0.45)),
+                                              border: InputBorder.none,
+                                            ),
+                                            maxLines: null,
+                                            expands: true,
+                                            textAlignVertical: TextAlignVertical.top,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -2378,6 +2535,48 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
   }
 
+  Widget _sizeSliderChip({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required Color fg,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Container(
+      width: 118,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      decoration: BoxDecoration(
+        color: fg.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: fg.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$label ${value.round()}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: fg.withValues(alpha: 0.7))),
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+              overlayShape: SliderComponentShape.noOverlay,
+              activeTrackColor: const Color(0xFF8B5CF6),
+              inactiveTrackColor: fg.withValues(alpha: 0.15),
+              thumbColor: const Color(0xFF8B5CF6),
+            ),
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatDate(DateTime d) {
     final local = d.toLocal();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -2388,28 +2587,38 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 }
 
 class _NoteMarkdownPreview extends StatelessWidget {
-  const _NoteMarkdownPreview({super.key, required this.text, required this.dark, this.textAnims = const []});
+  const _NoteMarkdownPreview({
+    super.key,
+    required this.text,
+    required this.dark,
+    this.textAnims = const [],
+    this.leadFontSize = 16,
+  });
   final String text;
   final bool dark;
   final List<NgmyNoteTextAnim> textAnims;
+  final double leadFontSize;
 
   @override
   Widget build(BuildContext context) {
     if (text.trim().isEmpty && textAnims.isEmpty) {
-      return Text('Nothing to preview yet', style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontStyle: FontStyle.italic));
+      return Text('Start writing…', style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontStyle: FontStyle.italic));
     }
     final fg = dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155);
     final lines = text.split('\n');
     var docOffset = 0;
     final widgets = <Widget>[];
+    var firstContentSeen = false;
     for (final line in lines) {
-      widgets.add(_lineWidget(line, fg, docOffset));
+      final isLead = !firstContentSeen && line.trim().isNotEmpty && line.trim() != '---';
+      if (isLead) firstContentSeen = true;
+      widgets.add(_lineWidget(line, fg, docOffset, isLead: isLead));
       docOffset += line.length + 1;
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 
-  Widget _lineWidget(String line, Color fg, int lineStart) {
+  Widget _lineWidget(String line, Color fg, int lineStart, {bool isLead = false}) {
     if (line.trim() == '---') {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -2475,7 +2684,21 @@ class _NoteMarkdownPreview extends StatelessWidget {
       );
     }
     if (line.trim().isEmpty) return const SizedBox(height: 10);
-    return Padding(padding: const EdgeInsets.only(bottom: 6), child: _inline(line, fg, lineStart: lineStart));
+
+    var content = line;
+    var lineSize = isLead ? leadFontSize : 15.0;
+    final sizeOpen = RegExp(r'^<s:(\d+)>');
+    final sizeClose = RegExp(r'</s>$');
+    final sizeMatch = sizeOpen.firstMatch(content);
+    if (sizeMatch != null && sizeClose.hasMatch(content)) {
+      lineSize = double.tryParse(sizeMatch.group(1) ?? '') ?? lineSize;
+      content = content.replaceFirst(sizeOpen, '').replaceFirst(sizeClose, '');
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLead ? 8 : 6),
+      child: _inline(content, fg, lineStart: lineStart, baseSize: lineSize, baseWeight: isLead ? FontWeight.w600 : FontWeight.w400),
+    );
   }
 
   Widget _inline(String raw, Color fg, {required int lineStart, double baseSize = 15, FontWeight baseWeight = FontWeight.w400}) {
@@ -2544,6 +2767,16 @@ class _NoteMarkdownPreview extends StatelessWidget {
           continue;
         }
       }
+      if (raw.startsWith('<s:', i)) {
+        final endTag = raw.indexOf('>', i);
+        final close = raw.indexOf('</s>', i);
+        if (endTag != -1 && close != -1 && close > endTag) {
+          final size = double.tryParse(raw.substring(i + 3, endTag)) ?? baseSize;
+          spans.add(TextSpan(text: raw.substring(endTag + 1, close), style: TextStyle(color: fg, fontSize: size, fontWeight: baseWeight)));
+          i = close + 4;
+          continue;
+        }
+      }
       final nextSpecial = _nextMarkdownSpecial(raw, i);
       spans.add(TextSpan(text: raw.substring(i, nextSpecial), style: TextStyle(color: fg, fontSize: baseSize, fontWeight: baseWeight)));
       i = nextSpecial;
@@ -2557,6 +2790,7 @@ class _NoteMarkdownPreview extends StatelessWidget {
       if (s.indexOf('_', from) >= 0) s.indexOf('_', from),
       if (s.indexOf('<u>', from) >= 0) s.indexOf('<u>', from),
       if (s.indexOf('<c:#', from) >= 0) s.indexOf('<c:#', from),
+      if (s.indexOf('<s:', from) >= 0) s.indexOf('<s:', from),
     ];
     if (indices.isEmpty) return s.length;
     return indices.reduce((a, b) => a < b ? a : b);

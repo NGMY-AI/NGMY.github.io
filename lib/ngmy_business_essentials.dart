@@ -60,6 +60,26 @@ class _BusinessEssentialsHub extends StatefulWidget {
   State<_BusinessEssentialsHub> createState() => _BusinessEssentialsHubState();
 }
 
+class _CategoryArt {
+  const _CategoryArt({required this.emoji, required this.accent, required this.gradient});
+  final String emoji;
+  final Color accent;
+  final List<Color> gradient;
+}
+
+const _categoryArt = <String, _CategoryArt>{
+  'Contacts': _CategoryArt(emoji: '👥', accent: Color(0xFF38BDF8), gradient: [Color(0xFF0EA5E9), Color(0xFF38BDF8)]),
+  'Site Map': _CategoryArt(emoji: '🗺️', accent: Color(0xFF34D399), gradient: [Color(0xFF10B981), Color(0xFF34D399)]),
+  'Hotlines': _CategoryArt(emoji: '📞', accent: Color(0xFFFBBF24), gradient: [Color(0xFFF59E0B), Color(0xFFFBBF24)]),
+  'Medicines': _CategoryArt(emoji: '💊', accent: Color(0xFFEC4899), gradient: [Color(0xFFDB2777), Color(0xFFEC4899)]),
+  'Notes': _CategoryArt(emoji: '📝', accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
+  'Quick Tasks': _CategoryArt(emoji: '✅', accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
+  'Where I Put It': _CategoryArt(emoji: '📍', accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
+  'Paper Trace': _CategoryArt(emoji: '✍️', accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
+  'Local Menu (Test)': _CategoryArt(emoji: '🍽️', accent: Color(0xFF0EA5E9), gradient: [Color(0xFF0284C7), Color(0xFF0EA5E9)]),
+  'Local Bio (Test)': _CategoryArt(emoji: '🔗', accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
+};
+
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _contacts = 0;
   int _locations = 0;
@@ -178,71 +198,51 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                   children: [
                     _CompactCategoryCard(
                       title: 'Contacts',
-                      icon: Icons.contacts_rounded,
-                      accent: const Color(0xFF38BDF8),
                       count: _contacts,
                       onTap: () => _openCategory((ctx) => showNgmyBusinessContactsDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Site Map',
-                      icon: Icons.map_rounded,
-                      accent: const Color(0xFF34D399),
                       count: _locations,
                       onTap: () => _openCategory((ctx) => showNgmySavedLocationsDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Hotlines',
-                      icon: Icons.phone_in_talk_rounded,
-                      accent: const Color(0xFFFBBF24),
                       count: _support,
                       onTap: () => _openCategory((ctx) => showNgmyQuickSupportDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Medicines',
-                      icon: Icons.medication_liquid_rounded,
-                      accent: const Color(0xFFEC4899),
                       count: _medicines,
                       onTap: () => _openCategory((ctx) => showNgmyMedicineOrganizerDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Notes',
-                      icon: Icons.note_alt_rounded,
-                      accent: const Color(0xFFA78BFA),
                       count: _notes,
                       onTap: () => _openCategory((ctx) => showNgmyBusinessNotesDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Quick Tasks',
-                      icon: Icons.task_alt_rounded,
-                      accent: const Color(0xFF34D399),
                       count: _tasks,
                       onTap: () => _openCategory((ctx) => showNgmyBusinessTasksDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Where I Put It',
-                      icon: Icons.place_rounded,
-                      accent: const Color(0xFFA78BFA),
                       count: _reminders,
                       onTap: () => _openCategory((ctx) => showNgmyItemReminderDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Paper Trace',
-                      icon: Icons.draw_rounded,
-                      accent: const Color(0xFFF97316),
                       count: _traces,
                       onTap: () => _openCategory((ctx) => showNgmyPaperTraceDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Local Menu (Test)',
-                      icon: Icons.restaurant_menu_rounded,
-                      accent: const Color(0xFF0EA5E9),
                       count: _localMenus,
                       onTap: () => _openCategory((ctx) => showNgmyLocalMenuStudioDialog(ctx, userEmail: widget.userEmail)),
                     ),
                     _CompactCategoryCard(
                       title: 'Local Bio (Test)',
-                      icon: Icons.link_rounded,
-                      accent: const Color(0xFF6366F1),
                       count: _localBios,
                       onTap: () => _openCategory((ctx) => showNgmyLocalBioStudioDialog(ctx, userEmail: widget.userEmail)),
                     ),
@@ -259,31 +259,42 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
 class _CompactCategoryCard extends StatelessWidget {
   const _CompactCategoryCard({
     required this.title,
-    required this.icon,
-    required this.accent,
     required this.count,
     required this.onTap,
   });
 
   final String title;
-  final IconData icon;
-  final Color accent;
   final int count;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
+    final art = _categoryArt[title]!;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            color: t.categoryCardBg(accent),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: t.categoryCardBorder(accent)),
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                art.gradient.first.withValues(alpha: t.isDark ? 0.22 : 0.14),
+                art.gradient.last.withValues(alpha: t.isDark ? 0.1 : 0.06),
+              ],
+            ),
+            border: Border.all(color: art.accent.withValues(alpha: t.isDark ? 0.45 : 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: art.accent.withValues(alpha: t.isDark ? 0.18 : 0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -291,20 +302,52 @@ class _CompactCategoryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
-                    color: t.categoryIconBg(accent),
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: art.gradient,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: art.accent.withValues(alpha: 0.45),
+                        blurRadius: 14,
+                        offset: const Offset(0, 5),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: t.isDark ? 0.08 : 0.55),
+                        blurRadius: 0,
+                        spreadRadius: -2,
+                        offset: const Offset(-2, -2),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: accent, size: 22),
+                  child: Center(
+                    child: Text(art.emoji, style: const TextStyle(fontSize: 26, height: 1)),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 13)),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 12.5, height: 1.15),
+                ),
                 if (count > 0)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text('$count saved', style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 9)),
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: art.accent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('$count', style: TextStyle(color: art.accent, fontWeight: FontWeight.w800, fontSize: 10)),
+                    ),
                   ),
               ],
             ),
