@@ -151,13 +151,23 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
         return;
       }
       var code = NgmyEssentialsShortCode.generate();
+      var published = false;
       for (var i = 0; i < 5; i++) {
-        final published = await NgmyEssentialsShortCode.publishPayload(ownerEmail: widget.userEmail, payload: payload, code: code);
-        if (published != null) {
-          code = published;
+        final result = await NgmyEssentialsShortCode.publishPayload(ownerEmail: widget.userEmail, payload: payload, code: code);
+        if (result != null) {
+          code = result;
+          published = true;
           break;
         }
         code = NgmyEssentialsShortCode.generate();
+      }
+      if (!published) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not upload backup — check internet and try again')),
+          );
+        }
+        return;
       }
       final qrData = ngmyEssentialsQrDisplayData(shortCode: code);
       if (!mounted) return;
@@ -193,7 +203,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     try {
       final payload = await ngmyEssentialsResolveImportPayload(raw);
       if (payload == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found on this device — scan the QR from the sender phone')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — check the 6-character code or create a new QR')));
         return;
       }
       final bundle = ngmyEssentialsDecodePayload(payload);
@@ -255,16 +265,16 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                       children: [
                         Text('Move your essentials', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20)),
                         const SizedBox(height: 6),
-                        Text('Scan the QR on another phone, or enter the 6-character code on this same device. Everything stays local — no cloud.', style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.4)),
+                        Text('Share a 6-character code or scan the big-dot NGMY QR — works on any phone for 24 hours.', style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.4)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _hubTile(context, icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Scannable QR with your backup data', color: _accent, onTap: _busy ? null : _showQr),
+                  _hubTile(context, icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Big easy-scan QR + 6-character code', color: _accent, onTap: _busy ? null : _showQr),
                   const SizedBox(height: 10),
                   _hubTile(context, icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
                   const SizedBox(height: 10),
-                  _hubTile(context, icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Works on this device only (saved locally)', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
+                  _hubTile(context, icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Type or paste the code from sender', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
                   const SizedBox(height: 24),
                   Text('INCLUDE IN BACKUP', style: t.sectionLabel.copyWith(letterSpacing: 1.2)),
                   const SizedBox(height: 8),
@@ -368,25 +378,20 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
                         large: true,
                         sizeOverride: 320,
                       ),
-                      const SizedBox(height: 18),
                       Text(
-                        'SCAN THIS QR',
-                        style: t.sectionLabel.copyWith(letterSpacing: 1.2),
-                        textAlign: TextAlign.center,
+                        'YOUR 6-CHARACTER CODE',
+                        style: t.sectionLabel.copyWith(letterSpacing: 1.3),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · big-dot NGMY QR like Advisors transfer\n'
-                        'Same phone: scan this QR · Other phone: use Copy backup or Share backup below',
-                        style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 18),
-                      Text('DEVICE CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
                       const SizedBox(height: 10),
                       SelectableText(
                         code,
                         style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · valid 24 hours · scan on any phone',
+                        style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
                       Wrap(
@@ -469,7 +474,7 @@ class _EssentialsEnterCodePageState extends State<_EssentialsEnterCodePage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (payload == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found on this device — scan the sender QR instead')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — ask sender to create a new QR')));
       return;
     }
     Navigator.pop(context, payload);

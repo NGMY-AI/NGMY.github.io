@@ -41,11 +41,12 @@ class NgmyCloudPolicy {
   static const bool persistMediaPostsToCloud = false;
   static const bool persistAnnouncementsToCloud = false;
 
-  /// Published bio/menu pages for the main cloud studio only — not Business Essentials.
+    /// Transfer relay, published pages, and essentials backup codes.
   static bool allowNgmySettingsKey(String key) {
     final k = key.trim();
     if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
     if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;
+    if (k.startsWith('ngmy_essentials_code_v1_')) return true;
     return false;
   }
 

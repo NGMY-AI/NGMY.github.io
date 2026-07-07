@@ -3,6 +3,9 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
 
 const kNgmyEssentialsShortQrPrefix = 'NGMY-ESS6';
 const kNgmyEssentialsShortCodePrefix = 'ngmy_essentials_code_v1_';
@@ -44,7 +47,7 @@ String? ngmyEssentialsParseScannedRaw(String raw) {
   return null;
 }
 
-/// Device-local short codes for Business Essentials transfer — no Supabase.
+/// Cloud-backed short codes for Business Essentials transfer (24h relay).
 class NgmyEssentialsShortCode {
   static String generate() {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -62,37 +65,35 @@ class NgmyEssentialsShortCode {
     return t;
   }
 
-  static Future<String?> publishPayload({
+  static String _localKey(String normalized) => '$kNgmyEssentialsShortCodePrefix$normalized';
+
+  static Map<String, dynamic> _record({
+    required String normalized,
     required String ownerEmail,
     required String payload,
-    required String code,
-  }) async {
-    final normalized = normalize(code);
-    if (normalized == null || payload.trim().isEmpty) return null;
-    final now = DateTime.now().toUtc();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final record = {
+    required DateTime now,
+  }) =>
+      {
         'code': normalized,
         'ownerEmail': ownerEmail.toLowerCase().trim(),
         'payload': payload.trim(),
         'expiresAt': now.add(const Duration(hours: 24)).toIso8601String(),
         'updatedAt': now.toIso8601String(),
       };
-      await prefs.setString('$kNgmyEssentialsShortCodePrefix$normalized', jsonEncode(record));
-      return normalized;
+
+  static Future<void> _cacheLocal(String normalized, Map<String, dynamic> record) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localKey(normalized), jsonEncode(record));
     } catch (e) {
-      debugPrint('[essentials short code] local publish $code: $e');
-      return null;
+      debugPrint('[essentials short code] local cache $normalized: $e');
     }
   }
 
-  static Future<String?> resolvePayload(String rawCode) async {
-    final normalized = normalize(rawCode);
-    if (normalized == null) return null;
+  static Future<String?> _readLocalPayload(String normalized) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('$kNgmyEssentialsShortCodePrefix$normalized');
+      final raw = prefs.getString(_localKey(normalized));
       if (raw == null || raw.isEmpty) return null;
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return null;
@@ -102,8 +103,61 @@ class NgmyEssentialsShortCode {
       final payload = (map['payload'] ?? '').toString().trim();
       return payload.isEmpty ? null : payload;
     } catch (e) {
-      debugPrint('[essentials short code] local resolve $rawCode: $e');
+      debugPrint('[essentials short code] local read $normalized: $e');
       return null;
     }
+  }
+
+  static Future<String?> publishPayload({
+    required String ownerEmail,
+    required String payload,
+    required String code,
+  }) async {
+    final normalized = normalize(code);
+    if (normalized == null || payload.trim().isEmpty) return null;
+    final now = DateTime.now().toUtc();
+    final record = _record(normalized: normalized, ownerEmail: ownerEmail, payload: payload, now: now);
+    await _cacheLocal(normalized, record);
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _localKey(normalized),
+          'value': record,
+          'updated_at': now.toIso8601String(),
+        },
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      return normalized;
+    } catch (e) {
+      debugPrint('[essentials short code] cloud publish $code: $e');
+      return null;
+    }
+  }
+
+  static Future<String?> resolvePayload(String rawCode) async {
+    final normalized = normalize(rawCode);
+    if (normalized == null) return null;
+
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _localKey(normalized))
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row != null) {
+        final value = row['value'];
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          final exp = DateTime.tryParse((map['expiresAt'] ?? '').toString());
+          if (exp != null && DateTime.now().toUtc().isAfter(exp)) return null;
+          final payload = (map['payload'] ?? '').toString().trim();
+          if (payload.isNotEmpty) return payload;
+        }
+      }
+    } catch (e) {
+      debugPrint('[essentials short code] cloud resolve $rawCode: $e');
+    }
+
+    return _readLocalPayload(normalized);
   }
 }
