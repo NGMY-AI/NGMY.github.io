@@ -127,8 +127,8 @@ IconData _bgOfflineIcon(String id) {
     case 'wildlife_forest': return Icons.forest_rounded;
     case 'lavender_fields': return Icons.spa_rounded;
     case 'snowy_peaks': return Icons.ac_unit_rounded;
-    case 'hummingbird': return Icons.egg_rounded;
-    case 'coral_reef': return Icons.scuba_diving_rounded;
+    case 'hummingbird': return Icons.flutter_dash_rounded;
+    case 'coral_reef': return Icons.water_rounded;
     case 'desert_dusk': return Icons.wb_twilight_rounded;
     case 'bamboo_grove': return Icons.grass_rounded;
     case 'firefly_night': return Icons.brightness_3_rounded;
@@ -136,7 +136,7 @@ IconData _bgOfflineIcon(String id) {
     case 'moonlit_lake': return Icons.brightness_2_rounded;
     case 'zen_garden': return Icons.self_improvement_rounded;
     case 'eagle_sky': return Icons.air_rounded;
-    case 'penguin_ice': return Icons.severe_cold_rounded;
+    case 'penguin_ice': return Icons.ac_unit_rounded;
     case 'dolphin_bay': return Icons.sailing_rounded;
     case 'sunflower_field': return Icons.wb_sunny_outlined;
     case 'startup_pitch': return Icons.trending_up_rounded;
@@ -329,19 +329,28 @@ String _notePublicBody(String body, List<NgmyNoteTextAnim> anims) => _notePublic
 
 /// Clean plain text for note cards and list previews — no markup visible.
 String _notePlainText(String body, List<NgmyNoteTextAnim> anims) {
-  var text = _buildNoteBodyView(body, anims, -1).display;
-  final lines = text.split('\n');
-  text = lines.map((line) {
-    if (line.startsWith('# ')) return line.substring(2);
-    if (line.startsWith('> ')) return line.substring(2);
-    if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) return line.substring(6);
-    if (line.startsWith('• ')) return line.substring(2);
-    if (line.startsWith('- ')) return line.substring(2);
-    final numbered = RegExp(r'^(\d+)\. (.*)$').firstMatch(line);
-    if (numbered != null) return numbered.group(2) ?? line;
-    return line;
-  }).join('\n');
-  return text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  try {
+    var text = _notePublicBody(body, anims);
+    text = text.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(RegExp(r'_([^_\n]+)_'), (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(RegExp(r'<u>(.*?)</u>', dotAll: true), (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(RegExp(r'<c:#[0-9A-Fa-f]{6}>(.*?)</c>', dotAll: true), (m) => m.group(1) ?? '');
+    text = text.replaceAllMapped(RegExp(r'<s:\d+>(.*?)</s>', dotAll: true), (m) => m.group(1) ?? '');
+    final lines = text.split('\n');
+    text = lines.map((line) {
+      if (line.startsWith('# ')) return line.substring(2);
+      if (line.startsWith('> ')) return line.substring(2);
+      if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) return line.substring(6);
+      if (line.startsWith('• ')) return line.substring(2);
+      if (line.startsWith('- ')) return line.substring(2);
+      final numbered = RegExp(r'^(\d+)\. (.*)$').firstMatch(line);
+      if (numbered != null) return numbered.group(2) ?? line;
+      return line;
+    }).join('\n');
+    return text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  } catch (_) {
+    return body.replaceAll(RegExp(r'[*_<>#\[\]]'), '').trim();
+  }
 }
 
 _BodyViewMap _buildNoteBodyView(String canonical, List<NgmyNoteTextAnim> anims, int cursorCanon) {
@@ -922,7 +931,7 @@ Future<void> showNgmyBusinessNotesDialog(BuildContext context, {required String 
     barrierLabel: 'Notes',
     barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder: (_, __, ___) => _BusinessNotesScreen(userEmail: userEmail),
+    pageBuilder: (_, __, ___) => SizedBox.expand(child: _BusinessNotesScreen(userEmail: userEmail)),
     transitionBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
   );
 }
@@ -1501,8 +1510,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   bool _dirty = false;
   bool _previewMode = false;
   late String _storedBody;
-  late _BodyViewMap _lastBodyView;
-  bool _syncingBody = false;
   int? _pendingDisplaySelStart;
   int? _pendingDisplaySelEnd;
 
@@ -1519,23 +1526,27 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _storedBody = _note.body;
     _initialBody = _storedBody;
     _title = TextEditingController(text: _note.title);
-    _body = TextEditingController();
-    _lastBodyView = _buildNoteBodyView(_storedBody, _note.textAnims, 0);
+    _body = TextEditingController(text: _storedBody);
     _bodyFocus = FocusNode();
-    _bodyFocus.onKeyEvent = (_, event) {
-      if (event is KeyDownEvent) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _onBodySelectionChanged();
-        });
-      }
-      return KeyEventResult.ignored;
-    };
     _title.addListener(_markDirty);
-    _body.addListener(_onBodyChanged);
-    _refreshBodyDisplay(putCursorCanonical: _storedBody.length);
+    _body.addListener(_onBodyEdited);
     if (!widget.isNew && _note.openInPreview) {
       _previewMode = true;
     }
+  }
+
+  void _onBodyEdited() {
+    if (_previewMode) return;
+    _storedBody = _body.text;
+    _note.body = _storedBody;
+    _markDirty();
+  }
+
+  void _setBodyText(String text, {required TextSelection selection}) {
+    _storedBody = text;
+    _note.body = text;
+    _body.value = TextEditingValue(text: text, selection: selection);
+    _markDirty();
   }
 
   void _syncAnimRangesFromParens() {
@@ -1553,66 +1564,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       if (a.end >= _storedBody.length || _storedBody[a.end] != ')') return true;
       return false;
     });
-  }
-
-  void _refreshBodyDisplay({int? putCursorCanonical}) {
-    final cursorCanon = putCursorCanonical ?? _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
-    final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
-    final displayCursor = _displayFromCanonical(view, cursorCanon).clamp(0, view.display.length);
-    _syncingBody = true;
-    _body.value = TextEditingValue(
-      text: view.display,
-      selection: TextSelection.collapsed(offset: displayCursor),
-    );
-    _syncingBody = false;
-    _lastBodyView = view;
-  }
-
-  void _onBodySelectionChanged() {
-    if (_syncingBody || _previewMode) return;
-    final cursorCanon = _canonicalFromDisplay(_lastBodyView, _body.selection.baseOffset);
-    final view = _buildNoteBodyView(_storedBody, _note.textAnims, cursorCanon);
-    if (view.display == _lastBodyView.display) {
-      _lastBodyView = view;
-      return;
-    }
-    final displayCursor = _displayFromCanonical(view, cursorCanon).clamp(0, view.display.length);
-    _syncingBody = true;
-    _body.value = TextEditingValue(
-      text: view.display,
-      selection: TextSelection.collapsed(offset: displayCursor),
-    );
-    _syncingBody = false;
-    _lastBodyView = view;
-  }
-
-  void _onBodyChanged() {
-    if (_syncingBody) return;
-    final newDisplay = _body.text;
-    final oldDisplay = _lastBodyView.display;
-    if (newDisplay != oldDisplay) {
-      var start = 0;
-      while (start < oldDisplay.length && start < newDisplay.length && oldDisplay[start] == newDisplay[start]) {
-        start++;
-      }
-      var oldTail = oldDisplay.length;
-      var newTail = newDisplay.length;
-      while (oldTail > start && newTail > start && oldDisplay[oldTail - 1] == newDisplay[newTail - 1]) {
-        oldTail--;
-        newTail--;
-      }
-      final oldStored = _storedBody;
-      final cStartBefore = start < _lastBodyView.d2c.length ? _lastBodyView.d2c[start] : oldStored.length;
-      _storedBody = _mergeDisplayEdit(_storedBody, _lastBodyView, oldDisplay, newDisplay);
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _note.body = _storedBody;
-      final newCursorCanon = (cStartBefore + (newTail - start)).clamp(0, _storedBody.length);
-      _refreshBodyDisplay(putCursorCanonical: newCursorCanon);
-    } else {
-      _onBodySelectionChanged();
-    }
-    _markDirty();
   }
 
   void _reconcileTextAnims(String old, String new_) {
@@ -1687,8 +1638,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   void _removeTextEffect({required int dSelStart, required int dSelEnd}) {
-    var cStart = _canonicalFromDisplay(_lastBodyView, dSelStart);
-    var cEnd = _canonicalFromDisplay(_lastBodyView, dSelEnd);
+    var cStart = dSelStart;
+    var cEnd = dSelEnd;
     if (cStart > cEnd) {
       final t = cStart;
       cStart = cEnd;
@@ -1708,59 +1659,45 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         if (cEnd > open && cStart < closeParen + 1) toRemove.add(a);
       }
     }
-    if (toRemove.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No animation on this text'), duration: Duration(seconds: 2)),
-        );
-      }
-      return;
-    }
+    if (toRemove.isEmpty) return;
     toRemove.sort((a, b) => b.start.compareTo(a.start));
     for (final a in toRemove) {
       _unwrapAnim(a);
     }
-    _note.body = _storedBody;
-    _refreshBodyDisplay(putCursorCanonical: cStart);
+    _setBodyText(_storedBody, selection: TextSelection.collapsed(offset: cStart.clamp(0, _storedBody.length)));
     _bodyFocus.requestFocus();
-    _markDirty();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Animation removed'), duration: Duration(seconds: 2)),
-      );
-    }
   }
 
-  void _wrapCanonicalSelection(String left, String right) {
-    var cStart = _canonicalFromDisplay(_lastBodyView, _body.selection.start);
-    var cEnd = _canonicalFromDisplay(_lastBodyView, _body.selection.end);
-    if (cStart > cEnd) {
-      final t = cStart;
-      cStart = cEnd;
-      cEnd = t;
+  void _wrapSelection(String left, String right) {
+    final t = _body.text;
+    final sel = _body.selection;
+    if (!sel.isValid) return;
+    var s = sel.start.clamp(0, t.length);
+    var e = sel.end.clamp(0, t.length);
+    if (s > e) {
+      final tmp = s;
+      s = e;
+      e = tmp;
     }
-    final oldStored = _storedBody;
-    if (cStart == cEnd) {
-      _storedBody = '${_storedBody.substring(0, cStart)}$left$right${_storedBody.substring(cEnd)}';
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _note.body = _storedBody;
-      _refreshBodyDisplay(putCursorCanonical: cStart + left.length);
+    final oldStored = t;
+    late final String newT;
+    late final int newCursor;
+    if (s == e) {
+      newT = '${t.substring(0, s)}$left$right${t.substring(e)}';
+      newCursor = s + left.length;
     } else {
-      final selected = _storedBody.substring(cStart, cEnd);
-      _storedBody = '${_storedBody.substring(0, cStart)}$left$selected$right${_storedBody.substring(cEnd)}';
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _note.body = _storedBody;
-      _refreshBodyDisplay(putCursorCanonical: cEnd + left.length + right.length);
+      newT = '${t.substring(0, s)}$left${t.substring(s, e)}$right${t.substring(e)}';
+      newCursor = e + left.length + right.length;
     }
+    _reconcileTextAnims(oldStored, newT);
+    _syncAnimRangesFromParens();
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: newCursor));
     _bodyFocus.requestFocus();
-    _markDirty();
   }
 
   void _applyTextEffect(String effect, {required int dSelStart, required int dSelEnd}) {
-    var cStart = _canonicalFromDisplay(_lastBodyView, dSelStart);
-    var cEnd = _canonicalFromDisplay(_lastBodyView, dSelEnd);
+    var cStart = dSelStart;
+    var cEnd = dSelEnd;
     if (cStart > cEnd) {
       final t = cStart;
       cStart = cEnd;
@@ -1769,43 +1706,28 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     final existing = cStart != cEnd ? _animMatchingInnerRange(cStart, cEnd) : null;
     if (existing != null) {
       existing.effect = effect;
-      _refreshBodyDisplay(putCursorCanonical: cEnd);
+      _setBodyText(_storedBody, selection: TextSelection.collapsed(offset: cEnd.clamp(0, _storedBody.length)));
       _bodyFocus.requestFocus();
-      _markDirty();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Animation changed to $effect'), duration: const Duration(seconds: 2)),
-        );
-      }
       return;
     }
     final oldStored = _storedBody;
+    late final String newT;
+    late final int newCursor;
     if (cStart != cEnd) {
       final selected = _storedBody.substring(cStart, cEnd);
-      _storedBody = '${_storedBody.substring(0, cStart)}($selected)${_storedBody.substring(cEnd)}';
+      newT = '${_storedBody.substring(0, cStart)}($selected)${_storedBody.substring(cEnd)}';
       _note.textAnims.removeWhere((a) => !(a.end <= cStart || a.start >= cEnd + 2));
       _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1 + selected.length, effect: effect));
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _refreshBodyDisplay(putCursorCanonical: cStart + 1 + selected.length);
+      newCursor = cStart + 1 + selected.length;
     } else {
-      _storedBody = '${_storedBody.substring(0, cStart)}()${_storedBody.substring(cStart)}';
+      newT = '${_storedBody.substring(0, cStart)}()${_storedBody.substring(cStart)}';
       _note.textAnims.add(NgmyNoteTextAnim(start: cStart + 1, end: cStart + 1, effect: effect));
-      _reconcileTextAnims(oldStored, _storedBody);
-      _syncAnimRangesFromParens();
-      _refreshBodyDisplay(putCursorCanonical: cStart + 1);
+      newCursor = cStart + 1;
     }
-    _note.body = _storedBody;
+    _reconcileTextAnims(oldStored, newT);
+    _syncAnimRangesFromParens();
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: newCursor));
     _bodyFocus.requestFocus();
-    _markDirty();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(cStart != cEnd ? '$effect applied to selected text' : 'Type between ( ) — $effect animates in Preview'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   bool _hasSaveableContent() {
@@ -1858,39 +1780,36 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     return false;
   }
 
-  void _insertAtCursorCanonical(String text) {
-    final cPos = _canonicalFromDisplay(_lastBodyView, _body.selection.start.clamp(0, _body.text.length));
-    final oldStored = _storedBody;
-    _storedBody = '${_storedBody.substring(0, cPos)}$text${_storedBody.substring(cPos)}';
-    _reconcileTextAnims(oldStored, _storedBody);
+  void _insertAtCursor(String text) {
+    final t = _body.text;
+    final pos = _body.selection.start.clamp(0, t.length);
+    final oldStored = t;
+    final newT = '${t.substring(0, pos)}$text${t.substring(pos)}';
+    _reconcileTextAnims(oldStored, newT);
     _syncAnimRangesFromParens();
-    _note.body = _storedBody;
-    _refreshBodyDisplay(putCursorCanonical: cPos + text.length);
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: pos + text.length));
     _bodyFocus.requestFocus();
-    _markDirty();
   }
 
-  void _insertLineCanonical(String prefix) {
-    final start = _body.selection.start.clamp(0, _body.text.length);
-    final cStart = _canonicalFromDisplay(_lastBodyView, start);
-    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
-    final oldStored = _storedBody;
-    _storedBody = '${_storedBody.substring(0, lineStart)}$prefix${_storedBody.substring(lineStart)}';
-    _reconcileTextAnims(oldStored, _storedBody);
+  void _insertLine(String prefix) {
+    final t = _body.text;
+    final start = _body.selection.start.clamp(0, t.length);
+    final lineStart = t.lastIndexOf('\n', start - 1) + 1;
+    final oldStored = t;
+    final newT = '${t.substring(0, lineStart)}$prefix${t.substring(lineStart)}';
+    _reconcileTextAnims(oldStored, newT);
     _syncAnimRangesFromParens();
-    _note.body = _storedBody;
-    _refreshBodyDisplay(putCursorCanonical: lineStart + prefix.length);
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: lineStart + prefix.length));
     _bodyFocus.requestFocus();
-    _markDirty();
   }
 
-  void _toggleCheckboxCanonical() {
-    final start = _body.selection.start.clamp(0, _body.text.length);
-    final cStart = _canonicalFromDisplay(_lastBodyView, start);
-    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
-    final lineEndIdx = _storedBody.indexOf('\n', cStart);
-    final lineEnd = lineEndIdx == -1 ? _storedBody.length : lineEndIdx;
-    var line = _storedBody.substring(lineStart, lineEnd);
+  void _toggleCheckbox() {
+    final t = _body.text;
+    final start = _body.selection.start.clamp(0, t.length);
+    final lineStart = t.lastIndexOf('\n', start - 1) + 1;
+    final lineEndIdx = t.indexOf('\n', start);
+    final lineEnd = lineEndIdx == -1 ? t.length : lineEndIdx;
+    var line = t.substring(lineStart, lineEnd);
     if (line.startsWith('- [ ] ')) {
       line = line.replaceFirst('- [ ] ', '- [x] ');
     } else if (line.startsWith('- [x] ')) {
@@ -1898,24 +1817,22 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     } else {
       line = '- [ ] $line';
     }
-    final oldStored = _storedBody;
-    _storedBody = '${_storedBody.substring(0, lineStart)}$line${_storedBody.substring(lineEnd)}';
-    _reconcileTextAnims(oldStored, _storedBody);
+    final oldStored = t;
+    final newT = '${t.substring(0, lineStart)}$line${t.substring(lineEnd)}';
+    _reconcileTextAnims(oldStored, newT);
     _syncAnimRangesFromParens();
-    _note.body = _storedBody;
-    _refreshBodyDisplay(putCursorCanonical: lineStart + line.length);
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: lineStart + line.length));
     _bodyFocus.requestFocus();
-    _markDirty();
   }
 
   void _toggleHeadingOnCurrentLine() {
     const headingSize = 22;
-    final start = _body.selection.start.clamp(0, _body.text.length);
-    final cStart = _canonicalFromDisplay(_lastBodyView, start);
-    final lineStart = _storedBody.lastIndexOf('\n', cStart - 1) + 1;
-    final lineEndIdx = _storedBody.indexOf('\n', cStart);
-    final lineEnd = lineEndIdx == -1 ? _storedBody.length : lineEndIdx;
-    var line = _storedBody.substring(lineStart, lineEnd);
+    final t = _body.text;
+    final start = _body.selection.start.clamp(0, t.length);
+    final lineStart = t.lastIndexOf('\n', start - 1) + 1;
+    final lineEndIdx = t.indexOf('\n', start);
+    final lineEnd = lineEndIdx == -1 ? t.length : lineEndIdx;
+    var line = t.substring(lineStart, lineEnd);
     final headingOpen = RegExp(r'^<s:\d+>');
     final headingClose = RegExp(r'</s>$');
     final hashHeading = RegExp(r'^# ');
@@ -1928,14 +1845,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     } else {
       line = '<s:$headingSize>**${line.trim()}</s>';
     }
-    final oldStored = _storedBody;
-    _storedBody = '${_storedBody.substring(0, lineStart)}$line${_storedBody.substring(lineEnd)}';
-    _reconcileTextAnims(oldStored, _storedBody);
+    final oldStored = t;
+    final newT = '${t.substring(0, lineStart)}$line${t.substring(lineEnd)}';
+    _reconcileTextAnims(oldStored, newT);
     _syncAnimRangesFromParens();
-    _note.body = _storedBody;
-    _refreshBodyDisplay(putCursorCanonical: lineStart + line.length);
+    _setBodyText(newT, selection: TextSelection.collapsed(offset: lineStart + line.length));
     _bodyFocus.requestFocus();
-    _markDirty();
   }
 
   void _applyLeadSizeToFirstParagraph(double size) {
@@ -1956,12 +1871,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
     lines[idx] = line;
     final oldStored = _storedBody;
-    _storedBody = lines.join('\n');
-    _reconcileTextAnims(oldStored, _storedBody);
+    final newT = lines.join('\n');
+    _reconcileTextAnims(oldStored, newT);
     _syncAnimRangesFromParens();
-    _note.body = _storedBody;
-    _refreshBodyDisplay();
-    _markDirty();
+    _setBodyText(newT, selection: _body.selection);
   }
 
   Future<void> _showTextAnimationPicker() async {
@@ -2072,7 +1985,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
     if (picked != null) {
       if (_bodyFocus.hasFocus || _body.text.isNotEmpty) {
-        _insertAtCursorCanonical(picked);
+        _insertAtCursor(picked);
       } else {
         setState(() => _note.icon = picked);
       }
@@ -2117,7 +2030,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       ),
     );
     if (t != null) {
-      _insertAtCursorCanonical('\n\n--- ${t.label} ---\n${t.body}\n');
+      _insertAtCursor('\n\n--- ${t.label} ---\n${t.body}\n');
     }
   }
 
@@ -2249,7 +2162,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
     if (picked == null) return;
     final hex = (picked & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
-    _wrapCanonicalSelection('<c:#$hex>', '</c>');
+    _wrapSelection('<c:#$hex>', '</c>');
   }
 
   Future<void> _showCustomColorPicker() async {
@@ -2373,7 +2286,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     final dark = _note.darkTheme;
     final fg = dark ? Colors.white : const Color(0xFF0F172A);
     final muted = dark ? Colors.white60 : const Color(0xFF64748B);
-    final public = _notePublicView(_storedBody, _note.textAnims);
+    final viewPlain = _notePlainText(_storedBody, _note.textAnims);
 
     return PopScope(
       canPop: false,
@@ -2415,7 +2328,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             onTap: () => setState(() {
                               _previewMode = false;
                               _note.openInPreview = false;
-                              _refreshBodyDisplay();
                             }),
                           ),
                         ] else ...[
@@ -2491,16 +2403,16 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapCanonicalSelection('**', '**'), fg),
-                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapCanonicalSelection('_', '_'), fg),
-                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapCanonicalSelection('<u>', '</u>'), fg),
+                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
+                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
+                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
                           _tool(Icons.format_color_text_rounded, 'Text color', _showTextColorPicker, fg),
-                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLineCanonical('• '), fg),
-                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLineCanonical('1. '), fg),
-                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckboxCanonical, fg),
+                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
+                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
+                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
                           _tool(Icons.title_rounded, 'Heading', _toggleHeadingOnCurrentLine, fg),
-                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLineCanonical('> '), fg),
-                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursorCanonical('\n---\n'), fg),
+                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
+                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
                           _sizeSliderChip(
                             label: 'Title',
                             value: _note.titleFontSize,
@@ -2547,12 +2459,14 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                               Expanded(
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                                  child: _NoteMarkdownPreview(
-                                    key: ValueKey('pv_${public.$1.hashCode}_${public.$2.map((a) => '${a.start}:${a.end}:${a.effect}').join('|')}_${_note.leadFontSize}'),
-                                    text: public.$1,
-                                    dark: dark,
-                                    textAnims: public.$2,
-                                    leadFontSize: _note.leadFontSize,
+                                  child: SelectableText(
+                                    viewPlain.trim().isEmpty ? 'Start writing…' : viewPlain,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      height: 1.55,
+                                      color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155),
+                                      fontStyle: viewPlain.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
+                                    ),
                                   ),
                                 ),
                               ),
