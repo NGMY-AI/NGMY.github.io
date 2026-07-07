@@ -41,13 +41,11 @@ class NgmyCloudPolicy {
   static const bool persistMediaPostsToCloud = false;
   static const bool persistAnnouncementsToCloud = false;
 
-  /// Published bio/menu pages must reach Supabase so guest links work.
+  /// Published bio/menu pages for the main cloud studio only — not Business Essentials.
   static bool allowNgmySettingsKey(String key) {
     final k = key.trim();
     if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
     if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;
-    if (k == 'ngmy_local_menu_publish_registry' || k.startsWith('ngmy_local_menu_pub_')) return true;
-    if (k == 'ngmy_local_bio_publish_registry' || k.startsWith('ngmy_local_bio_pub_')) return true;
     return false;
   }
 

@@ -1,9 +1,8 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'ngmy_network_resilience.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const kNgmyEssentialsShortQrPrefix = 'NGMY-ESS6';
 const kNgmyEssentialsShortCodePrefix = 'ngmy_essentials_code_v1_';
@@ -45,6 +44,7 @@ String? ngmyEssentialsParseScannedRaw(String raw) {
   return null;
 }
 
+/// Device-local short codes for Business Essentials transfer — no Supabase.
 class NgmyEssentialsShortCode {
   static String generate() {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -71,22 +71,18 @@ class NgmyEssentialsShortCode {
     if (normalized == null || payload.trim().isEmpty) return null;
     final now = DateTime.now().toUtc();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': '$kNgmyEssentialsShortCodePrefix$normalized',
-          'value': {
-            'code': normalized,
-            'ownerEmail': ownerEmail.toLowerCase().trim(),
-            'payload': payload.trim(),
-            'expiresAt': now.add(const Duration(hours: 24)).toIso8601String(),
-            'updatedAt': now.toIso8601String(),
-          },
-          'updated_at': now.toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      final prefs = await SharedPreferences.getInstance();
+      final record = {
+        'code': normalized,
+        'ownerEmail': ownerEmail.toLowerCase().trim(),
+        'payload': payload.trim(),
+        'expiresAt': now.add(const Duration(hours: 24)).toIso8601String(),
+        'updatedAt': now.toIso8601String(),
+      };
+      await prefs.setString('$kNgmyEssentialsShortCodePrefix$normalized', jsonEncode(record));
       return normalized;
     } catch (e) {
-      debugPrint('[essentials short code] publish $code: $e');
+      debugPrint('[essentials short code] local publish $code: $e');
       return null;
     }
   }
@@ -95,22 +91,18 @@ class NgmyEssentialsShortCode {
     final normalized = normalize(rawCode);
     if (normalized == null) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', '$kNgmyEssentialsShortCodePrefix$normalized')
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is! Map) return null;
-      final map = Map<String, dynamic>.from(value);
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$kNgmyEssentialsShortCodePrefix$normalized');
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      final map = Map<String, dynamic>.from(decoded);
       final exp = DateTime.tryParse((map['expiresAt'] ?? '').toString());
       if (exp != null && DateTime.now().toUtc().isAfter(exp)) return null;
       final payload = (map['payload'] ?? '').toString().trim();
       return payload.isEmpty ? null : payload;
     } catch (e) {
-      debugPrint('[essentials short code] resolve $rawCode: $e');
+      debugPrint('[essentials short code] local resolve $rawCode: $e');
       return null;
     }
   }

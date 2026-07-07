@@ -143,6 +143,14 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     try {
       final bundle = await ngmyEssentialsExportBundle(widget.userEmail, _selected);
       final payload = ngmyEssentialsEncodePayload(bundle);
+      if (payload.length > 2800) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Backup is too large for QR — select fewer categories and try again')),
+          );
+        }
+        return;
+      }
       var code = NgmyEssentialsShortCode.generate();
       for (var i = 0; i < 5; i++) {
         final published = await NgmyEssentialsShortCode.publishPayload(ownerEmail: widget.userEmail, payload: payload, code: code);
@@ -155,7 +163,11 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
-          builder: (_) => _EssentialsQrDisplayPage(code: code, categoryCount: _all ? 4 : _selected.length),
+          builder: (_) => _EssentialsQrDisplayPage(
+            qrPayload: payload,
+            code: code,
+            categoryCount: _all ? 4 : _selected.length,
+          ),
         ),
       );
     } finally {
@@ -180,7 +192,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     try {
       final payload = await ngmyEssentialsResolveImportPayload(raw);
       if (payload == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — check the 6-character code')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found on this device — scan the QR from the sender phone')));
         return;
       }
       final bundle = ngmyEssentialsDecodePayload(payload);
@@ -242,7 +254,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                       children: [
                         Text('Move your essentials', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 20)),
                         const SizedBox(height: 6),
-                        Text('Share a 6-character code or scan the big-dot NGMY QR — same style as Doc Share.', style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.4)),
+                        Text('Scan the QR on another phone, or enter the 6-character code on this same device. Everything stays local — no cloud.', style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.4)),
                       ],
                     ),
                   ),
@@ -251,7 +263,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                   const SizedBox(height: 10),
                   _hubTile(context, icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
                   const SizedBox(height: 10),
-                  _hubTile(context, icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Type or paste the code from sender', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
+                  _hubTile(context, icon: Icons.pin_rounded, title: 'Enter 6-character code', subtitle: 'Works on this device only (saved locally)', color: const Color(0xFFA78BFA), onTap: _busy ? null : _enterCode),
                   const SizedBox(height: 24),
                   Text('INCLUDE IN BACKUP', style: t.sectionLabel.copyWith(letterSpacing: 1.2)),
                   const SizedBox(height: 8),
@@ -320,14 +332,18 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
 }
 
 class _EssentialsQrDisplayPage extends StatelessWidget {
-  const _EssentialsQrDisplayPage({required this.code, required this.categoryCount});
+  const _EssentialsQrDisplayPage({
+    required this.qrPayload,
+    required this.code,
+    required this.categoryCount,
+  });
+  final String qrPayload;
   final String code;
   final int categoryCount;
 
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
-    final qrData = ngmyEssentialsShortQrPayload(code);
     return Scaffold(
       backgroundColor: t.scaffold,
       appBar: AppBar(backgroundColor: t.scaffold, foregroundColor: t.title, elevation: 0, centerTitle: true, title: const Text('Backup QR', style: TextStyle(fontWeight: FontWeight.w900))),
@@ -344,20 +360,20 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     NgmyBrandedQrWidget(
-                      data: qrData,
+                      data: qrPayload,
                       large: true,
                       coarseScan: true,
                       errorCorrectionLevel: QrErrorCorrectLevel.H,
                     ),
                     const SizedBox(height: 22),
-                    Text('YOUR 6-CHARACTER CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
+                    Text('SAME-DEVICE CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
                     const SizedBox(height: 10),
                     SelectableText(
                       code,
                       style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
                     ),
                     const SizedBox(height: 8),
-                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · valid 24 hours', style: TextStyle(color: t.subtitle, fontSize: 12)),
+                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · scan QR on another phone · code is local only', style: TextStyle(color: t.subtitle, fontSize: 12)),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -428,7 +444,7 @@ class _EssentialsEnterCodePageState extends State<_EssentialsEnterCodePage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (payload == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found — ask sender to create a new QR')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code not found on this device — scan the sender QR instead')));
       return;
     }
     Navigator.pop(context, payload);
