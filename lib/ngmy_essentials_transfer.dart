@@ -64,6 +64,22 @@ Map<String, dynamic>? ngmyEssentialsDecodePayload(String code) {
   return null;
 }
 
+bool ngmyEssentialsPayloadFitsQr(String payload) {
+  if (payload.trim().isEmpty) return false;
+  final result = QrValidator.validate(
+    data: payload,
+    version: QrVersions.auto,
+    errorCorrectionLevel: QrErrorCorrectLevel.L,
+  );
+  return result.isValid;
+}
+
+/// Full backup payload when it fits in a QR; otherwise a short scannable code.
+String ngmyEssentialsQrDisplayData({required String payload, required String shortCode}) {
+  if (ngmyEssentialsPayloadFitsQr(payload)) return payload;
+  return ngmyEssentialsShortQrPayload(shortCode);
+}
+
 Future<void> ngmyEssentialsImportBundle(String userEmail, Map<String, dynamic> bundle) async {
   if (bundle['contacts'] is List) {
     final items = (bundle['contacts'] as List).whereType<Map>().map((m) => NgmyBusinessContact.fromJson(Map<String, dynamic>.from(m))).toList();
@@ -143,11 +159,9 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
     try {
       final bundle = await ngmyEssentialsExportBundle(widget.userEmail, _selected);
       final payload = ngmyEssentialsEncodePayload(bundle);
-      if (payload.length > 2800) {
+      if (payload.trim().isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Backup is too large for QR — select fewer categories and try again')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nothing selected to back up')));
         }
         return;
       }
@@ -160,13 +174,16 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
         }
         code = NgmyEssentialsShortCode.generate();
       }
+      final qrData = ngmyEssentialsQrDisplayData(payload: payload, shortCode: code);
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
           builder: (_) => _EssentialsQrDisplayPage(
-            qrPayload: payload,
+            qrData: qrData,
+            fullPayload: payload,
             code: code,
             categoryCount: _all ? 4 : _selected.length,
+            fullBackupInQr: qrData.startsWith(kNgmyEssentialsPayloadPrefix),
           ),
         ),
       );
@@ -259,7 +276,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _hubTile(context, icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Big easy-scan QR + 6-character code', color: _accent, onTap: _busy ? null : _showQr),
+                  _hubTile(context, icon: Icons.qr_code_2_rounded, title: 'Show backup QR', subtitle: 'Scannable QR with your backup data', color: _accent, onTap: _busy ? null : _showQr),
                   const SizedBox(height: 10),
                   _hubTile(context, icon: Icons.qr_code_scanner_rounded, title: 'Scan QR code', subtitle: 'Camera scan on receiving phone', color: _accent2, onTap: _busy ? null : _scanQr),
                   const SizedBox(height: 10),
@@ -333,13 +350,17 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
 
 class _EssentialsQrDisplayPage extends StatelessWidget {
   const _EssentialsQrDisplayPage({
-    required this.qrPayload,
+    required this.qrData,
+    required this.fullPayload,
     required this.code,
     required this.categoryCount,
+    required this.fullBackupInQr,
   });
-  final String qrPayload;
+  final String qrData;
+  final String fullPayload;
   final String code;
   final int categoryCount;
+  final bool fullBackupInQr;
 
   @override
   Widget build(BuildContext context) {
@@ -352,50 +373,75 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: _accent.withValues(alpha: 0.35))),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    NgmyBrandedQrWidget(
-                      data: qrPayload,
-                      large: true,
-                      coarseScan: true,
-                      errorCorrectionLevel: QrErrorCorrectLevel.H,
-                    ),
-                    const SizedBox(height: 22),
-                    Text('SAME-DEVICE CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
-                    const SizedBox(height: 10),
-                    SelectableText(
-                      code,
-                      style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · scan QR on another phone · code is local only', style: TextStyle(color: t.subtitle, fontSize: 12)),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: code));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('6-character code copied')));
-                          },
-                          icon: const Icon(Icons.copy_rounded, size: 18),
-                          label: const Text('Copy code'),
-                          style: FilledButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.black),
-                        ),
-                        const SizedBox(width: 10),
-                        OutlinedButton.icon(
-                          onPressed: () => Share.share('NGMY Essentials code: $code', subject: 'NGMY Essentials backup'),
-                          icon: const Icon(Icons.share_rounded, size: 18),
-                          label: const Text('Share'),
-                        ),
-                      ],
-                    ),
-                  ],
+              child: SingleChildScrollView(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: _accent.withValues(alpha: 0.35))),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      NgmyBrandedQrWidget(
+                        data: qrData,
+                        large: true,
+                        coarseScan: true,
+                        showLogo: qrData.length < 700,
+                        errorCorrectionLevel: QrErrorCorrectLevel.L,
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        fullBackupInQr ? 'SCAN ON ANOTHER PHONE' : 'BACKUP TOO LARGE FOR ONE QR',
+                        style: t.sectionLabel.copyWith(letterSpacing: 1.2),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        fullBackupInQr
+                            ? '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · scan to import on another phone'
+                            : 'Use Copy backup or Share below to move data to another phone',
+                        style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 18),
+                      Text('DEVICE CODE', style: t.sectionLabel.copyWith(letterSpacing: 1.3)),
+                      const SizedBox(height: 10),
+                      SelectableText(
+                        code,
+                        style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 42, letterSpacing: 8),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: code));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('6-character code copied')));
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('Copy code'),
+                            style: FilledButton.styleFrom(backgroundColor: _accent, foregroundColor: Colors.black),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: fullPayload));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full backup copied — paste on other phone')));
+                            },
+                            icon: const Icon(Icons.backup_rounded, size: 18),
+                            label: const Text('Copy backup'),
+                            style: FilledButton.styleFrom(backgroundColor: _accent2, foregroundColor: Colors.black),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => Share.share(fullPayload, subject: 'NGMY Essentials backup'),
+                            icon: const Icon(Icons.share_rounded, size: 18),
+                            label: const Text('Share backup'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -536,10 +582,15 @@ class _EssentialsScanPageState extends State<_EssentialsScanPage> {
 
   Future<void> _pasteCode() async {
     final clip = await Clipboard.getData(Clipboard.kTextPlain);
-    final parsed = ngmyEssentialsParseScannedRaw(clip?.text ?? '');
+    final text = clip?.text ?? '';
+    if (text.trim().startsWith(kNgmyEssentialsPayloadPrefix)) {
+      if (mounted) Navigator.pop(context, text.trim());
+      return;
+    }
+    final parsed = ngmyEssentialsParseScannedRaw(text);
     if (parsed == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Clipboard does not contain a valid Essentials QR or code')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Clipboard does not contain a valid Essentials QR, code, or backup')));
       }
       return;
     }

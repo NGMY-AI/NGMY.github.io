@@ -976,10 +976,20 @@ class NgmyBrandedQrWidget extends StatelessWidget {
               children: [
                 QrImageView(
                   data: data,
+                  version: QrVersions.auto,
                   size: size - 20,
                   padding: EdgeInsets.zero,
                   backgroundColor: Colors.white,
                   errorCorrectionLevel: errorCorrectionLevel ?? (coarseScan ? QrErrorCorrectLevel.L : QrErrorCorrectLevel.H),
+                  errorStateBuilder: (context, error) => Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'QR too large',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: _ink.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: compact ? 10 : 12),
+                    ),
+                  ),
                   eyeStyle: QrEyeStyle(
                     eyeShape: coarseScan ? QrEyeShape.square : QrEyeShape.circle,
                     color: _ink,
