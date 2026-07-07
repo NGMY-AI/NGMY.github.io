@@ -6,14 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:qr_flutter/qr_flutter.dart';
-
 import 'ngmy_business_contacts.dart';
 import 'ngmy_business_notes.dart';
 import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_short_code.dart';
-import 'ngmy_medicine_organizer.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_medicine_organizer.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -64,21 +62,8 @@ Map<String, dynamic>? ngmyEssentialsDecodePayload(String code) {
   return null;
 }
 
-bool ngmyEssentialsPayloadFitsQr(String payload) {
-  if (payload.trim().isEmpty) return false;
-  final result = QrValidator.validate(
-    data: payload,
-    version: QrVersions.auto,
-    errorCorrectionLevel: QrErrorCorrectLevel.L,
-  );
-  return result.isValid;
-}
-
-/// Full backup payload when it fits in a QR; otherwise a short scannable code.
-String ngmyEssentialsQrDisplayData({required String payload, required String shortCode}) {
-  if (ngmyEssentialsPayloadFitsQr(payload)) return payload;
-  return ngmyEssentialsShortQrPayload(shortCode);
-}
+/// Short scannable code in the QR — same big-dot style as NGMY Advisors transfer.
+String ngmyEssentialsQrDisplayData({required String shortCode}) => ngmyEssentialsShortQrPayload(shortCode);
 
 Future<void> ngmyEssentialsImportBundle(String userEmail, Map<String, dynamic> bundle) async {
   if (bundle['contacts'] is List) {
@@ -174,7 +159,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
         }
         code = NgmyEssentialsShortCode.generate();
       }
-      final qrData = ngmyEssentialsQrDisplayData(payload: payload, shortCode: code);
+      final qrData = ngmyEssentialsQrDisplayData(shortCode: code);
       if (!mounted) return;
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
@@ -183,7 +168,6 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
             fullPayload: payload,
             code: code,
             categoryCount: _all ? 4 : _selected.length,
-            fullBackupInQr: qrData.startsWith(kNgmyEssentialsPayloadPrefix),
           ),
         ),
       );
@@ -354,13 +338,11 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
     required this.fullPayload,
     required this.code,
     required this.categoryCount,
-    required this.fullBackupInQr,
   });
   final String qrData;
   final String fullPayload;
   final String code;
   final int categoryCount;
-  final bool fullBackupInQr;
 
   @override
   Widget build(BuildContext context) {
@@ -384,21 +366,18 @@ class _EssentialsQrDisplayPage extends StatelessWidget {
                       NgmyBrandedQrWidget(
                         data: qrData,
                         large: true,
-                        coarseScan: true,
-                        showLogo: qrData.length < 700,
-                        errorCorrectionLevel: QrErrorCorrectLevel.L,
+                        sizeOverride: 320,
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        fullBackupInQr ? 'SCAN ON ANOTHER PHONE' : 'BACKUP TOO LARGE FOR ONE QR',
+                        'SCAN THIS QR',
                         style: t.sectionLabel.copyWith(letterSpacing: 1.2),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        fullBackupInQr
-                            ? '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · scan to import on another phone'
-                            : 'Use Copy backup or Share below to move data to another phone',
+                        '$categoryCount categor${categoryCount == 1 ? 'y' : 'ies'} · big-dot NGMY QR like Advisors transfer\n'
+                        'Same phone: scan this QR · Other phone: use Copy backup or Share backup below',
                         style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
                         textAlign: TextAlign.center,
                       ),

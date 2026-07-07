@@ -1002,22 +1002,21 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                 ),
                 if (showLogo)
                   Container(
-                    width: logoSize + 8,
-                    height: logoSize + 8,
+                    width: logoSize + 10,
+                    height: logoSize + 10,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(compact ? 8 : (large ? 14 : 12)),
-                      border: Border.all(color: _accent.withOpacity(0.35), width: 2),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _accent.withValues(alpha: 0.35), width: 2),
                       boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                     ),
-                    padding: const EdgeInsets.all(4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(compact ? 6 : (large ? 10 : 8)),
+                    padding: const EdgeInsets.all(5),
+                    child: ClipOval(
                       child: Image.network(
                         _kNgmyLogoUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: _accent.withOpacity(0.12),
+                          color: _accent.withValues(alpha: 0.12),
                           alignment: Alignment.center,
                           child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: large ? 13 : (compact ? 8 : 11), color: _accentDeep)),
                         ),
