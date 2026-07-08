@@ -107,28 +107,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     await _reload();
   }
 
-  Future<void> _importSharedProject({String? mode}) async {
-    String? choice = mode;
-    if (choice == null) {
-      choice = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Import shared project'),
-          content: const Text('Scan a project QR code or upload a backup file from someone who shared their worksheet project.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(ctx, 'file'), child: const Text('Upload file')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, 'scan'),
-              style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
-              child: const Text('Scan QR'),
-            ),
-          ],
-        ),
-      );
-    }
-    if (choice == null || !mounted) return;
-
+  Future<void> _importSharedProject(String choice) async {
     WorksheetProject? imported;
     if (choice == 'file') {
       imported = await ngmyPickAndParseWorksheetProjectBackup();
@@ -139,7 +118,6 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
       }
     }
     if (imported == null) {
-      if (choice != 'file' && choice != 'scan') return;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -169,63 +147,486 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     _openProject(project);
   }
 
-  void _openSettings(WorksheetPalette p) {
-    showModalBottomSheet(
+  Future<void> _confirmClearAll(WorksheetPalette p) async {
+    final ok = await showDialog<bool>(
       context: context,
-      backgroundColor: p.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
+      builder: (c) => Dialog(
+        backgroundColor: p.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Worksheets Settings',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.file_download_outlined, color: WorksheetPalette.green),
-                title: Text('Import shared project', style: TextStyle(color: p.primaryText)),
-                subtitle: Text('From QR or backup file', style: TextStyle(color: p.secondaryText, fontSize: 12)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await _importSharedProject();
-                },
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: p.isDark ? 0.18 : 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.28)),
+                ),
+                child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 30),
               ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                title: Text('Clear all projects', style: TextStyle(color: p.primaryText)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (c) => AlertDialog(
-                      title: const Text('Clear all projects?'),
-                      content: const Text('This cannot be undone.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(c, true),
-                          style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-                          child: const Text('Clear'),
-                        ),
-                      ],
+              const SizedBox(height: 16),
+              Text('Clear all projects?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
+              const SizedBox(height: 8),
+              Text(
+                'This permanently removes every worksheet project on this device. This cannot be undone.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, height: 1.4, color: p.secondaryText),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: p.primaryText,
+                        side: BorderSide(color: p.cardBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
-                  );
-                  if (ok == true) {
-                    await saveWorksheetProjects(widget.userEmail, []);
-                    await _reload();
-                  }
-                },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Clear all', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+    if (ok == true) {
+      await saveWorksheetProjects(widget.userEmail, []);
+      await _reload();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All projects cleared')));
+    }
+  }
+
+  void _openSettings(WorksheetPalette p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: p.cardBg,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [BoxShadow(color: p.shadow, blurRadius: 28, offset: const Offset(0, 12))],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: p.isDark
+                          ? const [Color(0xFF064E3B), Color(0xFF0F766E)]
+                          : const [Color(0xFF059669), Color(0xFF10B981)],
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(99)),
+                      ),
+                      const SizedBox(height: 14),
+                      const Row(
+                        children: [
+                          Icon(Icons.sync_alt_rounded, color: Colors.white, size: 22),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Transfer & settings',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Move worksheet projects between phones',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('IMPORT PROJECT', style: TextStyle(fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w800, color: p.secondaryText)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _settingsActionCard(
+                              p: p,
+                              icon: Icons.qr_code_scanner_rounded,
+                              title: 'Scan QR',
+                              subtitle: 'Camera import',
+                              color: const Color(0xFF8B5CF6),
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                await _importSharedProject('scan');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _settingsActionCard(
+                              p: p,
+                              icon: Icons.upload_file_rounded,
+                              title: 'Upload file',
+                              subtitle: '.json backup',
+                              color: const Color(0xFF0EA5E9),
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                await _importSharedProject('file');
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text('DANGER ZONE', style: TextStyle(fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w800, color: p.secondaryText)),
+                      const SizedBox(height: 10),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () async {
+                            Navigator.pop(ctx);
+                            await _confirmClearAll(p);
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withValues(alpha: p.isDark ? 0.14 : 0.06),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.28)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444), size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Clear all projects', style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText)),
+                                      Text('Remove every project on this device', style: TextStyle(fontSize: 12, color: p.secondaryText)),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right_rounded, color: p.secondaryText),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsActionCard({
+    required WorksheetPalette p,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+          decoration: BoxDecoration(
+            color: p.isDark ? p.mutedSurface : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: p.cardBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 12),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: p.primaryText)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: p.secondaryText)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProjectMenu(WorksheetProject project, WorksheetPalette p) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: p.cardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: p.shadow, blurRadius: 24, offset: const Offset(0, 10))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: p.cardBorder, borderRadius: BorderRadius.circular(99)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: ngmyImageOrPlaceholder(
+                            imageRef: project.thumbnailPath,
+                            width: 48,
+                            height: 48,
+                            icon: Icons.folder_outlined,
+                            iconColor: p.secondaryText,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(project.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: p.primaryText)),
+                            Text(
+                              '${project.items.length} items · ${ngmyFormatMoney(project.totalSpending)}',
+                              style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                _projectMenuTile(
+                  p: p,
+                  icon: Icons.sync_alt_rounded,
+                  iconColor: WorksheetPalette.green,
+                  title: 'Transfer project',
+                  subtitle: 'QR code or backup file',
+                  onTap: () => Navigator.pop(ctx, 'transfer'),
+                ),
+                _projectMenuTile(
+                  p: p,
+                  icon: Icons.delete_outline_rounded,
+                  iconColor: const Color(0xFFEF4444),
+                  title: 'Delete project',
+                  subtitle: 'Remove from this device',
+                  danger: true,
+                  onTap: () => Navigator.pop(ctx, 'delete'),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'transfer') {
+      showNgmyWorksheetProjectShareSheet(
+        context,
+        ownerEmail: widget.userEmail,
+        project: project,
+        onImported: (imported) async {
+          await upsertWorksheetProject(widget.userEmail, imported);
+          await _reload();
+        },
+      );
+    } else if (action == 'delete') {
+      await _confirmDeleteProject(project, p);
+    }
+  }
+
+  Widget _projectMenuTile({
+    required WorksheetPalette p,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool danger = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: danger ? const Color(0xFFEF4444) : p.primaryText)),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: p.secondaryText)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: p.secondaryText),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteProject(WorksheetProject project, WorksheetPalette p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => Dialog(
+        backgroundColor: p.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: p.isDark ? 0.18 : 0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.28)),
+                ),
+                child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 30),
+              ),
+              const SizedBox(height: 16),
+              Text('Delete project?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
+              const SizedBox(height: 8),
+              Text(
+                'Remove “${project.name}” and all of its budget items from this device?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, height: 1.4, color: p.secondaryText),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: p.primaryText,
+                        side: BorderSide(color: p.cardBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(c, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok == true) {
+      await deleteWorksheetProject(widget.userEmail, project.id);
+      await _reload();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deleted “${project.name}”')),
+      );
+    }
   }
 
   @override
@@ -558,7 +959,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                     p: p,
                     icon: Icons.qr_code_scanner_rounded,
                     label: 'Scan QR',
-                    onTap: () => _importSharedProject(mode: 'scan'),
+                    onTap: () => _importSharedProject('scan'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -567,7 +968,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                     p: p,
                     icon: Icons.upload_file_rounded,
                     label: 'Upload file',
-                    onTap: () => _importSharedProject(mode: 'file'),
+                    onTap: () => _importSharedProject('file'),
                   ),
                 ),
               ],
@@ -680,28 +1081,9 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                       ),
                     ),
                     IconButton(
-                      onPressed: () async {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (c) => AlertDialog(
-                            title: const Text('Delete project?'),
-                            content: Text('Remove "${project.name}"?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                              FilledButton(
-                                onPressed: () => Navigator.pop(c, true),
-                                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (ok == true) {
-                          await deleteWorksheetProject(widget.userEmail, project.id);
-                          await _reload();
-                        }
-                      },
-                      icon: Icon(Icons.more_vert, color: p.secondaryText),
+                      onPressed: () => _openProjectMenu(project, p),
+                      icon: Icon(Icons.more_vert_rounded, color: p.secondaryText),
+                      tooltip: 'Project options',
                     ),
                   ],
                 ),
