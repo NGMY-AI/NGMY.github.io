@@ -99,8 +99,27 @@ Future<void> ngmySaveUserAppProject(String email, NgmyAppProject project) async 
 
 Future<void> ngmyDeleteUserAppProject(String email, String projectId) async {
   final list = await ngmyLoadUserAppProjects(email);
+  final removed = list.where((p) => p.id == projectId).toList();
   list.removeWhere((p) => p.id == projectId);
   await _persistUserProjects(email, list);
+  for (final p in removed) {
+    final slug = p.slug.trim();
+    if (slug.isNotEmpty) {
+      await NgmyAppStudioPublishedRegistry.unpublishSlug(slug);
+    }
+  }
+  final published = await ngmyLoadLocalPublishedApps();
+  final publishedRemoved = published.where((p) => p.id == projectId).toList();
+  if (publishedRemoved.isNotEmpty) {
+    published.removeWhere((p) => p.id == projectId);
+    await ngmySaveLocalPublishedApps(published);
+    for (final p in publishedRemoved) {
+      final slug = p.slug.trim();
+      if (slug.isNotEmpty) {
+        await NgmyAppStudioPublishedRegistry.unpublishSlug(slug);
+      }
+    }
+  }
 }
 
 Future<void> _persistUserProjects(String email, List<NgmyAppProject> list) async {

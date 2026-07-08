@@ -110,6 +110,45 @@ Future<bool> _restPatchRow(String key, Map<String, dynamic> value, String update
   return false;
 }
 
+/// Deletes one `ngmy_settings` row by key (frees cloud space for that payload).
+Future<bool> ngmyDeleteSettingsKeyReliable(String key) async {
+  final k = key.trim();
+  if (k.isEmpty) return false;
+
+  var ok = false;
+  try {
+    final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings').replace(
+      queryParameters: {'key': 'eq.$k'},
+    );
+    final resp = await http
+        .delete(
+          uri,
+          headers: {
+            ..._ngmySettingsRestHeaders,
+            'Prefer': 'return=minimal',
+          },
+        )
+        .timeout(kNgmyCloudWriteTimeout);
+    ok = resp.statusCode >= 200 && resp.statusCode < 300;
+    if (!ok) debugPrint('[ngmy_settings] rest DELETE $k: ${resp.statusCode} ${resp.body}');
+  } catch (e) {
+    debugPrint('[ngmy_settings] rest DELETE $k: $e');
+  }
+
+  if (!ok) {
+    try {
+      await ngmyEnsureSupabaseAuthInitialized();
+      await ngmyWaitForSupabaseReady();
+      await Supabase.instance.client.from('ngmy_settings').delete().eq('key', k).timeout(kNgmyCloudWriteTimeout);
+      ok = true;
+    } catch (e) {
+      debugPrint('[ngmy_settings] client DELETE $k: $e');
+      ngmyInvalidateCloudReachabilityCache();
+    }
+  }
+  return ok;
+}
+
 Future<bool> ngmyUpsertSettingsRowReliable(
   String key,
   Map<String, dynamic> value, {

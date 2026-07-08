@@ -21,6 +21,7 @@ import 'ngmy_doc_share_school.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_doc_share_my_code.dart';
 import 'ngmy_doc_share_my_code_ui.dart';
+import 'ngmy_doc_share_qr_stash.dart';
 import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_sync.dart';
 import 'ngmy_qr_download.dart';
@@ -1221,7 +1222,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete file?'),
-        content: Text('Remove "${item.name}" from this device?'),
+        content: Text('Remove "${item.name}" from this device and clear the shared cloud copy?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
@@ -1229,6 +1230,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       ),
     );
     if (ok != true) return;
+    final token = (item.stashToken ?? '').trim();
+    if (token.isNotEmpty) {
+      await NgmyDocShareQrStash.deleteToken(token);
+    }
     await NgmyDocShareStore.delete(widget.email, item.id);
     _selected.remove(item.id);
     await _refresh();

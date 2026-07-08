@@ -22,6 +22,13 @@ Future<void> saveNgmyLocalMenu({required String userEmail, required NgmyMenuDocu
   await prefs.setString(_localMenuDraftKey(userEmail), NgmyMenuDocument.encodeList(list));
 }
 
+Future<void> deleteNgmyLocalMenu({required String userEmail, required String id}) async {
+  final list = await loadNgmyLocalMenus(userEmail: userEmail);
+  list.removeWhere((d) => d.id == id);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_localMenuDraftKey(userEmail), NgmyMenuDocument.encodeList(list));
+}
+
 Future<int> ngmyLocalMenuCount({required String userEmail}) async {
   return (await loadNgmyLocalMenus(userEmail: userEmail)).length;
 }

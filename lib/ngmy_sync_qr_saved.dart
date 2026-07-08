@@ -201,6 +201,19 @@ class NgmySyncQrSavedStore {
     final byEmail = Map<String, dynamic>.from((root['byEmail'] as Map?) ?? {});
     final user = Map<String, dynamic>.from(_userMap(root, email) ?? {});
     if (!user.containsKey(source.storageKey)) return;
+
+    final existing = user[source.storageKey];
+    if (existing is Map) {
+      final token = (existing['stashToken'] ?? '').toString().trim();
+      if (token.isNotEmpty) {
+        if (source == NgmySyncQrSource.advisor) {
+          await NgmyCommunicateQrStash.deleteToken(token);
+        } else {
+          await NgmyFamilyTreeQrStash.deleteToken(token);
+        }
+      }
+    }
+
     user.remove(source.storageKey);
     if (user.isEmpty) {
       byEmail.remove(key);

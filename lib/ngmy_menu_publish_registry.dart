@@ -182,4 +182,60 @@ class NgmyMenuPublishRegistry {
       return 'Could not publish menu to cloud. Check connection and try again.';
     }
   }
+
+  /// Removes the public menu link from Supabase so guests can no longer open it.
+  /// Deletes the per-slug payload row (frees space) and drops the slug from the index.
+  static Future<void> unpublishSlug(String slug, {String? ownerEmail}) async {
+    final clean = _normSlug(slug);
+    if (clean.isEmpty) return;
+    if (!await ngmyCanReachCloud()) return;
+    await ngmyWaitForSupabaseReady();
+    try {
+      final slugKey = _slugSettingsKey(clean);
+      final email = (ownerEmail ?? '').toLowerCase().trim();
+
+      if (email.isNotEmpty) {
+        final existing = await ngmyFetchSettingsValueReliable(slugKey, timeout: _guestFetchTimeout);
+        final owner = (existing?['createdByEmail'] ?? '').toString().toLowerCase().trim();
+        if (owner.isNotEmpty && owner != email) {
+          debugPrint('[menu registry] unpublish blocked — owner mismatch for $clean');
+          return;
+        }
+      }
+
+      await ngmyDeleteSettingsKeyReliable(slugKey);
+
+      Map<String, dynamic> value = {};
+      try {
+        final row = await Supabase.instance.client
+            .from('ngmy_settings')
+            .select()
+            .eq('key', settingsKey)
+            .maybeSingle()
+            .timeout(kNgmyCloudLoadTimeout);
+        if (row != null) {
+          final raw = row['value'];
+          if (raw is Map) value = Map<String, dynamic>.from(raw);
+        }
+      } catch (_) {
+        final rest = await _fetchRegistryValueViaRest();
+        if (rest != null) value = rest;
+      }
+
+      final entries = _entriesFromValue(value);
+      if (!entries.containsKey(clean)) return;
+
+      if (email.isNotEmpty) {
+        final entryOwner = (entries[clean]?['createdByEmail'] ?? '').toString().toLowerCase().trim();
+        if (entryOwner.isNotEmpty && entryOwner != email) return;
+      }
+
+      entries.remove(clean);
+      value['menus'] = entries;
+      value['savedAt'] = DateTime.now().toUtc().toIso8601String();
+      await ngmyUpsertSettingsRowReliable(settingsKey, value);
+    } catch (e) {
+      debugPrint('[menu registry] unpublish $clean: $e');
+    }
+  }
 }

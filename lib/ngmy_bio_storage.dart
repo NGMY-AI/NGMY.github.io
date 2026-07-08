@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_bio_models.dart';
+import 'ngmy_bio_publish_registry.dart';
 
 String _bioStorageKey(String userEmail) => 'ngmy_bios_v1_${userEmail.trim().toLowerCase()}';
 
@@ -24,9 +25,15 @@ Future<void> saveNgmyBio({required String userEmail, required NgmyBioDocument do
 
 Future<void> deleteNgmyBio({required String userEmail, required String id}) async {
   final list = await loadNgmyBios(userEmail: userEmail);
+  final removed = list.where((d) => d.id == id).toList();
   list.removeWhere((d) => d.id == id);
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_bioStorageKey(userEmail), NgmyBioDocument.encodeList(list));
+  for (final doc in removed) {
+    final slug = doc.slug.trim();
+    if (slug.isEmpty) continue;
+    await NgmyBioPublishRegistry.unpublishSlug(slug, ownerEmail: userEmail);
+  }
 }
 
 Future<int> ngmyBioCount({required String userEmail}) async {

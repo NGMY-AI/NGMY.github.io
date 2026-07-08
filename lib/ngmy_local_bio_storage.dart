@@ -22,6 +22,13 @@ Future<void> saveNgmyLocalBio({required String userEmail, required NgmyBioDocume
   await prefs.setString(_localBioDraftKey(userEmail), NgmyBioDocument.encodeList(list));
 }
 
+Future<void> deleteNgmyLocalBio({required String userEmail, required String id}) async {
+  final list = await loadNgmyLocalBios(userEmail: userEmail);
+  list.removeWhere((d) => d.id == id);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_localBioDraftKey(userEmail), NgmyBioDocument.encodeList(list));
+}
+
 Future<int> ngmyLocalBioCount({required String userEmail}) async {
   return (await loadNgmyLocalBios(userEmail: userEmail)).length;
 }

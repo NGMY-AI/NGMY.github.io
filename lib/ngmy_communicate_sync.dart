@@ -235,6 +235,16 @@ class NgmyCommunicateQrStash {
     );
   }
 
+  /// Removes one advisor transfer stash from cloud (frees space).
+  static Future<void> deleteToken(String token) async {
+    final id = token.trim();
+    if (id.isEmpty) return;
+    final stashes = await _loadStashes();
+    if (!stashes.containsKey(id)) return;
+    stashes.remove(id);
+    await _saveStashes(stashes);
+  }
+
   static Future<int?> usesRemainingForToken(String token) async {
     final id = token.trim();
     if (id.isEmpty) return null;

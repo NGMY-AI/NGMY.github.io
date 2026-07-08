@@ -261,6 +261,76 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     );
   }
 
+  Future<void> _confirmDeleteMenu(NgmyMenuDocument m) async {
+    final name = m.restaurantName.trim().isEmpty ? 'this menu' : m.restaurantName.trim();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete menu?'),
+        content: Text(
+          m.isPublished || m.slug.trim().isNotEmpty
+              ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
+              : 'Delete "$name" from this device?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (widget._isLocal) {
+      await deleteNgmyLocalMenu(userEmail: widget.userEmail, id: m.id);
+    } else {
+      await deleteNgmyMenu(userEmail: widget.userEmail, id: m.id);
+    }
+    if (_editing?.id == m.id) setState(() => _editing = null);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Menu deleted — public link cleared'), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _confirmDeleteBio(NgmyBioDocument b) async {
+    final name = b.displayName.trim().isEmpty ? 'this Bio' : b.displayName.trim();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Bio?'),
+        content: Text(
+          b.isPublished || b.slug.trim().isNotEmpty
+              ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
+              : 'Delete "$name" from this device?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (widget._isLocal) {
+      await deleteNgmyLocalBio(userEmail: widget.userEmail, id: b.id);
+    } else {
+      await deleteNgmyBio(userEmail: widget.userEmail, id: b.id);
+    }
+    if (_editingBio?.id == b.id) setState(() => _editingBio = null);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bio deleted — public link cleared'), behavior: SnackBarBehavior.floating),
+    );
+  }
+
   Future<void> _save() async {
     final doc = _editing;
     if (doc == null) return;
@@ -650,6 +720,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                     onPressed: () => _copyLink(b.publicUrl),
                     icon: Icon(Icons.copy_rounded, color: const Color(0xFF2563EB), size: 20),
                   ),
+                IconButton(
+                  tooltip: 'Delete Bio',
+                  onPressed: () => _confirmDeleteBio(b),
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                ),
                 Icon(Icons.chevron_right_rounded, color: t.muted),
               ],
             ),
@@ -726,6 +801,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                     onPressed: () => _copyLink(m.publicUrl),
                     icon: Icon(Icons.link_rounded, color: _kMenuAccent, size: 20),
                   ),
+                IconButton(
+                  tooltip: 'Delete menu',
+                  onPressed: () => _confirmDeleteMenu(m),
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                ),
                 Icon(Icons.chevron_right_rounded, color: t.muted),
               ],
             ),
