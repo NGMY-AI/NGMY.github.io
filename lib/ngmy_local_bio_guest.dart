@@ -7,6 +7,7 @@ import 'ngmy_bio_chrome.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_renderer.dart';
 import 'ngmy_bio_templates.dart';
+import 'ngmy_guest_link_missing.dart';
 import 'ngmy_local_bio_launch_stub.dart' if (dart.library.html) 'ngmy_local_bio_launch_web.dart';
 import 'ngmy_local_bio_publish_registry.dart';
 
@@ -124,29 +125,10 @@ class _NgmyGuestLocalBioHostScreenState extends State<NgmyGuestLocalBioHostScree
       );
     }
     if (_doc == null || _error != null) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF0F172A),
-          elevation: 0,
-          title: const Text('Local Bio not found'),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.devices_rounded, size: 56, color: Colors.black38),
-                const SizedBox(height: 12),
-                Text(_error ?? 'Not found', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: _load, child: const Text('Try again')),
-              ],
-            ),
-          ),
-        ),
+      return NgmyGuestLinkMissingPage(
+        kind: 'bio',
+        message: _error ?? 'This Bio page could not be found.',
+        onRetry: _load,
       );
     }
 

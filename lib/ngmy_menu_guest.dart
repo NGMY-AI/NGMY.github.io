@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
 import 'ngmy_menu_launch_stub.dart' if (dart.library.html) 'ngmy_menu_launch_web.dart';
+import 'ngmy_guest_link_missing.dart';
 import 'ngmy_menu_publish_registry.dart';
 import 'ngmy_menu_renderer.dart';
 
@@ -84,7 +85,7 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _error = 'We could not open this menu. Ask the restaurant to re-share the link.';
+      _error = 'This menu link is no longer available. Ask the restaurant for a new link.';
     });
   }
 
@@ -107,23 +108,10 @@ class _NgmyGuestMenuHostScreenState extends State<NgmyGuestMenuHostScreen> {
     }
 
     if (_doc == null || _error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Menu not found')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.restaurant_menu_rounded, size: 56, color: Colors.black38),
-                const SizedBox(height: 12),
-                Text(_error ?? 'Not found', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: _load, child: const Text('Try again')),
-              ],
-            ),
-          ),
-        ),
+      return NgmyGuestLinkMissingPage(
+        kind: 'menu',
+        message: _error ?? 'This menu page could not be found.',
+        onRetry: _load,
       );
     }
 

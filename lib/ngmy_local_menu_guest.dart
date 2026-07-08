@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_guest_link_missing.dart';
 import 'ngmy_local_menu_launch_stub.dart' if (dart.library.html) 'ngmy_local_menu_launch_web.dart';
 import 'ngmy_local_menu_publish_registry.dart';
 import 'ngmy_menu_footer.dart';
@@ -107,23 +108,10 @@ class _NgmyGuestLocalMenuHostScreenState extends State<NgmyGuestLocalMenuHostScr
     }
 
     if (_doc == null || _error != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Local menu not found')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.devices_rounded, size: 56, color: Colors.black38),
-                const SizedBox(height: 12),
-                Text(_error ?? 'Not found', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: _load, child: const Text('Try again')),
-              ],
-            ),
-          ),
-        ),
+      return NgmyGuestLinkMissingPage(
+        kind: 'menu',
+        message: _error ?? 'This menu page could not be found.',
+        onRetry: _load,
       );
     }
 
