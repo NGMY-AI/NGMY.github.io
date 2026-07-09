@@ -12930,6 +12930,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ColoredBox(
         color: isDark ? Colors.transparent : Colors.white,
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           backgroundColor: isDark ? null : Colors.white,
           body: Stack(
             children: [
@@ -12945,6 +12946,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: SelectionContainer.disabled(
                   child: Center(
                     child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
                       padding: const EdgeInsets.all(35),
                       child: Column(
                         children: [
