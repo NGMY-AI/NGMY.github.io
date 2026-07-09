@@ -146,6 +146,7 @@ import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
+import 'ngmy_civic_advisors_role_notes.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
 import 'ngmy_app_builder.dart';
@@ -19614,9 +19615,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
             _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
-            _menuFrame('Communicate', Icons.favorite_rounded, const Color(0xFFEC4899), () => unawaited(_openCommunicateAdmin(isDark)), isDark),
-            _menuFrame('NGMY AI', Icons.auto_awesome_rounded, const Color(0xFF3B82F6), () => unawaited(_openNgmyAiAdmin(isDark)), isDark),
-            _menuFrame('App Builder', Icons.star_rounded, const Color(0xFFF59E0B), () => unawaited(_openAppBuilderAdmin(isDark)), isDark),
             _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
           ],
         ),
@@ -31628,6 +31626,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ] else ...[
               if (_activeTab == 0) _searchSection(isDark),
               if (_activeTab == 1) _rankingsSection(isDark),
+            ],
+
+            if (widget.user.isAdmin) ...[
+              const SizedBox(height: 24),
+              NgmyCivicAdvisorsRoleNotesCard(isDark: isDark),
             ],
 
               const SizedBox(height: 50),
