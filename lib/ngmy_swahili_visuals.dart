@@ -485,13 +485,29 @@ SwahiliWordVisual resolveSwahiliWordVisual({required String swahili, required St
 }
 
 /// Full-screen photo viewer — tap any lesson picture to enlarge.
+/// Scales a photo URL up for full-screen viewing while keeping its original
+/// aspect ratio — forcing a fixed landscape size here would make Unsplash
+/// re-crop portrait (full-body) photos and cut off the top/bottom.
+String _upscaleSwahiliPhotoUrl(String url, {int targetLongSide = 1600}) {
+  final wMatch = RegExp(r'w=(\d+)').firstMatch(url);
+  final hMatch = RegExp(r'h=(\d+)').firstMatch(url);
+  if (wMatch == null || hMatch == null) return url;
+  final w = int.parse(wMatch.group(1)!);
+  final h = int.parse(hMatch.group(1)!);
+  if (w <= 0 || h <= 0) return url;
+  final scale = targetLongSide / (w > h ? w : h);
+  final newW = (w * scale).round();
+  final newH = (h * scale).round();
+  return url.replaceFirst(RegExp(r'w=\d+'), 'w=$newW').replaceFirst(RegExp(r'h=\d+'), 'h=$newH');
+}
+
 Future<void> showSwahiliWordImageFullscreen(
   BuildContext context, {
   required SwahiliWordVisual visual,
   required String swahili,
   required String english,
 }) {
-  final hiRes = visual.imageUrl.replaceFirst(RegExp(r'w=\d+'), 'w=1400').replaceFirst(RegExp(r'h=\d+'), 'h=1050');
+  final hiRes = _upscaleSwahiliPhotoUrl(visual.imageUrl);
 
   return showGeneralDialog<void>(
     context: context,
