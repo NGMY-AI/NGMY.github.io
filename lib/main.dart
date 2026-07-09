@@ -12944,12 +12944,18 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               SafeArea(
                 child: SelectionContainer.disabled(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      padding: const EdgeInsets.all(35),
-                      child: Column(
-                        children: [
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 35),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
       NgmyLoginLogoHero(logoUrl: widget.config.logoUrl),
       const SizedBox(height: 25), Text(_isLogin ? 'NGMY' : 'Create Account', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
       const SizedBox(height: 45),
@@ -13039,9 +13045,12 @@ class _AuthScreenState extends State<AuthScreen> {
       const SizedBox(height: 6),
       _buildAuthModeSwitchGlassCard(isDark),
       const NgmyLegalFooterLinks(),
-                        ],
-                      ),
-                    ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
