@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'ngmy_swahili_curriculum.dart';
 
 /// Gamified winding "road" map for a 5-day week + test (screenshot style).
-class SwahiliWeekPathPage extends StatelessWidget {
+/// Stateful so day unlocks refresh immediately when returning from a lesson.
+class SwahiliWeekPathPage extends StatefulWidget {
   const SwahiliWeekPathPage({
     super.key,
     required this.level,
@@ -23,23 +25,43 @@ class SwahiliWeekPathPage extends StatelessWidget {
   final int levelIndex;
   final bool Function(int dayIndex) isDayDone;
   final bool Function(int dayIndex) isDayUnlocked;
-  final bool allDaysDone;
-  final bool levelPassed;
-  final int? bestScore;
-  final void Function(int dayIndex, BuildContext pathContext) onDayTap;
-  final void Function(BuildContext pathContext)? onTestTap;
+  final bool Function() allDaysDone;
+  final bool Function() levelPassed;
+  final int? Function()? bestScore;
+  final Future<void> Function(int dayIndex, BuildContext pathContext) onDayTap;
+  final Future<void> Function(BuildContext pathContext)? onTestTap;
 
+  @override
+  State<SwahiliWeekPathPage> createState() => _SwahiliWeekPathPageState();
+}
+
+class _SwahiliWeekPathPageState extends State<SwahiliWeekPathPage> {
   int get _currentDay {
-    for (var d = 0; d < level.days.length; d++) {
-      if (!isDayDone(d) && isDayUnlocked(d)) return d;
+    for (var d = 0; d < widget.level.days.length; d++) {
+      if (!widget.isDayDone(d) && widget.isDayUnlocked(d)) return d;
     }
-    return level.days.length - 1;
+    return widget.level.days.length - 1;
+  }
+
+  Future<void> _openDay(int d) async {
+    await widget.onDayTap(d, context);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openTest() async {
+    final tap = widget.onTestTap;
+    if (tap == null) return;
+    await tap(context);
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final points = _pathPoints(size);
+    final allDone = widget.allDaysDone();
+    final passed = widget.levelPassed();
+    final score = widget.bestScore?.call();
 
     return Scaffold(
       backgroundColor: const Color(0xFF3D9A5F),
@@ -59,7 +81,7 @@ class SwahiliWeekPathPage extends StatelessWidget {
                       ),
                       Expanded(
                         child: Text(
-                          level.title,
+                          widget.level.title,
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                         ),
@@ -71,7 +93,7 @@ class SwahiliWeekPathPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'Wiki ${levelIndex + 1}',
+                          'Wiki ${widget.levelIndex + 1}',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
                         ),
                       ),
@@ -92,17 +114,17 @@ class SwahiliWeekPathPage extends StatelessWidget {
                             size: Size(w, h),
                             painter: _DashedPathPainter(scaled),
                           ),
-                          ...List.generate(level.days.length, (d) {
+                          ...List.generate(widget.level.days.length, (d) {
                             final pos = scaled[d];
-                            final done = isDayDone(d);
-                            final unlocked = isDayUnlocked(d);
+                            final done = widget.isDayDone(d);
+                            final unlocked = widget.isDayUnlocked(d);
                             final isCurrent = d == _currentDay && !done;
                             return Positioned(
                               left: pos.dx - 52,
                               top: pos.dy - 52,
                               child: _PathNode(
                                 label: isCurrent ? 'Anza' : 'Siku ${d + 1}',
-                                subtitle: level.days[d].title.split('—').last.trim(),
+                                subtitle: widget.level.days[d].title.split('—').last.trim(),
                                 state: done
                                     ? _NodeState.done
                                     : isCurrent
@@ -110,9 +132,7 @@ class SwahiliWeekPathPage extends StatelessWidget {
                                         : unlocked
                                             ? _NodeState.available
                                             : _NodeState.locked,
-                                onTap: unlocked && !done
-                                    ? () => onDayTap(d, context)
-                                    : (done ? () => onDayTap(d, context) : null),
+                                onTap: unlocked || done ? () => unawaited(_openDay(d)) : null,
                               ),
                             );
                           }),
@@ -121,18 +141,18 @@ class SwahiliWeekPathPage extends StatelessWidget {
                             top: scaled.last.dy - 56,
                             child: _PathNode(
                               label: 'Mtihani',
-                              subtitle: levelPassed
-                                  ? 'Bora: ${bestScore ?? 0}%'
-                                  : allDaysDone
+                              subtitle: passed
+                                  ? 'Bora: ${score ?? 0}%'
+                                  : allDone
                                       ? 'Pita 70%+'
                                       : 'Funga siku 5',
-                              state: levelPassed
+                              state: passed
                                   ? _NodeState.done
-                                  : allDaysDone
+                                  : allDone
                                       ? _NodeState.current
                                       : _NodeState.locked,
                               isTest: true,
-                              onTap: allDaysDone && onTestTap != null ? () => onTestTap!(context) : null,
+                              onTap: allDone && widget.onTestTap != null ? () => unawaited(_openTest()) : null,
                             ),
                           ),
                           Positioned(

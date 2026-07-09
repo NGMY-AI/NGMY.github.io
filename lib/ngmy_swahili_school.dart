@@ -258,19 +258,19 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
           levelIndex: levelIndex,
           isDayDone: (d) => _progress.isDayDone(levelIndex, d),
           isDayUnlocked: (d) => _isDayUnlocked(levelIndex, d),
-          allDaysDone: _progress.allDaysDone(level, levelIndex),
-          levelPassed: _progress.isLevelPassed(level.id),
-          bestScore: _progress.bestScores[level.id],
-          onDayTap: (d, pathCtx) {
+          allDaysDone: () => _progress.allDaysDone(level, levelIndex),
+          levelPassed: () => _progress.isLevelPassed(level.id),
+          bestScore: () => _progress.bestScores[level.id],
+          onDayTap: (d, pathCtx) async {
             final lesson = _buildLessonPage(levelIndex, d);
-            Navigator.of(pathCtx).push<void>(
+            await Navigator.of(pathCtx).push<void>(
               ngmySwahiliInstantRoute<void>(pathCtx, lesson),
-            ).then((_) {
-              if (mounted) setState(() {});
-            });
+            );
+            // Path page refreshes itself when this Future completes.
+            if (mounted) setState(() {});
           },
-          onTestTap: (pathCtx) {
-            Navigator.of(pathCtx).push<void>(
+          onTestTap: (pathCtx) async {
+            await Navigator.of(pathCtx).push<void>(
               ngmySwahiliInstantRoute<void>(
                 pathCtx,
                 _SwahiliTestPage(
@@ -295,11 +295,14 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
                 ),
               ),
             );
+            if (mounted) setState(() {});
           },
         ),
         background: kSwahiliPathBg,
       ),
-    ).then((_) => setState(() {}));
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Widget _buildLessonPage(int levelIndex, int dayIndex) {
