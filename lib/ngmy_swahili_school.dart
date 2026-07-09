@@ -886,7 +886,10 @@ class _WordCard extends StatefulWidget {
 class _WordCardState extends State<_WordCard> {
   bool _speaking = false;
 
-  String get _voiceKey => 'swahili_word_${widget.word.swahili}';
+  // Keyed by the Swahili word (unique per card) — but it's the English
+  // translation that gets spoken, since learners here are Swahili speakers
+  // learning English.
+  String get _voiceKey => 'english_word_${widget.word.swahili}';
 
   Future<void> _toggleSpeak() async {
     if (NgmyLocalTts.isSpeaking(_voiceKey)) {
@@ -897,7 +900,7 @@ class _WordCardState extends State<_WordCard> {
 
     setState(() => _speaking = true);
 
-    final result = await NgmyLocalTts.speak(text: widget.word.swahili, key: _voiceKey);
+    final result = await NgmyLocalTts.speak(text: widget.word.english, key: _voiceKey);
 
     if (!mounted) return;
     setState(() => _speaking = false);
