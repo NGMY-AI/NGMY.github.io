@@ -31,6 +31,8 @@ class NgmySupabaseColumns {
 
   static const geminiOnly = 'id,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key';
 
+  static const youtubeOnly = 'id,youtubeApiKey,youtube_api_key';
+
   /// Login probe — small payload, fast on slow networks.
   static const userLogin =
       'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath';
