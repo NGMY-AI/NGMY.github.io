@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_swahili_curriculum.dart';
+
+part 'ngmy_swahili_visual_semantics.dart';
+
 /// Visual cue for a Swahili/English lesson word — always a real photograph.
 class SwahiliWordVisual {
   const SwahiliWordVisual({
@@ -34,7 +38,7 @@ final Map<String, SwahiliWordVisual> _kExactBySwahili = {
   'mimi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1695835871463-ca6732c02551'), caption: 'I / me — pointing at self'),
   'wewe / ninyi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'), caption: 'You — pointing at you'),
   'wewe': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'), caption: 'You'),
-  'yeye': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1507003211169-0a1dd7228f2d'), caption: 'He / she'),
+  'yeye': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1681038097688-fbdc92bcaa76'), caption: 'He / she — another person'),
   'sisi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529156069898-49953e39b3ac'), caption: 'We / us'),
   'yeye ni mrefu': SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1567862140370-4ecd33c8e285'), caption: 'Tall — full height'),
   'yeye ni mfupi': SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1738680482082-4defacddf94b'), caption: 'Short — full height'),
@@ -162,7 +166,6 @@ final Map<String, SwahiliWordVisual> _kExactBySwahili = {
   'dada': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1494790108377-be9c29b29330'), caption: 'Sister'),
   'bibi': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1581578731548-c64695cc6952'), caption: 'Grandmother'),
   'babu': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1560250097-0b93528c311a'), caption: 'Grandfather'),
-  'sijambo': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1560250097-0b93528c311a'), caption: 'I am fine'),
   'tafadhali': SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1521791136064-7986c2920216'), caption: 'Please'),
 };
 
@@ -179,8 +182,8 @@ final _kRules = <_VisualRule>[
   _VisualRule(['going back home', 'ninarudi nyumbani'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1564013799919-ab600027ffc6'))),
   _VisualRule(['they are happy', 'wana furaha'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1522075469751-3a6694fb2f61'))),
   _VisualRule(['i am happy', 'nina furaha'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1535713875002-d1d0cf377fde'))),
-  _VisualRule(['she/he is tall', 'is tall', 'ni mrefu', 'mrefu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1567862140370-4ecd33c8e285'))),
-  _VisualRule(['she/he is short', 'is short', 'ni mfupi', 'mfupi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1738680482082-4defacddf94b'))),
+  _VisualRule(['she/he is tall', 'is tall', 'ni mrefu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1567862140370-4ecd33c8e285'))),
+  _VisualRule(['she/he is short', 'is short', 'ni mfupi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhotoBody('photo-1738680482082-4defacddf94b'))),
   _VisualRule(['she/he is mine', 'ni wangu', ' is mine'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1519741497674-611481863552'))),
   _VisualRule(['at work', 'kazini'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1497366216548-37526070297c'))),
   _VisualRule(['at school', 'shuleni', 'shule'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1503676260728-1c00da094a0b'))),
@@ -249,7 +252,7 @@ final _kRules = <_VisualRule>[
   _VisualRule([' you', 'wewe'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1673533583133-59fa5b2a80da'))),
   _VisualRule([' we ', 'sisi'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1529156069898-49953e39b3ac'))),
   _VisualRule([' they', 'wana'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1522075469751-3a6694fb2f61'))),
-  _VisualRule([' he ', ' she ', 'yeye'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1507003211169-0a1dd7228f2d'))),
+  _VisualRule([' he ', ' she ', 'yeye'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1681038097688-fbdc92bcaa76'))),
   _VisualRule(['can help', 'kusaidia', 'naweza'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1521791136064-7986c2920216'))),
   _VisualRule(["can't go", 'siwezi', 'kwenda'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1488646953014-85cb44e25828'))),
   _VisualRule(['because', 'kwasababu'], SwahiliWordVisual(imageUrl: ngmySwahiliPhoto('photo-1454165804606-c3d57bc86b40'))),
@@ -365,13 +368,20 @@ const _kDefaultVisual = SwahiliWordVisual(
 SwahiliWordVisual resolveSwahiliWordVisual({required String swahili, required String english}) {
   final swKey = _normSw(swahili);
   final swBare = _normSwKey(swahili);
-  final exact = _kExactBySwahili[swKey] ?? _kExactBySwahili[swBare];
-  if (exact != null) return exact;
 
+  // Manual overrides (highest priority).
+  final manual = _kExactBySwahili[swKey] ?? _kExactBySwahili[swBare];
+  if (manual != null) return manual;
+
+  // Pre-mapped curriculum visuals — one accurate photo per lesson word.
+  final curated = curriculumSwahiliVisual(swahili);
+  if (curated != null) return curated;
+
+  // Fallback keyword rules — whole-word matching only (no "mrefu" inside "maarufu").
   final hay = '$swBare ${english.toLowerCase()}';
   for (final rule in _kRules) {
     for (final kw in rule.keywords) {
-      if (hay.contains(kw)) return rule.visual;
+      if (ngmySwahiliTokenMatch(hay, kw)) return rule.visual;
     }
   }
   return _kDefaultVisual;
