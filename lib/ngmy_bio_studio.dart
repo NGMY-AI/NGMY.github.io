@@ -536,7 +536,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           subtitle: 'Name and tagline shown on your bio page.',
           child: Column(
             children: [
-              NgmyModernField(controller: _nameC, label: 'Display name', hint: 'KB Pablo', icon: Icons.person_outline_rounded, accent: _kBioAccent),
+              NgmyModernField(controller: _nameC, label: 'Display name', hint: kNgmyBioDefaultDisplayName, icon: Icons.person_outline_rounded, accent: _kBioAccent),
               const SizedBox(height: 12),
               NgmyModernField(controller: _taglineC, label: 'Bio line', hint: 'MAKE MONEY ONLINE', icon: Icons.short_text_rounded, accent: _kBioAccent),
               const SizedBox(height: 12),

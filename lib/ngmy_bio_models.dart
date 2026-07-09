@@ -135,9 +135,11 @@ class NgmyBioDocument {
   }
 }
 
+const kNgmyBioDefaultDisplayName = 'KB PABLO QR';
+
 NgmyBioDocument ngmyBioBlankDocument() => NgmyBioDocument(
       id: ngmyBioNewId(),
-      displayName: '',
+      displayName: kNgmyBioDefaultDisplayName,
       tagline: '',
       links: [NgmyBioLink(id: ngmyBioNewId(), title: 'My Link', url: '')],
     );

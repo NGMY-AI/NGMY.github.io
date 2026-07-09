@@ -76,6 +76,7 @@ class NgmyBioPreview extends StatelessWidget {
     );
 
     if (fullBleed) {
+      final bottomInset = MediaQuery.paddingOf(context).bottom;
       return SizedBox.expand(
         child: Stack(
           fit: StackFit.expand,
@@ -90,6 +91,12 @@ class NgmyBioPreview extends StatelessWidget {
                 child: _sceneBackdrop(tpl, document),
               ),
             pageStack,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: bottomInset + (compact ? 10 : 14),
+              child: Center(child: _madeByNgmyWatermark(tpl)),
+            ),
           ],
         ),
       );
@@ -1211,7 +1218,58 @@ class NgmyBioPreview extends StatelessWidget {
 
   Widget _linksColumn(List<NgmyBioLink> links, NgmyBioTemplate tpl, double pad) {
     return Column(
-      children: links.map((l) => _linkCard(l, tpl)).toList(),
+      children: [
+        ...links.map((l) => _linkCard(l, tpl)),
+        if (!fullBleed) ...[
+          SizedBox(height: compact ? 14 : 18),
+          Center(child: _madeByNgmyWatermark(tpl)),
+          SizedBox(height: compact ? 6 : 8),
+        ],
+      ],
+    );
+  }
+
+  Widget _madeByNgmyWatermark(NgmyBioTemplate tpl) {
+    final dark = _isDarkBg(tpl.pageBgEnd ?? tpl.pageBg);
+    final badge = Container(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 14, vertical: compact ? 6 : 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+        border: Border.all(
+          color: dark ? Colors.white.withValues(alpha: 0.22) : Colors.black.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.28 : 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        'MADE BY NGMY',
+        style: TextStyle(
+          fontSize: compact ? 9 : 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
+          color: dark ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF4B5563),
+        ),
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse('https://ngmy.org');
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        borderRadius: BorderRadius.circular(999),
+        child: badge,
+      ),
     );
   }
 
