@@ -48,7 +48,8 @@ class _NgmyYouTubeSearchSheetState extends State<_NgmyYouTubeSearchSheet> {
     if (text.isEmpty) return;
 
     // A pasted YouTube link/ID plays directly — no search needed.
-    final directId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(text);
+    final directId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(text) ??
+        (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(text) ? text : null);
     if (directId != null) {
       Navigator.pop(context, (url: NgmyVirtualDeviceEmbed.youtubeWatchUrl(directId), title: null));
       return;
@@ -60,27 +61,20 @@ class _NgmyYouTubeSearchSheetState extends State<_NgmyYouTubeSearchSheet> {
       _results = const [];
     });
     try {
+      // Prefer admin YouTube API key when present; otherwise public search works too.
       final key = await ngmyResolveYouTubeApiKey(config: widget.config);
-      if (key.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _searching = false;
-          _error = "Search isn't set up yet — paste a YouTube link instead, or ask the admin to add a YouTube API key.";
-        });
-        return;
-      }
       final results = await ngmySearchYouTube(text, apiKey: key);
       if (!mounted) return;
       setState(() {
         _searching = false;
         _results = results;
-        if (results.isEmpty) _error = 'No results for "$text".';
+        if (results.isEmpty) _error = 'No songs found for "$text". Try another name or paste a YouTube link.';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _searching = false;
-        _error = 'Search failed — ${e.toString().replaceFirst('Exception: ', '')}';
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -122,7 +116,7 @@ class _NgmyYouTubeSearchSheetState extends State<_NgmyYouTubeSearchSheet> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Search a song, or paste a YouTube link — keeps playing as you browse',
+                            'Type a song name to search, or paste a YouTube link. Then tap Sound on the player.',
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
@@ -188,7 +182,9 @@ class _NgmyYouTubeSearchSheetState extends State<_NgmyYouTubeSearchSheet> {
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            _searching ? 'Searching…' : 'Search for a song or paste a YouTube link above.',
+                            _searching
+                                ? 'Searching songs…'
+                                : 'Type a song name and tap search, or paste a YouTube link.',
                             textAlign: TextAlign.center,
                             style: TextStyle(fontSize: 13, color: isDark ? Colors.white38 : Colors.black38),
                           ),

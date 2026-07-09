@@ -171,7 +171,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         icon: Icons.headphones_rounded,
         colors: const [Color(0xFFDC2626), Color(0xFFEA580C)],
         title: 'Background Music',
-        subtitle: 'Search or paste YouTube — tap player once for sound',
+        subtitle: 'Type a song name or paste a YouTube link',
         onTap: () => unawaited(openNgmyBackgroundPlayerInput(context, config: config)),
       ),
     ];

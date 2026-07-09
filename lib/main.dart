@@ -1507,6 +1507,8 @@ class AppConfig {
   String loanPhone;
   String loanHowItWorks;
   String geminiApiKey;
+  /// YouTube Data API v3 key for Creator Toolkit song search (starts with AIza…).
+  String youtubeApiKey;
   /// ElevenLabs API key for message translator text-to-speech (starts with sk_).
   String elevenLabsApiKey;
   /// Resend.com API key for admin-only AI email delivery (starts with re_).
@@ -1645,6 +1647,7 @@ class AppConfig {
     this.loanPhone = '706-623-7963',
     this.loanHowItWorks = '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     this.geminiApiKey = '',
+    this.youtubeApiKey = '',
     this.elevenLabsApiKey = '',
     this.resendApiKey = '',
     this.resendFromEmail = 'NGMY <noreply@ngmy.org>',
@@ -1795,6 +1798,8 @@ class AppConfig {
     'loanPhone': loanPhone,
     'loanHowItWorks': loanHowItWorks,
     'geminiApiKey': geminiApiKey,
+    'youtubeApiKey': youtubeApiKey,
+    'youtube_api_key': youtubeApiKey,
     'elevenLabsApiKey': elevenLabsApiKey,
     'resendApiKey': resendApiKey,
     'resendFromEmail': resendFromEmail,
@@ -1914,6 +1919,7 @@ class AppConfig {
     loanPhone: json['loanPhone'] ?? '706-623-7963',
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
     geminiApiKey: _geminiKeyFromMap(json),
+    youtubeApiKey: (json['youtubeApiKey'] ?? json['youtube_api_key'] ?? '').toString().trim(),
     elevenLabsApiKey: (json['elevenLabsApiKey'] ?? '').toString().trim(),
     resendApiKey: (json['resendApiKey'] ?? '').toString().trim(),
     resendFromEmail: (json['resendFromEmail'] ?? 'NGMY <noreply@ngmy.org>').toString().trim(),
@@ -23509,6 +23515,7 @@ class _NgmyAiAdminSheet extends StatefulWidget {
 
 class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   late final TextEditingController _apiC;
+  late final TextEditingController _youtubeC;
   late final TextEditingController _elevenLabsC;
   late final TextEditingController _resendC;
   late final TextEditingController _resendFromC;
@@ -23521,6 +23528,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   Uint8List? _pendingLogoBytes;
   bool _logoUploading = false;
   bool _apiKeyVisible = false;
+  bool _youtubeKeyVisible = false;
   bool _elevenLabsKeyVisible = false;
   bool _resendKeyVisible = false;
 
@@ -23528,6 +23536,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   void initState() {
     super.initState();
     _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _youtubeC = TextEditingController(text: widget.config.youtubeApiKey);
     _elevenLabsC = TextEditingController(text: widget.config.elevenLabsApiKey);
     _resendC = TextEditingController(text: widget.config.resendApiKey);
     _resendFromC = TextEditingController(text: widget.config.resendFromEmail);
@@ -23558,6 +23567,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
     _elevenLabsFocus.dispose();
     _scrollC.dispose();
     _apiC.dispose();
+    _youtubeC.dispose();
     _elevenLabsC.dispose();
     _resendC.dispose();
     _resendFromC.dispose();
@@ -23662,6 +23672,7 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   Future<void> _saveSettings() async {
     widget.config.logoUrl = await _resolveLogoForSave();
     widget.config.geminiApiKey = _apiC.text.trim();
+    widget.config.youtubeApiKey = _youtubeC.text.trim();
     widget.config.elevenLabsApiKey = _elevenLabsC.text.trim();
     widget.config.resendApiKey = _resendC.text.trim();
     widget.config.resendFromEmail = _resendFromC.text.trim().isEmpty ? NgmyResendEmail.defaultFrom : _resendFromC.text.trim();
@@ -23820,6 +23831,28 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
                       Text(
                         'Auto-detects provider. Optional prefix: gemini:, openai:, anthropic:. '
                         'For other APIs: compat:https://api.example.com/v1|your-key',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _youtubeC,
+                        obscureText: !_youtubeKeyVisible,
+                        decoration: widget.adminInputDecoration(
+                          label: 'YouTube API Key (Background Music search)',
+                          hint: 'AIza… from Google Cloud → YouTube Data API v3',
+                          isDark: isDark,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(_youtubeKeyVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                            tooltip: _youtubeKeyVisible ? 'Hide key' : 'Show key',
+                            onPressed: () => setState(() => _youtubeKeyVisible = !_youtubeKeyVisible),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Required for song-name search in Creator Toolkit → Background Music. '
+                        'Users can still paste a YouTube link without this key. Enable YouTube Data API v3 in Google Cloud.',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
                       ),
                       const SizedBox(height: 14),
