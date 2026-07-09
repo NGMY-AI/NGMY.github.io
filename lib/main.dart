@@ -12956,9 +12956,10 @@ class _AuthScreenState extends State<AuthScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-      NgmyLoginLogoHero(logoUrl: widget.config.logoUrl),
-      const SizedBox(height: 25), Text(_isLogin ? 'NGMY' : 'Create Account', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-      const SizedBox(height: 45),
+                                Center(child: NgmyLoginLogoHero(logoUrl: widget.config.logoUrl)),
+                                const SizedBox(height: 25),
+                                Center(child: NgmyLoginTitleFrame(isLogin: _isLogin, isDark: isDark)),
+                                const SizedBox(height: 45),
       if (!_isLogin) ...[
         TextField(controller: _u, decoration: InputDecoration(labelText: 'Username', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
         const SizedBox(height: 20),

@@ -154,10 +154,11 @@ class _NgmyLoginLogoHeroState extends State<NgmyLoginLogoHero> with TickerProvid
     final touching = _pointerDown;
     final strength = touching ? _touchStrength.clamp(0.0, 3.6) : 0.0;
 
-    return SizedBox(
-      width: _kStageSize,
-      height: _kStageSize,
-      child: Material(
+    return Center(
+      child: SizedBox(
+        width: _kStageSize,
+        height: _kStageSize,
+        child: Material(
         color: Colors.transparent,
         child: Listener(
           behavior: HitTestBehavior.translucent,
@@ -245,11 +246,74 @@ class _NgmyLoginLogoHeroState extends State<NgmyLoginLogoHero> with TickerProvid
           ),
         ),
       ),
+      ),
     );
   }
 }
 
-/// Bright idle-only effects (always visible before touch).
+/// Centered title badge under the login logo.
+class NgmyLoginTitleFrame extends StatelessWidget {
+  const NgmyLoginTitleFrame({super.key, required this.isLogin, required this.isDark});
+
+  final bool isLogin;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isLogin ? 'NGMY' : 'Create Account';
+    if (!isLogin) {
+      return Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 11),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1A1F2E).withValues(alpha: 0.92), const Color(0xFF151922).withValues(alpha: 0.88)]
+              : [Colors.white.withValues(alpha: 0.95), const Color(0xFFF5F3FF)],
+        ),
+        border: Border.all(
+          color: isDark ? const Color(0xFF7C3AED).withValues(alpha: 0.55) : const Color(0xFF6200EE).withValues(alpha: 0.38),
+          width: 1.6,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6200EE).withValues(alpha: isDark ? 0.28 : 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.12 : 0.08),
+            blurRadius: 12,
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2.2,
+          color: isDark ? Colors.white : const Color(0xFF111827),
+          shadows: isDark
+              ? [Shadow(color: const Color(0xFF7C3AED).withValues(alpha: 0.45), blurRadius: 12)]
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
 class _NgmyIdleAuraPainter extends CustomPainter {
   const _NgmyIdleAuraPainter({
     required this.idlePulse,
