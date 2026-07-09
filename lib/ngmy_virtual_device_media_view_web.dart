@@ -205,7 +205,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
                         Icon(Icons.volume_up_rounded, color: Colors.white.withValues(alpha: 0.9), size: 22),
                         const SizedBox(width: 8),
                         Text(
-                          'Tap for sound',
+                          'Tap to play music',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.92),
                             fontWeight: FontWeight.w700,

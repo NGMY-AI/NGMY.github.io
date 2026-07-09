@@ -35,6 +35,15 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   late final WebViewController _controller;
   var _loading = true;
   var _failed = false;
+  var _userUnmuted = false;
+
+  bool get _showUnmuteHint => widget.startMuted && !_userUnmuted && !_loading && !_failed;
+
+  void _unmute() {
+    if (_userUnmuted) return;
+    setState(() => _userUnmuted = true);
+    _load(widget.playUrl);
+  }
 
   @override
   void initState() {
@@ -127,16 +136,17 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
 
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
     if (ytId != null) {
-      final muted = widget.startMuted || _isMutedUrl(url);
+      final muted = (widget.startMuted && !_userUnmuted) || _isMutedUrl(url);
       final origin = NgmyVirtualDeviceEmbed.embedOrigin;
-      if (widget.notifyOnEnd) {
-        _controller.loadHtmlString(
-          NgmyVirtualDeviceEmbed.youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true, origin: origin),
-          baseUrl: '$origin/',
-        );
-      } else {
-        _controller.loadRequest(Uri.parse(NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted)));
-      }
+      _controller.loadHtmlString(
+        NgmyVirtualDeviceEmbed.youtubePlayerHtml(
+          ytId,
+          muted: muted,
+          notifyOnEnd: widget.notifyOnEnd,
+          origin: origin,
+        ),
+        baseUrl: '$origin/',
+      );
       return;
     }
 
@@ -166,7 +176,9 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.playUrl != widget.playUrl ||
         oldWidget.useEmbedHtml != widget.useEmbedHtml ||
-        oldWidget.notifyOnEnd != widget.notifyOnEnd) {
+        oldWidget.notifyOnEnd != widget.notifyOnEnd ||
+        oldWidget.startMuted != widget.startMuted) {
+      _userUnmuted = false;
       _load(widget.playUrl);
     }
   }
@@ -214,6 +226,40 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
                 width: spinner,
                 height: spinner,
                 child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+              ),
+            ),
+          ),
+        if (_showUnmuteHint)
+          Positioned.fill(
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.35),
+              child: InkWell(
+                onTap: _unmute,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.volume_up_rounded, color: Colors.white.withValues(alpha: 0.9), size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tap to play music',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontWeight: FontWeight.w700,
+                            fontSize: widget.compact ? 11 : 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

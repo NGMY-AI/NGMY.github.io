@@ -3,18 +3,14 @@ import 'package:flutter/material.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_virtual_device_embed.dart';
 import 'ngmy_youtube_search.dart';
-import 'ngmy_background_player.dart' deferred as bgplayer;
+import 'ngmy_background_player.dart';
 
-/// Opens the search/paste-link sheet, then starts the persistent background
-/// player — loaded on demand so the heavy iframe/WebView code never loads at
-/// app startup.
+/// Opens the search/paste-link sheet, then starts the persistent background player.
 Future<void> openNgmyBackgroundPlayerInput(BuildContext context, {dynamic config}) async {
   final picked = await _askForYouTubeVideo(context, config: config);
   if (picked == null) return;
   if (!context.mounted) return;
-  await bgplayer.loadLibrary();
-  if (!context.mounted) return;
-  bgplayer.showBackgroundPlayer(context, url: picked.url, title: picked.title);
+  showBackgroundPlayer(context, url: picked.url, title: picked.title);
 }
 
 Future<({String url, String? title})?> _askForYouTubeVideo(BuildContext context, {dynamic config}) {

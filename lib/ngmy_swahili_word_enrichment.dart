@@ -1,6 +1,6 @@
 import 'ngmy_swahili_curriculum.dart';
 
-const kSwahiliMinStudySeconds = 20;
+const kSwahiliMinStudySeconds = 5;
 
 /// Swahili tip with English meaning beside it.
 class SwahiliBilingualTip {

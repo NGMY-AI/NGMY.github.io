@@ -12,11 +12,16 @@ OverlayEntry? _ngmyBgPlayerEntry;
 /// keeps playing across tab switches and screen navigation. Only the user's
 /// close button or [stopBackgroundPlayer] removes it.
 void showBackgroundPlayer(BuildContext context, {required String url, String? title}) {
-  final overlay = NgmyNavigator.root?.overlay;
-  if (overlay == null) return;
+  final overlay = NgmyNavigator.root?.overlay ?? Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Could not start background music — try again.')),
+    );
+    return;
+  }
   stopBackgroundPlayer();
   _ngmyBgPlayerEntry = OverlayEntry(
-    builder: (_) => _NgmyBgPlayerBar(url: url, title: title, onClose: stopBackgroundPlayer),
+    builder: (ctx) => _NgmyBgPlayerBar(url: url, title: title, onClose: stopBackgroundPlayer),
   );
   overlay.insert(_ngmyBgPlayerEntry!);
 }
@@ -58,10 +63,7 @@ class _NgmyBgPlayerBarState extends State<_NgmyBgPlayerBar> {
       compact: !_expanded,
       useEmbedHtml: true,
       notifyOnEnd: false,
-      // Browsers block autoplay-with-sound outright, which is why the video
-      // never actually started — start muted (autoplay is reliably allowed
-      // muted) and let the player's own "tap for sound" hint unmute it on
-      // a real user tap.
+      // Start muted so autoplay works everywhere; user taps once for sound.
       startMuted: true,
     );
 
