@@ -12957,19 +12957,24 @@ class _AuthScreenState extends State<AuthScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Center(child: NgmyLoginLogoHero(logoUrl: widget.config.logoUrl)),
-                                const SizedBox(height: 25),
-                                Center(child: NgmyLoginTitleFrame(isLogin: _isLogin, isDark: isDark)),
-                                const SizedBox(height: 45),
+                                Transform.translate(
+                                  offset: const Offset(0, -22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const SizedBox(height: 10),
+                                      Center(child: NgmyLoginTitleFrame(isLogin: _isLogin, isDark: isDark)),
+                                      const SizedBox(height: 22),
       if (!_isLogin) ...[
         TextField(controller: _u, decoration: InputDecoration(labelText: 'Username', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
       ],
       TextField(controller: _e, decoration: InputDecoration(labelText: 'Gmail Address', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       if (!_isLogin) ...[
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       ],
-      const SizedBox(height: 20),
+      const SizedBox(height: 14),
       TextField(
         controller: _s,
         obscureText: !_showPassword,
@@ -12984,7 +12989,7 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ),
-      const SizedBox(height: 35),
+      const SizedBox(height: 22),
       ElevatedButton(
         onPressed: _authBusy ? null : _submit,
         style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, elevation: 5),
@@ -12993,7 +12998,7 @@ class _AuthScreenState extends State<AuthScreen> {
             : Text(_isLogin ? 'LOGIN' : 'SIGN UP', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
       if (_isLogin) ...[
-        const SizedBox(height: 15),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
@@ -13043,9 +13048,13 @@ class _AuthScreenState extends State<AuthScreen> {
           onPressed: _showForgotPassword,
           child: const Text('Forgot Password?', style: TextStyle(color: Color(0xFF6200EE), fontWeight: FontWeight.w700, fontSize: 15)),
         ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 2),
       _buildAuthModeSwitchGlassCard(isDark),
+      const SizedBox(height: 6),
       const NgmyLegalFooterLinks(),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
