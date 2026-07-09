@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_elevenlabs_tts.dart';
+import 'ngmy_local_tts.dart';
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
 import 'ngmy_swahili_routes.dart';
@@ -44,12 +44,12 @@ class SwahiliWordReminder {
       );
 }
 
-void showNgmySwahiliSchool({required BuildContext context, String? userEmail, dynamic config}) {
+void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
   final bg = Theme.of(context).brightness == Brightness.dark ? kSwahiliSchoolBgDark : kSwahiliSchoolBgLight;
   Navigator.of(context).push<void>(
     ngmySwahiliInstantRoute<void>(
       context,
-      NgmySwahiliSchoolPage(userEmail: userEmail, config: config),
+      NgmySwahiliSchoolPage(userEmail: userEmail),
       background: bg,
     ),
   );
@@ -191,10 +191,9 @@ Future<void> saveSwahiliProgress(String? email, NgmySwahiliProgress progress) as
 }
 
 class NgmySwahiliSchoolPage extends StatefulWidget {
-  const NgmySwahiliSchoolPage({super.key, this.userEmail, this.config});
+  const NgmySwahiliSchoolPage({super.key, this.userEmail});
 
   final String? userEmail;
-  final dynamic config;
 
   @override
   State<NgmySwahiliSchoolPage> createState() => _NgmySwahiliSchoolPageState();
@@ -314,9 +313,8 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
       dayIndex: dayIndex,
       day: day,
       userEmail: widget.userEmail,
-      config: widget.config,
-      // Voice notes are rolling out starting with Basics Day 1 only.
-      enableVoice: level.id == 'basics' && dayIndex == 0,
+      // Voice notes are rolling out starting with the first two Basics Day 1 words.
+      enableVoiceDay: level.id == 'basics' && dayIndex == 0,
       isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
       onWordStudied: (w) async {
         _progress.markWordStudied(levelIndex, dayIndex, w);
@@ -611,8 +609,7 @@ class _SwahiliLessonPage extends StatefulWidget {
     required this.dayIndex,
     required this.day,
     required this.userEmail,
-    this.config,
-    this.enableVoice = false,
+    this.enableVoiceDay = false,
     required this.isWordStudied,
     required this.onWordStudied,
     required this.isDayDone,
@@ -626,8 +623,9 @@ class _SwahiliLessonPage extends StatefulWidget {
   final int dayIndex;
   final SwahiliLessonDay day;
   final String? userEmail;
-  final dynamic config;
-  final bool enableVoice;
+  /// True for the lesson day currently piloting voice notes — only the
+  /// first two words in that day get the mic button (see [_WordCard]).
+  final bool enableVoiceDay;
   final bool Function(String word) isWordStudied;
   final Future<void> Function(String word) onWordStudied;
   final bool Function() isDayDone;
@@ -849,8 +847,8 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                 studied: _isStudied(w.swahili),
                 studySeconds: _studySeconds[w.swahili] ?? 0,
                 onTap: () => _openWord(w),
-                config: widget.config,
-                enableVoice: widget.enableVoice,
+                // Piloting voice notes on just the first two words of this day.
+                enableVoice: widget.enableVoiceDay && (index - 1) < 2,
               ),
             );
           },
@@ -869,7 +867,6 @@ class _WordCard extends StatefulWidget {
     required this.studied,
     required this.studySeconds,
     required this.onTap,
-    this.config,
     this.enableVoice = false,
   });
 
@@ -880,7 +877,6 @@ class _WordCard extends StatefulWidget {
   final bool studied;
   final int studySeconds;
   final VoidCallback onTap;
-  final dynamic config;
   final bool enableVoice;
 
   @override
@@ -889,47 +885,33 @@ class _WordCard extends StatefulWidget {
 
 class _WordCardState extends State<_WordCard> {
   bool _speaking = false;
-  bool _speakBusy = false;
 
   String get _voiceKey => 'swahili_word_${widget.word.swahili}';
 
   Future<void> _toggleSpeak() async {
-    if (_speakBusy) return;
-    if (NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
-      await NgmyElevenLabsTts.stop();
+    if (NgmyLocalTts.isSpeaking(_voiceKey)) {
+      await NgmyLocalTts.stop();
       if (mounted) setState(() => _speaking = false);
       return;
     }
 
-    setState(() {
-      _speakBusy = true;
-      _speaking = true;
-    });
+    setState(() => _speaking = true);
 
-    final apiKey = await NgmyElevenLabsTts.resolveApiKey(config: widget.config);
-    final result = await NgmyElevenLabsTts.speak(
-      apiKey: apiKey,
-      text: widget.word.swahili,
-      langCode: 'sw',
-      key: _voiceKey,
-    );
+    final result = await NgmyLocalTts.speak(text: widget.word.swahili, key: _voiceKey);
 
     if (!mounted) return;
-    setState(() => _speakBusy = false);
+    setState(() => _speaking = false);
     if (result.error != null) {
-      setState(() => _speaking = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.error!), backgroundColor: const Color(0xFFDC2626)),
       );
-    } else if (!NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
-      setState(() => _speaking = false);
     }
   }
 
   @override
   void dispose() {
-    if (NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
-      NgmyElevenLabsTts.stop();
+    if (NgmyLocalTts.isSpeaking(_voiceKey)) {
+      NgmyLocalTts.stop();
     }
     super.dispose();
   }
@@ -998,7 +980,6 @@ class _WordCardState extends State<_WordCard> {
                           const SizedBox(width: 2),
                           _SwahiliVoiceButton(
                             speaking: _speaking,
-                            busy: _speakBusy,
                             onPressed: _toggleSpeak,
                           ),
                         ],
@@ -1028,39 +1009,32 @@ class _WordCardState extends State<_WordCard> {
   }
 }
 
-/// Small "listen" button — plays the Swahili word aloud (young-woman AI voice).
+/// Small "listen" button — plays the Swahili word aloud using the device's
+/// own local voice engine (no cloud service, no API key).
 class _SwahiliVoiceButton extends StatelessWidget {
   const _SwahiliVoiceButton({
     required this.speaking,
-    required this.busy,
     required this.onPressed,
   });
 
   final bool speaking;
-  final bool busy;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: speaking ? const Color(0xFFD97706).withValues(alpha: 0.15) : Colors.transparent,
+      color: speaking ? const Color(0xFFD97706).withValues(alpha: 0.18) : Colors.transparent,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onPressed,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: busy
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)),
-                )
-              : Icon(
-                  speaking ? Icons.stop_circle_rounded : Icons.mic_rounded,
-                  size: 18,
-                  color: const Color(0xFFD97706),
-                ),
+          child: Icon(
+            speaking ? Icons.stop_circle_rounded : Icons.mic_rounded,
+            size: 20,
+            color: const Color(0xFFD97706),
+          ),
         ),
       ),
     );
