@@ -102,12 +102,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
           );
         _applySrc(_frame!, widget.playUrl);
         _frame!.onLoad.listen((_) {
-          if (mounted) {
-            setState(() => _loading = false);
-            Future<void>.delayed(const Duration(seconds: 4), () {
-              if (mounted && _loading) setState(() => _loading = false);
-            });
-          }
+          if (mounted) setState(() => _loading = false);
         });
         _frame!.onError.listen((_) {
           if (mounted) {
@@ -116,6 +111,12 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
               _failed = true;
             });
           }
+        });
+        // Fallback for embeds whose onLoad never fires (e.g. slow/blocked
+        // third-party iframes) — stop showing the spinner after a timeout
+        // instead of spinning forever over a video that may already be usable.
+        Future<void>.delayed(const Duration(seconds: 6), () {
+          if (mounted && _loading) setState(() => _loading = false);
         });
         return _frame!;
       });

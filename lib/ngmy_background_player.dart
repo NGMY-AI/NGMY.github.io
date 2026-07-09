@@ -58,6 +58,11 @@ class _NgmyBgPlayerBarState extends State<_NgmyBgPlayerBar> {
       compact: !_expanded,
       useEmbedHtml: true,
       notifyOnEnd: false,
+      // Browsers block autoplay-with-sound outright, which is why the video
+      // never actually started — start muted (autoplay is reliably allowed
+      // muted) and let the player's own "tap for sound" hint unmute it on
+      // a real user tap.
+      startMuted: true,
     );
 
     final bottom = NgmyBottomNavMetrics.barHeight + bottomInset + 16;

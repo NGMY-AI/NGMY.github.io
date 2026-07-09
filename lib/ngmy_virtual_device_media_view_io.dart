@@ -113,6 +113,12 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
       _loading = true;
       _failed = false;
     });
+    // Fallback for pages whose onPageFinished never fires — stop showing the
+    // spinner after a timeout instead of spinning forever over a video that
+    // may already be usable.
+    Future<void>.delayed(const Duration(seconds: 6), () {
+      if (mounted && _loading) setState(() => _loading = false);
+    });
 
     if (!widget.useEmbedHtml) {
       _controller.loadRequest(Uri.parse(url));
