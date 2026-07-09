@@ -116,7 +116,7 @@ class _NgmyYouTubeSearchSheetState extends State<_NgmyYouTubeSearchSheet> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Type a song name to search, or paste a YouTube link. Then tap Sound on the player.',
+                            'Type a song name or paste a YouTube link. On the player, tap Tap to play.',
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
