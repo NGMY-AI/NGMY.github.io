@@ -8,11 +8,11 @@ import 'ngmy_popups.dart';
 const String _kNgmyLogoAsset = 'assets/images/ngmy_logo.png';
 const String _kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
-const double _kOuterSize = 124;
-const double _kRingWidth = 5;
+const double _kOuterSize = 156;
+const double _kRingWidth = 5.5;
 const double _kAvatarSize = _kOuterSize - (_kRingWidth * 2) - 2;
-const double _kHitSize = 280;
-const double _kMaxFingerReach = 148;
+const double _kHitSize = 320;
+const double _kMaxFingerReach = 186;
 
 /// Login hero — circular profile NGMY logo with ambient + touch-reactive ring FX.
 class NgmyLoginLogoHero extends StatefulWidget {
