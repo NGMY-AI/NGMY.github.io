@@ -19,7 +19,7 @@ break}q=C.dVt(r)
 if(q==null){d.F(x.q).f.R(D.cKL)
 w=1
 break}w=4
-return A.b(A.bN(B.id,null,x.H),$async$Zr)
+return A.b(A.bN(B.ic,null,x.H),$async$Zr)
 case 4:if(d.e==null){w=1
 break}n=B.l.X(e,1,999)
 $.dxA=n
@@ -191,8 +191,8 @@ a0.D(0,s)
 h=g.a
 a2.D(0,h[4])
 w=B.l.a5(e,20)
-k=D.bWU[w]
-j=D.bNQ[w]
+k=D.bWT[w]
+j=D.bNP[w]
 return new C.o8("vd_"+1000*Date.now()+"_"+e+"_"+i.bF(99999),"Device "+B.b.bh(B.l.n(e+1),2,"0"),u,k,C.dVv(i,16),s,t,j.a,j.b,h[0],h[1],h[2],h[3],h[4],new A.Q(Date.now(),0,!1).a4().a_())},
 dVv(d,e){var w,v=J.dw(e,x.N)
 for(w=0;w<e;++w)v[w]=B.b.bh(B.l.hv(d.bF(256),16),2,"0")
@@ -326,7 +326,7 @@ s=C.dVq(w,v)
 if(s!=null)return s
 r=C.dVp(w,v)
 if(r!=null)return r
-if(B.b.t(v,"tiktok.com")||B.b.t(v,"instagram.com")||B.b.t(v,"facebook.com")||B.b.t(v,"fb.watch")||B.b.t(v,"youtube.com")||B.b.t(v,"youtu.be"))return new C.ql(w,w,D.csb,"Video",q)
+if(B.b.t(v,"tiktok.com")||B.b.t(v,"instagram.com")||B.b.t(v,"facebook.com")||B.b.t(v,"fb.watch")||B.b.t(v,"youtube.com")||B.b.t(v,"youtu.be"))return new C.ql(w,w,D.csa,"Video",q)
 return q},
 dVq(d,e){var w,v,u="/embed/captioned/?cr=1&v=14",t="Instagram",s=A.ao("instagram\\.com/reel/([a-zA-Z0-9_-]+)",!0,!1,!1,!1).dr(e)
 if(s!=null){w=s.b[1]
@@ -374,7 +374,7 @@ akN:function akN(){},
 dxE(d,e,f,g,h,i){return new C.a6s(i,f,h,e,g,d)},
 edJ(d){var w=window
 w.toString
-A.hg(w,"message",new C.ddN(d),!1,x._)},
+A.hh(w,"message",new C.ddN(d),!1,x._)},
 a6s:function a6s(d,e,f,g,h,i){var _=this
 _.c=d
 _.d=e
@@ -461,8 +461,8 @@ B=c[2]
 C=a.updateHolder(c[3],C)
 D=c[4]
 C.Nl.prototype={
-C(d){var w=null,v=this.e,u=v?B.aM:B.e,t=A.m(20),s=A.O(B.a5.l(0.25),B.w,1),r=A.X(this.d,B.a5,w,w,14)
-return A.t(w,A.H(A.a([r,B.fS,A.e(this.c,w,w,w,w,w,w,A.l(w,w,v?B.a6:B.c5,w,w,w,w,w,w,w,w,11,w,w,B.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),B.o,w,B.i,B.a1,0,w,w),B.j,w,w,new A.r(u,w,s,t,w,w,B.p),w,w,w,B.fd,w,w,w)}}
+C(d){var w=null,v=this.e,u=v?B.aN:B.e,t=A.m(20),s=A.O(B.a5.l(0.25),B.w,1),r=A.X(this.d,B.a5,w,w,14)
+return A.t(w,A.H(A.a([r,B.fS,A.e(this.c,w,w,w,w,w,w,A.l(w,w,v?B.a6:B.c4,w,w,w,w,w,w,w,w,11,w,w,B.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w)],x.p),B.o,w,B.i,B.a1,0,w,w),B.j,w,w,new A.r(u,w,s,t,w,w,B.p),w,w,w,B.fd,w,w,w)}}
 C.o8.prototype={
 aa(){var w=this
 return A.u(["id",w.a,"label",w.b,"serialNumber",w.c,"modelName",w.d,"deviceId",w.e,"macAddress",w.f,"imei",w.r,"osName",w.w,"osVersion",w.x,"virtualCity",w.y,"virtualCountry",w.z,"virtualLat",w.Q,"virtualLng",w.as,"timezone",w.at,"createdAt",w.ax],x.N,x.z)}}
@@ -511,15 +511,15 @@ w.toString
 return C.Zr(w,J.a2(this.d))},
 C(d){var w=this,v=null,u=A.A(d).ax.a===B.C,t=u?B.fc:B.bw,s=A.aL(v,v,v,v,B.L8,v,v,v,new C.cHM(d),v,v,v,v,v,v),r=w.e?"Virtual Devices":"Virtual Devices ("+J.a2(w.d)+")",q=x.p
 r=A.H(A.a([s,A.I(new A.DJ(A.H(A.a([A.I(new A.J(B.j9,A.e(r,v,1,B.aD,v,v,v,A.l(v,v,u?B.e:B.W,v,v,v,v,v,v,v,v,15,v,v,B.D,v,v,!0,v,0.2,v,v,v,v,v,v),v,v,v),v),1),A.aJ(!1,B.V,!0,v,A.aP(!1,v,!0,new A.J(B.bf,A.X(B.h7,B.a5,v,v,28),v),B.cN,!0,v,v,v,v,v,v,v,v,v,v,v,w.gbpg(),v,v,v,v,v,v,v),B.j,B.L,0,v,v,v,v,v,B.a9)],q),B.o,v,B.i,B.k,0,v,v),v,v,v),1)],q),B.o,v,B.i,B.k,0,v,v)
-s=A.c_(!0,A.w(A.a([new A.J(D.WM,r,v),A.I(w.e?B.n6:new A.l7($.P2(),new C.cHN(w,u),v,v,x.j),1)],q),B.o,B.i,B.k,0,B.q),!1,B.aj,!0,!0)
+s=A.c_(!0,A.w(A.a([new A.J(D.WM,r,v),A.I(w.e?B.n5:new A.l7($.P2(),new C.cHN(w,u),v,v,x.j),1)],q),B.o,B.i,B.k,0,B.q),!1,B.aj,!0,!0)
 return A.c9(v,t,s,v,!1,!1,A.aqK(B.a5,B.Gr,B.mm,D.d7f,w.e?v:new C.cHO(w)),v)}}
 C.WC.prototype={
 C(d){var w,v=this,u=null,t=A.m(14),s=A.m(14),r=A.O(B.e.l(0.1),B.w,1),q=A.a([new A.a9(0,B.G,B.a5.l(0.18),B.dk,8)],x.V),p=A.m(10),o=v.c,n=v.r
 if(n!=null){w=v.d
 w=new C.a6r(n,!0,!C.dVo(w),"Fold "+(B.l.aH(w,4)+1)+"/"+B.l.aH(v.e+4-1,4),u)
-n=w}else n=A.t(u,A.w(A.a([A.X(B.jK,B.nf,u,u,22),B.aN,A.e("YouTube",u,u,u,u,u,u,A.l(u,u,B.e.l(0.7),u,u,u,u,u,u,u,u,7,u,u,B.P,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],x.p),B.o,B.aW,B.k,0,B.q),B.j,B.yI,u,u,u,u,u,u,u,u,1/0)
+n=w}else n=A.t(u,A.w(A.a([A.X(B.jK,B.ne,u,u,22),B.aO,A.e("YouTube",u,u,u,u,u,u,A.l(u,u,B.e.l(0.7),u,u,u,u,u,u,u,u,7,u,u,B.P,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],x.p),B.o,B.aW,B.k,0,B.q),B.j,B.yI,u,u,u,u,u,u,u,u,1/0)
 w=x.p
-return A.aJ(!1,B.V,!0,u,A.aP(!1,t,!0,A.w(A.a([A.I(A.t(u,A.cl(p,A.fR(A.w(A.a([new C.aJC(o,u),A.I(n,1),A.t(u,A.H(A.a([A.X(B.B6,B.a5.l(0.85),u,u,9),D.cGw,A.e("Tap",u,u,u,u,u,u,A.l(u,u,B.e.l(0.5),u,u,u,u,u,u,u,u,7,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],w),B.o,u,B.aW,B.k,0,u,u),B.j,B.aw,u,u,u,u,u,D.aD3,u,u,u)],w),B.o,B.i,B.k,0,B.q),B.A,!0),B.aJ),B.j,u,u,new A.r(u,u,r,s,q,D.a_Z,B.p),u,u,u,B.ht,u,u,u),1),B.aN,A.e(o.b,u,1,B.aD,u,u,u,A.l(u,u,A.A(d).ax.k3,u,u,u,u,u,u,u,u,9,u,u,B.K,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.e(o.y,u,1,B.aD,u,u,u,A.l(u,u,A.A(d).ax.k3.l(0.55),u,u,u,u,u,u,u,u,8,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.e(o.c,u,1,B.aD,u,u,u,A.l(u,u,B.a5.l(0.85),u,u,u,u,u,u,u,u,7,u,u,u,u,u,!0,u,0.2,u,u,u,u,u,u),u,u,u)],w),B.o,B.i,B.k,0,B.q),u,!0,u,u,u,u,u,u,u,u,u,u,u,v.f,u,u,u,u,u,u,u),B.j,B.L,0,u,u,u,u,u,B.a9)}}
+return A.aJ(!1,B.V,!0,u,A.aP(!1,t,!0,A.w(A.a([A.I(A.t(u,A.cl(p,A.fR(A.w(A.a([new C.aJC(o,u),A.I(n,1),A.t(u,A.H(A.a([A.X(B.B6,B.a5.l(0.85),u,u,9),D.cGw,A.e("Tap",u,u,u,u,u,u,A.l(u,u,B.e.l(0.5),u,u,u,u,u,u,u,u,7,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u)],w),B.o,u,B.aW,B.k,0,u,u),B.j,B.aw,u,u,u,u,u,D.aD2,u,u,u)],w),B.o,B.i,B.k,0,B.q),B.A,!0),B.aJ),B.j,u,u,new A.r(u,u,r,s,q,D.a_Z,B.p),u,u,u,B.ht,u,u,u),1),B.aO,A.e(o.b,u,1,B.aD,u,u,u,A.l(u,u,A.A(d).ax.k3,u,u,u,u,u,u,u,u,9,u,u,B.K,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.e(o.y,u,1,B.aD,u,u,u,A.l(u,u,A.A(d).ax.k3.l(0.55),u,u,u,u,u,u,u,u,8,u,u,u,u,u,!0,u,u,u,u,u,u,u,u),u,u,u),A.e(o.c,u,1,B.aD,u,u,u,A.l(u,u,B.a5.l(0.85),u,u,u,u,u,u,u,u,7,u,u,u,u,u,!0,u,0.2,u,u,u,u,u,u),u,u,u)],w),B.o,B.i,B.k,0,B.q),u,!0,u,u,u,u,u,u,u,u,u,u,u,v.f,u,u,u,u,u,u,u),B.j,B.L,0,u,u,u,u,u,B.a9)}}
 C.aJC.prototype={
 C(d){var w=null
 return A.t(w,A.H(A.a([A.I(A.e(B.h.gaw(this.c.c.split("-")),w,w,B.aD,w,w,w,A.l(w,w,B.e.l(0.45),w,w,w,w,w,w,w,w,5.5,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),1),A.X(B.rI,B.e.l(0.45),w,w,7)],x.p),B.o,w,B.i,B.k,0,w,w),B.j,B.aw,w,w,w,w,w,B.WC,w,w,w)}}
@@ -546,33 +546,33 @@ r=B.b.bh(B.l.n(r),2,"0")
 q=(q<12?B.h2:B.j6)===B.h2?"AM":"PM"
 u=this.c
 t=x.p
-q=A.a([A.H(A.a([A.e(""+v+":"+r+" "+q,s,s,s,s,s,s,B.mR,s,s,s),B.bD,A.e(u.b,s,s,s,s,s,s,A.l(s,s,B.e.l(0.5),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),B.bU,D.aNY,B.er,D.aNa,B.er,D.aO1],t),B.o,s,B.i,B.k,0,s,s)],t)
-if(this.d)B.h.A(q,A.a([B.aN,A.H(A.a([A.X(B.KY,B.a5.l(0.9),s,s,12),B.er,A.I(A.e(u.c,s,s,B.aD,s,s,s,A.l(s,s,B.e.l(0.55),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,0.4,s,s,s,s,s,s),s,s,s),1),A.e(u.y,s,s,s,s,s,s,A.l(s,s,B.e.l(0.45),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],t),B.o,s,B.i,B.k,0,s,s)],t))
-return A.t(s,A.w(q,B.o,B.i,B.k,0,B.q),B.j,B.aw,s,s,s,s,s,D.aDQ,s,s,s)}}
+q=A.a([A.H(A.a([A.e(""+v+":"+r+" "+q,s,s,s,s,s,s,B.mQ,s,s,s),B.bD,A.e(u.b,s,s,s,s,s,s,A.l(s,s,B.e.l(0.5),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),B.bU,D.aNX,B.er,D.aN9,B.er,D.aO0],t),B.o,s,B.i,B.k,0,s,s)],t)
+if(this.d)B.h.A(q,A.a([B.aO,A.H(A.a([A.X(B.KY,B.a5.l(0.9),s,s,12),B.er,A.I(A.e(u.c,s,s,B.aD,s,s,s,A.l(s,s,B.e.l(0.55),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,0.4,s,s,s,s,s,s),s,s,s),1),A.e(u.y,s,s,s,s,s,s,A.l(s,s,B.e.l(0.45),s,s,s,s,s,s,s,s,9,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],t),B.o,s,B.i,B.k,0,s,s)],t))
+return A.t(s,A.w(q,B.o,B.i,B.k,0,B.q),B.j,B.aw,s,s,s,s,s,D.aDP,s,s,s)}}
 C.aKL.prototype={
 C(d){var w=null
-return A.t(w,A.aI(A.w(A.a([A.X(B.Ay,B.e.l(0.35),w,w,40),B.Y,A.e("No video yet",w,w,w,w,w,w,A.l(w,w,B.e.l(0.6),w,w,w,w,w,w,w,w,12,w,w,B.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.aN,A.e("Tap search above to paste a link",w,w,w,w,w,w,A.l(w,w,B.e.l(0.4),w,w,w,w,w,w,w,w,10,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.aO,A.eN(D.aRo,D.cW4,this.c,A.es(w,w,w,w,w,w,w,w,w,B.a5,w,w,w,w,w,new A.aG(B.a5.l(0.5),1,B.w,-1),w,w,w,w))],x.p),B.o,B.i,B.a1,0,B.q),w,w,w),B.j,B.yI,w,w,w,w,w,w,w,w,1/0)}}
+return A.t(w,A.aI(A.w(A.a([A.X(B.Ay,B.e.l(0.35),w,w,40),B.Y,A.e("No video yet",w,w,w,w,w,w,A.l(w,w,B.e.l(0.6),w,w,w,w,w,w,w,w,12,w,w,B.P,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.aO,A.e("Tap search above to paste a link",w,w,w,w,w,w,A.l(w,w,B.e.l(0.4),w,w,w,w,w,w,w,w,10,w,w,w,w,w,!0,w,w,w,w,w,w,w,w),w,w,w),B.aM,A.eN(D.aRn,D.cW4,this.c,A.es(w,w,w,w,w,w,w,w,w,B.a5,w,w,w,w,w,new A.aG(B.a5.l(0.5),1,B.w,-1),w,w,w,w))],x.p),B.o,B.i,B.a1,0,B.q),w,w,w),B.j,B.yI,w,w,w,w,w,w,w,w,1/0)}}
 C.aRt.prototype={
 C(d){var w,v,u=this,t=null,s=u.c,r=u.d,q=u.awP(B.AW,"YouTube",s===0,r,new C.cX3(u))
 s=u.awP(B.kp,"Device",s===1,r,new C.cX4(u))
 w=r?"Power off":"Power on"
-v=r?D.Zh:D.aLd
-return A.t(t,A.H(A.a([q,B.an,s,B.bD,A.aL(t,t,t,t,A.X(v,r?B.bE:B.fO,t,t,t),t,t,t,u.f,t,t,t,t,w,B.dA)],x.p),B.o,t,B.i,B.k,0,t,t),B.j,B.aw,t,t,t,t,t,D.aDA,t,t,t)},
+v=r?D.Zh:D.aLc
+return A.t(t,A.H(A.a([q,B.an,s,B.bD,A.aL(t,t,t,t,A.X(v,r?B.bE:B.fO,t,t,t),t,t,t,u.f,t,t,t,t,w,B.dA)],x.p),B.o,t,B.i,B.k,0,t,t),B.j,B.aw,t,t,t,t,t,D.aDz,t,t,t)},
 awP(d,e,f,g,h){var w,v,u,t,s=null
 if(!g)w=B.bp
 else w=f?B.a5:B.az
 v=f&&g?B.a5.l(0.15):B.L
 u=A.m(10)
 t=g?h:s
-return A.I(A.aJ(!1,B.V,!0,u,A.aP(!1,A.m(10),!0,new A.J(B.np,A.w(A.a([A.X(d,w,s,s,18),A.e(e,s,s,s,s,s,s,A.l(s,s,w,s,s,s,s,s,s,s,s,9,s,s,B.P,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],x.p),B.o,B.i,B.a1,0,B.q),s),s,!0,s,s,s,s,s,s,s,s,s,s,s,t,s,s,s,s,s,s,s),B.j,v,0,s,s,s,s,s,B.a9),1)}}
+return A.I(A.aJ(!1,B.V,!0,u,A.aP(!1,A.m(10),!0,new A.J(B.no,A.w(A.a([A.X(d,w,s,s,18),A.e(e,s,s,s,s,s,s,A.l(s,s,w,s,s,s,s,s,s,s,s,9,s,s,B.P,s,s,!0,s,s,s,s,s,s,s,s),s,s,s)],x.p),B.o,B.i,B.a1,0,B.q),s),s,!0,s,s,s,s,s,s,s,s,s,s,s,t,s,s,s,s,s,s,s),B.j,v,0,s,s,s,s,s,B.a9),1)}}
 C.aM0.prototype={
-C(d){return D.ath}}
+C(d){return D.atg}}
 C.aFT.prototype={
 C(d){var w=this,v=null,u=w.c,t=A.e(u.b,v,v,v,v,v,v,B.lK,v,v,v),s=A.e("Independent virtual hardware \u2014 not linked to your iPhone or real device.",v,v,v,v,v,v,A.l(v,v,B.e.l(0.55),v,v,v,v,v,v,v,v,10,v,v,v,v,1.35,!0,v,v,v,v,v,v,v,v),v,v,v),r=w.tE("Serial",u.c),q=w.tE("Model",u.d),p=w.tE("Device ID",u.e),o=w.tE("IMEI",u.r),n=w.tE("MAC",u.f),m=w.tE("OS",u.w+" "+u.x),l=w.tE("Location",u.y+", "+u.z),k=w.tE("Coordinates",B.m.a3(u.Q,4)+", "+B.m.a3(u.as,4)),j=w.tE("Timezone",u.at)
 u=u.ax
-return A.eg(A.a([t,B.aN,s,B.ab,r,q,p,o,n,m,l,k,j,w.tE("Provisioned",u.length>=10?B.b.aj(u,0,10):u)],x.p),v,B.bf,v,v,B.al,!1)},
+return A.eg(A.a([t,B.aO,s,B.ab,r,q,p,o,n,m,l,k,j,w.tE("Provisioned",u.length>=10?B.b.aj(u,0,10):u)],x.p),v,B.bf,v,v,B.al,!1)},
 tE(d,e){var w=null
-return new A.J(B.cX,A.w(A.a([A.e(d.toUpperCase(),w,w,w,w,w,w,A.l(w,w,B.e.l(0.4),w,w,w,w,w,w,w,w,8,w,w,w,w,w,!0,w,0.8,w,w,w,w,w,w),w,w,w),B.cC,A.e(e,w,w,w,w,w,w,D.cO_,w,w,w)],x.p),B.F,B.i,B.k,0,B.q),w)}}
+return new A.J(B.cX,A.w(A.a([A.e(d.toUpperCase(),w,w,w,w,w,w,A.l(w,w,B.e.l(0.4),w,w,w,w,w,w,w,w,8,w,w,w,w,w,!0,w,0.8,w,w,w,w,w,w),w,w,w),B.cy,A.e(e,w,w,w,w,w,w,D.cO_,w,w,w)],x.p),B.F,B.i,B.k,0,B.q),w)}}
 C.JZ.prototype={
 P(){return"NgmyVirtualMediaPlatform."+this.b}}
 C.ql.prototype={
@@ -591,10 +591,10 @@ w.q()
 this.aWm()},
 C(d){var w,v,u=this,t=null,s=u.a.c,r=A.dp(t,new A.r(t,t,t,t,t,new A.ak(B.cI,B.cu,B.H,A.a([B.L,B.A.l(0.55)],x.O),t,t),B.p),B.bS),q=x.Y,p=u.d
 p===$&&A.c()
-p=A.cw(B.ic,p,t)
+p=A.cw(B.ib,p,t)
 w=B.e.l(0.92)
 q=A.aI(new A.d3(new A.b2(p,new A.bl(0.72,1,q),q.j("b2<bk.T>")),!1,A.X(B.jK,w,t,t,20),t),t,t,t)
-p=u.a.e?B.e.l(0.22):B.nf
+p=u.a.e?B.e.l(0.22):B.ne
 w=A.m(4)
 v=u.a.e?"WAIT":"LIVE"
 s=A.a([new C.aM5(s,t),r,q,A.aQ(t,A.t(t,A.e(v,t,t,t,t,t,t,A.l(t,t,B.e,t,t,t,t,t,t,t,t,5,t,t,B.D,t,t,!0,t,0.4,t,t,t,t,t,t),t,t,t),B.j,t,t,new A.r(p,t,t,w,t,t,B.p),t,t,t,new A.V(3,1,3,1),t,t,t),t,t,t,2,2,t)],x.p)
@@ -614,13 +614,13 @@ C.Fi.prototype={
 C(d){var w,v,u=null
 switch(this.c.c.a){case 0:w=new A.aN(A.a([B.uQ,B.SM],x.O),B.jK)
 break
-case 1:w=new A.aN(A.a([B.yI,D.axQ],x.O),B.lp)
+case 1:w=new A.aN(A.a([B.yI,D.axP],x.O),B.lp)
 break
-case 2:w=new A.aN(A.a([D.azn,D.axg],x.O),B.AG)
+case 2:w=new A.aN(A.a([D.azm,D.axf],x.O),B.AG)
 break
 case 3:w=new A.aN(A.a([B.W,B.du],x.O),B.AK)
 break
-case 4:w=new A.aN(A.a([B.aw,B.aM],x.O),B.pe)
+case 4:w=new A.aN(A.a([B.aw,B.aN],x.O),B.pe)
 break
 default:w=u}v=w.a
 return A.t(u,A.aI(A.X(w.b,B.a5.l(0.55),u,u,28),u,u,u),B.j,u,u,new A.r(u,u,u,u,u,new A.ak(B.aK,B.aR,B.H,v,u,u),B.p),u,u,u,u,u,u,u)}}
@@ -675,7 +675,7 @@ w=o.d
 w===$&&A.c()
 v=x.p
 w=A.a([A.a1N(n,B.tt,w)],v)
-if(o.f)w.push(A.fR(A.aI(new A.ac(28,28,D.aul,n),n,n,n),B.d0,!0))
+if(o.f)w.push(A.fR(A.aI(new A.ac(28,28,D.auk,n),n,n,n),B.d0,!0))
 if(o.a.x&&!o.w&&!o.f&&!o.r){u=B.A.l(0.35)
 t=B.A.l(0.72)
 s=A.m(14)
@@ -684,32 +684,32 @@ q=A.X(B.L1,B.e.l(0.9),n,n,22)
 p=B.e.l(0.92)
 o.a.toString
 w.push(A.eV(0,A.aJ(!1,B.V,!0,n,A.aP(!1,n,!0,A.aI(A.t(n,A.H(A.a([q,B.an,A.e("Tap for sound",n,n,n,n,n,n,A.l(n,n,p,n,n,n,n,n,n,n,n,14,n,n,B.P,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)],v),B.o,n,B.i,B.a1,0,n,n),B.j,n,n,new A.r(t,n,r,s,n,n,B.p),n,n,n,D.W7,n,n,n),n,n,n),n,!0,n,n,n,n,n,n,n,n,n,n,n,o.gbEo(),n,n,n,n,n,n,n),B.j,u,0,n,n,n,n,n,B.a9)))}v=C.bny(o.a.d)
-if(v!=null)w.push(A.aQ(8,A.jo(D.aPt,D.d2C,new C.cHQ(o),A.iO(n,n,B.A.l(0.55),n,n,n,n,n,n,n,n,n,n,n,n,n,n,B.fd,n,n,n,n,n,n,n,n)),n,n,n,8,n,n))
+if(v!=null)w.push(A.aQ(8,A.jo(D.aPs,D.d2C,new C.cHQ(o),A.iO(n,n,B.A.l(0.55),n,n,n,n,n,n,n,n,n,n,n,n,n,n,B.fd,n,n,n,n,n,n,n,n)),n,n,n,8,n,n))
 return new A.aE(B.ak,n,B.bc,B.y,w,n)}}
 var z=a.updateTypes(["o(o8)","~()","JW(R)","o8(a_<@,@>)","a1(o8)","a_<o,@>(o8)","aB<~>()","JV(R)","l7<K>(R,ql?,q?)","WC(R,K)","tY(R,ql?,q?)","Fi(R,al,dK?)"])
 C.dhm.prototype={
 $1(d){return new C.JW(this.a,null)},
 $S:z+2}
 C.dhl.prototype={
-$1(d){var w,v,u,t,s,r,q,p,o,n=null,m=A.A(d).ax.a===B.C,l=A.aF(d,n,x.w).w,k=A.m(28),j=x.O,i=m?A.a([B.dV,B.W],j):A.a([B.e,B.av],j),h=A.a([new A.a9(0,B.G,B.a5.l(0.22),B.eW,32)],x.V),g=A.O(m?B.c8:B.a5.l(0.18),B.w,1),f=A.m(28),e=B.a5.l(m?0.35:0.14)
+$1(d){var w,v,u,t,s,r,q,p,o,n=null,m=A.A(d).ax.a===B.C,l=A.aF(d,n,x.w).w,k=A.m(28),j=x.O,i=m?A.a([B.dV,B.W],j):A.a([B.e,B.av],j),h=A.a([new A.a9(0,B.G,B.a5.l(0.22),B.eW,32)],x.V),g=A.O(m?B.c7:B.a5.l(0.18),B.w,1),f=A.m(28),e=B.a5.l(m?0.35:0.14)
 j=A.a([e,B.au.l(m?0.18:0.08)],j)
-e=A.t(n,D.aMT,B.j,n,n,new A.r(B.a5.l(0.18),n,A.O(B.a5.l(0.45),B.w,1),n,n,n,B.as),n,48,n,n,n,n,48)
+e=A.t(n,D.aMS,B.j,n,n,new A.r(B.a5.l(0.18),n,A.O(B.a5.l(0.45),B.w,1),n,n,n,B.at),n,48,n,n,n,n,48)
 w=A.e("Paste video link",n,n,n,n,n,n,A.l(n,n,m?B.e:B.W,n,n,n,n,n,n,n,n,18,n,n,B.D,n,n,!0,n,n,n,n,n,n,n,n),n,n,n)
 v=x.p
-w=A.I(A.w(A.a([w,B.aN,A.e("Master player + "+this.a+" phone previews \xb7 rotates in batches of 4",n,n,n,n,n,n,A.l(n,n,m?B.a6:B.am,n,n,n,n,n,n,n,n,12,n,n,n,n,1.35,!0,n,n,n,n,n,n,n,n),n,n,n)],v),B.F,B.i,B.k,0,B.q),1)
+w=A.I(A.w(A.a([w,B.aO,A.e("Master player + "+this.a+" phone previews \xb7 rotates in batches of 4",n,n,n,n,n,n,A.l(n,n,m?B.a6:B.am,n,n,n,n,n,n,n,n,12,n,n,n,n,1.35,!0,n,n,n,n,n,n,n,n),n,n,n)],v),B.F,B.i,B.k,0,B.q),1)
 j=A.t(n,A.H(A.a([e,B.f5,w,A.aL(n,n,n,n,A.X(B.d5,m?B.az:B.d0,n,n,n),n,n,n,new C.dhh(d),n,n,n,n,n,n)],v),B.o,n,B.i,B.k,0,n,n),B.j,n,n,new A.r(n,n,n,n,n,new A.ak(B.ad,B.ag,B.H,j,n,n),B.p),n,n,n,B.IO,n,n,n)
 e=A.ee(B.cG,A.a([new C.Nl("YouTube",B.KX,m,n),new C.Nl("TikTok",B.lp,m,n),new C.Nl("Instagram",B.AG,m,n),new C.Nl("Facebook",B.AK,m,n)],v),B.cm,8,8)
 w=this.b
 u=A.l(n,n,m?B.e:B.W,n,n,n,n,n,n,n,n,14,n,n,n,n,n,!0,n,n,n,n,n,n,n,n)
 t=A.l(n,n,m?B.cq:B.iz,n,n,n,n,n,n,n,n,n,n,n,n,n,n,!0,n,n,n,n,n,n,n,n)
-s=m?B.aM:B.bw
+s=m?B.aN:B.bw
 r=A.X(B.fx,B.a5.l(0.85),n,n,n)
 q=A.m(16)
 p=A.m(16)
-o=m?B.c8:B.aI
-u=A.w(A.a([e,B.aS,A.aM(n,B.S,!0,n,!0,B.y,n,A.aO(),w,n,n,n,n,n,2,A.br(n,new A.bb(4,q,B.X),n,n,n,n,n,n,!0,new A.bb(4,p,new A.aG(o,1,B.w,-1)),n,n,n,n,n,s,!0,n,n,n,n,new A.bb(4,A.m(16),B.Rw),n,n,n,n,n,n,n,n,t,"https://youtube.com/watch?v=\u2026",n,n,n,n,n,n,n,n,n,!0,!0,!1,n,r,n,n,n,n,n,n,n,n,n,n,n,n),B.E,!0,n,!0,n,!1,n,B.a8,n,n,n,n,n,n,n,n,n,3,2,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,u,!0,B.a_,n,B.aa,n,n,n,n)],v),B.at,B.i,B.k,0,B.q)
-e=A.jo(D.aMW,D.d6o,new C.dhi(d),A.iO(n,n,n,n,n,n,n,n,n,n,n,m?B.bm:B.am,n,n,n,n,n,n,n,n,n,n,n,n,n,n))
-return new A.J(new A.V(12,0,12,12+l.f.d),A.dp(A.cl(f,A.w(A.a([j,new A.J(B.Wo,u,n),new A.J(D.aF7,A.H(A.a([e,B.bD,A.c8(!1,A.e("Cancel",n,n,n,n,n,n,A.l(n,n,m?B.a6:B.ay,n,n,n,n,n,n,n,n,n,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),n,n,!0,n,n,new C.dhj(d),n,n),B.an,A.dN(D.aR7,D.d79,new C.dhk(d,w),A.bz(B.a5,n,n,n,B.e,n,D.W7,n,new A.bE(A.m(14),B.X),n,n,n))],v),B.o,n,B.i,B.k,0,n,n),n)],v),B.at,B.i,B.a1,0,B.q),B.aJ),new A.r(n,n,g,k,h,new A.ak(B.aK,B.aR,B.H,i,n,n),B.p),B.bS),n)},
+o=m?B.c7:B.aI
+u=A.w(A.a([e,B.aS,A.aM(n,B.S,!0,n,!0,B.y,n,A.aO(),w,n,n,n,n,n,2,A.br(n,new A.bb(4,q,B.X),n,n,n,n,n,n,!0,new A.bb(4,p,new A.aG(o,1,B.w,-1)),n,n,n,n,n,s,!0,n,n,n,n,new A.bb(4,A.m(16),B.Rw),n,n,n,n,n,n,n,n,t,"https://youtube.com/watch?v=\u2026",n,n,n,n,n,n,n,n,n,!0,!0,!1,n,r,n,n,n,n,n,n,n,n,n,n,n,n),B.E,!0,n,!0,n,!1,n,B.a8,n,n,n,n,n,n,n,n,n,3,2,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,u,!0,B.a_,n,B.aa,n,n,n,n)],v),B.as,B.i,B.k,0,B.q)
+e=A.jo(D.aMV,D.d6o,new C.dhi(d),A.iO(n,n,n,n,n,n,n,n,n,n,n,m?B.bm:B.am,n,n,n,n,n,n,n,n,n,n,n,n,n,n))
+return new A.J(new A.V(12,0,12,12+l.f.d),A.dp(A.cl(f,A.w(A.a([j,new A.J(B.Wo,u,n),new A.J(D.aF6,A.H(A.a([e,B.bD,A.c8(!1,A.e("Cancel",n,n,n,n,n,n,A.l(n,n,m?B.a6:B.ay,n,n,n,n,n,n,n,n,n,n,n,n,n,n,!0,n,n,n,n,n,n,n,n),n,n,n),n,n,!0,n,n,new C.dhj(d),n,n),B.an,A.dN(D.aR6,D.d79,new C.dhk(d,w),A.bz(B.a5,n,n,n,B.e,n,D.W7,n,new A.bE(A.m(14),B.X),n,n,n))],v),B.o,n,B.i,B.k,0,n,n),n)],v),B.as,B.i,B.a1,0,B.q),B.aJ),new A.r(n,n,g,k,h,new A.ak(B.aK,B.aR,B.H,i,n,n),B.p),B.bS),n)},
 $S:81}
 C.dhh.prototype={
 $0(){A.a7(this.a,!1).T(null)
@@ -812,7 +812,7 @@ r=j.b
 B.h.A(t,A.a([A.cl(s,new A.j4(1.7777777777777777,C.dxE(new A.dx("fleet_master_"+r,x.W),!0,r,!0,j.gaMA(),"fleet_master"),k),B.aJ),B.ab],w))}B.h.A(u,t)}i=i?"Master player above plays your video (tap for sound). Grid badges show which batch is active \u2014 previews only, not separate players.":""+J.a2(l.a.d)+" separate virtual phones \u2014 4 per row. Tap search above to paste a link, or tap a phone to open it."
 u.push(A.e(i,k,k,k,k,k,k,A.l(k,k,A.A(d).ax.k3.l(0.65),k,k,k,k,k,k,k,k,13,k,k,k,k,1.4,!0,k,k,k,k,k,k,k,k),k,k,k))
 i=l.a
-return A.vS(0,B.y,k,B.E,k,k,k,k,!1,k,B.al,!1,A.a([new A.kx(new A.J(B.IG,A.w(u,B.F,B.i,B.k,0,B.q),k),k),new A.oi(D.aDd,A.aAR(new A.nw(new C.cHK(i,j),J.a2(i.d),!1,!0,!0,A.tr(),k),D.cHh),k)],w))},
+return A.vS(0,B.y,k,B.E,k,k,k,k,!1,k,B.al,!1,A.a([new A.kx(new A.J(B.IG,A.w(u,B.F,B.i,B.k,0,B.q),k),k),new A.oi(D.aDc,A.aAR(new A.nw(new C.cHK(i,j),J.a2(i.d),!1,!0,!0,A.tr(),k),D.cHh),k)],w))},
 $S:1680}
 C.cHK.prototype={
 $2(d,e){var w=this.a,v=J.n(w.d,e)
@@ -874,7 +874,7 @@ $3(d,e,f){return new C.Fi(this.a.c,null)},
 $S:z+11}
 C.cMq.prototype={
 $3(d,e,f){if(f==null)return e
-return new A.aE(B.ak,null,B.bc,B.y,A.a([new C.Fi(this.a.c,null),D.atw],x.p),null)},
+return new A.aE(B.ak,null,B.bc,B.y,A.a([new C.Fi(this.a.c,null),D.atv],x.p),null)},
 $C:"$3",
 $R:3,
 $S:227}
@@ -896,10 +896,10 @@ w.a7n(v,w.a.d)
 v=w.e
 v.toString
 u=x.E.c
-A.hg(v,"load",new C.cHW(w),!1,u)
+A.hh(v,"load",new C.cHW(w),!1,u)
 v=w.e
 v.toString
-A.hg(v,"error",new C.cHX(w),!1,u)
+A.hh(v,"error",new C.cHX(w),!1,u)
 w=w.e
 w.toString
 return w},
@@ -973,38 +973,38 @@ var y={c:"(?:youtube\\.com/embed/|youtube-nocookie\\.com/embed/|[?&]v=|youtu\\.b
 var x=(function rtii(){var w=A.b3
 return{V:w("a3<a9>"),O:w("a3<x>"),e:w("a3<o8>"),s:w("a3<o>"),p:w("a3<q>"),t:w("a3<K>"),X:w("ad<o8>"),a:w("ad<@>"),P:w("a_<o,@>"),f:w("a_<@,@>"),w:w("o3"),_:w("Da"),k:w("o8"),N:w("o"),Y:w("bl<aa>"),W:w("dx<o>"),J:w("l7<K>"),j:w("l7<ql?>"),E:w("xq<cL>"),q:w("Xo"),z:w("@"),Q:w("al?"),H:w("~")}})();(function constants(){var w=a.makeConstList
 D.Zh=new A.M(983224,"MaterialIcons",!1)
-D.aPB=new A.a8(D.Zh,48,B.bp,null,null,null)
+D.aPA=new A.a8(D.Zh,48,B.bp,null,null,null)
 D.cND=new A.S(!0,B.cq,null,null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 D.cUZ=new A.B("Powered off",null,D.cND,null,null,null,null,null,null,null,null,null)
-D.bL_=w([D.aPB,B.Q,D.cUZ],x.p)
-D.aAB=new A.eJ(B.al,B.i,B.a1,B.o,null,B.q,null,0,D.bL_,null)
-D.ath=new A.dn(B.N,null,null,D.aAB,null)
+D.bKZ=w([D.aPA,B.Q,D.cUZ],x.p)
+D.aAA=new A.eJ(B.al,B.i,B.a1,B.o,null,B.q,null,0,D.bKZ,null)
+D.atg=new A.dn(B.N,null,null,D.aAA,null)
 D.cGW=new A.ac(18,18,B.Su,null)
-D.atw=new A.dn(B.N,null,null,D.cGW,null)
-D.aul=new A.ha(2,null,null,null,null,B.a6,null,null,null,null)
-D.axg=new A.x(1,0.10196078431372549,0.15294117647058825,0.26666666666666666,B.z)
-D.axQ=new A.x(1,0.06274509803921569,0.12549019607843137,0.1568627450980392,B.z)
-D.azn=new A.x(1,0.2901960784313726,0.10196078431372549,0.4196078431372549,B.z)
-D.aD3=new A.V(0,3,0,3)
-D.aDd=new A.V(10,0,10,88)
-D.aDA=new A.V(12,6,12,10)
-D.aDQ=new A.V(14,8,14,6)
+D.atv=new A.dn(B.N,null,null,D.cGW,null)
+D.auk=new A.ha(2,null,null,null,null,B.a6,null,null,null,null)
+D.axf=new A.x(1,0.10196078431372549,0.15294117647058825,0.26666666666666666,B.z)
+D.axP=new A.x(1,0.06274509803921569,0.12549019607843137,0.1568627450980392,B.z)
+D.azm=new A.x(1,0.2901960784313726,0.10196078431372549,0.4196078431372549,B.z)
+D.aD2=new A.V(0,3,0,3)
+D.aDc=new A.V(10,0,10,88)
+D.aDz=new A.V(12,6,12,10)
+D.aDP=new A.V(14,8,14,6)
 D.W7=new A.V(18,12,18,12)
-D.aF7=new A.V(20,8,20,20)
+D.aF6=new A.V(20,8,20,20)
 D.WM=new A.V(8,6,15,8)
-D.aLd=new A.M(983222,"MaterialIcons",!1)
-D.aMT=new A.a8(B.jK,26,B.a5,null,null,null)
-D.aMW=new A.a8(B.Yw,18,null,null,null,null)
-D.aNa=new A.a8(B.rI,14,B.a6,null,null,null)
-D.aLv=new A.M(983420,"MaterialIcons",!1)
-D.aNY=new A.a8(D.aLv,14,B.a6,null,null,null)
-D.aJD=new A.M(62895,"MaterialIcons",!1)
-D.aO1=new A.a8(D.aJD,14,B.a6,null,null,null)
-D.aPt=new A.a8(B.rA,16,B.a6,null,null,null)
-D.aR7=new A.a8(B.jf,20,null,null,null,null)
-D.aRo=new A.a8(B.h7,16,null,null,null,null)
-D.bOC=w([B.aM,B.W],x.O)
-D.a_Z=new A.ak(B.aK,B.aR,B.H,D.bOC,null,null)
+D.aLc=new A.M(983222,"MaterialIcons",!1)
+D.aMS=new A.a8(B.jK,26,B.a5,null,null,null)
+D.aMV=new A.a8(B.Yw,18,null,null,null,null)
+D.aN9=new A.a8(B.rI,14,B.a6,null,null,null)
+D.aLu=new A.M(983420,"MaterialIcons",!1)
+D.aNX=new A.a8(D.aLu,14,B.a6,null,null,null)
+D.aJC=new A.M(62895,"MaterialIcons",!1)
+D.aO0=new A.a8(D.aJC,14,B.a6,null,null,null)
+D.aPs=new A.a8(B.rA,16,B.a6,null,null,null)
+D.aR6=new A.a8(B.jf,20,null,null,null,null)
+D.aRn=new A.a8(B.h7,16,null,null,null,null)
+D.bOB=w([B.aN,B.W],x.O)
+D.a_Z=new A.ak(B.aK,B.aR,B.H,D.bOB,null,null)
 D.cAA=new A.aN("NGMY OS","14.2.1")
 D.czn=new A.aN("VirtualDroid","13.8.4")
 D.czm=new A.aN("NGMY OS","15.0.0")
@@ -1025,7 +1025,7 @@ D.cAf=new A.aN("NGMY Tab OS","12.4.1")
 D.cAu=new A.aN("VirtualDroid","16.1.0")
 D.czJ=new A.aN("NGMY OS","14.4.6")
 D.cAB=new A.aN("VirtualDroid","15.0.8")
-D.bNQ=w([D.cAA,D.czn,D.czm,D.cA8,D.czk,D.czi,D.cz7,D.czK,D.cAe,D.cAK,D.cz0,D.cyQ,D.cAr,D.czw,D.cz_,D.czh,D.cAf,D.cAu,D.czJ,D.cAB],A.b3("a3<+(o,o)>"))
+D.bNP=w([D.cAA,D.czn,D.czm,D.cA8,D.czk,D.czi,D.cz7,D.czK,D.cAe,D.cAK,D.cz0,D.cyQ,D.cAr,D.czw,D.cz_,D.czh,D.cAf,D.cAu,D.czJ,D.cAB],A.b3("a3<+(o,o)>"))
 D.cCQ=new A.eH(["Tokyo","Japan",35.6762,139.6503,"Asia/Tokyo"])
 D.cCo=new A.eH(["London","United Kingdom",51.5074,-0.1278,"Europe/London"])
 D.cCj=new A.eH(["New York","United States",40.7128,-74.006,"America/New_York"])
@@ -1047,12 +1047,12 @@ D.cCr=new A.eH(["Bangkok","Thailand",13.7563,100.5018,"Asia/Bangkok"])
 D.cCB=new A.eH(["Johannesburg","South Africa",-26.2041,28.0473,"Africa/Johannesburg"])
 D.cCG=new A.eH(["Hong Kong","Hong Kong",22.3193,114.1694,"Asia/Hong_Kong"])
 D.a6y=w([D.cCQ,D.cCo,D.cCj,D.cCs,D.cCf,D.cCu,D.cCS,D.cCg,D.cCn,D.cCw,D.cCe,D.cCK,D.cCH,D.cCm,D.cCE,D.cCD,D.cCd,D.cCr,D.cCB,D.cCG],A.b3("a3<+(o,o,aa,aa,o)>"))
-D.bWU=w(["NGMY Virtual Phone Air","NGMY Virtual Phone Pro","NGMY Virtual Phone Lite","NGMY Virtual Phone Max","NGMY Virtual Tab Mini","NGMY Virtual Phone Ultra","NGMY Virtual Phone Neo","NGMY Virtual Phone Edge","NGMY Virtual Phone Flex","NGMY Virtual Phone Core","NGMY Virtual Phone Nova","NGMY Virtual Phone Pulse","NGMY Virtual Phone Apex","NGMY Virtual Phone Zen","NGMY Virtual Phone Spark","NGMY Virtual Phone Wave","NGMY Virtual Phone Orbit","NGMY Virtual Phone Prism","NGMY Virtual Phone Flux","NGMY Virtual Phone Echo"],x.s)
+D.bWT=w(["NGMY Virtual Phone Air","NGMY Virtual Phone Pro","NGMY Virtual Phone Lite","NGMY Virtual Phone Max","NGMY Virtual Tab Mini","NGMY Virtual Phone Ultra","NGMY Virtual Phone Neo","NGMY Virtual Phone Edge","NGMY Virtual Phone Flex","NGMY Virtual Phone Core","NGMY Virtual Phone Nova","NGMY Virtual Phone Pulse","NGMY Virtual Phone Apex","NGMY Virtual Phone Zen","NGMY Virtual Phone Spark","NGMY Virtual Phone Wave","NGMY Virtual Phone Orbit","NGMY Virtual Phone Prism","NGMY Virtual Phone Flux","NGMY Virtual Phone Echo"],x.s)
 D.ae1=new C.JZ(0,"youtube")
 D.ae2=new C.JZ(1,"tiktok")
 D.NU=new C.JZ(2,"instagram")
 D.ae3=new C.JZ(3,"facebook")
-D.csb=new C.JZ(4,"other")
+D.csa=new C.JZ(4,"other")
 D.cGw=new A.ac(3,null,null,null)
 D.cHh=new A.i6(4,10,8,0.52,null)
 D.cWg=new A.B("Could not read that link. Paste a YouTube, TikTok, Instagram, or Facebook URL.",null,null,null,null,null,null,null,null,null,null,null)
@@ -1068,4 +1068,4 @@ $.awO=null
 $.bnz=20})();(function lazyInitializers(){var w=a.lazyFinal
 w($,"eiX","Gq",()=>A.aCG(0))
 w($,"eiY","P2",()=>A.aCG(null))})()};
-(a=>{a["tPdwpTfvRoJrQwnSp1dUYehvceM="]=a.current})($__dart_deferred_initializers__);
+(a=>{a["o95M4bw0ilrXMTQbVauzV2bIlMk="]=a.current})($__dart_deferred_initializers__);
