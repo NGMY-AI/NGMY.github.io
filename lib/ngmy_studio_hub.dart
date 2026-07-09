@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'ngmy_studio_colors.dart';
-import 'ngmy_background_player_launcher.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_iron_triangle_panel.dart';
@@ -166,13 +165,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Virtual Device',
         subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
         onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
-      ),
-      _CreatorTool(
-        icon: Icons.headphones_rounded,
-        colors: const [Color(0xFFDC2626), Color(0xFFEA580C)],
-        title: 'Background Music',
-        subtitle: 'Search or paste a link — then tap Tap to play',
-        onTap: () => unawaited(openNgmyBackgroundPlayerInput(context, config: config)),
       ),
     ];
 

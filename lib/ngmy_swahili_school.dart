@@ -313,8 +313,7 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
       dayIndex: dayIndex,
       day: day,
       userEmail: widget.userEmail,
-      // Voice notes are rolling out starting with the first two Basics Day 1 words.
-      enableVoiceDay: level.id == 'basics' && dayIndex == 0,
+      enableVoiceDay: false,
       isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
       onWordStudied: (w) async {
         _progress.markWordStudied(levelIndex, dayIndex, w);
