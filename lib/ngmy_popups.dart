@@ -455,9 +455,13 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
     Future.delayed(Duration(milliseconds: widget.durationMs), _exit);
   }
 
-  Future<void> _exit() async {
+  Future<void> _exit({bool instant = false}) async {
     if (!mounted || _leaving) return;
     _leaving = true;
+    if (instant) {
+      widget.onDone();
+      return;
+    }
     await _enter.reverse();
     if (mounted) widget.onDone();
   }
@@ -587,6 +591,7 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
 
   @override
   Widget build(BuildContext context) {
+    final dismissOnTap = widget.config['dismissOnTap'] == true;
     return AnimatedBuilder(
       animation: Listenable.merge([_enter, _spin, _orbit, _float, _pulse]),
       builder: (context, _) {
@@ -596,49 +601,56 @@ class _Ngmy3DFloatingPopupBodyState extends State<_Ngmy3DFloatingPopupBody> with
         final size = 200.0 * ((widget.config['sizeScale'] as num?)?.toDouble() ?? 1.0);
         final floatY = math.sin(_float.value * math.pi) * 8;
 
-        return IgnorePointer(
-          child: Material(
-            type: MaterialType.transparency,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Opacity(
-                  opacity: fade * 0.38,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: const Alignment(0, -0.1),
-                        radius: 1.2,
-                        colors: [_colors[0].withValues(alpha: 0.85), const Color(0xCC000000), const Color(0xF0000000)],
-                      ),
+        final body = Material(
+          type: MaterialType.transparency,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Opacity(
+                opacity: fade * 0.38,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.1),
+                      radius: 1.2,
+                      colors: [_colors[0].withValues(alpha: 0.85), const Color(0xCC000000), const Color(0xF0000000)],
                     ),
                   ),
                 ),
-                Center(
-                  child: Transform.translate(
-                    offset: Offset(0, floatY + (1 - enter) * 36),
-                    child: Transform.scale(
-                      scale: 0.7 + enter * 0.3,
-                      child: Opacity(
-                        opacity: fade,
-                        child: SizedBox(
-                          width: size,
-                          height: size,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              ...List.generate(_orbitWords.length, (i) => _orbitLabel(size, i, _orbit.value)),
-                              _core(size, spinY, _pulse.value),
-                            ],
-                          ),
+              ),
+              Center(
+                child: Transform.translate(
+                  offset: Offset(0, floatY + (1 - enter) * 36),
+                  child: Transform.scale(
+                    scale: 0.7 + enter * 0.3,
+                    child: Opacity(
+                      opacity: fade,
+                      child: SizedBox(
+                        width: size,
+                        height: size,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ...List.generate(_orbitWords.length, (i) => _orbitLabel(size, i, _orbit.value)),
+                            _core(size, spinY, _pulse.value),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        );
+
+        if (!dismissOnTap) {
+          return IgnorePointer(child: body);
+        }
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _exit(instant: true),
+          child: body,
         );
       },
     );
