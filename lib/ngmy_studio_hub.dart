@@ -158,7 +158,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
         title: 'Kiswahili School',
         subtitle: 'Jifunze Kiingereza kwa picha na Mwalimu Amina',
-        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
+        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail, config: config),
       ),
       _CreatorTool(
         icon: Icons.smartphone_rounded,

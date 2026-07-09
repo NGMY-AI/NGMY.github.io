@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_elevenlabs_tts.dart';
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
 import 'ngmy_swahili_routes.dart';
@@ -43,12 +44,12 @@ class SwahiliWordReminder {
       );
 }
 
-void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
+void showNgmySwahiliSchool({required BuildContext context, String? userEmail, dynamic config}) {
   final bg = Theme.of(context).brightness == Brightness.dark ? kSwahiliSchoolBgDark : kSwahiliSchoolBgLight;
   Navigator.of(context).push<void>(
     ngmySwahiliInstantRoute<void>(
       context,
-      NgmySwahiliSchoolPage(userEmail: userEmail),
+      NgmySwahiliSchoolPage(userEmail: userEmail, config: config),
       background: bg,
     ),
   );
@@ -190,9 +191,10 @@ Future<void> saveSwahiliProgress(String? email, NgmySwahiliProgress progress) as
 }
 
 class NgmySwahiliSchoolPage extends StatefulWidget {
-  const NgmySwahiliSchoolPage({super.key, this.userEmail});
+  const NgmySwahiliSchoolPage({super.key, this.userEmail, this.config});
 
   final String? userEmail;
+  final dynamic config;
 
   @override
   State<NgmySwahiliSchoolPage> createState() => _NgmySwahiliSchoolPageState();
@@ -309,6 +311,9 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
       dayIndex: dayIndex,
       day: day,
       userEmail: widget.userEmail,
+      config: widget.config,
+      // Voice notes are rolling out starting with Basics Day 1 only.
+      enableVoice: level.id == 'basics' && dayIndex == 0,
       isWordStudied: (w) => _progress.isWordStudied(levelIndex, dayIndex, w),
       onWordStudied: (w) async {
         _progress.markWordStudied(levelIndex, dayIndex, w);
@@ -603,6 +608,8 @@ class _SwahiliLessonPage extends StatefulWidget {
     required this.dayIndex,
     required this.day,
     required this.userEmail,
+    this.config,
+    this.enableVoice = false,
     required this.isWordStudied,
     required this.onWordStudied,
     required this.isDayDone,
@@ -616,6 +623,8 @@ class _SwahiliLessonPage extends StatefulWidget {
   final int dayIndex;
   final SwahiliLessonDay day;
   final String? userEmail;
+  final dynamic config;
+  final bool enableVoice;
   final bool Function(String word) isWordStudied;
   final Future<void> Function(String word) onWordStudied;
   final bool Function() isDayDone;
@@ -837,6 +846,8 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                 studied: _isStudied(w.swahili),
                 studySeconds: _studySeconds[w.swahili] ?? 0,
                 onTap: () => _openWord(w),
+                config: widget.config,
+                enableVoice: widget.enableVoice,
               ),
             );
           },
@@ -846,7 +857,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
   }
 }
 
-class _WordCard extends StatelessWidget {
+class _WordCard extends StatefulWidget {
   const _WordCard({
     required this.word,
     required this.index,
@@ -855,6 +866,8 @@ class _WordCard extends StatelessWidget {
     required this.studied,
     required this.studySeconds,
     required this.onTap,
+    this.config,
+    this.enableVoice = false,
   });
 
   final SwahiliWord word;
@@ -864,9 +877,66 @@ class _WordCard extends StatelessWidget {
   final bool studied;
   final int studySeconds;
   final VoidCallback onTap;
+  final dynamic config;
+  final bool enableVoice;
+
+  @override
+  State<_WordCard> createState() => _WordCardState();
+}
+
+class _WordCardState extends State<_WordCard> {
+  bool _speaking = false;
+  bool _speakBusy = false;
+
+  String get _voiceKey => 'swahili_word_${widget.word.swahili}';
+
+  Future<void> _toggleSpeak() async {
+    if (_speakBusy) return;
+    if (NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
+      await NgmyElevenLabsTts.stop();
+      if (mounted) setState(() => _speaking = false);
+      return;
+    }
+
+    setState(() {
+      _speakBusy = true;
+      _speaking = true;
+    });
+
+    final apiKey = await NgmyElevenLabsTts.resolveApiKey(config: widget.config);
+    final result = await NgmyElevenLabsTts.speak(
+      apiKey: apiKey,
+      text: widget.word.swahili,
+      langCode: 'sw',
+      key: _voiceKey,
+    );
+
+    if (!mounted) return;
+    setState(() => _speakBusy = false);
+    if (result.error != null) {
+      setState(() => _speaking = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error!), backgroundColor: const Color(0xFFDC2626)),
+      );
+    } else if (!NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
+      setState(() => _speaking = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (NgmyElevenLabsTts.isSpeaking(_voiceKey)) {
+      NgmyElevenLabsTts.stop();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final word = widget.word;
+    final isDark = widget.isDark;
+    final studied = widget.studied;
+    final color = widget.color;
     final card = isDark ? const Color(0xFF1A2030) : Colors.white;
     final borderColor = studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.25);
     final visual = resolveSwahiliWordVisual(swahili: word.swahili, english: word.english);
@@ -875,7 +945,7 @@ class _WordCard extends StatelessWidget {
       color: card,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -886,7 +956,7 @@ class _WordCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SwahiliLessonNumberBadge(number: index, color: studied ? const Color(0xFFD97706) : color),
+              SwahiliLessonNumberBadge(number: widget.index, color: studied ? const Color(0xFFD97706) : color),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -921,12 +991,20 @@ class _WordCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (widget.enableVoice) ...[
+                          const SizedBox(width: 2),
+                          _SwahiliVoiceButton(
+                            speaking: _speaking,
+                            busy: _speakBusy,
+                            onPressed: _toggleSpeak,
+                          ),
+                        ],
                       ],
                     ),
-                    if (!studied && studySeconds > 0) ...[
+                    if (!studied && widget.studySeconds > 0) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '${kSwahiliMinStudySeconds - studySeconds}s left',
+                        '${kSwahiliMinStudySeconds - widget.studySeconds}s left',
                         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
                       ),
                     ],
@@ -941,6 +1019,45 @@ class _WordCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small "listen" button — plays the Swahili word aloud (young-woman AI voice).
+class _SwahiliVoiceButton extends StatelessWidget {
+  const _SwahiliVoiceButton({
+    required this.speaking,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final bool speaking;
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: speaking ? const Color(0xFFD97706).withValues(alpha: 0.15) : Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD97706)),
+                )
+              : Icon(
+                  speaking ? Icons.stop_circle_rounded : Icons.mic_rounded,
+                  size: 18,
+                  color: const Color(0xFFD97706),
+                ),
         ),
       ),
     );
