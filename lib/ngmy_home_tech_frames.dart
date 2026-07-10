@@ -57,66 +57,71 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
-        // Neural / Signal get the big first-creation frames again (majority of height).
-        // Core + Vault stay as wide bars underneath without crushing the top pair.
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 5,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 168),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _TechFrameCard(
-                        spec: _TechFrameSpec.neural,
-                        pulse: pulse,
-                        scan: scan,
-                        orbit: orbit,
-                        onTap: () => _openExperience(_TechFrameSpec.neural),
+        // Give Neural / Signal a large fixed share of the remaining height so they
+        // stay roomy (icons + labels readable). Core / Vault stay compact bars.
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 10.0;
+            const barH = 78.0;
+            final bars = barH * 2 + gap * 2;
+            final topH = (constraints.maxHeight - bars).clamp(190.0, 320.0);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: topH,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _TechFrameCard(
+                          spec: _TechFrameSpec.neural,
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          onTap: () => _openExperience(_TechFrameSpec.neural),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _TechFrameCard(
-                        spec: _TechFrameSpec.signal,
-                        pulse: pulse,
-                        scan: (scan + 0.35) % 1.0,
-                        orbit: (orbit + 0.22) % 1.0,
-                        onTap: () => _openExperience(_TechFrameSpec.signal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _TechFrameCard(
+                          spec: _TechFrameSpec.signal,
+                          pulse: pulse,
+                          scan: (scan + 0.35) % 1.0,
+                          orbit: (orbit + 0.22) % 1.0,
+                          onTap: () => _openExperience(_TechFrameSpec.signal),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 96,
-              child: _TechFrameCard(
-                spec: _TechFrameSpec.core,
-                pulse: pulse,
-                scan: (scan + 0.62) % 1.0,
-                orbit: (orbit + 0.48) % 1.0,
-                wide: true,
-                onTap: () => _openExperience(_TechFrameSpec.core),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 96,
-              child: _TechFrameCard(
-                spec: _TechFrameSpec.vault,
-                pulse: pulse,
-                scan: (scan + 0.18) % 1.0,
-                orbit: (orbit + 0.71) % 1.0,
-                wide: true,
-                onTap: () => _openExperience(_TechFrameSpec.vault),
-              ),
-            ),
-          ],
+                const SizedBox(height: gap),
+                SizedBox(
+                  height: barH,
+                  child: _TechFrameCard(
+                    spec: _TechFrameSpec.core,
+                    pulse: pulse,
+                    scan: (scan + 0.62) % 1.0,
+                    orbit: (orbit + 0.48) % 1.0,
+                    wide: true,
+                    onTap: () => _openExperience(_TechFrameSpec.core),
+                  ),
+                ),
+                const SizedBox(height: gap),
+                SizedBox(
+                  height: barH,
+                  child: _TechFrameCard(
+                    spec: _TechFrameSpec.vault,
+                    pulse: pulse,
+                    scan: (scan + 0.18) % 1.0,
+                    orbit: (orbit + 0.71) % 1.0,
+                    wide: true,
+                    onTap: () => _openExperience(_TechFrameSpec.vault),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -217,7 +222,7 @@ class _TechFrameCard extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
-                padding: EdgeInsets.fromLTRB(wide ? 18 : 14, wide ? 14 : 14, wide ? 18 : 14, wide ? 14 : 14),
+                padding: EdgeInsets.fromLTRB(wide ? 16 : 16, wide ? 12 : 16, wide ? 16 : 16, wide ? 12 : 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
                   gradient: LinearGradient(
@@ -243,7 +248,8 @@ class _TechFrameCard extends StatelessWidget {
   Widget _tallBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final orb = (constraints.maxHeight * 0.38).clamp(56.0, 88.0);
+        // Keep orb inside its box (rings used to paint over the title).
+        final orb = (math.min(constraints.maxHeight * 0.42, constraints.maxWidth * 0.55)).clamp(64.0, 104.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -251,35 +257,49 @@ class _TechFrameCard extends StatelessWidget {
               children: [
                 _badge(),
                 const Spacer(),
-                Icon(spec.icon, size: 20, color: Colors.white.withValues(alpha: 0.85 + pulse * 0.15)),
+                Icon(spec.icon, size: 22, color: Colors.white.withValues(alpha: 0.9)),
               ],
             ),
-            const Spacer(),
-            Center(
-              child: SizedBox(
-                width: orb,
-                height: orb,
-                child: CustomPaint(
-                  painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind),
+            Expanded(
+              child: Center(
+                child: SizedBox(
+                  width: orb,
+                  height: orb,
+                  child: CustomPaint(
+                    painter: _OrbPainter(
+                      colors: spec.colors,
+                      pulse: pulse,
+                      orbit: orbit,
+                      kind: spec.kind,
+                      compact: true,
+                    ),
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
             Text(
               spec.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.95),
+                color: Colors.white.withValues(alpha: 0.96),
                 fontWeight: FontWeight.w900,
-                fontSize: 13,
-                letterSpacing: 1.1,
+                fontSize: 13.5,
+                letterSpacing: 1.05,
+                height: 1.15,
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               spec.subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.58),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                height: 1.1,
+              ),
             ),
           ],
         );
@@ -291,10 +311,10 @@ class _TechFrameCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 64,
-          height: 64,
+          width: 56,
+          height: 56,
           child: CustomPaint(
-            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind),
+            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: true),
           ),
         ),
         const SizedBox(width: 12),
@@ -304,22 +324,24 @@ class _TechFrameCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _badge(),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Text(
                 spec.title,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.2),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 1.1),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 spec.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 26),
+        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 24),
       ],
     );
   }
@@ -428,22 +450,33 @@ class _HudFramePainter extends CustomPainter {
 }
 
 class _OrbPainter extends CustomPainter {
-  _OrbPainter({required this.colors, required this.pulse, required this.orbit, required this.kind});
+  _OrbPainter({
+    required this.colors,
+    required this.pulse,
+    required this.orbit,
+    required this.kind,
+    this.compact = false,
+  });
 
   final List<Color> colors;
   final double pulse;
   final double orbit;
   final _TechKind kind;
+  final bool compact;
 
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide * 0.34;
+    // Compact keeps rings inside the box so they don't collide with titles.
+    final radius = size.shortestSide * (compact ? 0.30 : 0.34);
+    final haloStep = compact ? 3.5 : 7.0;
+    final haloPulse = compact ? 1.5 : 4.0;
+    final accentR = compact ? radius + 6 : radius + 12;
 
-    for (var i = 3; i >= 1; i--) {
+    for (var i = (compact ? 2 : 3); i >= 1; i--) {
       canvas.drawCircle(
         c,
-        radius + i * 7 + pulse * 4,
+        radius + i * haloStep + pulse * haloPulse,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1
@@ -472,18 +505,17 @@ class _OrbPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2
         ..color = colors.last.withValues(alpha: 0.85);
-      canvas.drawArc(Rect.fromCircle(center: c, radius: radius + 10), orbit * math.pi * 2, 1.2, false, sweep);
+      canvas.drawArc(Rect.fromCircle(center: c, radius: accentR), orbit * math.pi * 2, 1.2, false, sweep);
     } else if (kind == _TechKind.neural) {
       for (var i = 0; i < 4; i++) {
         final a = orbit * math.pi * 2 + i * (math.pi / 2);
-        final p = Offset(c.dx + math.cos(a) * (radius + 12), c.dy + math.sin(a) * (radius + 12));
-        canvas.drawCircle(p, 2.4, Paint()..color = colors[i % colors.length]);
+        final p = Offset(c.dx + math.cos(a) * accentR, c.dy + math.sin(a) * accentR);
+        canvas.drawCircle(p, compact ? 1.8 : 2.4, Paint()..color = colors[i % colors.length]);
         canvas.drawLine(c, p, Paint()..color = colors.first.withValues(alpha: 0.35)..strokeWidth = 1);
       }
     } else if (kind == _TechKind.vault) {
-      // Shield-style lock ring
       canvas.drawArc(
-        Rect.fromCircle(center: c, radius: radius + 11),
+        Rect.fromCircle(center: c, radius: accentR),
         -math.pi / 2 + orbit * math.pi * 2,
         math.pi * 1.35,
         false,
@@ -494,22 +526,22 @@ class _OrbPainter extends CustomPainter {
       );
       for (var i = 0; i < 3; i++) {
         final a = orbit * math.pi * 2 + i * (math.pi * 2 / 3);
-        final p = Offset(c.dx + math.cos(a) * (radius + 14), c.dy + math.sin(a) * (radius + 14));
-        canvas.drawCircle(p, 2.2, Paint()..color = colors[i % colors.length]);
+        final p = Offset(c.dx + math.cos(a) * (accentR + 2), c.dy + math.sin(a) * (accentR + 2));
+        canvas.drawCircle(p, compact ? 1.6 : 2.2, Paint()..color = colors[i % colors.length]);
       }
     } else {
-      // Core hex-ish ticks
       for (var i = 0; i < 6; i++) {
         final a = orbit * math.pi * 2 + i * (math.pi / 3);
         final inner = Offset(c.dx + math.cos(a) * (radius - 6), c.dy + math.sin(a) * (radius - 6));
-        final outer = Offset(c.dx + math.cos(a) * (radius + 8), c.dy + math.sin(a) * (radius + 8));
+        final outer = Offset(c.dx + math.cos(a) * accentR, c.dy + math.sin(a) * accentR);
         canvas.drawLine(inner, outer, Paint()..color = Colors.white.withValues(alpha: 0.55)..strokeWidth = 1.6);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _OrbPainter old) => old.pulse != pulse || old.orbit != orbit;
+  bool shouldRepaint(covariant _OrbPainter old) =>
+      old.pulse != pulse || old.orbit != orbit || old.compact != compact;
 }
 
 // ── Full-screen tap experience ──────────────────────────────────────────────
