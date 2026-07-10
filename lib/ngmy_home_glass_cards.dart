@@ -10,9 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
-import 'ngmy_business_notes.dart';
-import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
+import 'ngmy_home_essentials_hub.dart';
 
 /// Local-only (device storage, no database) spending + notes cards for Home.
 /// Everything here lives in SharedPreferences, keyed per user email.
@@ -32,6 +31,7 @@ class NgmySpendingEntry {
     this.passwordSecret = '',
     this.pinnedNoteText = '',
     this.pinnedAlarmText = '',
+    this.pinnedEssentialsKind = '',
     this.businessCardJson = '',
   });
 
@@ -50,14 +50,17 @@ class NgmySpendingEntry {
   final String pinnedNoteText;
   /// Snapshot text pinned from alarms / medicine reminders.
   final String pinnedAlarmText;
+  /// Essentials category label (Contacts, Notes, Hotlines, …).
+  final String pinnedEssentialsKind;
   /// JSON of a pinned NgmyBusinessCardDocument.
   final String businessCardJson;
 
   bool get hasImage => imageBase64.trim().isNotEmpty;
   bool get isPassword => category == 'Password';
-  bool get hasPinnedEssentials => pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
+  bool get hasPinnedEssentials =>
+      pinnedEssentialsKind.trim().isNotEmpty || pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
   bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
-  bool get hideModePill => hasImage || isPassword || hasBusinessCard;
+  bool get hideModePill => hasImage || isPassword || hasBusinessCard || (hasPinnedEssentials && amount <= 0);
   /// Money / category face that should fill the whole frosted card like a photo.
   bool get showsCreditFace => !hasImage && !isPassword && !hasBusinessCard && !(hasPinnedEssentials && amount <= 0);
 
@@ -73,6 +76,7 @@ class NgmySpendingEntry {
     String? passwordSecret,
     String? pinnedNoteText,
     String? pinnedAlarmText,
+    String? pinnedEssentialsKind,
     String? businessCardJson,
   }) =>
       NgmySpendingEntry(
@@ -87,6 +91,7 @@ class NgmySpendingEntry {
         passwordSecret: passwordSecret ?? this.passwordSecret,
         pinnedNoteText: pinnedNoteText ?? this.pinnedNoteText,
         pinnedAlarmText: pinnedAlarmText ?? this.pinnedAlarmText,
+        pinnedEssentialsKind: pinnedEssentialsKind ?? this.pinnedEssentialsKind,
         businessCardJson: businessCardJson ?? this.businessCardJson,
       );
 
@@ -102,6 +107,7 @@ class NgmySpendingEntry {
         'passwordSecret': passwordSecret,
         'pinnedNoteText': pinnedNoteText,
         'pinnedAlarmText': pinnedAlarmText,
+        'pinnedEssentialsKind': pinnedEssentialsKind,
         'businessCardJson': businessCardJson,
       };
 
@@ -117,6 +123,7 @@ class NgmySpendingEntry {
         passwordSecret: j['passwordSecret']?.toString() ?? '',
         pinnedNoteText: j['pinnedNoteText']?.toString() ?? '',
         pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
+        pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
         businessCardJson: j['businessCardJson']?.toString() ?? '',
       );
 }
@@ -400,10 +407,20 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
       _scheduleAuto();
     }
     if (oldWidget.items.length == widget.items.length && identical(oldWidget.items, widget.items)) return;
+    final next = List<T>.of(widget.items);
+    // Newly added cards are prepended by the panel — keep that order so the new card is front.
+    if (widget.items.length > oldWidget.items.length) {
+      setState(() {
+        _order = next;
+        _resetFrontProps();
+        _animCtrl.stop();
+      });
+      _scheduleAuto();
+      return;
+    }
     final idOf = widget.itemId;
     Object? frontId;
     if (_order.isNotEmpty && idOf != null) frontId = idOf(_order.first);
-    final next = List<T>.of(widget.items);
     if (frontId != null && idOf != null) {
       final idx = next.indexWhere((e) => idOf(e) == frontId);
       if (idx > 0) {
@@ -437,7 +454,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   void _scheduleAuto() {
     _autoTimer?.cancel();
     if (!widget.autoPlay || _order.length < 2) return;
-    _autoTimer = Timer.periodic(const Duration(milliseconds: 3400), (_) {
+    _autoTimer = Timer.periodic(const Duration(seconds: 7), (_) {
       if (mounted && !_autoBusy) _runAutoAdvance();
     });
   }
@@ -1326,6 +1343,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             date: DateTime.now(),
             pinnedNoteText: result['pinnedNoteText'] ?? '',
             pinnedAlarmText: result['pinnedAlarmText'] ?? '',
+            pinnedEssentialsKind: result['pinnedEssentialsKind'] ?? '',
             note: result['note'] ?? '',
           ),
         );
@@ -1343,6 +1361,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
           note: result['note'] ?? '',
           pinnedNoteText: result['pinnedNoteText'] ?? '',
           pinnedAlarmText: result['pinnedAlarmText'] ?? '',
+          pinnedEssentialsKind: result['pinnedEssentialsKind'] ?? '',
         ),
       );
     } else {
@@ -1449,18 +1468,22 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 dateLabel: ngmyHomeDateTabLabel(entry.date),
                 accent: entry.hasImage
                     ? const [Color(0xFF111827), Color(0xFF1F2937)]
-                    : entry.isPassword
-                        ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
-                        : entry.showsCreditFace
-                            ? ngmyCreditThemeColors(entry.category)
-                            : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+                    : entry.hasBusinessCard
+                        ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
+                        : entry.isPassword
+                            ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
+                            : entry.hasPinnedEssentials && entry.amount <= 0
+                                ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
+                                : entry.showsCreditFace
+                                    ? ngmyCreditThemeColors(entry.category)
+                                    : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                 isFront: isFront,
                 showDateTab: revealDates,
                 welcomeName: isFront ? name : null,
                 onDelete: isFront ? () => _deleteSpending(entry.id) : null,
                 onAdd: isFront ? _openAddSheet : null,
                 footer: isFront && !entry.hideModePill ? _modePill() : null,
-                fillBleed: entry.hasImage || entry.showsCreditFace,
+                fillBleed: entry.hasImage || entry.showsCreditFace || entry.hasBusinessCard || (entry.hasPinnedEssentials && entry.amount <= 0),
                 child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
               ),
             ),
@@ -1607,18 +1630,32 @@ class _BusinessCardBody extends StatelessWidget {
       final map = jsonDecode(json);
       if (map is Map) doc = NgmyBusinessCardDocument.fromJson(Map<String, dynamic>.from(map));
     } catch (_) {}
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 44, 10, 12),
-      child: Center(
-        child: doc == null
-            ? const Text('Business card unavailable', style: TextStyle(color: Colors.white70))
-            : LayoutBuilder(
-                builder: (context, c) {
-                  final w = math.min(c.maxWidth, 320.0);
-                  return NgmyBusinessCardPreview(document: doc!, width: w, interactive: false);
-                },
+    if (doc == null) {
+      return const ColoredBox(
+        color: Color(0xFF0B1220),
+        child: Center(child: Text('Business card unavailable', style: TextStyle(color: Colors.white70))),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final cardH = w / kNgmyBusinessCardAspect;
+        final scale = math.max(1.0, c.maxHeight / cardH);
+        return ColoredBox(
+          color: const Color(0xFF0B1220),
+          child: ClipRect(
+            child: OverflowBox(
+              maxWidth: w * scale,
+              maxHeight: cardH * scale,
+              alignment: Alignment.center,
+              child: Transform.scale(
+                scale: scale,
+                child: NgmyBusinessCardPreview(document: doc!, width: w, interactive: false),
               ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1741,53 +1778,64 @@ class _PinnedEssentialsCardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 36),
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'FROM BUSINESS ESSENTIALS',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.65)),
-          ),
-          const Spacer(),
-          if (entry.pinnedAlarmText.trim().isNotEmpty)
-            _essentialsBlock(icon: Icons.alarm_rounded, label: 'ALARM', text: entry.pinnedAlarmText, color: const Color(0xFFF97316)),
-          if (entry.pinnedAlarmText.trim().isNotEmpty && entry.pinnedNoteText.trim().isNotEmpty) const SizedBox(height: 10),
-          if (entry.pinnedNoteText.trim().isNotEmpty)
-            _essentialsBlock(icon: Icons.sticky_note_2_rounded, label: 'NOTE', text: entry.pinnedNoteText, color: const Color(0xFF60A5FA)),
-          if (entry.note.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(entry.note, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
-          ],
-          const Spacer(),
-        ],
+    final kind = entry.pinnedEssentialsKind.trim().isEmpty
+        ? (entry.pinnedAlarmText.trim().isNotEmpty ? 'Alarms' : 'Notes')
+        : entry.pinnedEssentialsKind.trim();
+    final title = entry.description.trim().isEmpty ? kind : entry.description.trim();
+    final body = entry.pinnedNoteText.trim().isNotEmpty
+        ? entry.pinnedNoteText.trim()
+        : entry.pinnedAlarmText.trim();
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0B1220), Color(0xFF1E1B4B), Color(0xFF0F172A)],
+        ),
       ),
-    );
-  }
-
-  Widget _essentialsBlock({required IconData icon, required String label, required String text, required Color color}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: color)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 54, 16, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)]),
+              ),
+              child: Text(
+                kind.toUpperCase(),
+                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: Colors.white),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, height: 1.2),
+            ),
+            if (body.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                body,
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w600, fontSize: 13, height: 1.35),
+              ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, height: 1.3, fontSize: 14)),
-        ],
+            if (entry.note.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                entry.note,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontWeight: FontWeight.w600, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1963,6 +2011,8 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
   String _category = 'Food';
   String? _pinnedNote;
   String? _pinnedAlarm;
+  String? _pinnedKind;
+  String? _pinnedTitle;
   late bool _autoPlay;
   late NgmyHomeCardSlideStyle _slideStyle;
   late final AnimationController _pulse;
@@ -1995,19 +2045,14 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
   }
 
   Future<void> _pickEssentialsPin() async {
-    final notes = await ngmyExportBusinessNotes(userEmail: widget.userEmail);
-    final alarms = await NgmyHelperAlarmMemoryStore.load(widget.userEmail);
-    if (!mounted) return;
-    final picked = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _NgmyPinEssentialsSheet(notes: notes, alarms: alarms),
-    );
+    final picked = await showNgmyHomeRoboticEssentialsHub(context, userEmail: widget.userEmail);
     if (picked == null || !mounted) return;
     setState(() {
-      _pinnedNote = picked['note'];
-      _pinnedAlarm = picked['alarm'];
+      _pinnedKind = picked.kind;
+      _pinnedTitle = picked.title;
+      _pinnedNote = picked.body.trim().isEmpty ? picked.title : picked.body;
+      _pinnedAlarm = '';
+      if (_descC.text.trim().isEmpty) _descC.text = picked.title;
     });
   }
 
@@ -2045,15 +2090,16 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       });
       return;
     }
-    final hasPin = (_pinnedNote ?? '').isNotEmpty || (_pinnedAlarm ?? '').isNotEmpty;
+    final hasPin = (_pinnedNote ?? '').isNotEmpty || (_pinnedAlarm ?? '').isNotEmpty || (_pinnedKind ?? '').isNotEmpty;
     final amount = _amountC.text.trim();
     if (hasPin && (amount.isEmpty || (double.tryParse(amount) ?? 0) <= 0)) {
       Navigator.pop(context, {
         'kind': 'pin',
-        'description': _descC.text.trim().isEmpty ? 'Pinned item' : _descC.text.trim(),
+        'description': (_pinnedTitle ?? _descC.text).trim().isEmpty ? 'Pinned item' : (_pinnedTitle ?? _descC.text).trim(),
         'category': _category,
         'pinnedNoteText': _pinnedNote ?? '',
         'pinnedAlarmText': _pinnedAlarm ?? '',
+        'pinnedEssentialsKind': _pinnedKind ?? '',
       });
       return;
     }
@@ -2064,6 +2110,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       'category': _category,
       'pinnedNoteText': _pinnedNote ?? '',
       'pinnedAlarmText': _pinnedAlarm ?? '',
+      'pinnedEssentialsKind': _pinnedKind ?? '',
     });
   }
 
@@ -2451,8 +2498,10 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                             ),
                             const SizedBox(height: 10),
                             _hudAction(
-                              icon: Icons.business_center_rounded,
-                              label: (_pinnedNote != null || _pinnedAlarm != null) ? 'Essentials pinned ✓' : 'Pin note / alarm from Essentials',
+                              icon: Icons.hub_rounded,
+                              label: (_pinnedKind != null || _pinnedNote != null || _pinnedAlarm != null)
+                                  ? 'Essentials vault · pinned ✓'
+                                  : 'Open Essentials vault',
                               onTap: _pickEssentialsPin,
                               t: t,
                               phase: 1,
@@ -2675,80 +2724,6 @@ class _NgmyPickBusinessCardSheet extends StatelessWidget {
                     ),
                   );
                 }),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NgmyPinEssentialsSheet extends StatelessWidget {
-  const _NgmyPinEssentialsSheet({required this.notes, required this.alarms});
-
-  final List<NgmyBusinessNote> notes;
-  final List<NgmyHelperAlarmEntry> alarms;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
-    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: double.infinity,
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              children: [
-                Text('Pin to home card', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
-                const SizedBox(height: 6),
-                Text('Pick a Business Essentials note or alarm', style: TextStyle(fontSize: 12, color: muted)),
-                const SizedBox(height: 16),
-                Text('ALARMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
-                const SizedBox(height: 8),
-                if (alarms.isEmpty)
-                  Text('No alarms yet', style: TextStyle(color: muted))
-                else
-                  ...alarms.take(12).map(
-                    (a) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.alarm_rounded, color: Color(0xFFF97316)),
-                      title: Text(a.summaryLine, style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
-                      onTap: () => Navigator.pop(context, {'alarm': a.summaryLine, 'note': ''}),
-                    ),
-                  ),
-                const SizedBox(height: 14),
-                Text('NOTES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
-                const SizedBox(height: 8),
-                if (notes.isEmpty)
-                  Text('No essentials notes yet', style: TextStyle(color: muted))
-                else
-                  ...notes.take(16).map(
-                    (n) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFF60A5FA)),
-                      title: Text(n.preview, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
-                      subtitle: n.displayBody.trim().isEmpty
-                          ? null
-                          : Text(n.displayBody, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 12)),
-                      onTap: () => Navigator.pop(context, {
-                        'note': n.displayBody.trim().isEmpty ? n.preview : '${n.preview}\n${n.displayBody}'.trim(),
-                        'alarm': '',
-                      }),
-                    ),
-                  ),
               ],
             ),
           ),
