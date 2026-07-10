@@ -6,6 +6,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_business_card_models.dart';
+import 'ngmy_business_card_renderer.dart';
+import 'ngmy_business_card_storage.dart';
 import 'ngmy_business_notes.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
@@ -28,6 +31,7 @@ class NgmySpendingEntry {
     this.passwordSecret = '',
     this.pinnedNoteText = '',
     this.pinnedAlarmText = '',
+    this.businessCardJson = '',
   });
 
   final String id;
@@ -45,10 +49,14 @@ class NgmySpendingEntry {
   final String pinnedNoteText;
   /// Snapshot text pinned from alarms / medicine reminders.
   final String pinnedAlarmText;
+  /// JSON of a pinned NgmyBusinessCardDocument.
+  final String businessCardJson;
 
   bool get hasImage => imageBase64.trim().isNotEmpty;
   bool get isPassword => category == 'Password';
   bool get hasPinnedEssentials => pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
+  bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
+  bool get hideModePill => hasImage || isPassword || hasBusinessCard;
 
   NgmySpendingEntry copyWith({
     String? id,
@@ -62,6 +70,7 @@ class NgmySpendingEntry {
     String? passwordSecret,
     String? pinnedNoteText,
     String? pinnedAlarmText,
+    String? businessCardJson,
   }) =>
       NgmySpendingEntry(
         id: id ?? this.id,
@@ -75,6 +84,7 @@ class NgmySpendingEntry {
         passwordSecret: passwordSecret ?? this.passwordSecret,
         pinnedNoteText: pinnedNoteText ?? this.pinnedNoteText,
         pinnedAlarmText: pinnedAlarmText ?? this.pinnedAlarmText,
+        businessCardJson: businessCardJson ?? this.businessCardJson,
       );
 
   Map<String, dynamic> toJson() => {
@@ -89,6 +99,7 @@ class NgmySpendingEntry {
         'passwordSecret': passwordSecret,
         'pinnedNoteText': pinnedNoteText,
         'pinnedAlarmText': pinnedAlarmText,
+        'businessCardJson': businessCardJson,
       };
 
   factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) => NgmySpendingEntry(
@@ -103,6 +114,7 @@ class NgmySpendingEntry {
         passwordSecret: j['passwordSecret']?.toString() ?? '',
         pinnedNoteText: j['pinnedNoteText']?.toString() ?? '',
         pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
+        businessCardJson: j['businessCardJson']?.toString() ?? '',
       );
 }
 
@@ -498,6 +510,7 @@ class NgmyFrostedCard extends StatelessWidget {
     this.isFront = true,
     this.showDateTab = true,
     this.welcomeName,
+    this.fillBleed = false,
   });
 
   final Widget child;
@@ -510,6 +523,8 @@ class NgmyFrostedCard extends StatelessWidget {
   final bool showDateTab;
   /// Front card: left glass chip = welcome + @name; right = date chip above X/+.
   final String? welcomeName;
+  /// When true, [child] fills the whole card face (for photos).
+  final bool fillBleed;
 
   @override
   Widget build(BuildContext context) {
@@ -555,29 +570,52 @@ class NgmyFrostedCard extends StatelessWidget {
                 ),
                 child: Stack(
                   children: [
-                    if (isFront)
+                    if (fillBleed)
+                      Positioned.fill(child: child)
+                    else ...[
+                      if (isFront)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 70,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.24),
+                                  Colors.white.withValues(alpha: 0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(showWelcome ? 12 : 20, showWelcome ? 48 : 28, 48, footer != null ? 44 : 16),
+                        child: child,
+                      ),
+                    ],
+                    if (fillBleed)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
-                        height: 70,
+                        height: 72,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withValues(alpha: 0.24),
-                                Colors.white.withValues(alpha: 0.0),
+                                Colors.black.withValues(alpha: 0.45),
+                                Colors.black.withValues(alpha: 0.0),
                               ],
                             ),
                           ),
                         ),
                       ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(showWelcome ? 12 : 20, showWelcome ? 48 : 28, 48, 16),
-                      child: child,
-                    ),
                     // LEFT corner (opposite date/X): welcome + @name in a compact glass frame.
                     if (showWelcome)
                       Positioned(
@@ -959,6 +997,21 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
         );
         return;
       }
+      if (kind == 'business_card') {
+        final json = result['businessCardJson'] ?? '';
+        if (json.isEmpty) return;
+        await _addSpendingEntry(
+          NgmySpendingEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            amount: 0,
+            description: result['description'] ?? 'Business card',
+            category: 'Business Card',
+            date: DateTime.now(),
+            businessCardJson: json,
+          ),
+        );
+        return;
+      }
       if (kind == 'password') {
         final email = (result['passwordEmail'] ?? '').trim();
         final secret = (result['passwordSecret'] ?? '').trim();
@@ -1099,13 +1152,18 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             ),
             cardBuilder: (ctx, entry, {required isFront, required revealDates}) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(entry.date),
-              accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+              accent: entry.hasImage
+                  ? const [Color(0xFF111827), Color(0xFF1F2937)]
+                  : entry.isPassword
+                      ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
+                      : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
               isFront: isFront,
               showDateTab: revealDates,
               welcomeName: isFront ? name : null,
               onDelete: isFront ? () => _deleteSpending(entry.id) : null,
               onAdd: isFront ? _openAddSheet : null,
-              footer: isFront ? _modePill() : null,
+              footer: isFront && !entry.hideModePill ? _modePill() : null,
+              fillBleed: entry.hasImage,
               child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
             ),
           )
@@ -1170,13 +1228,16 @@ class _SpendingCardContent extends StatelessWidget {
     if (entry.hasImage) {
       return _ImageCardBody(imageBase64: entry.imageBase64);
     }
+    if (entry.hasBusinessCard) {
+      return _BusinessCardBody(json: entry.businessCardJson);
+    }
     if (entry.isPassword) {
       return _PasswordCardBody(entry: entry);
     }
     if (entry.hasPinnedEssentials && entry.amount <= 0) {
       return _PinnedEssentialsCardBody(entry: entry);
     }
-    return _CategoryThemedSpendBody(entry: entry, totalSpent: totalSpent);
+    return _CreditCardSpendBody(entry: entry, totalSpent: totalSpent);
   }
 }
 
@@ -1191,41 +1252,63 @@ class _ImageCardBody extends StatelessWidget {
     try {
       bytes = base64Decode(imageBase64);
     } catch (_) {}
+    if (bytes == null) {
+      return const ColoredBox(color: Colors.black26, child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)));
+    }
+    return Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+  }
+}
+
+class _BusinessCardBody extends StatelessWidget {
+  const _BusinessCardBody({required this.json});
+
+  final String json;
+
+  @override
+  Widget build(BuildContext context) {
+    NgmyBusinessCardDocument? doc;
+    try {
+      final map = jsonDecode(json);
+      if (map is Map) doc = NgmyBusinessCardDocument.fromJson(Map<String, dynamic>.from(map));
+    } catch (_) {}
     return Padding(
-      padding: const EdgeInsets.only(bottom: 40, top: 4),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 160.0;
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: SizedBox(
-              width: double.infinity,
-              height: h,
-              child: bytes == null
-                  ? const ColoredBox(color: Colors.black26, child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)))
-                  : Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: h),
-            ),
-          );
-        },
+      padding: const EdgeInsets.fromLTRB(10, 44, 10, 12),
+      child: Center(
+        child: doc == null
+            ? const Text('Business card unavailable', style: TextStyle(color: Colors.white70))
+            : LayoutBuilder(
+                builder: (context, c) {
+                  final w = math.min(c.maxWidth, 320.0);
+                  return NgmyBusinessCardPreview(document: doc!, width: w, interactive: false);
+                },
+              ),
       ),
     );
   }
 }
 
-class _PasswordCardBody extends StatelessWidget {
+class _PasswordCardBody extends StatefulWidget {
   const _PasswordCardBody({required this.entry});
 
   final NgmySpendingEntry entry;
 
   @override
+  State<_PasswordCardBody> createState() => _PasswordCardBodyState();
+}
+
+class _PasswordCardBodyState extends State<_PasswordCardBody> {
+  bool _show = false;
+
+  @override
   Widget build(BuildContext context) {
+    final entry = widget.entry;
+    final secret = entry.passwordSecret;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 36),
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       child: Column(
         children: [
-          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               color: Colors.black.withValues(alpha: 0.28),
@@ -1234,45 +1317,81 @@ class _PasswordCardBody extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.lock_rounded, size: 14, color: Color(0xFFFBBF24)),
-                SizedBox(width: 6),
-                Text('PASSWORD VAULT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: Color(0xFFFBBF24))),
+                Icon(Icons.lock_rounded, size: 12, color: Color(0xFFFBBF24)),
+                SizedBox(width: 5),
+                Text('PASSWORD', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1.0, color: Color(0xFFFBBF24))),
               ],
             ),
           ),
-          const Spacer(),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withValues(alpha: 0.35),
-                  const Color(0xFF7C2D12).withValues(alpha: 0.35),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.40),
+                    const Color(0xFF7C2D12).withValues(alpha: 0.32),
+                  ],
+                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.description.isEmpty ? 'Login' : entry.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('EMAIL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.0, color: Colors.white.withValues(alpha: 0.55))),
+                  const SizedBox(height: 2),
+                  Text(
+                    entry.passwordEmail.isEmpty ? '—' : entry.passwordEmail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('PASSWORD', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.0, color: Colors.white.withValues(alpha: 0.55))),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          secret.isEmpty
+                              ? '—'
+                              : (_show ? secret : '•' * math.min(secret.length.clamp(6, 14), 14)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: _show ? 13 : 16,
+                            letterSpacing: _show ? 0.2 : 1.2,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () => setState(() => _show = !_show),
+                        icon: Icon(_show ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: const Color(0xFFFBBF24), size: 20),
+                        tooltip: _show ? 'Hide password' : 'Show password',
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(entry.description, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                const SizedBox(height: 12),
-                Text('EMAIL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55))),
-                const SizedBox(height: 4),
-                Text(entry.passwordEmail.isEmpty ? '—' : entry.passwordEmail, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
-                const SizedBox(height: 12),
-                Text('PASSWORD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55))),
-                const SizedBox(height: 4),
-                Text(
-                  entry.passwordSecret.isEmpty ? '—' : '•' * math.min(entry.passwordSecret.length, 14),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5),
-                ),
-              ],
             ),
           ),
-          const Spacer(),
         ],
       ),
     );
@@ -1338,8 +1457,8 @@ class _PinnedEssentialsCardBody extends StatelessWidget {
   }
 }
 
-class _CategoryThemedSpendBody extends StatelessWidget {
-  const _CategoryThemedSpendBody({required this.entry, required this.totalSpent});
+class _CreditCardSpendBody extends StatelessWidget {
+  const _CreditCardSpendBody({required this.entry, required this.totalSpent});
 
   final NgmySpendingEntry entry;
   final double totalSpent;
@@ -1347,54 +1466,27 @@ class _CategoryThemedSpendBody extends StatelessWidget {
   List<Color> get _themeColors {
     switch (entry.category) {
       case 'Food':
-        return const [Color(0xFFF97316), Color(0xFFEF4444)];
+        return const [Color(0xFF1F2937), Color(0xFFEA580C)];
       case 'Transport':
-        return const [Color(0xFF38BDF8), Color(0xFF2563EB)];
+        return const [Color(0xFF0F172A), Color(0xFF2563EB)];
       case 'Bills':
-        return const [Color(0xFFA3E635), Color(0xFF16A34A)];
+        return const [Color(0xFF14532D), Color(0xFF16A34A)];
       case 'Shopping':
-        return const [Color(0xFFF472B6), Color(0xFFDB2777)];
+        return const [Color(0xFF4C0519), Color(0xFFDB2777)];
       case 'Fun':
-        return const [Color(0xFFFBBF24), Color(0xFFF59E0B)];
+        return const [Color(0xFF422006), Color(0xFFF59E0B)];
       case 'Health':
-        return const [Color(0xFFFB7185), Color(0xFFE11D48)];
+        return const [Color(0xFF4C0519), Color(0xFFE11D48)];
       case 'Work':
-        return const [Color(0xFF94A3B8), Color(0xFF334155)];
+        return const [Color(0xFF111827), Color(0xFF64748B)];
       case 'Travel':
-        return const [Color(0xFF22D3EE), Color(0xFF0891B2)];
+        return const [Color(0xFF083344), Color(0xFF0891B2)];
       case 'Gift':
-        return const [Color(0xFFC084FC), Color(0xFF7C3AED)];
+        return const [Color(0xFF2E1065), Color(0xFF7C3AED)];
       case 'Savings':
-        return const [Color(0xFF34D399), Color(0xFF059669)];
+        return const [Color(0xFF064E3B), Color(0xFF059669)];
       default:
-        return const [Color(0xFF60A5FA), Color(0xFF8B5CF6)];
-    }
-  }
-
-  String get _themeLabel {
-    switch (entry.category) {
-      case 'Transport':
-        return 'TRANSIT PASS';
-      case 'Bills':
-        return 'BILL STATEMENT';
-      case 'Shopping':
-        return 'SHOPPING BAG';
-      case 'Food':
-        return 'FOOD TICKET';
-      case 'Health':
-        return 'HEALTH CARD';
-      case 'Travel':
-        return 'BOARDING PASS';
-      case 'Gift':
-        return 'GIFT CARD';
-      case 'Savings':
-        return 'SAVINGS SLIP';
-      case 'Work':
-        return 'WORK LOG';
-      case 'Fun':
-        return 'FUN PASS';
-      default:
-        return entry.category.toUpperCase();
+        return const [Color(0xFF1E1B4B), Color(0xFF4F46E5)];
     }
   }
 
@@ -1403,91 +1495,88 @@ class _CategoryThemedSpendBody extends StatelessWidget {
     final colors = _themeColors;
     final cardNote = entry.note.trim();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 36),
+      padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.35), colors.last.withValues(alpha: 0.25)]),
-              border: Border.all(color: colors.first.withValues(alpha: 0.55)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_kSpendingCategories[entry.category] ?? Icons.category_rounded, size: 13, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(_themeLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.05, color: Colors.white)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'TOTAL SPENT',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.65)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '-\$${totalSpent.toStringAsFixed(2)}',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.88)),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.35), colors.last.withValues(alpha: 0.22)]),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-            ),
-            child: Text(
-              '-\$${entry.amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white, height: 1.05),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_kSpendingCategories[entry.category] ?? Icons.category_rounded, size: 15, color: Colors.white.withValues(alpha: 0.9)),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  '${entry.category} · ${entry.description}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.95)),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colors.first, colors.last.withValues(alpha: 0.85)],
                 ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                boxShadow: [
+                  BoxShadow(color: colors.last.withValues(alpha: 0.28), blurRadius: 12, offset: const Offset(0, 4)),
+                ],
               ),
-            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(_kSpendingCategories[entry.category] ?? Icons.credit_card_rounded, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          entry.category.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.85)),
+                        ),
+                      ),
+                      Text(
+                        'NGMY',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.55)),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    entry.description.isEmpty ? 'Expense' : entry.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '-\$${entry.amount.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7)),
+                        ),
+                      ),
+                      Text(
+                        ngmyHomeDateTabLabel(entry.date).split(',').first,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.65)),
+                      ),
+                    ],
+                  ),
+                  if (cardNote.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      cardNote,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          if (cardNote.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              cardNote,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.3, color: Colors.white.withValues(alpha: 0.82)),
-            ),
-          ],
-          if (entry.pinnedAlarmText.trim().isNotEmpty || entry.pinnedNoteText.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              [
-                if (entry.pinnedAlarmText.trim().isNotEmpty) '⏰ ${entry.pinnedAlarmText.trim()}',
-                if (entry.pinnedNoteText.trim().isNotEmpty) '📝 ${entry.pinnedNoteText.trim()}',
-              ].join(' · '),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
-            ),
-          ],
-          const Spacer(),
         ],
       ),
     );
@@ -1594,6 +1683,30 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
     setState(() {
       _pinnedNote = picked['note'];
       _pinnedAlarm = picked['alarm'];
+    });
+  }
+
+  Future<void> _pickBusinessCard() async {
+    final cards = await loadNgmyBusinessCards(userEmail: widget.userEmail);
+    if (!mounted) return;
+    if (cards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No business cards yet — create one in Business Card Studio first.')),
+      );
+      return;
+    }
+    final picked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _NgmyPickBusinessCardSheet(cards: cards),
+    );
+    if (picked == null || !mounted) return;
+    final doc = NgmyBusinessCardDocument.fromJson(picked);
+    Navigator.pop(context, {
+      'kind': 'business_card',
+      'businessCardJson': jsonEncode(doc.toJson()),
+      'description': doc.fullName.trim().isEmpty ? 'Business card' : doc.fullName.trim(),
     });
   }
 
@@ -1714,6 +1827,18 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                         (_pinnedNote != null || _pinnedAlarm != null) ? 'Essentials pinned ✓' : 'Pin note / alarm from Essentials',
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ink,
+                        minimumSize: const Size(double.infinity, 48),
+                        side: BorderSide(color: muted.withValues(alpha: 0.35)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _pickBusinessCard,
+                      icon: const Icon(Icons.badge_rounded),
+                      label: const Text('Add business card to home', style: TextStyle(fontWeight: FontWeight.w800)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ink,
                         minimumSize: const Size(double.infinity, 48),
@@ -1900,6 +2025,67 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NgmyPickBusinessCardSheet extends StatelessWidget {
+  const _NgmyPickBusinessCardSheet({required this.cards});
+
+  final List<Map<String, dynamic>> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: double.infinity,
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              children: [
+                Text('Add business card', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
+                const SizedBox(height: 6),
+                Text('Pick a card from Business Card Studio', style: TextStyle(fontSize: 12, color: muted)),
+                const SizedBox(height: 16),
+                ...cards.map((raw) {
+                  final doc = NgmyBusinessCardDocument.fromJson(raw);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => Navigator.pop(context, raw),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            doc.fullName.trim().isEmpty ? 'Untitled card' : doc.fullName.trim(),
+                            style: TextStyle(fontWeight: FontWeight.w800, color: ink),
+                          ),
+                          const SizedBox(height: 8),
+                          NgmyBusinessCardPreview(document: doc, width: math.min(MediaQuery.sizeOf(context).width - 48, 320), interactive: false),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
         ),
