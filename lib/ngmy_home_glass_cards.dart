@@ -433,6 +433,7 @@ class NgmyFrostedCard extends StatelessWidget {
     this.footer,
     this.isFront = true,
     this.showDateTab = true,
+    this.welcomeName,
   });
 
   final Widget child;
@@ -443,11 +444,15 @@ class NgmyFrostedCard extends StatelessWidget {
   final Widget? footer;
   final bool isFront;
   final bool showDateTab;
+  /// When set on the front card: left side shows Hey welcome back + name; top-left shows current date.
+  final String? welcomeName;
 
   @override
   Widget build(BuildContext context) {
     final glassAlpha = isFront ? 0.22 : 0.10;
     final borderAlpha = isFront ? 0.42 : 0.18;
+    final showWelcome = isFront && welcomeName != null && welcomeName!.trim().isNotEmpty;
+    final todayLabel = ngmyHomeDateTabLabel(DateTime.now());
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
@@ -504,9 +509,61 @@ class NgmyFrostedCard extends StatelessWidget {
                         ),
                       ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 28, 48, 16),
+                      padding: EdgeInsets.fromLTRB(showWelcome ? 16 : 20, showWelcome ? 36 : 28, 48, showWelcome ? 52 : 16),
                       child: child,
                     ),
+                    // Top-left (opposite the X): current date.
+                    if (showWelcome)
+                      Positioned(
+                        left: 14,
+                        top: 10,
+                        right: 56,
+                        child: Text(
+                          todayLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                            color: Colors.white.withValues(alpha: 0.90),
+                          ),
+                        ),
+                      ),
+                    // Bottom-left: Hey welcome back + user name.
+                    if (showWelcome)
+                      Positioned(
+                        left: 14,
+                        bottom: showWelcome && footer != null ? 40 : 14,
+                        right: 56,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Hey welcome back',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white.withValues(alpha: 0.92),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              welcomeName!.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white.withValues(alpha: 0.98),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (isFront && (onDelete != null || onAdd != null))
                       Positioned(
                         right: 10,
@@ -583,9 +640,14 @@ class _GlassIconButton extends StatelessWidget {
 enum _NgmyHomeCardKind { spending, notes }
 
 class NgmyHomeGlassCardsPanel extends StatefulWidget {
-  const NgmyHomeGlassCardsPanel({super.key, required this.userEmail});
+  const NgmyHomeGlassCardsPanel({
+    super.key,
+    required this.userEmail,
+    this.displayName,
+  });
 
   final String userEmail;
+  final String? displayName;
 
   @override
   State<NgmyHomeGlassCardsPanel> createState() => _NgmyHomeGlassCardsPanelState();
@@ -705,10 +767,19 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     );
   }
 
+  String get _welcomeName {
+    final n = (widget.displayName ?? '').trim();
+    if (n.isNotEmpty) return n;
+    final email = widget.userEmail.trim();
+    if (email.contains('@')) return email.split('@').first;
+    return email.isEmpty ? 'friend' : email;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (!_loaded) return const SizedBox(height: 300);
+    final name = _welcomeName;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -721,6 +792,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
               isFront: true,
               showDateTab: true,
+              welcomeName: name,
               accent: [
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
@@ -729,7 +801,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               footer: _modePill(),
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 28),
+                  padding: const EdgeInsets.only(bottom: 28, top: 36),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -750,6 +822,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
               isFront: isFront,
               showDateTab: revealDates,
+              welcomeName: isFront ? name : null,
               onDelete: isFront ? () => _deleteSpending(entry.id) : null,
               onAdd: isFront ? _openAddSheet : null,
               footer: isFront ? _modePill() : null,
@@ -764,6 +837,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
               isFront: true,
               showDateTab: true,
+              welcomeName: name,
               accent: [
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
@@ -772,7 +846,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               footer: _modePill(),
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 28),
+                  padding: const EdgeInsets.only(bottom: 28, top: 36),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -793,6 +867,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
               isFront: isFront,
               showDateTab: revealDates,
+              welcomeName: isFront ? name : null,
               onDelete: isFront ? () => _deleteNote(note.id) : null,
               onAdd: isFront ? _openAddSheet : null,
               footer: isFront ? _modePill() : null,

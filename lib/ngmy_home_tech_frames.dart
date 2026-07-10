@@ -61,7 +61,8 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            const barH = 104.0;
+            // Slightly smaller than before so Neural/Signal keep more room.
+            const barH = 88.0;
             final bars = barH * 2 + gap * 2;
             final topH = (constraints.maxHeight - bars).clamp(200.0, 340.0);
             return Column(
@@ -310,37 +311,37 @@ class _TechFrameCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 72,
-          height: 72,
+          width: 58,
+          height: 58,
           child: CustomPaint(
-            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: false),
+            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: true),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _badge(),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 spec.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 1.1),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 1.1),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 spec.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 28),
+        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 24),
       ],
     );
   }

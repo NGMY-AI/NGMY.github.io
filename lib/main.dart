@@ -15651,7 +15651,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ],
                       // Room above cards so top peeks can show without pushing the deck down.
                       const SizedBox(height: 32),
-                      NgmyHomeGlassCardsPanel(userEmail: widget.user.email),
+                      NgmyHomeGlassCardsPanel(
+                        userEmail: widget.user.email,
+                        displayName: widget.user.username,
+                      ),
                       // Extra air so tech frames sit a bit lower under the cards.
                       const SizedBox(height: 26),
                       // Tech HUD — Neural/Signal get the big first-creation frames again.
