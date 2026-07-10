@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,7 +32,7 @@ class NgmySlidesStudioScreen extends StatefulWidget {
   State<NgmySlidesStudioScreen> createState() => _NgmySlidesStudioScreenState();
 }
 
-class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with TickerProviderStateMixin {
+class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> {
   List<NgmySlideDeck> _decks = [];
   NgmySlideDeck? _activeDeck;
   int _slideIndex = 0;
@@ -51,22 +50,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Ti
   String? _notesSlideId;
   bool _isDraft = false;
 
-  late final AnimationController _libPulse;
-  late final AnimationController _libScan;
-
   @override
   void initState() {
     super.initState();
-    _libPulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
-    _libScan = AnimationController(vsync: this, duration: const Duration(milliseconds: 5200))..repeat();
     unawaited(_loadDecks());
   }
 
   @override
   void dispose() {
     _autosaveTimer?.cancel();
-    _libPulse.dispose();
-    _libScan.dispose();
     for (final c in _textControllers.values) {
       c.dispose();
     }
@@ -1284,166 +1276,93 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Ti
   Widget _buildLibrary() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AnimatedBuilder(
-        animation: Listenable.merge([_libPulse, _libScan]),
-        builder: (context, _) {
-          final pulse = Curves.easeInOut.transform(_libPulse.value);
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? const [Color(0xFF070B16), Color(0xFF0F172A), Color(0xFF111827)]
-                        : const [Color(0xFFF0F9FF), Color(0xFFEEF2FF), Color(0xFFF8FAFC)],
+      backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(18, 12, 18, widget.bottomScrollPadding),
+          children: [
+            _header(
+              title: 'NGMY SLIDES',
+              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
+              icon: Icons.auto_stories_rounded,
+              accent: const Color(0xFF2563EB),
+              onIconTap: () => showNgmySlidesTransferHub(
+                context,
+                ownerEmail: widget.userEmail,
+                decks: _decks,
+                onImported: (imported) async {
+                  setState(() {
+                    for (final d in imported) {
+                      _decks.insert(0, d);
+                    }
+                  });
+                  await _persistDecks();
+                },
+              ),
+              onTrailingTap: _launchMarriageAgreement,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _actionCard(
+                    icon: Icons.add_rounded,
+                    label: 'Blank Presentation',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => _createDeck(),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _actionCard(
+                    icon: Icons.school_rounded,
+                    label: 'Class Template',
+                    color: const Color(0xFF059669),
+                    onTap: () => _createDeck(sample: true, name: 'Class Presentation'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'YOUR PRESENTATIONS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+                color: isDark ? Colors.white54 : const Color(0xFF64748B),
               ),
-              Positioned(
-                top: -40,
-                right: -30,
-                child: _slidesOrb(120, const [Color(0xFF67E8F9), Color(0xFF818CF8)], 0.18 + pulse * 0.08),
-              ),
-              Positioned(
-                top: 180,
-                left: -50,
-                child: _slidesOrb(150, const [Color(0xFF34D399), Color(0xFF22D3EE)], 0.12 + pulse * 0.06),
-              ),
-              CustomPaint(
-                painter: _SlidesHudPainter(scan: _libScan.value, pulse: pulse, isDark: isDark),
-                child: const SizedBox.expand(),
-              ),
-              SafeArea(
-                bottom: false,
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(18, 12, 18, widget.bottomScrollPadding),
+            ),
+            const SizedBox(height: 12),
+            if (_decks.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF111827) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
                   children: [
-                    _header(
-                      title: 'NGMY SLIDES',
-                      subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
-                      icon: Icons.auto_stories_rounded,
-                      accent: const Color(0xFF2563EB),
-                      onIconTap: () => showNgmySlidesTransferHub(
-                        context,
-                        ownerEmail: widget.userEmail,
-                        decks: _decks,
-                        onImported: (imported) async {
-                          setState(() {
-                            for (final d in imported) {
-                              _decks.insert(0, d);
-                            }
-                          });
-                          await _persistDecks();
-                        },
-                      ),
-                      onTrailingTap: _launchMarriageAgreement,
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _actionCard(
-                            icon: Icons.add_rounded,
-                            label: 'Blank Presentation',
-                            color: const Color(0xFF2563EB),
-                            onTap: () => _createDeck(),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _actionCard(
-                            icon: Icons.school_rounded,
-                            label: 'Class Template',
-                            color: const Color(0xFF059669),
-                            onTap: () => _createDeck(sample: true, name: 'Class Presentation'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'YOUR PRESENTATIONS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                      ),
-                    ),
+                    Icon(Icons.view_carousel_outlined, size: 48, color: isDark ? Colors.white24 : Colors.black26),
                     const SizedBox(height: 12),
-                    if (_decks.isEmpty)
-                      _slidesGlassPanel(
-                        isDark: isDark,
-                        child: Column(
-                          children: [
-                            Icon(Icons.view_carousel_outlined, size: 48, color: isDark ? Colors.white38 : Colors.black38),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No presentations yet',
-                              style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Open Blank or Class Template to start — nothing is saved until you edit.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ..._decks.map((d) => _deckTile(d, isDark)),
+                    Text(
+                      'No presentations yet',
+                      style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Open Blank or Class Template to start — nothing is saved until you edit.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _slidesOrb(double size, List<Color> colors, double alpha) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [
-            colors.first.withValues(alpha: alpha),
-            colors.last.withValues(alpha: alpha * 0.35),
-            colors.last.withValues(alpha: 0),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _slidesGlassPanel({required bool isDark, required Widget child}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? [Colors.white.withValues(alpha: 0.10), const Color(0xFF111827).withValues(alpha: 0.55)]
-                  : [Colors.white.withValues(alpha: 0.72), Colors.white.withValues(alpha: 0.42)],
-            ),
-            border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: isDark ? 0.35 : 0.28)),
-          ),
-          child: child,
+              )
+            else
+              ..._decks.map((d) => _deckTile(d, isDark)),
+          ],
         ),
       ),
     );
@@ -1615,62 +1534,58 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Ti
         : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ClipRRect(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _openDeck(deck),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [Colors.white.withValues(alpha: 0.10), const Color(0xFF111827).withValues(alpha: 0.55)]
-                        : [Colors.white.withValues(alpha: 0.78), Colors.white.withValues(alpha: 0.48)],
-                  ),
-                  border: Border.all(color: accent.first.withValues(alpha: isDark ? 0.40 : 0.28)),
-                  boxShadow: [
-                    BoxShadow(color: accent.first.withValues(alpha: 0.12), blurRadius: 14, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  leading: Container(
-                    width: 52,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: LinearGradient(colors: accent),
-                      boxShadow: [BoxShadow(color: accent.first.withValues(alpha: 0.35), blurRadius: 10)],
-                    ),
-                    child: Icon(
-                      deck.isMarriageAgreement ? Icons.description_rounded : Icons.slideshow_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                  title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                  subtitle: Text(
-                    deck.isMarriageAgreement
-                        ? 'Marriage agreement • ${deck.marriageState ?? 'U.S.'}'
-                        : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
-                    tooltip: 'Project options',
-                    onPressed: () => _showDeckActionsSheet(deck, isDark),
-                  ),
-                ),
-              ),
-            ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  Colors.white.withValues(alpha: 0.10),
+                  const Color(0xFF111827),
+                  const Color(0xFF0F172A),
+                ]
+              : [
+                  Colors.white,
+                  const Color(0xFFF0F9FF),
+                  Colors.white,
+                ],
+        ),
+        border: Border.all(color: accent.first.withValues(alpha: isDark ? 0.42 : 0.30), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: accent.first.withValues(alpha: 0.16), blurRadius: 16, offset: const Offset(0, 6)),
+          if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        leading: Container(
+          width: 52,
+          height: 36,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            gradient: LinearGradient(colors: accent),
+            boxShadow: [BoxShadow(color: accent.first.withValues(alpha: 0.35), blurRadius: 10)],
+          ),
+          child: Icon(
+            deck.isMarriageAgreement ? Icons.description_rounded : Icons.slideshow_rounded,
+            color: Colors.white,
+            size: 22,
           ),
         ),
+        title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+        subtitle: Text(
+          deck.isMarriageAgreement
+              ? 'Marriage agreement • ${deck.marriageState ?? 'U.S.'}'
+              : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
+          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+        ),
+        trailing: IconButton(
+          icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
+          tooltip: 'Project options',
+          onPressed: () => _showDeckActionsSheet(deck, isDark),
+        ),
+        onTap: () => _openDeck(deck),
       ),
     );
   }
@@ -2787,33 +2702,46 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Ti
     required Color color,
     required VoidCallback onTap,
   }) {
-    final pulse = Curves.easeInOut.transform(_libPulse.value);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [color, Color.lerp(color, Colors.white, 0.12)!, color.withValues(alpha: 0.82)],
+              colors: [
+                color,
+                Color.lerp(color, const Color(0xFF67E8F9), 0.28)!,
+                color.withValues(alpha: 0.88),
+              ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28 + pulse * 0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2),
             boxShadow: [
-              BoxShadow(color: color.withValues(alpha: 0.35 + pulse * 0.12), blurRadius: 16, offset: const Offset(0, 6)),
+              BoxShadow(color: color.withValues(alpha: 0.40), blurRadius: 18, offset: const Offset(0, 8)),
+              BoxShadow(color: const Color(0xFF67E8F9).withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon, color: Colors.white, size: 32),
-              const SizedBox(height: 10),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                ),
+                child: Icon(icon, color: Colors.white, size: 26),
+              ),
+              const SizedBox(height: 12),
               Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
             ],
           ),
@@ -3131,64 +3059,4 @@ class _SlideWipeClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
-}
-
-class _SlidesHudPainter extends CustomPainter {
-  _SlidesHudPainter({required this.scan, required this.pulse, required this.isDark});
-
-  final double scan;
-  final double pulse;
-  final bool isDark;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final grid = Paint()
-      ..color = (isDark ? Colors.white : const Color(0xFF0F172A)).withValues(alpha: isDark ? 0.035 : 0.03)
-      ..strokeWidth = 1;
-    for (var x = 0.0; x < size.width; x += 36) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
-    }
-    for (var y = 0.0; y < size.height; y += 36) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
-    }
-
-    final sy = size.height * scan;
-    final scanPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFF67E8F9).withValues(alpha: 0),
-          const Color(0xFF67E8F9).withValues(alpha: 0.08 + pulse * 0.05),
-          const Color(0xFF67E8F9).withValues(alpha: 0),
-        ],
-      ).createShader(Rect.fromLTWH(0, sy - 28, size.width, 56));
-    canvas.drawRect(Rect.fromLTWH(0, sy - 28, size.width, 56), scanPaint);
-
-    final bracket = Paint()
-      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.22 + pulse * 0.18)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    const c = 16.0;
-    const inset = 14.0;
-    void corner(double x, double y, double dx, double dy) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(x + dx * c, y)
-          ..lineTo(x, y)
-          ..lineTo(x, y + dy * c),
-        bracket,
-      );
-    }
-
-    corner(inset, inset, 1, 1);
-    corner(size.width - inset, inset, -1, 1);
-    corner(inset, size.height - inset, 1, -1);
-    corner(size.width - inset, size.height - inset, -1, -1);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SlidesHudPainter old) =>
-      old.scan != scan || old.pulse != pulse || old.isDark != isDark;
 }

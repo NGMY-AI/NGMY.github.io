@@ -156,7 +156,6 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
                     child: CustomPaint(
                       painter: _NavHudPainter(
                         isDark: isDark,
-                        spin: _spin.value,
                         scan: scan,
                         pulse: pulse,
                       ),
@@ -202,70 +201,50 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
 class _NavHudPainter extends CustomPainter {
   _NavHudPainter({
     required this.isDark,
-    required this.spin,
     required this.scan,
     required this.pulse,
   });
 
   final bool isDark;
-  final double spin;
   final double scan;
   final double pulse;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Corner brackets
-    final bracket = Paint()
-      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.35 + pulse * 0.25)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    const c = 10.0;
-    const inset = 7.0;
-    void corner(double x, double y, double dx, double dy) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(x + dx * c, y)
-          ..lineTo(x, y)
-          ..lineTo(x, y + dy * c),
-        bracket,
-      );
-    }
-
-    corner(inset, inset, 1, 1);
-    corner(size.width - inset, inset, -1, 1);
-    corner(inset, size.height - inset, 1, -1);
-    corner(size.width - inset, size.height - inset, -1, -1);
-
-    // Horizontal scan line
+    // Soft glowing scan band only — no corner brackets.
     final sy = size.height * scan;
+    final bandH = size.height * 0.55;
     final scanPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
           const Color(0xFF67E8F9).withValues(alpha: 0.0),
-          const Color(0xFF67E8F9).withValues(alpha: isDark ? 0.16 : 0.10),
+          const Color(0xFF67E8F9).withValues(alpha: isDark ? 0.34 + pulse * 0.16 : 0.26 + pulse * 0.14),
+          const Color(0xFFA78BFA).withValues(alpha: isDark ? 0.28 + pulse * 0.12 : 0.20 + pulse * 0.10),
           const Color(0xFF67E8F9).withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromLTWH(0, sy - 10, size.width, 20));
-    canvas.drawRect(Rect.fromLTWH(8, sy - 10, size.width - 16, 20), scanPaint);
+        stops: const [0.0, 0.35, 0.65, 1.0],
+      ).createShader(Rect.fromLTWH(0, sy - bandH / 2, size.width, bandH));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(6, sy - bandH / 2, size.width - 12, bandH),
+        const Radius.circular(20),
+      ),
+      scanPaint,
+    );
 
-    // Tiny orbit ticks on the right
-    final cx = size.width - 16;
-    final cy = size.height / 2;
-    final tick = Paint()
-      ..color = const Color(0xFFA78BFA).withValues(alpha: 0.55)
-      ..strokeWidth = 1.2;
-    for (var i = 0; i < 5; i++) {
-      final a = spin * math.pi * 2 + i * (math.pi * 2 / 5);
-      canvas.drawCircle(Offset(cx + math.cos(a) * 5, cy + math.sin(a) * 5), 1.1, tick);
-    }
+    // Thin bright core line so the motion reads clearly.
+    final core = Paint()
+      ..color = Colors.white.withValues(alpha: isDark ? 0.45 + pulse * 0.2 : 0.55 + pulse * 0.2)
+      ..strokeWidth = 1.4
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+    canvas.drawLine(Offset(14, sy), Offset(size.width - 14, sy), core);
   }
 
   @override
   bool shouldRepaint(covariant _NavHudPainter old) =>
-      old.spin != spin || old.scan != scan || old.pulse != pulse || old.isDark != isDark;
+      old.scan != scan || old.pulse != pulse || old.isDark != isDark;
 }
 
 /// Sliding glass selection orb used behind the active bottom-nav tab.
