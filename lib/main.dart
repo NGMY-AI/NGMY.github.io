@@ -114,6 +114,7 @@ import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
 import 'ngmy_studio_hub.dart';
+import 'ngmy_home_glass_cards.dart';
 import 'ngmy_slides_studio.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -15586,6 +15587,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 12),
                         _buildFreeTrialGlassBanner(isLight),
                       ],
+                      const SizedBox(height: 16),
+                      NgmyHomeGlassCardsPanel(userEmail: widget.user.email),
                       const SizedBox(height: 16),
                       Expanded(child: _buildAiHeroCard(isLight)),
                     ],
