@@ -15081,22 +15081,51 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBottomNavBar() {
+    const orb = NgmyBottomNavMetrics.selectionOrb;
+    const barH = NgmyBottomNavMetrics.barHeight;
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
       child: SafeArea(
         top: false,
         child: NgmySculptedBottomNavFrame(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _nav(0, Icons.home_rounded),
-              _navToolHub(),
-              _nav(2, Icons.auto_stories_rounded),
-              _navC(3),
-              _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
-              _navStudio(),
-              _nav(6, Icons.person_rounded),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final tabW = constraints.maxWidth / 7;
+              final ballLeft = _idx * tabW + (tabW - orb) / 2;
+              final ballTop = (barH - orb) / 2;
+              final accent = switch (_idx) {
+                3 => const Color(0xFFBB86FC),
+                4 => kNgmyAdvisorsHubAccent,
+                5 => const Color(0xFF8B5CF6),
+                _ => const Color(0xFF67E8F9),
+              };
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    left: ballLeft,
+                    top: ballTop,
+                    width: orb,
+                    height: orb,
+                    child: NgmyNavSelectionOrb(size: orb, accent: accent),
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _nav(0, Icons.home_rounded),
+                      _navToolHub(),
+                      _nav(2, Icons.auto_stories_rounded),
+                      _navC(3),
+                      _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
+                      _navStudio(),
+                      _nav(6, Icons.person_rounded),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -15112,6 +15141,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _visitedTabs.add(5);
             }),
             customBorder: const CircleBorder(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(child: NgmyStudioHubNavIcon(dimmed: _idx != 5, size: 30)),
@@ -15132,6 +15163,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               unawaited(widget.onRefreshLegalAndPlans?.call());
             },
             customBorder: const CircleBorder(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(child: NgmyToolHubNavIcon(dimmed: _idx != 1, size: 30)),
@@ -15158,13 +15191,22 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
             },
             customBorder: const CircleBorder(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(
-                child: Icon(
-                  icon,
-                  color: _idx == i ? (selectedColor ?? Theme.of(context).colorScheme.primary) : Colors.grey,
-                  size: NgmyBottomNavMetrics.sideIconSize,
+                child: AnimatedScale(
+                  scale: _idx == i ? 1.12 : 1.0,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    icon,
+                    color: _idx == i
+                        ? (selectedColor ?? const Color(0xFF67E8F9))
+                        : (Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.black45),
+                    size: NgmyBottomNavMetrics.sideIconSize,
+                  ),
                 ),
               ),
             ),
@@ -15181,10 +15223,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _visitedTabs.add(i);
             }),
             customBorder: const CircleBorder(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: SizedBox(
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 240),
                   width: NgmyBottomNavMetrics.centerButtonSize,
                   height: NgmyBottomNavMetrics.centerButtonSize,
                   decoration: BoxDecoration(
@@ -15192,12 +15237,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF6200EE).withOpacity(0.4),
-                        blurRadius: 12,
+                        color: const Color(0xFF6200EE).withValues(alpha: _idx == i ? 0.55 : 0.35),
+                        blurRadius: _idx == i ? 16 : 12,
                         offset: const Offset(0, 4),
                       ),
                     ],
-                    border: Border.all(color: _idx == i ? Colors.white : Colors.transparent, width: 2),
+                    border: Border.all(color: _idx == i ? Colors.white : Colors.white24, width: _idx == i ? 2.2 : 1.2),
                   ),
                   child: Center(
                     child: ClipRRect(
