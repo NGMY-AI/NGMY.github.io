@@ -57,71 +57,67 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
-        // Fit exactly into available space (screenshot proportions) — never
-        // overflow/clip, so there are no hard straight cut lines around the frames.
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            const gap = 10.0;
-            const barH = 96.0;
-            final bars = barH * 2 + gap * 2;
-            final topH = math.max(0.0, constraints.maxHeight - bars);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: topH,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _TechFrameCard(
-                          spec: _TechFrameSpec.neural,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          onTap: () => _openExperience(_TechFrameSpec.neural),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _TechFrameCard(
-                          spec: _TechFrameSpec.signal,
-                          pulse: pulse,
-                          scan: (scan + 0.35) % 1.0,
-                          orbit: (orbit + 0.22) % 1.0,
-                          onTap: () => _openExperience(_TechFrameSpec.signal),
-                        ),
-                      ),
-                    ],
+        // Slightly taller Neural / Signal (not 2x) — fixed height so growth goes
+        // DOWN and pushes Core / Vault down. Cards above stay untouched.
+        const gap = 10.0;
+        const topH = 300.0;
+        const barH = 96.0;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: topH,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _TechFrameCard(
+                      spec: _TechFrameSpec.neural,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      onTap: () => _openExperience(_TechFrameSpec.neural),
+                    ),
                   ),
-                ),
-                const SizedBox(height: gap),
-                SizedBox(
-                  height: barH,
-                  child: _TechFrameCard(
-                    spec: _TechFrameSpec.core,
-                    pulse: pulse,
-                    scan: (scan + 0.62) % 1.0,
-                    orbit: (orbit + 0.48) % 1.0,
-                    wide: true,
-                    onTap: () => _openExperience(_TechFrameSpec.core),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _TechFrameCard(
+                      spec: _TechFrameSpec.signal,
+                      pulse: pulse,
+                      scan: (scan + 0.35) % 1.0,
+                      orbit: (orbit + 0.22) % 1.0,
+                      onTap: () => _openExperience(_TechFrameSpec.signal),
+                    ),
                   ),
-                ),
-                const SizedBox(height: gap),
-                SizedBox(
-                  height: barH,
-                  child: _TechFrameCard(
-                    spec: _TechFrameSpec.vault,
-                    pulse: pulse,
-                    scan: (scan + 0.18) % 1.0,
-                    orbit: (orbit + 0.71) % 1.0,
-                    wide: true,
-                    onTap: () => _openExperience(_TechFrameSpec.vault),
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              ),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
+              height: barH,
+              child: _TechFrameCard(
+                spec: _TechFrameSpec.core,
+                pulse: pulse,
+                scan: (scan + 0.62) % 1.0,
+                orbit: (orbit + 0.48) % 1.0,
+                wide: true,
+                onTap: () => _openExperience(_TechFrameSpec.core),
+              ),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
+              height: barH,
+              child: _TechFrameCard(
+                spec: _TechFrameSpec.vault,
+                pulse: pulse,
+                scan: (scan + 0.18) % 1.0,
+                orbit: (orbit + 0.71) % 1.0,
+                wide: true,
+                onTap: () => _openExperience(_TechFrameSpec.vault),
+              ),
+            ),
+          ],
         );
       },
     );
