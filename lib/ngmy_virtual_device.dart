@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_bottom_nav_frame.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_virtual_device_fleet_playback.dart';
 import 'ngmy_virtual_device_media.dart';
@@ -666,52 +667,70 @@ class _NgmyVirtualDeviceFleetScreenState extends State<NgmyVirtualDeviceFleetScr
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 6, 15, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: NgmySculptedBottomNavFrame(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                _loading ? 'Virtual Devices' : 'Virtual Devices (${_fleet.length})',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  letterSpacing: 0.2,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _openLinkSearch,
-                              customBorder: const CircleBorder(),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Icon(
-                                  Icons.search_rounded,
-                                  size: NgmyBottomNavMetrics.sideIconSize,
-                                  color: kNgmyStudioHubAccent,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+              child: NgmyHudMotion(
+                builder: (context, pulse, scan, orbit) {
+                  const colors = [kNgmyStudioHubAccent, Color(0xFF0EA5E9)];
+                  return Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.white70),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                    ),
-                  ),
-                ],
+                      Expanded(
+                        child: NgmyToolkitAliveSection(
+                          colors: colors,
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Row(
+                            children: [
+                              NgmyHudMiniOrb(
+                                colors: colors,
+                                pulse: pulse,
+                                orbit: orbit,
+                                size: 36,
+                                icon: Icons.smartphone_rounded,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _loading ? 'Virtual Devices' : 'Virtual Devices (${_fleet.length})',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 15,
+                                    letterSpacing: 0.2,
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(color: colors.first.withValues(alpha: 0.45 + pulse * 0.2), blurRadius: 10),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _openLinkSearch,
+                                  customBorder: const CircleBorder(),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Icon(
+                                      Icons.search_rounded,
+                                      size: NgmyBottomNavMetrics.sideIconSize,
+                                      color: Color.lerp(colors.first, colors.last, pulse),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             Expanded(

@@ -9,6 +9,7 @@ import 'generated/ngmy_riddles.g.dart';
 import 'ngmy_fun_games_cache.dart';
 import 'ngmy_fun_games_limits.dart';
 import 'ngmy_fun_games_popups.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_love_content.dart';
 import 'ngmy_love_popups.dart';
 
@@ -207,83 +208,70 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
       backgroundColor: Colors.transparent,
-      child: Container(
-        width: dialogW,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
-        decoration: BoxDecoration(
-          color: _bg,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
-          boxShadow: [
-            BoxShadow(color: _pink.withOpacity(0.12), blurRadius: 32, spreadRadius: 2),
-            BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 24, offset: const Offset(0, 12)),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _header(),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                child: Column(
-                  children: [
-                    _categoryRow(),
-                    const SizedBox(height: 14),
-                    _sectionBanner(),
-                    const SizedBox(height: 12),
-                    if (_category == 0) ...[
-                      _loveSubTabs(),
-                      const SizedBox(height: 16),
-                      _loveContent(),
-                    ] else if (_category == 1)
-                      _confidenceContent()
-                    else if (_category == 2)
-                      _brainContent()
-                    else
-                      _fortuneContent(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _header() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_pink, _pinkDeep]),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: _pink.withOpacity(0.45), blurRadius: 10)],
-            ),
-            child: const Center(
-              child: Text('✨', style: TextStyle(fontSize: 20)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
+      child: NgmyHudMotion(
+        builder: (context, pulse, scan, orbit) {
+          const colors = [_pink, _pinkDeep];
+          return NgmyToolkitAlivePanel(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            width: dialogW,
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Play Zone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                Text('Entertainment Hub', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
+                NgmyToolkitAliveHeader(
+                  title: 'Play Zone',
+                  subtitle: 'Entertainment Hub · live',
+                  colors: colors,
+                  pulse: pulse,
+                  orbit: orbit,
+                  icon: Icons.interests_rounded,
+                  onClose: () => Navigator.of(context).pop(),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                    child: Column(
+                      children: [
+                        NgmyToolkitAliveSection(
+                          colors: colors,
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          phase: 0.1,
+                          padding: const EdgeInsets.all(8),
+                          child: _categoryRow(),
+                        ),
+                        const SizedBox(height: 14),
+                        NgmyToolkitAliveSection(
+                          colors: const [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          phase: 0.24,
+                          child: _sectionBanner(),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_category == 0) ...[
+                          _loveSubTabs(),
+                          const SizedBox(height: 16),
+                          _loveContent(),
+                        ] else if (_category == 1)
+                          _confidenceContent()
+                        else if (_category == 2)
+                          _brainContent()
+                        else
+                          _fortuneContent(),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_local_tts.dart';
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
@@ -353,38 +354,43 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              IconButton(
-                                onPressed: () => Navigator.pop(context),
-                                icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-                              ),
-                              const Spacer(),
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white,
-                                  border: Border.all(color: const Color(0xFF4AAF6E), width: 2.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF4AAF6E).withValues(alpha: 0.25),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                          NgmyHudMotion(
+                            builder: (context, pulse, scan, orbit) {
+                              const colors = [Color(0xFF4AAF6E), Color(0xFF14B8A6)];
+                              return NgmyToolkitAliveSection(
+                                colors: colors,
+                                pulse: pulse,
+                                scan: scan,
+                                orbit: orbit,
+                                padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.white70),
+                                    ),
+                                    Expanded(
+                                      child: NgmyToolkitAliveHeader(
+                                        title: 'Kiswahili School',
+                                        subtitle: 'Jifunze · live path',
+                                        colors: colors,
+                                        pulse: pulse,
+                                        orbit: orbit,
+                                        icon: Icons.translate_rounded,
+                                        dense: true,
+                                      ),
+                                    ),
+                                    NgmyHudMiniOrb(
+                                      colors: colors,
+                                      pulse: pulse,
+                                      orbit: orbit,
+                                      size: 40,
+                                      icon: Icons.school_rounded,
                                     ),
                                   ],
                                 ),
-                                child: ClipOval(
-                                  child: Image.asset(
-                                    'assets/images/ngmy_logo.png',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(Icons.school_rounded, color: Color(0xFF2D7A4A), size: 22),
-                                  ),
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 8),
                           Container(

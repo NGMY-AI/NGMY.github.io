@@ -301,3 +301,268 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant NgmyHudMiniOrbPainter old) => old.pulse != pulse || old.orbit != orbit;
 }
+
+/// Animated header used inside Creator Toolkit tools (dialogs + pages).
+class NgmyToolkitAliveHeader extends StatelessWidget {
+  const NgmyToolkitAliveHeader({
+    super.key,
+    required this.title,
+    required this.colors,
+    required this.pulse,
+    required this.orbit,
+    this.subtitle,
+    this.icon,
+    this.onClose,
+    this.trailing,
+    this.dense = false,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<Color> colors;
+  final double pulse;
+  final double orbit;
+  final IconData? icon;
+  final VoidCallback? onClose;
+  final Widget? trailing;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(dense ? 12 : 16, dense ? 10 : 14, 8, dense ? 6 : 8),
+      child: Row(
+        children: [
+          NgmyHudMiniOrb(
+            colors: colors,
+            pulse: pulse,
+            orbit: orbit,
+            size: dense ? 40 : 46,
+            icon: icon,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: dense ? 16 : 18,
+                    letterSpacing: 0.4,
+                    shadows: [
+                      Shadow(color: colors.first.withValues(alpha: 0.45 + pulse * 0.25), blurRadius: 12),
+                    ],
+                  ),
+                ),
+                if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.58 + pulse * 0.08),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) trailing!,
+          if (onClose != null)
+            IconButton(
+              onPressed: onClose,
+              icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.55), size: 22),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Glowing animated panel for toolkit dialogs.
+class NgmyToolkitAlivePanel extends StatelessWidget {
+  const NgmyToolkitAlivePanel({
+    super.key,
+    required this.colors,
+    required this.pulse,
+    required this.scan,
+    required this.orbit,
+    required this.child,
+    this.width,
+    this.maxHeight,
+    this.borderRadius = 22,
+  });
+
+  final List<Color> colors;
+  final double pulse;
+  final double scan;
+  final double orbit;
+  final Widget child;
+  final double? width;
+  final double? maxHeight;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withValues(alpha: 0.16 + pulse * 0.14),
+            blurRadius: 28 + pulse * 10,
+            spreadRadius: 1,
+          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
+      ),
+      child: NgmyHudTechFrame(
+        colors: colors,
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        borderRadius: borderRadius,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Soft animated section card for content blocks inside toolkit tools.
+class NgmyToolkitAliveSection extends StatelessWidget {
+  const NgmyToolkitAliveSection({
+    super.key,
+    required this.colors,
+    required this.pulse,
+    required this.scan,
+    required this.orbit,
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+    this.phase = 0,
+    this.onTap,
+  });
+
+  final List<Color> colors;
+  final double pulse;
+  final double scan;
+  final double orbit;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double phase;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return NgmyHudTechFrame(
+      colors: colors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
+      borderRadius: 16,
+      padding: padding,
+      onTap: onTap,
+      child: child,
+    );
+  }
+}
+
+/// Full-page alive backdrop + optional top header strip.
+class NgmyToolkitAlivePageChrome extends StatelessWidget {
+  const NgmyToolkitAlivePageChrome({
+    super.key,
+    required this.colors,
+    required this.pulse,
+    required this.scan,
+    required this.orbit,
+    required this.child,
+    this.header,
+  });
+
+  final List<Color> colors;
+  final double pulse;
+  final double scan;
+  final double orbit;
+  final Widget child;
+  final Widget? header;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF0B1220),
+                Color.lerp(const Color(0xFF111827), colors.first.withValues(alpha: 0.22), pulse)!,
+                Color.lerp(const Color(0xFF0B1020), colors.last.withValues(alpha: 0.18), 1 - pulse)!,
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          top: -40,
+          right: -30,
+          child: IgnorePointer(
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.first.withValues(alpha: 0.22 + pulse * 0.12),
+                    colors.first.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 80,
+          left: -50,
+          child: IgnorePointer(
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    colors.last.withValues(alpha: 0.16 + (1 - pulse) * 0.1),
+                    colors.last.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Column(
+          children: [
+            if (header != null)
+              NgmyHudTechFrame(
+                colors: colors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                borderRadius: 0,
+                child: SafeArea(bottom: false, child: header!),
+              ),
+            Expanded(child: child),
+          ],
+        ),
+      ],
+    );
+  }
+}

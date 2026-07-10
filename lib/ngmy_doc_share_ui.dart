@@ -24,6 +24,7 @@ import 'ngmy_doc_share_my_code_ui.dart';
 import 'ngmy_doc_share_qr_stash.dart';
 import 'ngmy_doc_share_short_code.dart';
 import 'ngmy_doc_share_sync.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
@@ -1349,7 +1350,31 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         backgroundColor: c.bg,
         foregroundColor: c.fg,
         elevation: 0,
-        title: Text('Doc Share', style: TextStyle(fontWeight: FontWeight.w900, color: c.fg)),
+        title: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            const colors = [Color(0xFF0D9488), Color(0xFF7C3AED)];
+            return Row(
+              children: [
+                NgmyHudMiniOrb(
+                  colors: colors,
+                  pulse: pulse,
+                  orbit: orbit,
+                  size: 32,
+                  icon: Icons.folder_shared_rounded,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Doc Share',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: c.fg,
+                    shadows: [Shadow(color: colors.first.withValues(alpha: 0.4 + pulse * 0.2), blurRadius: 10)],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
         actions: [
           if (widget.orgOwnerMode)

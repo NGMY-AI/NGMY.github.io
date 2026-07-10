@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_storage.dart';
 
@@ -322,133 +323,126 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
       backgroundColor: Colors.transparent,
-      child: Container(
-        width: dialogW,
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
-        decoration: BoxDecoration(
-          color: _bg,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
-          boxShadow: [
-            BoxShadow(color: _accent.withOpacity(0.12), blurRadius: 32, spreadRadius: 2),
-            BoxShadow(color: Colors.black.withOpacity(0.55), blurRadius: 24, offset: const Offset(0, 12)),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _header(),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _typeRow(),
-                    const SizedBox(height: 14),
-                    _typeBanner(),
-                    const SizedBox(height: 14),
-                    if (onSavedTab)
-                      _savedList()
-                    else ...[
-                      _formFields(),
-                      if (hasQr) ...[
-                        const SizedBox(height: 14),
-                        _field(
-                          controller: _labelC,
-                          label: 'Label this QR code *',
-                          hint: 'e.g. Home Wi‑Fi, My website, Shop link',
-                          icon: Icons.label_outline_rounded,
-                        ),
-                      ],
-                      const SizedBox(height: 18),
-                      _qrPreview(payload, hasQr),
-                      if (hasQr) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _busy ? null : _downloadCurrent,
-                                icon: _busy
-                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                    : const Icon(Icons.download_rounded, size: 18),
-                                label: const Text('Download'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: _accent,
-                                  side: BorderSide(color: _accent.withOpacity(0.55)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _busy ? null : _saveCurrent,
-                                icon: const Icon(Icons.bookmark_rounded, size: 18),
-                                label: const Text('Save'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _accent,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Saved locally on this device only · never uploaded',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _header() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_accent, _accentDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: _accent.withOpacity(0.45), blurRadius: 10)],
-            ),
-            child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+      child: NgmyHudMotion(
+        builder: (context, pulse, scan, orbit) {
+          const colors = [_accent, _accentDeep];
+          return NgmyToolkitAlivePanel(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            width: dialogW,
+            maxHeight: MediaQuery.of(context).size.height * 0.92,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('QR Code Generator', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                Text(
-                  widget.userEmail != null && widget.userEmail!.isNotEmpty
+                NgmyToolkitAliveHeader(
+                  title: 'QR Code Generator',
+                  subtitle: widget.userEmail != null && widget.userEmail!.isNotEmpty
                       ? 'Saved sync QRs · Local codes'
                       : 'Local device · Download · Save',
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+                  colors: colors,
+                  pulse: pulse,
+                  orbit: orbit,
+                  icon: Icons.qr_code_2_rounded,
+                  onClose: () => Navigator.of(context).pop(),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        NgmyToolkitAliveSection(
+                          colors: colors,
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          phase: 0.08,
+                          padding: const EdgeInsets.all(8),
+                          child: _typeRow(),
+                        ),
+                        const SizedBox(height: 14),
+                        NgmyToolkitAliveSection(
+                          colors: const [Color(0xFF22D3EE), Color(0xFF6366F1)],
+                          pulse: pulse,
+                          scan: scan,
+                          orbit: orbit,
+                          phase: 0.2,
+                          child: _typeBanner(),
+                        ),
+                        const SizedBox(height: 14),
+                        if (onSavedTab)
+                          _savedList()
+                        else ...[
+                          _formFields(),
+                          if (hasQr) ...[
+                            const SizedBox(height: 14),
+                            _field(
+                              controller: _labelC,
+                              label: 'Label this QR code *',
+                              hint: 'e.g. Home Wi‑Fi, My website, Shop link',
+                              icon: Icons.label_outline_rounded,
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          NgmyToolkitAliveSection(
+                            colors: colors,
+                            pulse: pulse,
+                            scan: scan,
+                            orbit: orbit,
+                            phase: 0.35,
+                            child: _qrPreview(payload, hasQr),
+                          ),
+                          if (hasQr) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _busy ? null : _downloadCurrent,
+                                    icon: _busy
+                                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.download_rounded, size: 18),
+                                    label: const Text('Download'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _accent,
+                                      side: BorderSide(color: _accent.withOpacity(0.55)),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _busy ? null : _saveCurrent,
+                                    icon: const Icon(Icons.bookmark_rounded, size: 18),
+                                    label: const Text('Save'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _accent,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Saved locally on this device only · never uploaded',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_video_studio_picker.dart';
 
@@ -154,124 +155,183 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0F1A) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('AI Outfit Studio', style: TextStyle(fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-          children: [
-            _header(isDark),
-            const SizedBox(height: 18),
-            _pickCard(
-              isDark: isDark,
-              title: '1 · Your photo',
-              subtitle: 'Full-body or upper-body photo of the person',
-              icon: Icons.person_rounded,
-              pick: _personPick,
-              onTap: _busy ? null : _pickPerson,
+    const colors = [_accent, _accent2];
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF0B0F1A),
+          body: NgmyToolkitAlivePageChrome(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            header: NgmyToolkitAliveHeader(
+              title: 'AI Outfit Studio',
+              subtitle: 'Try-on · style · export',
+              colors: colors,
+              pulse: pulse,
+              orbit: orbit,
+              icon: Icons.style_rounded,
+              onClose: () => Navigator.of(context).pop(),
             ),
-            const SizedBox(height: 12),
-            _pickCard(
-              isDark: isDark,
-              title: '2 · Outfit / dress',
-              subtitle: 'Photo of the clothes they should wear',
-              icon: Icons.checkroom_rounded,
-              pick: _outfitPick,
-              onTap: _busy ? null : _pickOutfit,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '3 · Style & scene (optional)',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _styleNotesC,
-              enabled: !_busy,
-              maxLines: 4,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                hintText: 'e.g. Walking in a luxurious house, black aviator sunglasses, silver luxury watch, confident pose like a fashion lookbook…',
-                hintStyle: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF12182A) : Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
-                ),
+            child: SafeArea(
+              top: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  NgmyToolkitAliveSection(
+                    colors: colors,
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.05,
+                    child: _header(isDark),
+                  ),
+                  const SizedBox(height: 14),
+                  NgmyToolkitAliveSection(
+                    colors: colors,
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.16,
+                    padding: EdgeInsets.zero,
+                    child: _pickCard(
+                      isDark: true,
+                      title: '1 · Your photo',
+                      subtitle: 'Full-body or upper-body photo of the person',
+                      icon: Icons.person_rounded,
+                      pick: _personPick,
+                      onTap: _busy ? null : _pickPerson,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  NgmyToolkitAliveSection(
+                    colors: const [Color(0xFF9333EA), Color(0xFF06B6D4)],
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.28,
+                    padding: EdgeInsets.zero,
+                    child: _pickCard(
+                      isDark: true,
+                      title: '2 · Outfit / dress',
+                      subtitle: 'Photo of the clothes they should wear',
+                      icon: Icons.checkroom_rounded,
+                      pick: _outfitPick,
+                      onTap: _busy ? null : _pickOutfit,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  NgmyToolkitAliveSection(
+                    colors: colors,
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '3 · Style & scene (optional)',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _styleNotesC,
+                          enabled: !_busy,
+                          maxLines: 4,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Walking in a luxurious house, black aviator sunglasses, silver luxury watch, confident pose like a fashion lookbook…',
+                            hintStyle: const TextStyle(fontSize: 12, color: Colors.white38),
+                            filled: true,
+                            fillColor: const Color(0xFF12182A),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: _accent.withValues(alpha: 0.25)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Describe pose, location, glasses, watches, or vibe. AI dresses you fully in the outfit — not a piece on your shoulder.',
+                          style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.55), height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  ..._outfitActions(isDark: true),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Describe pose, location, glasses, watches, or vibe. AI dresses you fully in the outfit — not a piece on your shoulder.',
-              style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white54 : Colors.black54),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _busy ? null : _generate,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.auto_awesome_rounded),
-              label: Text(_busy ? 'Generating…' : 'Dress with AI'),
-              style: FilledButton.styleFrom(
-                backgroundColor: _accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-            if (_status != null) ...[
-              const SizedBox(height: 12),
-              Text(_status!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: isDark ? 0.15 : 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
-                ),
-                child: Text(_error!, style: TextStyle(fontSize: 12, color: isDark ? Colors.redAccent : Colors.red.shade800)),
-              ),
-            ],
-            if (_resultBytes != null) ...[
-              const SizedBox(height: 22),
-              Text('RESULT', style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Image.memory(_resultBytes!, fit: BoxFit.contain),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _download,
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Save image'),
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  List<Widget> _outfitActions({required bool isDark}) {
+    return [
+      FilledButton.icon(
+        onPressed: _busy ? null : _generate,
+        icon: _busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.auto_awesome_rounded),
+        label: Text(_busy ? 'Generating…' : 'Dress with AI', style: const TextStyle(fontWeight: FontWeight.w900)),
+        style: FilledButton.styleFrom(
+          backgroundColor: _accent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      if (_status != null) ...[
+        const SizedBox(height: 12),
+        Text(_status!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.6))),
+      ],
+      if (_error != null) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+          ),
+          child: Text(_error!, style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+        ),
+      ],
+      if (_resultBytes != null) ...[
+        const SizedBox(height: 22),
+        Text('RESULT', style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: Colors.white.withValues(alpha: 0.54))),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.memory(_resultBytes!, fit: BoxFit.contain),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _download,
+          icon: const Icon(Icons.download_rounded),
+          label: const Text('Save image'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+      ],
+    ];
   }
 
   Widget _header(bool isDark) {

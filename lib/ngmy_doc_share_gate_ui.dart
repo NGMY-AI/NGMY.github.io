@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_doc_share_school.dart';
 import 'ngmy_doc_share_ui.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_studio_hub.dart';
 
 /// Doc Share entry — individual vs organization paths, smart routing, redesigned sheets.
@@ -332,14 +333,33 @@ class _DocShareGatePageState extends State<_DocShareGatePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded)),
-                  const Expanded(
-                    child: Text('Doc Share', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                  ),
-                  const SizedBox(width: 48),
-                ],
+              NgmyHudMotion(
+                builder: (context, pulse, scan, orbit) {
+                  const colors = [Color(0xFF0D9488), Color(0xFF7C3AED)];
+                  return NgmyToolkitAliveSection(
+                    colors: colors,
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
+                    child: Row(
+                      children: [
+                        IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70)),
+                        Expanded(
+                          child: NgmyToolkitAliveHeader(
+                            title: 'Doc Share',
+                            subtitle: 'Upload · share · sync',
+                            colors: colors,
+                            pulse: pulse,
+                            orbit: orbit,
+                            icon: Icons.folder_shared_rounded,
+                            dense: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 8),
               Container(

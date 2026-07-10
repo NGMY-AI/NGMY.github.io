@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'ngmy_studio_download.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_video_studio_blob_stub.dart' if (dart.library.html) 'ngmy_video_studio_blob.dart' as blob_util;
 import 'ngmy_video_studio_export.dart';
 import 'ngmy_video_studio_logo.dart';
@@ -620,27 +621,31 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: _closeStudio,
         ),
-        title: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(9),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+        title: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            return Row(
+              children: [
+                NgmyHudMiniOrb(
+                  colors: const [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+                  pulse: pulse,
+                  orbit: orbit,
+                  size: 34,
+                  icon: Icons.live_tv_rounded,
                 ),
-                boxShadow: [
-                  BoxShadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: const Icon(Icons.live_tv_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 10),
-            const Text('NGMY Studio', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-          ],
+                const SizedBox(width: 10),
+                Text(
+                  'NGMY Studio',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                    shadows: [
+                      Shadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.45 + pulse * 0.25), blurRadius: 10),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           Padding(

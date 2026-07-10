@@ -183,7 +183,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _CreatorHubTitle(),
+                        _CreatorHubTitle(pulse: pulse, orbit: orbit, scan: scan),
                         const SizedBox(height: 18),
                         GridView.builder(
                           shrinkWrap: true,
@@ -217,45 +217,63 @@ class NgmyCreatorHubTab extends StatelessWidget {
 }
 
 class _CreatorHubTitle extends StatelessWidget {
-  const _CreatorHubTitle();
+  const _CreatorHubTitle({required this.pulse, required this.orbit, required this.scan});
+
+  final double pulse;
+  final double orbit;
+  final double scan;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2]),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: kNgmyStudioHubAccent.withValues(alpha: 0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    const colors = [kNgmyStudioHubAccent, kNgmyStudioHubAccent2];
+    return NgmyHudTechFrame(
+      colors: colors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      borderRadius: 18,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Row(
+        children: [
+          NgmyHudMiniOrb(
+            colors: colors,
+            pulse: pulse,
+            orbit: orbit,
+            size: 52,
+            icon: Icons.auto_awesome_mosaic_rounded,
           ),
-          child: const Icon(Icons.auto_awesome_mosaic_rounded, color: Colors.white, size: 26),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2],
-            ).createShader(bounds),
-            child: const Text(
-              'CREATOR TOOLKIT',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 22,
-                letterSpacing: 1.1,
-              ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CREATOR TOOLKIT',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(color: kNgmyStudioHubAccent.withValues(alpha: 0.5 + pulse * 0.3), blurRadius: 14),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Live studio · tools online',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.62 + pulse * 0.1),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -479,87 +497,99 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-      backgroundColor: const Color(0xFF091323),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: SizedBox(
-        width: dialogW,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      backgroundColor: Colors.transparent,
+      child: NgmyHudMotion(
+        builder: (context, pulse, scan, orbit) {
+          const colors = [Color(0xFF16A34A), Color(0xFF065F46)];
+          return NgmyToolkitAlivePanel(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            width: dialogW,
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+            borderRadius: 18,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: const LinearGradient(colors: [Color(0xFF16A34A), Color(0xFF065F46)]),
-                    ),
-                    child: const Icon(Icons.request_quote_rounded, color: Colors.white, size: 16),
+                  NgmyToolkitAliveHeader(
+                    title: 'Quote Calc',
+                    subtitle: 'Rates · triangle · invoices',
+                    colors: colors,
+                    pulse: pulse,
+                    orbit: orbit,
+                    icon: Icons.request_quote_rounded,
+                    dense: true,
+                    onClose: () => Navigator.pop(context),
                   ),
-                  const SizedBox(width: 8),
-                  const Text('Quote Calc', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, letterSpacing: 0.3)),
-                  const Spacer(),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                  const SizedBox(height: 6),
+                  NgmyToolkitAliveSection(
+                    colors: colors,
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.12,
+                    child: NgmyIronTrianglePanel(
+                      triFast: _triFast,
+                      triCheap: _triCheap,
+                      triGood: _triGood,
+                      resultText: _triangleResult(),
+                      onToggle: _setTriangleOption,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  NgmyToolkitAliveSection(
+                    colors: const [Color(0xFF22C55E), Color(0xFF0EA5E9)],
+                    pulse: pulse,
+                    scan: scan,
+                    orbit: orbit,
+                    phase: 0.28,
+                    child: NgmyPriceCalculatorPanel(
+                      cityController: _cityC,
+                      stateController: _stateC,
+                      serviceController: _serviceC,
+                      othersPriceController: _othersPriceC,
+                      myPriceController: _myPriceC,
+                      discount: _discount,
+                      onDiscountChanged: (v) => setState(() => _discount = v),
+                      onFieldChanged: () => setState(() {}),
+                      city: city,
+                      service: service,
+                      others: others,
+                      mine: mine,
+                      netMine: netMine,
+                      discountAmt: discountAmt,
+                      belowMarket: belowMarket,
+                      showPriceResult: showPriceResult,
+                      onEstimateTap: () => _toast('Repair Estimate opens from NGMY Hub. Quote Calc is ready here.'),
+                      onInvoiceTap: () => showNgmyStandaloneInvoiceTool(
+                        context,
+                        userEmail: widget.userEmail,
+                        user: widget.user,
+                        config: widget.config,
+                        onCharge: widget.onCharge,
+                        onDataChanged: widget.onDataChanged,
+                        service: service,
+                        amount: netMine > 0 ? netMine : mine,
+                      ),
+                      onScanTap: () => openNgmyPriceProductScanner(
+                        context,
+                        onApplyPrice: (name, price, type) {
+                          if (name.isNotEmpty) _serviceC.text = name;
+                          if (type.isNotEmpty && _serviceC.text.trim().isEmpty) _serviceC.text = type;
+                          if (price > 0) _myPriceC.text = price.toStringAsFixed(2);
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              NgmyIronTrianglePanel(
-                triFast: _triFast,
-                triCheap: _triCheap,
-                triGood: _triGood,
-                resultText: _triangleResult(),
-                onToggle: _setTriangleOption,
-              ),
-              const SizedBox(height: 14),
-              NgmyPriceCalculatorPanel(
-                cityController: _cityC,
-                stateController: _stateC,
-                serviceController: _serviceC,
-                othersPriceController: _othersPriceC,
-                myPriceController: _myPriceC,
-                discount: _discount,
-                onDiscountChanged: (v) => setState(() => _discount = v),
-                onFieldChanged: () => setState(() {}),
-                city: city,
-                service: service,
-                others: others,
-                mine: mine,
-                netMine: netMine,
-                discountAmt: discountAmt,
-                belowMarket: belowMarket,
-                showPriceResult: showPriceResult,
-                onEstimateTap: () => _toast('Repair Estimate opens from NGMY Hub. Quote Calc is ready here.'),
-                onInvoiceTap: () => showNgmyStandaloneInvoiceTool(
-                  context,
-                  userEmail: widget.userEmail,
-                  user: widget.user,
-                  config: widget.config,
-                  onCharge: widget.onCharge,
-                  onDataChanged: widget.onDataChanged,
-                  service: service,
-                  amount: netMine > 0 ? netMine : mine,
-                ),
-                onScanTap: () => openNgmyPriceProductScanner(
-                  context,
-                  onApplyPrice: (name, price, type) {
-                    if (name.isNotEmpty) _serviceC.text = name;
-                    if (type.isNotEmpty && _serviceC.text.trim().isEmpty) _serviceC.text = type;
-                    if (price > 0) _myPriceC.text = price.toStringAsFixed(2);
-                    setState(() {});
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
