@@ -61,13 +61,13 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            // Halfway back toward the previous 104px size (88 → 96).
-            const barH = 96.0;
+            // Core / Vault stay readable bars; Neural / Signal take the rest (~2x taller).
+            const barH = 72.0;
             final bars = barH * 2 + gap * 2;
             // Use whatever height is left — never force a min that overflows and
             // draws a hard clipped "box" edge around the frames.
-            // Neural / Signal get a higher ceiling so they read bigger.
-            final topH = (constraints.maxHeight - bars).clamp(0.0, 440.0);
+            // Neural / Signal get nearly all leftover height (about 2x previous size).
+            final topH = (constraints.maxHeight - bars).clamp(0.0, 880.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -251,8 +251,8 @@ class _TechFrameCard extends StatelessWidget {
   Widget _tallBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Big center orb — still leaves room for badge + title under it.
-        final orb = (math.min(constraints.maxHeight * 0.62, constraints.maxWidth * 0.78)).clamp(100.0, 172.0);
+        // Big center orb — ~2x the previous size.
+        final orb = (math.min(constraints.maxHeight * 0.72, constraints.maxWidth * 0.88)).clamp(160.0, 320.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
