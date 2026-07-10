@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -26,7 +25,7 @@ class NgmyBottomNavMetrics {
   static double get frameHeight => barHeight;
 }
 
-/// Frosted-glass pill bar — translucent so content shows through, with robotic HUD motion.
+/// Frosted-glass pill bar — translucent, soft breathing glow (no scan / rainbow motion).
 class NgmySculptedBottomNavFrame extends StatefulWidget {
   const NgmySculptedBottomNavFrame({
     super.key,
@@ -43,24 +42,18 @@ class NgmySculptedBottomNavFrame extends StatefulWidget {
   State<NgmySculptedBottomNavFrame> createState() => _NgmySculptedBottomNavFrameState();
 }
 
-class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame> with TickerProviderStateMixin {
-  late final AnimationController _spin;
-  late final AnimationController _pulse;
-  late final AnimationController _scan;
+class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame> with SingleTickerProviderStateMixin {
+  late final AnimationController _breathe;
 
   @override
   void initState() {
     super.initState();
-    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 10000))..repeat();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
-    _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 4200))..repeat();
+    _breathe = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _spin.dispose();
-    _pulse.dispose();
-    _scan.dispose();
+    _breathe.dispose();
     super.dispose();
   }
 
@@ -69,182 +62,95 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final height = widget.barHeight ?? NgmyBottomNavMetrics.barHeight;
     final radius = widget.borderRadius ?? 30.0;
-    final outerRadius = radius + 2;
 
     return SizedBox(
       height: height,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_spin, _pulse, _scan]),
+        animation: _breathe,
         builder: (context, child) {
-          final pulse = Curves.easeInOut.transform(_pulse.value);
-          final scan = _scan.value;
-          final glow = 0.28 + pulse * 0.22;
+          final t = Curves.easeInOut.transform(_breathe.value);
+          final borderA = (isDark ? 0.38 : 0.30) + t * 0.18;
+          final glowA = 0.10 + t * 0.14;
 
-          final glassPanel = ClipRRect(
-            borderRadius: BorderRadius.circular(radius),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Frosted glass so content behind the bar stays visible.
-                BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: const SizedBox.expand(),
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF67E8F9).withValues(alpha: glowA),
+                  blurRadius: 22 + t * 8,
+                  offset: const Offset(0, 4),
                 ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(radius),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              Colors.white.withValues(alpha: 0.12 + pulse * 0.04),
-                              const Color(0xFF0F172A).withValues(alpha: 0.38),
-                              const Color(0xFF111827).withValues(alpha: 0.48),
-                            ]
-                          : [
-                              Colors.white.withValues(alpha: 0.42 + pulse * 0.08),
-                              Colors.white.withValues(alpha: 0.22),
-                              const Color(0xFFE0F2FE).withValues(alpha: 0.28),
-                            ],
-                    ),
-                    border: Border.all(
-                      color: Color.lerp(
-                        const Color(0xFF67E8F9),
-                        const Color(0xFFA78BFA),
-                        pulse,
-                      )!.withValues(alpha: isDark ? 0.45 + glow * 0.25 : 0.35 + glow * 0.2),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.10),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFF67E8F9).withValues(alpha: 0.10 + pulse * 0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                    child: const SizedBox.expand(),
                   ),
-                ),
-                // Top sheen
-                Positioned(
-                  left: 10,
-                  right: 10,
-                  top: 0,
-                  height: 20,
-                  child: DecoratedBox(
+                  DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                      borderRadius: BorderRadius.circular(radius),
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withValues(alpha: isDark ? 0.16 + pulse * 0.06 : 0.42 + pulse * 0.08),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
+                        colors: isDark
+                            ? [
+                                Colors.white.withValues(alpha: 0.16 + t * 0.04),
+                                const Color(0xFF0F172A).withValues(alpha: 0.42),
+                                const Color(0xFF111827).withValues(alpha: 0.52),
+                              ]
+                            : [
+                                Colors.white.withValues(alpha: 0.52 + t * 0.06),
+                                Colors.white.withValues(alpha: 0.30),
+                                const Color(0xFFE0F2FE).withValues(alpha: 0.34),
+                              ],
+                      ),
+                      border: Border.all(
+                        color: const Color(0xFF67E8F9).withValues(alpha: borderA),
+                        width: 1.35,
                       ),
                     ),
                   ),
-                ),
-                // Soft scan sweep
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _NavHudPainter(
-                        isDark: isDark,
-                        scan: scan,
-                        pulse: pulse,
+                  // Soft top glass sheen only — no moving bands.
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 0,
+                    height: 18,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withValues(alpha: isDark ? 0.18 + t * 0.06 : 0.48 + t * 0.08),
+                            Colors.white.withValues(alpha: 0.0),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                child!,
-              ],
-            ),
-          );
-
-          return Container(
-            padding: const EdgeInsets.all(1.5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(outerRadius),
-              gradient: SweepGradient(
-                colors: [
-                  const Color(0xFF67E8F9).withValues(alpha: 0.05),
-                  const Color(0xFF67E8F9).withValues(alpha: 0.45 + pulse * 0.2),
-                  const Color(0xFFA78BFA).withValues(alpha: 0.55),
-                  const Color(0xFF34D399).withValues(alpha: 0.35 + pulse * 0.15),
-                  const Color(0xFF67E8F9).withValues(alpha: 0.05),
+                  child!,
                 ],
-                transform: GradientRotation(_spin.value * 2 * math.pi),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12 + pulse * 0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
-            child: glassPanel,
           );
         },
         child: widget.child,
       ),
     );
   }
-}
-
-class _NavHudPainter extends CustomPainter {
-  _NavHudPainter({
-    required this.isDark,
-    required this.scan,
-    required this.pulse,
-  });
-
-  final bool isDark;
-  final double scan;
-  final double pulse;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Soft glowing scan band only — no corner brackets.
-    final sy = size.height * scan;
-    final bandH = size.height * 0.55;
-    final scanPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFF67E8F9).withValues(alpha: 0.0),
-          const Color(0xFF67E8F9).withValues(alpha: isDark ? 0.34 + pulse * 0.16 : 0.26 + pulse * 0.14),
-          const Color(0xFFA78BFA).withValues(alpha: isDark ? 0.28 + pulse * 0.12 : 0.20 + pulse * 0.10),
-          const Color(0xFF67E8F9).withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.35, 0.65, 1.0],
-      ).createShader(Rect.fromLTWH(0, sy - bandH / 2, size.width, bandH));
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(6, sy - bandH / 2, size.width - 12, bandH),
-        const Radius.circular(20),
-      ),
-      scanPaint,
-    );
-
-    // Thin bright core line so the motion reads clearly.
-    final core = Paint()
-      ..color = Colors.white.withValues(alpha: isDark ? 0.45 + pulse * 0.2 : 0.55 + pulse * 0.2)
-      ..strokeWidth = 1.4
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawLine(Offset(14, sy), Offset(size.width - 14, sy), core);
-  }
-
-  @override
-  bool shouldRepaint(covariant _NavHudPainter old) =>
-      old.scan != scan || old.pulse != pulse || old.isDark != isDark;
 }
 
 /// Sliding glass selection orb used behind the active bottom-nav tab.
@@ -266,15 +172,14 @@ class NgmyNavSelectionOrb extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            Colors.white.withValues(alpha: isDark ? 0.28 : 0.55),
-            accent.withValues(alpha: isDark ? 0.38 : 0.28),
-            accent.withValues(alpha: isDark ? 0.12 : 0.08),
+            Colors.white.withValues(alpha: isDark ? 0.34 : 0.62),
+            accent.withValues(alpha: isDark ? 0.42 : 0.32),
+            accent.withValues(alpha: isDark ? 0.10 : 0.06),
           ],
         ),
-        border: Border.all(color: accent.withValues(alpha: isDark ? 0.65 : 0.45), width: 1.3),
+        border: Border.all(color: accent.withValues(alpha: isDark ? 0.70 : 0.50), width: 1.3),
         boxShadow: [
-          BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 2)),
-          BoxShadow(color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.35), blurRadius: 8),
+          BoxShadow(color: accent.withValues(alpha: 0.40), blurRadius: 14, offset: const Offset(0, 2)),
         ],
       ),
     );
