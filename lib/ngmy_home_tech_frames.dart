@@ -61,6 +61,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
+              flex: 5,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -73,7 +74,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                       onTap: () => _openExperience(_TechFrameSpec.neural),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _TechFrameCard(
                       spec: _TechFrameSpec.signal,
@@ -86,9 +87,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 118,
+            const SizedBox(height: 8),
+            Expanded(
+              flex: 3,
               child: _TechFrameCard(
                 spec: _TechFrameSpec.core,
                 pulse: pulse,
@@ -98,6 +99,18 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                 onTap: () => _openExperience(_TechFrameSpec.core),
               ),
             ),
+            const SizedBox(height: 8),
+            Expanded(
+              flex: 3,
+              child: _TechFrameCard(
+                spec: _TechFrameSpec.vault,
+                pulse: pulse,
+                scan: (scan + 0.18) % 1.0,
+                orbit: (orbit + 0.71) % 1.0,
+                wide: true,
+                onTap: () => _openExperience(_TechFrameSpec.vault),
+              ),
+            ),
           ],
         );
       },
@@ -105,7 +118,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
   }
 }
 
-enum _TechKind { neural, signal, core }
+enum _TechKind { neural, signal, core, vault }
 
 class _TechFrameSpec {
   const _TechFrameSpec({
@@ -149,6 +162,15 @@ class _TechFrameSpec {
     badge: 'MAINFRAME',
     colors: [Color(0xFF34D399), Color(0xFF06B6D4), Color(0xFF818CF8)],
     icon: Icons.memory_rounded,
+  );
+
+  static const vault = _TechFrameSpec(
+    kind: _TechKind.vault,
+    title: 'VAULT CHANNEL',
+    subtitle: 'Secure lane · encrypted pulse',
+    badge: 'SECURE',
+    colors: [Color(0xFFFBBF24), Color(0xFFF97316), Color(0xFFEF4444)],
+    icon: Icons.shield_rounded,
   );
 }
 
@@ -444,6 +466,23 @@ class _OrbPainter extends CustomPainter {
         canvas.drawCircle(p, 2.4, Paint()..color = colors[i % colors.length]);
         canvas.drawLine(c, p, Paint()..color = colors.first.withValues(alpha: 0.35)..strokeWidth = 1);
       }
+    } else if (kind == _TechKind.vault) {
+      // Shield-style lock ring
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: radius + 11),
+        -math.pi / 2 + orbit * math.pi * 2,
+        math.pi * 1.35,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..color = colors.first.withValues(alpha: 0.9),
+      );
+      for (var i = 0; i < 3; i++) {
+        final a = orbit * math.pi * 2 + i * (math.pi * 2 / 3);
+        final p = Offset(c.dx + math.cos(a) * (radius + 14), c.dy + math.sin(a) * (radius + 14));
+        canvas.drawCircle(p, 2.2, Paint()..color = colors[i % colors.length]);
+      }
     } else {
       // Core hex-ish ticks
       for (var i = 0; i < 6; i++) {
@@ -615,6 +654,8 @@ class _TechPulseExperienceState extends State<_TechPulseExperience> with TickerP
         return const ['Sweeping spectrum…', 'Locking carrier wave…', 'Grid synchronized.', 'Broadcast online.'][step];
       case _TechKind.core:
         return const ['Booting core modules…', 'Loading protocol stack…', 'Integrity check OK.', 'Mainframe online.'][step];
+      case _TechKind.vault:
+        return const ['Sealing vault channel…', 'Encrypting payload…', 'Key exchange verified.', 'Secure lane open.'][step];
     }
   }
 

@@ -15579,7 +15579,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 Positioned.fill(child: _homePastelBackdrop(isLight)),
                 Padding(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+          padding: EdgeInsets.fromLTRB(20, 4, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -15601,12 +15601,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ],
                       ),
               if (widget.user.isOnFreeTrial) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                         _buildFreeTrialGlassBanner(isLight),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       NgmyHomeGlassCardsPanel(userEmail: widget.user.email),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       // Tech HUD frames replace the old AI chat panel on Home.
                       const Expanded(child: NgmyHomeTechFramesPanel()),
                     ],

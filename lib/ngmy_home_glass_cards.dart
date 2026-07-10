@@ -105,12 +105,22 @@ class NgmyHomeLocalStore {
   }
 }
 
+/// Three rows × four categories for the Log spending sheet.
 const _kSpendingCategories = <String, IconData>{
+  // Row 1
   'Food': Icons.restaurant_rounded,
   'Transport': Icons.directions_car_rounded,
   'Bills': Icons.receipt_long_rounded,
   'Shopping': Icons.shopping_bag_rounded,
+  // Row 2
   'Fun': Icons.celebration_rounded,
+  'Password': Icons.lock_rounded,
+  'Health': Icons.favorite_rounded,
+  'Work': Icons.work_rounded,
+  // Row 3
+  'Travel': Icons.flight_rounded,
+  'Gift': Icons.card_giftcard_rounded,
+  'Savings': Icons.savings_rounded,
   'Other': Icons.category_rounded,
 };
 
@@ -164,10 +174,10 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   late final AnimationController _animCtrl;
   Animation<double>? _spreadAnim;
 
-  /// Collapsed: only a thin edge of back cards peeks (dates stay hidden).
-  static const _peek = 12.0;
-  /// How far the wallet fans open when you swipe down.
-  static const _maxSpread = 132.0;
+  /// Collapsed: clear stacked peeks so you see a deck of cards.
+  static const _peek = 28.0;
+  /// How far the wallet fans open when you swipe down (Apple Wallet style).
+  static const _maxSpread = 168.0;
 
   @override
   void initState() {
@@ -217,24 +227,25 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     _animCtrl.stop();
     setState(() {
       // Drag down opens the wallet fan; drag up closes it.
-      _spread = (_spread + d.delta.dy).clamp(0.0, _maxSpread);
+      _spread = (_spread + d.delta.dy * 1.15).clamp(0.0, _maxSpread);
     });
   }
 
   void _onVerticalDragEnd(DragEndDetails d) {
     final vy = d.velocity.pixelsPerSecond.dy;
-    if (_spread > _maxSpread * 0.45 || vy > 700) {
+    if (_spread > _maxSpread * 0.28 || vy > 450) {
       _animateSpreadTo(_maxSpread);
-    } else {
+    } else if (vy < -450) {
       _animateSpreadTo(0);
+    } else {
+      _animateSpreadTo(_spread > _maxSpread * 0.5 ? _maxSpread : 0);
     }
   }
 
   void _onHorizontalDragEnd(DragEndDetails d) {
     final vx = d.velocity.pixelsPerSecond.dx;
-    if (vx.abs() < 650 && _spread < 20) return;
-    if (vx.abs() < 650) return;
-    // Horizontal flick cycles front card while collapsed.
+    if (vx.abs() < 500) return;
+    // Horizontal flick cycles front card.
     if (_order.length < 2) return;
     setState(() {
       final front = _order.removeAt(0);
@@ -250,12 +261,12 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     }
 
     final openT = (_spread / _maxSpread).clamp(0.0, 1.0);
-    final visibleCount = math.min(5, _order.length);
+    final visibleCount = math.min(6, _order.length);
     final lastDepth = visibleCount - 1;
     final lastCollapsedY = lastDepth * _peek;
-    final lastOpenY = lastDepth * (48.0 + openT * 22);
+    final lastOpenY = lastDepth * (56.0 + openT * 28);
     final lastDy = lastCollapsedY + (lastOpenY - lastCollapsedY) * openT;
-    final stackHeight = widget.height + 28 + lastDy;
+    final stackHeight = widget.height + 36 + lastDy;
 
     return SizedBox(
       height: stackHeight,
@@ -277,13 +288,14 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
 
   Widget _buildLayer(int depth, int visibleCount, double openT) {
     final isFront = depth == 0;
-    // Collapsed: tight stack with tiny peeks below. Swipe down → cards roll forward (Apple Wallet).
+    // Collapsed: visible stacked deck. Swipe down → cards roll forward (Apple Wallet).
     final collapsedY = depth * _peek;
-    final openY = depth * (48.0 + openT * 22);
+    final openY = depth * (56.0 + openT * 28);
     final dy = collapsedY + (openY - collapsedY) * openT;
-    final scale = isFront ? 1.0 : (0.94 - depth * 0.02) + openT * 0.04;
-    final revealDates = isFront || openT > 0.32;
-    final dim = isFront ? 1.0 : (0.42 + openT * 0.5).clamp(0.42, 0.92);
+    final scale = isFront ? 1.0 : (0.96 - depth * 0.018) + openT * 0.03;
+    // Keep date tabs as designed: front always; back cards only when fanned open.
+    final revealDates = isFront || openT > 0.28;
+    final dim = isFront ? 1.0 : (0.55 + openT * 0.4).clamp(0.55, 0.95);
 
     Widget card = Transform.translate(
       offset: Offset(0, dy),
@@ -1056,43 +1068,69 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                     const SizedBox(height: 14),
                     Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _kSpendingCategories.entries.map((e) {
-                        final selected = _category == e.key;
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () => setState(() => _category = e.key),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              gradient: selected ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)]) : null,
-                              color: selected ? null : fieldBg,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: selected ? Colors.transparent : muted.withValues(alpha: 0.22),
+                    // Fixed 3 rows × 4 categories (Password, Savings, etc.).
+                    Builder(
+                      builder: (context) {
+                        final entries = _kSpendingCategories.entries.toList();
+                        return Column(
+                          children: [
+                            for (var row = 0; row < 3; row++) ...[
+                              if (row > 0) const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  for (var col = 0; col < 4; col++) ...[
+                                    if (col > 0) const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Builder(
+                                        builder: (context) {
+                                          final e = entries[row * 4 + col];
+                                          final selected = _category == e.key;
+                                          return InkWell(
+                                            borderRadius: BorderRadius.circular(14),
+                                            onTap: () => setState(() => _category = e.key),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(milliseconds: 160),
+                                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                              decoration: BoxDecoration(
+                                                gradient: selected
+                                                    ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)])
+                                                    : null,
+                                                color: selected ? null : fieldBg,
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: selected ? Colors.transparent : muted.withValues(alpha: 0.22),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(e.value, size: 16, color: selected ? Colors.white : muted),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    e.key,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 10.5,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: selected ? Colors.white : muted,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(e.value, size: 14, color: selected ? Colors.white : muted),
-                                const SizedBox(width: 5),
-                                Text(
-                                  e.key,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: selected ? Colors.white : muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                            ],
+                          ],
                         );
-                      }).toList(),
+                      },
                     ),
                     const SizedBox(height: 22),
                     FilledButton(
