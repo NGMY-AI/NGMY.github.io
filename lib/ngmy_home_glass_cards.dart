@@ -57,6 +57,8 @@ class NgmySpendingEntry {
   bool get hasPinnedEssentials => pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
   bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
   bool get hideModePill => hasImage || isPassword || hasBusinessCard;
+  /// Money / category face that should fill the whole frosted card like a photo.
+  bool get showsCreditFace => !hasImage && !isPassword && !hasBusinessCard && !(hasPinnedEssentials && amount <= 0);
 
   NgmySpendingEntry copyWith({
     String? id,
@@ -227,6 +229,7 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
     required this.cardBuilder,
     required this.emptyBuilder,
     this.height = 248,
+    this.itemId,
   });
 
   final List<T> items;
@@ -238,6 +241,8 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
   }) cardBuilder;
   final WidgetBuilder emptyBuilder;
   final double height;
+  /// Stable id so front-card order survives list rebuilds / mode switches.
+  final Object Function(T item)? itemId;
 
   @override
   State<NgmyGlassCardStack<T>> createState() => _NgmyGlassCardStackState<T>();
@@ -269,11 +274,23 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   @override
   void didUpdateWidget(covariant NgmyGlassCardStack<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.items.length != widget.items.length || !identical(oldWidget.items, widget.items)) {
-      _order = List.of(widget.items);
+    if (oldWidget.items.length == widget.items.length && identical(oldWidget.items, widget.items)) return;
+    final idOf = widget.itemId;
+    Object? frontId;
+    if (_order.isNotEmpty && idOf != null) frontId = idOf(_order.first);
+    final next = List<T>.of(widget.items);
+    if (frontId != null && idOf != null) {
+      final idx = next.indexWhere((e) => idOf(e) == frontId);
+      if (idx > 0) {
+        final kept = next.removeAt(idx);
+        next.insert(0, kept);
+      }
+    }
+    setState(() {
+      _order = next;
       _frontDrag = 0;
       _animCtrl.stop();
-    }
+    });
   }
 
   @override
@@ -597,21 +614,24 @@ class NgmyFrostedCard extends StatelessWidget {
                         child: child,
                       ),
                     ],
+                    // Soft top shade so welcome / date stay readable on full-bleed faces.
                     if (fillBleed)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
-                        height: 72,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.45),
-                                Colors.black.withValues(alpha: 0.0),
-                              ],
+                        height: 64,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.38),
+                                  Colors.black.withValues(alpha: 0.0),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -956,6 +976,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
   }
 
   Future<void> _deleteSpending(String id) async {
+    final ok = await showNgmyRoboticDeleteConfirm(context, title: 'Remove this card?');
+    if (!ok || !mounted) return;
     setState(() => _spending = _spending.where((e) => e.id != id).toList());
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
   }
@@ -967,6 +989,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
   }
 
   Future<void> _deleteNote(String id) async {
+    final ok = await showNgmyRoboticDeleteConfirm(context, title: 'Remove this note?');
+    if (!ok || !mounted) return;
     setState(() => _notes = _notes.where((n) => n.id != id).toList());
     await NgmyHomeLocalStore.saveNotes(widget.userEmail, _notes);
   }
@@ -1117,101 +1141,110 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_kind == _NgmyHomeCardKind.spending)
-          NgmyGlassCardStack<NgmySpendingEntry>(
-            height: 252,
-            items: _spending,
-            emptyBuilder: (ctx) => NgmyFrostedCard(
-              dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
-              isFront: true,
-              showDateTab: true,
-              welcomeName: name,
-              accent: [
-                (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
-                (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-              ],
-              onAdd: _openAddSheet,
-              footer: _modePill(),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 28, top: 36),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.savings_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
-                      const SizedBox(height: 10),
-                      Text(
-                        'No spending yet — tap + to add',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
-                      ),
-                    ],
+        // Keep both stacks mounted so the front card stays put when toggling SPENDING/NOTES.
+        IndexedStack(
+          index: _kind == _NgmyHomeCardKind.spending ? 0 : 1,
+          sizing: StackFit.loose,
+          children: [
+            NgmyGlassCardStack<NgmySpendingEntry>(
+              key: const ValueKey('home-spending-stack'),
+              height: 252,
+              items: _spending,
+              itemId: (e) => e.id,
+              emptyBuilder: (ctx) => NgmyFrostedCard(
+                dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+                isFront: true,
+                showDateTab: true,
+                welcomeName: name,
+                accent: [
+                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+                ],
+                onAdd: _openAddSheet,
+                footer: _modePill(),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 28, top: 36),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.savings_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No spending yet — tap + to add',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+              cardBuilder: (ctx, entry, {required isFront, required revealDates}) => NgmyFrostedCard(
+                dateLabel: ngmyHomeDateTabLabel(entry.date),
+                accent: entry.hasImage
+                    ? const [Color(0xFF111827), Color(0xFF1F2937)]
+                    : entry.isPassword
+                        ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
+                        : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+                isFront: isFront,
+                showDateTab: revealDates,
+                welcomeName: isFront ? name : null,
+                onDelete: isFront ? () => _deleteSpending(entry.id) : null,
+                onAdd: isFront ? _openAddSheet : null,
+                footer: isFront && !entry.hideModePill ? _modePill() : null,
+                fillBleed: entry.hasImage || entry.showsCreditFace,
+                child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
+              ),
             ),
-            cardBuilder: (ctx, entry, {required isFront, required revealDates}) => NgmyFrostedCard(
-              dateLabel: ngmyHomeDateTabLabel(entry.date),
-              accent: entry.hasImage
-                  ? const [Color(0xFF111827), Color(0xFF1F2937)]
-                  : entry.isPassword
-                      ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
-                      : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
-              isFront: isFront,
-              showDateTab: revealDates,
-              welcomeName: isFront ? name : null,
-              onDelete: isFront ? () => _deleteSpending(entry.id) : null,
-              onAdd: isFront ? _openAddSheet : null,
-              footer: isFront && !entry.hideModePill ? _modePill() : null,
-              fillBleed: entry.hasImage,
-              child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
-            ),
-          )
-        else
-          NgmyGlassCardStack<NgmyHomeNote>(
-            height: 252,
-            items: _notes,
-            emptyBuilder: (ctx) => NgmyFrostedCard(
-              dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
-              isFront: true,
-              showDateTab: true,
-              welcomeName: name,
-              accent: [
-                (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
-                (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-              ],
-              onAdd: _openAddSheet,
-              footer: _modePill(),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 28, top: 36),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.sticky_note_2_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
-                      const SizedBox(height: 10),
-                      Text(
-                        'No notes yet — tap + to write one',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
-                      ),
-                    ],
+            NgmyGlassCardStack<NgmyHomeNote>(
+              key: const ValueKey('home-notes-stack'),
+              height: 252,
+              items: _notes,
+              itemId: (n) => n.id,
+              emptyBuilder: (ctx) => NgmyFrostedCard(
+                dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+                isFront: true,
+                showDateTab: true,
+                welcomeName: name,
+                accent: [
+                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+                ],
+                onAdd: _openAddSheet,
+                footer: _modePill(),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 28, top: 36),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.sticky_note_2_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No notes yet — tap + to write one',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+              cardBuilder: (ctx, note, {required isFront, required revealDates}) => NgmyFrostedCard(
+                dateLabel: ngmyHomeDateTabLabel(note.createdAt),
+                accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
+                isFront: isFront,
+                showDateTab: revealDates,
+                welcomeName: isFront ? name : null,
+                onDelete: isFront ? () => _deleteNote(note.id) : null,
+                onAdd: isFront ? _openAddSheet : null,
+                footer: isFront ? _modePill() : null,
+                child: _NoteCardContent(note: note),
+              ),
             ),
-            cardBuilder: (ctx, note, {required isFront, required revealDates}) => NgmyFrostedCard(
-              dateLabel: ngmyHomeDateTabLabel(note.createdAt),
-              accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
-              isFront: isFront,
-              showDateTab: revealDates,
-              welcomeName: isFront ? name : null,
-              onDelete: isFront ? () => _deleteNote(note.id) : null,
-              onAdd: isFront ? _openAddSheet : null,
-              footer: isFront ? _modePill() : null,
-              child: _NoteCardContent(note: note),
-            ),
-          ),
+          ],
+        ),
       ],
     );
   }
@@ -1241,21 +1274,55 @@ class _SpendingCardContent extends StatelessWidget {
   }
 }
 
-class _ImageCardBody extends StatelessWidget {
+class _ImageCardBody extends StatefulWidget {
   const _ImageCardBody({required this.imageBase64});
 
   final String imageBase64;
 
   @override
-  Widget build(BuildContext context) {
-    Uint8List? bytes;
+  State<_ImageCardBody> createState() => _ImageCardBodyState();
+}
+
+class _ImageCardBodyState extends State<_ImageCardBody> {
+  Uint8List? _bytes;
+  String _src = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _decode(widget.imageBase64);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ImageCardBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageBase64 != widget.imageBase64) _decode(widget.imageBase64);
+  }
+
+  void _decode(String raw) {
+    if (raw == _src && _bytes != null) return;
+    _src = raw;
     try {
-      bytes = base64Decode(imageBase64);
-    } catch (_) {}
-    if (bytes == null) {
+      _bytes = base64Decode(raw);
+    } catch (_) {
+      _bytes = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_bytes == null) {
       return const ColoredBox(color: Colors.black26, child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)));
     }
-    return Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+    return Image.memory(
+      _bytes!,
+      key: ValueKey(_src.hashCode),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      gaplessPlayback: true,
+      filterQuality: FilterQuality.medium,
+    );
   }
 }
 
@@ -1494,87 +1561,81 @@ class _CreditCardSpendBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = _themeColors;
     final cardNote = entry.note.trim();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
-      child: Column(
+    // Full-bleed money face — fills the frosted card like a photo.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.first, colors.last.withValues(alpha: 0.92)],
+        ),
+      ),
+      child: Stack(
         children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.first, colors.last.withValues(alpha: 0.85)],
+          Positioned(
+            right: -20,
+            bottom: -30,
+            child: Icon(Icons.credit_card_rounded, size: 140, color: Colors.white.withValues(alpha: 0.07)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 54, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(_kSpendingCategories[entry.category] ?? Icons.credit_card_rounded, size: 16, color: Colors.white.withValues(alpha: 0.92)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        entry.category.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.88)),
+                      ),
+                    ),
+                    Text('NGMY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.5))),
+                  ],
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                boxShadow: [
-                  BoxShadow(color: colors.last.withValues(alpha: 0.28), blurRadius: 12, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(_kSpendingCategories[entry.category] ?? Icons.credit_card_rounded, size: 16, color: Colors.white.withValues(alpha: 0.9)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          entry.category.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.85)),
-                        ),
+                const Spacer(),
+                Text(
+                  entry.description.isEmpty ? 'Expense' : entry.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '-\$${entry.amount.toStringAsFixed(2)}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.72)),
                       ),
-                      Text(
-                        'NGMY',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.55)),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    entry.description.isEmpty ? 'Expense' : entry.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '-\$${entry.amount.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.7)),
-                        ),
-                      ),
-                      Text(
-                        ngmyHomeDateTabLabel(entry.date).split(',').first,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.65)),
-                      ),
-                    ],
-                  ),
-                  if (cardNote.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    ),
                     Text(
-                      cardNote,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
+                      ngmyHomeDateTabLabel(entry.date).split(',').first,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.65)),
                     ),
                   ],
+                ),
+                if (cardNote.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    cardNote,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -2303,6 +2364,169 @@ class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated robotic confirm dialog for deleting a home card.
+Future<bool> showNgmyRoboticDeleteConfirm(BuildContext context, {required String title}) async {
+  final result = await showGeneralDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    barrierColor: Colors.black.withValues(alpha: 0.62),
+    transitionDuration: const Duration(milliseconds: 420),
+    pageBuilder: (ctx, anim, secondary) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim, secondary, child) {
+      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+      return FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.82, end: 1).animate(curved),
+          child: _NgmyRoboticDeleteDialog(title: title),
+        ),
+      );
+    },
+  );
+  return result == true;
+}
+
+class _NgmyRoboticDeleteDialog extends StatefulWidget {
+  const _NgmyRoboticDeleteDialog({required this.title});
+
+  final String title;
+
+  @override
+  State<_NgmyRoboticDeleteDialog> createState() => _NgmyRoboticDeleteDialogState();
+}
+
+class _NgmyRoboticDeleteDialogState extends State<_NgmyRoboticDeleteDialog> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, _) {
+            final t = Curves.easeInOut.transform(_pulse.value);
+            return Container(
+              width: math.min(MediaQuery.sizeOf(context).width - 40, 360),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0B1220), Color(0xFF111827), Color(0xFF1E1B4B)],
+                ),
+                border: Border.all(color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFEF4444), t)!, width: 1.6),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF67E8F9).withValues(alpha: 0.22 + t * 0.18), blurRadius: 28, spreadRadius: 1),
+                  BoxShadow(color: const Color(0xFFEF4444).withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 10)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Transform.rotate(
+                    angle: (t - 0.5) * 0.12,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: SweepGradient(
+                          colors: [
+                            Color.lerp(const Color(0xFF22D3EE), const Color(0xFFEF4444), t)!,
+                            const Color(0xFF8B5CF6),
+                            Color.lerp(const Color(0xFFEF4444), const Color(0xFF22D3EE), t)!,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.35), blurRadius: 18 + t * 10),
+                        ],
+                      ),
+                      child: Container(
+                        margin: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF0B1220)),
+                        child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF67E8F9), size: 30),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'SYSTEM CHECK',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.2,
+                      color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFF87171), t),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, height: 1.2),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This card will be removed from your home deck. Confirm to proceed.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.68), fontWeight: FontWeight.w600, fontSize: 13, height: 1.35),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Remove', style: TextStyle(fontWeight: FontWeight.w900)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
