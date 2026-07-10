@@ -15650,13 +15650,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _buildFreeTrialGlassBanner(isLight),
                       ],
                       // Room above cards so top peeks can show without pushing the deck down.
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 32),
                       NgmyHomeGlassCardsPanel(
                         userEmail: widget.user.email,
                         displayName: widget.user.username,
                       ),
-                      // Tight gap so Neural / Signal can grow ~2x taller.
-                      const SizedBox(height: 6),
+                      // Extra air so tech frames sit a bit lower under the cards.
+                      const SizedBox(height: 26),
                       // Tech HUD — Neural/Signal get the big first-creation frames again.
                       const Expanded(child: NgmyHomeTechFramesPanel()),
                     ],

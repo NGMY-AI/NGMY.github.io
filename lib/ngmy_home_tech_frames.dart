@@ -61,12 +61,12 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            // Core / Vault stay readable bars; Neural / Signal take the rest (~2x taller).
-            const barH = 72.0;
+            // Halfway back toward the previous 104px size (88 → 96).
+            const barH = 96.0;
             final bars = barH * 2 + gap * 2;
             // Use whatever height is left — never force a min that overflows and
             // draws a hard clipped "box" edge around the frames.
-            // Neural / Signal get nearly all leftover height (about 2x previous size).
+            // Neural / Signal get a higher ceiling so they read bigger.
             final topH = (constraints.maxHeight - bars).clamp(0.0, 880.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

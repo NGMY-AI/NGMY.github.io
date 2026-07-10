@@ -976,7 +976,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
       children: [
         if (_kind == _NgmyHomeCardKind.spending)
           NgmyGlassCardStack<NgmySpendingEntry>(
-            height: 200,
+            height: 252,
             items: _spending,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
@@ -1021,7 +1021,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
           )
         else
           NgmyGlassCardStack<NgmyHomeNote>(
-            height: 200,
+            height: 252,
             items: _notes,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
