@@ -3,6 +3,37 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+/// Ink / surface tokens for HUD chrome — dark mode unchanged, light mode readable.
+class NgmyHudInk {
+  NgmyHudInk._();
+
+  static bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
+
+  static Color title(BuildContext context) =>
+      isDark(context) ? Colors.white : const Color(0xFF0F172A);
+
+  static Color subtitle(BuildContext context, {double pulse = 0}) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.58 + pulse * 0.08)
+      : const Color(0xFF475569);
+
+  static Color muted(BuildContext context) =>
+      isDark(context) ? Colors.white54 : const Color(0xFF64748B);
+
+  static Color faint(BuildContext context) =>
+      isDark(context) ? Colors.white38 : const Color(0xFF94A3B8);
+
+  static Color icon(BuildContext context) =>
+      isDark(context) ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1E293B);
+
+  static Color panel(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.06)
+      : const Color(0xFFF1F5F9);
+
+  static Color panelBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.14)
+      : const Color(0xFFCBD5E1);
+}
+
 /// Shared pulse / scan / orbit clocks — same motion language as home tech frames.
 class NgmyHudMotion extends StatefulWidget {
   const NgmyHudMotion({super.key, required this.builder});
@@ -74,10 +105,28 @@ class NgmyHudTechFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
     final glow = 0.35 + pulse * 0.35;
     final scanV = (scan + phase) % 1.0;
     final orbitV = (orbit + phase * 0.7) % 1.0;
-    final body = CustomPaint(
+    final fill = dark
+        ? [
+            const Color(0xFF0B1220).withValues(alpha: 0.92),
+            colors.first.withValues(alpha: 0.28 + pulse * 0.12),
+            colors.last.withValues(alpha: 0.22),
+            const Color(0xFF020617).withValues(alpha: 0.95),
+          ]
+        : [
+            Colors.white.withValues(alpha: 0.98),
+            colors.first.withValues(alpha: 0.14 + pulse * 0.08),
+            colors.last.withValues(alpha: 0.10),
+            const Color(0xFFF8FAFC),
+          ];
+    final borderColor = dark
+        ? colors.first.withValues(alpha: 0.22 + pulse * 0.12)
+        : colors.first.withValues(alpha: 0.45 + pulse * 0.15);
+
+    Widget framed = CustomPaint(
       painter: NgmyHudFramePainter(
         colors: colors,
         pulse: pulse,
@@ -85,48 +134,56 @@ class NgmyHudTechFrame extends StatelessWidget {
         orbit: orbitV,
         glow: glow,
         borderRadius: borderRadius,
+        lightMode: !dark,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Never force infinite height — that blanks Creator Toolkit in scroll views.
-              final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
-              return Container(
-                width: double.infinity,
-                height: fillH ? constraints.maxHeight : null,
-                padding: padding,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF0B1220).withValues(alpha: 0.92),
-                      colors.first.withValues(alpha: 0.28 + pulse * 0.12),
-                      colors.last.withValues(alpha: 0.22),
-                      const Color(0xFF020617).withValues(alpha: 0.95),
-                    ],
-                  ),
-                  border: Border.all(color: colors.first.withValues(alpha: 0.22 + pulse * 0.12)),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Never force infinite height — that blanks Creator Toolkit in scroll views.
+            final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+            final content = Container(
+              width: double.infinity,
+              height: fillH ? constraints.maxHeight : null,
+              padding: padding,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(borderRadius),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: fill,
                 ),
-                child: child,
-              );
-            },
-          ),
+                border: Border.all(color: borderColor),
+                boxShadow: dark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: colors.first.withValues(alpha: 0.12 + pulse * 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+              ),
+              child: child,
+            );
+            // Heavy blur milks light pastel backgrounds — keep crisp in light mode.
+            if (!dark) return content;
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: content,
+            );
+          },
         ),
       ),
     );
 
-    if (onTap == null) return body;
+    if (onTap == null) return framed;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(borderRadius),
-        child: body,
+        child: framed,
       ),
     );
   }
@@ -177,6 +234,7 @@ class NgmyHudFramePainter extends CustomPainter {
     required this.orbit,
     required this.glow,
     this.borderRadius = 22,
+    this.lightMode = false,
   });
 
   final List<Color> colors;
@@ -185,25 +243,29 @@ class NgmyHudFramePainter extends CustomPainter {
   final double orbit;
   final double glow;
   final double borderRadius;
+  final bool lightMode;
 
   @override
   void paint(Canvas canvas, Size size) {
     final r = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(borderRadius));
+    final midStroke = lightMode
+        ? colors.first.withValues(alpha: 0.55)
+        : Colors.white.withValues(alpha: 0.35);
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
+      ..strokeWidth = lightMode ? 1.8 : 1.4
       ..shader = LinearGradient(
         colors: [
           colors.first.withValues(alpha: 0.35 + glow * 0.45),
-          Colors.white.withValues(alpha: 0.35),
+          midStroke,
           colors.last.withValues(alpha: 0.45 + glow * 0.35),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawRRect(r, border);
 
     final bracket = Paint()
-      ..color = colors.first.withValues(alpha: 0.75 + pulse * 0.25)
-      ..strokeWidth = 2
+      ..color = colors.first.withValues(alpha: lightMode ? 0.85 + pulse * 0.15 : 0.75 + pulse * 0.25)
+      ..strokeWidth = lightMode ? 2.4 : 2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     const c = 14.0;
@@ -230,7 +292,7 @@ class NgmyHudFramePainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: [
           colors.first.withValues(alpha: 0.0),
-          colors.first.withValues(alpha: 0.22),
+          colors.first.withValues(alpha: lightMode ? 0.16 : 0.22),
           colors.first.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(0, sy - 18, size.width, 36));
@@ -239,7 +301,7 @@ class NgmyHudFramePainter extends CustomPainter {
     final cx = size.width - 22;
     final cy = 22.0;
     final tick = Paint()
-      ..color = colors.last.withValues(alpha: 0.7)
+      ..color = colors.last.withValues(alpha: lightMode ? 0.85 : 0.7)
       ..strokeWidth = 1.5;
     for (var i = 0; i < 6; i++) {
       final a = orbit * math.pi * 2 + i * (math.pi / 3);
@@ -249,7 +311,11 @@ class NgmyHudFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant NgmyHudFramePainter old) =>
-      old.pulse != pulse || old.scan != scan || old.orbit != orbit || old.glow != glow;
+      old.pulse != pulse ||
+      old.scan != scan ||
+      old.orbit != orbit ||
+      old.glow != glow ||
+      old.lightMode != lightMode;
 }
 
 class NgmyHudMiniOrbPainter extends CustomPainter {
@@ -336,6 +402,8 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = NgmyHudInk.title(context);
+    final subColor = NgmyHudInk.subtitle(context, pulse: pulse);
     return Padding(
       padding: EdgeInsets.fromLTRB(dense ? 12 : 16, dense ? 10 : 14, 8, dense ? 6 : 8),
       child: Row(
@@ -355,7 +423,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: titleColor,
                     fontWeight: FontWeight.w900,
                     fontSize: dense ? 16 : 18,
                     letterSpacing: 0.4,
@@ -369,7 +437,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.58 + pulse * 0.08),
+                      color: subColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -382,7 +450,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
           if (onClose != null)
             IconButton(
               onPressed: onClose,
-              icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.55), size: 22),
+              icon: Icon(Icons.close_rounded, color: NgmyHudInk.muted(context), size: 22),
             ),
         ],
       ),
@@ -415,6 +483,7 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
     return Container(
       width: width,
       constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
@@ -426,7 +495,11 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
             blurRadius: 28 + pulse * 10,
             spreadRadius: 1,
           ),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 24, offset: const Offset(0, 12)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.55 : 0.12),
+            blurRadius: dark ? 24 : 16,
+            offset: const Offset(0, 12),
+          ),
         ],
       ),
       child: NgmyHudTechFrame(
@@ -501,6 +574,18 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
+    final pageColors = dark
+        ? [
+            const Color(0xFF0B1220),
+            Color.lerp(const Color(0xFF111827), colors.first.withValues(alpha: 0.22), pulse)!,
+            Color.lerp(const Color(0xFF0B1020), colors.last.withValues(alpha: 0.18), 1 - pulse)!,
+          ]
+        : [
+            const Color(0xFFF1F5F9),
+            Color.lerp(Colors.white, colors.first.withValues(alpha: 0.12), pulse)!,
+            Color.lerp(const Color(0xFFE2E8F0), colors.last.withValues(alpha: 0.10), 1 - pulse)!,
+          ];
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -509,11 +594,7 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF0B1220),
-                Color.lerp(const Color(0xFF111827), colors.first.withValues(alpha: 0.22), pulse)!,
-                Color.lerp(const Color(0xFF0B1020), colors.last.withValues(alpha: 0.18), 1 - pulse)!,
-              ],
+              colors: pageColors,
             ),
           ),
         ),
@@ -528,7 +609,7 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    colors.first.withValues(alpha: 0.22 + pulse * 0.12),
+                    colors.first.withValues(alpha: (dark ? 0.22 : 0.18) + pulse * 0.12),
                     colors.first.withValues(alpha: 0),
                   ],
                 ),
@@ -547,7 +628,7 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    colors.last.withValues(alpha: 0.16 + (1 - pulse) * 0.1),
+                    colors.last.withValues(alpha: (dark ? 0.16 : 0.12) + (1 - pulse) * 0.1),
                     colors.last.withValues(alpha: 0),
                   ],
                 ),
@@ -595,6 +676,12 @@ class NgmyToolkitAliveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
+    final idleFg = dark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF475569);
+    final idleBg = dark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
+    final idleBorder = dark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFCBD5E1);
+    // Selected stays on accent gradient — white label is always readable.
+    final fg = selected ? Colors.white.withValues(alpha: 0.95) : idleFg;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -611,9 +698,9 @@ class NgmyToolkitAliveButton extends StatelessWidget {
                     colors.last,
                   ])
                 : null,
-            color: selected ? null : Colors.white.withValues(alpha: 0.06),
+            color: selected ? null : idleBg,
             border: Border.all(
-              color: selected ? colors.first.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.12),
+              color: selected ? colors.first.withValues(alpha: 0.7) : idleBorder,
             ),
             boxShadow: selected
                 ? [BoxShadow(color: colors.first.withValues(alpha: 0.28 + pulse * 0.2), blurRadius: 12 + pulse * 6)]
@@ -624,13 +711,13 @@ class NgmyToolkitAliveButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: Colors.white.withValues(alpha: selected ? 0.95 : 0.55)),
+                Icon(icon, size: 16, color: fg),
                 const SizedBox(width: 6),
               ],
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: selected ? 1 : 0.55),
+                  color: selected ? Colors.white : idleFg,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                 ),

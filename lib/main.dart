@@ -25140,19 +25140,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = Colors.white;
-    final softText = Colors.white.withValues(alpha: 0.62);
-    final cardBg = Colors.white.withValues(alpha: 0.06);
-    final panelBg = Colors.white.withValues(alpha: 0.08);
-    final panelBorder = Colors.white.withValues(alpha: 0.16);
-    final neutralAction = Colors.white.withValues(alpha: 0.12);
-    final neutralActionText = Colors.white;
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final softText = isDark ? Colors.white.withValues(alpha: 0.62) : const Color(0xFF64748B);
+    final cardBg = isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
+    final panelBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white;
+    final panelBorder = isDark ? Colors.white.withValues(alpha: 0.16) : const Color(0xFFCBD5E1);
+    final neutralAction = isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
+    final neutralActionText = isDark ? Colors.white : const Color(0xFF0F172A);
     final cashEarned = widget.user.totalProfit;
     final cashInvested = widget.user.totalInvestmentAmount;
     final pointsCash = widget.user.points / 100.0;
     const profileColors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFF0F172A),
+      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF1F5F9),
       body: SafeArea(
         bottom: false,
         child: NgmyHudMotion(
@@ -25313,7 +25313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Text(
         widget.user.username,
         style: TextStyle(
-          color: Colors.white,
+          color: primaryText,
           fontWeight: FontWeight.w900,
           fontSize: 22,
           letterSpacing: 0.4,
@@ -25335,7 +25335,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SizedBox(height: 15),
       _box(context, 'Account Information', [
         _pair('Account ID', _accountId),
-        const Divider(color: Colors.white24),
+        Divider(color: panelBorder),
         _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor'),
         const SizedBox(height: 14),
         Container(
@@ -25380,7 +25380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Text('Your Referral Code', style: TextStyle(fontSize: 11, color: softText)),
                           const SizedBox(height: 4),
-                          CopyOnHoldText(_referralCode, style: const TextStyle(fontSize: 30 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFFE5E7EB))),
+                          CopyOnHoldText(_referralCode, style: TextStyle(fontSize: 30 * 0.7, fontWeight: FontWeight.w900, color: primaryText)),
                           Text('Share this code with friends to earn rewards!', style: TextStyle(fontSize: 12, color: softText)),
                         ],
                       ),
@@ -25496,12 +25496,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       TextField(
                         controller: _referralInputC,
                         textCapitalization: TextCapitalization.characters,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: primaryText),
                         decoration: InputDecoration(
                           hintText: 'ENTER CODE',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                          hintStyle: TextStyle(color: softText),
                           filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.06),
+                          fillColor: cardBg,
                           errorText: _referralPreviewInvalid &&
                                   (_referralPreviewName == null || _referralPreviewName!.isEmpty) &&
                                   _referralInputC.text.trim().isNotEmpty
@@ -25578,7 +25578,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('📊 Cash Invested', style: TextStyle(fontSize: 12, color: softText)),
                   const SizedBox(height: 4),
-                  Text('\$${formatCurrency(cashInvested)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFFF3F4F6))),
+                  Text('\$${formatCurrency(cashInvested)}', style: TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: primaryText)),
                 ]),
               ),
             ),
@@ -25611,25 +25611,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               Text(
                 '${widget.user.points} pts',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 36 * 0.7,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFFE5E7EB),
+                  color: primaryText,
                 ),
               ),
               const SizedBox(height: 8),
               Text('Convert to Cash', style: TextStyle(fontWeight: FontWeight.w600, color: primaryText)),
               const SizedBox(height: 3),
               Text('Every 100 pts =', style: TextStyle(fontSize: 12, color: softText)),
-              const Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF86EFAC)))),
-              const Divider(color: Colors.white24),
+              const Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF16A34A)))),
+              Divider(color: panelBorder),
               Row(
                 children: [
                   Text('Available:', style: TextStyle(color: primaryText)),
                   const Spacer(),
                   Text(
                     '\$${pointsCash.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF86EFAC)),
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
                   ),
                 ],
               ),
@@ -25675,7 +25675,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Text(
             'LOGOUT ACCOUNT',
             style: TextStyle(
-              color: Colors.white,
+              color: NgmyHudInk.title(context),
               fontWeight: FontWeight.w900,
               letterSpacing: 1.1,
               shadows: [Shadow(color: const Color(0xFFEF4444).withValues(alpha: 0.5 + pulse * 0.3), blurRadius: 12)],
@@ -26017,19 +26017,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      color: Colors.white.withValues(alpha: 0.04),
+      border: Border.all(color: NgmyHudInk.panelBorder(context)),
+      color: NgmyHudInk.panel(context),
     ),
     child: Row(
       children: [
-        Icon(i, size: 18, color: Colors.white70),
+        Icon(i, size: 18, color: NgmyHudInk.muted(context)),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l, style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.55))),
-              CopyOnHoldText(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(l, style: TextStyle(fontSize: 10, color: NgmyHudInk.muted(context))),
+              CopyOnHoldText(v, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: NgmyHudInk.title(context)), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -26039,7 +26039,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             tooltip: 'Copy $l',
-            icon: Icon(Icons.copy_rounded, size: 18, color: Colors.white.withValues(alpha: 0.55)),
+            icon: Icon(Icons.copy_rounded, size: 18, color: NgmyHudInk.muted(context)),
             onPressed: () => _copyProfileField(l, copyText),
           ),
       ],
@@ -26069,7 +26069,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              Text('CONTACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.7))),
+              Text('CONTACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: NgmyHudInk.muted(context))),
               const Spacer(),
               if (_canScanCivicRegistryIds())
                 IconButton(
@@ -26077,7 +26077,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                   onPressed: _openCivicIdScanner,
-                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20, color: Color(0xFF93C5FD)),
+                  icon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: NgmyHudInk.isDark(context) ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
                 ),
             ],
           ),
@@ -26148,7 +26148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontSize: 11,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.2,
-              color: Colors.white.withValues(alpha: 0.7),
+              color: NgmyHudInk.muted(ctx),
             ),
           ),
           const SizedBox(height: 14),
@@ -26162,18 +26162,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      color: Colors.white.withValues(alpha: 0.04),
+      border: Border.all(color: NgmyHudInk.panelBorder(context)),
+      color: NgmyHudInk.panel(context),
     ),
     child: Row(
       children: [
-        Expanded(child: Text(l, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75)))),
+        Expanded(child: Text(l, style: TextStyle(fontSize: 13, color: NgmyHudInk.subtitle(context)))),
         const SizedBox(width: 10),
         Expanded(
           child: CopyOnHoldText(
             v,
             textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: NgmyHudInk.title(context)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -26200,9 +26200,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'LEGAL INFORMATION',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white70),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: NgmyHudInk.muted(ctx)),
               ),
               const SizedBox(height: 14),
               _legalTile(
@@ -26338,8 +26338,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: NgmyHudInk.panelBorder(context)),
+            color: NgmyHudInk.panel(context),
           ),
           child: Row(
             children: [
@@ -26356,13 +26356,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: NgmyHudInk.title(context),
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.45)),
+              Icon(Icons.chevron_right, color: NgmyHudInk.muted(context)),
             ],
           ),
         ),
@@ -26371,7 +26371,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l, double pulse) {
     final sel = widget.currentThemeMode == m;
-    final color = sel ? Color.lerp(const Color(0xFF22D3EE), const Color(0xFFA78BFA), pulse)! : Colors.white54;
+    final dark = NgmyHudInk.isDark(ctx);
+    final color = sel
+        ? Color.lerp(const Color(0xFF22D3EE), const Color(0xFFA78BFA), pulse)!
+        : (dark ? Colors.white54 : const Color(0xFF64748B));
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -26388,8 +26391,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const Color(0xFF8B5CF6).withValues(alpha: 0.28),
                   ])
                 : null,
-            color: sel ? null : Colors.white.withValues(alpha: 0.04),
-            border: Border.all(color: sel ? color.withValues(alpha: 0.7) : Colors.white12),
+            color: sel ? null : (dark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9)),
+            border: Border.all(color: sel ? color.withValues(alpha: 0.7) : (dark ? Colors.white12 : const Color(0xFFCBD5E1))),
             boxShadow: sel ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)] : null,
           ),
           child: Column(

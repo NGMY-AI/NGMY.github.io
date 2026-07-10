@@ -1181,8 +1181,8 @@ class _Companion3DCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nameColor = Colors.white;
-    final subColor = Colors.white.withValues(alpha: 0.62);
+    final nameColor = NgmyHudInk.title(context);
+    final subColor = NgmyHudInk.subtitle(context);
     final colors = <Color>[
       kNgmyAdvisorsHubAccent,
       kNgmyAdvisorsHubAccent2,

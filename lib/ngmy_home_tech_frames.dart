@@ -199,6 +199,9 @@ class _TechFrameCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final ink = isLight ? const Color(0xFF0F172A) : Colors.white;
+    final muted = isLight ? const Color(0xFF64748B) : Colors.white.withValues(alpha: 0.58);
     return Material(
       color: Colors.transparent,
       child: GestureDetector(
@@ -211,11 +214,12 @@ class _TechFrameCard extends StatelessWidget {
             scan: scan,
             orbit: orbit,
             glow: glow,
+            lightMode: isLight,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(sigmaX: isLight ? 6 : 18, sigmaY: isLight ? 6 : 18),
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
@@ -225,15 +229,25 @@ class _TechFrameCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.10),
-                      spec.colors.first.withValues(alpha: 0.16 + pulse * 0.08),
-                      spec.colors.last.withValues(alpha: 0.12),
-                      Colors.black.withValues(alpha: 0.18),
-                    ],
+                    colors: isLight
+                        ? [
+                            Colors.white.withValues(alpha: 0.96),
+                            spec.colors.first.withValues(alpha: 0.16 + pulse * 0.08),
+                            spec.colors.last.withValues(alpha: 0.12),
+                            const Color(0xFFF1F5F9),
+                          ]
+                        : [
+                            Colors.white.withValues(alpha: 0.10),
+                            spec.colors.first.withValues(alpha: 0.16 + pulse * 0.08),
+                            spec.colors.last.withValues(alpha: 0.12),
+                            Colors.black.withValues(alpha: 0.18),
+                          ],
                   ),
+                  border: isLight
+                      ? Border.all(color: spec.colors.first.withValues(alpha: 0.4 + pulse * 0.15))
+                      : null,
                 ),
-                child: wide ? _wideBody() : _tallBody(),
+                child: wide ? _wideBody(ink: ink, muted: muted, isLight: isLight) : _tallBody(ink: ink, muted: muted, isLight: isLight),
               ),
             ),
           ),
@@ -242,7 +256,7 @@ class _TechFrameCard extends StatelessWidget {
     );
   }
 
-  Widget _tallBody() {
+  Widget _tallBody({required Color ink, required Color muted, required bool isLight}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Big center orb — screenshot proportions.
@@ -252,9 +266,9 @@ class _TechFrameCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _badge(),
+                _badge(isLight: isLight),
                 const Spacer(),
-                Icon(spec.icon, size: 22, color: Colors.white.withValues(alpha: 0.9)),
+                Icon(spec.icon, size: 22, color: ink.withValues(alpha: 0.9)),
               ],
             ),
             Expanded(
@@ -279,7 +293,7 @@ class _TechFrameCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.96),
+                color: ink.withValues(alpha: 0.96),
                 fontWeight: FontWeight.w900,
                 fontSize: 13.5,
                 letterSpacing: 1.05,
@@ -292,7 +306,7 @@ class _TechFrameCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.58),
+                color: muted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 height: 1.1,
@@ -304,7 +318,7 @@ class _TechFrameCard extends StatelessWidget {
     );
   }
 
-  Widget _wideBody() {
+  Widget _wideBody({required Color ink, required Color muted, required bool isLight}) {
     return Row(
       children: [
         SizedBox(
@@ -320,41 +334,41 @@ class _TechFrameCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _badge(),
+              _badge(isLight: isLight),
               const SizedBox(height: 5),
               Text(
                 spec.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.1),
+                style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.1),
               ),
               const SizedBox(height: 2),
               Text(
                 spec.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
+                style: TextStyle(color: muted, fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 26),
+        Icon(Icons.play_arrow_rounded, color: ink.withValues(alpha: 0.75 + pulse * 0.25), size: 26),
       ],
     );
   }
 
-  Widget _badge() {
+  Widget _badge({required bool isLight}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: spec.colors.first.withValues(alpha: 0.55)),
-        color: Colors.black.withValues(alpha: 0.25),
+        color: isLight ? spec.colors.first.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.25),
       ),
       child: Text(
         spec.badge,
         style: TextStyle(
-          color: spec.colors.first.withValues(alpha: 0.95),
+          color: isLight ? const Color(0xFF0F172A) : spec.colors.first.withValues(alpha: 0.95),
           fontSize: 9.5,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.0,
@@ -371,6 +385,7 @@ class _HudFramePainter extends CustomPainter {
     required this.scan,
     required this.orbit,
     required this.glow,
+    this.lightMode = false,
   });
 
   final List<Color> colors;
@@ -378,17 +393,18 @@ class _HudFramePainter extends CustomPainter {
   final double scan;
   final double orbit;
   final double glow;
+  final bool lightMode;
 
   @override
   void paint(Canvas canvas, Size size) {
     final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(24));
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
+      ..strokeWidth = lightMode ? 1.8 : 1.4
       ..shader = LinearGradient(
         colors: [
           colors.first.withValues(alpha: 0.35 + glow * 0.45),
-          Colors.white.withValues(alpha: 0.35),
+          lightMode ? colors.first.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.35),
           colors.last.withValues(alpha: 0.45 + glow * 0.35),
         ],
       ).createShader(Offset.zero & size);
@@ -396,8 +412,8 @@ class _HudFramePainter extends CustomPainter {
 
     // Corner brackets
     final bracket = Paint()
-      ..color = colors.first.withValues(alpha: 0.75 + pulse * 0.25)
-      ..strokeWidth = 2
+      ..color = colors.first.withValues(alpha: lightMode ? 0.9 : 0.75 + pulse * 0.25)
+      ..strokeWidth = lightMode ? 2.4 : 2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     const c = 14.0;
@@ -425,7 +441,7 @@ class _HudFramePainter extends CustomPainter {
         end: Alignment.bottomCenter,
         colors: [
           colors.first.withValues(alpha: 0.0),
-          colors.first.withValues(alpha: 0.22),
+          colors.first.withValues(alpha: lightMode ? 0.16 : 0.22),
           colors.first.withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(0, sy - 18, size.width, 36));
@@ -434,7 +450,7 @@ class _HudFramePainter extends CustomPainter {
     // Tiny orbit ticks
     final cx = size.width - 22;
     final cy = 22.0;
-    final tick = Paint()..color = colors.last.withValues(alpha: 0.7)..strokeWidth = 1.5;
+    final tick = Paint()..color = colors.last.withValues(alpha: lightMode ? 0.85 : 0.7)..strokeWidth = 1.5;
     for (var i = 0; i < 6; i++) {
       final a = orbit * math.pi * 2 + i * (math.pi / 3);
       canvas.drawCircle(Offset(cx + math.cos(a) * 8, cy + math.sin(a) * 8), 1.2, tick);
@@ -443,7 +459,7 @@ class _HudFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _HudFramePainter old) =>
-      old.pulse != pulse || old.scan != scan || old.orbit != orbit || old.glow != glow;
+      old.pulse != pulse || old.scan != scan || old.orbit != orbit || old.glow != glow || old.lightMode != lightMode;
 }
 
 class _OrbPainter extends CustomPainter {

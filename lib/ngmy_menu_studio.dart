@@ -551,7 +551,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                   const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text('YOUR MENUS', style: t.sectionLabel.copyWith(color: Colors.white70)),
+                    child: Text('YOUR MENUS', style: t.sectionLabel.copyWith(color: NgmyHudInk.muted(context))),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
@@ -564,11 +564,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.restaurant_menu_rounded, size: 56, color: Colors.white38),
+                                      Icon(Icons.restaurant_menu_rounded, size: 56, color: NgmyHudInk.faint(context)),
                                       const SizedBox(height: 12),
-                                      const Text('No menus yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                                      Text('No menus yet', style: TextStyle(color: NgmyHudInk.title(context), fontWeight: FontWeight.w800, fontSize: 16)),
                                       const SizedBox(height: 4),
-                                      Text('Tap Create new menu to start', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                                      Text('Tap Create new menu to start', style: TextStyle(color: NgmyHudInk.muted(context), fontSize: 13)),
                                     ],
                                   ),
                                 ),
@@ -625,7 +625,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                   const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text('YOUR BIO PAGES', style: t.sectionLabel.copyWith(color: Colors.white70)),
+                    child: Text('YOUR BIO PAGES', style: t.sectionLabel.copyWith(color: NgmyHudInk.muted(context))),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
@@ -638,13 +638,13 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.link_rounded, size: 56, color: Colors.white38),
+                                      Icon(Icons.link_rounded, size: 56, color: NgmyHudInk.faint(context)),
                                       const SizedBox(height: 12),
-                                      const Text('No Bio pages yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                                      Text('No Bio pages yet', style: TextStyle(color: NgmyHudInk.title(context), fontWeight: FontWeight.w800, fontSize: 16)),
                                       const SizedBox(height: 4),
-                                      const Text(
+                                      Text(
                                         'Create a link-in-bio page with photos & links',
-                                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                                        style: TextStyle(color: NgmyHudInk.muted(context), fontSize: 13),
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
@@ -701,9 +701,9 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Widget _bioListTile(NgmyHubTheme t, NgmyBioDocument b, {bool framed = false}) {
     final name = b.displayName.trim().isEmpty ? 'Untitled Bio' : b.displayName.trim();
-    final titleColor = framed ? Colors.white : t.title;
-    final subColor = framed ? Colors.white70 : t.subtitle;
-    final mutedColor = framed ? Colors.white54 : t.muted;
+    final titleColor = framed ? NgmyHudInk.title(context) : t.title;
+    final subColor = framed ? NgmyHudInk.subtitle(context) : t.subtitle;
+    final mutedColor = framed ? NgmyHudInk.muted(context) : t.muted;
     final body = Material(
       color: Colors.transparent,
       child: InkWell(
@@ -763,9 +763,9 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Widget _menuListTile(NgmyHubTheme t, NgmyMenuDocument m, {bool framed = false}) {
     final name = m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName;
-    final titleColor = framed ? Colors.white : t.title;
-    final subColor = framed ? Colors.white70 : t.subtitle;
-    final mutedColor = framed ? Colors.white54 : t.muted;
+    final titleColor = framed ? NgmyHudInk.title(context) : t.title;
+    final subColor = framed ? NgmyHudInk.subtitle(context) : t.subtitle;
+    final mutedColor = framed ? NgmyHudInk.muted(context) : t.muted;
     final body = Material(
       color: Colors.transparent,
       child: InkWell(

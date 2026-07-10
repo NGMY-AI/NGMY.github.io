@@ -163,7 +163,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                   );
                   if (imported == true) await _reload();
                 },
-                icon: Icon(Icons.sync_alt_rounded, color: Colors.white.withValues(alpha: 0.85), size: 20),
+                icon: Icon(Icons.sync_alt_rounded, color: NgmyHudInk.icon(context), size: 20),
               ),
             ),
             child: Column(
@@ -173,7 +173,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                   child: Text(
                     'Organize contacts, reminders, notes, tasks & more — all saved locally',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 13, height: 1.35),
+                    style: TextStyle(color: NgmyHudInk.subtitle(context), fontSize: 13, height: 1.35),
                   ),
                 ),
                 if (_loading)
@@ -335,7 +335,7 @@ class _CompactCategoryCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12.5, height: 1.15),
+            style: TextStyle(color: NgmyHudInk.title(context), fontWeight: FontWeight.w900, fontSize: 12.5, height: 1.15),
           ),
           if (count > 0)
             Padding(

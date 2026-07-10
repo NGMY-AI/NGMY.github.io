@@ -859,8 +859,9 @@ class _NgmyDateTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return CustomPaint(
-      painter: _DateTabPainter(emphasized: emphasized),
+      painter: _DateTabPainter(emphasized: emphasized, lightMode: isLight),
       child: Container(
         constraints: BoxConstraints(minWidth: emphasized ? 168 : 132),
         padding: EdgeInsets.fromLTRB(emphasized ? 20 : 14, emphasized ? 9 : 5, emphasized ? 20 : 14, emphasized ? 10 : 6),
@@ -871,8 +872,10 @@ class _NgmyDateTab extends StatelessWidget {
             fontSize: emphasized ? 13.5 : 10.5,
             fontWeight: FontWeight.w900,
             letterSpacing: emphasized ? 0.35 : 0.15,
-            color: Colors.white.withValues(alpha: emphasized ? 1.0 : 0.55),
-            shadows: emphasized
+            color: isLight
+                ? (emphasized ? const Color(0xFF0F172A) : const Color(0xFF64748B))
+                : Colors.white.withValues(alpha: emphasized ? 1.0 : 0.55),
+            shadows: emphasized && !isLight
                 ? const [
                     Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2)),
                   ]
@@ -885,9 +888,10 @@ class _NgmyDateTab extends StatelessWidget {
 }
 
 class _DateTabPainter extends CustomPainter {
-  _DateTabPainter({required this.emphasized});
+  _DateTabPainter({required this.emphasized, this.lightMode = false});
 
   final bool emphasized;
+  final bool lightMode;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -897,19 +901,24 @@ class _DateTabPainter extends CustomPainter {
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
-    final topA = emphasized ? 0.55 : 0.16;
-    final botA = emphasized ? 0.32 : 0.08;
+    final topA = emphasized ? (lightMode ? 0.95 : 0.55) : (lightMode ? 0.75 : 0.16);
+    final botA = emphasized ? (lightMode ? 0.88 : 0.32) : (lightMode ? 0.65 : 0.08);
     final fill = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withValues(alpha: topA),
-          Colors.white.withValues(alpha: botA),
-        ],
+        colors: lightMode
+            ? [
+                const Color(0xFFFFFFFF).withValues(alpha: topA),
+                const Color(0xFFE2E8F0).withValues(alpha: botA),
+              ]
+            : [
+                Colors.white.withValues(alpha: topA),
+                Colors.white.withValues(alpha: botA),
+              ],
       ).createShader(Offset.zero & size);
     if (emphasized) {
-      canvas.drawShadow(path, Colors.black.withValues(alpha: 0.45), 10, true);
+      canvas.drawShadow(path, Colors.black.withValues(alpha: lightMode ? 0.18 : 0.45), 10, true);
     }
     canvas.drawPath(path, fill);
     canvas.drawPath(
@@ -917,12 +926,15 @@ class _DateTabPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = emphasized ? 1.4 : 0.8
-        ..color = Colors.white.withValues(alpha: emphasized ? 0.7 : 0.22),
+        ..color = lightMode
+            ? const Color(0xFF94A3B8).withValues(alpha: emphasized ? 0.7 : 0.4)
+            : Colors.white.withValues(alpha: emphasized ? 0.7 : 0.22),
     );
   }
 
   @override
-  bool shouldRepaint(covariant _DateTabPainter oldDelegate) => oldDelegate.emphasized != emphasized;
+  bool shouldRepaint(covariant _DateTabPainter oldDelegate) =>
+      oldDelegate.emphasized != emphasized || oldDelegate.lightMode != lightMode;
 }
 
 // ── Frosted glass card shell ────────────────────────────────────────────────
@@ -957,8 +969,10 @@ class NgmyFrostedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glassAlpha = isFront ? 0.22 : 0.10;
-    final borderAlpha = isFront ? 0.42 : 0.18;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final glassAlpha = isLight ? (isFront ? 0.88 : 0.72) : (isFront ? 0.22 : 0.10);
+    final borderAlpha = isLight ? (isFront ? 0.55 : 0.35) : (isFront ? 0.42 : 0.18);
+    final blurSigma = isLight ? (isFront ? 8.0 : 4.0) : (isFront ? 28.0 : 16.0);
     final rawName = welcomeName?.trim() ?? '';
     final showWelcome = isFront && rawName.isNotEmpty;
     final todayLabel = ngmyHomeDateTabLabel(DateTime.now());
@@ -980,8 +994,8 @@ class NgmyFrostedCard extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withValues(alpha: 0.24),
-                      Colors.white.withValues(alpha: 0.0),
+                      (isLight ? Colors.black : Colors.white).withValues(alpha: isLight ? 0.04 : 0.24),
+                      (isLight ? Colors.black : Colors.white).withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -1058,11 +1072,11 @@ class NgmyFrostedCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               boxShadow: isFront
                   ? [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.32), blurRadius: 28, offset: const Offset(0, 14)),
-                      BoxShadow(color: accent[0].withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 6)),
+                      BoxShadow(color: Colors.black.withValues(alpha: isLight ? 0.12 : 0.32), blurRadius: 28, offset: const Offset(0, 14)),
+                      BoxShadow(color: accent[0].withValues(alpha: isLight ? 0.22 : 0.18), blurRadius: 18, offset: const Offset(0, 6)),
                     ]
                   : [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 8)),
+                      BoxShadow(color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.18), blurRadius: 14, offset: const Offset(0, 8)),
                     ],
             ),
             // Full-bleed money/photo faces: solid underlay + no white glass ring (kills edge hairlines).
@@ -1075,22 +1089,34 @@ class NgmyFrostedCard extends StatelessWidget {
                 : ClipRRect(
                     borderRadius: BorderRadius.circular(28),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: isFront ? 28 : 16, sigmaY: isFront ? 28 : 16),
+                      filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(28),
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: glassAlpha),
-                              accent[0].withValues(alpha: isFront ? 0.20 : 0.10),
-                              accent[1].withValues(alpha: isFront ? 0.16 : 0.08),
-                              Colors.white.withValues(alpha: isFront ? 0.08 : 0.04),
-                            ],
+                            colors: isLight
+                                ? [
+                                    Colors.white.withValues(alpha: glassAlpha),
+                                    accent[0].withValues(alpha: isFront ? 0.14 : 0.08),
+                                    accent[1].withValues(alpha: isFront ? 0.10 : 0.06),
+                                    const Color(0xFFF8FAFC).withValues(alpha: 0.95),
+                                  ]
+                                : [
+                                    Colors.white.withValues(alpha: glassAlpha),
+                                    accent[0].withValues(alpha: isFront ? 0.20 : 0.10),
+                                    accent[1].withValues(alpha: isFront ? 0.16 : 0.08),
+                                    Colors.white.withValues(alpha: isFront ? 0.08 : 0.04),
+                                  ],
                             stops: const [0.0, 0.35, 0.7, 1.0],
                           ),
-                          border: Border.all(color: Colors.white.withValues(alpha: borderAlpha), width: isFront ? 1.5 : 1.0),
+                          border: Border.all(
+                            color: isLight
+                                ? accent[0].withValues(alpha: borderAlpha)
+                                : Colors.white.withValues(alpha: borderAlpha),
+                            width: isFront ? 1.5 : 1.0,
+                          ),
                         ),
                         child: face,
                       ),
@@ -1115,10 +1141,11 @@ class _GlassChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: isLight ? 2 : 8, sigmaY: isLight ? 2 : 8),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 108),
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
@@ -1127,12 +1154,17 @@ class _GlassChip extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withValues(alpha: 0.28),
-                Colors.white.withValues(alpha: 0.10),
-              ],
+              colors: isLight
+                  ? [
+                      Colors.white.withValues(alpha: 0.95),
+                      const Color(0xFFE2E8F0).withValues(alpha: 0.92),
+                    ]
+                  : [
+                      Colors.white.withValues(alpha: 0.28),
+                      Colors.white.withValues(alpha: 0.10),
+                    ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
+            border: Border.all(color: isLight ? const Color(0xFF94A3B8) : Colors.white.withValues(alpha: 0.45)),
           ),
           child: Text(
             label,
@@ -1141,7 +1173,7 @@ class _GlassChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 8.5,
               fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.95),
+              color: isLight ? const Color(0xFF0F172A) : Colors.white.withValues(alpha: 0.95),
             ),
           ),
         ),
@@ -1158,10 +1190,11 @@ class _WelcomeGlassFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: isLight ? 2 : 8, sigmaY: isLight ? 2 : 8),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 112),
           padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
@@ -1170,12 +1203,17 @@ class _WelcomeGlassFrame extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withValues(alpha: 0.30),
-                Colors.white.withValues(alpha: 0.10),
-              ],
+              colors: isLight
+                  ? [
+                      Colors.white.withValues(alpha: 0.96),
+                      const Color(0xFFE2E8F0).withValues(alpha: 0.94),
+                    ]
+                  : [
+                      Colors.white.withValues(alpha: 0.30),
+                      Colors.white.withValues(alpha: 0.10),
+                    ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.48)),
+            border: Border.all(color: isLight ? const Color(0xFF94A3B8) : Colors.white.withValues(alpha: 0.48)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1188,7 +1226,7 @@ class _WelcomeGlassFrame extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 8.5,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white.withValues(alpha: 0.95),
+                  color: isLight ? const Color(0xFF64748B) : Colors.white.withValues(alpha: 0.95),
                 ),
               ),
               const SizedBox(height: 1),
@@ -1196,10 +1234,10 @@ class _WelcomeGlassFrame extends StatelessWidget {
                 handle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: isLight ? const Color(0xFF0F172A) : Colors.white,
                 ),
               ),
             ],
@@ -1321,6 +1359,7 @@ class _GlassIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1335,13 +1374,13 @@ class _GlassIconButton extends StatelessWidget {
             gradient: filled
                 ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)])
                 : null,
-            color: filled ? null : Colors.black.withValues(alpha: 0.28),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            color: filled ? null : (isLight ? Colors.white.withValues(alpha: 0.92) : Colors.black.withValues(alpha: 0.28)),
+            border: Border.all(color: isLight ? const Color(0xFF94A3B8) : Colors.white.withValues(alpha: 0.28)),
             boxShadow: filled
                 ? [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 10, offset: const Offset(0, 3))]
                 : null,
           ),
-          child: Icon(icon, size: 16, color: Colors.white),
+          child: Icon(icon, size: 16, color: filled || !isLight ? Colors.white : const Color(0xFF0F172A)),
         ),
       ),
     );

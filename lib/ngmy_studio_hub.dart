@@ -252,7 +252,7 @@ class _CreatorHubTitle extends StatelessWidget {
                 Text(
                   'CREATOR TOOLKIT',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: NgmyHudInk.title(context),
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
                     letterSpacing: 1.2,
@@ -265,7 +265,7 @@ class _CreatorHubTitle extends StatelessWidget {
                 Text(
                   'Live studio · tools online',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.62 + pulse * 0.1),
+                    color: NgmyHudInk.subtitle(context, pulse: pulse),
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     letterSpacing: 0.4,
@@ -339,8 +339,8 @@ class _CreatorToolCard extends StatelessWidget {
             Text(
               tool.title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: NgmyHudInk.title(context),
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
                 letterSpacing: 0.3,
@@ -353,7 +353,7 @@ class _CreatorToolCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
+                color: NgmyHudInk.subtitle(context),
                 fontSize: 10.5,
                 height: 1.25,
                 fontWeight: FontWeight.w600,
