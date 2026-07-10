@@ -15623,43 +15623,48 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Stack(
               children: [
                 Positioned.fill(child: _homePastelBackdrop(isLight)),
+                // Scroll the page so Neural/Signal can grow down and push Core/Vault
+                // below — cards keep their full size (nothing shrinks upward).
                 Padding(
-          padding: EdgeInsets.fromLTRB(20, 2, 20, _ngmyBottomNavScrollPadding(context)),
-          child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-                      // Slim icon row — Loan | animated NGMY | Local Growth.
-                      Row(
-                        children: [
-                          widget.homeLeadingOverride ??
-                              _roundGlassButton(
-                                icon: Icons.attach_money_rounded,
-                                tooltip: 'Loan Service',
-                                onTap: () => NgmyNavigator.push(
-                                  context,
-                                  LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
-                                  routeName: 'LoanServiceScreen',
+                  padding: EdgeInsets.fromLTRB(20, 2, 20, _ngmyBottomNavScrollPadding(context)),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Slim icon row — Loan | animated NGMY | Local Growth.
+                        Row(
+                          children: [
+                            widget.homeLeadingOverride ??
+                                _roundGlassButton(
+                                  icon: Icons.attach_money_rounded,
+                                  tooltip: 'Loan Service',
+                                  onTap: () => NgmyNavigator.push(
+                                    context,
+                                    LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                                    routeName: 'LoanServiceScreen',
+                                  ),
                                 ),
-                              ),
-                          const Expanded(child: Center(child: NgmyHomeBrandBadge())),
-                          _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+                            const Expanded(child: Center(child: NgmyHomeBrandBadge())),
+                            _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+                          ],
+                        ),
+                        if (widget.user.isOnFreeTrial) ...[
+                          const SizedBox(height: 6),
+                          _buildFreeTrialGlassBanner(isLight),
                         ],
-                      ),
-              if (widget.user.isOnFreeTrial) ...[
-                const SizedBox(height: 6),
-                        _buildFreeTrialGlassBanner(isLight),
+                        // Room above cards so top peeks can show without pushing the deck down.
+                        const SizedBox(height: 32),
+                        NgmyHomeGlassCardsPanel(
+                          userEmail: widget.user.email,
+                          displayName: widget.user.username,
+                        ),
+                        // Extra air so tech frames sit a bit lower under the cards.
+                        const SizedBox(height: 26),
+                        // Intrinsic height — Neural/Signal tall, Core/Vault pushed down.
+                        const NgmyHomeTechFramesPanel(),
                       ],
-                      // Room above cards so top peeks can show without pushing the deck down.
-                      const SizedBox(height: 32),
-                      NgmyHomeGlassCardsPanel(
-                        userEmail: widget.user.email,
-                        displayName: widget.user.username,
-                      ),
-                      // Extra air so tech frames sit a bit lower under the cards.
-                      const SizedBox(height: 26),
-                      // Tech HUD — Neural/Signal get the big first-creation frames again.
-                      const Expanded(child: NgmyHomeTechFramesPanel()),
-                    ],
+                    ),
                   ),
                 ),
               ],
