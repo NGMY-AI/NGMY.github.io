@@ -15068,12 +15068,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
-        bottomNavigationBar: Material(
-          type: MaterialType.transparency,
-          elevation: 0,
-          color: Colors.transparent,
-          child: _buildBottomNavBar(),
-        ),
+        bottomNavigationBar: _buildBottomNavBar(),
         ),
         ),
       ),
@@ -15083,49 +15078,56 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget _buildBottomNavBar() {
     const orb = NgmyBottomNavMetrics.selectionOrb;
     const barH = NgmyBottomNavMetrics.barHeight;
+    // No full-size Material wrapper — that was absorbing taps over Vault Channel.
+    // Only the pill itself (and its tab InkWells) should receive hits.
     return Padding(
       padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
       child: SafeArea(
         top: false,
-        child: NgmySculptedBottomNavFrame(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final tabW = constraints.maxWidth / 7;
-              final ballLeft = _idx * tabW + (tabW - orb) / 2;
-              final ballTop = (barH - orb) / 2;
-              final accent = switch (_idx) {
-                3 => const Color(0xFFBB86FC),
-                4 => kNgmyAdvisorsHubAccent,
-                5 => const Color(0xFF8B5CF6),
-                _ => const Color(0xFF67E8F9),
-              };
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
-                    left: ballLeft,
-                    top: ballTop,
-                    width: orb,
-                    height: orb,
-                    child: NgmyNavSelectionOrb(size: orb, accent: accent),
-                  ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _nav(0, Icons.home_rounded),
-                      _navToolHub(),
-                      _nav(2, Icons.auto_stories_rounded),
-                      _navC(3),
-                      _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
-                      _navStudio(),
-                      _nav(6, Icons.person_rounded),
-                    ],
-                  ),
-                ],
-              );
-            },
+        child: Material(
+          type: MaterialType.transparency,
+          elevation: 0,
+          color: Colors.transparent,
+          child: NgmySculptedBottomNavFrame(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final tabW = constraints.maxWidth / 7;
+                final ballLeft = _idx * tabW + (tabW - orb) / 2;
+                final ballTop = (barH - orb) / 2;
+                final accent = switch (_idx) {
+                  3 => const Color(0xFFBB86FC),
+                  4 => kNgmyAdvisorsHubAccent,
+                  5 => const Color(0xFF8B5CF6),
+                  _ => const Color(0xFF67E8F9),
+                };
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 320),
+                      curve: Curves.easeOutCubic,
+                      left: ballLeft,
+                      top: ballTop,
+                      width: orb,
+                      height: orb,
+                      child: NgmyNavSelectionOrb(size: orb, accent: accent),
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _nav(0, Icons.home_rounded),
+                        _navToolHub(),
+                        _nav(2, Icons.auto_stories_rounded),
+                        _navC(3),
+                        _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
+                        _navStudio(),
+                        _nav(6, Icons.person_rounded),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),

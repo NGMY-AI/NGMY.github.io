@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'ngmy_business_notes.dart';
+import 'ngmy_helper_alarm_memory.dart';
+import 'ngmy_home_card_image_crop.dart';
 
 /// Local-only (device storage, no database) spending + notes cards for Home.
 /// Everything here lives in SharedPreferences, keyed per user email.
@@ -18,6 +23,11 @@ class NgmySpendingEntry {
     required this.category,
     required this.date,
     this.note = '',
+    this.imageBase64 = '',
+    this.passwordEmail = '',
+    this.passwordSecret = '',
+    this.pinnedNoteText = '',
+    this.pinnedAlarmText = '',
   });
 
   final String id;
@@ -27,6 +37,18 @@ class NgmySpendingEntry {
   final DateTime date;
   /// Per-card note (each spending card keeps its own).
   final String note;
+  /// Cropped photo for the card (base64, no data: prefix). When set, card shows photo only.
+  final String imageBase64;
+  final String passwordEmail;
+  final String passwordSecret;
+  /// Snapshot text pinned from Business Essentials notes.
+  final String pinnedNoteText;
+  /// Snapshot text pinned from alarms / medicine reminders.
+  final String pinnedAlarmText;
+
+  bool get hasImage => imageBase64.trim().isNotEmpty;
+  bool get isPassword => category == 'Password';
+  bool get hasPinnedEssentials => pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
 
   NgmySpendingEntry copyWith({
     String? id,
@@ -35,6 +57,11 @@ class NgmySpendingEntry {
     String? category,
     DateTime? date,
     String? note,
+    String? imageBase64,
+    String? passwordEmail,
+    String? passwordSecret,
+    String? pinnedNoteText,
+    String? pinnedAlarmText,
   }) =>
       NgmySpendingEntry(
         id: id ?? this.id,
@@ -43,6 +70,11 @@ class NgmySpendingEntry {
         category: category ?? this.category,
         date: date ?? this.date,
         note: note ?? this.note,
+        imageBase64: imageBase64 ?? this.imageBase64,
+        passwordEmail: passwordEmail ?? this.passwordEmail,
+        passwordSecret: passwordSecret ?? this.passwordSecret,
+        pinnedNoteText: pinnedNoteText ?? this.pinnedNoteText,
+        pinnedAlarmText: pinnedAlarmText ?? this.pinnedAlarmText,
       );
 
   Map<String, dynamic> toJson() => {
@@ -52,6 +84,11 @@ class NgmySpendingEntry {
         'category': category,
         'date': date.toIso8601String(),
         'note': note,
+        'imageBase64': imageBase64,
+        'passwordEmail': passwordEmail,
+        'passwordSecret': passwordSecret,
+        'pinnedNoteText': pinnedNoteText,
+        'pinnedAlarmText': pinnedAlarmText,
       };
 
   factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) => NgmySpendingEntry(
@@ -61,6 +98,11 @@ class NgmySpendingEntry {
         category: j['category']?.toString() ?? 'Other',
         date: DateTime.tryParse(j['date']?.toString() ?? '') ?? DateTime.now(),
         note: j['note']?.toString() ?? '',
+        imageBase64: j['imageBase64']?.toString() ?? '',
+        passwordEmail: j['passwordEmail']?.toString() ?? '',
+        passwordSecret: j['passwordSecret']?.toString() ?? '',
+        pinnedNoteText: j['pinnedNoteText']?.toString() ?? '',
+        pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
       );
 }
 
@@ -868,16 +910,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     });
   }
 
-  double get _totalSpent => _spending.fold(0.0, (sum, e) => sum + e.amount);
+  double get _totalSpent => _spending.where((e) => !e.hasImage && !e.isPassword).fold(0.0, (sum, e) => sum + e.amount);
 
-  Future<void> _addSpending({required double amount, required String description, required String category}) async {
-    final entry = NgmySpendingEntry(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      amount: amount,
-      description: description,
-      category: category,
-      date: DateTime.now(),
-    );
+  Future<void> _addSpendingEntry(NgmySpendingEntry entry) async {
     setState(() => _spending = [entry, ..._spending]);
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
   }
@@ -905,15 +940,70 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
         isScrollControlled: true,
         useSafeArea: false,
         backgroundColor: Colors.transparent,
-        builder: (ctx) => const _NgmyAddSpendingSheet(),
+        builder: (ctx) => _NgmyAddSpendingSheet(userEmail: widget.userEmail),
       );
       if (result == null) return;
+      final kind = result['kind'] ?? 'spending';
+      if (kind == 'photo') {
+        final b64 = result['imageBase64'] ?? '';
+        if (b64.isEmpty) return;
+        await _addSpendingEntry(
+          NgmySpendingEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            amount: 0,
+            description: 'Photo',
+            category: 'Photo',
+            date: DateTime.now(),
+            imageBase64: b64,
+          ),
+        );
+        return;
+      }
+      if (kind == 'password') {
+        final email = (result['passwordEmail'] ?? '').trim();
+        final secret = (result['passwordSecret'] ?? '').trim();
+        if (email.isEmpty && secret.isEmpty) return;
+        await _addSpendingEntry(
+          NgmySpendingEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            amount: 0,
+            description: (result['description'] ?? '').trim().isEmpty ? 'Login' : result['description']!.trim(),
+            category: 'Password',
+            date: DateTime.now(),
+            passwordEmail: email,
+            passwordSecret: secret,
+          ),
+        );
+        return;
+      }
+      if (kind == 'pin') {
+        await _addSpendingEntry(
+          NgmySpendingEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            amount: 0,
+            description: (result['description'] ?? 'Pinned').trim(),
+            category: result['category'] ?? 'Other',
+            date: DateTime.now(),
+            pinnedNoteText: result['pinnedNoteText'] ?? '',
+            pinnedAlarmText: result['pinnedAlarmText'] ?? '',
+            note: result['note'] ?? '',
+          ),
+        );
+        return;
+      }
       final amount = double.tryParse(result['amount'] ?? '') ?? 0;
       if (amount <= 0) return;
-      await _addSpending(
-        amount: amount,
-        description: result['description']?.trim().isEmpty == true ? 'Expense' : result['description']!.trim(),
-        category: result['category'] ?? 'Other',
+      await _addSpendingEntry(
+        NgmySpendingEntry(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          amount: amount,
+          description: result['description']?.trim().isEmpty == true ? 'Expense' : result['description']!.trim(),
+          category: result['category'] ?? 'Other',
+          date: DateTime.now(),
+          note: result['note'] ?? '',
+          pinnedNoteText: result['pinnedNoteText'] ?? '',
+          pinnedAlarmText: result['pinnedAlarmText'] ?? '',
+        ),
       );
     } else {
       final text = await showModalBottomSheet<String>(
@@ -1077,6 +1167,240 @@ class _SpendingCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (entry.hasImage) {
+      return _ImageCardBody(imageBase64: entry.imageBase64);
+    }
+    if (entry.isPassword) {
+      return _PasswordCardBody(entry: entry);
+    }
+    if (entry.hasPinnedEssentials && entry.amount <= 0) {
+      return _PinnedEssentialsCardBody(entry: entry);
+    }
+    return _CategoryThemedSpendBody(entry: entry, totalSpent: totalSpent);
+  }
+}
+
+class _ImageCardBody extends StatelessWidget {
+  const _ImageCardBody({required this.imageBase64});
+
+  final String imageBase64;
+
+  @override
+  Widget build(BuildContext context) {
+    Uint8List? bytes;
+    try {
+      bytes = base64Decode(imageBase64);
+    } catch (_) {}
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 40, top: 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 160.0;
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              width: double.infinity,
+              height: h,
+              child: bytes == null
+                  ? const ColoredBox(color: Colors.black26, child: Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54)))
+                  : Image.memory(bytes, fit: BoxFit.cover, width: double.infinity, height: h),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PasswordCardBody extends StatelessWidget {
+  const _PasswordCardBody({required this.entry});
+
+  final NgmySpendingEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 36),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              color: Colors.black.withValues(alpha: 0.28),
+              border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.55)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_rounded, size: 14, color: Color(0xFFFBBF24)),
+                SizedBox(width: 6),
+                Text('PASSWORD VAULT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: Color(0xFFFBBF24))),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: 0.35),
+                  const Color(0xFF7C2D12).withValues(alpha: 0.35),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.description, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 12),
+                Text('EMAIL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55))),
+                const SizedBox(height: 4),
+                Text(entry.passwordEmail.isEmpty ? '—' : entry.passwordEmail, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                const SizedBox(height: 12),
+                Text('PASSWORD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55))),
+                const SizedBox(height: 4),
+                Text(
+                  entry.passwordSecret.isEmpty ? '—' : '•' * math.min(entry.passwordSecret.length, 14),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.5),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+}
+
+class _PinnedEssentialsCardBody extends StatelessWidget {
+  const _PinnedEssentialsCardBody({required this.entry});
+
+  final NgmySpendingEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 36),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          Text(
+            'FROM BUSINESS ESSENTIALS',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.65)),
+          ),
+          const Spacer(),
+          if (entry.pinnedAlarmText.trim().isNotEmpty)
+            _essentialsBlock(icon: Icons.alarm_rounded, label: 'ALARM', text: entry.pinnedAlarmText, color: const Color(0xFFF97316)),
+          if (entry.pinnedAlarmText.trim().isNotEmpty && entry.pinnedNoteText.trim().isNotEmpty) const SizedBox(height: 10),
+          if (entry.pinnedNoteText.trim().isNotEmpty)
+            _essentialsBlock(icon: Icons.sticky_note_2_rounded, label: 'NOTE', text: entry.pinnedNoteText, color: const Color(0xFF60A5FA)),
+          if (entry.note.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(entry.note, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
+          ],
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _essentialsBlock({required IconData icon, required String label, required String text, required Color color}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: color)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, height: 1.3, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryThemedSpendBody extends StatelessWidget {
+  const _CategoryThemedSpendBody({required this.entry, required this.totalSpent});
+
+  final NgmySpendingEntry entry;
+  final double totalSpent;
+
+  List<Color> get _themeColors {
+    switch (entry.category) {
+      case 'Food':
+        return const [Color(0xFFF97316), Color(0xFFEF4444)];
+      case 'Transport':
+        return const [Color(0xFF38BDF8), Color(0xFF2563EB)];
+      case 'Bills':
+        return const [Color(0xFFA3E635), Color(0xFF16A34A)];
+      case 'Shopping':
+        return const [Color(0xFFF472B6), Color(0xFFDB2777)];
+      case 'Fun':
+        return const [Color(0xFFFBBF24), Color(0xFFF59E0B)];
+      case 'Health':
+        return const [Color(0xFFFB7185), Color(0xFFE11D48)];
+      case 'Work':
+        return const [Color(0xFF94A3B8), Color(0xFF334155)];
+      case 'Travel':
+        return const [Color(0xFF22D3EE), Color(0xFF0891B2)];
+      case 'Gift':
+        return const [Color(0xFFC084FC), Color(0xFF7C3AED)];
+      case 'Savings':
+        return const [Color(0xFF34D399), Color(0xFF059669)];
+      default:
+        return const [Color(0xFF60A5FA), Color(0xFF8B5CF6)];
+    }
+  }
+
+  String get _themeLabel {
+    switch (entry.category) {
+      case 'Transport':
+        return 'TRANSIT PASS';
+      case 'Bills':
+        return 'BILL STATEMENT';
+      case 'Shopping':
+        return 'SHOPPING BAG';
+      case 'Food':
+        return 'FOOD TICKET';
+      case 'Health':
+        return 'HEALTH CARD';
+      case 'Travel':
+        return 'BOARDING PASS';
+      case 'Gift':
+        return 'GIFT CARD';
+      case 'Savings':
+        return 'SAVINGS SLIP';
+      case 'Work':
+        return 'WORK LOG';
+      case 'Fun':
+        return 'FUN PASS';
+      default:
+        return entry.category.toUpperCase();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _themeColors;
     final cardNote = entry.note.trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 36),
@@ -1084,30 +1408,38 @@ class _SpendingCardContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.35), colors.last.withValues(alpha: 0.25)]),
+              border: Border.all(color: colors.first.withValues(alpha: 0.55)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_kSpendingCategories[entry.category] ?? Icons.category_rounded, size: 13, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(_themeLabel, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.05, color: Colors.white)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             'TOTAL SPENT',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.65)),
           ),
           const SizedBox(height: 4),
           Text(
             '-\$${totalSpent.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.88),
-            ),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.88)),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withValues(alpha: 0.12),
+              gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.35), colors.last.withValues(alpha: 0.22)]),
               border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
             child: Text(
@@ -1139,12 +1471,20 @@ class _SpendingCardContent extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                height: 1.3,
-                color: Colors.white.withValues(alpha: 0.82),
-              ),
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.3, color: Colors.white.withValues(alpha: 0.82)),
+            ),
+          ],
+          if (entry.pinnedAlarmText.trim().isNotEmpty || entry.pinnedNoteText.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              [
+                if (entry.pinnedAlarmText.trim().isNotEmpty) '⏰ ${entry.pinnedAlarmText.trim()}',
+                if (entry.pinnedNoteText.trim().isNotEmpty) '📝 ${entry.pinnedNoteText.trim()}',
+              ].join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
             ),
           ],
           const Spacer(),
@@ -1204,7 +1544,9 @@ class _NoteCardContent extends StatelessWidget {
 // ── Add sheets ───────────────────────────────────────────────────────────
 
 class _NgmyAddSpendingSheet extends StatefulWidget {
-  const _NgmyAddSpendingSheet();
+  const _NgmyAddSpendingSheet({required this.userEmail});
+
+  final String userEmail;
 
   @override
   State<_NgmyAddSpendingSheet> createState() => _NgmyAddSpendingSheetState();
@@ -1213,15 +1555,78 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
 class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
   final _amountC = TextEditingController();
   final _descC = TextEditingController();
+  final _emailC = TextEditingController();
+  final _passC = TextEditingController();
   final _amountFocus = FocusNode();
   String _category = 'Food';
+  String? _pinnedNote;
+  String? _pinnedAlarm;
+
+  bool get _isPassword => _category == 'Password';
 
   @override
   void dispose() {
     _amountC.dispose();
     _descC.dispose();
+    _emailC.dispose();
+    _passC.dispose();
     _amountFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _uploadPhoto() async {
+    final b64 = await ngmyPickAndCropHomeCardImage(context);
+    if (b64 == null || b64.isEmpty || !mounted) return;
+    Navigator.pop(context, {'kind': 'photo', 'imageBase64': b64});
+  }
+
+  Future<void> _pickEssentialsPin() async {
+    final notes = await ngmyExportBusinessNotes(userEmail: widget.userEmail);
+    final alarms = await NgmyHelperAlarmMemoryStore.load(widget.userEmail);
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _NgmyPinEssentialsSheet(notes: notes, alarms: alarms),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _pinnedNote = picked['note'];
+      _pinnedAlarm = picked['alarm'];
+    });
+  }
+
+  void _save() {
+    if (_isPassword) {
+      Navigator.pop(context, {
+        'kind': 'password',
+        'passwordEmail': _emailC.text.trim(),
+        'passwordSecret': _passC.text.trim(),
+        'description': _descC.text.trim(),
+      });
+      return;
+    }
+    final hasPin = (_pinnedNote ?? '').isNotEmpty || (_pinnedAlarm ?? '').isNotEmpty;
+    final amount = _amountC.text.trim();
+    if (hasPin && (amount.isEmpty || (double.tryParse(amount) ?? 0) <= 0)) {
+      Navigator.pop(context, {
+        'kind': 'pin',
+        'description': _descC.text.trim().isEmpty ? 'Pinned item' : _descC.text.trim(),
+        'category': _category,
+        'pinnedNoteText': _pinnedNote ?? '',
+        'pinnedAlarmText': _pinnedAlarm ?? '',
+      });
+      return;
+    }
+    Navigator.pop(context, {
+      'kind': 'spending',
+      'amount': amount,
+      'description': _descC.text.trim(),
+      'category': _category,
+      'pinnedNoteText': _pinnedNote ?? '',
+      'pinnedAlarmText': _pinnedAlarm ?? '',
+    });
   }
 
   @override
@@ -1234,7 +1639,6 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
 
     return Padding(
-      // Keep the sheet seated above the keyboard without jumping the field to the top of the screen.
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -1242,9 +1646,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
           color: Colors.transparent,
           child: Container(
             width: double.infinity,
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * 0.72,
-            ),
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.78),
             decoration: BoxDecoration(
               color: surface,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1255,7 +1657,6 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
             child: SafeArea(
               top: false,
               child: SingleChildScrollView(
-                // Don't auto-scroll the focused field to the top of the viewport.
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 child: Column(
@@ -1266,10 +1667,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                       child: Container(
                         width: 40,
                         height: 4,
-                        decoration: BoxDecoration(
-                          color: muted.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
+                        decoration: BoxDecoration(color: muted.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(99)),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1296,74 +1694,36 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Text('AMOUNT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: fieldBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35)),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6)),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Text('\$', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: ink.withValues(alpha: 0.55))),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _amountC,
-                              focusNode: _amountFocus,
-                              autofocus: true,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              scrollPadding: const EdgeInsets.only(bottom: 120),
-                              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: ink, height: 1.2),
-                              decoration: InputDecoration(
-                                hintText: '0.00',
-                                hintStyle: TextStyle(color: muted.withValues(alpha: 0.45), fontWeight: FontWeight.w800),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: _uploadPhoto,
+                      icon: const Icon(Icons.photo_camera_back_rounded),
+                      label: const Text('Upload & crop photo for card', style: TextStyle(fontWeight: FontWeight.w800)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ink,
+                        minimumSize: const Size(double.infinity, 48),
+                        side: BorderSide(color: muted.withValues(alpha: 0.35)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text('FOR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _descC,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
-                      decoration: InputDecoration(
-                        hintText: 'What was it for?',
-                        hintStyle: TextStyle(color: muted),
-                        filled: true,
-                        fillColor: fieldBg,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4),
-                        ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _pickEssentialsPin,
+                      icon: const Icon(Icons.business_center_rounded),
+                      label: Text(
+                        (_pinnedNote != null || _pinnedAlarm != null) ? 'Essentials pinned ✓' : 'Pin note / alarm from Essentials',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ink,
+                        minimumSize: const Size(double.infinity, 48),
+                        side: BorderSide(color: muted.withValues(alpha: 0.35)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
                     const SizedBox(height: 8),
-                    // Fixed 3 rows × 4 categories (Password, Savings, etc.).
                     Builder(
                       builder: (context) {
                         final entries = _kSpendingCategories.entries.toList();
@@ -1392,9 +1752,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                                                     : null,
                                                 color: selected ? null : fieldBg,
                                                 borderRadius: BorderRadius.circular(14),
-                                                border: Border.all(
-                                                  color: selected ? Colors.transparent : muted.withValues(alpha: 0.22),
-                                                ),
+                                                border: Border.all(color: selected ? Colors.transparent : muted.withValues(alpha: 0.22)),
                                               ),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.min,
@@ -1406,11 +1764,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
                                                     textAlign: TextAlign.center,
-                                                    style: TextStyle(
-                                                      fontSize: 10.5,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: selected ? Colors.white : muted,
-                                                    ),
+                                                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: selected ? Colors.white : muted),
                                                   ),
                                                 ],
                                               ),
@@ -1427,13 +1781,113 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                         );
                       },
                     ),
+                    const SizedBox(height: 14),
+                    if (_isPassword) ...[
+                      Text('LABEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _descC,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Gmail, Bank login',
+                          hintStyle: TextStyle(color: muted),
+                          filled: true,
+                          fillColor: fieldBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('EMAIL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _emailC,
+                        keyboardType: TextInputType.emailAddress,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
+                        decoration: InputDecoration(
+                          hintText: 'email@example.com',
+                          hintStyle: TextStyle(color: muted),
+                          filled: true,
+                          fillColor: fieldBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('PASSWORD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _passC,
+                        obscureText: true,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
+                        decoration: InputDecoration(
+                          hintText: 'Password',
+                          hintStyle: TextStyle(color: muted),
+                          filled: true,
+                          fillColor: fieldBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4)),
+                        ),
+                      ),
+                    ] else ...[
+                      Text('AMOUNT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: fieldBg,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text('\$', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: ink.withValues(alpha: 0.55))),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _amountC,
+                                focusNode: _amountFocus,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: ink, height: 1.2),
+                                decoration: InputDecoration(
+                                  hintText: '0.00',
+                                  hintStyle: TextStyle(color: muted.withValues(alpha: 0.45), fontWeight: FontWeight.w800),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('FOR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _descC,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
+                        decoration: InputDecoration(
+                          hintText: 'What was it for?',
+                          hintStyle: TextStyle(color: muted),
+                          filled: true,
+                          fillColor: fieldBg,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: muted.withValues(alpha: 0.2))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 22),
                     FilledButton(
-                      onPressed: () => Navigator.pop(context, {
-                        'amount': _amountC.text.trim(),
-                        'description': _descC.text.trim(),
-                        'category': _category,
-                      }),
+                      onPressed: _save,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF8B5CF6),
                         foregroundColor: Colors.white,
@@ -1441,11 +1895,85 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
-                      child: const Text('Save spending', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                      child: Text(_isPassword ? 'Save password' : 'Save to card', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                     ),
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NgmyPinEssentialsSheet extends StatelessWidget {
+  const _NgmyPinEssentialsSheet({required this.notes, required this.alarms});
+
+  final List<NgmyBusinessNote> notes;
+  final List<NgmyHelperAlarmEntry> alarms;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: double.infinity,
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              children: [
+                Text('Pin to home card', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
+                const SizedBox(height: 6),
+                Text('Pick a Business Essentials note or alarm', style: TextStyle(fontSize: 12, color: muted)),
+                const SizedBox(height: 16),
+                Text('ALARMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                const SizedBox(height: 8),
+                if (alarms.isEmpty)
+                  Text('No alarms yet', style: TextStyle(color: muted))
+                else
+                  ...alarms.take(12).map(
+                    (a) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.alarm_rounded, color: Color(0xFFF97316)),
+                      title: Text(a.summaryLine, style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
+                      onTap: () => Navigator.pop(context, {'alarm': a.summaryLine, 'note': ''}),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                Text('NOTES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                const SizedBox(height: 8),
+                if (notes.isEmpty)
+                  Text('No essentials notes yet', style: TextStyle(color: muted))
+                else
+                  ...notes.take(16).map(
+                    (n) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFF60A5FA)),
+                      title: Text(n.preview, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
+                      subtitle: n.displayBody.trim().isEmpty
+                          ? null
+                          : Text(n.displayBody, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 12)),
+                      onTap: () => Navigator.pop(context, {
+                        'note': n.displayBody.trim().isEmpty ? n.preview : '${n.preview}\n${n.displayBody}'.trim(),
+                        'alarm': '',
+                      }),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

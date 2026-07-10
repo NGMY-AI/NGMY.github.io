@@ -201,9 +201,9 @@ class _TechFrameCard extends StatelessWidget {
     final glow = 0.35 + pulse * 0.35;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
         child: CustomPaint(
           painter: _HudFramePainter(
             colors: spec.colors,
@@ -217,6 +217,8 @@ class _TechFrameCard extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
+                width: double.infinity,
+                height: double.infinity,
                 padding: EdgeInsets.fromLTRB(wide ? 16 : 16, wide ? 12 : 16, wide ? 16 : 16, wide ? 12 : 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
