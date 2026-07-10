@@ -15606,8 +15606,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
-    // iPhone 14-class (~844) vs Pro Max (~932): tighten home stack on compact phones
-    // so Core / Vault aren't crushed under the floating bottom nav.
+    // Look stays identical. On compact phones only, allow a short swipe-up so
+    // Vault/Core clear the floating bottom nav (no frame redesign).
     final compactPhone = MediaQuery.sizeOf(context).height < 900;
     return ColoredBox(
       color: bg,
@@ -15620,6 +15620,50 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           final h = constraints.hasBoundedHeight && constraints.maxHeight.isFinite
               ? constraints.maxHeight
               : (MediaQuery.of(context).size.height - _ngmyBottomNavScrollPadding(context));
+          final bottomPad = _ngmyBottomNavScrollPadding(context);
+          final viewH = h - bottomPad;
+          // Extra height only on small phones → swipe lifts Vault above the menu.
+          final contentH = compactPhone ? viewH + 96 : viewH;
+          final homeColumn = SizedBox(
+            height: contentH,
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Slim icon row — Loan | animated NGMY | Local Growth.
+                Row(
+                  children: [
+                    widget.homeLeadingOverride ??
+                        _roundGlassButton(
+                          icon: Icons.attach_money_rounded,
+                          tooltip: 'Loan Service',
+                          onTap: () => NgmyNavigator.push(
+                            context,
+                            LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                            routeName: 'LoanServiceScreen',
+                          ),
+                        ),
+                    const Expanded(child: Center(child: NgmyHomeBrandBadge())),
+                    _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+                  ],
+                ),
+                if (widget.user.isOnFreeTrial) ...[
+                  const SizedBox(height: 6),
+                  _buildFreeTrialGlassBanner(isLight),
+                ],
+                // Room above cards so top peeks can show without pushing the deck down.
+                const SizedBox(height: 32),
+                NgmyHomeGlassCardsPanel(
+                  userEmail: widget.user.email,
+                  displayName: widget.user.username,
+                ),
+                // Extra air so tech frames sit a bit lower under the cards.
+                const SizedBox(height: 26),
+                // Tech HUD — Neural/Signal get the big first-creation frames again.
+                const Expanded(child: NgmyHomeTechFramesPanel()),
+              ],
+            ),
+          );
           return SizedBox(
             height: h,
             width: double.infinity,
@@ -15627,44 +15671,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 Positioned.fill(child: _homePastelBackdrop(isLight)),
                 Padding(
-          padding: EdgeInsets.fromLTRB(20, 2, 20, _ngmyBottomNavScrollPadding(context)),
-          child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-                      // Slim icon row — Loan | animated NGMY | Local Growth.
-                      Row(
-                        children: [
-                          widget.homeLeadingOverride ??
-                              _roundGlassButton(
-                                icon: Icons.attach_money_rounded,
-                                tooltip: 'Loan Service',
-                                onTap: () => NgmyNavigator.push(
-                                  context,
-                                  LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
-                                  routeName: 'LoanServiceScreen',
-                                ),
-                              ),
-                          const Expanded(child: Center(child: NgmyHomeBrandBadge())),
-                          _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
-                        ],
-                      ),
-              if (widget.user.isOnFreeTrial) ...[
-                const SizedBox(height: 6),
-                        _buildFreeTrialGlassBanner(isLight),
-                      ],
-                      // Room above cards so top peeks can show without pushing the deck down.
-                      SizedBox(height: compactPhone ? 18 : 32),
-                      NgmyHomeGlassCardsPanel(
-                        userEmail: widget.user.email,
-                        displayName: widget.user.username,
-                      ),
-                      // Extra air so tech frames sit a bit lower under the cards.
-                      SizedBox(height: compactPhone ? 14 : 26),
-                      // Tech HUD — Neural/Signal get the big first-creation frames again.
-                      // Clip so Core/Vault never paint under the bottom nav hit area.
-                      const Expanded(child: ClipRect(child: NgmyHomeTechFramesPanel())),
-                    ],
-                  ),
+                  padding: EdgeInsets.fromLTRB(20, 2, 20, bottomPad),
+                  child: compactPhone
+                      ? SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: homeColumn,
+                        )
+                      : homeColumn,
                 ),
               ],
             ),

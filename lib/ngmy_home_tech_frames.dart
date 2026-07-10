@@ -51,34 +51,21 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
 
   @override
   Widget build(BuildContext context) {
-    // iPhone 14 ~844pt tall; Pro Max ~932pt. Compact phones need swipe-up so
-    // Core / Vault aren't trapped under the floating bottom nav.
-    final screenH = MediaQuery.sizeOf(context).height;
-    final compactPhone = screenH < 900;
-
     return AnimatedBuilder(
       animation: Listenable.merge([_pulse, _scan, _orbit]),
       builder: (context, _) {
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
+        // Neural / Signal stay large; Core / Vault bars are taller too.
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            final avail = constraints.maxHeight;
-            // Large phones keep the locked layout; compact phones use slightly
-            // shorter bars so more of Core/Vault stays tappable before swipe.
-            final barH = compactPhone ? 88.0 : 96.0;
+            // Halfway back toward the previous 104px size (88 → 96).
+            const barH = 96.0;
             final bars = barH * 2 + gap * 2;
-            final topH = compactPhone
-                ? (avail - bars).clamp(150.0, 240.0)
-                : (avail - bars).clamp(200.0, 340.0);
-            // Extra scroll room on small phones so Vault can lift fully above the nav.
-            final scrollTail = compactPhone ? 72.0 : 0.0;
-            final contentH = topH + bars + scrollTail;
-            final needsLiftScroll = compactPhone && contentH > avail + 1;
-
-            final deck = Column(
+            final topH = (constraints.maxHeight - bars).clamp(200.0, 340.0);
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
@@ -132,20 +119,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                     onTap: () => _openExperience(_TechFrameSpec.vault),
                   ),
                 ),
-                if (scrollTail > 0) SizedBox(height: scrollTail),
               ],
-            );
-
-            if (!needsLiftScroll) {
-              // Big screens (e.g. iPhone 14 Pro Max): stay locked in place.
-              return deck;
-            }
-
-            return ClipRect(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                child: deck,
-              ),
             );
           },
         );
@@ -230,12 +204,11 @@ class _TechFrameCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
-    // Opaque hit target so Core / Vault register taps even when partially near the nav.
     return Material(
       color: Colors.transparent,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
         child: CustomPaint(
           painter: _HudFramePainter(
             colors: spec.colors,
@@ -249,8 +222,6 @@ class _TechFrameCard extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
-                width: double.infinity,
-                height: double.infinity,
                 padding: EdgeInsets.fromLTRB(wide ? 16 : 16, wide ? 12 : 16, wide ? 16 : 16, wide ? 12 : 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
