@@ -57,14 +57,13 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
-        // Give Neural / Signal a large fixed share of the remaining height so they
-        // stay roomy (icons + labels readable). Core / Vault stay compact bars.
+        // Neural / Signal stay large; Core / Vault bars are taller too.
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            const barH = 78.0;
+            const barH = 104.0;
             final bars = barH * 2 + gap * 2;
-            final topH = (constraints.maxHeight - bars).clamp(190.0, 320.0);
+            final topH = (constraints.maxHeight - bars).clamp(200.0, 340.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -248,8 +247,8 @@ class _TechFrameCard extends StatelessWidget {
   Widget _tallBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Keep orb inside its box (rings used to paint over the title).
-        final orb = (math.min(constraints.maxHeight * 0.42, constraints.maxWidth * 0.55)).clamp(64.0, 104.0);
+        // Big center orb — still leaves room for badge + title under it.
+        final orb = (math.min(constraints.maxHeight * 0.58, constraints.maxWidth * 0.72)).clamp(88.0, 140.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -271,7 +270,7 @@ class _TechFrameCard extends StatelessWidget {
                       pulse: pulse,
                       orbit: orbit,
                       kind: spec.kind,
-                      compact: true,
+                      compact: false,
                     ),
                   ),
                 ),
@@ -311,37 +310,37 @@ class _TechFrameCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 56,
-          height: 56,
+          width: 72,
+          height: 72,
           child: CustomPaint(
-            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: true),
+            painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: false),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _badge(),
-              const SizedBox(height: 5),
+              const SizedBox(height: 6),
               Text(
                 spec.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 1.1),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14.5, letterSpacing: 1.1),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 spec.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 24),
+        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 28),
       ],
     );
   }

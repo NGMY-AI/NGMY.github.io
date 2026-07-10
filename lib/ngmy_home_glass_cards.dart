@@ -239,15 +239,15 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   void _onVerticalDragUpdate(DragUpdateDetails d) {
     _animCtrl.stop();
     setState(() {
-      // Only the front card moves — drag down to send it away / reveal the deck above.
-      _frontDrag = (_frontDrag + d.delta.dy).clamp(0.0, 160.0);
+      // Only the front card moves — drag down to send it away / reveal the next card.
+      _frontDrag = (_frontDrag + d.delta.dy).clamp(0.0, 200.0);
     });
   }
 
   void _onVerticalDragEnd(DragEndDetails d) {
     final vy = d.velocity.pixelsPerSecond.dy;
     if (_frontDrag > _cycleThreshold || vy > 700) {
-      _animateFrontTo(220, onDone: _cycleFrontToBack);
+      _animateFrontTo(260, onDone: _cycleFrontToBack);
     } else {
       _animateFrontTo(0);
     }
@@ -275,6 +275,8 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     }
 
     final visibleCount = math.min(_maxBehind + 1, _order.length);
+    // As the front card drops, the 2nd card rises into place and becomes fully visible.
+    final revealT = (_frontDrag / _cycleThreshold).clamp(0.0, 1.0);
 
     return SizedBox(
       height: stackHeight,
@@ -289,15 +291,22 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
             // Back cards peek above the front (negative top). Deepest first.
             for (var i = visibleCount - 1; i >= 1; i--)
               Positioned(
-                top: -i * _peek,
+                // Card #2 slides into the front slot as the front is dragged down.
+                top: i == 1
+                    ? -_peek + revealT * _peek
+                    : -i * _peek + revealT * _peek * 0.35,
                 left: 0,
                 right: 0,
                 height: widget.height,
                 child: Transform.scale(
-                  scale: 1 - i * 0.03,
+                  scale: i == 1
+                      ? (1 - 0.03) + revealT * 0.03
+                      : 1 - i * 0.03,
                   alignment: Alignment.topCenter,
                   child: Opacity(
-                    opacity: (1 - i * 0.12).clamp(0.45, 0.9),
+                    opacity: i == 1
+                        ? (0.55 + revealT * 0.45).clamp(0.55, 1.0)
+                        : (1 - i * 0.12).clamp(0.45, 0.85),
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () => _bringIndexToFront(i),
@@ -305,7 +314,8 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
                         context,
                         _order[i],
                         isFront: false,
-                        revealDates: _frontDrag > 40,
+                        // Second card's date/content lights up as soon as the drag starts.
+                        revealDates: i == 1 ? revealT > 0.08 : revealT > 0.55,
                       ),
                     ),
                   ),
@@ -318,7 +328,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
               right: 0,
               height: widget.height,
               child: Opacity(
-                opacity: (1 - _frontDrag / 240).clamp(0.35, 1.0),
+                opacity: (1 - _frontDrag / 260).clamp(0.25, 1.0),
                 child: widget.cardBuilder(
                   context,
                   _order[0],
@@ -705,7 +715,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
       children: [
         if (_kind == _NgmyHomeCardKind.spending)
           NgmyGlassCardStack<NgmySpendingEntry>(
-            height: 220,
+            height: 252,
             items: _spending,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
@@ -748,7 +758,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
           )
         else
           NgmyGlassCardStack<NgmyHomeNote>(
-            height: 220,
+            height: 252,
             items: _notes,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
