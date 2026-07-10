@@ -64,7 +64,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
             // Halfway back toward the previous 104px size (88 → 96).
             const barH = 96.0;
             final bars = barH * 2 + gap * 2;
-            final topH = (constraints.maxHeight - bars).clamp(200.0, 340.0);
+            // Use whatever height is left — never force a min that overflows and
+            // draws a hard clipped "box" edge around the frames.
+            final topH = (constraints.maxHeight - bars).clamp(0.0, 340.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
