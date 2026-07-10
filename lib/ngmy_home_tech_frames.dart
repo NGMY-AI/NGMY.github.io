@@ -66,7 +66,8 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
             final bars = barH * 2 + gap * 2;
             // Use whatever height is left — never force a min that overflows and
             // draws a hard clipped "box" edge around the frames.
-            final topH = (constraints.maxHeight - bars).clamp(0.0, 340.0);
+            // Neural / Signal get a higher ceiling so they read bigger.
+            final topH = (constraints.maxHeight - bars).clamp(0.0, 440.0);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -251,7 +252,7 @@ class _TechFrameCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Big center orb — still leaves room for badge + title under it.
-        final orb = (math.min(constraints.maxHeight * 0.58, constraints.maxWidth * 0.72)).clamp(88.0, 140.0);
+        final orb = (math.min(constraints.maxHeight * 0.62, constraints.maxWidth * 0.78)).clamp(100.0, 172.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

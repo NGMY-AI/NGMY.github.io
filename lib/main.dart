@@ -15655,8 +15655,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         userEmail: widget.user.email,
                         displayName: widget.user.username,
                       ),
-                      // Extra air so tech frames sit a bit lower under the cards.
-                      const SizedBox(height: 26),
+                      // Less gap under cards so Neural / Signal can grow taller.
+                      const SizedBox(height: 12),
                       // Tech HUD — Neural/Signal get the big first-creation frames again.
                       const Expanded(child: NgmyHomeTechFramesPanel()),
                     ],
