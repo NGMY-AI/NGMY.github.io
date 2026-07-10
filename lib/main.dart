@@ -15628,7 +15628,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-                      // Slim icon row only — no "NGMY Assistant" / "NGMY AI HOME" titles.
+                      // Slim icon row — Loan | animated NGMY | Local Growth.
                       Row(
                         children: [
                           widget.homeLeadingOverride ??
@@ -15641,7 +15641,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   routeName: 'LoanServiceScreen',
                                 ),
                               ),
-                          const Spacer(),
+                          const Expanded(child: Center(child: NgmyHomeBrandBadge())),
                           _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
                         ],
                       ),

@@ -17,6 +17,7 @@ class NgmySpendingEntry {
     required this.description,
     required this.category,
     required this.date,
+    this.note = '',
   });
 
   final String id;
@@ -24,6 +25,25 @@ class NgmySpendingEntry {
   final String description;
   final String category;
   final DateTime date;
+  /// Per-card note (each spending card keeps its own).
+  final String note;
+
+  NgmySpendingEntry copyWith({
+    String? id,
+    double? amount,
+    String? description,
+    String? category,
+    DateTime? date,
+    String? note,
+  }) =>
+      NgmySpendingEntry(
+        id: id ?? this.id,
+        amount: amount ?? this.amount,
+        description: description ?? this.description,
+        category: category ?? this.category,
+        date: date ?? this.date,
+        note: note ?? this.note,
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -31,6 +51,7 @@ class NgmySpendingEntry {
         'description': description,
         'category': category,
         'date': date.toIso8601String(),
+        'note': note,
       };
 
   factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) => NgmySpendingEntry(
@@ -39,6 +60,7 @@ class NgmySpendingEntry {
         description: j['description']?.toString() ?? '',
         category: j['category']?.toString() ?? 'Other',
         date: DateTime.tryParse(j['date']?.toString() ?? '') ?? DateTime.now(),
+        note: j['note']?.toString() ?? '',
       );
 }
 
@@ -444,7 +466,7 @@ class NgmyFrostedCard extends StatelessWidget {
   final Widget? footer;
   final bool isFront;
   final bool showDateTab;
-  /// Front card: top tab becomes welcome + @name; top-right glass chip shows current date above X/+.
+  /// Front card: left glass chip = welcome + @name; right = date chip above X/+.
   final String? welcomeName;
 
   @override
@@ -455,14 +477,12 @@ class NgmyFrostedCard extends StatelessWidget {
     final showWelcome = isFront && rawName.isNotEmpty;
     final todayLabel = ngmyHomeDateTabLabel(DateTime.now());
     final handle = rawName.startsWith('@') ? rawName : '@$rawName';
-    // Extra top room so date chip sits above the X / + buttons.
-    final topPad = showWelcome ? 22.0 : 16.0;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
         Padding(
-          padding: EdgeInsets.only(top: topPad),
+          padding: const EdgeInsets.only(top: 16),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
@@ -513,10 +533,17 @@ class NgmyFrostedCard extends StatelessWidget {
                         ),
                       ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(20, showWelcome ? 36 : 28, 48, 16),
+                      padding: EdgeInsets.fromLTRB(showWelcome ? 14 : 20, showWelcome ? 58 : 28, 48, 16),
                       child: child,
                     ),
-                    // Top-right: date glass chip, then X / + a bit lower under it.
+                    // LEFT corner (opposite date/X): welcome + @name in a glass frame.
+                    if (showWelcome)
+                      Positioned(
+                        left: 10,
+                        top: 8,
+                        child: _WelcomeGlassFrame(greeting: 'Hey welcome back', handle: handle),
+                      ),
+                    // RIGHT corner: date chip on top, then X / + below it.
                     if (isFront && (showWelcome || onDelete != null || onAdd != null))
                       Positioned(
                         right: 10,
@@ -547,13 +574,8 @@ class NgmyFrostedCard extends StatelessWidget {
             ),
           ),
         ),
-        // Top tab: welcome + @name (same spot the date tab used to be).
-        if (showWelcome)
-          Positioned(
-            top: 0,
-            child: _NgmyWelcomeTab(greeting: 'Hey welcome back', handle: handle),
-          )
-        else if (showDateTab)
+        // Center top tab stays the card's own date (not welcome).
+        if (showDateTab)
           Positioned(
             top: 0,
             child: _NgmyDateTab(label: dateLabel, emphasized: isFront),
@@ -605,52 +627,164 @@ class _GlassChip extends StatelessWidget {
   }
 }
 
-class _NgmyWelcomeTab extends StatelessWidget {
-  const _NgmyWelcomeTab({required this.greeting, required this.handle});
+class _WelcomeGlassFrame extends StatelessWidget {
+  const _WelcomeGlassFrame({required this.greeting, required this.handle});
 
   final String greeting;
   final String handle;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DateTabPainter(emphasized: true),
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 176, maxWidth: 240),
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 9),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              greeting,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-                color: Colors.white.withValues(alpha: 0.95),
-                shadows: const [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))],
-              ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 150),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.10),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              handle,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.3,
-                color: Colors.white,
-                shadows: [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))],
+            border: Border.all(color: Colors.white.withValues(alpha: 0.48)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                greeting,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white.withValues(alpha: 0.95),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Animated capital NGMY glass badge — sits between Loan Service and Local Growth.
+class NgmyHomeBrandBadge extends StatefulWidget {
+  const NgmyHomeBrandBadge({super.key});
+
+  @override
+  State<NgmyHomeBrandBadge> createState() => _NgmyHomeBrandBadgeState();
+}
+
+class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final AnimationController _shimmer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+    _shimmer = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return AnimatedBuilder(
+      animation: Listenable.merge([_pulse, _shimmer]),
+      builder: (context, _) {
+        final pulse = Curves.easeInOut.transform(_pulse.value);
+        final shimmer = _shimmer.value;
+        final glow = 0.18 + pulse * 0.22;
+        final scale = 1.0 + pulse * 0.035;
+        return Transform.scale(
+          scale: scale,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
+                    end: Alignment(1.2 - shimmer * 2.4, 0.6),
+                    colors: isLight
+                        ? [
+                            const Color(0xFF60A5FA).withValues(alpha: 0.22 + pulse * 0.12),
+                            Colors.white.withValues(alpha: 0.55),
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.18 + pulse * 0.10),
+                          ]
+                        : [
+                            const Color(0xFF60A5FA).withValues(alpha: 0.28 + pulse * 0.14),
+                            Colors.white.withValues(alpha: 0.12),
+                            const Color(0xFFA78BFA).withValues(alpha: 0.26 + pulse * 0.12),
+                          ],
+                  ),
+                  border: Border.all(
+                    color: (isLight ? const Color(0xFF4A55D9) : Colors.white).withValues(alpha: 0.35 + pulse * 0.25),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF60A5FA).withValues(alpha: glow),
+                      blurRadius: 14 + pulse * 10,
+                      spreadRadius: 0.5,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: glow * 0.7),
+                      blurRadius: 18 + pulse * 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'NGMY',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.8 + pulse * 0.6,
+                    color: isLight ? const Color(0xFF171633) : Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.35 + pulse * 0.25),
+                        blurRadius: 8 + pulse * 6,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -753,6 +887,16 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
   }
 
+  Future<void> _setCardNote(String spendingId, String note) async {
+    setState(() {
+      _spending = [
+        for (final e in _spending)
+          if (e.id == spendingId) e.copyWith(note: note) else e,
+      ];
+    });
+    await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+  }
+
   Future<void> _addNote(String text) async {
     final note = NgmyHomeNote(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, createdAt: DateTime.now());
     setState(() => _notes = [note, ..._notes]);
@@ -794,29 +938,44 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     }
   }
 
-  Widget _modePill() {
+  Future<void> _openCardNoteEditor(NgmySpendingEntry entry) async {
+    final text = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _NgmyAddNoteSheet(initialText: entry.note, title: 'Card note'),
+    );
+    if (text == null) return;
+    await _setCardNote(entry.id, text.trim());
+  }
+
+  Widget _modePill({VoidCallback? onNotesTap, String? notesLabel}) {
     final spending = _kind == _NgmyHomeCardKind.spending;
+    final isCardNote = notesLabel != null;
+    final colors = isCardNote
+        ? const [Color(0xFF38BDF8), Color(0xFF6366F1)]
+        : spending
+            ? const [Color(0xFFEF4444), Color(0xFFDC2626)]
+            : const [Color(0xFFF59E0B), Color(0xFFEC4899)];
     return GestureDetector(
-      onTap: () => setState(() => _kind = spending ? _NgmyHomeCardKind.notes : _NgmyHomeCardKind.spending),
+      onTap: onNotesTap ??
+          () => setState(() => _kind = spending ? _NgmyHomeCardKind.notes : _NgmyHomeCardKind.spending),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          gradient: LinearGradient(
-            colors: spending
-                ? const [Color(0xFFEF4444), Color(0xFFDC2626)]
-                : const [Color(0xFFF59E0B), Color(0xFFEC4899)],
-          ),
+          gradient: LinearGradient(colors: colors),
           boxShadow: [
             BoxShadow(
-              color: (spending ? const Color(0xFFEF4444) : const Color(0xFFEC4899)).withValues(alpha: 0.4),
+              color: colors.last.withValues(alpha: 0.4),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Text(
-          spending ? 'SPENDING' : 'NOTES',
+          notesLabel ?? (spending ? 'SPENDING' : 'NOTES'),
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.1),
         ),
       ),
@@ -881,7 +1040,19 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               welcomeName: isFront ? name : null,
               onDelete: isFront ? () => _deleteSpending(entry.id) : null,
               onAdd: isFront ? _openAddSheet : null,
-              footer: isFront ? _modePill() : null,
+              footer: isFront
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _modePill(),
+                        const SizedBox(width: 8),
+                        _modePill(
+                          notesLabel: entry.note.trim().isEmpty ? 'ADD NOTE' : 'NOTE',
+                          onNotesTap: () => _openCardNoteEditor(entry),
+                        ),
+                      ],
+                    )
+                  : null,
               child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
             ),
           )
@@ -943,6 +1114,7 @@ class _SpendingCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardNote = entry.note.trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 36),
       child: Column(
@@ -997,6 +1169,21 @@ class _SpendingCardContent extends StatelessWidget {
               ),
             ],
           ),
+          if (cardNote.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              cardNote,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+                color: Colors.white.withValues(alpha: 0.82),
+              ),
+            ),
+          ],
           const Spacer(),
         ],
       ),
@@ -1305,14 +1492,23 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
 }
 
 class _NgmyAddNoteSheet extends StatefulWidget {
-  const _NgmyAddNoteSheet();
+  const _NgmyAddNoteSheet({this.initialText = '', this.title = 'New note'});
+
+  final String initialText;
+  final String title;
 
   @override
   State<_NgmyAddNoteSheet> createState() => _NgmyAddNoteSheetState();
 }
 
 class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
-  final _textC = TextEditingController();
+  late final TextEditingController _textC;
+
+  @override
+  void initState() {
+    super.initState();
+    _textC = TextEditingController(text: widget.initialText);
+  }
 
   @override
   void dispose() {
@@ -1381,7 +1577,7 @@ class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('New note', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
+                              Text(widget.title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
                               Text('Stays on this device only', style: TextStyle(fontSize: 12, color: muted)),
                             ],
                           ),
