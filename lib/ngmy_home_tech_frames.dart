@@ -57,39 +57,44 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
-        // Restore original large frame sizes (Expanded top pair + fixed-height wide frames).
+        // Neural / Signal get the big first-creation frames again (majority of height).
+        // Core + Vault stay as wide bars underneath without crushing the top pair.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _TechFrameCard(
-                      spec: _TechFrameSpec.neural,
-                      pulse: pulse,
-                      scan: scan,
-                      orbit: orbit,
-                      onTap: () => _openExperience(_TechFrameSpec.neural),
+              flex: 5,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 168),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _TechFrameCard(
+                        spec: _TechFrameSpec.neural,
+                        pulse: pulse,
+                        scan: scan,
+                        orbit: orbit,
+                        onTap: () => _openExperience(_TechFrameSpec.neural),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _TechFrameCard(
-                      spec: _TechFrameSpec.signal,
-                      pulse: pulse,
-                      scan: (scan + 0.35) % 1.0,
-                      orbit: (orbit + 0.22) % 1.0,
-                      onTap: () => _openExperience(_TechFrameSpec.signal),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _TechFrameCard(
+                        spec: _TechFrameSpec.signal,
+                        pulse: pulse,
+                        scan: (scan + 0.35) % 1.0,
+                        orbit: (orbit + 0.22) % 1.0,
+                        onTap: () => _openExperience(_TechFrameSpec.signal),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             SizedBox(
-              height: 118,
+              height: 96,
               child: _TechFrameCard(
                 spec: _TechFrameSpec.core,
                 pulse: pulse,
@@ -99,9 +104,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                 onTap: () => _openExperience(_TechFrameSpec.core),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             SizedBox(
-              height: 118,
+              height: 96,
               child: _TechFrameCard(
                 spec: _TechFrameSpec.vault,
                 pulse: pulse,
@@ -236,42 +241,49 @@ class _TechFrameCard extends StatelessWidget {
   }
 
   Widget _tallBody() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final orb = (constraints.maxHeight * 0.38).clamp(56.0, 88.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _badge(),
-            const Spacer(),
-            Icon(spec.icon, size: 18, color: Colors.white.withValues(alpha: 0.85 + pulse * 0.15)),
-          ],
-        ),
-        const Spacer(),
-        Center(
-          child: SizedBox(
-            width: 72,
-            height: 72,
-            child: CustomPaint(
-              painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind),
+            Row(
+              children: [
+                _badge(),
+                const Spacer(),
+                Icon(spec.icon, size: 20, color: Colors.white.withValues(alpha: 0.85 + pulse * 0.15)),
+              ],
             ),
-          ),
-        ),
-        const Spacer(),
-        Text(
-          spec.title,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.95),
-            fontWeight: FontWeight.w900,
-            fontSize: 12.5,
-            letterSpacing: 1.1,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          spec.subtitle,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w600),
-        ),
-      ],
+            const Spacer(),
+            Center(
+              child: SizedBox(
+                width: orb,
+                height: orb,
+                child: CustomPaint(
+                  painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind),
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              spec.title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              spec.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -279,33 +291,35 @@ class _TechFrameCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 78,
-          height: 78,
+          width: 64,
+          height: 64,
           child: CustomPaint(
             painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _badge(),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 spec.title,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1.2),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.2),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 spec.subtitle,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 28),
+        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 26),
       ],
     );
   }

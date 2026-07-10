@@ -15579,7 +15579,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 Positioned.fill(child: _homePastelBackdrop(isLight)),
                 Padding(
-          padding: EdgeInsets.fromLTRB(20, 6, 20, _ngmyBottomNavScrollPadding(context)),
+          padding: EdgeInsets.fromLTRB(20, 2, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -15601,13 +15601,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ],
                       ),
               if (widget.user.isOnFreeTrial) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                         _buildFreeTrialGlassBanner(isLight),
                       ],
-                      const SizedBox(height: 8),
+                      // Room above cards so top peeks can show without pushing the deck down.
+                      const SizedBox(height: 36),
                       NgmyHomeGlassCardsPanel(userEmail: widget.user.email),
-                      const SizedBox(height: 10),
-                      // Tech HUD frames — original large sizes; only nudged slightly upward.
+                      const SizedBox(height: 8),
+                      // Tech HUD — Neural/Signal get the big first-creation frames again.
                       const Expanded(child: NgmyHomeTechFramesPanel()),
                     ],
                   ),

@@ -175,7 +175,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   Animation<double>? _dragAnim;
 
   /// Peek strip for each card behind the front — peeks sit ABOVE the front card.
-  static const _peek = 16.0;
+  static const _peek = 14.0;
   /// Front + up to 4 cards behind it.
   static const _maxBehind = 4;
   static const _cycleThreshold = 90.0;
@@ -266,16 +266,15 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
 
   @override
   Widget build(BuildContext context) {
-    // Fixed height so fanning / dragging never pushes the tech frames below.
-    final peekReserve = _maxBehind * _peek;
-    final stackHeight = widget.height + peekReserve + 20;
+    // Front card stays pinned high. Extra cards peek UPWARD (overflow above),
+    // so more cards never push the deck or the tech frames down.
+    final stackHeight = widget.height + 12;
 
     if (_order.isEmpty) {
       return SizedBox(height: stackHeight, child: widget.emptyBuilder(context));
     }
 
     final visibleCount = math.min(_maxBehind + 1, _order.length);
-    final frontBaseY = peekReserve.toDouble();
 
     return SizedBox(
       height: stackHeight,
@@ -285,12 +284,12 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
         onVerticalDragEnd: _onVerticalDragEnd,
         onHorizontalDragEnd: _onHorizontalDragEnd,
         child: Stack(
-          clipBehavior: Clip.hardEdge,
+          clipBehavior: Clip.none,
           children: [
-            // Draw back cards first (deepest first), peeks above the front.
+            // Back cards peek above the front (negative top). Deepest first.
             for (var i = visibleCount - 1; i >= 1; i--)
               Positioned(
-                top: frontBaseY - i * _peek,
+                top: -i * _peek,
                 left: 0,
                 right: 0,
                 height: widget.height,
@@ -306,16 +305,15 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
                         context,
                         _order[i],
                         isFront: false,
-                        // Dates stay as designed: only emphasize when near front / after open drag.
                         revealDates: _frontDrag > 40,
                       ),
                     ),
                   ),
                 ),
               ),
-            // Front card — the one that moves on swipe down.
+            // Front card — always starts at the top of this stack.
             Positioned(
-              top: frontBaseY + _frontDrag,
+              top: _frontDrag,
               left: 0,
               right: 0,
               height: widget.height,
