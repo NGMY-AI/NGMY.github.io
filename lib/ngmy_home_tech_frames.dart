@@ -57,11 +57,11 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
+        // Restore original large frame sizes (Expanded top pair + fixed-height wide frames).
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 5,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -74,7 +74,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                       onTap: () => _openExperience(_TechFrameSpec.neural),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: _TechFrameCard(
                       spec: _TechFrameSpec.signal,
@@ -87,9 +87,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              flex: 3,
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 118,
               child: _TechFrameCard(
                 spec: _TechFrameSpec.core,
                 pulse: pulse,
@@ -99,9 +99,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
                 onTap: () => _openExperience(_TechFrameSpec.core),
               ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              flex: 3,
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 118,
               child: _TechFrameCard(
                 spec: _TechFrameSpec.vault,
                 pulse: pulse,

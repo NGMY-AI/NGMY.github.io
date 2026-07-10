@@ -169,23 +169,24 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
 
 class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with SingleTickerProviderStateMixin {
   late List<T> _order;
-  /// 0 = collapsed (front card on top). Positive = how far the deck is fanned open (Apple Wallet style).
-  double _spread = 0;
+  /// How far the front card has been pulled down (only the front moves).
+  double _frontDrag = 0;
   late final AnimationController _animCtrl;
-  Animation<double>? _spreadAnim;
+  Animation<double>? _dragAnim;
 
-  /// Collapsed: clear stacked peeks so you see a deck of cards.
-  static const _peek = 28.0;
-  /// How far the wallet fans open when you swipe down (Apple Wallet style).
-  static const _maxSpread = 168.0;
+  /// Peek strip for each card behind the front — peeks sit ABOVE the front card.
+  static const _peek = 16.0;
+  /// Front + up to 4 cards behind it.
+  static const _maxBehind = 4;
+  static const _cycleThreshold = 90.0;
 
   @override
   void initState() {
     super.initState();
     _order = List.of(widget.items);
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 320))
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 280))
       ..addListener(() {
-        if (_spreadAnim != null) setState(() => _spread = _spreadAnim!.value);
+        if (_dragAnim != null) setState(() => _frontDrag = _dragAnim!.value);
       });
   }
 
@@ -194,7 +195,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     super.didUpdateWidget(oldWidget);
     if (oldWidget.items.length != widget.items.length || !identical(oldWidget.items, widget.items)) {
       _order = List.of(widget.items);
-      _spread = 0;
+      _frontDrag = 0;
       _animCtrl.stop();
     }
   }
@@ -205,12 +206,24 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     super.dispose();
   }
 
-  void _animateSpreadTo(double target, {VoidCallback? onDone}) {
-    _spreadAnim = Tween<double>(begin: _spread, end: target).animate(
+  void _animateFrontTo(double target, {VoidCallback? onDone}) {
+    _dragAnim = Tween<double>(begin: _frontDrag, end: target).animate(
       CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
     );
     _animCtrl.forward(from: 0).whenComplete(() {
       if (mounted && onDone != null) onDone();
+    });
+  }
+
+  void _cycleFrontToBack() {
+    if (_order.length < 2) {
+      setState(() => _frontDrag = 0);
+      return;
+    }
+    setState(() {
+      final front = _order.removeAt(0);
+      _order.add(front);
+      _frontDrag = 0;
     });
   }
 
@@ -219,54 +232,50 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     setState(() {
       final picked = _order.removeAt(index);
       _order.insert(0, picked);
-      _spread = 0;
+      _frontDrag = 0;
     });
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails d) {
     _animCtrl.stop();
     setState(() {
-      // Drag down opens the wallet fan; drag up closes it.
-      _spread = (_spread + d.delta.dy * 1.15).clamp(0.0, _maxSpread);
+      // Only the front card moves — drag down to send it away / reveal the deck above.
+      _frontDrag = (_frontDrag + d.delta.dy).clamp(0.0, 160.0);
     });
   }
 
   void _onVerticalDragEnd(DragEndDetails d) {
     final vy = d.velocity.pixelsPerSecond.dy;
-    if (_spread > _maxSpread * 0.28 || vy > 450) {
-      _animateSpreadTo(_maxSpread);
-    } else if (vy < -450) {
-      _animateSpreadTo(0);
+    if (_frontDrag > _cycleThreshold || vy > 700) {
+      _animateFrontTo(220, onDone: _cycleFrontToBack);
     } else {
-      _animateSpreadTo(_spread > _maxSpread * 0.5 ? _maxSpread : 0);
+      _animateFrontTo(0);
     }
   }
 
   void _onHorizontalDragEnd(DragEndDetails d) {
     final vx = d.velocity.pixelsPerSecond.dx;
     if (vx.abs() < 500) return;
-    // Horizontal flick cycles front card.
     if (_order.length < 2) return;
     setState(() {
       final front = _order.removeAt(0);
       _order.add(front);
-      _spread = 0;
+      _frontDrag = 0;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Fixed height so fanning / dragging never pushes the tech frames below.
+    final peekReserve = _maxBehind * _peek;
+    final stackHeight = widget.height + peekReserve + 20;
+
     if (_order.isEmpty) {
-      return SizedBox(height: widget.height + 28, child: widget.emptyBuilder(context));
+      return SizedBox(height: stackHeight, child: widget.emptyBuilder(context));
     }
 
-    final openT = (_spread / _maxSpread).clamp(0.0, 1.0);
-    final visibleCount = math.min(6, _order.length);
-    final lastDepth = visibleCount - 1;
-    final lastCollapsedY = lastDepth * _peek;
-    final lastOpenY = lastDepth * (56.0 + openT * 28);
-    final lastDy = lastCollapsedY + (lastOpenY - lastCollapsedY) * openT;
-    final stackHeight = widget.height + 36 + lastDy;
+    final visibleCount = math.min(_maxBehind + 1, _order.length);
+    final frontBaseY = peekReserve.toDouble();
 
     return SizedBox(
       height: stackHeight,
@@ -276,67 +285,53 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
         onVerticalDragEnd: _onVerticalDragEnd,
         onHorizontalDragEnd: _onHorizontalDragEnd,
         child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.topCenter,
+          clipBehavior: Clip.hardEdge,
           children: [
-            for (var i = visibleCount - 1; i >= 0; i--) _buildLayer(i, visibleCount, openT),
+            // Draw back cards first (deepest first), peeks above the front.
+            for (var i = visibleCount - 1; i >= 1; i--)
+              Positioned(
+                top: frontBaseY - i * _peek,
+                left: 0,
+                right: 0,
+                height: widget.height,
+                child: Transform.scale(
+                  scale: 1 - i * 0.03,
+                  alignment: Alignment.topCenter,
+                  child: Opacity(
+                    opacity: (1 - i * 0.12).clamp(0.45, 0.9),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => _bringIndexToFront(i),
+                      child: widget.cardBuilder(
+                        context,
+                        _order[i],
+                        isFront: false,
+                        // Dates stay as designed: only emphasize when near front / after open drag.
+                        revealDates: _frontDrag > 40,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // Front card — the one that moves on swipe down.
+            Positioned(
+              top: frontBaseY + _frontDrag,
+              left: 0,
+              right: 0,
+              height: widget.height,
+              child: Opacity(
+                opacity: (1 - _frontDrag / 240).clamp(0.35, 1.0),
+                child: widget.cardBuilder(
+                  context,
+                  _order[0],
+                  isFront: true,
+                  revealDates: true,
+                ),
+              ),
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildLayer(int depth, int visibleCount, double openT) {
-    final isFront = depth == 0;
-    // Collapsed: visible stacked deck. Swipe down → cards roll forward (Apple Wallet).
-    final collapsedY = depth * _peek;
-    final openY = depth * (56.0 + openT * 28);
-    final dy = collapsedY + (openY - collapsedY) * openT;
-    final scale = isFront ? 1.0 : (0.96 - depth * 0.018) + openT * 0.03;
-    // Keep date tabs as designed: front always; back cards only when fanned open.
-    final revealDates = isFront || openT > 0.28;
-    final dim = isFront ? 1.0 : (0.55 + openT * 0.4).clamp(0.55, 0.95);
-
-    Widget card = Transform.translate(
-      offset: Offset(0, dy),
-      child: Transform.scale(
-        scale: scale,
-        alignment: Alignment.topCenter,
-        child: Opacity(
-          opacity: dim,
-          child: SizedBox(
-            height: widget.height,
-            width: double.infinity,
-            child: widget.cardBuilder(
-              context,
-              _order[depth],
-              isFront: isFront,
-              revealDates: revealDates,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (!isFront) {
-      card = GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          if (openT > 0.28) {
-            _bringIndexToFront(depth);
-          } else {
-            _animateSpreadTo(_maxSpread);
-          }
-        },
-        child: card,
-      );
-    }
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: card,
     );
   }
 }
