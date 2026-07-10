@@ -40,6 +40,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   final GlobalKey _captureKey = GlobalKey();
   TextEditingController? _activeField;
   String? _selectedElementId;
+  int _galleryReload = 0;
 
   static const _businessEmojis = [
     '💼', '📇', '✨', '🏢', '💡', '🎯', '⭐', '🔥', '💎', '🚀',
@@ -165,6 +166,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     _applyControllersToDoc();
     await saveNgmyBusinessCard(_doc.toJson(), userEmail: widget.userEmail);
     if (!mounted) return;
+    setState(() => _galleryReload++);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Business card saved on this device.'), backgroundColor: Color(0xFF16A34A)),
     );
@@ -392,6 +394,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
         Text('Saved cards', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
         const SizedBox(height: 8),
         NgmyBusinessCardGallery(
+          key: ValueKey('biz-gallery-$_galleryReload'),
           userEmail: widget.userEmail,
           onOpen: loadDocument,
         ),
@@ -891,7 +894,7 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
 }
 
 /// Saved cards gallery for Market Hub frame 4.
-class NgmyBusinessCardGallery extends StatelessWidget {
+class NgmyBusinessCardGallery extends StatefulWidget {
   const NgmyBusinessCardGallery({
     super.key,
     required this.userEmail,
@@ -902,10 +905,57 @@ class NgmyBusinessCardGallery extends StatelessWidget {
   final ValueChanged<NgmyBusinessCardDocument> onOpen;
 
   @override
+  State<NgmyBusinessCardGallery> createState() => _NgmyBusinessCardGalleryState();
+}
+
+class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = loadNgmyBusinessCards(userEmail: widget.userEmail);
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyBusinessCardGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userEmail != widget.userEmail) {
+      _future = loadNgmyBusinessCards(userEmail: widget.userEmail);
+    }
+  }
+
+  void _reload() {
+    setState(() => _future = loadNgmyBusinessCards(userEmail: widget.userEmail));
+  }
+
+  Future<void> _deleteCard(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete business card?'),
+        content: const Text('This removes the saved card from this device.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await deleteNgmyBusinessCard(id, userEmail: widget.userEmail);
+    if (!mounted) return;
+    _reload();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: loadNgmyBusinessCards(userEmail: userEmail),
+      future: _future,
       builder: (context, snap) {
         final raw = snap.data ?? [];
         if (snap.connectionState == ConnectionState.waiting && raw.isEmpty) {
@@ -920,34 +970,50 @@ class NgmyBusinessCardGallery extends StatelessWidget {
         return Column(
           children: raw.take(8).map((entry) {
             final doc = NgmyBusinessCardDocument.fromJson(entry);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: t.listItemBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: t.border),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 96,
-                    child: NgmyBusinessCardPreview(document: doc, width: 96, interactive: false),
+            return Stack(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: t.listItemBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: t.border),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(doc.fullName, style: TextStyle(color: t.title, fontWeight: FontWeight.w800)),
-                        Text(doc.company, style: TextStyle(color: t.subtitle, fontSize: 11)),
-                        Text(doc.template.name, style: TextStyle(color: t.muted, fontSize: 10)),
-                      ],
-                    ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 96,
+                        child: NgmyBusinessCardPreview(document: doc, width: 96, interactive: false),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(doc.fullName, style: TextStyle(color: t.title, fontWeight: FontWeight.w800)),
+                            Text(doc.company, style: TextStyle(color: t.subtitle, fontSize: 11)),
+                            Text(doc.template.name, style: TextStyle(color: t.muted, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      TextButton(onPressed: () => widget.onOpen(doc), child: const Text('Open')),
+                    ],
                   ),
-                  TextButton(onPressed: () => onOpen(doc), child: const Text('Open')),
-                ],
-              ),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: IconButton(
+                    tooltip: 'Delete card',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                    onPressed: () => _deleteCard(doc.id),
+                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: t.muted),
+                  ),
+                ),
+              ],
             );
           }).toList(),
         );

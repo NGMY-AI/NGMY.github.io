@@ -776,7 +776,8 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     return SizedBox(
       height: stackHeight,
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+        // Only the cards themselves — opaque empty space was blocking Core/Vault below.
+        behavior: HitTestBehavior.deferToChild,
         onVerticalDragUpdate: _onVerticalDragUpdate,
         onVerticalDragEnd: _onVerticalDragEnd,
         onHorizontalDragEnd: _onHorizontalDragEnd,
@@ -3060,7 +3061,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                               onTap: _pickBusinessCard,
                               t: t,
                               phase: 2,
-                              accent: const [Color(0xFFA78BFA), Color(0xFFEC4899)],
+                              accent: const [Color(0xFF38BDF8), Color(0xFF6366F1)],
                             ),
                             const SizedBox(height: 16),
                             Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),

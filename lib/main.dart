@@ -15078,58 +15078,66 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget _buildBottomNavBar() {
     const orb = NgmyBottomNavMetrics.selectionOrb;
     const barH = NgmyBottomNavMetrics.barHeight;
-    // No full-size Material wrapper — that was absorbing taps over Vault Channel.
-    // Only the pill itself (and its tab InkWells) should receive hits.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 0, 15, 20),
-      child: SafeArea(
-        top: false,
-        child: Material(
-          type: MaterialType.transparency,
-          elevation: 0,
-          color: Colors.transparent,
-          child: NgmySculptedBottomNavFrame(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final tabW = constraints.maxWidth / 7;
-                final ballLeft = _idx * tabW + (tabW - orb) / 2;
-                final ballTop = (barH - orb) / 2;
-                final accent = switch (_idx) {
-                  3 => const Color(0xFFBB86FC),
-                  4 => kNgmyAdvisorsHubAccent,
-                  5 => const Color(0xFF8B5CF6),
-                  _ => const Color(0xFF67E8F9),
-                };
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.easeOutCubic,
-                      left: ballLeft,
-                      top: ballTop,
-                      width: orb,
-                      height: orb,
-                      child: NgmyNavSelectionOrb(size: orb, accent: accent),
-                    ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+    // extendBody stacks this over the body. Size a slot for layout, but only the
+    // pill itself hit-tests — empty space above must pass through to Core/Vault.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return SizedBox(
+      height: barH + 20 + bottomInset,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 15,
+            right: 15,
+            bottom: 20 + bottomInset,
+            height: barH,
+            child: Material(
+              type: MaterialType.transparency,
+              elevation: 0,
+              color: Colors.transparent,
+              child: NgmySculptedBottomNavFrame(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tabW = constraints.maxWidth / 7;
+                    final ballLeft = _idx * tabW + (tabW - orb) / 2;
+                    final ballTop = (barH - orb) / 2;
+                    final accent = switch (_idx) {
+                      3 => const Color(0xFFBB86FC),
+                      4 => kNgmyAdvisorsHubAccent,
+                      5 => const Color(0xFF8B5CF6),
+                      _ => const Color(0xFF67E8F9),
+                    };
+                    return Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        _nav(0, Icons.home_rounded),
-                        _navToolHub(),
-                        _nav(2, Icons.auto_stories_rounded),
-                        _navC(3),
-                        _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
-                        _navStudio(),
-                        _nav(6, Icons.person_rounded),
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 320),
+                          curve: Curves.easeOutCubic,
+                          left: ballLeft,
+                          top: ballTop,
+                          width: orb,
+                          height: orb,
+                          child: IgnorePointer(child: NgmyNavSelectionOrb(size: orb, accent: accent)),
+                        ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _nav(0, Icons.home_rounded),
+                            _navToolHub(),
+                            _nav(2, Icons.auto_stories_rounded),
+                            _navC(3),
+                            _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
+                            _navStudio(),
+                            _nav(6, Icons.person_rounded),
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -15624,7 +15632,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             width: double.infinity,
             child: Stack(
               children: [
-                Positioned.fill(child: _homePastelBackdrop(isLight)),
+                Positioned.fill(
+                  child: IgnorePointer(child: _homePastelBackdrop(isLight)),
+                ),
                 // Scroll only so a small Neural/Signal bump can push Core/Vault down
                 // without shrinking the cards above. No ClipRect / hard cut edges.
                 Padding(
@@ -22083,7 +22093,8 @@ class LoanServiceScreen extends StatelessWidget {
 
 /// Scroll padding so list content can pass behind the floating bottom nav (like Media).
 double _ngmyBottomNavScrollPadding(BuildContext context) {
-  return 110 + MediaQuery.paddingOf(context).bottom;
+  // Clear floating pill + outer pad so Core/Vault sit above the nav hit box.
+  return NgmyBottomNavMetrics.barHeight + 56 + MediaQuery.paddingOf(context).bottom;
 }
 
 class InvestScreen extends StatefulWidget {
