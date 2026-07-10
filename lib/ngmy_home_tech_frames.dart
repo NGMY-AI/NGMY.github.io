@@ -61,8 +61,8 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         return LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
-            // Slightly smaller than before so Neural/Signal keep more room.
-            const barH = 88.0;
+            // Halfway back toward the previous 104px size (88 → 96).
+            const barH = 96.0;
             final bars = barH * 2 + gap * 2;
             final topH = (constraints.maxHeight - bars).clamp(200.0, 340.0);
             return Column(
@@ -311,8 +311,8 @@ class _TechFrameCard extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 58,
-          height: 58,
+          width: 64,
+          height: 64,
           child: CustomPaint(
             painter: _OrbPainter(colors: spec.colors, pulse: pulse, orbit: orbit, kind: spec.kind, compact: true),
           ),
@@ -324,24 +324,24 @@ class _TechFrameCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _badge(),
-              const SizedBox(height: 4),
+              const SizedBox(height: 5),
               Text(
                 spec.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5, letterSpacing: 1.1),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1.1),
               ),
               const SizedBox(height: 2),
               Text(
                 spec.subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 24),
+        Icon(Icons.play_arrow_rounded, color: Colors.white.withValues(alpha: 0.75 + pulse * 0.25), size: 26),
       ],
     );
   }

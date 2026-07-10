@@ -444,21 +444,25 @@ class NgmyFrostedCard extends StatelessWidget {
   final Widget? footer;
   final bool isFront;
   final bool showDateTab;
-  /// When set on the front card: left side shows Hey welcome back + name; top-left shows current date.
+  /// Front card: top tab becomes welcome + @name; top-right glass chip shows current date above X/+.
   final String? welcomeName;
 
   @override
   Widget build(BuildContext context) {
     final glassAlpha = isFront ? 0.22 : 0.10;
     final borderAlpha = isFront ? 0.42 : 0.18;
-    final showWelcome = isFront && welcomeName != null && welcomeName!.trim().isNotEmpty;
+    final rawName = welcomeName?.trim() ?? '';
+    final showWelcome = isFront && rawName.isNotEmpty;
     final todayLabel = ngmyHomeDateTabLabel(DateTime.now());
+    final handle = rawName.startsWith('@') ? rawName : '@$rawName';
+    // Extra top room so date chip sits above the X / + buttons.
+    final topPad = showWelcome ? 22.0 : 16.0;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 16),
+          padding: EdgeInsets.only(top: topPad),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
@@ -509,67 +513,21 @@ class NgmyFrostedCard extends StatelessWidget {
                         ),
                       ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(showWelcome ? 16 : 20, showWelcome ? 36 : 28, 48, showWelcome ? 52 : 16),
+                      padding: EdgeInsets.fromLTRB(20, showWelcome ? 36 : 28, 48, 16),
                       child: child,
                     ),
-                    // Top-left (opposite the X): current date.
-                    if (showWelcome)
-                      Positioned(
-                        left: 14,
-                        top: 10,
-                        right: 56,
-                        child: Text(
-                          todayLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                            color: Colors.white.withValues(alpha: 0.90),
-                          ),
-                        ),
-                      ),
-                    // Bottom-left: Hey welcome back + user name.
-                    if (showWelcome)
-                      Positioned(
-                        left: 14,
-                        bottom: showWelcome && footer != null ? 40 : 14,
-                        right: 56,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Hey welcome back',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white.withValues(alpha: 0.92),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              welcomeName!.trim(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white.withValues(alpha: 0.98),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (isFront && (onDelete != null || onAdd != null))
+                    // Top-right: date glass chip, then X / + a bit lower under it.
+                    if (isFront && (showWelcome || onDelete != null || onAdd != null))
                       Positioned(
                         right: 10,
-                        top: 10,
+                        top: 8,
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+                            if (showWelcome) ...[
+                              _GlassChip(label: todayLabel),
+                              const SizedBox(height: 8),
+                            ],
                             if (onDelete != null) _GlassIconButton(icon: Icons.close_rounded, onTap: onDelete!),
                             if (onDelete != null && onAdd != null) const SizedBox(height: 8),
                             if (onAdd != null) _GlassIconButton(icon: Icons.add_rounded, onTap: onAdd!, filled: true),
@@ -589,12 +547,110 @@ class NgmyFrostedCard extends StatelessWidget {
             ),
           ),
         ),
-        if (showDateTab)
+        // Top tab: welcome + @name (same spot the date tab used to be).
+        if (showWelcome)
+          Positioned(
+            top: 0,
+            child: _NgmyWelcomeTab(greeting: 'Hey welcome back', handle: handle),
+          )
+        else if (showDateTab)
           Positioned(
             top: 0,
             child: _NgmyDateTab(label: dateLabel, emphasized: isFront),
           ),
       ],
+    );
+  }
+}
+
+class _GlassChip extends StatelessWidget {
+  const _GlassChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 148),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withValues(alpha: 0.28),
+                Colors.white.withValues(alpha: 0.10),
+              ],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Colors.white.withValues(alpha: 0.95),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NgmyWelcomeTab extends StatelessWidget {
+  const _NgmyWelcomeTab({required this.greeting, required this.handle});
+
+  final String greeting;
+  final String handle;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DateTabPainter(emphasized: true),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 176, maxWidth: 240),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 9),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              greeting,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: Colors.white.withValues(alpha: 0.95),
+                shadows: const [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              handle,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                color: Colors.white,
+                shadows: [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -955,11 +1011,13 @@ class _NoteCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Same full-card layout language as spending (not a tiny inset note).
     return Padding(
-      padding: const EdgeInsets.only(bottom: 36, top: 8),
+      padding: const EdgeInsets.only(bottom: 36),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          const SizedBox(height: 6),
           Text(
             'NOTE',
             style: TextStyle(
@@ -969,15 +1027,24 @@ class _NoteCardContent extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.65),
             ),
           ),
-          const SizedBox(height: 10),
-          Expanded(
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            ),
             child: Text(
               note.text,
-              maxLines: 6,
+              maxLines: 5,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, height: 1.4, color: Colors.white),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.35, color: Colors.white),
             ),
           ),
+          const Spacer(),
         ],
       ),
     );
