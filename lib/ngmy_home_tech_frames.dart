@@ -57,10 +57,9 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final scan = _scan.value;
         final orbit = _orbit.value;
-        // Slightly taller Neural / Signal (not 2x) — fixed height so growth goes
-        // DOWN and pushes Core / Vault down. Cards above stay untouched.
+        // Slightly shorter Neural / Signal — still grow down so cards stay full size.
         const gap = 10.0;
-        const topH = 300.0;
+        const topH = 270.0;
         const barH = 96.0;
         return Column(
           mainAxisSize: MainAxisSize.min,
