@@ -2749,77 +2749,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
     );
   }
 
-  Widget _logSpendingLogo(double t) {
-    final spin = t * math.pi * 2;
-    return SizedBox(
-      width: 54,
-      height: 54,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Transform.rotate(
-            angle: spin * 0.35,
-            child: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: SweepGradient(
-                  colors: [
-                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
-                    const Color(0xFF60A5FA),
-                    Color.lerp(const Color(0xFFA78BFA), const Color(0xFF22D3EE), t)!,
-                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.35 + t * 0.25), blurRadius: 16 + t * 10),
-                  BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 4)),
-                ],
-              ),
-            ),
-          ),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color.lerp(const Color(0xFF0B1220), const Color(0xFF1E1B4B), t)!,
-                  const Color(0xFF0F172A),
-                ],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Transform.rotate(
-                  angle: -spin * 0.2,
-                  child: Icon(Icons.memory_rounded, size: 20, color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t)),
-                ),
-                Positioned(
-                  bottom: 7,
-                  child: Text(
-                    'NGMY',
-                    style: TextStyle(
-                      fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.6,
-                      color: Colors.white.withValues(alpha: 0.85 + t * 0.1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _logSpendingLogo(double t) => _NgmyRoboticNgmyMark(t: t);
 
   @override
   Widget build(BuildContext context) {
@@ -3504,6 +3434,91 @@ class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
   }
 }
 
+/// Shared NGMY mark used in Log spending + remove-card confirm.
+class _NgmyRoboticNgmyMark extends StatelessWidget {
+  const _NgmyRoboticNgmyMark({required this.t, this.size = 54});
+
+  final double t;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final spin = t * math.pi * 2;
+    final inner = size * (42 / 54);
+    final iconSize = size * (20 / 54);
+    final labelSize = size * (6.5 / 54);
+    final labelBottom = size * (7 / 54);
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.rotate(
+            angle: spin * 0.35,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
+                    const Color(0xFF60A5FA),
+                    Color.lerp(const Color(0xFFA78BFA), const Color(0xFF22D3EE), t)!,
+                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.35 + t * 0.25), blurRadius: 16 + t * 10),
+                  BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 4)),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: inner,
+            height: inner,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(const Color(0xFF0B1220), const Color(0xFF1E1B4B), t)!,
+                  const Color(0xFF0F172A),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.rotate(
+                  angle: -spin * 0.2,
+                  child: Icon(Icons.memory_rounded, size: iconSize, color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t)),
+                ),
+                Positioned(
+                  bottom: labelBottom,
+                  child: Text(
+                    'NGMY',
+                    style: TextStyle(
+                      fontSize: labelSize,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                      color: Colors.white.withValues(alpha: 0.85 + t * 0.1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Animated robotic confirm dialog for deleting a home card.
 Future<bool> showNgmyRoboticDeleteConfirm(BuildContext context, {required String title}) async {
   final result = await showGeneralDialog<bool>(
@@ -3580,31 +3595,7 @@ class _NgmyRoboticDeleteDialogState extends State<_NgmyRoboticDeleteDialog> with
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Transform.rotate(
-                    angle: (t - 0.5) * 0.12,
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: SweepGradient(
-                          colors: [
-                            Color.lerp(const Color(0xFF22D3EE), const Color(0xFFEF4444), t)!,
-                            const Color(0xFF8B5CF6),
-                            Color.lerp(const Color(0xFFEF4444), const Color(0xFF22D3EE), t)!,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.35), blurRadius: 18 + t * 10),
-                        ],
-                      ),
-                      child: Container(
-                        margin: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF0B1220)),
-                        child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF67E8F9), size: 30),
-                      ),
-                    ),
-                  ),
+                  _NgmyRoboticNgmyMark(t: t, size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'SYSTEM CHECK',
