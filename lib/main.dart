@@ -15606,6 +15606,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
+    // iPhone 14-class (~844) vs Pro Max (~932): tighten home stack on compact phones
+    // so Core / Vault aren't crushed under the floating bottom nav.
+    final compactPhone = MediaQuery.sizeOf(context).height < 900;
     return ColoredBox(
       color: bg,
       child: LayoutBuilder(
@@ -15650,15 +15653,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _buildFreeTrialGlassBanner(isLight),
                       ],
                       // Room above cards so top peeks can show without pushing the deck down.
-                      const SizedBox(height: 32),
+                      SizedBox(height: compactPhone ? 18 : 32),
                       NgmyHomeGlassCardsPanel(
                         userEmail: widget.user.email,
                         displayName: widget.user.username,
                       ),
                       // Extra air so tech frames sit a bit lower under the cards.
-                      const SizedBox(height: 26),
+                      SizedBox(height: compactPhone ? 14 : 26),
                       // Tech HUD — Neural/Signal get the big first-creation frames again.
-                      const Expanded(child: NgmyHomeTechFramesPanel()),
+                      // Clip so Core/Vault never paint under the bottom nav hit area.
+                      const Expanded(child: ClipRect(child: NgmyHomeTechFramesPanel())),
                     ],
                   ),
                 ),
