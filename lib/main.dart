@@ -25140,43 +25140,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryText = isDark ? Colors.white : const Color(0xFF111827);
-    final softText = isDark ? Colors.white70 : Colors.grey;
-    final cardBg = isDark ? const Color(0xFF171F2C) : const Color(0xFFF8FAFC);
-    final panelBg = isDark ? const Color(0xFF0E1522) : const Color(0xFFFFFFFF);
-    final panelBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    final neutralAction = isDark ? const Color(0xFF2C3748) : const Color(0xFFE5EAF1);
-    final neutralActionText = isDark ? Colors.white : const Color(0xFF111827);
+    final primaryText = Colors.white;
+    final softText = Colors.white.withValues(alpha: 0.62);
+    final cardBg = Colors.white.withValues(alpha: 0.06);
+    final panelBg = Colors.white.withValues(alpha: 0.08);
+    final panelBorder = Colors.white.withValues(alpha: 0.16);
+    final neutralAction = Colors.white.withValues(alpha: 0.12);
+    final neutralActionText = Colors.white;
     final cashEarned = widget.user.totalProfit;
     final cashInvested = widget.user.totalInvestmentAmount;
     final pointsCash = widget.user.points / 100.0;
+    const profileColors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFF0F172A),
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
-          child: Column(children: [
-      FloatingTitle(
-        title: 'MY PROFILE',
-        trailing: widget.user.isAdmin
-            ? InkWell(
-                onTap: () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E).withValues(alpha: isDark ? 0.22 : 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF22C55E), size: 20),
+        child: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 10, 20, _ngmyBottomNavScrollPadding(context)),
+              child: Column(children: [
+      NgmyToolkitAliveSection(
+        colors: profileColors,
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: NgmyToolkitAliveHeader(
+                title: 'MY PROFILE',
+                subtitle: 'Account · rewards · settings',
+                colors: profileColors,
+                pulse: pulse,
+                orbit: orbit,
+                icon: Icons.person_rounded,
+                dense: true,
+              ),
+            ),
+            if (widget.user.isAdmin)
+              IconButton(
+                onPressed: () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
+                tooltip: 'Admin deposit QR',
+                icon: NgmyHudMiniOrb(
+                  colors: const [Color(0xFF22C55E), Color(0xFF16A34A)],
+                  pulse: pulse,
+                  orbit: orbit,
+                  size: 36,
+                  icon: Icons.qr_code_2_rounded,
                 ),
-              )
-            : null,
+              ),
+          ],
+        ),
       ),
-      const SizedBox(height: 30),
+      const SizedBox(height: 22),
       GestureDetector(
         onTap: _profileAvatarUploading
             ? null
@@ -25244,31 +25262,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: RepaintBoundary(
           child: Stack(alignment: Alignment.center, children: [
           Container(
-            width: 112,
-            height: 112,
+            width: 124,
+            height: 124,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)]),
+              gradient: SweepGradient(
+                colors: [
+                  Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), pulse)!,
+                  const Color(0xFF60A5FA),
+                  Color.lerp(const Color(0xFFA78BFA), const Color(0xFF22D3EE), pulse)!,
+                  Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), pulse)!,
+                ],
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF22D3EE).withOpacity(isDark ? 0.28 : 0.18),
-                  blurRadius: 16,
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.28 + pulse * 0.22),
+                  blurRadius: 18 + pulse * 10,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                color: Color(0xFF0F172A),
               ),
               child: CircleAvatar(
                 key: ValueKey(_profileAvatarPath),
-                radius: 50,
-                backgroundColor: Colors.grey.shade300,
+                radius: 54,
+                backgroundColor: Colors.grey.shade800,
                 backgroundImage: _profileAvatar,
-                child: _profileAvatar == null ? const Icon(Icons.person, size: 40, color: Colors.white) : null,
+                child: _profileAvatar == null ? const Icon(Icons.person, size: 40, color: Colors.white70) : null,
               ),
             ),
           ),
@@ -25284,7 +25309,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]),
         ),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 10),
+      Text(
+        widget.user.username,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+          letterSpacing: 0.4,
+          shadows: [Shadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.4 + pulse * 0.25), blurRadius: 12)],
+        ),
+      ),
+      const SizedBox(height: 16),
       _profileContactSection(
         context,
         panelBg: panelBg,
@@ -25292,11 +25328,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         cardBg: cardBg,
         primaryText: primaryText,
         neutralActionText: neutralActionText,
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
       ),
       const SizedBox(height: 15),
       _box(context, 'Account Information', [
         _pair('Account ID', _accountId),
-        const Divider(),
+        const Divider(color: Colors.white24),
         _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor'),
         const SizedBox(height: 14),
         Container(
@@ -25306,7 +25345,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: panelBg,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: panelBorder, width: 1.25),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.22 : 0.08), blurRadius: 12, offset: const Offset(0, 5))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -25322,7 +25360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                     onPressed: _copyReferralInviteLink,
-                    icon: Icon(Icons.link_rounded, color: isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6200EE)),
+                    icon: const Icon(Icons.link_rounded, color: Color(0xFFA78BFA)),
                   ),
                 ],
               ),
@@ -25333,7 +25371,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: panelBorder, width: 1.15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Row(
                   children: [
@@ -25343,7 +25380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Text('Your Referral Code', style: TextStyle(fontSize: 11, color: softText)),
                           const SizedBox(height: 4),
-                          CopyOnHoldText(_referralCode, style: TextStyle(fontSize: 30 * 0.7, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937))),
+                          CopyOnHoldText(_referralCode, style: const TextStyle(fontSize: 30 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFFE5E7EB))),
                           Text('Share this code with friends to earn rewards!', style: TextStyle(fontSize: 12, color: softText)),
                         ],
                       ),
@@ -25364,7 +25401,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: panelBorder, width: 1.15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -25385,25 +25421,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: isDark
-                          ? const [Color(0xFF1F2937), Color(0xFF111827)]
-                          : const [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
+                      colors: [
+                        Color.lerp(const Color(0xFF1F2937), const Color(0xFF312E81), pulse)!,
+                        const Color(0xFF111827),
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: panelBorder, width: 1.15),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
+                    boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2 + pulse * 0.15), blurRadius: 12)],
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      Icon(Icons.group_outlined, color: isDark ? Colors.white : const Color(0xFF111827)),
-                      const SizedBox(width: 10),
+                      Icon(Icons.group_outlined, color: Colors.white),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('View Referral Tree', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.w800)),
-                          Text('See your referral network', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF4B5563), fontSize: 11)),
+                          Text('View Referral Tree', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                          Text('See your referral network', style: TextStyle(color: Colors.white70, fontSize: 11)),
                         ]),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white : const Color(0xFF111827)),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white),
                     ],
                   ),
                 ),
@@ -25415,7 +25452,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: panelBorder, width: 1.15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -25443,7 +25479,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF059669),
+                                color: Color(0xFF34D399),
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -25460,8 +25496,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       TextField(
                         controller: _referralInputC,
                         textCapitalization: TextCapitalization.characters,
+                        style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: 'ENTER CODE',
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35)),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.06),
                           errorText: _referralPreviewInvalid &&
                                   (_referralPreviewName == null || _referralPreviewName!.isEmpty) &&
                                   _referralInputC.text.trim().isNotEmpty
@@ -25506,7 +25546,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ]), const SizedBox(height: 15),
+      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.08, colors: profileColors),
+      const SizedBox(height: 15),
       _box(context, 'My Prizes', [
         Row(
           children: [
@@ -25517,12 +25558,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: panelBorder, width: 1.15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('💰 Cash Earned', style: TextStyle(fontSize: 12, color: softText)),
                   const SizedBox(height: 4),
-                  Text('\$${formatCurrency(cashEarned)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF0F9D58))),
+                  Text('\$${formatCurrency(cashEarned)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF34D399))),
                 ]),
               ),
             ),
@@ -25534,12 +25574,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: panelBorder, width: 1.15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.14 : 0.05), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('📊 Cash Invested', style: TextStyle(fontSize: 12, color: softText)),
                   const SizedBox(height: 4),
-                  Text('\$${formatCurrency(cashInvested)}', style: TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: isDark ? const Color(0xFFF3F4F6) : const Color(0xFF1F2937))),
+                  Text('\$${formatCurrency(cashInvested)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFFF3F4F6))),
                 ]),
               ),
             ),
@@ -25553,7 +25592,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: panelBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: panelBorder, width: 1.25),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.22 : 0.08), blurRadius: 12, offset: const Offset(0, 5))],
+            boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 14)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -25572,37 +25611,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               Text(
                 '${widget.user.points} pts',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 36 * 0.7,
                   fontWeight: FontWeight.w900,
-                  color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1F2937),
+                  color: Color(0xFFE5E7EB),
                 ),
               ),
               const SizedBox(height: 8),
               Text('Convert to Cash', style: TextStyle(fontWeight: FontWeight.w600, color: primaryText)),
               const SizedBox(height: 3),
               Text('Every 100 pts =', style: TextStyle(fontSize: 12, color: softText)),
-              Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.green[700]))),
-              const Divider(),
+              const Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF86EFAC)))),
+              const Divider(color: Colors.white24),
               Row(
                 children: [
                   Text('Available:', style: TextStyle(color: primaryText)),
                   const Spacer(),
                   Text(
                     '\$${pointsCash.toStringAsFixed(2)}',
-                    style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534)),
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF86EFAC)),
                   ),
                 ],
               ),
             ],
           ),
         ),
-      ]), const SizedBox(height: 15),
-      _legalInformationSection(context),
+      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.2, colors: const [Color(0xFF22C55E), Color(0xFF06B6D4)]),
       const SizedBox(height: 15),
-      _box(context, 'Appearance', [Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_tOp(context, ThemeMode.light, Icons.light_mode, 'Light'), _tOp(context, ThemeMode.dark, Icons.dark_mode, 'Dark'), _tOp(context, ThemeMode.system, Icons.brightness_auto, 'Auto')])]), const SizedBox(height: 30),
-      ElevatedButton(onPressed: _confirmLogout, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5), child: const Text('LOGOUT ACCOUNT', style: TextStyle(fontWeight: FontWeight.bold))),
-    ]),
+      _legalInformationSection(context, pulse: pulse, scan: scan, orbit: orbit),
+      const SizedBox(height: 15),
+      _box(
+        context,
+        'Appearance',
+        [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _tOp(context, ThemeMode.light, Icons.light_mode, 'Light', pulse),
+              _tOp(context, ThemeMode.dark, Icons.dark_mode, 'Dark', pulse),
+              _tOp(context, ThemeMode.system, Icons.brightness_auto, 'Auto', pulse),
+            ],
+          ),
+        ],
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        phase: 0.34,
+        colors: const [Color(0xFFA78BFA), Color(0xFF6366F1)],
+      ),
+      const SizedBox(height: 24),
+      NgmyToolkitAliveSection(
+        colors: const [Color(0xFFEF4444), Color(0xFFF97316)],
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        phase: 0.5,
+        padding: EdgeInsets.zero,
+        onTap: _confirmLogout,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          alignment: Alignment.center,
+          child: Text(
+            'LOGOUT ACCOUNT',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+              shadows: [Shadow(color: const Color(0xFFEF4444).withValues(alpha: 0.5 + pulse * 0.3), blurRadius: 12)],
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+              ]),
+            );
+          },
         ),
       ),
     );
@@ -25933,19 +26017,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey.withOpacity(0.22)),
-      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      color: Colors.white.withValues(alpha: 0.04),
     ),
     child: Row(
       children: [
-        Icon(i, size: 18, color: Colors.grey),
+        Icon(i, size: 18, color: Colors.white70),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              CopyOnHoldText(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(l, style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.55))),
+              CopyOnHoldText(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -25955,7 +26039,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             tooltip: 'Copy $l',
-            icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.grey),
+            icon: Icon(Icons.copy_rounded, size: 18, color: Colors.white.withValues(alpha: 0.55)),
             onPressed: () => _copyProfileField(l, copyText),
           ),
       ],
@@ -25969,28 +26053,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Color cardBg,
     required Color primaryText,
     required Color neutralActionText,
+    required double pulse,
+    required double scan,
+    required double orbit,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: frameBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: frameBorder, width: 1.25),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.24 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
-          BoxShadow(color: (isDark ? Colors.white : Colors.black).withOpacity(0.04), blurRadius: 1, offset: const Offset(0, -1)),
-        ],
-      ),
+    return NgmyToolkitAliveSection(
+      colors: const [Color(0xFF22D3EE), Color(0xFF6366F1)],
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: 0.04,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text('Contact', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('CONTACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.7))),
               const Spacer(),
               if (_canScanCivicRegistryIds())
                 IconButton(
@@ -25998,11 +26077,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                   onPressed: _openCivicIdScanner,
-                  icon: Icon(Icons.qr_code_scanner_rounded, size: 20, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF6200EE)),
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20, color: Color(0xFF93C5FD)),
                 ),
             ],
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -26010,7 +26089,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: panelBg,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: panelBorder, width: 1.25),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.22 : 0.08), blurRadius: 12, offset: const Offset(0, 5))],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -26028,7 +26106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: cardBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: panelBorder, width: 1.15),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.18 : 0.07), blurRadius: 10, offset: const Offset(0, 4))],
             ),
             child: Column(
               children: [
@@ -26045,27 +26122,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _box(BuildContext ctx, String t, List<Widget> c) {
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: frameBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: frameBorder, width: 1.25),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.24 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
-          BoxShadow(color: (isDark ? Colors.white : Colors.black).withOpacity(0.04), blurRadius: 1, offset: const Offset(0, -1)),
-        ],
-      ),
+  Widget _box(
+    BuildContext ctx,
+    String t,
+    List<Widget> c, {
+    required double pulse,
+    required double scan,
+    required double orbit,
+    double phase = 0,
+    List<Color> colors = const [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+  }) {
+    return NgmyToolkitAliveSection(
+      colors: colors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 15),
+          Text(
+            t.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 14),
           ...c,
         ],
       ),
@@ -26076,18 +26162,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey.withOpacity(0.22)),
-      color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.grey.withOpacity(0.03),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      color: Colors.white.withValues(alpha: 0.04),
     ),
     child: Row(
       children: [
-        Expanded(child: Text(l, style: const TextStyle(fontSize: 13))),
+        Expanded(child: Text(l, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75)))),
         const SizedBox(width: 10),
         Expanded(
           child: CopyOnHoldText(
             v,
             textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -26095,31 +26181,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     ),
   );
-  Widget _legalInformationSection(BuildContext ctx) {
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final frameBg = isDark ? const Color(0xFF0C1320) : const Color(0xFFFFFFFF);
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    final titleColor = isDark ? Colors.white : const Color(0xFF1E3A5F);
+  Widget _legalInformationSection(
+    BuildContext ctx, {
+    required double pulse,
+    required double scan,
+    required double orbit,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: frameBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: frameBorder, width: 1.25),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(isDark ? 0.24 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
-            ],
-          ),
+        NgmyToolkitAliveSection(
+          colors: const [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+          pulse: pulse,
+          scan: scan,
+          orbit: orbit,
+          phase: 0.28,
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Legal Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: titleColor),
+              const Text(
+                'LEGAL INFORMATION',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white70),
               ),
               const SizedBox(height: 14),
               _legalTile(
@@ -26147,97 +26230,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        _worksheetsPromoTile(ctx),
+        NgmyToolkitAliveSection(
+          colors: const [Color(0xFF38BDF8), Color(0xFF2563EB)],
+          pulse: pulse,
+          scan: scan,
+          orbit: orbit,
+          phase: 0.4,
+          padding: const EdgeInsets.all(6),
+          child: _worksheetsPromoTile(ctx),
+        ),
       ],
     );
   }
 
   Widget _worksheetsPromoTile(BuildContext ctx) {
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final outerBg = isDark ? const Color(0xFF0B1526) : const Color(0xFFEFF6FF);
-    final outerBorder = isDark ? const Color(0xFF1E3A8A) : const Color(0xFFBFDBFE);
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isDark ? 6 : 10),
-      decoration: BoxDecoration(
-        color: outerBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: outerBorder, width: isDark ? 1 : 1.5),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => NgmyNavigator.push(
-            ctx,
-            NgmyWorksheetsScreen(
-              userEmail: widget.user.email,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => NgmyNavigator.push(
+          ctx,
+          NgmyWorksheetsScreen(
+            userEmail: widget.user.email,
+            user: widget.user,
+            config: widget.config,
+            onChargeWallet: (amount, description) async => ngmyChargeUserWallet(
               user: widget.user,
-              config: widget.config,
-              onChargeWallet: (amount, description) async => ngmyChargeUserWallet(
-                user: widget.user,
-                allUsers: widget.allUsers,
-                amount: amount,
-                description: description,
-                onAddTransaction: widget.onAddTransaction,
-              ),
-              onDataChanged: widget.onDataChanged,
+              allUsers: widget.allUsers,
+              amount: amount,
+              description: description,
+              onAddTransaction: widget.onAddTransaction,
             ),
-            routeName: 'NgmyWorksheetsScreen',
+            onDataChanged: widget.onDataChanged,
           ),
-          borderRadius: BorderRadius.circular(12),
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? const [Color(0xFF1D4ED8), Color(0xFF2563EB)]
-                    : const [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: isDark ? Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.45)) : null,
+          routeName: 'NgmyWorksheetsScreen',
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.article_outlined, color: Colors.white, size: 24),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.45)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Worksheets',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
+                  child: const Icon(Icons.article_outlined, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Worksheets',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Track project spending',
-                          style: TextStyle(
-                            color: Color(0xE6FFFFFF),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Track project spending',
+                        style: TextStyle(
+                          color: Color(0xE6FFFFFF),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.white, size: 26),
-                ],
-              ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white, size: 26),
+              ],
             ),
           ),
         ),
@@ -26251,7 +26328,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Color iconBg,
     required VoidCallback onTap,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -26262,8 +26338,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.22)),
-            color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFF9FAFB),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            color: Colors.white.withValues(alpha: 0.04),
           ),
           child: Row(
             children: [
@@ -26280,35 +26356,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF111827),
+                    color: Colors.white,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+              Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.45)),
             ],
           ),
         ),
       ),
     );
   }
-  Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l) {
+  Widget _tOp(BuildContext ctx, ThemeMode m, IconData i, String l, double pulse) {
     final sel = widget.currentThemeMode == m;
-    final color = sel ? Theme.of(ctx).colorScheme.primary : Colors.grey;
+    final color = sel ? Color.lerp(const Color(0xFF22D3EE), const Color(0xFFA78BFA), pulse)! : Colors.white54;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => widget.onThemeChanged(m),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: sel
+                ? LinearGradient(colors: [
+                    const Color(0xFF22D3EE).withValues(alpha: 0.35 + pulse * 0.2),
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.28),
+                  ])
+                : null,
+            color: sel ? null : Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: sel ? color.withValues(alpha: 0.7) : Colors.white12),
+            boxShadow: sel ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)] : null,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(i, color: color, size: 28),
               const SizedBox(height: 5),
-              Text(l, style: TextStyle(fontSize: 10, color: color)),
+              Text(l, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
             ],
           ),
         ),
