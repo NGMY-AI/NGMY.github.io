@@ -170,7 +170,9 @@ class NgmyCreatorHubTab extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF0B1020)
+          : const Color(0xFFF1F5F9),
       body: SafeArea(
         bottom: false,
         child: NgmyHudMotion(
@@ -181,7 +183,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(20, 10, 20, bottomScrollPadding),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _CreatorHubTitle(pulse: pulse, orbit: orbit, scan: scan),
                         const SizedBox(height: 18),
@@ -311,52 +313,54 @@ class _CreatorToolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NgmyHudTechFrame(
-      colors: tool.colors,
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: phase,
-      onTap: tool.onTap,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Center(
-              child: NgmyHudMiniOrb(
-                colors: tool.colors,
-                pulse: pulse,
-                orbit: (orbit + phase) % 1.0,
-                size: 72,
-                icon: tool.icon,
+    return SizedBox.expand(
+      child: NgmyHudTechFrame(
+        colors: tool.colors,
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        phase: phase,
+        onTap: tool.onTap,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Center(
+                child: NgmyHudMiniOrb(
+                  colors: tool.colors,
+                  pulse: pulse,
+                  orbit: (orbit + phase) % 1.0,
+                  size: 72,
+                  icon: tool.icon,
+                ),
               ),
             ),
-          ),
-          Text(
-            tool.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 14,
-              letterSpacing: 0.3,
+            Text(
+              tool.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 0.3,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            tool.subtitle,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.62),
-              fontSize: 10.5,
-              height: 1.25,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 2),
+            Text(
+              tool.subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontSize: 10.5,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

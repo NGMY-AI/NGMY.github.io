@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_swahili_curriculum.dart';
 
 /// Gamified winding "road" map for a 5-day week + test (screenshot style).
@@ -65,110 +66,134 @@ class _SwahiliWeekPathPageState extends State<SwahiliWeekPathPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF3D9A5F),
-      body: Stack(
-        children: [
-          const _PathBackground(),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 12, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-                      ),
-                      Expanded(
-                        child: Text(
-                          widget.level.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Wiki ${widget.levelIndex + 1}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final w = constraints.maxWidth;
-                      final h = constraints.maxHeight;
-                      final scaled = points.map((p) => Offset(p.dx * w, p.dy * h)).toList();
-                      return Stack(
-                        clipBehavior: Clip.none,
+      body: NgmyHudMotion(
+        builder: (context, pulse, scan, orbit) {
+          const colors = [Color(0xFF4AAF6E), Color(0xFF14B8A6)];
+          return Stack(
+            children: [
+              const _PathBackground(),
+              SafeArea(
+                child: Column(
+                  children: [
+                    NgmyToolkitAliveSection(
+                      colors: colors,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      phase: 0.04,
+                      padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
+                      child: Row(
                         children: [
-                          CustomPaint(
-                            size: Size(w, h),
-                            painter: _DashedPathPainter(scaled),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
                           ),
-                          ...List.generate(widget.level.days.length, (d) {
-                            final pos = scaled[d];
-                            final done = widget.isDayDone(d);
-                            final unlocked = widget.isDayUnlocked(d);
-                            final isCurrent = d == _currentDay && !done;
-                            return Positioned(
-                              left: pos.dx - 52,
-                              top: pos.dy - 52,
-                              child: _PathNode(
-                                label: isCurrent ? 'Anza' : 'Siku ${d + 1}',
-                                subtitle: widget.level.days[d].title.split('—').last.trim(),
-                                state: done
-                                    ? _NodeState.done
-                                    : isCurrent
-                                        ? _NodeState.current
-                                        : unlocked
-                                            ? _NodeState.available
-                                            : _NodeState.locked,
-                                onTap: unlocked || done ? () => unawaited(_openDay(d)) : null,
-                              ),
-                            );
-                          }),
-                          Positioned(
-                            left: scaled.last.dx - 56,
-                            top: scaled.last.dy - 56,
-                            child: _PathNode(
-                              label: 'Mtihani',
-                              subtitle: passed
-                                  ? 'Bora: ${score ?? 0}%'
-                                  : allDone
-                                      ? 'Pita 70%+'
-                                      : 'Funga siku 5',
-                              state: passed
-                                  ? _NodeState.done
-                                  : allDone
-                                      ? _NodeState.current
-                                      : _NodeState.locked,
-                              isTest: true,
-                              onTap: allDone && widget.onTestTap != null ? () => unawaited(_openTest()) : null,
+                          Expanded(
+                            child: Text(
+                              widget.level.title,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                             ),
                           ),
-                          Positioned(
-                            right: 8,
-                            bottom: h * 0.18,
-                            child: Icon(Icons.pets_rounded, size: 56, color: Colors.green.shade300.withValues(alpha: 0.9)),
+                          NgmyHudMiniOrb(
+                            colors: colors,
+                            pulse: pulse,
+                            orbit: orbit,
+                            size: 36,
+                            icon: Icons.flag_rounded,
                           ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'Wiki ${widget.levelIndex + 1}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                         ],
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final w = constraints.maxWidth;
+                          final h = constraints.maxHeight;
+                          final scaled = points.map((p) => Offset(p.dx * w, p.dy * h)).toList();
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              CustomPaint(
+                                size: Size(w, h),
+                                painter: _DashedPathPainter(scaled),
+                              ),
+                              ...List.generate(widget.level.days.length, (d) {
+                                final pos = scaled[d];
+                                final done = widget.isDayDone(d);
+                                final unlocked = widget.isDayUnlocked(d);
+                                final isCurrent = d == _currentDay && !done;
+                                return Positioned(
+                                  left: pos.dx - 52,
+                                  top: pos.dy - 52,
+                                  child: _PathNode(
+                                    label: isCurrent ? 'Anza' : 'Siku ${d + 1}',
+                                    subtitle: widget.level.days[d].title.split('—').last.trim(),
+                                    state: done
+                                        ? _NodeState.done
+                                        : isCurrent
+                                            ? _NodeState.current
+                                            : unlocked
+                                                ? _NodeState.available
+                                                : _NodeState.locked,
+                                    pulse: pulse,
+                                    orbit: orbit,
+                                    phase: 0.1 + d * 0.08,
+                                    onTap: unlocked || done ? () => unawaited(_openDay(d)) : null,
+                                  ),
+                                );
+                              }),
+                              Positioned(
+                                left: scaled.last.dx - 56,
+                                top: scaled.last.dy - 56,
+                                child: _PathNode(
+                                  label: 'Mtihani',
+                                  subtitle: passed
+                                      ? 'Bora: ${score ?? 0}%'
+                                      : allDone
+                                          ? 'Pita 70%+'
+                                          : 'Funga siku 5',
+                                  state: passed
+                                      ? _NodeState.done
+                                      : allDone
+                                          ? _NodeState.current
+                                          : _NodeState.locked,
+                                  isTest: true,
+                                  pulse: pulse,
+                                  orbit: orbit,
+                                  phase: 0.55,
+                                  onTap: allDone && widget.onTestTap != null ? () => unawaited(_openTest()) : null,
+                                ),
+                              ),
+                              Positioned(
+                                right: 8,
+                                bottom: h * 0.18,
+                                child: Icon(Icons.pets_rounded, size: 56, color: Colors.green.shade300.withValues(alpha: 0.9)),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -195,6 +220,9 @@ class _PathNode extends StatelessWidget {
     required this.state,
     this.isTest = false,
     this.onTap,
+    this.pulse = 0,
+    this.orbit = 0,
+    this.phase = 0,
   });
 
   final String label;
@@ -202,6 +230,9 @@ class _PathNode extends StatelessWidget {
   final _NodeState state;
   final bool isTest;
   final VoidCallback? onTap;
+  final double pulse;
+  final double orbit;
+  final double phase;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +258,13 @@ class _PathNode extends StatelessWidget {
         c3 = Colors.white70;
     }
 
+    final glow = state == _NodeState.current || state == _NodeState.done
+        ? 0.35 + ((pulse + phase) % 1.0) * 0.35
+        : 0.2;
+    // Keep orbit referenced so neighboring nodes stay phase-offset ready.
+    final size = isTest ? 88.0 : 104.0;
+    final borderPulse = 0.55 + ((pulse + orbit * 0.15 + phase) % 1.0) * 0.15;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -235,49 +273,53 @@ class _PathNode extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: isTest ? 88 : 104,
-              height: isTest ? 88 : 104,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [c1, c2],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: c2.withValues(alpha: 0.45),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+            SizedBox(
+              width: size,
+              height: size,
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [c1, c2],
                   ),
-                ],
-                border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 3),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    state == _NodeState.locked
-                        ? Icons.lock_rounded
-                        : state == _NodeState.done
-                            ? Icons.check_rounded
-                            : isTest
-                                ? Icons.quiz_rounded
-                                : Icons.flag_rounded,
-                    color: c3,
-                    size: 26,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: c3,
-                      fontWeight: FontWeight.w900,
-                      fontSize: isTest ? 11 : 13,
+                  boxShadow: [
+                    BoxShadow(
+                      color: c2.withValues(alpha: glow),
+                      blurRadius: 16 + pulse * 8,
+                      offset: const Offset(0, 6),
                     ),
-                  ),
-                ],
+                  ],
+                  border: Border.all(color: Colors.white.withValues(alpha: borderPulse), width: 3),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      state == _NodeState.locked
+                          ? Icons.lock_rounded
+                          : state == _NodeState.done
+                              ? Icons.check_rounded
+                              : isTest
+                                  ? Icons.quiz_rounded
+                                  : Icons.flag_rounded,
+                      color: c3,
+                      size: 26,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: c3,
+                        fontWeight: FontWeight.w900,
+                        fontSize: isTest ? 11 : 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -405,6 +447,7 @@ class SwahiliLevelDashboardCard extends StatelessWidget {
     required this.locked,
     required this.passed,
     required this.onTap,
+    this.bare = false,
   });
 
   final SwahiliLevel level;
@@ -413,6 +456,8 @@ class SwahiliLevelDashboardCard extends StatelessWidget {
   final bool locked;
   final bool passed;
   final VoidCallback? onTap;
+  /// When true, skip outer Material/InkWell chrome (parent supplies AliveSection).
+  final bool bare;
 
   static const _gradients = [
     [Color(0xFFFF9A4A), Color(0xFFFF6B35)],
@@ -423,10 +468,70 @@ class SwahiliLevelDashboardCard extends StatelessWidget {
     [Color(0xFFFBBF24), Color(0xFFD97706)],
   ];
 
+  static List<Color> gradientsFor(int levelIndex) => _gradients[levelIndex % _gradients.length];
+
   @override
   Widget build(BuildContext context) {
-    final g = _gradients[levelIndex % _gradients.length];
+    final g = gradientsFor(levelIndex);
     final pct = (progress * 100).round();
+
+    final content = SizedBox(
+      width: 168,
+      height: 200,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            if (locked)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(Icons.lock_rounded, color: Colors.white.withValues(alpha: 0.8), size: 20),
+              ),
+            if (passed)
+              const Positioned(top: 0, right: 0, child: Icon(Icons.verified_rounded, color: Colors.white, size: 22)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(level.icon, color: Colors.white, size: 32),
+                const Spacer(),
+                Text(
+                  level.title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Hatua ${levelIndex + 1} · $pct%',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 4,
+                      backgroundColor: Colors.white.withValues(alpha: 0.25),
+                      color: Colors.white,
+                    ),
+                    Text('$pct%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (bare) return content;
 
     return Material(
       color: Colors.transparent,

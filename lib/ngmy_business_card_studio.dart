@@ -10,7 +10,10 @@ import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
+
+const _kBizCardHudColors = [Color(0xFF22C55E), Color(0xFF16A34A)];
 
 /// Inline or full-screen business card designer.
 class NgmyBusinessCardStudio extends StatefulWidget {
@@ -254,151 +257,195 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
     final templates = ngmyBusinessCardTemplatesForCategory(_category);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 36,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              _chip('All', 'all'),
-              ...kNgmyBusinessCardCategories.map((c) => _chip(c.$2, c.$1)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: templates.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final tpl = templates[i];
-              final selected = tpl.id == _doc.templateId;
-              return GestureDetector(
-                onTap: () => _selectTemplate(tpl),
-                child: Container(
-                  width: 120,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? const Color(0xFF22C55E) : t.chipOffBorder,
-                      width: selected ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: ngmyBusinessCardTemplateThumb(tpl, width: 120)),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 3, 4, 5),
-                        child: Text(
-                          tpl.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: t.chipOffLabel, fontWeight: FontWeight.w800, fontSize: 8),
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            NgmyToolkitAliveSection(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              phase: 0.06,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _chip('All', 'all'),
+                    ...kNgmyBusinessCardCategories.map((c) => _chip(c.$2, c.$1)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            NgmyToolkitAliveSection(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              phase: 0.14,
+              padding: const EdgeInsets.all(8),
+              child: SizedBox(
+                height: 100,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: templates.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final tpl = templates[i];
+                    final selected = tpl.id == _doc.templateId;
+                    return GestureDetector(
+                      onTap: () => _selectTemplate(tpl),
+                      child: Container(
+                        width: 120,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected ? const Color(0xFF22C55E) : t.chipOffBorder,
+                            width: selected ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: ngmyBusinessCardTemplateThumb(tpl, width: 120)),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 3, 4, 5),
+                              child: Text(
+                                tpl.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: t.chipOffLabel, fontWeight: FontWeight.w800, fontSize: 8),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-        Center(
-          child: RepaintBoundary(
-            key: _captureKey,
-            child: NgmyBusinessCardPreview(
-              document: _doc,
-              interactive: _editMode,
-              width: widget.compact ? 320 : 360,
-              selectedElementId: _selectedElementId,
-              onElementSelect: _selectElement,
-              onElementDrag: (id, delta) {
-                setState(() {
-                  _selectedElementId = id;
-                  ngmyCardSetElementOffset(_doc, id, delta);
-                });
-                widget.onDocumentChanged?.call(_doc);
-              },
-            ),
-          ),
-        ),
-        if (_editMode && _selectedElementId != null) _selectedElementSizeBar(),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() => _editMode = !_editMode),
-                icon: Icon(_editMode ? Icons.touch_app_rounded : Icons.visibility_rounded, size: 18),
-                label: Text(_editMode ? 'Drag Mode On' : 'Preview Mode'),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Reset layout',
-              onPressed: () {
-                setState(() {
-                  ngmyCardResetLayout(_doc);
-                  _selectedElementId = null;
-                });
-                widget.onDocumentChanged?.call(_doc);
-              },
-              icon: const Icon(Icons.restart_alt_rounded),
+            const SizedBox(height: 12),
+            Center(
+              child: RepaintBoundary(
+                key: _captureKey,
+                child: NgmyBusinessCardPreview(
+                  document: _doc,
+                  interactive: _editMode,
+                  width: widget.compact ? 320 : 360,
+                  selectedElementId: _selectedElementId,
+                  onElementSelect: _selectElement,
+                  onElementDrag: (id, delta) {
+                    setState(() {
+                      _selectedElementId = id;
+                      ngmyCardSetElementOffset(_doc, id, delta);
+                    });
+                    widget.onDocumentChanged?.call(_doc);
+                  },
+                ),
+              ),
             ),
-            IconButton(
-              tooltip: 'Add logo',
-              onPressed: _pickLogo,
-              icon: const Icon(Icons.add_photo_alternate_outlined),
+            if (_editMode && _selectedElementId != null) _selectedElementSizeBar(),
+            const SizedBox(height: 10),
+            NgmyToolkitAliveSection(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              phase: 0.22,
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => _editMode = !_editMode),
+                      icon: Icon(_editMode ? Icons.touch_app_rounded : Icons.visibility_rounded, size: 18),
+                      label: Text(_editMode ? 'Drag Mode On' : 'Preview Mode'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Reset layout',
+                    onPressed: () {
+                      setState(() {
+                        ngmyCardResetLayout(_doc);
+                        _selectedElementId = null;
+                      });
+                      widget.onDocumentChanged?.call(_doc);
+                    },
+                    icon: const Icon(Icons.restart_alt_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Add logo',
+                    onPressed: _pickLogo,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            NgmyToolkitAliveSection(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              phase: 0.3,
+              padding: EdgeInsets.zero,
+              child: _toolsPanel(),
+            ),
+            const SizedBox(height: 10),
+            NgmyToolkitAliveSection(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              phase: 0.38,
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _saveCard,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Save Card'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _downloadCard,
+                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.black),
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('Download'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!widget.compact && widget.showExpandButton) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => _openFullStudio(context),
+                icon: const Icon(Icons.open_in_full_rounded, size: 18),
+                label: const Text('Open full-screen studio'),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text('Saved cards', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
+            const SizedBox(height: 8),
+            NgmyBusinessCardGallery(
+              key: ValueKey('biz-gallery-$_galleryReload'),
+              userEmail: widget.userEmail,
+              onOpen: loadDocument,
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        _toolsPanel(),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _saveCard,
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('Save Card'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _downloadCard,
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.black),
-                icon: const Icon(Icons.download_rounded),
-                label: const Text('Download'),
-              ),
-            ),
-          ],
-        ),
-        if (!widget.compact && widget.showExpandButton) ...[
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => _openFullStudio(context),
-            icon: const Icon(Icons.open_in_full_rounded, size: 18),
-            label: const Text('Open full-screen studio'),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Text('Saved cards', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
-        const SizedBox(height: 8),
-        NgmyBusinessCardGallery(
-          key: ValueKey('biz-gallery-$_galleryReload'),
-          userEmail: widget.userEmail,
-          onOpen: loadDocument,
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -771,41 +818,49 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       context: context,
       barrierColor: t.overlayDark,
       builder: (ctx) {
-        final dt = NgmyHubTheme.of(ctx);
+        final w = MediaQuery.of(ctx).size.width;
+        final dialogW = w > 540 ? 520.0 : w - 24;
         return Dialog(
           insetPadding: const EdgeInsets.all(12),
-          backgroundColor: dt.scaffold,
-          child: SizedBox(
-            width: 520,
-            height: MediaQuery.of(ctx).size.height * 0.92,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 4, 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text('Business Card Studio', style: TextStyle(color: dt.title, fontWeight: FontWeight.w900, fontSize: 18)),
+          backgroundColor: Colors.transparent,
+          child: NgmyHudMotion(
+            builder: (context, pulse, scan, orbit) {
+              return NgmyToolkitAlivePanel(
+                colors: _kBizCardHudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                width: dialogW,
+                maxHeight: MediaQuery.of(context).size.height * 0.92,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NgmyToolkitAliveHeader(
+                      title: 'Business Card Studio',
+                      subtitle: '34 templates · emojis · colors · drag to design',
+                      colors: _kBizCardHudColors,
+                      pulse: pulse,
+                      orbit: orbit,
+                      icon: Icons.badge_rounded,
+                      onClose: () => Navigator.pop(context),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(12),
+                        child: NgmyBusinessCardStudio(
+                          userEmail: widget.userEmail,
+                          initialDocument: _doc,
+                          showExpandButton: false,
+                          onDocumentChanged: (d) => loadDocument(d),
+                        ),
                       ),
-                      IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: dt.iconButtonIcon)),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: NgmyBusinessCardStudio(
-                    userEmail: widget.userEmail,
-                    initialDocument: _doc,
-                    showExpandButton: false,
-                    onDocumentChanged: (d) => loadDocument(d),
-                  ),
-                ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
-      );
+        );
       },
     );
   }
@@ -820,69 +875,44 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
     barrierColor: barrier,
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (ctx, a1, a2) {
-      final t = NgmyHubTheme.of(ctx);
-      return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: 520,
-          height: MediaQuery.of(ctx).size.height * 0.92,
-          margin: const EdgeInsets.all(12),
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: t.dialogGradient(const Color(0xFF22C55E)),
-            ),
-            border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: t.isDark ? 0.25 : 0.35)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [const Color(0xFF22C55E).withValues(alpha: t.isDark ? 0.2 : 0.12), Colors.transparent],
+      final w = MediaQuery.of(ctx).size.width;
+      final dialogW = w > 540 ? 520.0 : w - 24;
+      return Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        backgroundColor: Colors.transparent,
+        child: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            return NgmyToolkitAlivePanel(
+              colors: _kBizCardHudColors,
+              pulse: pulse,
+              scan: scan,
+              orbit: orbit,
+              width: dialogW,
+              maxHeight: MediaQuery.of(context).size.height * 0.92,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NgmyToolkitAliveHeader(
+                    title: 'Business Card Studio',
+                    subtitle: '34 templates · emojis · colors · drag to design',
+                    colors: _kBizCardHudColors,
+                    pulse: pulse,
+                    orbit: orbit,
+                    icon: Icons.badge_rounded,
+                    onClose: () => Navigator.pop(context),
                   ),
-                  border: Border(bottom: BorderSide(color: t.border)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.badge_rounded, color: Colors.black, size: 22),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: NgmyBusinessCardStudio(userEmail: userEmail, initialDocument: doc, showExpandButton: false),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Business Card Studio', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
-                          Text('34 templates · emojis · colors · drag to design', style: TextStyle(color: t.subtitle, fontSize: 10, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: t.iconButtonIcon)),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: NgmyBusinessCardStudio(userEmail: userEmail, initialDocument: doc, showExpandButton: false),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
-      ),
-    );
+      );
     },
     transitionBuilder: (ctx, anim, _, child) {
       return FadeTransition(

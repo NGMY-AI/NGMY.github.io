@@ -393,38 +393,41 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
                             },
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1A2030) : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4)),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Tuanze somo letu la Kiswahili! ðŸš€',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                      color: isDark ? Colors.white : const Color(0xFF334155),
+                          NgmyHudMotion(
+                            builder: (context, pulse, scan, orbit) {
+                              const colors = [Color(0xFF4AAF6E), Color(0xFF14B8A6)];
+                              return NgmyToolkitAliveSection(
+                                colors: colors,
+                                pulse: pulse,
+                                scan: scan,
+                                orbit: orbit,
+                                phase: 0.12,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Tuanze somo letu la Kiswahili!',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: Colors.white.withValues(alpha: 0.9),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    FilledButton(
+                                      onPressed: () => _openLevelPath(_progress.unlockedLevelIndex),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF4AAF6E),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        minimumSize: Size.zero,
+                                      ),
+                                      child: const Text('Anza', style: TextStyle(fontWeight: FontWeight.w800)),
+                                    ),
+                                  ],
                                 ),
-                                FilledButton(
-                                  onPressed: () => _openLevelPath(_progress.unlockedLevelIndex),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4AAF6E),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    minimumSize: Size.zero,
-                                  ),
-                                  child: const Text('Anza', style: TextStyle(fontWeight: FontWeight.w800)),
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 20),
                           Text(
@@ -443,24 +446,39 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
                           const SizedBox(height: 16),
                           SizedBox(
                             height: 210,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: kSwahiliLevels.length,
-                              separatorBuilder: (_, _) => const SizedBox(width: 12),
-                              itemBuilder: (context, i) {
-                                final level = kSwahiliLevels[i];
-                                final locked = i > _progress.unlockedLevelIndex;
-                                var done = 0;
-                                for (var d = 0; d < level.days.length; d++) {
-                                  if (_progress.isDayDone(i, d)) done++;
-                                }
-                                return SwahiliLevelDashboardCard(
-                                  level: level,
-                                  levelIndex: i,
-                                  progress: level.days.isEmpty ? 0 : done / level.days.length,
-                                  locked: locked,
-                                  passed: _progress.isLevelPassed(level.id),
-                                  onTap: locked ? null : () => _openLevelPath(i),
+                            child: NgmyHudMotion(
+                              builder: (context, pulse, scan, orbit) {
+                                return ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: kSwahiliLevels.length,
+                                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                                  itemBuilder: (context, i) {
+                                    final level = kSwahiliLevels[i];
+                                    final locked = i > _progress.unlockedLevelIndex;
+                                    var done = 0;
+                                    for (var d = 0; d < level.days.length; d++) {
+                                      if (_progress.isDayDone(i, d)) done++;
+                                    }
+                                    final g = SwahiliLevelDashboardCard.gradientsFor(i);
+                                    return NgmyToolkitAliveSection(
+                                      colors: g,
+                                      pulse: pulse,
+                                      scan: scan,
+                                      orbit: orbit,
+                                      phase: 0.08 + i * 0.09,
+                                      padding: EdgeInsets.zero,
+                                      onTap: locked ? null : () => _openLevelPath(i),
+                                      child: SwahiliLevelDashboardCard(
+                                        level: level,
+                                        levelIndex: i,
+                                        progress: level.days.isEmpty ? 0 : done / level.days.length,
+                                        locked: locked,
+                                        passed: _progress.isLevelPassed(level.id),
+                                        onTap: null,
+                                        bare: true,
+                                      ),
+                                    );
+                                  },
                                 );
                               },
                             ),
@@ -744,19 +762,21 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
           surfaceTintColor: Colors.transparent,
           title: Text(widget.day.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
         ),
-        body: ListView.builder(
+        body: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            final hudColors = <Color>[widget.level.color, const Color(0xFF14B8A6)];
+            return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           itemCount: widget.day.words.length + 2,
           cacheExtent: 1200,
           itemBuilder: (context, index) {
             if (index == 0) {
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1A2030) : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.35)),
-                ),
+              return NgmyToolkitAliveSection(
+                colors: hudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                phase: 0.06,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -765,7 +785,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+                        color: Colors.white.withValues(alpha: 0.88),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -774,7 +794,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.45,
-                        color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                        color: Colors.white.withValues(alpha: 0.62),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -794,7 +814,7 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                         const SizedBox(width: 10),
                         Text(
                           '$_studiedCount/${widget.day.words.length}',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
                         ),
                       ],
                     ),
@@ -805,7 +825,14 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
             if (index == widget.day.words.length + 1) {
               return Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: FilledButton.icon(
+                child: NgmyToolkitAliveSection(
+                  colors: const [Color(0xFFD97706), Color(0xFFF59E0B)],
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.4,
+                  padding: const EdgeInsets.all(8),
+                  child: FilledButton.icon(
                   onPressed: (_completed || !_allStudied)
                       ? null
                       : () {
@@ -839,23 +866,35 @@ class _SwahiliLessonPageState extends State<_SwahiliLessonPage> with WidgetsBind
                     textAlign: TextAlign.center,
                   ),
                 ),
+                ),
               );
             }
             final w = widget.day.words[index - 1];
             return Padding(
               padding: const EdgeInsets.only(top: 10),
-              child: _WordCard(
-                word: w,
-                index: index,
-                color: widget.level.color,
-                isDark: isDark,
-                studied: _isStudied(w.swahili),
-                studySeconds: _studySeconds[w.swahili] ?? 0,
+              child: NgmyToolkitAliveSection(
+                colors: hudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                phase: 0.1 + (index % 6) * 0.06,
+                padding: EdgeInsets.zero,
                 onTap: () => _openWord(w),
-                // Piloting voice notes on just the first two words of this day.
-                enableVoice: widget.enableVoiceDay && (index - 1) < 2,
+                child: _WordCard(
+                  word: w,
+                  index: index,
+                  color: widget.level.color,
+                  isDark: true,
+                  studied: _isStudied(w.swahili),
+                  studySeconds: _studySeconds[w.swahili] ?? 0,
+                  onTap: () => _openWord(w),
+                  enableVoice: widget.enableVoiceDay && (index - 1) < 2,
+                  bare: true,
+                ),
               ),
             );
+          },
+        );
           },
         ),
       ),
@@ -873,6 +912,7 @@ class _WordCard extends StatefulWidget {
     required this.studySeconds,
     required this.onTap,
     this.enableVoice = false,
+    this.bare = false,
   });
 
   final SwahiliWord word;
@@ -883,6 +923,7 @@ class _WordCard extends StatefulWidget {
   final int studySeconds;
   final VoidCallback onTap;
   final bool enableVoice;
+  final bool bare;
 
   @override
   State<_WordCard> createState() => _WordCardState();
@@ -927,24 +968,28 @@ class _WordCardState extends State<_WordCard> {
   @override
   Widget build(BuildContext context) {
     final word = widget.word;
-    final isDark = widget.isDark;
+    final isDark = widget.isDark || widget.bare;
     final studied = widget.studied;
     final color = widget.color;
-    final card = isDark ? const Color(0xFF1A2030) : Colors.white;
-    final borderColor = studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.25);
+    final card = widget.bare ? Colors.transparent : (isDark ? const Color(0xFF1A2030) : Colors.white);
+    final borderColor = widget.bare
+        ? Colors.transparent
+        : (studied ? const Color(0xFFD97706) : color.withValues(alpha: 0.25));
     final visual = resolveSwahiliWordVisual(swahili: word.swahili, english: word.english);
+    final titleColor = widget.bare || isDark ? Colors.white : const Color(0xFF0F172A);
+    final englishColor = widget.bare || isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
 
     return Material(
       color: card,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: widget.bare ? null : widget.onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor, width: studied ? 1.8 : 1),
+            border: Border.all(color: borderColor, width: studied && !widget.bare ? 1.8 : 1),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -961,7 +1006,7 @@ class _WordCardState extends State<_WordCard> {
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
                         height: 1.2,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        color: titleColor,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -980,7 +1025,7 @@ class _WordCardState extends State<_WordCard> {
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
                               height: 1.25,
-                              color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                              color: englishColor,
                             ),
                           ),
                         ),
@@ -1465,6 +1510,7 @@ class _SwahiliTestPageState extends State<_SwahiliTestPage> {
     }
 
     final q = _questions[_index];
+    final hudColors = <Color>[widget.level.color, const Color(0xFF14B8A6)];
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1018) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -1472,94 +1518,126 @@ class _SwahiliTestPageState extends State<_SwahiliTestPage> {
         foregroundColor: Colors.white,
         title: Text('${widget.level.title} test', style: const TextStyle(fontWeight: FontWeight.w900)),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      body: NgmyHudMotion(
+        builder: (context, pulse, scan, orbit) {
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: (_index + 1) / _questions.length,
-                      minHeight: 8,
-                      backgroundColor: widget.level.color.withValues(alpha: 0.2),
-                      color: widget.level.color,
+                NgmyToolkitAliveSection(
+                  colors: hudColors,
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.05,
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: (_index + 1) / _questions.length,
+                            minHeight: 8,
+                            backgroundColor: widget.level.color.withValues(alpha: 0.2),
+                            color: widget.level.color,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${_index + 1}/${_questions.length}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                NgmyToolkitAliveSection(
+                  colors: hudColors,
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.14,
+                  child: Text(
+                    q.prompt,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.3,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text('${_index + 1}/${_questions.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 16),
+                ...List.generate(q.options.length, (i) {
+                  final opt = q.options[i];
+                  Color? bg;
+                  if (_revealed) {
+                    if (i == q.correctIndex) {
+                      bg = Colors.green.withValues(alpha: 0.2);
+                    } else if (i == _selected) {
+                      bg = Colors.red.withValues(alpha: 0.15);
+                    }
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: NgmyToolkitAliveSection(
+                      colors: hudColors,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      phase: 0.2 + i * 0.08,
+                      padding: EdgeInsets.zero,
+                      onTap: () => _pick(i),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selected == i ? Colors.white70 : Colors.white24,
+                            width: _selected == i ? 2 : 1,
+                          ),
+                        ),
+                        child: Text(
+                          opt,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+                const Spacer(),
+                NgmyToolkitAliveSection(
+                  colors: hudColors,
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.5,
+                  padding: const EdgeInsets.all(8),
+                  child: FilledButton(
+                    onPressed: _revealed ? _next : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: widget.level.color,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    child: Text(
+                      _index + 1 >= _questions.length ? 'See results' : 'Next question',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 28),
-            Text(
-              q.prompt,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ...List.generate(q.options.length, (i) {
-              final opt = q.options[i];
-              Color? bg;
-              if (_revealed) {
-                if (i == q.correctIndex) {
-                  bg = Colors.green.withValues(alpha: 0.2);
-                } else if (i == _selected) {
-                  bg = Colors.red.withValues(alpha: 0.15);
-                }
-              }
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: bg ?? (isDark ? const Color(0xFF151D2B) : Colors.white),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    onTap: () => _pick(i),
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: _selected == i ? widget.level.color : widget.level.color.withValues(alpha: 0.25),
-                          width: _selected == i ? 2 : 1,
-                        ),
-                      ),
-                      child: Text(
-                        opt,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            const Spacer(),
-            FilledButton(
-              onPressed: _revealed ? _next : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: widget.level.color,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: Text(
-                _index + 1 >= _questions.length ? 'See results' : 'Next question',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

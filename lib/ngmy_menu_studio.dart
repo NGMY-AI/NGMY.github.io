@@ -8,6 +8,7 @@ import 'ngmy_bio_models.dart';
 import 'ngmy_bio_storage.dart';
 import 'ngmy_bio_studio.dart';
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_local_bio_storage.dart';
 import 'ngmy_local_menu_publish_registry.dart';
 import 'ngmy_local_menu_storage.dart';
@@ -25,6 +26,8 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_studio_backend.dart';
 
 const _kMenuAccent = Color(0xFFD4AF37);
+const _kMenuHudColors = [_kMenuAccent, Color(0xFFB8860B)];
+const _kBioHudColors = [Color(0xFF2563EB), Color(0xFF1D4ED8)];
 
 Future<void> showNgmyMenuStudioDialog(
   BuildContext context, {
@@ -462,79 +465,72 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       );
     }
     if (_editing != null) return _editor(t);
-    return Material(
-      color: t.scaffold,
-      child: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 240,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [const Color(0xFF1A1410).withValues(alpha: t.isDark ? 0.95 : 0.15), t.scaffold],
-                ),
-              ),
+    final title = widget._isLocal
+        ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly ? 'Local Bio (Test)' : 'Local Menu (Test)')
+        : 'Menu Studio';
+    final subtitle = widget._isLocal
+        ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly
+            ? 'Link-in-bio · your phone hosts · works on any device'
+            : 'Restaurant menus · your phone hosts · works on any device')
+        : 'Luxury menus · Bio pages · publish online · QR codes';
+    final colors = _homeMode == 'bio' ? _kBioHudColors : _kMenuHudColors;
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) {
+        return Material(
+          color: Colors.transparent,
+          child: NgmyToolkitAlivePageChrome(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            header: NgmyToolkitAliveHeader(
+              title: title,
+              subtitle: subtitle,
+              colors: colors,
+              pulse: pulse,
+              orbit: orbit,
+              icon: _homeMode == 'bio' ? Icons.link_rounded : Icons.restaurant_menu_rounded,
+              onClose: () => Navigator.pop(context),
             ),
-          ),
-          SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _homeTopBar(t),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget._isLocal
-                            ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly ? 'Local Bio (Test)' : 'Local Menu (Test)')
-                            : 'Menu Studio',
-                        style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: -0.5),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        widget._isLocal
-                            ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly
-                                ? 'Link-in-bio · your phone hosts · works on any device'
-                                : 'Restaurant menus · your phone hosts · works on any device')
-                            : 'Luxury menus · Bio pages · publish online · QR codes',
-                        style: TextStyle(color: t.subtitle, fontSize: 13, height: 1.35),
-                      ),
-                    ],
-                  ),
-                ),
                 if (widget.homeFilter == NgmyStudioHomeFilter.all)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        Expanded(child: _homeModeChip('Menus', 'menus', t)),
-                        const SizedBox(width: 8),
-                        Expanded(child: _homeModeChip('Bio', 'bio', t)),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: NgmyToolkitAliveSection(
+                      colors: colors,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      phase: 0.08,
+                      padding: const EdgeInsets.all(8),
+                      child: Row(
+                        children: [
+                          Expanded(child: _homeModeChip('Menus', 'menus', t)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _homeModeChip('Bio', 'bio', t)),
+                        ],
+                      ),
                     ),
                   ),
                 if (widget.homeFilter == NgmyStudioHomeFilter.all) const SizedBox(height: 14),
-                if (widget.homeFilter != NgmyStudioHomeFilter.all) const SizedBox(height: 4),
+                if (widget.homeFilter != NgmyStudioHomeFilter.all) const SizedBox(height: 12),
                 if (_homeMode == 'menus') ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: NgmyToolkitAliveSection(
+                      colors: _kMenuHudColors,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      phase: 0.18,
+                      padding: EdgeInsets.zero,
                       onTap: _newMenu,
-                      borderRadius: BorderRadius.circular(18),
                       child: Ink(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(colors: [Color(0xFFD4AF37), Color(0xFFB8860B)]),
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: _kMenuAccent.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                         child: Row(
@@ -552,51 +548,63 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text('YOUR MENUS', style: t.sectionLabel),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator(color: _kMenuAccent))
-                      : _menus.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(32),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.restaurant_menu_rounded, size: 56, color: t.muted),
-                                    const SizedBox(height: 12),
-                                    Text('No menus yet', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Text('Tap Create new menu to start', style: TextStyle(color: t.subtitle, fontSize: 13)),
-                                  ],
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('YOUR MENUS', style: t.sectionLabel.copyWith(color: Colors.white70)),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator(color: _kMenuAccent))
+                        : _menus.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.restaurant_menu_rounded, size: 56, color: Colors.white38),
+                                      const SizedBox(height: 12),
+                                      const Text('No menus yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                                      const SizedBox(height: 4),
+                                      Text('Tap Create new menu to start', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                itemCount: _menus.length,
+                                itemBuilder: (_, i) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: NgmyToolkitAliveSection(
+                                    colors: _kMenuHudColors,
+                                    pulse: pulse,
+                                    scan: scan,
+                                    orbit: orbit,
+                                    phase: 0.22 + (i % 5) * 0.07,
+                                    padding: EdgeInsets.zero,
+                                    child: _menuListTile(t, _menus[i], framed: true),
+                                  ),
                                 ),
                               ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: _menus.length,
-                              itemBuilder: (_, i) => _menuListTile(t, _menus[i]),
-                            ),
-                ),
+                  ),
                 ] else ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: NgmyToolkitAliveSection(
+                      colors: _kBioHudColors,
+                      pulse: pulse,
+                      scan: scan,
+                      orbit: orbit,
+                      phase: 0.18,
+                      padding: EdgeInsets.zero,
                       onTap: _newBio,
-                      borderRadius: BorderRadius.circular(18),
                       child: Ink(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 8))],
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                         child: Row(
@@ -614,44 +622,58 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text('YOUR BIO PAGES', style: t.sectionLabel),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
-                      : _bios.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(32),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.link_rounded, size: 56, color: t.muted),
-                                    const SizedBox(height: 12),
-                                    Text('No Bio pages yet', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Text('Create a link-in-bio page with photos & links', style: TextStyle(color: t.subtitle, fontSize: 13), textAlign: TextAlign.center),
-                                  ],
+                  const SizedBox(height: 18),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text('YOUR BIO PAGES', style: t.sectionLabel.copyWith(color: Colors.white70)),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                        : _bios.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.link_rounded, size: 56, color: Colors.white38),
+                                      const SizedBox(height: 12),
+                                      const Text('No Bio pages yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Create a link-in-bio page with photos & links',
+                                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                itemCount: _bios.length,
+                                itemBuilder: (_, i) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: NgmyToolkitAliveSection(
+                                    colors: _kBioHudColors,
+                                    pulse: pulse,
+                                    scan: scan,
+                                    orbit: orbit,
+                                    phase: 0.22 + (i % 5) * 0.07,
+                                    padding: EdgeInsets.zero,
+                                    child: _bioListTile(t, _bios[i], framed: true),
+                                  ),
                                 ),
                               ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                              itemCount: _bios.length,
-                              itemBuilder: (_, i) => _bioListTile(t, _bios[i]),
-                            ),
-                ),
+                  ),
                 ],
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -677,8 +699,57 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     );
   }
 
-  Widget _bioListTile(NgmyHubTheme t, NgmyBioDocument b) {
+  Widget _bioListTile(NgmyHubTheme t, NgmyBioDocument b, {bool framed = false}) {
     final name = b.displayName.trim().isEmpty ? 'Untitled Bio' : b.displayName.trim();
+    final titleColor = framed ? Colors.white : t.title;
+    final subColor = framed ? Colors.white70 : t.subtitle;
+    final mutedColor = framed ? Colors.white54 : t.muted;
+    final body = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openBio(b),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+                ),
+                child: const Icon(Icons.link_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: TextStyle(fontWeight: FontWeight.w800, color: titleColor)),
+                    Text('${b.links.length} links${b.isPublished ? ' · Live' : ''}', style: TextStyle(fontSize: 11, color: subColor)),
+                  ],
+                ),
+              ),
+              if (b.publicUrl.isNotEmpty)
+                IconButton(
+                  tooltip: 'Copy link',
+                  onPressed: () => _copyLink(b.publicUrl),
+                  icon: const Icon(Icons.copy_rounded, color: Color(0xFF60A5FA), size: 20),
+                ),
+              IconButton(
+                tooltip: 'Delete Bio',
+                onPressed: () => _confirmDeleteBio(b),
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+              ),
+              Icon(Icons.chevron_right_rounded, color: mutedColor),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (framed) return body;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -686,74 +757,66 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: t.border),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _openBio(b),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-                  ),
-                  child: const Icon(Icons.link_rounded, color: Colors.white, size: 22),
+      child: body,
+    );
+  }
+
+  Widget _menuListTile(NgmyHubTheme t, NgmyMenuDocument m, {bool framed = false}) {
+    final name = m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName;
+    final titleColor = framed ? Colors.white : t.title;
+    final subColor = framed ? Colors.white70 : t.subtitle;
+    final mutedColor = framed ? Colors.white54 : t.muted;
+    final body = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openMenu(m),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [_kMenuAccent.withValues(alpha: 0.25), _kMenuAccent.withValues(alpha: 0.08)]),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _kMenuAccent.withValues(alpha: 0.35)),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, color: t.title)),
-                      Text('${b.links.length} links${b.isPublished ? ' · Live' : ''}', style: TextStyle(fontSize: 11, color: t.subtitle)),
-                    ],
-                  ),
+                child: const Icon(Icons.restaurant_menu_rounded, color: _kMenuAccent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: TextStyle(color: titleColor, fontWeight: FontWeight.w800, fontSize: 15)),
+                    const SizedBox(height: 3),
+                    Text(
+                      m.isPublished ? 'Published · ${m.templateId.replaceAll('_', ' ')}' : 'Draft · ${m.templateId.replaceAll('_', ' ')}',
+                      style: TextStyle(color: subColor, fontSize: 11),
+                    ),
+                  ],
                 ),
-                if (b.publicUrl.isNotEmpty)
-                  IconButton(
-                    tooltip: 'Copy link',
-                    onPressed: () => _copyLink(b.publicUrl),
-                    icon: Icon(Icons.copy_rounded, color: const Color(0xFF2563EB), size: 20),
-                  ),
+              ),
+              if (m.isPublished && m.publicUrl.isNotEmpty)
                 IconButton(
-                  tooltip: 'Delete Bio',
-                  onPressed: () => _confirmDeleteBio(b),
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                  tooltip: 'Copy link',
+                  onPressed: () => _copyLink(m.publicUrl),
+                  icon: const Icon(Icons.link_rounded, color: _kMenuAccent, size: 20),
                 ),
-                Icon(Icons.chevron_right_rounded, color: t.muted),
-              ],
-            ),
+              IconButton(
+                tooltip: 'Delete menu',
+                onPressed: () => _confirmDeleteMenu(m),
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+              ),
+              Icon(Icons.chevron_right_rounded, color: mutedColor),
+            ],
           ),
         ),
       ),
     );
-  }
-
-  Widget _homeTopBar(NgmyHubTheme t) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: t.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
-              child: Icon(Icons.close_rounded, color: t.iconButtonIcon, size: 20),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _menuListTile(NgmyHubTheme t, NgmyMenuDocument m) {
-    final name = m.restaurantName.trim().isEmpty ? 'Untitled menu' : m.restaurantName;
+    if (framed) return body;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -762,56 +825,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         border: Border.all(color: t.border),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: t.isDark ? 0.2 : 0.04), blurRadius: 12, offset: const Offset(0, 4))],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _openMenu(m),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [_kMenuAccent.withValues(alpha: 0.25), _kMenuAccent.withValues(alpha: 0.08)]),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _kMenuAccent.withValues(alpha: 0.35)),
-                  ),
-                  child: const Icon(Icons.restaurant_menu_rounded, color: _kMenuAccent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 15)),
-                      const SizedBox(height: 3),
-                      Text(
-                        m.isPublished ? 'Published · ${m.templateId.replaceAll('_', ' ')}' : 'Draft · ${m.templateId.replaceAll('_', ' ')}',
-                        style: TextStyle(color: t.subtitle, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                if (m.isPublished && m.publicUrl.isNotEmpty)
-                  IconButton(
-                    tooltip: 'Copy link',
-                    onPressed: () => _copyLink(m.publicUrl),
-                    icon: Icon(Icons.link_rounded, color: _kMenuAccent, size: 20),
-                  ),
-                IconButton(
-                  tooltip: 'Delete menu',
-                  onPressed: () => _confirmDeleteMenu(m),
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                ),
-                Icon(Icons.chevron_right_rounded, color: t.muted),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: body,
     );
   }
 

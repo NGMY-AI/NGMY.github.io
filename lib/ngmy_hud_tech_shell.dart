@@ -89,25 +89,32 @@ class NgmyHudTechFrame extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(borderRadius),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.10),
-                  colors.first.withValues(alpha: 0.16 + pulse * 0.08),
-                  colors.last.withValues(alpha: 0.12),
-                  Colors.black.withValues(alpha: 0.18),
-                ],
-              ),
-            ),
-            child: child,
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Never force infinite height — that blanks Creator Toolkit in scroll views.
+              final fillH = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+              return Container(
+                width: double.infinity,
+                height: fillH ? constraints.maxHeight : null,
+                padding: padding,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF0B1220).withValues(alpha: 0.92),
+                      colors.first.withValues(alpha: 0.28 + pulse * 0.12),
+                      colors.last.withValues(alpha: 0.22),
+                      const Color(0xFF020617).withValues(alpha: 0.95),
+                    ],
+                  ),
+                  border: Border.all(color: colors.first.withValues(alpha: 0.22 + pulse * 0.12)),
+                ),
+                child: child,
+              );
+            },
           ),
         ),
       ),
@@ -563,6 +570,75 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Pulsing action chip / button shell for toolkit interiors.
+class NgmyToolkitAliveButton extends StatelessWidget {
+  const NgmyToolkitAliveButton({
+    super.key,
+    required this.colors,
+    required this.pulse,
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.selected = true,
+  });
+
+  final List<Color> colors;
+  final double pulse;
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: selected
+                ? LinearGradient(colors: [
+                    Color.lerp(colors.first, colors.last, pulse)!,
+                    colors.last,
+                  ])
+                : null,
+            color: selected ? null : Colors.white.withValues(alpha: 0.06),
+            border: Border.all(
+              color: selected ? colors.first.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.12),
+            ),
+            boxShadow: selected
+                ? [BoxShadow(color: colors.first.withValues(alpha: 0.28 + pulse * 0.2), blurRadius: 12 + pulse * 6)]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: Colors.white.withValues(alpha: selected ? 0.95 : 0.55)),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: selected ? 1 : 0.55),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
