@@ -36,6 +36,7 @@ class NgmySpendingEntry {
     this.pinnedAlarmText = '',
     this.pinnedEssentialsKind = '',
     this.businessCardJson = '',
+    this.cardTemplateId = '',
   });
 
   final String id;
@@ -57,6 +58,8 @@ class NgmySpendingEntry {
   final String pinnedEssentialsKind;
   /// JSON of a pinned NgmyBusinessCardDocument.
   final String businessCardJson;
+  /// Money-card face template id (see [kNgmyMoneyCardTemplates]).
+  final String cardTemplateId;
 
   bool get hasImage => imageBase64.trim().isNotEmpty;
   bool get isPassword => category == 'Password';
@@ -81,6 +84,7 @@ class NgmySpendingEntry {
     String? pinnedAlarmText,
     String? pinnedEssentialsKind,
     String? businessCardJson,
+    String? cardTemplateId,
   }) =>
       NgmySpendingEntry(
         id: id ?? this.id,
@@ -96,6 +100,7 @@ class NgmySpendingEntry {
         pinnedAlarmText: pinnedAlarmText ?? this.pinnedAlarmText,
         pinnedEssentialsKind: pinnedEssentialsKind ?? this.pinnedEssentialsKind,
         businessCardJson: businessCardJson ?? this.businessCardJson,
+        cardTemplateId: cardTemplateId ?? this.cardTemplateId,
       );
 
   Map<String, dynamic> toJson() => {
@@ -112,6 +117,7 @@ class NgmySpendingEntry {
         'pinnedAlarmText': pinnedAlarmText,
         'pinnedEssentialsKind': pinnedEssentialsKind,
         'businessCardJson': businessCardJson,
+        'cardTemplateId': cardTemplateId,
       };
 
   factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) => NgmySpendingEntry(
@@ -128,6 +134,7 @@ class NgmySpendingEntry {
         pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
         pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
         businessCardJson: j['businessCardJson']?.toString() ?? '',
+        cardTemplateId: j['cardTemplateId']?.toString() ?? '',
       );
 }
 
@@ -331,6 +338,102 @@ List<Color> ngmyCreditThemeColors(String category) {
     default:
       return const [Color(0xFF1E1B4B), Color(0xFF4F46E5)];
   }
+}
+
+/// Luxurious payment-card face templates (Log spending → money categories).
+enum NgmyMoneyCardPattern { luxeGradient, diagonal, mesh, carbon, marbleVein, nightGold, oceanDepth, obsidian, champagne, aurora }
+
+class NgmyMoneyCardTemplate {
+  const NgmyMoneyCardTemplate({
+    required this.id,
+    required this.label,
+    required this.colors,
+    required this.pattern,
+  });
+
+  final String id;
+  final String label;
+  final List<Color> colors;
+  final NgmyMoneyCardPattern pattern;
+}
+
+const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
+  NgmyMoneyCardTemplate(
+    id: 'midnight_gold',
+    label: 'Midnight Gold',
+    colors: [Color(0xFF0B1220), Color(0xFF1E293B), Color(0xFFB45309)],
+    pattern: NgmyMoneyCardPattern.nightGold,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'obsidian_steel',
+    label: 'Obsidian',
+    colors: [Color(0xFF09090B), Color(0xFF27272A), Color(0xFF71717A)],
+    pattern: NgmyMoneyCardPattern.obsidian,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'champagne_noir',
+    label: 'Champagne',
+    colors: [Color(0xFF1C1917), Color(0xFF44403C), Color(0xFFD6B56A)],
+    pattern: NgmyMoneyCardPattern.champagne,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'royal_violet',
+    label: 'Royal Violet',
+    colors: [Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFFA78BFA)],
+    pattern: NgmyMoneyCardPattern.luxeGradient,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'ocean_platinum',
+    label: 'Ocean Platinum',
+    colors: [Color(0xFF042F2E), Color(0xFF0E7490), Color(0xFF67E8F9)],
+    pattern: NgmyMoneyCardPattern.oceanDepth,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'carbon_noir',
+    label: 'Carbon Noir',
+    colors: [Color(0xFF111827), Color(0xFF1F2937), Color(0xFF9CA3AF)],
+    pattern: NgmyMoneyCardPattern.carbon,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'emerald_luxe',
+    label: 'Emerald Luxe',
+    colors: [Color(0xFF022C22), Color(0xFF065F46), Color(0xFF34D399)],
+    pattern: NgmyMoneyCardPattern.diagonal,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'marble_ink',
+    label: 'Marble Ink',
+    colors: [Color(0xFF0F172A), Color(0xFF334155), Color(0xFFE2E8F0)],
+    pattern: NgmyMoneyCardPattern.marbleVein,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'aurora_vault',
+    label: 'Aurora Vault',
+    colors: [Color(0xFF0B1220), Color(0xFF312E81), Color(0xFF22D3EE)],
+    pattern: NgmyMoneyCardPattern.aurora,
+  ),
+  NgmyMoneyCardTemplate(
+    id: 'mesh_sapphire',
+    label: 'Mesh Sapphire',
+    colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFF60A5FA)],
+    pattern: NgmyMoneyCardPattern.mesh,
+  ),
+];
+
+NgmyMoneyCardTemplate ngmyMoneyCardTemplateById(String? id) {
+  final key = (id ?? '').trim();
+  for (final t in kNgmyMoneyCardTemplates) {
+    if (t.id == key) return t;
+  }
+  return kNgmyMoneyCardTemplates.first;
+}
+
+List<Color> ngmyMoneyCardAccent(NgmySpendingEntry entry) {
+  if (entry.cardTemplateId.trim().isNotEmpty) {
+    final t = ngmyMoneyCardTemplateById(entry.cardTemplateId);
+    return [t.colors.first, t.colors.length > 1 ? t.colors[1] : t.colors.first];
+  }
+  return ngmyCreditThemeColors(entry.category);
 }
 
 /// Three rows × four categories for the Log spending sheet.
@@ -1608,6 +1711,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
           pinnedNoteText: result['pinnedNoteText'] ?? '',
           pinnedAlarmText: result['pinnedAlarmText'] ?? '',
           pinnedEssentialsKind: result['pinnedEssentialsKind'] ?? '',
+          cardTemplateId: result['cardTemplateId'] ?? '',
         ),
       );
     } else {
@@ -1726,7 +1830,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                             : entry.hasPinnedEssentials && entry.amount <= 0
                                 ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
                                 : entry.showsCreditFace
-                                    ? ngmyCreditThemeColors(entry.category)
+                                    ? ngmyMoneyCardAccent(entry)
                                     : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                 isFront: isFront,
                 showDateTab: revealDates,
@@ -2146,93 +2250,234 @@ class _CreditCardSpendBody extends StatelessWidget {
   final NgmySpendingEntry entry;
   final double totalSpent;
 
-  List<Color> get _themeColors => ngmyCreditThemeColors(entry.category);
-
   @override
   Widget build(BuildContext context) {
-    final colors = _themeColors;
+    final tpl = ngmyMoneyCardTemplateById(entry.cardTemplateId);
+    final colors = tpl.colors;
     final cardNote = entry.note.trim();
-    // Full-bleed money face — fills the frosted card like a photo.
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [colors.first, colors.last.withValues(alpha: 0.92)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            bottom: -30,
-            child: Icon(Icons.credit_card_rounded, size: 140, color: Colors.white.withValues(alpha: 0.07)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 54, 16, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(_kSpendingCategories[entry.category] ?? Icons.credit_card_rounded, size: 16, color: Colors.white.withValues(alpha: 0.92)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        entry.category.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.88)),
-                      ),
-                    ),
-                    Text('NGMY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.5))),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  entry.description.isEmpty ? 'Expense' : entry.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '-\$${entry.amount.toStringAsFixed(2)}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.72)),
-                      ),
-                    ),
-                    Text(
-                      ngmyHomeDateTabLabel(entry.date).split(',').first,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.65)),
-                    ),
-                  ],
-                ),
-                if (cardNote.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    cardNote,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
-                  ),
-                ],
-              ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: colors.length >= 3
+                  ? [colors[0], colors[1], colors[2].withValues(alpha: 0.95)]
+                  : [colors.first, colors.last.withValues(alpha: 0.92)],
             ),
           ),
-        ],
-      ),
+        ),
+        Positioned.fill(child: CustomPaint(painter: _MoneyCardPatternPainter(template: tpl))),
+        Positioned(
+          right: -18,
+          bottom: -28,
+          child: Icon(Icons.credit_card_rounded, size: 140, color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        // Soft chip sheen
+        Positioned(
+          left: 16,
+          top: 58,
+          child: Container(
+            width: 36,
+            height: 26,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withValues(alpha: 0.55),
+                  Colors.white.withValues(alpha: 0.18),
+                  colors.last.withValues(alpha: 0.35),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 54, 16, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_kSpendingCategories[entry.category] ?? Icons.credit_card_rounded, size: 16, color: Colors.white.withValues(alpha: 0.92)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      entry.category.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white.withValues(alpha: 0.88)),
+                    ),
+                  ),
+                  Text('NGMY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Colors.white.withValues(alpha: 0.55))),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                entry.description.isEmpty ? 'Expense' : entry.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '-\$${entry.amount.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.72)),
+                    ),
+                  ),
+                  Text(
+                    ngmyHomeDateTabLabel(entry.date).split(',').first,
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.65)),
+                  ),
+                ],
+              ),
+              if (cardNote.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  cardNote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.78)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
+}
+
+class _MoneyCardPatternPainter extends CustomPainter {
+  _MoneyCardPatternPainter({required this.template});
+
+  final NgmyMoneyCardTemplate template;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = template.colors;
+    final accent = c.length > 2 ? c[2] : c.last;
+    switch (template.pattern) {
+      case NgmyMoneyCardPattern.diagonal:
+        final p = Paint()..color = accent.withValues(alpha: 0.12);
+        for (var i = -4; i < 14; i++) {
+          final path = Path()
+            ..moveTo(i * 36.0, 0)
+            ..lineTo(i * 36.0 + 18, 0)
+            ..lineTo(i * 36.0 - 40, size.height)
+            ..lineTo(i * 36.0 - 58, size.height)
+            ..close();
+          canvas.drawPath(path, p);
+        }
+        break;
+      case NgmyMoneyCardPattern.carbon:
+        final p = Paint()..color = Colors.white.withValues(alpha: 0.04);
+        for (var y = 0.0; y < size.height; y += 7) {
+          for (var x = (y ~/ 7).isEven ? 0.0 : 3.5; x < size.width; x += 7) {
+            canvas.drawCircle(Offset(x, y), 1.1, p);
+          }
+        }
+        break;
+      case NgmyMoneyCardPattern.marbleVein:
+        final p = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = accent.withValues(alpha: 0.22);
+        for (var i = 0; i < 5; i++) {
+          final path = Path()..moveTo(-10, size.height * (0.15 + i * 0.16));
+          path.cubicTo(size.width * 0.25, size.height * (0.05 + i * 0.18), size.width * 0.55, size.height * (0.35 + i * 0.1), size.width + 10, size.height * (0.2 + i * 0.14));
+          canvas.drawPath(path, p);
+        }
+        break;
+      case NgmyMoneyCardPattern.nightGold:
+      case NgmyMoneyCardPattern.champagne:
+        final glow = Paint()
+          ..shader = RadialGradient(
+            center: const Alignment(0.75, -0.55),
+            radius: 1.1,
+            colors: [accent.withValues(alpha: 0.38), accent.withValues(alpha: 0.0)],
+          ).createShader(Offset.zero & size);
+        canvas.drawRect(Offset.zero & size, glow);
+        final line = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = accent.withValues(alpha: 0.28);
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(12, 12, size.width - 24, size.height - 24), const Radius.circular(18)), line);
+        break;
+      case NgmyMoneyCardPattern.oceanDepth:
+        final wave = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = accent.withValues(alpha: 0.2);
+        for (var i = 0; i < 4; i++) {
+          final path = Path()..moveTo(0, size.height * (0.45 + i * 0.12));
+          for (var x = 0.0; x <= size.width; x += 18) {
+            path.quadraticBezierTo(x + 9, size.height * (0.45 + i * 0.12) + (i.isEven ? -8 : 8), x + 18, size.height * (0.45 + i * 0.12));
+          }
+          canvas.drawPath(path, wave);
+        }
+        break;
+      case NgmyMoneyCardPattern.obsidian:
+        final edge = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white.withValues(alpha: 0.14), Colors.transparent, accent.withValues(alpha: 0.18)],
+          ).createShader(Offset.zero & size);
+        canvas.drawRect(Offset.zero & size, edge);
+        break;
+      case NgmyMoneyCardPattern.aurora:
+        final a = Paint()
+          ..shader = SweepGradient(
+            center: Alignment.center,
+            colors: [
+              accent.withValues(alpha: 0.0),
+              accent.withValues(alpha: 0.22),
+              const Color(0xFFA78BFA).withValues(alpha: 0.18),
+              accent.withValues(alpha: 0.0),
+            ],
+          ).createShader(Offset.zero & size);
+        canvas.drawRect(Offset.zero & size, a);
+        break;
+      case NgmyMoneyCardPattern.mesh:
+        final p = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..color = accent.withValues(alpha: 0.16);
+        for (var x = 0.0; x < size.width; x += 16) {
+          canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+        }
+        for (var y = 0.0; y < size.height; y += 16) {
+          canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+        }
+        break;
+      case NgmyMoneyCardPattern.luxeGradient:
+        final sheen = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Colors.white.withValues(alpha: 0.16), Colors.transparent, accent.withValues(alpha: 0.12)],
+          ).createShader(Offset.zero & size);
+        canvas.drawRect(Offset.zero & size, sheen);
+        break;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MoneyCardPatternPainter oldDelegate) => oldDelegate.template.id != template.id;
 }
 
 class _NoteCardContent extends StatelessWidget {
@@ -2308,6 +2553,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
   final _passC = TextEditingController();
   final _amountFocus = FocusNode();
   String _category = 'Food';
+  String _cardTemplateId = kNgmyMoneyCardTemplates.first.id;
   String? _pinnedNote;
   String? _pinnedAlarm;
   String? _pinnedKind;
@@ -2410,6 +2656,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       'pinnedNoteText': _pinnedNote ?? '',
       'pinnedAlarmText': _pinnedAlarm ?? '',
       'pinnedEssentialsKind': _pinnedKind ?? '',
+      'cardTemplateId': _cardTemplateId,
     });
   }
 
@@ -2891,6 +3138,89 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                 );
                               },
                             ),
+                            if (!_isPassword) ...[
+                              const SizedBox(height: 16),
+                              Text('CARD TEMPLATE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                              const SizedBox(height: 4),
+                              Text('Pick a luxurious payment-card look', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 10),
+                              for (var row = 0; row < 2; row++) ...[
+                                if (row > 0) const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    for (var col = 0; col < 5; col++) ...[
+                                      if (col > 0) const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Builder(
+                                          builder: (context) {
+                                            final tpl = kNgmyMoneyCardTemplates[row * 5 + col];
+                                            final selected = _cardTemplateId == tpl.id;
+                                            return GestureDetector(
+                                              onTap: () => setState(() => _cardTemplateId = tpl.id),
+                                              child: AnimatedContainer(
+                                                duration: const Duration(milliseconds: 160),
+                                                height: 58,
+                                                decoration: BoxDecoration(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: tpl.colors.length >= 3
+                                                        ? [tpl.colors[0], tpl.colors[1], tpl.colors[2]]
+                                                        : [tpl.colors.first, tpl.colors.last],
+                                                  ),
+                                                  border: Border.all(
+                                                    color: selected ? Colors.white : Colors.white.withValues(alpha: 0.18),
+                                                    width: selected ? 2 : 1,
+                                                  ),
+                                                  boxShadow: selected
+                                                      ? [BoxShadow(color: tpl.colors.last.withValues(alpha: 0.45), blurRadius: 12)]
+                                                      : null,
+                                                ),
+                                                child: Stack(
+                                                  children: [
+                                                    Positioned.fill(
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(11),
+                                                        child: CustomPaint(painter: _MoneyCardPatternPainter(template: tpl)),
+                                                      ),
+                                                    ),
+                                                    Align(
+                                                      alignment: Alignment.bottomCenter,
+                                                      child: Container(
+                                                        width: double.infinity,
+                                                        padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black.withValues(alpha: 0.45),
+                                                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+                                                        ),
+                                                        child: Text(
+                                                          tpl.label,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          textAlign: TextAlign.center,
+                                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 8),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (selected)
+                                                      const Positioned(
+                                                        top: 4,
+                                                        right: 4,
+                                                        child: Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ],
                             const SizedBox(height: 14),
                             if (_isPassword) ...[
                               Text('LABEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
