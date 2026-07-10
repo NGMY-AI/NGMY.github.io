@@ -217,6 +217,9 @@ enum NgmyHomeCardSlideStyle {
   slideRight,
   fade,
   flipScale,
+  slideUp,
+  zoomBurst,
+  spiral,
 }
 
 extension NgmyHomeCardSlideStyleX on NgmyHomeCardSlideStyle {
@@ -226,6 +229,9 @@ extension NgmyHomeCardSlideStyleX on NgmyHomeCardSlideStyle {
         NgmyHomeCardSlideStyle.slideRight => 'Sweep →',
         NgmyHomeCardSlideStyle.fade => 'Fade',
         NgmyHomeCardSlideStyle.flipScale => 'Flip',
+        NgmyHomeCardSlideStyle.slideUp => 'Lift',
+        NgmyHomeCardSlideStyle.zoomBurst => 'Zoom',
+        NgmyHomeCardSlideStyle.spiral => 'Spiral',
       };
 
   IconData get icon => switch (this) {
@@ -234,6 +240,9 @@ extension NgmyHomeCardSlideStyleX on NgmyHomeCardSlideStyle {
         NgmyHomeCardSlideStyle.slideRight => Icons.east_rounded,
         NgmyHomeCardSlideStyle.fade => Icons.blur_on_rounded,
         NgmyHomeCardSlideStyle.flipScale => Icons.flip_rounded,
+        NgmyHomeCardSlideStyle.slideUp => Icons.arrow_upward_rounded,
+        NgmyHomeCardSlideStyle.zoomBurst => Icons.zoom_out_map_rounded,
+        NgmyHomeCardSlideStyle.spiral => Icons.rotate_right_rounded,
       };
 }
 
@@ -451,6 +460,15 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
         break;
       case NgmyHomeCardSlideStyle.flipScale:
         await _animateExit(angle: 1.15, scale: 0.62, opacity: 0.1);
+        break;
+      case NgmyHomeCardSlideStyle.slideUp:
+        await _animateExit(dy: -260, opacity: 0.12, scale: 0.94);
+        break;
+      case NgmyHomeCardSlideStyle.zoomBurst:
+        await _animateExit(scale: 1.45, opacity: 0, angle: 0.08);
+        break;
+      case NgmyHomeCardSlideStyle.spiral:
+        await _animateExit(dx: 120, dy: 180, angle: 2.4, scale: 0.45, opacity: 0.05);
         break;
     }
     if (!mounted) return;
@@ -2073,31 +2091,138 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
     );
   }
 
-  Widget _hudAction({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _hudAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required double t,
+    required int phase,
+    required List<Color> accent,
+  }) {
+    final wave = ((t + phase * 0.22) % 1.0);
+    final glow = 0.12 + wave * 0.22;
+    final border = Color.lerp(accent[0], accent[1], wave)!;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: Colors.white.withValues(alpha: 0.05),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment(-1.2 + wave * 2.4, -0.6),
+              end: Alignment(1.2 - wave * 2.4, 0.8),
+              colors: [
+                accent[0].withValues(alpha: 0.18 + wave * 0.10),
+                const Color(0xFF0B1220).withValues(alpha: 0.55),
+                accent[1].withValues(alpha: 0.16 + (1 - wave) * 0.10),
+              ],
+            ),
+            border: Border.all(color: border.withValues(alpha: 0.45 + wave * 0.25), width: 1.35),
+            boxShadow: [
+              BoxShadow(color: accent[0].withValues(alpha: glow), blurRadius: 14 + wave * 10, spreadRadius: 0.4),
+              BoxShadow(color: accent[1].withValues(alpha: glow * 0.7), blurRadius: 18, offset: const Offset(0, 6)),
+            ],
           ),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: const Color(0xFF67E8F9)),
-              const SizedBox(width: 10),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(colors: accent),
+                  boxShadow: [BoxShadow(color: accent[0].withValues(alpha: 0.35), blurRadius: 10)],
+                ),
+                child: Icon(icon, size: 18, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
               ),
-              Icon(Icons.chevron_right_rounded, size: 18, color: Colors.white.withValues(alpha: 0.35)),
+              Transform.translate(
+                offset: Offset(math.sin(wave * math.pi * 2) * 2.5, 0),
+                child: Icon(Icons.chevron_right_rounded, size: 20, color: border.withValues(alpha: 0.9)),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _logSpendingLogo(double t) {
+    final spin = t * math.pi * 2;
+    return SizedBox(
+      width: 54,
+      height: 54,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Transform.rotate(
+            angle: spin * 0.35,
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
+                    const Color(0xFF60A5FA),
+                    Color.lerp(const Color(0xFFA78BFA), const Color(0xFF22D3EE), t)!,
+                    Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.35 + t * 0.25), blurRadius: 16 + t * 10),
+                  BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 4)),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(const Color(0xFF0B1220), const Color(0xFF1E1B4B), t)!,
+                  const Color(0xFF0F172A),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.rotate(
+                  angle: -spin * 0.2,
+                  child: Icon(Icons.memory_rounded, size: 20, color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t)),
+                ),
+                Positioned(
+                  bottom: 7,
+                  child: Text(
+                    'NGMY',
+                    style: TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                      color: Colors.white.withValues(alpha: 0.85 + t * 0.1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2124,10 +2249,14 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                 constraints: BoxConstraints(maxHeight: size.height * 0.82),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(26),
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF0B1220), Color(0xFF111827), Color(0xFF1E1B4B)],
+                    colors: [
+                      const Color(0xFF0B1220),
+                      Color.lerp(const Color(0xFF111827), const Color(0xFF1E1B4B), t * 0.35)!,
+                      const Color(0xFF1E1B4B),
+                    ],
                   ),
                   border: Border.all(
                     color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFF8B5CF6), t)!,
@@ -2145,39 +2274,26 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                       padding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
                       child: Row(
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              gradient: SweepGradient(
-                                colors: [
-                                  Color.lerp(const Color(0xFF22D3EE), const Color(0xFF8B5CF6), t)!,
-                                  const Color(0xFF60A5FA),
-                                  Color.lerp(const Color(0xFF8B5CF6), const Color(0xFF22D3EE), t)!,
-                                ],
-                              ),
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(2.5),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                color: const Color(0xFF0B1220),
-                              ),
-                              child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF67E8F9), size: 22),
-                            ),
-                          ),
+                          _logSpendingLogo(t),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'LOG SPENDING',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Color(0xFF67E8F9)),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2.2,
+                                    color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t),
+                                  ),
                                 ),
-                                SizedBox(height: 2),
-                                Text('Device vault · stays local', style: TextStyle(fontSize: 12, color: Color(0x99FFFFFF), fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Device vault · stays local',
+                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.58 + t * 0.08), fontWeight: FontWeight.w600),
+                                ),
                               ],
                             ),
                           ),
@@ -2199,15 +2315,29 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
-                                color: Colors.white.withValues(alpha: 0.04),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                                gradient: LinearGradient(
+                                  begin: Alignment(-1 + t * 2, -0.4),
+                                  end: Alignment(1 - t * 2, 0.6),
+                                  colors: [
+                                    const Color(0xFF22D3EE).withValues(alpha: 0.10 + t * 0.06),
+                                    Colors.white.withValues(alpha: 0.04),
+                                    const Color(0xFF8B5CF6).withValues(alpha: 0.12 + (1 - t) * 0.06),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFF8B5CF6), t)!.withValues(alpha: 0.45),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(color: const Color(0xFF67E8F9).withValues(alpha: 0.10 + t * 0.10), blurRadius: 16),
+                                ],
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.auto_awesome_motion_rounded, size: 18, color: Color(0xFF67E8F9)),
+                                      Icon(Icons.auto_awesome_motion_rounded, size: 18, color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t)),
                                       const SizedBox(width: 8),
                                       const Expanded(
                                         child: Text('AUTO SLIDE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Color(0xFF67E8F9))),
@@ -2220,10 +2350,18 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                           decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(999),
                                             gradient: _autoPlay
-                                                ? const LinearGradient(colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)])
+                                                ? LinearGradient(
+                                                    colors: [
+                                                      Color.lerp(const Color(0xFF22D3EE), const Color(0xFF60A5FA), t)!,
+                                                      Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), t)!,
+                                                    ],
+                                                  )
                                                 : null,
                                             color: _autoPlay ? null : Colors.white.withValues(alpha: 0.08),
                                             border: Border.all(color: Colors.white.withValues(alpha: _autoPlay ? 0 : 0.2)),
+                                            boxShadow: _autoPlay
+                                                ? [BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.28 + t * 0.15), blurRadius: 12)]
+                                                : null,
                                           ),
                                           child: Text(
                                             _autoPlay ? 'ON' : 'OFF',
@@ -2234,53 +2372,101 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                     ],
                                   ),
                                   const SizedBox(height: 10),
-                                  Text('Pick a slide animation', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+                                  Text('8 slide animations', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      for (final style in NgmyHomeCardSlideStyle.values)
-                                        GestureDetector(
-                                          onTap: () => _pickStyle(style),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 160),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(12),
-                                              gradient: _slideStyle == style
-                                                  ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)])
-                                                  : null,
-                                              color: _slideStyle == style ? null : Colors.white.withValues(alpha: 0.05),
-                                              border: Border.all(
-                                                color: _slideStyle == style ? Colors.transparent : Colors.white.withValues(alpha: 0.14),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(style.icon, size: 14, color: ink),
-                                                const SizedBox(width: 6),
-                                                Text(style.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
-                                              ],
+                                  for (var row = 0; row < 2; row++) ...[
+                                    if (row > 0) const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        for (var col = 0; col < 4; col++) ...[
+                                          if (col > 0) const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Builder(
+                                              builder: (context) {
+                                                final style = NgmyHomeCardSlideStyle.values[row * 4 + col];
+                                                final selected = _slideStyle == style;
+                                                return GestureDetector(
+                                                  onTap: () => _pickStyle(style),
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(milliseconds: 180),
+                                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                                    decoration: BoxDecoration(
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      gradient: selected
+                                                          ? LinearGradient(
+                                                              colors: [
+                                                                Color.lerp(const Color(0xFF60A5FA), const Color(0xFF22D3EE), t)!,
+                                                                Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), 1 - t)!,
+                                                              ],
+                                                            )
+                                                          : LinearGradient(
+                                                              colors: [
+                                                                Colors.white.withValues(alpha: 0.06),
+                                                                Colors.white.withValues(alpha: 0.02),
+                                                              ],
+                                                            ),
+                                                      border: Border.all(
+                                                        color: selected
+                                                            ? Colors.white.withValues(alpha: 0.35)
+                                                            : Colors.white.withValues(alpha: 0.12),
+                                                      ),
+                                                      boxShadow: selected
+                                                          ? [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.28 + t * 0.12), blurRadius: 12)]
+                                                          : null,
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(style.icon, size: 16, color: ink),
+                                                        const SizedBox(height: 4),
+                                                        Text(
+                                                          style.label,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          textAlign: TextAlign.center,
+                                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
-                                        ),
-                                    ],
-                                  ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
                             const SizedBox(height: 14),
-                            _hudAction(icon: Icons.photo_camera_back_rounded, label: 'Upload & crop photo', onTap: _uploadPhoto),
-                            const SizedBox(height: 8),
+                            _hudAction(
+                              icon: Icons.photo_camera_back_rounded,
+                              label: 'Upload & crop photo',
+                              onTap: _uploadPhoto,
+                              t: t,
+                              phase: 0,
+                              accent: const [Color(0xFF22D3EE), Color(0xFF60A5FA)],
+                            ),
+                            const SizedBox(height: 10),
                             _hudAction(
                               icon: Icons.business_center_rounded,
                               label: (_pinnedNote != null || _pinnedAlarm != null) ? 'Essentials pinned ✓' : 'Pin note / alarm from Essentials',
                               onTap: _pickEssentialsPin,
+                              t: t,
+                              phase: 1,
+                              accent: const [Color(0xFF34D399), Color(0xFF059669)],
                             ),
-                            const SizedBox(height: 8),
-                            _hudAction(icon: Icons.badge_rounded, label: 'Add business card to home', onTap: _pickBusinessCard),
+                            const SizedBox(height: 10),
+                            _hudAction(
+                              icon: Icons.badge_rounded,
+                              label: 'Add business card to home',
+                              onTap: _pickBusinessCard,
+                              t: t,
+                              phase: 2,
+                              accent: const [Color(0xFFA78BFA), Color(0xFFEC4899)],
+                            ),
                             const SizedBox(height: 16),
                             Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
                             const SizedBox(height: 8),
@@ -2308,11 +2494,27 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                                       decoration: BoxDecoration(
                                                         gradient: selected
-                                                            ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)])
-                                                            : null,
-                                                        color: selected ? null : fieldBg,
+                                                            ? LinearGradient(
+                                                                colors: [
+                                                                  Color.lerp(const Color(0xFF60A5FA), const Color(0xFF22D3EE), t)!,
+                                                                  Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), 1 - t)!,
+                                                                ],
+                                                              )
+                                                            : LinearGradient(
+                                                                colors: [
+                                                                  Colors.white.withValues(alpha: 0.07),
+                                                                  Colors.white.withValues(alpha: 0.03),
+                                                                ],
+                                                              ),
                                                         borderRadius: BorderRadius.circular(14),
-                                                        border: Border.all(color: selected ? Colors.transparent : muted.withValues(alpha: 0.22)),
+                                                        border: Border.all(
+                                                          color: selected
+                                                              ? Colors.white.withValues(alpha: 0.35)
+                                                              : muted.withValues(alpha: 0.22),
+                                                        ),
+                                                        boxShadow: selected
+                                                            ? [BoxShadow(color: const Color(0xFF60A5FA).withValues(alpha: 0.25 + t * 0.12), blurRadius: 10)]
+                                                            : null,
                                                       ),
                                                       child: Column(
                                                         mainAxisSize: MainAxisSize.min,
@@ -2362,7 +2564,10 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                 decoration: BoxDecoration(
                                   color: fieldBg,
                                   borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: 0.35)),
+                                  border: Border.all(color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFF8B5CF6), t)!.withValues(alpha: 0.45)),
+                                  boxShadow: [
+                                    BoxShadow(color: const Color(0xFF67E8F9).withValues(alpha: 0.12 + t * 0.10), blurRadius: 14),
+                                  ],
                                 ),
                                 child: Row(
                                   children: [
@@ -2395,7 +2600,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                             FilledButton(
                               onPressed: _save,
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF8B5CF6),
+                                backgroundColor: Color.lerp(const Color(0xFF8B5CF6), const Color(0xFF6366F1), t),
                                 foregroundColor: Colors.white,
                                 minimumSize: const Size(double.infinity, 52),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
