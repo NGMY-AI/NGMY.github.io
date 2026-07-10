@@ -144,7 +144,12 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
   });
 
   final List<T> items;
-  final Widget Function(BuildContext context, T item) cardBuilder;
+  final Widget Function(
+    BuildContext context,
+    T item, {
+    required bool isFront,
+    required bool revealDates,
+  }) cardBuilder;
   final WidgetBuilder emptyBuilder;
   final double height;
 
@@ -154,17 +159,23 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
 
 class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with SingleTickerProviderStateMixin {
   late List<T> _order;
-  Offset _drag = Offset.zero;
-  late final AnimationController _snapCtrl;
-  Animation<Offset>? _snapAnim;
+  /// 0 = collapsed (front card on top). Positive = how far the deck is fanned open (Apple Wallet style).
+  double _spread = 0;
+  late final AnimationController _animCtrl;
+  Animation<double>? _spreadAnim;
+
+  /// Collapsed: only a thin edge of back cards peeks (dates stay hidden).
+  static const _peek = 12.0;
+  /// How far the wallet fans open when you swipe down.
+  static const _maxSpread = 132.0;
 
   @override
   void initState() {
     super.initState();
     _order = List.of(widget.items);
-    _snapCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 260))
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 320))
       ..addListener(() {
-        if (_snapAnim != null) setState(() => _drag = _snapAnim!.value);
+        if (_spreadAnim != null) setState(() => _spread = _spreadAnim!.value);
       });
   }
 
@@ -173,61 +184,63 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     super.didUpdateWidget(oldWidget);
     if (oldWidget.items.length != widget.items.length || !identical(oldWidget.items, widget.items)) {
       _order = List.of(widget.items);
-      _drag = Offset.zero;
-      _snapCtrl.stop();
+      _spread = 0;
+      _animCtrl.stop();
     }
   }
 
   @override
   void dispose() {
-    _snapCtrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
-  void _animateTo(Offset target, {VoidCallback? onDone}) {
-    _snapAnim = Tween<Offset>(begin: _drag, end: target).animate(
-      CurvedAnimation(parent: _snapCtrl, curve: Curves.easeOutCubic),
+  void _animateSpreadTo(double target, {VoidCallback? onDone}) {
+    _spreadAnim = Tween<double>(begin: _spread, end: target).animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
     );
-    _snapCtrl.forward(from: 0).whenComplete(() {
+    _animCtrl.forward(from: 0).whenComplete(() {
       if (mounted && onDone != null) onDone();
     });
   }
 
-  void _cycleFrontToBack() {
+  void _bringIndexToFront(int index) {
+    if (index <= 0 || index >= _order.length) return;
     setState(() {
-      final front = _order.removeAt(0);
-      _order.add(front);
-      _drag = Offset.zero;
+      final picked = _order.removeAt(index);
+      _order.insert(0, picked);
+      _spread = 0;
     });
   }
 
-  void _onPanUpdate(DragUpdateDetails d) {
-    _snapCtrl.stop();
-    setState(() => _drag += d.delta);
+  void _onVerticalDragUpdate(DragUpdateDetails d) {
+    _animCtrl.stop();
+    setState(() {
+      // Drag down opens the wallet fan; drag up closes it.
+      _spread = (_spread + d.delta.dy).clamp(0.0, _maxSpread);
+    });
   }
 
-  void _onPanEnd(DragEndDetails d) {
-    final dx = _drag.dx;
-    final dy = _drag.dy;
-    final vx = d.velocity.pixelsPerSecond.dx;
+  void _onVerticalDragEnd(DragEndDetails d) {
     final vy = d.velocity.pixelsPerSecond.dy;
-    final vertical = dy.abs() > dx.abs() * 0.85;
-    final shouldCycle = vertical
-        ? (dy.abs() > 70 || vy.abs() > 650)
-        : (dx.abs() > 90 || vx.abs() > 700);
-
-    if (shouldCycle) {
-      if (vertical) {
-        // Swipe down / up at the top — bring next card forward.
-        final dir = dy == 0 ? (vy.isNegative ? -1.0 : 1.0) : (dy.isNegative ? -1.0 : 1.0);
-        _animateTo(Offset(0, dir * 420), onDone: _cycleFrontToBack);
-      } else {
-        final dir = dx == 0 ? (vx.isNegative ? -1.0 : 1.0) : (dx.isNegative ? -1.0 : 1.0);
-        _animateTo(Offset(dir * 520, 0), onDone: _cycleFrontToBack);
-      }
+    if (_spread > _maxSpread * 0.45 || vy > 700) {
+      _animateSpreadTo(_maxSpread);
     } else {
-      _animateTo(Offset.zero);
+      _animateSpreadTo(0);
     }
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails d) {
+    final vx = d.velocity.pixelsPerSecond.dx;
+    if (vx.abs() < 650 && _spread < 20) return;
+    if (vx.abs() < 650) return;
+    // Horizontal flick cycles front card while collapsed.
+    if (_order.length < 2) return;
+    setState(() {
+      final front = _order.removeAt(0);
+      _order.add(front);
+      _spread = 0;
+    });
   }
 
   @override
@@ -235,55 +248,82 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     if (_order.isEmpty) {
       return SizedBox(height: widget.height + 28, child: widget.emptyBuilder(context));
     }
-    final visible = _order.take(3).toList();
+
+    final openT = (_spread / _maxSpread).clamp(0.0, 1.0);
+    final visibleCount = math.min(5, _order.length);
+    final lastDepth = visibleCount - 1;
+    final lastCollapsedY = lastDepth * _peek;
+    final lastOpenY = lastDepth * (48.0 + openT * 22);
+    final lastDy = lastCollapsedY + (lastOpenY - lastCollapsedY) * openT;
+    final stackHeight = widget.height + 28 + lastDy;
+
     return SizedBox(
-      height: widget.height + 36,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          for (var i = visible.length - 1; i >= 0; i--) _buildLayer(context, i, visible[i]),
-        ],
+      height: stackHeight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        onHorizontalDragEnd: _onHorizontalDragEnd,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            for (var i = visibleCount - 1; i >= 0; i--) _buildLayer(i, visibleCount, openT),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildLayer(BuildContext context, int depth, T item) {
+  Widget _buildLayer(int depth, int visibleCount, double openT) {
     final isFront = depth == 0;
-    // Stack upward behind the front card (like the sports deck).
-    final dy = isFront ? _drag.dy : -(depth * 14.0);
-    final scale = 1 - (depth * 0.045);
-    final dx = isFront ? _drag.dx : 0.0;
-    final rotation = isFront ? (_drag.dx / 520).clamp(-0.22, 0.22) : 0.0;
-    final opacity = isFront
-        ? (1 - math.max(_drag.dx.abs(), _drag.dy.abs()) / 480).clamp(0.35, 1.0)
-        : (1 - depth * 0.16);
+    // Collapsed: tight stack with tiny peeks below. Swipe down → cards roll forward (Apple Wallet).
+    final collapsedY = depth * _peek;
+    final openY = depth * (48.0 + openT * 22);
+    final dy = collapsedY + (openY - collapsedY) * openT;
+    final scale = isFront ? 1.0 : (0.94 - depth * 0.02) + openT * 0.04;
+    final revealDates = isFront || openT > 0.32;
+    final dim = isFront ? 1.0 : (0.42 + openT * 0.5).clamp(0.42, 0.92);
 
-    final card = Transform.translate(
-      offset: Offset(dx, dy + (isFront ? 0 : 10.0)),
-      child: Transform.rotate(
-        angle: rotation,
+    Widget card = Transform.translate(
+      offset: Offset(0, dy),
+      child: Transform.scale(
+        scale: scale,
+        alignment: Alignment.topCenter,
         child: Opacity(
-          opacity: opacity,
-          child: Transform.scale(
-            scale: scale,
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: widget.height,
-              width: double.infinity,
-              child: widget.cardBuilder(context, item),
+          opacity: dim,
+          child: SizedBox(
+            height: widget.height,
+            width: double.infinity,
+            child: widget.cardBuilder(
+              context,
+              _order[depth],
+              isFront: isFront,
+              revealDates: revealDates,
             ),
           ),
         ),
       ),
     );
 
-    if (!isFront) return IgnorePointer(child: card);
+    if (!isFront) {
+      card = GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          if (openT > 0.28) {
+            _bringIndexToFront(depth);
+          } else {
+            _animateSpreadTo(_maxSpread);
+          }
+        },
+        child: card,
+      );
+    }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
       child: card,
     );
   }
@@ -292,25 +332,31 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
 // ── Date tab (sports-card style) ────────────────────────────────────────────
 
 class _NgmyDateTab extends StatelessWidget {
-  const _NgmyDateTab({required this.label});
+  const _NgmyDateTab({required this.label, this.emphasized = true});
 
   final String label;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _DateTabPainter(),
+      painter: _DateTabPainter(emphasized: emphasized),
       child: Container(
-        constraints: const BoxConstraints(minWidth: 148),
-        padding: const EdgeInsets.fromLTRB(18, 7, 18, 8),
+        constraints: BoxConstraints(minWidth: emphasized ? 168 : 132),
+        padding: EdgeInsets.fromLTRB(emphasized ? 20 : 14, emphasized ? 9 : 5, emphasized ? 20 : 14, emphasized ? 10 : 6),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.2,
-            color: Colors.white.withValues(alpha: 0.92),
+            fontSize: emphasized ? 13.5 : 10.5,
+            fontWeight: FontWeight.w900,
+            letterSpacing: emphasized ? 0.35 : 0.15,
+            color: Colors.white.withValues(alpha: emphasized ? 1.0 : 0.55),
+            shadows: emphasized
+                ? const [
+                    Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2)),
+                  ]
+                : null,
           ),
         ),
       ),
@@ -319,6 +365,10 @@ class _NgmyDateTab extends StatelessWidget {
 }
 
 class _DateTabPainter extends CustomPainter {
+  _DateTabPainter({required this.emphasized});
+
+  final bool emphasized;
+
   @override
   void paint(Canvas canvas, Size size) {
     final path = Path()
@@ -327,27 +377,32 @@ class _DateTabPainter extends CustomPainter {
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
+    final topA = emphasized ? 0.55 : 0.16;
+    final botA = emphasized ? 0.32 : 0.08;
     final fill = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.28),
-          Colors.white.withValues(alpha: 0.12),
+          Colors.white.withValues(alpha: topA),
+          Colors.white.withValues(alpha: botA),
         ],
       ).createShader(Offset.zero & size);
+    if (emphasized) {
+      canvas.drawShadow(path, Colors.black.withValues(alpha: 0.45), 10, true);
+    }
     canvas.drawPath(path, fill);
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: 0.35),
+        ..strokeWidth = emphasized ? 1.4 : 0.8
+        ..color = Colors.white.withValues(alpha: emphasized ? 0.7 : 0.22),
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _DateTabPainter oldDelegate) => oldDelegate.emphasized != emphasized;
 }
 
 // ── Frosted glass card shell ────────────────────────────────────────────────
@@ -361,6 +416,8 @@ class NgmyFrostedCard extends StatelessWidget {
     this.onDelete,
     this.onAdd,
     this.footer,
+    this.isFront = true,
+    this.showDateTab = true,
   });
 
   final Widget child;
@@ -369,9 +426,13 @@ class NgmyFrostedCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onAdd;
   final Widget? footer;
+  final bool isFront;
+  final bool showDateTab;
 
   @override
   Widget build(BuildContext context) {
+    final glassAlpha = isFront ? 0.22 : 0.10;
+    final borderAlpha = isFront ? 0.42 : 0.18;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
@@ -381,7 +442,7 @@ class NgmyFrostedCard extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+              filter: ImageFilter.blur(sigmaX: isFront ? 28 : 16, sigmaY: isFront ? 28 : 16),
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(28),
@@ -389,45 +450,49 @@ class NgmyFrostedCard extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withValues(alpha: 0.22),
-                      accent[0].withValues(alpha: 0.18),
-                      accent[1].withValues(alpha: 0.14),
-                      Colors.white.withValues(alpha: 0.08),
+                      Colors.white.withValues(alpha: glassAlpha),
+                      accent[0].withValues(alpha: isFront ? 0.20 : 0.10),
+                      accent[1].withValues(alpha: isFront ? 0.16 : 0.08),
+                      Colors.white.withValues(alpha: isFront ? 0.08 : 0.04),
                     ],
                     stops: const [0.0, 0.35, 0.7, 1.0],
                   ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.38), width: 1.4),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 28, offset: const Offset(0, 14)),
-                    BoxShadow(color: accent[0].withValues(alpha: 0.16), blurRadius: 18, offset: const Offset(0, 6)),
-                  ],
+                  border: Border.all(color: Colors.white.withValues(alpha: borderAlpha), width: isFront ? 1.5 : 1.0),
+                  boxShadow: isFront
+                      ? [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.32), blurRadius: 28, offset: const Offset(0, 14)),
+                          BoxShadow(color: accent[0].withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 6)),
+                        ]
+                      : [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 8)),
+                        ],
                 ),
                 child: Stack(
                   children: [
-                    // Soft inner glass sheen
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 70,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.22),
-                              Colors.white.withValues(alpha: 0.0),
-                            ],
+                    if (isFront)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 70,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.24),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 28, 48, 16),
                       child: child,
                     ),
-                    if (onDelete != null || onAdd != null)
+                    if (isFront && (onDelete != null || onAdd != null))
                       Positioned(
                         right: 10,
                         top: 10,
@@ -439,7 +504,7 @@ class NgmyFrostedCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                    if (footer != null)
+                    if (isFront && footer != null)
                       Positioned(
                         left: 0,
                         right: 0,
@@ -452,10 +517,11 @@ class NgmyFrostedCard extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          top: 0,
-          child: _NgmyDateTab(label: dateLabel),
-        ),
+        if (showDateTab)
+          Positioned(
+            top: 0,
+            child: _NgmyDateTab(label: dateLabel, emphasized: isFront),
+          ),
       ],
     );
   }
@@ -570,6 +636,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
       final result = await showModalBottomSheet<Map<String, String>>(
         context: context,
         isScrollControlled: true,
+        useSafeArea: false,
         backgroundColor: Colors.transparent,
         builder: (ctx) => const _NgmyAddSpendingSheet(),
       );
@@ -585,6 +652,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
       final text = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
+        useSafeArea: false,
         backgroundColor: Colors.transparent,
         builder: (ctx) => const _NgmyAddNoteSheet(),
       );
@@ -636,6 +704,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             items: _spending,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+              isFront: true,
+              showDateTab: true,
               accent: [
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
@@ -660,12 +730,14 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 ),
               ),
             ),
-            cardBuilder: (ctx, entry) => NgmyFrostedCard(
+            cardBuilder: (ctx, entry, {required isFront, required revealDates}) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(entry.date),
               accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
-              onDelete: () => _deleteSpending(entry.id),
-              onAdd: _openAddSheet,
-              footer: _modePill(),
+              isFront: isFront,
+              showDateTab: revealDates,
+              onDelete: isFront ? () => _deleteSpending(entry.id) : null,
+              onAdd: isFront ? _openAddSheet : null,
+              footer: isFront ? _modePill() : null,
               child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
             ),
           )
@@ -675,6 +747,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             items: _notes,
             emptyBuilder: (ctx) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+              isFront: true,
+              showDateTab: true,
               accent: [
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
                 (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
@@ -699,12 +773,14 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 ),
               ),
             ),
-            cardBuilder: (ctx, note) => NgmyFrostedCard(
+            cardBuilder: (ctx, note, {required isFront, required revealDates}) => NgmyFrostedCard(
               dateLabel: ngmyHomeDateTabLabel(note.createdAt),
               accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
-              onDelete: () => _deleteNote(note.id),
-              onAdd: _openAddSheet,
-              footer: _modePill(),
+              isFront: isFront,
+              showDateTab: revealDates,
+              onDelete: isFront ? () => _deleteNote(note.id) : null,
+              onAdd: isFront ? _openAddSheet : null,
+              footer: isFront ? _modePill() : null,
               child: _NoteCardContent(note: note),
             ),
           ),
@@ -830,116 +906,214 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
 class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> {
   final _amountC = TextEditingController();
   final _descC = TextEditingController();
+  final _amountFocus = FocusNode();
   String _category = 'Food';
 
   @override
   void dispose() {
     _amountC.dispose();
     _descC.dispose();
+    _amountFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final fieldBg = isDark ? const Color(0xFF1F2937) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F172A) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Log spending',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Saved only on this device',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _amountC,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: TextStyle(fontSize: 16, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                decoration: InputDecoration(
-                  hintText: 'Amount',
-                  prefixText: '\$ ',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _descC,
-                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                decoration: InputDecoration(
-                  hintText: 'What was it for?',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _kSpendingCategories.entries.map((e) {
-                  final selected = _category == e.key;
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () => setState(() => _category = e.key),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      // Keep the sheet seated above the keyboard without jumping the field to the top of the screen.
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: double.infinity,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+            ),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 28, offset: const Offset(0, -8)),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                // Don't auto-scroll the focused field to the top of the viewport.
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: muted.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)]),
+                          ),
+                          child: const Icon(Icons.add_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Log spending', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
+                              Text('Stays on this device only', style: TextStyle(fontSize: 12, color: muted)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text('AMOUNT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       decoration: BoxDecoration(
-                        gradient: selected ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)]) : null,
-                        color: selected ? null : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                        color: fieldBg,
                         borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.35)),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6)),
+                        ],
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(e.value, size: 14, color: selected ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF64748B))),
-                          const SizedBox(width: 5),
-                          Text(
-                            e.key,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: selected ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+                          Text('\$', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: ink.withValues(alpha: 0.55))),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _amountC,
+                              focusNode: _amountFocus,
+                              autofocus: true,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              scrollPadding: const EdgeInsets.only(bottom: 120),
+                              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: ink, height: 1.2),
+                              decoration: InputDecoration(
+                                hintText: '0.00',
+                                hintStyle: TextStyle(color: muted.withValues(alpha: 0.45), fontWeight: FontWeight.w800),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, {
-                  'amount': _amountC.text.trim(),
-                  'description': _descC.text.trim(),
-                  'category': _category,
-                }),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B5CF6),
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    const SizedBox(height: 14),
+                    Text('FOR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _descC,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink),
+                      decoration: InputDecoration(
+                        hintText: 'What was it for?',
+                        hintStyle: TextStyle(color: muted),
+                        filled: true,
+                        fillColor: fieldBg,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _kSpendingCategories.entries.map((e) {
+                        final selected = _category == e.key;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => setState(() => _category = e.key),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              gradient: selected ? const LinearGradient(colors: [Color(0xFF60A5FA), Color(0xFF8B5CF6)]) : null,
+                              color: selected ? null : fieldBg,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: selected ? Colors.transparent : muted.withValues(alpha: 0.22),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(e.value, size: 14, color: selected ? Colors.white : muted),
+                                const SizedBox(width: 5),
+                                Text(
+                                  e.key,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected ? Colors.white : muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 22),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, {
+                        'amount': _amountC.text.trim(),
+                        'description': _descC.text.trim(),
+                        'category': _category,
+                      }),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Save spending', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    ),
+                  ],
                 ),
-                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900)),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -966,54 +1140,115 @@ class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final surface = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final fieldBg = isDark ? const Color(0xFF1F2937) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F172A) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'New note',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Saved only on this device',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _textC,
-                autofocus: true,
-                maxLines: 6,
-                minLines: 4,
-                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                decoration: InputDecoration(
-                  hintText: 'Write anything…',
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: double.infinity,
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.68),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 28, offset: const Offset(0, -8)),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: muted.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899)]),
+                          ),
+                          child: const Icon(Icons.edit_note_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('New note', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ink)),
+                              Text('Stays on this device only', style: TextStyle(fontSize: 12, color: muted)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: _textC,
+                      autofocus: true,
+                      maxLines: 7,
+                      minLines: 5,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.4, color: ink),
+                      decoration: InputDecoration(
+                        hintText: 'Write anything…',
+                        hintStyle: TextStyle(color: muted),
+                        filled: true,
+                        fillColor: fieldBg,
+                        contentPadding: const EdgeInsets.all(16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: muted.withValues(alpha: 0.2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: Color(0xFFEC4899), width: 1.4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, _textC.text),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFEC4899),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Save note', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, _textC.text),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFEC4899),
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w900)),
-              ),
-            ],
+            ),
           ),
         ),
       ),

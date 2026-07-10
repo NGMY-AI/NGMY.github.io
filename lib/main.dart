@@ -115,6 +115,7 @@ import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_home_glass_cards.dart';
+import 'ngmy_home_tech_frames.dart';
 import 'ngmy_slides_studio.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -15582,15 +15583,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-                      _buildAiHomeHeader(isLight),
+                      // Slim icon row only — no "NGMY Assistant" / "NGMY AI HOME" titles.
+                      Row(
+                        children: [
+                          widget.homeLeadingOverride ??
+                              _roundGlassButton(
+                                icon: Icons.attach_money_rounded,
+                                tooltip: 'Loan Service',
+                                onTap: () => NgmyNavigator.push(
+                                  context,
+                                  LoanServiceScreen(user: widget.user, config: widget.config, onDataChanged: widget.onDataChanged),
+                                  routeName: 'LoanServiceScreen',
+                                ),
+                              ),
+                          const Spacer(),
+                          _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+                        ],
+                      ),
               if (widget.user.isOnFreeTrial) ...[
                 const SizedBox(height: 12),
                         _buildFreeTrialGlassBanner(isLight),
                       ],
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
                       NgmyHomeGlassCardsPanel(userEmail: widget.user.email),
                       const SizedBox(height: 16),
-                      Expanded(child: _buildAiHeroCard(isLight)),
+                      // Tech HUD frames replace the old AI chat panel on Home.
+                      const Expanded(child: NgmyHomeTechFramesPanel()),
                     ],
                   ),
                 ),
