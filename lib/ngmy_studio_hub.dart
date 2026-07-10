@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_creator.dart';
 import 'ngmy_swahili_school.dart';
@@ -172,33 +173,43 @@ class NgmyCreatorHubTab extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 10, 20, bottomScrollPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _CreatorHubTitle(),
-                    const SizedBox(height: 18),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.08,
-                      ),
-                      itemCount: tools.length,
-                      itemBuilder: (_, i) => _CreatorToolCard(tool: tools[i]),
+        child: NgmyHudMotion(
+          builder: (context, pulse, scan, orbit) {
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 10, 20, bottomScrollPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _CreatorHubTitle(),
+                        const SizedBox(height: 18),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.08,
+                          ),
+                          itemCount: tools.length,
+                          itemBuilder: (_, i) => _CreatorToolCard(
+                            tool: tools[i],
+                            pulse: pulse,
+                            scan: scan,
+                            orbit: orbit,
+                            phase: i * 0.11,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -266,65 +277,68 @@ class _CreatorTool {
 }
 
 class _CreatorToolCard extends StatelessWidget {
-  const _CreatorToolCard({required this.tool});
+  const _CreatorToolCard({
+    required this.tool,
+    required this.pulse,
+    required this.scan,
+    required this.orbit,
+    required this.phase,
+  });
 
   final _CreatorTool tool;
+  final double pulse;
+  final double scan;
+  final double orbit;
+  final double phase;
 
   @override
   Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: tool.onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: tool.colors.first.withValues(alpha: 0.35)),
+    return NgmyHudTechFrame(
+      colors: tool.colors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
+      onTap: tool.onTap,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Center(
+              child: NgmyHudMiniOrb(
+                colors: tool.colors,
+                pulse: pulse,
+                orbit: (orbit + phase) % 1.0,
+                size: 72,
+                icon: tool.icon,
+              ),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Center(
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: tool.colors),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(tool.icon, color: Colors.white, size: 46),
-                  ),
-                ),
-              ),
-              Text(
-                tool.title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                tool.subtitle,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
-                  fontSize: 10.5,
-                  height: 1.25,
-                ),
-              ),
-            ],
+          Text(
+            tool.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+              letterSpacing: 0.3,
+            ),
           ),
-        ),
+          const SizedBox(height: 2),
+          Text(
+            tool.subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.62),
+              fontSize: 10.5,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -15,6 +15,7 @@ import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_communicate_sync_ui.dart';
 import 'ngmy_communicate_text_coach.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_mshauri.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
@@ -1122,30 +1123,37 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
         ),
       );
     }
-    return GridView.builder(
-      padding: EdgeInsets.fromLTRB(16, topPad + 18, 16, bottomPad),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 0.78,
-      ),
-      itemCount: profiles.length,
-      itemBuilder: (context, i) => _Companion3DCard(
-        profile: profiles[i],
-        index: i,
-        floatCtrl: _floatCtrl,
-        isDark: isDark,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          setState(() {
-            _searchOpen = false;
-            _searchQuery = '';
-            _searchCtrl.clear();
-            _selected = profiles[i];
-          });
-        },
-      ),
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) {
+        return GridView.builder(
+          padding: EdgeInsets.fromLTRB(16, topPad + 18, 16, bottomPad),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.78,
+          ),
+          itemCount: profiles.length,
+          itemBuilder: (context, i) => _Companion3DCard(
+            profile: profiles[i],
+            index: i,
+            floatCtrl: _floatCtrl,
+            isDark: isDark,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _searchOpen = false;
+                _searchQuery = '';
+                _searchCtrl.clear();
+                _selected = profiles[i];
+              });
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -1155,6 +1163,9 @@ class _Companion3DCard extends StatelessWidget {
   final int index;
   final AnimationController floatCtrl;
   final bool isDark;
+  final double pulse;
+  final double scan;
+  final double orbit;
   final VoidCallback onTap;
 
   const _Companion3DCard({
@@ -1162,13 +1173,21 @@ class _Companion3DCard extends StatelessWidget {
     required this.index,
     required this.floatCtrl,
     required this.isDark,
+    required this.pulse,
+    required this.scan,
+    required this.orbit,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final nameColor = isDark ? Colors.white : const Color(0xFF111827);
-    final subColor = isDark ? Colors.white.withValues(alpha: 0.55) : Colors.black54;
+    final nameColor = Colors.white;
+    final subColor = Colors.white.withValues(alpha: 0.62);
+    final colors = <Color>[
+      kNgmyAdvisorsHubAccent,
+      kNgmyAdvisorsHubAccent2,
+      const Color(0xFFEC4899),
+    ];
     return AnimatedBuilder(
       animation: floatCtrl,
       builder: (context, _) {
@@ -1181,66 +1200,67 @@ class _Companion3DCard extends StatelessWidget {
             ..rotateY(tiltY)
             ..rotateX(tiltX),
           alignment: Alignment.center,
-          child: GestureDetector(
+          child: NgmyHudTechFrame(
+            colors: colors,
+            pulse: pulse,
+            scan: scan,
+            orbit: orbit,
+            phase: index * 0.13,
             onTap: onTap,
-            child: _loveGlassPanel(
-              context: context,
-              borderRadius: BorderRadius.circular(22),
-              fillAlpha: 0.1,
-              child: Stack(
-                children: [
-                  if (profile.roleBadgeLabel != null)
-                    Positioned(top: 8, right: 8, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Center(
-                            child: NgmyCommunicateAvatar(
-                              key: ValueKey<String>('ngmy_avatar_${profile.id}'),
-                              profile: profile,
-                              size: 72,
-                              glow: true,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            profile.name,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: nameColor, fontWeight: FontWeight.w900, fontSize: 15),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            profile.genderLabel,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: subColor, fontSize: 11),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)]),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Text('Say hi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
-                                SizedBox(width: 4),
-                                Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 11),
-                              ],
-                            ),
-                          ),
-                        ],
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+            child: Stack(
+              children: [
+                if (profile.roleBadgeLabel != null)
+                  Positioned(top: 8, right: 8, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Center(
+                        child: NgmyCommunicateAvatar(
+                          key: ValueKey<String>('ngmy_avatar_${profile.id}'),
+                          profile: profile,
+                          size: 72,
+                          glow: true,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      Text(
+                        profile.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: nameColor, fontWeight: FontWeight.w900, fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        profile.genderLabel,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: subColor, fontSize: 11),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)]),
+                          boxShadow: [
+                            BoxShadow(color: kNgmyAdvisorsHubAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text('Say hi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                            SizedBox(width: 4),
+                            Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 11),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );

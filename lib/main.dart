@@ -116,6 +116,7 @@ import 'ngmy_virtual_device_media_view.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_home_glass_cards.dart';
 import 'ngmy_home_tech_frames.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_slides_studio.dart';
 import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
@@ -26546,69 +26547,89 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
               _ngmyServicesHeroCard(isDark: isDark, topColors: topColors),
               const SizedBox(height: 25),
               // 2x2 service grid + document scanner
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                mainAxisSpacing: 15,
-                crossAxisSpacing: 15,
-                childAspectRatio: 1.6,
-                children: [
-                  _hubBox(
-                    'Civic Registry',
-                    Icons.shield_outlined,
-                    civicColors,
-                    () => NgmyNavigator.push(
-                      context,
-                      CivicRegistryScreen(
-                        user: widget.user,
-                        allUsers: widget.allUsers,
-                        allTransactions: widget.allTransactions,
-                        onAddTransaction: widget.onAddTransaction,
-                        onDataChanged: widget.onDataChanged,
-                        config: widget.config,
+              NgmyHudMotion(
+                builder: (context, pulse, scan, orbit) {
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 15,
+                    crossAxisSpacing: 15,
+                    childAspectRatio: 1.6,
+                    children: [
+                      _hubBox(
+                        'Civic Registry',
+                        Icons.shield_outlined,
+                        civicColors,
+                        pulse,
+                        scan,
+                        orbit,
+                        0,
+                        () => NgmyNavigator.push(
+                          context,
+                          CivicRegistryScreen(
+                            user: widget.user,
+                            allUsers: widget.allUsers,
+                            allTransactions: widget.allTransactions,
+                            onAddTransaction: widget.onAddTransaction,
+                            onDataChanged: widget.onDataChanged,
+                            config: widget.config,
+                          ),
+                          routeName: 'CivicRegistryScreen',
+                        ),
                       ),
-                      routeName: 'CivicRegistryScreen',
-                    ),
-                  ),
-                  _hubBox(
-                    'NGMY Store',
-                    Icons.shopping_bag_outlined,
-                    storeColors,
-                    () => NgmyNavigator.push(
-                      context,
-                      NgmyStoreScreen(
-                        user: widget.user,
-                        allUsers: widget.allUsers,
-                        config: widget.config,
-                        onAddTransaction: widget.onAddTransaction,
-                        onDataChanged: widget.onDataChanged,
+                      _hubBox(
+                        'NGMY Store',
+                        Icons.shopping_bag_outlined,
+                        storeColors,
+                        pulse,
+                        scan,
+                        orbit,
+                        0.18,
+                        () => NgmyNavigator.push(
+                          context,
+                          NgmyStoreScreen(
+                            user: widget.user,
+                            allUsers: widget.allUsers,
+                            config: widget.config,
+                            onAddTransaction: widget.onAddTransaction,
+                            onDataChanged: widget.onDataChanged,
+                          ),
+                          routeName: 'NgmyStoreScreen',
+                        ),
                       ),
-                      routeName: 'NgmyStoreScreen',
-                    ),
-                  ),
-                  _hubBox(
-                    'Help Center',
-                    Icons.support_agent_rounded,
-                    helpColors,
-                    () => NgmyNavigator.push(
-                      context,
-                      NgmyHelpCenterScreen(
-                        configMap: widget.config.helpCenterHub,
-                        clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
-                        clientEmail: widget.user.email,
-                        clientPhone: widget.user.phone,
+                      _hubBox(
+                        'Help Center',
+                        Icons.support_agent_rounded,
+                        helpColors,
+                        pulse,
+                        scan,
+                        orbit,
+                        0.36,
+                        () => NgmyNavigator.push(
+                          context,
+                          NgmyHelpCenterScreen(
+                            configMap: widget.config.helpCenterHub,
+                            clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
+                            clientEmail: widget.user.email,
+                            clientPhone: widget.user.phone,
+                          ),
+                          routeName: 'NgmyHelpCenterScreen',
+                        ),
                       ),
-                      routeName: 'NgmyHelpCenterScreen',
-                    ),
-                  ),
-                  _hubBox(
-                    'Document Scanner',
-                    Icons.document_scanner_rounded,
-                    docColors,
-                    _openDocumentScanner,
-                  ),
-                ],
+                      _hubBox(
+                        'Document Scanner',
+                        Icons.document_scanner_rounded,
+                        docColors,
+                        pulse,
+                        scan,
+                        orbit,
+                        0.54,
+                        _openDocumentScanner,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 100),
             ],
@@ -27960,35 +27981,42 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     );
   }
 
-  Widget _hubBox(String title, IconData icon, List<Color> colors, VoidCallback onTap) {
-    return InkWell(
+  Widget _hubBox(
+    String title,
+    IconData icon,
+    List<Color> colors,
+    double pulse,
+    double scan,
+    double orbit,
+    double phase,
+    VoidCallback onTap,
+  ) {
+    return NgmyHudTechFrame(
+      colors: colors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
+      borderRadius: 20,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: colors[0].withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 28, color: Colors.white),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          NgmyHudMiniOrb(
+            colors: colors,
+            pulse: pulse,
+            orbit: (orbit + phase) % 1.0,
+            size: 44,
+            icon: icon,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.white, letterSpacing: 0.2),
+          ),
+        ],
       ),
     );
   }
