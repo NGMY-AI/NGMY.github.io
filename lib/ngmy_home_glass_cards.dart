@@ -10,8 +10,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
+import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
+import 'ngmy_item_reminder_storage.dart';
+import 'ngmy_medicine_organizer.dart';
 
 /// Local-only (device storage, no database) spending + notes cards for Home.
 /// Everything here lives in SharedPreferences, keyed per user email.
@@ -192,11 +195,11 @@ class NgmyHomeLocalStore {
 
   static String _deckKey(String email) => 'ngmy_home_deck_prefs_v1_${email.toLowerCase().trim()}';
 
-  static Future<({bool autoPlay, NgmyHomeCardSlideStyle style})> loadDeckPrefs(String email) async {
+  static Future<({bool autoPlay, NgmyHomeCardSlideStyle style, String? frontSpendingId, String? frontNoteId})> loadDeckPrefs(String email) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_deckKey(email));
     if (raw == null || raw.isEmpty) {
-      return (autoPlay: false, style: NgmyHomeCardSlideStyle.dropDown);
+      return (autoPlay: false, style: NgmyHomeCardSlideStyle.dropDown, frontSpendingId: null, frontNoteId: null);
     }
     try {
       final map = Map<String, dynamic>.from(jsonDecode(raw) as Map);
@@ -205,15 +208,65 @@ class NgmyHomeLocalStore {
         (e) => e.name == styleName,
         orElse: () => NgmyHomeCardSlideStyle.dropDown,
       );
-      return (autoPlay: map['autoPlay'] == true, style: style);
+      return (
+        autoPlay: map['autoPlay'] == true,
+        style: style,
+        frontSpendingId: map['frontSpendingId']?.toString(),
+        frontNoteId: map['frontNoteId']?.toString(),
+      );
     } catch (_) {
-      return (autoPlay: false, style: NgmyHomeCardSlideStyle.dropDown);
+      return (autoPlay: false, style: NgmyHomeCardSlideStyle.dropDown, frontSpendingId: null, frontNoteId: null);
     }
   }
 
-  static Future<void> saveDeckPrefs(String email, {required bool autoPlay, required NgmyHomeCardSlideStyle style}) async {
+  static Future<void> saveDeckPrefs(
+    String email, {
+    required bool autoPlay,
+    required NgmyHomeCardSlideStyle style,
+    String? frontSpendingId,
+    String? frontNoteId,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_deckKey(email), jsonEncode({'autoPlay': autoPlay, 'style': style.name}));
+    final existing = prefs.getString(_deckKey(email));
+    String? keepSpend = frontSpendingId;
+    String? keepNote = frontNoteId;
+    if (existing != null && existing.isNotEmpty) {
+      try {
+        final map = Map<String, dynamic>.from(jsonDecode(existing) as Map);
+        keepSpend ??= map['frontSpendingId']?.toString();
+        keepNote ??= map['frontNoteId']?.toString();
+      } catch (_) {}
+    }
+    await prefs.setString(
+      _deckKey(email),
+      jsonEncode({
+        'autoPlay': autoPlay,
+        'style': style.name,
+        if (keepSpend != null && keepSpend.isNotEmpty) 'frontSpendingId': keepSpend,
+        if (keepNote != null && keepNote.isNotEmpty) 'frontNoteId': keepNote,
+      }),
+    );
+  }
+
+  static String _ackKey(String email) => 'ngmy_home_alarm_ack_v1_${email.toLowerCase().trim()}';
+
+  static Future<Set<String>> loadAlarmAcks(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_ackKey(email));
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final list = jsonDecode(raw);
+      if (list is! List) return {};
+      return list.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveAlarmAcks(String email, Set<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmed = ids.toList()..sort();
+    await prefs.setString(_ackKey(email), jsonEncode(trimmed.take(200).toList()));
   }
 }
 
@@ -329,6 +382,8 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
     this.itemId,
     this.autoPlay = false,
     this.slideStyle = NgmyHomeCardSlideStyle.dropDown,
+    this.pauseAutoPlay = false,
+    this.onFrontChanged,
   });
 
   final List<T> items;
@@ -344,6 +399,9 @@ class NgmyGlassCardStack<T> extends StatefulWidget {
   final Object Function(T item)? itemId;
   final bool autoPlay;
   final NgmyHomeCardSlideStyle slideStyle;
+  /// When true (e.g. alarm hold), auto-slide stays paused.
+  final bool pauseAutoPlay;
+  final ValueChanged<Object>? onFrontChanged;
 
   @override
   State<NgmyGlassCardStack<T>> createState() => _NgmyGlassCardStackState<T>();
@@ -403,7 +461,9 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   @override
   void didUpdateWidget(covariant NgmyGlassCardStack<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.autoPlay != widget.autoPlay || oldWidget.slideStyle != widget.slideStyle) {
+    if (oldWidget.autoPlay != widget.autoPlay ||
+        oldWidget.slideStyle != widget.slideStyle ||
+        oldWidget.pauseAutoPlay != widget.pauseAutoPlay) {
       _scheduleAuto();
     }
     if (oldWidget.items.length == widget.items.length && identical(oldWidget.items, widget.items)) return;
@@ -415,6 +475,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
         _resetFrontProps();
         _animCtrl.stop();
       });
+      _emitFront();
       _scheduleAuto();
       return;
     }
@@ -451,16 +512,22 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     _frontAngle = 0;
   }
 
+  void _emitFront() {
+    final idOf = widget.itemId;
+    if (idOf == null || _order.isEmpty) return;
+    widget.onFrontChanged?.call(idOf(_order.first));
+  }
+
   void _scheduleAuto() {
     _autoTimer?.cancel();
-    if (!widget.autoPlay || _order.length < 2) return;
-    _autoTimer = Timer.periodic(const Duration(seconds: 7), (_) {
-      if (mounted && !_autoBusy) _runAutoAdvance();
+    if (!widget.autoPlay || widget.pauseAutoPlay || _order.length < 2) return;
+    _autoTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && !_autoBusy && !widget.pauseAutoPlay) _runAutoAdvance();
     });
   }
 
   Future<void> _runAutoAdvance() async {
-    if (_order.length < 2 || _autoBusy) return;
+    if (_order.length < 2 || _autoBusy || widget.pauseAutoPlay) return;
     _autoBusy = true;
     switch (widget.slideStyle) {
       case NgmyHomeCardSlideStyle.dropDown:
@@ -541,6 +608,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
       _order.add(front);
       _resetFrontProps();
     });
+    _emitFront();
   }
 
   void _bringIndexToFront(int index) {
@@ -550,10 +618,11 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
       _order.insert(0, picked);
       _resetFrontProps();
     });
+    _emitFront();
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails d) {
-    if (_autoBusy) return;
+    if (_autoBusy || widget.pauseAutoPlay) return;
     _animCtrl.stop();
     _exitAnimating = false;
     setState(() {
@@ -563,7 +632,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   }
 
   void _onVerticalDragEnd(DragEndDetails d) {
-    if (_autoBusy) return;
+    if (_autoBusy || widget.pauseAutoPlay) return;
     final vy = d.velocity.pixelsPerSecond.dy;
     if (_frontDrag > _cycleThreshold || vy > 700) {
       _animateFrontTo(260, onDone: _cycleFrontToBack);
@@ -573,7 +642,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   }
 
   void _onHorizontalDragEnd(DragEndDetails d) {
-    if (_autoBusy) return;
+    if (_autoBusy || widget.pauseAutoPlay) return;
     final vx = d.velocity.pixelsPerSecond.dx;
     if (vx.abs() < 500) return;
     if (_order.length < 2) return;
@@ -582,6 +651,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
       _order.add(front);
       _resetFrontProps();
     });
+    _emitFront();
   }
 
   @override
@@ -1199,37 +1269,77 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
   bool _loaded = false;
   bool _autoPlay = false;
   NgmyHomeCardSlideStyle _slideStyle = NgmyHomeCardSlideStyle.dropDown;
+  String? _frontSpendingId;
+  String? _frontNoteId;
+  Timer? _alarmPoll;
+  bool _alarmHold = false;
+  String _alarmHoldTitle = '';
+  String? _alarmHoldAckKey;
+  Set<String> _alarmAcks = {};
 
   @override
   void initState() {
     super.initState();
     _load();
+    _alarmPoll = Timer.periodic(const Duration(seconds: 20), (_) => _checkDueAlarms());
+  }
+
+  @override
+  void dispose() {
+    _alarmPoll?.cancel();
+    super.dispose();
+  }
+
+  void _moveIdToFront<T>(List<T> list, Object Function(T) idOf, String? id) {
+    if (id == null || id.isEmpty || list.isEmpty) return;
+    final idx = list.indexWhere((e) => idOf(e) == id);
+    if (idx > 0) {
+      final item = list.removeAt(idx);
+      list.insert(0, item);
+    }
   }
 
   Future<void> _load() async {
     final s = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
     final n = await NgmyHomeLocalStore.loadNotes(widget.userEmail);
     final deck = await NgmyHomeLocalStore.loadDeckPrefs(widget.userEmail);
+    final acks = await NgmyHomeLocalStore.loadAlarmAcks(widget.userEmail);
     if (!mounted) return;
     s.sort((a, b) => b.date.compareTo(a.date));
     n.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _moveIdToFront(s, (e) => e.id, deck.frontSpendingId);
+    _moveIdToFront(n, (e) => e.id, deck.frontNoteId);
     setState(() {
       _spending = s;
       _notes = n;
       _autoPlay = deck.autoPlay;
       _slideStyle = deck.style;
+      _frontSpendingId = deck.frontSpendingId ?? (s.isNotEmpty ? s.first.id : null);
+      _frontNoteId = deck.frontNoteId ?? (n.isNotEmpty ? n.first.id : null);
+      _alarmAcks = acks;
       _loaded = true;
     });
+    _checkDueAlarms();
   }
 
-  Future<void> _setDeckPrefs({bool? autoPlay, NgmyHomeCardSlideStyle? style}) async {
+  Future<void> _setDeckPrefs({bool? autoPlay, NgmyHomeCardSlideStyle? style, String? frontSpendingId, String? frontNoteId}) async {
     final nextAuto = autoPlay ?? _autoPlay;
     final nextStyle = style ?? _slideStyle;
+    final nextSpend = frontSpendingId ?? _frontSpendingId;
+    final nextNote = frontNoteId ?? _frontNoteId;
     setState(() {
       _autoPlay = nextAuto;
       _slideStyle = nextStyle;
+      _frontSpendingId = nextSpend;
+      _frontNoteId = nextNote;
     });
-    await NgmyHomeLocalStore.saveDeckPrefs(widget.userEmail, autoPlay: nextAuto, style: nextStyle);
+    await NgmyHomeLocalStore.saveDeckPrefs(
+      widget.userEmail,
+      autoPlay: nextAuto,
+      style: nextStyle,
+      frontSpendingId: nextSpend,
+      frontNoteId: nextNote,
+    );
   }
 
   double get _totalSpent => _spending.where((e) => !e.hasImage && !e.isPassword).fold(0.0, (sum, e) => sum + e.amount);
@@ -1237,6 +1347,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
   Future<void> _addSpendingEntry(NgmySpendingEntry entry) async {
     setState(() => _spending = [entry, ..._spending]);
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    await _setDeckPrefs(frontSpendingId: entry.id);
   }
 
   Future<void> _deleteSpending(String id) async {
@@ -1244,12 +1355,16 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     if (!ok || !mounted) return;
     setState(() => _spending = _spending.where((e) => e.id != id).toList());
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    if (_frontSpendingId == id) {
+      await _setDeckPrefs(frontSpendingId: _spending.isNotEmpty ? _spending.first.id : '');
+    }
   }
 
   Future<void> _addNote(String text) async {
     final note = NgmyHomeNote(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, createdAt: DateTime.now());
     setState(() => _notes = [note, ..._notes]);
     await NgmyHomeLocalStore.saveNotes(widget.userEmail, _notes);
+    await _setDeckPrefs(frontNoteId: note.id);
   }
 
   Future<void> _deleteNote(String id) async {
@@ -1257,6 +1372,137 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     if (!ok || !mounted) return;
     setState(() => _notes = _notes.where((n) => n.id != id).toList());
     await NgmyHomeLocalStore.saveNotes(widget.userEmail, _notes);
+    if (_frontNoteId == id) {
+      await _setDeckPrefs(frontNoteId: _notes.isNotEmpty ? _notes.first.id : '');
+    }
+  }
+
+  bool _medicineDueNow(NgmyMedicineEntry m, DateTime now) {
+    if (!m.remindersEnabled) return false;
+    final times = m.reminderTimes.isNotEmpty ? m.reminderTimes : ngmyDefaultMedicineReminderTimes(m.timesPerDay);
+    final hm = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    for (final t in times) {
+      final parts = t.split(':');
+      if (parts.length < 2) continue;
+      final h = int.tryParse(parts[0]) ?? -1;
+      final min = int.tryParse(parts[1]) ?? -1;
+      if (h < 0 || min < 0) continue;
+      final at = DateTime(now.year, now.month, now.day, h, min);
+      final diff = now.difference(at).inMinutes.abs();
+      if (diff <= 1) return true;
+      if (t.trim() == hm) return true;
+    }
+    return false;
+  }
+
+  Future<void> _checkDueAlarms() async {
+    if (!mounted || _alarmHold) return;
+    final now = DateTime.now();
+    final acks = _alarmAcks;
+
+    final helperAlarms = await NgmyHelperAlarmMemoryStore.load(widget.userEmail);
+    for (final a in helperAlarms) {
+      final key = 'helper:${a.id}:${a.when.toIso8601String()}';
+      if (acks.contains(key)) continue;
+      if (a.when.isAfter(now)) continue;
+      if (now.difference(a.when) > const Duration(hours: 12)) continue;
+      await _triggerAlarmHold(
+        ackKey: key,
+        title: a.title.trim().isEmpty ? 'Alarm' : a.title.trim(),
+        body: a.summaryLine,
+        kind: 'Alarms',
+      );
+      return;
+    }
+
+    final dueItems = await ngmyDueItemReminders(userEmail: widget.userEmail);
+    for (final r in dueItems) {
+      final key = 'item:${r.id}';
+      if (acks.contains(key)) continue;
+      await _triggerAlarmHold(
+        ackKey: key,
+        title: r.itemName.trim().isEmpty ? 'Reminder' : r.itemName.trim(),
+        body: [if (r.locationNote.trim().isNotEmpty) r.locationNote.trim(), 'Due now'].join('\n'),
+        kind: 'Where I Put It',
+      );
+      return;
+    }
+
+    final meds = await ngmyExportMedicines(userEmail: widget.userEmail);
+    for (final m in meds) {
+      if (!_medicineDueNow(m, now)) continue;
+      final slot = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      final key = 'med:${m.id}:$slot';
+      if (acks.contains(key)) continue;
+      await _triggerAlarmHold(
+        ackKey: key,
+        title: m.name.trim().isEmpty ? 'Medicine' : m.name.trim(),
+        body: [if (m.dosage.trim().isNotEmpty) m.dosage.trim(), 'Time for your medicine'].join('\n'),
+        kind: 'Medicines',
+      );
+      return;
+    }
+  }
+
+  Future<void> _triggerAlarmHold({
+    required String ackKey,
+    required String title,
+    required String body,
+    required String kind,
+  }) async {
+    if (!mounted) return;
+    // Prefer an existing matching pin card; otherwise create one and put it first.
+    var idx = _spending.indexWhere((e) {
+      if (!e.hasPinnedEssentials) return false;
+      final hay = '${e.description}\n${e.pinnedNoteText}\n${e.pinnedAlarmText}'.toLowerCase();
+      return hay.contains(title.toLowerCase()) || (e.pinnedEssentialsKind == kind && e.pinnedNoteText.contains(body.split('\n').first));
+    });
+    String cardId;
+    if (idx >= 0) {
+      cardId = _spending[idx].id;
+      final card = _spending.removeAt(idx);
+      setState(() {
+        _spending = [card, ..._spending];
+        _kind = _NgmyHomeCardKind.spending;
+        _alarmHold = true;
+        _alarmHoldTitle = title;
+        _alarmHoldAckKey = ackKey;
+      });
+    } else {
+      final entry = NgmySpendingEntry(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        amount: 0,
+        description: title,
+        category: 'Other',
+        date: DateTime.now(),
+        pinnedNoteText: body,
+        pinnedEssentialsKind: kind,
+      );
+      cardId = entry.id;
+      setState(() {
+        _spending = [entry, ..._spending];
+        _kind = _NgmyHomeCardKind.spending;
+        _alarmHold = true;
+        _alarmHoldTitle = title;
+        _alarmHoldAckKey = ackKey;
+      });
+      await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    }
+    await _setDeckPrefs(frontSpendingId: cardId);
+  }
+
+  Future<void> _confirmAlarmSeen() async {
+    final key = _alarmHoldAckKey;
+    if (key != null && key.isNotEmpty) {
+      _alarmAcks = {..._alarmAcks, key};
+      await NgmyHomeLocalStore.saveAlarmAcks(widget.userEmail, _alarmAcks);
+    }
+    if (!mounted) return;
+    setState(() {
+      _alarmHold = false;
+      _alarmHoldTitle = '';
+      _alarmHoldAckKey = null;
+    });
   }
 
   Future<void> _openAddSheet() async {
@@ -1424,10 +1670,13 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Keep both stacks mounted so the front card stays put when toggling SPENDING/NOTES.
-        IndexedStack(
-          index: _kind == _NgmyHomeCardKind.spending ? 0 : 1,
-          sizing: StackFit.loose,
+        Stack(
+          clipBehavior: Clip.none,
           children: [
+            IndexedStack(
+              index: _kind == _NgmyHomeCardKind.spending ? 0 : 1,
+              sizing: StackFit.loose,
+              children: [
             NgmyGlassCardStack<NgmySpendingEntry>(
               key: const ValueKey('home-spending-stack'),
               height: 252,
@@ -1435,6 +1684,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               itemId: (e) => e.id,
               autoPlay: _autoPlay,
               slideStyle: _slideStyle,
+              pauseAutoPlay: _alarmHold,
+              onFrontChanged: (id) => _setDeckPrefs(frontSpendingId: id.toString()),
               emptyBuilder: (ctx) => NgmyFrostedCard(
                 dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
                 isFront: true,
@@ -1494,6 +1745,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
               itemId: (n) => n.id,
               autoPlay: _autoPlay,
               slideStyle: _slideStyle,
+              pauseAutoPlay: _alarmHold,
+              onFrontChanged: (id) => _setDeckPrefs(frontNoteId: id.toString()),
               emptyBuilder: (ctx) => NgmyFrostedCard(
                 dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
                 isFront: true,
@@ -1535,6 +1788,52 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 child: _NoteCardContent(note: note),
               ),
             ),
+          ],
+            ),
+            if (_alarmHold)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 8,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(colors: [Color(0xFF0B1220), Color(0xFF1E1B4B)]),
+                      border: Border.all(color: const Color(0xFF67E8F9), width: 1.4),
+                      boxShadow: [BoxShadow(color: const Color(0xFF67E8F9).withValues(alpha: 0.35), blurRadius: 18)],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.alarm_on_rounded, color: Color(0xFF67E8F9), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _alarmHoldTitle.isEmpty ? 'Alarm due — confirm to resume slides' : '$_alarmHoldTitle · confirm seen',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: _confirmAlarmSeen,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF22D3EE),
+                            foregroundColor: const Color(0xFF0B1220),
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Seen', style: TextStyle(fontWeight: FontWeight.w900)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ],
@@ -2400,7 +2699,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                                 ? LinearGradient(
                                                     colors: [
                                                       Color.lerp(const Color(0xFF22D3EE), const Color(0xFF60A5FA), t)!,
-                                                      Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), t)!,
+                                                      Color.lerp(const Color(0xFF8B5CF6), const Color(0xFF67E8F9), t)!,
                                                     ],
                                                   )
                                                 : null,
@@ -2443,7 +2742,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                                           ? LinearGradient(
                                                               colors: [
                                                                 Color.lerp(const Color(0xFF60A5FA), const Color(0xFF22D3EE), t)!,
-                                                                Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), 1 - t)!,
+                                                                Color.lerp(const Color(0xFF8B5CF6), const Color(0xFF67E8F9), 1 - t)!,
                                                               ],
                                                             )
                                                           : LinearGradient(
@@ -2546,7 +2845,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                                             ? LinearGradient(
                                                                 colors: [
                                                                   Color.lerp(const Color(0xFF60A5FA), const Color(0xFF22D3EE), t)!,
-                                                                  Color.lerp(const Color(0xFF8B5CF6), const Color(0xFFEC4899), 1 - t)!,
+                                                                  Color.lerp(const Color(0xFF8B5CF6), const Color(0xFF67E8F9), 1 - t)!,
                                                                 ],
                                                               )
                                                             : LinearGradient(
