@@ -2411,19 +2411,24 @@ class _CreditCardSpendBody extends StatelessWidget {
   }
 
   Color _luxeInkFor(NgmyMoneyCardTemplate tpl) {
-    switch (tpl.pattern) {
-      case NgmyMoneyCardPattern.goldLeaf:
+    switch (tpl.id) {
+      case 'midnight_gold':
+      case 'imperial_gold':
         return const Color(0xFF1C1408);
-      case NgmyMoneyCardPattern.silverBrushed:
-        return const Color(0xFF111827);
-      case NgmyMoneyCardPattern.crystalFacet:
-        return const Color(0xFF0C4A6E);
-      case NgmyMoneyCardPattern.roseMetal:
-        return Colors.white;
-      case NgmyMoneyCardPattern.diamondNoir:
-        return const Color(0xFFF8FAFC);
-      case NgmyMoneyCardPattern.carbon:
-      case NgmyMoneyCardPattern.diagonal:
+      case 'royal_violet':
+      case 'ocean_platinum':
+      case 'marble_ink':
+      case 'sterling_silver':
+      case 'crystal_prism':
+        return const Color(0xFF0F172A);
+      case 'obsidian_steel':
+      case 'carbon_noir':
+      case 'emerald_luxe':
+      case 'mesh_sapphire':
+      case 'black_diamond':
+      case 'champagne_noir':
+      case 'aurora_vault':
+      case 'rose_sovereign':
         return Colors.white;
       default:
         return Colors.white;
@@ -2431,144 +2436,90 @@ class _CreditCardSpendBody extends StatelessWidget {
   }
 
   List<Widget> _luxeDecor(NgmyMoneyCardTemplate tpl, List<Color> colors) {
-    switch (tpl.layout) {
-      case NgmyMoneyCardLayout.amountTopRight:
+    switch (tpl.id) {
+      case 'midnight_gold':
         return [
-          Positioned(
-            left: 18,
-            bottom: 28,
-            child: Container(
-              width: 42,
-              height: 30,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(7),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.7),
-                    colors.last.withValues(alpha: 0.45),
-                    Colors.white.withValues(alpha: 0.25),
-                  ],
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
-                boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.35), blurRadius: 10)],
-              ),
-            ),
-          ),
-          Positioned(
-            right: -10,
-            top: 40,
-            child: Icon(Icons.diamond_rounded, size: 88, color: Colors.white.withValues(alpha: 0.10)),
-          ),
+          Positioned(left: 16, right: 16, top: 52, child: Container(height: 1.2, color: colors.last.withValues(alpha: 0.55))),
+          Positioned(left: 16, right: 16, top: 56, child: Container(height: 0.6, color: colors.last.withValues(alpha: 0.28))),
+          Positioned(right: 18, bottom: 22, child: Container(width: 40, height: 28, decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), gradient: LinearGradient(colors: [Color(0xFFFFF1C1), colors[1], Color(0xFF7A4E00)]), border: Border.all(color: Colors.white.withValues(alpha: 0.5))))),
         ];
-      case NgmyMoneyCardLayout.amountCenter:
+      case 'obsidian_steel':
         return [
-          Positioned(
-            right: 16,
-            top: 58,
-            child: Container(
-              width: 34,
-              height: 24,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.75),
-                    Colors.white.withValues(alpha: 0.2),
-                  ],
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -24,
-            bottom: -20,
-            child: Icon(Icons.auto_awesome_rounded, size: 120, color: Colors.white.withValues(alpha: 0.08)),
-          ),
+          Positioned(left: 14, top: 54, bottom: 18, child: Container(width: 2, color: Colors.white.withValues(alpha: 0.22))),
+          Positioned(right: 14, top: 54, bottom: 18, child: Container(width: 1, color: Colors.white.withValues(alpha: 0.12))),
+          Positioned(right: 20, top: 58, child: Container(width: 28, height: 28, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.2)))),
         ];
-      case NgmyMoneyCardLayout.amountBottomRight:
+      case 'champagne_noir':
         return [
-          Positioned(
-            left: 16,
-            top: 58,
-            child: Transform.rotate(
-              angle: -0.12,
-              child: Container(
-                width: 40,
-                height: 28,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.85),
-                      const Color(0xFFBAE6FD).withValues(alpha: 0.55),
-                      Colors.white.withValues(alpha: 0.3),
-                    ],
-                  ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: -30,
-            bottom: -10,
-            child: Icon(Icons.hexagon_outlined, size: 130, color: Colors.white.withValues(alpha: 0.12)),
-          ),
+          Positioned(left: 18, top: 58, child: Container(width: 48, height: 1, color: Colors.white.withValues(alpha: 0.35))),
+          Positioned(right: -20, bottom: -30, child: Icon(Icons.favorite_rounded, size: 120, color: Colors.white.withValues(alpha: 0.07))),
+          Positioned(right: 16, top: 56, child: Container(width: 36, height: 24, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), gradient: LinearGradient(colors: [Color(0xFFFCE7F3), colors.last.withValues(alpha: 0.5)]), border: Border.all(color: Colors.white38)))),
         ];
-      case NgmyMoneyCardLayout.amountMidLeft:
+      case 'royal_violet':
         return [
-          Positioned(
-            right: 18,
-            top: 56,
-            child: Container(
-              width: 38,
-              height: 26,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFFCE7F3).withValues(alpha: 0.8),
-                    colors.last.withValues(alpha: 0.4),
-                  ],
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
-              ),
-            ),
-          ),
-          Positioned(
-            right: -16,
-            bottom: -24,
-            child: Icon(Icons.spa_rounded, size: 120, color: Colors.white.withValues(alpha: 0.09)),
-          ),
+          Positioned(right: 14, top: 54, child: Transform.rotate(angle: 0.2, child: Container(width: 52, height: 52, decoration: BoxDecoration(border: Border.all(color: colors[1].withValues(alpha: 0.55), width: 1.4), borderRadius: BorderRadius.circular(8))))),
+          Positioned(left: 16, bottom: 20, child: Container(width: 34, height: 24, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.white.withValues(alpha: 0.55), border: Border.all(color: colors[0].withValues(alpha: 0.25))))),
         ];
-      case NgmyMoneyCardLayout.classic:
+      case 'ocean_platinum':
         return [
-          Positioned(
-            right: -18,
-            bottom: -28,
-            child: Icon(Icons.credit_card_rounded, size: 140, color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          Positioned(
-            left: 16,
-            top: 58,
-            child: Container(
-              width: 36,
-              height: 26,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.55),
-                    Colors.white.withValues(alpha: 0.18),
-                    colors.last.withValues(alpha: 0.35),
-                  ],
-                ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-              ),
-            ),
-          ),
+          Positioned(left: 0, right: 0, bottom: 52, child: Container(height: 36, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.white.withValues(alpha: 0.0), Colors.white.withValues(alpha: 0.22), Colors.white.withValues(alpha: 0.0)])))),
+          Positioned(left: 16, top: 56, child: Container(width: 38, height: 26, decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), gradient: LinearGradient(colors: [Colors.white, Color(0xFFBAE6FD)]), border: Border.all(color: Colors.white70)))),
         ];
+      case 'carbon_noir':
+        return [
+          Positioned(left: 16, right: 16, top: 70, child: Container(height: 1, color: Colors.white.withValues(alpha: 0.14))),
+          Positioned(left: 16, right: 16, bottom: 48, child: Container(height: 1, color: Colors.white.withValues(alpha: 0.14))),
+          Positioned(right: 16, top: 56, child: Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: colors.last.withValues(alpha: 0.7), shape: BoxShape.circle)), SizedBox(width: 4), Container(width: 8, height: 8, decoration: BoxDecoration(border: Border.all(color: Colors.white38), shape: BoxShape.circle))])),
+        ];
+      case 'emerald_luxe':
+        return [
+          Positioned(left: 16, top: 54, child: Container(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), border: Border.all(color: colors.last.withValues(alpha: 0.55)), color: Colors.black.withValues(alpha: 0.2)), child: Text('EMERALD', style: TextStyle(color: colors.last, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1.2)))),
+          Positioned(right: -12, bottom: -18, child: Icon(Icons.eco_rounded, size: 110, color: Colors.white.withValues(alpha: 0.08))),
+        ];
+      case 'marble_ink':
+        return [
+          Positioned(left: 20, right: 20, top: 60, child: Container(height: 0.8, color: colors[0].withValues(alpha: 0.25))),
+          Positioned(left: 20, right: 20, bottom: 56, child: Container(height: 0.8, color: colors[0].withValues(alpha: 0.2))),
+          Positioned(right: 18, bottom: 20, child: Icon(Icons.ac_unit_rounded, size: 28, color: colors[0].withValues(alpha: 0.35))),
+        ];
+      case 'aurora_vault':
+        return [
+          Positioned(left: -30, top: 40, child: Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [colors.last.withValues(alpha: 0.28), Colors.transparent])))),
+          Positioned(right: 14, top: 56, bottom: 18, child: Container(width: 1.5, color: Colors.white.withValues(alpha: 0.28))),
+        ];
+      case 'mesh_sapphire':
+        return [
+          Positioned(right: 18, top: 58, child: Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: colors.last.withValues(alpha: 0.45), width: 1.5), gradient: RadialGradient(colors: [colors.last.withValues(alpha: 0.2), Colors.transparent])), child: Text('N', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900, fontSize: 16)))),
+          Positioned(left: 16, bottom: 18, right: 70, child: Container(height: 1, color: Colors.white.withValues(alpha: 0.2))),
+        ];
+      case 'imperial_gold':
+        return [
+          Positioned(left: 12, right: 12, top: 50, child: Container(height: 28, decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), gradient: LinearGradient(colors: [colors.last.withValues(alpha: 0.55), colors[1].withValues(alpha: 0.35), colors.last.withValues(alpha: 0.15)]), border: Border.all(color: colors.last.withValues(alpha: 0.45))))),
+          Positioned(left: 18, bottom: 20, child: Container(width: 36, height: 26, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), gradient: LinearGradient(colors: [Color(0xFFFFF7D6), colors[1]]), border: Border.all(color: Color(0xFF7A4E00).withValues(alpha: 0.35))))),
+        ];
+      case 'sterling_silver':
+        return [
+          Positioned(left: 14, top: 54, bottom: 16, child: Container(width: 1.2, color: colors[0].withValues(alpha: 0.35))),
+          Positioned(left: 18, top: 54, bottom: 16, child: Container(width: 0.6, color: colors[0].withValues(alpha: 0.18))),
+          Positioned(right: 16, top: 56, child: Container(width: 32, height: 22, decoration: BoxDecoration(borderRadius: BorderRadius.circular(3), gradient: LinearGradient(colors: [Colors.white, Color(0xFFCBD5E1)]), border: Border.all(color: colors[0].withValues(alpha: 0.3))))),
+        ];
+      case 'crystal_prism':
+        return [
+          Positioned(right: 12, bottom: 14, child: Container(width: 110, height: 54, decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: colors[0].withValues(alpha: 0.35), width: 1.3), color: Colors.white.withValues(alpha: 0.28)))),
+          Positioned(left: 16, top: 56, child: Transform.rotate(angle: -0.15, child: Container(width: 38, height: 26, decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), gradient: LinearGradient(colors: [Colors.white, Color(0xFFBAE6FD), colors.last.withValues(alpha: 0.5)]), border: Border.all(color: Colors.white70))))),
+        ];
+      case 'rose_sovereign':
+        return [
+          Positioned(right: 0, top: 48, bottom: 0, width: 72, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Colors.transparent, Colors.black.withValues(alpha: 0.18)])))),
+          Positioned(right: 16, top: 58, child: Container(width: 34, height: 24, decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), gradient: LinearGradient(colors: [Color(0xFFFCE7F3), colors.last]), border: Border.all(color: Colors.white38)))),
+        ];
+      case 'black_diamond':
+        return [
+          Positioned(left: 16, right: 16, top: 72, child: Column(children: [Container(height: 1, color: Colors.white.withValues(alpha: 0.35)), SizedBox(height: 3), Container(height: 0.7, color: Colors.white.withValues(alpha: 0.18))])),
+          Positioned(right: 18, bottom: 20, child: Icon(Icons.diamond_rounded, size: 22, color: Colors.white.withValues(alpha: 0.45))),
+        ];
+      default:
+        return [];
     }
   }
 
@@ -2583,199 +2534,391 @@ class _CreditCardSpendBody extends StatelessWidget {
     required String day,
     required String cardNote,
   }) {
-    final soft = ink.withValues(alpha: 0.72);
-    final muted = ink.withValues(alpha: 0.58);
-    switch (tpl.layout) {
-      case NgmyMoneyCardLayout.amountTopRight:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('NGMY · ${tpl.label.toUpperCase()}', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.3, color: muted)),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(catIcon, size: 14, color: soft),
-                          const SizedBox(width: 5),
-                          Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24, height: 1, letterSpacing: 0.3)),
-                    const SizedBox(height: 2),
-                    Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
-                  ],
-                ),
-              ],
-            ),
+    final soft = ink.withValues(alpha: 0.75);
+    final muted = ink.withValues(alpha: 0.55);
+    Widget note() => cardNote.isEmpty
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
+          );
+
+    switch (tpl.id) {
+      // Amount top-right under double gold rules
+      case 'midnight_gold':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: Text('MIDNIGHT SERIES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.6, color: muted))),
+            Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.4)),
+          ]),
+          const SizedBox(height: 4),
+          Align(alignment: Alignment.centerRight, child: Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted))),
+          const Spacer(),
+          Row(children: [Icon(catIcon, size: 14, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft))]),
+          const SizedBox(height: 8),
+          Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 6),
+          Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          note(),
+        ]);
+
+      // Vertical monolith — huge amount left, meta right
+      case 'obsidian_steel':
+        return Row(children: [
+          const SizedBox(width: 10),
+          Expanded(flex: 6, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('OBSIDIAN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: muted)),
             const Spacer(),
-            Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+            Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 32, height: 0.95, letterSpacing: 0.6)),
+            const SizedBox(height: 8),
+            Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: soft, fontWeight: FontWeight.w700, fontSize: 13)),
+            note(),
+          ])),
+          Expanded(flex: 4, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Icon(catIcon, size: 18, color: soft),
+            const SizedBox(height: 6),
+            Text(category, textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft)),
+            const Spacer(),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+            const SizedBox(height: 4),
+            Text(total, textAlign: TextAlign.right, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: soft)),
+          ])),
+        ]);
+
+      // Script stack — desc top, hairline, amount bottom-left
+      case 'champagne_noir':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(catIcon, size: 14, color: soft),
+            const SizedBox(width: 6),
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: soft)),
+            const Spacer(),
+            Text('ROSE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.8, color: muted)),
+          ]),
+          const SizedBox(height: 14),
+          Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 17, height: 1.2, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 10),
+          Container(width: 42, height: 1, color: Colors.white.withValues(alpha: 0.35)),
+          const Spacer(),
+          Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 0.3)),
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(child: Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          note(),
+        ]);
+
+      // Facet frame — amount inside bottom-right bordered panel
+      case 'royal_violet':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('CRYSTAL VIOLET', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+          const SizedBox(height: 10),
+          Row(children: [Icon(catIcon, size: 15, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: soft))]),
+          const SizedBox(height: 10),
+          Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+          const Spacer(),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: ink.withValues(alpha: 0.22)), color: Colors.white.withValues(alpha: 0.35)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22)),
+                Text(day, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: muted)),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          note(),
+        ]);
+
+      // Tide bar — amount sits on a frosted horizontal band
+      case 'ocean_platinum':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('CRYSTAL TIDE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+            const Spacer(),
+            Icon(catIcon, size: 16, color: soft),
+          ]),
+          const SizedBox(height: 8),
+          Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
+          const SizedBox(height: 8),
+          Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withValues(alpha: 0.42), border: Border.all(color: Colors.white.withValues(alpha: 0.55))),
+            child: Row(children: [
+              Expanded(child: Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24))),
+              Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          note(),
+        ]);
+
+      // Tech ledger — amount top-left, monospace feel, double rules
+      case 'carbon_noir':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('CARBON // NGMY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: muted)),
+            const Spacer(),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          const SizedBox(height: 14),
+          Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 1.2, fontFamily: 'monospace')),
+          const SizedBox(height: 6),
+          Text(desc.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: soft, fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 1.0)),
+          const Spacer(),
+          Row(children: [
+            Icon(catIcon, size: 14, color: soft),
+            const SizedBox(width: 6),
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft)),
+            const Spacer(),
+            Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          ]),
+          note(),
+        ]);
+
+      // Emerald pill — amount in a glowing pill mid-card
+      case 'emerald_luxe':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 18),
+          Row(children: [
+            Icon(catIcon, size: 14, color: soft),
+            const SizedBox(width: 6),
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
+            const Spacer(),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          const Spacer(),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(colors: [const Color(0xFF34D399).withValues(alpha: 0.35), const Color(0xFF065F46).withValues(alpha: 0.55)]),
+                border: Border.all(color: const Color(0xFF6EE7B7).withValues(alpha: 0.65)),
+                boxShadow: [BoxShadow(color: const Color(0xFF34D399).withValues(alpha: 0.35), blurRadius: 16)],
+              ),
+              child: Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 0.5)),
+            ),
+          ),
+          const Spacer(),
+          Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          note(),
+        ]);
+
+      // Frost center — huge centered amount between thin rules
+      case 'marble_ink':
+        return Column(children: [
+          Row(children: [
+            Icon(catIcon, size: 14, color: soft),
+            const SizedBox(width: 6),
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft)),
+            const Spacer(),
+            Text('FROST', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.8, color: muted)),
+          ]),
+          const Spacer(),
+          Text(amount, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 34, letterSpacing: 1.0, height: 1)),
+          const SizedBox(height: 8),
+          Text(desc, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: soft, fontWeight: FontWeight.w700, fontSize: 13)),
+          const Spacer(),
+          Row(children: [
+            Expanded(child: Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          note(),
+        ]);
+
+      // Aurora fan — amount on right rail
+      case 'aurora_vault':
+        return Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('ROSE AURORA', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+            const SizedBox(height: 10),
+            Row(children: [Icon(catIcon, size: 14, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft))]),
+            const SizedBox(height: 12),
+            Text(desc, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15, height: 1.25)),
+            const Spacer(),
+            Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+            note(),
+          ])),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 96,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(amount, textAlign: TextAlign.right, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05)),
+              const SizedBox(height: 8),
+              Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+            ]),
+          ),
+        ]);
+
+      // Seal stamp — circular amount badge top-right
+      case 'mesh_sapphire':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('SAPPHIRE SEAL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: muted)),
+              const SizedBox(height: 8),
+              Row(children: [Icon(catIcon, size: 14, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft))]),
+            ])),
+            const SizedBox(width: 56),
+          ]),
+          const Spacer(),
+          Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 10),
+          Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 0.4)),
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(child: Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          note(),
+        ]);
+
+      // Imperial banner — amount inside top gold ribbon
+      case 'imperial_gold':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 28,
+            child: Align(
+              alignment: Alignment.center,
+              child: Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.8)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Icon(catIcon, size: 14, color: soft),
+            const SizedBox(width: 6),
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
+            const Spacer(),
+            Text('IMPERIAL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+          ]),
+          const Spacer(),
+          Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          note(),
+        ]);
+
+      // Mirror split — left copy, right amount column with rail
+      case 'sterling_silver':
+        return Row(children: [
+          const SizedBox(width: 8),
+          Expanded(flex: 6, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('CRYSTAL MIRROR', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: muted)),
+            const SizedBox(height: 10),
+            Row(children: [Icon(catIcon, size: 14, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft))]),
+            const Spacer(),
+            Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
             const SizedBox(height: 8),
             Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
-            if (cardNote.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
-            ],
-          ],
-        );
-      case NgmyMoneyCardLayout.amountCenter:
-        return Column(
-          children: [
-            Row(
-              children: [
-                Icon(catIcon, size: 14, color: soft),
-                const SizedBox(width: 5),
-                Expanded(child: Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: soft))),
-                Text('STERLING', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.6, color: muted)),
-              ],
-            ),
+            note(),
+          ])),
+          Expanded(flex: 4, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             const Spacer(),
-            Text(amount, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 30, height: 1, letterSpacing: 0.8)),
+            Text(amount, textAlign: TextAlign.right, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05)),
             const SizedBox(height: 8),
-            Text(desc, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 13)),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
             const Spacer(),
-            Row(
-              children: [
-                Expanded(child: Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
-                Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
-              ],
+            Text('NGMY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.8, color: muted)),
+          ])),
+        ]);
+
+      // Prism panel — amount in frosted bottom-right plate
+      case 'crystal_prism':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('PRISM ATELIER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+          const SizedBox(height: 10),
+          Row(children: [Icon(catIcon, size: 15, color: soft), const SizedBox(width: 6), Text(category, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: soft))]),
+          const SizedBox(height: 10),
+          Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 16, height: 1.2)),
+          const Spacer(),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+              Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+              note(),
+            ])),
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              child: Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24)),
             ),
-            if (cardNote.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
-            ],
-          ],
-        );
-      case NgmyMoneyCardLayout.amountBottomRight:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('CRYSTAL SERIES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(catIcon, size: 15, color: soft),
-                const SizedBox(width: 6),
-                Text(category, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
-              ],
-            ),
+          ]),
+        ]);
+
+      // Rose rail — amount mid-left, dark rail right with meta
+      case 'rose_sovereign':
+        return Row(children: [
+          Expanded(flex: 7, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('ROSE SOVEREIGN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: muted)),
+            const Spacer(flex: 2),
+            Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 30, height: 1, letterSpacing: 0.3)),
             const SizedBox(height: 10),
-            Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 16, height: 1.2)),
+            Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
             const Spacer(),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
-                      const SizedBox(height: 2),
-                      Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
-                      if (cardNote.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
-                      ],
-                    ],
-                  ),
-                ),
-                Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 26, height: 1, letterSpacing: 0.4)),
-              ],
-            ),
-          ],
-        );
-      case NgmyMoneyCardLayout.amountMidLeft:
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('ROSE ATELIER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: muted)),
-                  const Spacer(flex: 2),
-                  Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28, height: 1, letterSpacing: 0.3)),
-                  const SizedBox(height: 8),
-                  Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
-                  const Spacer(),
-                  Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
-                  if (cardNote.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 4,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Icon(catIcon, size: 18, color: soft),
-                  const SizedBox(height: 6),
-                  Text(category, textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.0, color: soft)),
-                  const Spacer(),
-                  Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
-                  const SizedBox(height: 4),
-                  Text('NGMY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.6, color: muted)),
-                ],
-              ),
-            ),
-          ],
-        );
-      case NgmyMoneyCardLayout.classic:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(catIcon, size: 16, color: ink.withValues(alpha: 0.92)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: ink.withValues(alpha: 0.88)),
-                  ),
-                ),
-                Text('NGMY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: ink.withValues(alpha: 0.55))),
-              ],
-            ),
-            const Spacer(),
-            Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
+            Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+            note(),
+          ])),
+          const SizedBox(width: 8),
+          SizedBox(width: 64, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Icon(catIcon, size: 18, color: soft),
             const SizedBox(height: 6),
-            Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: 0.4)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(child: Text(total, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft))),
-                Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
-              ],
-            ),
-            if (cardNote.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(cardNote, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: soft)),
-            ],
-          ],
-        );
+            Text(category, textAlign: TextAlign.right, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: soft)),
+            const Spacer(),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+            const SizedBox(height: 4),
+            Text('NGMY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
+          ])),
+        ]);
+
+      // Noir ledger — amount under double rule at top
+      case 'black_diamond':
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text('BLACK DIAMOND', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.6, color: muted)),
+            const Spacer(),
+            Icon(catIcon, size: 14, color: soft),
+          ]),
+          const SizedBox(height: 16),
+          Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 0.8)),
+          const SizedBox(height: 6),
+          Text(desc.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: soft, fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 1.1)),
+          const Spacer(),
+          Row(children: [
+            Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, color: soft)),
+            const Spacer(),
+            Text(day, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: muted)),
+          ]),
+          const SizedBox(height: 4),
+          Text(total, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: soft)),
+          note(),
+        ]);
+
+      default:
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: soft)),
+          const Spacer(),
+          Text(desc, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
+          Text(amount, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22)),
+          Text(total, style: TextStyle(fontSize: 10, color: soft)),
+        ]);
     }
   }
 }
-
 class _MoneyCardPatternPainter extends CustomPainter {
   _MoneyCardPatternPainter({required this.template});
 
@@ -2889,34 +3032,46 @@ class _MoneyCardPatternPainter extends CustomPainter {
         canvas.drawRect(Offset.zero & size, sheen);
         break;
       case NgmyMoneyCardPattern.goldLeaf:
+        final imperial = template.id == 'imperial_gold';
         final foil = Paint()
           ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFFFF7D6).withValues(alpha: 0.55),
-              accent.withValues(alpha: 0.0),
-              const Color(0xFFB45309).withValues(alpha: 0.28),
-              const Color(0xFFFFF1C1).withValues(alpha: 0.35),
-            ],
-            stops: const [0.0, 0.35, 0.7, 1.0],
+            begin: imperial ? Alignment.topCenter : Alignment.topLeft,
+            end: imperial ? Alignment.bottomCenter : Alignment.bottomRight,
+            colors: imperial
+                ? [
+                    const Color(0xFFFFF1C1).withValues(alpha: 0.65),
+                    accent.withValues(alpha: 0.15),
+                    const Color(0xFF7A4E00).withValues(alpha: 0.35),
+                  ]
+                : [
+                    const Color(0xFFFFF7D6).withValues(alpha: 0.55),
+                    accent.withValues(alpha: 0.0),
+                    const Color(0xFFB45309).withValues(alpha: 0.28),
+                    const Color(0xFFFFF1C1).withValues(alpha: 0.35),
+                  ],
           ).createShader(Offset.zero & size);
         canvas.drawRect(Offset.zero & size, foil);
         final vein = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
+          ..strokeWidth = imperial ? 1.6 : 1.2
           ..color = const Color(0xFF7A4E00).withValues(alpha: 0.28);
-        for (var i = 0; i < 6; i++) {
-          final path = Path()..moveTo(size.width * (0.05 + i * 0.14), -4);
-          path.cubicTo(
-            size.width * (0.2 + i * 0.1),
-            size.height * 0.35,
-            size.width * (0.1 + i * 0.12),
-            size.height * 0.7,
-            size.width * (0.25 + i * 0.08),
-            size.height + 4,
-          );
-          canvas.drawPath(path, vein);
+        if (imperial) {
+          for (var i = 0; i < 5; i++) {
+            canvas.drawLine(Offset(16, size.height * (0.35 + i * 0.1)), Offset(size.width - 16, size.height * (0.35 + i * 0.1)), vein);
+          }
+        } else {
+          for (var i = 0; i < 6; i++) {
+            final path = Path()..moveTo(size.width * (0.05 + i * 0.14), -4);
+            path.cubicTo(
+              size.width * (0.2 + i * 0.1),
+              size.height * 0.35,
+              size.width * (0.1 + i * 0.12),
+              size.height * 0.7,
+              size.width * (0.25 + i * 0.08),
+              size.height + 4,
+            );
+            canvas.drawPath(path, vein);
+          }
         }
         final rim = Paint()
           ..style = PaintingStyle.stroke
@@ -2955,33 +3110,55 @@ class _MoneyCardPatternPainter extends CustomPainter {
         );
         break;
       case NgmyMoneyCardPattern.crystalFacet:
-        final facets = <List<Offset>>[
-          [Offset(size.width * 0.15, 0), Offset(size.width * 0.45, size.height * 0.35), Offset(0, size.height * 0.4)],
-          [Offset(size.width, size.height * 0.1), Offset(size.width * 0.7, size.height * 0.45), Offset(size.width * 0.95, size.height * 0.55)],
-          [Offset(size.width * 0.2, size.height), Offset(size.width * 0.55, size.height * 0.55), Offset(size.width * 0.05, size.height * 0.65)],
-          [Offset(size.width * 0.85, size.height), Offset(size.width * 0.6, size.height * 0.6), Offset(size.width, size.height * 0.7)],
-        ];
+        // Unique facet geometry per crystal card — not the same cut twice.
+        final id = template.id;
+        late final List<List<Offset>> facets;
+        if (id == 'royal_violet') {
+          facets = [
+            [Offset(size.width * 0.55, 0), Offset(size.width, size.height * 0.2), Offset(size.width * 0.75, size.height * 0.55)],
+            [Offset(0, size.height * 0.15), Offset(size.width * 0.35, size.height * 0.4), Offset(0, size.height * 0.55)],
+            [Offset(size.width * 0.1, size.height), Offset(size.width * 0.45, size.height * 0.6), Offset(size.width * 0.2, size.height * 0.35)],
+          ];
+        } else if (id == 'ocean_platinum') {
+          facets = [
+            [Offset(0, size.height * 0.55), Offset(size.width * 0.4, size.height * 0.4), Offset(size.width * 0.35, size.height)],
+            [Offset(size.width * 0.5, size.height * 0.5), Offset(size.width, size.height * 0.35), Offset(size.width, size.height * 0.7)],
+            [Offset(size.width * 0.2, 0), Offset(size.width * 0.55, size.height * 0.25), Offset(size.width * 0.05, size.height * 0.3)],
+          ];
+        } else if (id == 'marble_ink') {
+          facets = [
+            [Offset(size.width * 0.3, 0), Offset(size.width * 0.7, 0), Offset(size.width * 0.5, size.height * 0.45)],
+            [Offset(0, size.height * 0.7), Offset(size.width * 0.35, size.height * 0.45), Offset(size.width * 0.15, size.height)],
+            [Offset(size.width, size.height * 0.65), Offset(size.width * 0.65, size.height * 0.4), Offset(size.width * 0.85, size.height)],
+          ];
+        } else if (id == 'sterling_silver') {
+          facets = [
+            [Offset(0, 0), Offset(size.width * 0.4, 0), Offset(0, size.height * 0.5)],
+            [Offset(size.width, 0), Offset(size.width * 0.6, 0), Offset(size.width, size.height * 0.5)],
+            [Offset(size.width * 0.25, size.height), Offset(size.width * 0.75, size.height), Offset(size.width * 0.5, size.height * 0.45)],
+          ];
+        } else {
+          facets = [
+            [Offset(size.width * 0.15, 0), Offset(size.width * 0.45, size.height * 0.35), Offset(0, size.height * 0.4)],
+            [Offset(size.width, size.height * 0.1), Offset(size.width * 0.7, size.height * 0.45), Offset(size.width * 0.95, size.height * 0.55)],
+            [Offset(size.width * 0.2, size.height), Offset(size.width * 0.55, size.height * 0.55), Offset(size.width * 0.05, size.height * 0.65)],
+            [Offset(size.width * 0.85, size.height), Offset(size.width * 0.6, size.height * 0.6), Offset(size.width, size.height * 0.7)],
+          ];
+        }
         for (var i = 0; i < facets.length; i++) {
           final path = Path()..addPolygon(facets[i], true);
-          canvas.drawPath(
-            path,
-            Paint()..color = (i.isEven ? Colors.white : accent).withValues(alpha: 0.14 + i * 0.03),
-          );
-          canvas.drawPath(
-            path,
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1
-              ..color = Colors.white.withValues(alpha: 0.28),
-          );
+          canvas.drawPath(path, Paint()..color = (i.isEven ? Colors.white : accent).withValues(alpha: 0.14 + i * 0.03));
+          canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white.withValues(alpha: 0.28));
         }
-        final spark = Paint()..color = Colors.white.withValues(alpha: 0.55);
-        for (final o in [
-          Offset(size.width * 0.72, size.height * 0.22),
-          Offset(size.width * 0.28, size.height * 0.58),
-          Offset(size.width * 0.58, size.height * 0.78),
-        ]) {
-          canvas.drawCircle(o, 1.8, spark);
+        if (id == 'ocean_platinum') {
+          final wave = Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = accent.withValues(alpha: 0.28);
+          for (var i = 0; i < 3; i++) {
+            final path = Path()..moveTo(0, size.height * (0.62 + i * 0.08));
+            for (var x = 0.0; x <= size.width; x += 20) {
+              path.quadraticBezierTo(x + 10, size.height * (0.62 + i * 0.08) + (i.isEven ? -6 : 6), x + 20, size.height * (0.62 + i * 0.08));
+            }
+            canvas.drawPath(path, wave);
+          }
         }
         break;
       case NgmyMoneyCardPattern.roseMetal:
