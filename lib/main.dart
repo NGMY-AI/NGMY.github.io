@@ -25151,6 +25151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final cashInvested = widget.user.totalInvestmentAmount;
     final pointsCash = widget.user.points / 100.0;
     const profileColors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
+    const legalFrameColors = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF1F5F9),
       body: SafeArea(
@@ -25546,7 +25547,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.08, colors: profileColors),
+      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.08, colors: legalFrameColors),
       const SizedBox(height: 15),
       _box(context, 'My Prizes', [
         Row(
@@ -25636,7 +25637,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.2, colors: const [Color(0xFF22C55E), Color(0xFF06B6D4)]),
+      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.2, colors: legalFrameColors),
       const SizedBox(height: 15),
       _legalInformationSection(context, pulse: pulse, scan: scan, orbit: orbit),
       const SizedBox(height: 15),
@@ -25657,11 +25658,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         scan: scan,
         orbit: orbit,
         phase: 0.34,
-        colors: const [Color(0xFFA78BFA), Color(0xFF6366F1)],
+        colors: legalFrameColors,
       ),
       const SizedBox(height: 24),
       NgmyToolkitAliveSection(
-        colors: const [Color(0xFFEF4444), Color(0xFFF97316)],
+        colors: legalFrameColors,
         pulse: pulse,
         scan: scan,
         orbit: orbit,
@@ -25678,7 +25679,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: NgmyHudInk.title(context),
               fontWeight: FontWeight.w900,
               letterSpacing: 1.1,
-              shadows: [Shadow(color: const Color(0xFFEF4444).withValues(alpha: 0.5 + pulse * 0.3), blurRadius: 12)],
+              shadows: [Shadow(color: const Color(0xFF3B82F6).withValues(alpha: 0.5 + pulse * 0.3), blurRadius: 12)],
             ),
           ),
         ),
@@ -26058,7 +26059,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required double orbit,
   }) {
     return NgmyToolkitAliveSection(
-      colors: const [Color(0xFF22D3EE), Color(0xFF6366F1)],
+      colors: const [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
       pulse: pulse,
       scan: scan,
       orbit: orbit,
@@ -26130,7 +26131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required double scan,
     required double orbit,
     double phase = 0,
-    List<Color> colors = const [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+    List<Color> colors = const [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
   }) {
     return NgmyToolkitAliveSection(
       colors: colors,
@@ -26373,36 +26374,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sel = widget.currentThemeMode == m;
     final dark = NgmyHudInk.isDark(ctx);
     final color = sel
-        ? Color.lerp(const Color(0xFF22D3EE), const Color(0xFFA78BFA), pulse)!
+        ? Color.lerp(const Color(0xFF3B82F6), const Color(0xFFA78BFA), pulse)!
         : (dark ? Colors.white54 : const Color(0xFF64748B));
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => widget.onThemeChanged(m),
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: sel
-                ? LinearGradient(colors: [
-                    const Color(0xFF22D3EE).withValues(alpha: 0.35 + pulse * 0.2),
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.28),
-                  ])
-                : null,
-            color: sel ? null : (dark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9)),
-            border: Border.all(color: sel ? color.withValues(alpha: 0.7) : (dark ? Colors.white12 : const Color(0xFFCBD5E1))),
-            boxShadow: sel ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)] : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(i, color: color, size: 28),
-              const SizedBox(height: 5),
-              Text(l, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
-            ],
-          ),
+        customBorder: const CircleBorder(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 58,
+              height: 58,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: sel
+                    ? LinearGradient(colors: [
+                        const Color(0xFF3B82F6).withValues(alpha: 0.45 + pulse * 0.2),
+                        const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                      ])
+                    : null,
+                color: sel ? null : (dark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9)),
+                border: Border.all(color: sel ? color.withValues(alpha: 0.85) : (dark ? Colors.white24 : const Color(0xFFCBD5E1)), width: sel ? 2 : 1.25),
+                boxShadow: sel ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 14)] : null,
+              ),
+              child: Icon(i, color: color, size: 26),
+            ),
+            const SizedBox(height: 8),
+            Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+          ],
         ),
       ),
     );

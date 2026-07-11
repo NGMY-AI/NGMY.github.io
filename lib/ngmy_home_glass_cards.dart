@@ -385,67 +385,79 @@ class NgmyMoneyCardTemplate {
 }
 
 const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
+  // Row 1 — redesigned with unique luxe structure
   NgmyMoneyCardTemplate(
     id: 'midnight_gold',
     label: 'Midnight Gold',
-    colors: [Color(0xFF0B1220), Color(0xFF1E293B), Color(0xFFB45309)],
-    pattern: NgmyMoneyCardPattern.nightGold,
+    colors: [Color(0xFF1A1207), Color(0xFF8B6914), Color(0xFFF5D76E)],
+    pattern: NgmyMoneyCardPattern.goldLeaf,
+    layout: NgmyMoneyCardLayout.amountTopRight,
   ),
   NgmyMoneyCardTemplate(
     id: 'obsidian_steel',
     label: 'Obsidian',
-    colors: [Color(0xFF09090B), Color(0xFF27272A), Color(0xFF71717A)],
-    pattern: NgmyMoneyCardPattern.obsidian,
+    colors: [Color(0xFF050505), Color(0xFF1C1917), Color(0xFFA8A29E)],
+    pattern: NgmyMoneyCardPattern.diamondNoir,
+    layout: NgmyMoneyCardLayout.amountCenter,
   ),
   NgmyMoneyCardTemplate(
     id: 'champagne_noir',
-    label: 'Champagne',
-    colors: [Color(0xFF1C1917), Color(0xFF44403C), Color(0xFFD6B56A)],
-    pattern: NgmyMoneyCardPattern.champagne,
+    label: 'Rose Champagne',
+    colors: [Color(0xFF3B0A1F), Color(0xFF9F1239), Color(0xFFFBCFE8)],
+    pattern: NgmyMoneyCardPattern.roseMetal,
+    layout: NgmyMoneyCardLayout.amountMidLeft,
   ),
   NgmyMoneyCardTemplate(
     id: 'royal_violet',
-    label: 'Royal Violet',
-    colors: [Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFFA78BFA)],
-    pattern: NgmyMoneyCardPattern.luxeGradient,
+    label: 'Crystal Violet',
+    colors: [Color(0xFF2E1065), Color(0xFFC4B5FD), Color(0xFFF5F3FF)],
+    pattern: NgmyMoneyCardPattern.crystalFacet,
+    layout: NgmyMoneyCardLayout.amountBottomRight,
   ),
   NgmyMoneyCardTemplate(
     id: 'ocean_platinum',
-    label: 'Ocean Platinum',
-    colors: [Color(0xFF042F2E), Color(0xFF0E7490), Color(0xFF67E8F9)],
-    pattern: NgmyMoneyCardPattern.oceanDepth,
+    label: 'Crystal Tide',
+    colors: [Color(0xFF0C4A6E), Color(0xFF7DD3FC), Color(0xFFF0F9FF)],
+    pattern: NgmyMoneyCardPattern.crystalFacet,
+    layout: NgmyMoneyCardLayout.amountTopRight,
   ),
+  // Row 2 — Carbon + Emerald kept; more crystal / rose / diamond
   NgmyMoneyCardTemplate(
     id: 'carbon_noir',
     label: 'Carbon Noir',
     colors: [Color(0xFF111827), Color(0xFF1F2937), Color(0xFF9CA3AF)],
     pattern: NgmyMoneyCardPattern.carbon,
+    layout: NgmyMoneyCardLayout.amountCenter,
   ),
   NgmyMoneyCardTemplate(
     id: 'emerald_luxe',
     label: 'Emerald Luxe',
     colors: [Color(0xFF022C22), Color(0xFF065F46), Color(0xFF34D399)],
     pattern: NgmyMoneyCardPattern.diagonal,
+    layout: NgmyMoneyCardLayout.amountMidLeft,
   ),
   NgmyMoneyCardTemplate(
     id: 'marble_ink',
-    label: 'Marble Ink',
-    colors: [Color(0xFF0F172A), Color(0xFF334155), Color(0xFFE2E8F0)],
-    pattern: NgmyMoneyCardPattern.marbleVein,
+    label: 'Crystal Frost',
+    colors: [Color(0xFF164E63), Color(0xFFA5F3FC), Color(0xFFECFEFF)],
+    pattern: NgmyMoneyCardPattern.crystalFacet,
+    layout: NgmyMoneyCardLayout.amountCenter,
   ),
   NgmyMoneyCardTemplate(
     id: 'aurora_vault',
-    label: 'Aurora Vault',
-    colors: [Color(0xFF0B1220), Color(0xFF312E81), Color(0xFF22D3EE)],
-    pattern: NgmyMoneyCardPattern.aurora,
+    label: 'Rose Aurora',
+    colors: [Color(0xFF500724), Color(0xFFE11D48), Color(0xFFFDA4AF)],
+    pattern: NgmyMoneyCardPattern.roseMetal,
+    layout: NgmyMoneyCardLayout.amountBottomRight,
   ),
   NgmyMoneyCardTemplate(
     id: 'mesh_sapphire',
-    label: 'Mesh Sapphire',
-    colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFF60A5FA)],
-    pattern: NgmyMoneyCardPattern.mesh,
+    label: 'Sapphire Diamond',
+    colors: [Color(0xFF020617), Color(0xFF1E3A8A), Color(0xFFBFDBFE)],
+    pattern: NgmyMoneyCardPattern.diamondNoir,
+    layout: NgmyMoneyCardLayout.amountMidLeft,
   ),
-  // Row 3 — Atelier Luxe (distinct layouts + materials)
+  // Row 3 — Atelier Luxe
   NgmyMoneyCardTemplate(
     id: 'imperial_gold',
     label: 'Imperial Gold',
@@ -455,9 +467,9 @@ const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
   ),
   NgmyMoneyCardTemplate(
     id: 'sterling_silver',
-    label: 'Sterling Silver',
-    colors: [Color(0xFF4B5563), Color(0xFFC0C7D1), Color(0xFFF8FAFC)],
-    pattern: NgmyMoneyCardPattern.silverBrushed,
+    label: 'Crystal Mirror',
+    colors: [Color(0xFF334155), Color(0xFFE2E8F0), Color(0xFFF8FAFC)],
+    pattern: NgmyMoneyCardPattern.crystalFacet,
     layout: NgmyMoneyCardLayout.amountCenter,
   ),
   NgmyMoneyCardTemplate(
@@ -482,7 +494,6 @@ const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
     layout: NgmyMoneyCardLayout.amountTopRight,
   ),
 ];
-
 NgmyMoneyCardTemplate ngmyMoneyCardTemplateById(String? id) {
   final key = (id ?? '').trim();
   for (final t in kNgmyMoneyCardTemplates) {
@@ -2411,6 +2422,9 @@ class _CreditCardSpendBody extends StatelessWidget {
         return Colors.white;
       case NgmyMoneyCardPattern.diamondNoir:
         return const Color(0xFFF8FAFC);
+      case NgmyMoneyCardPattern.carbon:
+      case NgmyMoneyCardPattern.diagonal:
+        return Colors.white;
       default:
         return Colors.white;
     }
@@ -3630,7 +3644,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                 if (row == 2) ...[
                                   Text('ATELIER LUXE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.3, color: muted)),
                                   const SizedBox(height: 2),
-                                  Text('Gold · Silver · Crystal · Rose · Diamond', style: TextStyle(fontSize: 11, color: muted.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
+                                  Text('Gold · Crystal · Rose · Diamond', style: TextStyle(fontSize: 11, color: muted.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 8),
                                 ],
                                 Row(

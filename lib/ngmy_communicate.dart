@@ -1211,7 +1211,7 @@ class _Companion3DCard extends StatelessWidget {
             child: Stack(
               children: [
                 if (profile.roleBadgeLabel != null)
-                  Positioned(top: 8, right: 8, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
+                  Positioned(top: 2, right: 4, child: _roleBadge(profile.roleBadgeLabel!, small: true)),
                 SizedBox(
                   width: double.infinity,
                   child: Column(
@@ -2155,7 +2155,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                         ),
                       ),
                       if (widget.profile.roleBadgeLabel != null)
-                        Positioned(top: 6, right: 8, child: _roleBadge(widget.profile.roleBadgeLabel!)),
+                        Positioned(top: 2, right: 4, child: _roleBadge(widget.profile.roleBadgeLabel!)),
                     ],
                   ),
                 ),
