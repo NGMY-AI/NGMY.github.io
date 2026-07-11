@@ -147,14 +147,22 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     try {
       final file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 400,
-        maxHeight: 400,
-        imageQuality: 88,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 90,
       );
       if (file == null) return;
       final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read that image. Try another file.')));
+        }
+        return;
+      }
       setState(() {
         _doc.logoBase64 = base64Encode(bytes);
+        // Make sure a previously hidden logo slot is shown again.
+        _doc.hidden.remove('logo');
         _doc.touch();
       });
       widget.onDocumentChanged?.call(_doc);

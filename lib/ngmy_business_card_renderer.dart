@@ -128,10 +128,32 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'type_halo' => _layoutTypeHalo(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
+    // Templates that already place a logo in their own layout.
+    const stylesWithBuiltInLogo = {
+      'glass_frost',
+      'vertical_split',
+      'orbit',
+      'wave_curve',
+      'hero_strip',
+      'bubble_duotone',
+      'mesh_dots',
+      'champagne_foil',
+      'rose_gold_arc',
+      'crystalline',
+    };
+    final hasLogo = document.logoBytes != null;
+    final needsLogoOverlay = hasLogo && !stylesWithBuiltInLogo.contains(tpl.renderStyle);
     return Stack(
       fit: StackFit.expand,
       children: [
         layout,
+        if (needsLogoOverlay)
+          ctx.slot(
+            'logo',
+            ctx.logo(height * 0.32, radius: BorderRadius.circular(height * 0.08)),
+            right: 12,
+            top: 12,
+          ),
         if (document.cardEmoji.trim().isNotEmpty)
           ctx.slot(
             'card_emoji',
@@ -216,16 +238,32 @@ class _CardRenderCtx {
 
   Widget logo(double size, {BorderRadius? radius}) {
     final bytes = doc.logoBytes;
+    final r = radius ?? BorderRadius.circular(size * 0.22);
     return Container(
       width: size,
       height: size,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: radius ?? BorderRadius.circular(size * 0.22),
-        gradient: bytes == null ? LinearGradient(colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)]) : null,
-        image: bytes != null ? DecorationImage(image: MemoryImage(bytes), fit: BoxFit.cover) : null,
+        borderRadius: r,
+        color: bytes != null ? Colors.white : null,
+        gradient: bytes == null
+            ? LinearGradient(colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)])
+            : null,
         border: Border.all(color: accent.withValues(alpha: 0.45), width: 1.2),
       ),
-      child: bytes == null ? Icon(Icons.person_rounded, color: accent, size: size * 0.42) : null,
+      // Image.memory is reliable on Flutter web; DecorationImage(MemoryImage) often paints blank.
+      child: bytes == null
+          ? Icon(Icons.person_rounded, color: accent, size: size * 0.42)
+          : Image.memory(
+              bytes,
+              key: ValueKey<String>('biz_logo_${bytes.length}_${Object.hashAll(bytes.take(64))}'),
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, color: accent, size: size * 0.42),
+            ),
     );
   }
 }

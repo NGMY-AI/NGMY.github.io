@@ -163,9 +163,17 @@ class NgmyBusinessCardDocument {
   Color get effectiveBgEnd => backgroundEndColor ?? template.bgEnd;
 
   Uint8List? get logoBytes {
-    if (logoBase64.isEmpty) return null;
+    var raw = logoBase64.trim();
+    if (raw.isEmpty) return null;
+    // Support data-URL form: data:image/png;base64,AAAA...
+    final comma = raw.indexOf(',');
+    if (raw.startsWith('data:') && comma > 0) {
+      raw = raw.substring(comma + 1);
+    }
     try {
-      return base64Decode(logoBase64);
+      final bytes = base64Decode(raw);
+      if (bytes.isEmpty) return null;
+      return bytes;
     } catch (_) {
       return null;
     }
