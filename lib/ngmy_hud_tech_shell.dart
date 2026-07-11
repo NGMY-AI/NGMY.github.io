@@ -263,28 +263,6 @@ class NgmyHudFramePainter extends CustomPainter {
       ).createShader(Offset.zero & size);
     canvas.drawRRect(r, border);
 
-    final bracket = Paint()
-      ..color = colors.first.withValues(alpha: lightMode ? 0.85 + pulse * 0.15 : 0.75 + pulse * 0.25)
-      ..strokeWidth = lightMode ? 2.4 : 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    const c = 14.0;
-    const inset = 8.0;
-    void corner(double x, double y, double dx, double dy) {
-      canvas.drawPath(
-        Path()
-          ..moveTo(x + dx * c, y)
-          ..lineTo(x, y)
-          ..lineTo(x, y + dy * c),
-        bracket,
-      );
-    }
-
-    corner(inset, inset, 1, 1);
-    corner(size.width - inset, inset, -1, 1);
-    corner(inset, size.height - inset, 1, -1);
-    corner(size.width - inset, size.height - inset, -1, -1);
-
     final sy = size.height * scan;
     final scanPaint = Paint()
       ..shader = LinearGradient(
