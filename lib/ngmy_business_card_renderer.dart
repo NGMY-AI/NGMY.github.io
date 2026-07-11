@@ -140,7 +140,7 @@ class _NgmyCardRenderBody extends StatelessWidget {
         if (needsLogoOverlay)
           ctx.slot(
             'logo',
-            ctx.logo(height * 0.32, radius: BorderRadius.circular(height * 0.08)),
+            ctx.logo(height * 0.34, radius: BorderRadius.circular(999)),
             right: 12,
             top: 12,
           ),
@@ -228,7 +228,8 @@ class _CardRenderCtx {
 
   Widget logo(double size, {BorderRadius? radius}) {
     final bytes = doc.logoBytes;
-    final r = radius ?? BorderRadius.circular(size * 0.22);
+    // Default to a true circle frame (not a rounded box).
+    final r = radius ?? BorderRadius.circular(999);
     // Clean logo plate — no accent border ring (that was showing blue/colored lines).
     return Container(
       width: size,
@@ -332,26 +333,13 @@ Widget _layoutVerticalSplit(_CardRenderCtx c) {
           ),
         ],
       ),
-      // Full-bleed logo on the left panel when set — no colored ring around a circle.
+      // Circular logo centered on the left panel (no box / full-bleed frame).
       Positioned(
         left: 0,
         top: 0,
         bottom: 0,
         width: c.w * 0.38,
-        child: c.doc.logoBytes != null
-            ? ClipRect(
-                child: Image.memory(
-                  c.doc.logoBytes!,
-                  key: ValueKey<String>('split_logo_${c.doc.logoBytes!.length}'),
-                  fit: BoxFit.cover,
-                  width: c.w * 0.38,
-                  height: c.h,
-                  gaplessPlayback: true,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (_, __, ___) => Center(child: c.logo(c.h * 0.36, radius: BorderRadius.circular(999))),
-                ),
-              )
-            : Center(child: c.logo(c.h * 0.36, radius: BorderRadius.circular(999))),
+        child: Center(child: c.logo(c.h * 0.42, radius: BorderRadius.circular(999))),
       ),
       Positioned(left: c.w * 0.36, top: 0, bottom: 0, width: 2, child: Container(color: Colors.white.withValues(alpha: 0.85))),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900, color: c.text), left: c.w * 0.42, top: 14),

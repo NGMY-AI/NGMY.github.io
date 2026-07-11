@@ -1862,9 +1862,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             ),
           ],
         ),
-        child: Text(
-          spending ? 'SPENDING' : 'NOTES',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.1),
+        child: Icon(
+          spending ? Icons.credit_card_rounded : Icons.sticky_note_2_rounded,
+          color: Colors.white,
+          size: 18,
         ),
       ),
     );
@@ -2003,7 +2004,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 onDelete: isFront ? () => _deleteNote(note.id) : null,
                 onAdd: isFront ? _openAddSheet : null,
                 footer: isFront ? _modePill() : null,
-                child: _NoteCardContent(note: note),
+                fillBleed: true,
+                child: _NoteCardContent(note: note, isFront: isFront),
               ),
             ),
           ],
@@ -3223,20 +3225,21 @@ class _MoneyCardPatternPainter extends CustomPainter {
 }
 
 class _NoteCardContent extends StatelessWidget {
-  const _NoteCardContent({required this.note});
+  const _NoteCardContent({required this.note, this.isFront = true});
 
   final NgmyHomeNote note;
+  final bool isFront;
 
   @override
   Widget build(BuildContext context) {
-    // Full-card note text from the top — no "NOTE" label.
+    // Note body only — no "NOTE" / "Notes" title. Text fills the card face.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 36),
+      padding: EdgeInsets.fromLTRB(16, isFront ? 54 : 20, isFront ? 52 : 16, isFront ? 52 : 20),
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: Alignment.topLeft,
         child: Text(
           note.text,
-          maxLines: 9,
+          maxLines: 14,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.left,
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.4, color: Colors.white),
