@@ -3229,41 +3229,18 @@ class _NoteCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Same full-card layout language as spending (not a tiny inset note).
+    // Full-card note text from the top — no "NOTE" label.
     return Padding(
-      padding: const EdgeInsets.only(bottom: 36),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(height: 6),
-          Text(
-            'NOTE',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withValues(alpha: 0.12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-            ),
-            child: Text(
-              note.text,
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.35, color: Colors.white),
-            ),
-          ),
-          const Spacer(),
-        ],
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 36),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Text(
+          note.text,
+          maxLines: 9,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.left,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.4, color: Colors.white),
+        ),
       ),
     );
   }
