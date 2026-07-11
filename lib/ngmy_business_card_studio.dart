@@ -576,6 +576,37 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text('Logo rings', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final opt in const [
+                ('none', 'None'),
+                ('thin', 'Thin'),
+                ('double', 'Double'),
+                ('gold', 'Gold'),
+                ('neon', 'Neon'),
+                ('soft', 'Soft'),
+              ])
+                FilterChip(
+                  label: Text(opt.$2, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                  selected: _doc.logoRingStyle == opt.$1,
+                  onSelected: (_) {
+                    setState(() {
+                      _doc.logoRingStyle = opt.$1;
+                      _doc.touch();
+                    });
+                    widget.onDocumentChanged?.call(_doc);
+                  },
+                  selectedColor: const Color(0xFF22C55E),
+                  checkmarkColor: Colors.black,
+                  backgroundColor: t.isDark ? Colors.black26 : const Color(0xFFE2E8F0),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -878,14 +909,16 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
   final barrier = NgmyHubTheme.of(context).barrier;
   showGeneralDialog<void>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: 'Business Card Studio',
     barrierColor: barrier,
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (ctx, a1, a2) {
       final w = MediaQuery.of(ctx).size.width;
       final dialogW = w > 540 ? 520.0 : w - 24;
-      return Dialog(
+      return PopScope(
+        canPop: false,
+        child: Dialog(
         insetPadding: const EdgeInsets.all(12),
         backgroundColor: Colors.transparent,
         child: NgmyHudMotion(
@@ -920,6 +953,7 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
             );
           },
         ),
+      ),
       );
     },
     transitionBuilder: (ctx, anim, _, child) {

@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
+import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
@@ -36,6 +37,7 @@ class NgmySpendingEntry {
     this.pinnedAlarmText = '',
     this.pinnedEssentialsKind = '',
     this.businessCardJson = '',
+    this.civicIdJson = '',
     this.cardTemplateId = '',
   });
 
@@ -58,6 +60,8 @@ class NgmySpendingEntry {
   final String pinnedEssentialsKind;
   /// JSON of a pinned NgmyBusinessCardDocument.
   final String businessCardJson;
+  /// JSON of a pinned Civic Registry ID record.
+  final String civicIdJson;
   /// Money-card face template id (see [kNgmyMoneyCardTemplates]).
   final String cardTemplateId;
 
@@ -66,9 +70,12 @@ class NgmySpendingEntry {
   bool get hasPinnedEssentials =>
       pinnedEssentialsKind.trim().isNotEmpty || pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
   bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
-  bool get hideModePill => hasImage || isPassword || hasBusinessCard || (hasPinnedEssentials && amount <= 0);
+  bool get hasCivicId => civicIdJson.trim().isNotEmpty;
+  bool get hideModePill =>
+      hasImage || isPassword || hasBusinessCard || hasCivicId || (hasPinnedEssentials && amount <= 0);
   /// Money / category face that should fill the whole frosted card like a photo.
-  bool get showsCreditFace => !hasImage && !isPassword && !hasBusinessCard && !(hasPinnedEssentials && amount <= 0);
+  bool get showsCreditFace =>
+      !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !(hasPinnedEssentials && amount <= 0);
 
   NgmySpendingEntry copyWith({
     String? id,
@@ -84,6 +91,7 @@ class NgmySpendingEntry {
     String? pinnedAlarmText,
     String? pinnedEssentialsKind,
     String? businessCardJson,
+    String? civicIdJson,
     String? cardTemplateId,
   }) =>
       NgmySpendingEntry(
@@ -100,6 +108,7 @@ class NgmySpendingEntry {
         pinnedAlarmText: pinnedAlarmText ?? this.pinnedAlarmText,
         pinnedEssentialsKind: pinnedEssentialsKind ?? this.pinnedEssentialsKind,
         businessCardJson: businessCardJson ?? this.businessCardJson,
+        civicIdJson: civicIdJson ?? this.civicIdJson,
         cardTemplateId: cardTemplateId ?? this.cardTemplateId,
       );
 
@@ -117,6 +126,7 @@ class NgmySpendingEntry {
         'pinnedAlarmText': pinnedAlarmText,
         'pinnedEssentialsKind': pinnedEssentialsKind,
         'businessCardJson': businessCardJson,
+        'civicIdJson': civicIdJson,
         'cardTemplateId': cardTemplateId,
       };
 
@@ -134,6 +144,7 @@ class NgmySpendingEntry {
         pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
         pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
         businessCardJson: j['businessCardJson']?.toString() ?? '',
+        civicIdJson: j['civicIdJson']?.toString() ?? '',
         cardTemplateId: j['cardTemplateId']?.toString() ?? '',
       );
 }
@@ -144,6 +155,12 @@ class NgmyHomeNote {
   final String id;
   final String text;
   final DateTime createdAt;
+
+  NgmyHomeNote copyWith({String? id, String? text, DateTime? createdAt}) => NgmyHomeNote(
+        id: id ?? this.id,
+        text: text ?? this.text,
+        createdAt: createdAt ?? this.createdAt,
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -1470,16 +1487,19 @@ class NgmyHomeGlassCardsPanel extends StatefulWidget {
     super.key,
     required this.userEmail,
     this.displayName,
+    this.civicIdRecord,
   });
 
   final String userEmail;
   final String? displayName;
+  /// Current user's Civic Registry ID record (if enrolled) for pinning to home.
+  final Map<String, dynamic>? civicIdRecord;
 
   @override
   State<NgmyHomeGlassCardsPanel> createState() => _NgmyHomeGlassCardsPanelState();
 }
 
-class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
+class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with WidgetsBindingObserver {
   _NgmyHomeCardKind _kind = _NgmyHomeCardKind.spending;
   List<NgmySpendingEntry> _spending = [];
   List<NgmyHomeNote> _notes = [];
@@ -1493,18 +1513,34 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
   String _alarmHoldTitle = '';
   String? _alarmHoldAckKey;
   Set<String> _alarmAcks = {};
+  int _tapCount = 0;
+  DateTime? _lastTapAt;
+  String? _lastTapId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ngmyHomeCardsRevision.addListener(_onHomeRevision);
     _load();
     _alarmPoll = Timer.periodic(const Duration(seconds: 20), (_) => _checkDueAlarms());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ngmyHomeCardsRevision.removeListener(_onHomeRevision);
     _alarmPoll?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
+  }
+
+  void _onHomeRevision() {
+    if (mounted) _load();
   }
 
   void _moveIdToFront<T>(List<T> list, Object Function(T) idOf, String? id) {
@@ -1516,8 +1552,50 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     }
   }
 
+  Future<List<NgmySpendingEntry>> _syncBusinessCardSnapshots(List<NgmySpendingEntry> spending) async {
+    final cards = await loadNgmyBusinessCards(userEmail: widget.userEmail);
+    if (cards.isEmpty) return spending;
+    final byId = <String, Map<String, dynamic>>{
+      for (final c in cards) (c['id'] ?? '').toString(): c,
+    };
+    var changed = false;
+    final next = <NgmySpendingEntry>[];
+    for (final e in spending) {
+      if (!e.hasBusinessCard) {
+        next.add(e);
+        continue;
+      }
+      try {
+        final map = jsonDecode(e.businessCardJson);
+        if (map is! Map) {
+          next.add(e);
+          continue;
+        }
+        final id = (map['id'] ?? '').toString();
+        final fresh = byId[id];
+        if (fresh == null) {
+          next.add(e);
+          continue;
+        }
+        final encoded = jsonEncode(fresh);
+        if (encoded != e.businessCardJson) {
+          changed = true;
+          final name = (fresh['fullName'] ?? '').toString().trim();
+          next.add(e.copyWith(businessCardJson: encoded, description: name.isEmpty ? e.description : name));
+        } else {
+          next.add(e);
+        }
+      } catch (_) {
+        next.add(e);
+      }
+    }
+    if (changed) await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+    return next;
+  }
+
   Future<void> _load() async {
-    final s = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
+    final s0 = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
+    final s = await _syncBusinessCardSnapshots(s0);
     final n = await NgmyHomeLocalStore.loadNotes(widget.userEmail);
     final deck = await NgmyHomeLocalStore.loadDeckPrefs(widget.userEmail);
     final acks = await NgmyHomeLocalStore.loadAlarmAcks(widget.userEmail);
@@ -1592,6 +1670,107 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
     if (_frontNoteId == id) {
       await _setDeckPrefs(frontNoteId: _notes.isNotEmpty ? _notes.first.id : '');
     }
+  }
+
+  bool _registerTripleTap(String id) {
+    final now = DateTime.now();
+    if (_lastTapId != id || _lastTapAt == null || now.difference(_lastTapAt!) > const Duration(milliseconds: 450)) {
+      _tapCount = 1;
+    } else {
+      _tapCount += 1;
+    }
+    _lastTapAt = now;
+    _lastTapId = id;
+    if (_tapCount >= 3) {
+      _tapCount = 0;
+      _lastTapAt = null;
+      _lastTapId = null;
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _editSpendingAmount(NgmySpendingEntry entry) async {
+    if (!entry.showsCreditFace) return;
+    final amountC = TextEditingController(text: entry.amount > 0 ? entry.amount.toStringAsFixed(entry.amount % 1 == 0 ? 0 : 2) : '');
+    final descC = TextEditingController(text: entry.description);
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF0B1220) : Colors.white,
+          title: Text('Edit spending', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                autofocus: true,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w800, fontSize: 22),
+                decoration: const InputDecoration(labelText: 'Amount', prefixText: '\$ '),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descC,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                decoration: const InputDecoration(labelText: 'For'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          ],
+        );
+      },
+    );
+    final amount = double.tryParse(amountC.text.trim()) ?? 0;
+    amountC.dispose();
+    final desc = descC.text.trim();
+    descC.dispose();
+    if (saved != true || !mounted || amount <= 0) return;
+    final next = entry.copyWith(amount: amount, description: desc.isEmpty ? entry.description : desc, date: DateTime.now());
+    setState(() {
+      _spending = _spending.map((e) => e.id == entry.id ? next : e).toList();
+    });
+    await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+  }
+
+  Future<void> _editNote(NgmyHomeNote note) async {
+    final textC = TextEditingController(text: note.text);
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF0B1220) : Colors.white,
+          title: Text('Edit note', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
+          content: TextField(
+            controller: textC,
+            maxLines: 8,
+            autofocus: true,
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w700, height: 1.35),
+            decoration: const InputDecoration(hintText: 'Write your note…'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          ],
+        );
+      },
+    );
+    final text = textC.text.trim();
+    textC.dispose();
+    if (saved != true || !mounted || text.isEmpty) return;
+    final next = note.copyWith(text: text);
+    setState(() {
+      _notes = _notes.map((n) => n.id == note.id ? next : n).toList();
+    });
+    await NgmyHomeLocalStore.saveNotes(widget.userEmail, _notes);
   }
 
   bool _medicineDueNow(NgmyMedicineEntry m, DateTime now) {
@@ -1741,6 +1920,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                 userEmail: widget.userEmail,
                 autoPlay: _autoPlay,
                 slideStyle: _slideStyle,
+                civicIdRecord: widget.civicIdRecord,
                 onDeckSettingsChanged: (auto, style) => _setDeckPrefs(autoPlay: auto, style: style),
               ),
             ),
@@ -1775,6 +1955,21 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
             category: 'Business Card',
             date: DateTime.now(),
             businessCardJson: json,
+          ),
+        );
+        return;
+      }
+      if (kind == 'civic_id') {
+        final json = result['civicIdJson'] ?? '';
+        if (json.isEmpty) return;
+        await _addSpendingEntry(
+          NgmySpendingEntry(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            amount: 0,
+            description: result['description'] ?? 'Civic Registry ID',
+            category: 'Civic ID',
+            date: DateTime.now(),
+            civicIdJson: json,
           ),
         );
         return;
@@ -1934,28 +2129,44 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                   ),
                 ),
               ),
-              cardBuilder: (ctx, entry, {required isFront, required revealDates}) => NgmyFrostedCard(
-                dateLabel: ngmyHomeDateTabLabel(entry.date),
-                accent: entry.hasImage
-                    ? const [Color(0xFF111827), Color(0xFF1F2937)]
-                    : entry.hasBusinessCard
-                        ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
-                        : entry.isPassword
-                            ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
-                            : entry.hasPinnedEssentials && entry.amount <= 0
-                                ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
-                                : entry.showsCreditFace
-                                    ? ngmyMoneyCardAccent(entry)
-                                    : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
-                isFront: isFront,
-                showDateTab: revealDates,
-                welcomeName: isFront ? name : null,
-                onDelete: isFront ? () => _deleteSpending(entry.id) : null,
-                onAdd: isFront ? _openAddSheet : null,
-                footer: isFront && !entry.hideModePill ? _modePill() : null,
-                fillBleed: entry.hasImage || entry.showsCreditFace || entry.hasBusinessCard || (entry.hasPinnedEssentials && entry.amount <= 0),
-                child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
-              ),
+              cardBuilder: (ctx, entry, {required isFront, required revealDates}) {
+                final card = NgmyFrostedCard(
+                  dateLabel: ngmyHomeDateTabLabel(entry.date),
+                  accent: entry.hasImage
+                      ? const [Color(0xFF111827), Color(0xFF1F2937)]
+                      : entry.hasCivicId
+                          ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
+                          : entry.hasBusinessCard
+                              ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
+                              : entry.isPassword
+                                  ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
+                                  : entry.hasPinnedEssentials && entry.amount <= 0
+                                      ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
+                                      : entry.showsCreditFace
+                                          ? ngmyMoneyCardAccent(entry)
+                                          : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+                  isFront: isFront,
+                  showDateTab: revealDates,
+                  welcomeName: isFront ? name : null,
+                  onDelete: isFront ? () => _deleteSpending(entry.id) : null,
+                  onAdd: isFront ? _openAddSheet : null,
+                  footer: isFront && !entry.hideModePill ? _modePill() : null,
+                  fillBleed: entry.hasImage ||
+                      entry.showsCreditFace ||
+                      entry.hasBusinessCard ||
+                      entry.hasCivicId ||
+                      (entry.hasPinnedEssentials && entry.amount <= 0),
+                  child: _SpendingCardContent(entry: entry, totalSpent: _totalSpent),
+                );
+                if (!isFront || !entry.showsCreditFace) return card;
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    if (_registerTripleTap(entry.id)) _editSpendingAmount(entry);
+                  },
+                  child: card,
+                );
+              },
             ),
             NgmyGlassCardStack<NgmyHomeNote>(
               key: const ValueKey('home-notes-stack'),
@@ -1995,18 +2206,28 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> {
                   ),
                 ),
               ),
-              cardBuilder: (ctx, note, {required isFront, required revealDates}) => NgmyFrostedCard(
-                dateLabel: ngmyHomeDateTabLabel(note.createdAt),
-                accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
-                isFront: isFront,
-                showDateTab: revealDates,
-                welcomeName: isFront ? name : null,
-                onDelete: isFront ? () => _deleteNote(note.id) : null,
-                onAdd: isFront ? _openAddSheet : null,
-                footer: isFront ? _modePill() : null,
-                fillBleed: true,
-                child: _NoteCardContent(note: note, isFront: isFront),
-              ),
+              cardBuilder: (ctx, note, {required isFront, required revealDates}) {
+                final card = NgmyFrostedCard(
+                  dateLabel: ngmyHomeDateTabLabel(note.createdAt),
+                  accent: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
+                  isFront: isFront,
+                  showDateTab: revealDates,
+                  welcomeName: isFront ? name : null,
+                  onDelete: isFront ? () => _deleteNote(note.id) : null,
+                  onAdd: isFront ? _openAddSheet : null,
+                  footer: isFront ? _modePill() : null,
+                  fillBleed: true,
+                  child: _NoteCardContent(note: note, isFront: isFront),
+                );
+                if (!isFront) return card;
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    if (_registerTripleTap('note_${note.id}')) _editNote(note);
+                  },
+                  child: card,
+                );
+              },
             ),
           ],
             ),
@@ -2074,6 +2295,9 @@ class _SpendingCardContent extends StatelessWidget {
     }
     if (entry.hasBusinessCard) {
       return _BusinessCardBody(json: entry.businessCardJson);
+    }
+    if (entry.hasCivicId) {
+      return _CivicIdCardBody(json: entry.civicIdJson);
     }
     if (entry.isPassword) {
       return _PasswordCardBody(entry: entry);
@@ -2170,6 +2394,55 @@ class _BusinessCardBody extends StatelessWidget {
               child: Transform.scale(
                 scale: scale,
                 child: NgmyBusinessCardPreview(document: doc!, width: w, interactive: false),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CivicIdCardBody extends StatelessWidget {
+  const _CivicIdCardBody({required this.json});
+
+  final String json;
+
+  @override
+  Widget build(BuildContext context) {
+    Map<String, dynamic>? record;
+    try {
+      final map = jsonDecode(json);
+      if (map is Map) record = Map<String, dynamic>.from(map);
+    } catch (_) {}
+    if (record == null) {
+      return const ColoredBox(
+        color: Color(0xFF0B1220),
+        child: Center(child: Text('Civic ID unavailable', style: TextStyle(color: Colors.white70))),
+      );
+    }
+    final photo = (record['idPhotoPath'] ?? '').toString();
+    return LayoutBuilder(
+      builder: (context, c) {
+        const designW = 360.0;
+        final scale = math.max(c.maxWidth / designW, c.maxHeight / 230);
+        return ColoredBox(
+          color: const Color(0xFF0B1220),
+          child: ClipRect(
+            child: OverflowBox(
+              maxWidth: designW * scale,
+              maxHeight: 260 * scale,
+              alignment: Alignment.center,
+              child: Transform.scale(
+                scale: scale,
+                child: SizedBox(
+                  width: designW,
+                  child: NgmyCivicRegistryIdCard(
+                    record: record!,
+                    photoPath: photo.isEmpty ? null : photo,
+                    scale: 1,
+                  ),
+                ),
               ),
             ),
           ),
@@ -3257,12 +3530,14 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
     required this.autoPlay,
     required this.slideStyle,
     required this.onDeckSettingsChanged,
+    this.civicIdRecord,
   });
 
   final String userEmail;
   final bool autoPlay;
   final NgmyHomeCardSlideStyle slideStyle;
   final Future<void> Function(bool autoPlay, NgmyHomeCardSlideStyle style) onDeckSettingsChanged;
+  final Map<String, dynamic>? civicIdRecord;
 
   @override
   State<_NgmyAddSpendingSheet> createState() => _NgmyAddSpendingSheetState();
@@ -3344,6 +3619,22 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       'kind': 'business_card',
       'businessCardJson': jsonEncode(doc.toJson()),
       'description': doc.fullName.trim().isEmpty ? 'Business card' : doc.fullName.trim(),
+    });
+  }
+
+  void _pickCivicId() {
+    final record = widget.civicIdRecord;
+    if (record == null || record.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No Civic Registry ID on this account yet.')),
+      );
+      return;
+    }
+    final name = (record['fullName'] ?? record['registryId'] ?? 'Civic Registry ID').toString().trim();
+    Navigator.pop(context, {
+      'kind': 'civic_id',
+      'civicIdJson': jsonEncode(record),
+      'description': name.isEmpty ? 'Civic Registry ID' : name,
     });
   }
 
@@ -3713,6 +4004,15 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                               t: t,
                               phase: 2,
                               accent: const [Color(0xFF38BDF8), Color(0xFF6366F1)],
+                            ),
+                            const SizedBox(height: 10),
+                            _hudAction(
+                              icon: Icons.badge_outlined,
+                              label: 'Add Civic Registry ID to home',
+                              onTap: _pickCivicId,
+                              t: t,
+                              phase: 3,
+                              accent: const [Color(0xFF0EA5E9), Color(0xFF1D4ED8)],
                             ),
                             const SizedBox(height: 16),
                             Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),

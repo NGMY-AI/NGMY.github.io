@@ -39,11 +39,14 @@ Future<void> showNgmyBusinessEssentialsHub(BuildContext context, {required Strin
   final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: 'Business Essentials',
     barrierColor: t.barrier,
     transitionDuration: const Duration(milliseconds: 340),
-    pageBuilder: (ctx, a1, a2) => _BusinessEssentialsHub(userEmail: userEmail),
+    pageBuilder: (ctx, a1, a2) => PopScope(
+      canPop: false,
+      child: _BusinessEssentialsHub(userEmail: userEmail),
+    ),
     transitionBuilder: (ctx, anim, _, child) {
       final scale = Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
       return FadeTransition(

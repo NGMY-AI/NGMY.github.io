@@ -114,6 +114,7 @@ class NgmyBusinessCardDocument {
     this.fontScale = 1.0,
     this.boldText = false,
     this.cardEmoji = '',
+    this.logoRingStyle = 'none',
     Map<String, double>? offsetX,
     Map<String, double>? offsetY,
     Map<String, double>? elementScale,
@@ -147,6 +148,8 @@ class NgmyBusinessCardDocument {
   double fontScale;
   bool boldText;
   String cardEmoji;
+  /// Logo frame ring: none | thin | double | gold | neon | soft
+  String logoRingStyle;
   final Map<String, double> offsetX;
   final Map<String, double> offsetY;
   final Map<String, double> elementScale;
@@ -200,6 +203,7 @@ class NgmyBusinessCardDocument {
         'fontScale': fontScale,
         'boldText': boldText,
         'cardEmoji': cardEmoji,
+        'logoRingStyle': logoRingStyle,
         'offsetX': offsetX,
         'offsetY': offsetY,
         'elementScale': elementScale,
@@ -245,6 +249,7 @@ class NgmyBusinessCardDocument {
       fontScale: (json['fontScale'] is num) ? (json['fontScale'] as num).toDouble() : double.tryParse('${json['fontScale']}') ?? 1.0,
       boldText: json['boldText'] == true,
       cardEmoji: (json['cardEmoji'] ?? '').toString(),
+      logoRingStyle: (json['logoRingStyle'] ?? 'none').toString(),
       offsetX: mapDouble(json['offsetX']),
       offsetY: mapDouble(json['offsetY']),
       elementScale: mapDouble(json['elementScale']),

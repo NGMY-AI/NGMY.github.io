@@ -67,7 +67,7 @@ Future<NgmyHomeEssentialsPin?> showNgmyHomeRoboticEssentialsHub(
 }) {
   return showGeneralDialog<NgmyHomeEssentialsPin>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: 'Essentials vault',
     barrierColor: Colors.black.withValues(alpha: 0.68),
     transitionDuration: const Duration(milliseconds: 420),

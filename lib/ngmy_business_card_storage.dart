@@ -1,8 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String kNgmyBusinessCardsKey = 'ngmy_business_cards_v1';
+
+/// Bumped when studio cards change so Home can refresh pinned snapshots.
+final ValueNotifier<int> ngmyHomeCardsRevision = ValueNotifier<int>(0);
+
+void ngmyBumpHomeCardsRevision() => ngmyHomeCardsRevision.value++;
 
 String _cardsKeyForUser(String userEmail) {
   final e = userEmail.toLowerCase().trim();
@@ -45,10 +51,12 @@ Future<void> saveNgmyBusinessCard(Map<String, dynamic> entry, {String userEmail 
   list.removeWhere((e) => (e['id'] ?? '').toString() == id);
   list.insert(0, entry);
   await persistNgmyBusinessCards(list, userEmail: userEmail);
+  ngmyBumpHomeCardsRevision();
 }
 
 Future<void> deleteNgmyBusinessCard(String id, {String userEmail = ''}) async {
   final list = await loadNgmyBusinessCards(userEmail: userEmail);
   list.removeWhere((e) => (e['id'] ?? '').toString() == id);
   await persistNgmyBusinessCards(list, userEmail: userEmail);
+  ngmyBumpHomeCardsRevision();
 }

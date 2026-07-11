@@ -15672,6 +15672,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         NgmyHomeGlassCardsPanel(
                           userEmail: widget.user.email,
                           displayName: widget.user.username,
+                          civicIdRecord: () {
+                            final u = widget.user;
+                            final rid = (u.registryId ?? '').trim();
+                            if (!u.isEnrolledInRegistry && rid.isEmpty) return null;
+                            return <String, dynamic>{
+                              'email': u.email,
+                              'fullName': (u.fullName ?? u.username).toString(),
+                              'dob': (u.dob ?? '').toString(),
+                              'idType': (u.idType ?? '').toString(),
+                              'homeAddress': (u.homeAddress ?? '').toString(),
+                              'phone': u.phone,
+                              'city': (u.city ?? '').toString(),
+                              'room': (u.room ?? '').toString(),
+                              'state': u.state,
+                              'registryId': rid,
+                              'idPhotoPath': (u.profilePicturePath ?? '').toString(),
+                              'passportGranted': true,
+                              'helps': u.helps,
+                              'missed': u.missed,
+                            };
+                          }(),
                         ),
                         // Extra air so tech frames sit a bit lower under the cards.
                         const SizedBox(height: 26),

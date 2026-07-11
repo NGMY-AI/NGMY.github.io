@@ -128,9 +128,19 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'type_halo' => _layoutTypeHalo(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
-    // Only split-panel keeps an in-layout logo (large left circle). All other
-    // templates get a clean global logo overlay when the user uploads one.
-    const stylesWithBuiltInLogo = {'vertical_split'};
+    // Templates with their own logo placement (Orbit ring, hero strip, etc.).
+    const stylesWithBuiltInLogo = {
+      'glass_frost',
+      'vertical_split',
+      'orbit',
+      'wave_curve',
+      'hero_strip',
+      'bubble_duotone',
+      'mesh_dots',
+      'champagne_foil',
+      'rose_gold_arc',
+      'crystalline',
+    };
     final hasLogo = document.logoBytes != null;
     final needsLogoOverlay = hasLogo && !stylesWithBuiltInLogo.contains(tpl.renderStyle);
     return Stack(
@@ -230,8 +240,8 @@ class _CardRenderCtx {
     final bytes = doc.logoBytes;
     // Default to a true circle frame (not a rounded box).
     final r = radius ?? BorderRadius.circular(999);
-    // Clean logo plate — no accent border ring (that was showing blue/colored lines).
-    return Container(
+    final ring = doc.logoRingStyle.trim().toLowerCase();
+    final plate = Container(
       width: size,
       height: size,
       clipBehavior: Clip.antiAlias,
@@ -254,6 +264,69 @@ class _CardRenderCtx {
               filterQuality: FilterQuality.high,
               errorBuilder: (_, __, ___) => Icon(Icons.broken_image_outlined, color: accent, size: size * 0.42),
             ),
+    );
+    if (ring.isEmpty || ring == 'none') return plate;
+
+    Color ringColor;
+    double outerPad;
+    double stroke;
+    int rings;
+    switch (ring) {
+      case 'gold':
+        ringColor = const Color(0xFFD4AF37);
+        outerPad = size * 0.1;
+        stroke = 2.2;
+        rings = 1;
+        break;
+      case 'neon':
+        ringColor = accent;
+        outerPad = size * 0.12;
+        stroke = 2.4;
+        rings = 1;
+        break;
+      case 'double':
+        ringColor = Colors.white.withValues(alpha: 0.85);
+        outerPad = size * 0.14;
+        stroke = 1.6;
+        rings = 2;
+        break;
+      case 'soft':
+        ringColor = accent.withValues(alpha: 0.55);
+        outerPad = size * 0.1;
+        stroke = 3;
+        rings = 1;
+        break;
+      case 'thin':
+      default:
+        ringColor = Colors.white.withValues(alpha: 0.9);
+        outerPad = size * 0.08;
+        stroke = 1.4;
+        rings = 1;
+        break;
+    }
+
+    final total = size + outerPad * 2;
+    return SizedBox(
+      width: total,
+      height: total,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          for (var i = 0; i < rings; i++)
+            Container(
+              width: total - i * (outerPad * 0.55),
+              height: total - i * (outerPad * 0.55),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: ringColor.withValues(alpha: i == 0 ? 1 : 0.45), width: stroke),
+                boxShadow: ring == 'neon'
+                    ? [BoxShadow(color: accent.withValues(alpha: 0.45), blurRadius: 10, spreadRadius: 1)]
+                    : null,
+              ),
+            ),
+          plate,
+        ],
+      ),
     );
   }
 }
@@ -300,6 +373,7 @@ Widget _layoutGlassFrost(_CardRenderCtx c) {
       c.slot('company', c.txt(c.doc.company, weight: FontWeight.w800, color: c.accent, size: c.h * 0.052), left: 16, top: c.h * 0.46),
       c.slot('phone', c.txt('📞 ${c.doc.phone}', color: c.sub, size: c.h * 0.048), left: 16, bottom: 28),
       c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.046), left: 16, bottom: 12),
+      c.slot('logo', c.logo(c.h * 0.38, radius: BorderRadius.circular(999)), right: 14, top: 14),
     ],
   );
 }
@@ -381,6 +455,7 @@ Widget _layoutOrbit(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: RadialGradient(center: Alignment.topCenter, radius: 1.2, colors: [c.accent.withValues(alpha: 0.35), c.bg1, c.bg2]))),
       Center(child: Container(width: c.h * 0.52, height: c.h * 0.52, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.accent.withValues(alpha: 0.35), width: 2)))),
+      c.slot('logo', c.logo(c.h * 0.38, radius: BorderRadius.circular(999)), left: c.w * 0.5 - c.h * 0.19, top: c.h * 0.08),
       c.slot('name', Center(child: c.txt(c.doc.fullName, size: c.h * 0.09, weight: FontWeight.w900)), left: 12, right: 12, top: c.h * 0.52),
       c.slot('title', Center(child: c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048)), left: 12, right: 12, top: c.h * 0.66),
       c.slot('phone', Center(child: c.txt(c.doc.phone, color: c.accent, size: c.h * 0.042)), left: 12, right: 12, bottom: 10),
@@ -452,6 +527,7 @@ Widget _layoutWaveCurve(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       CustomPaint(painter: _WavePainter(c.accent.withValues(alpha: 0.92)), size: Size.infinite),
+      c.slot('logo', c.logo(c.h * 0.3, radius: BorderRadius.circular(999)), left: 14, top: 12),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 14, top: c.h * 0.08),
       c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white.withValues(alpha: 0.85), size: c.h * 0.05), left: 14, top: c.h * 0.28),
       c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.048), left: 14, bottom: 36),
@@ -522,8 +598,9 @@ Widget _layoutHeroStrip(_CardRenderCtx c) {
         Container(height: c.h * 0.38, width: double.infinity, decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent, c.accent.withValues(alpha: 0.65)]))),
         Expanded(child: Container(color: c.bg2)),
       ]),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: Colors.white), left: 14, top: c.h * 0.1),
-      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white.withValues(alpha: 0.88), size: c.h * 0.048), left: 14, top: c.h * 0.24),
+      c.slot('logo', c.logo(c.h * 0.32, radius: BorderRadius.circular(999)), left: 14, top: c.h * 0.2),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: Colors.white), left: c.w * 0.32, top: c.h * 0.1),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white.withValues(alpha: 0.88), size: c.h * 0.048), left: c.w * 0.32, top: c.h * 0.24),
       c.slot('company', c.txt(c.doc.company, weight: FontWeight.w800, size: c.h * 0.052), left: 14, top: c.h * 0.44),
       c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.044), left: 14, bottom: 28),
       c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.042), left: 14, bottom: 12),
@@ -610,6 +687,7 @@ Widget _layoutBubbleDuotone(_CardRenderCtx c) {
       Container(color: c.bg1),
       Positioned(right: -c.w * 0.12, top: -c.h * 0.15, child: CircleAvatar(radius: c.h * 0.5, backgroundColor: c.accent.withValues(alpha: 0.25))),
       Positioned(left: -c.w * 0.08, bottom: -c.h * 0.2, child: CircleAvatar(radius: c.h * 0.38, backgroundColor: c.bg2.withValues(alpha: 0.9))),
+      c.slot('logo', c.logo(c.h * 0.34, radius: BorderRadius.circular(999)), left: 14, top: 14),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 14, top: c.h * 0.52),
       c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.048), left: 14, top: c.h * 0.68),
       c.slot('email', c.txt(c.doc.email, color: c.accent, size: c.h * 0.042), right: 14, bottom: 12),
@@ -879,6 +957,7 @@ Widget _layoutMeshDots(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       CustomPaint(painter: _DotMeshPainter(c.accent.withValues(alpha: 0.18)), size: Size.infinite),
+      c.slot('logo', c.logo(c.h * 0.28, radius: BorderRadius.circular(999)), right: 12, top: 12),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 14, top: 14),
       c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.05), left: 14, top: c.h * 0.32),
       c.slot('tagline', c.txt(c.doc.tagline, color: c.accent, size: c.h * 0.042), left: 14, top: c.h * 0.44),
@@ -930,8 +1009,9 @@ Widget _layoutChampagneFoil(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       Positioned(left: 0, right: 0, top: 0, height: c.h * 0.22, child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent.withValues(alpha: 0.55), c.accent.withValues(alpha: 0.15)])))),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: c.text), left: 14, top: 14),
-      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.046), left: 14, top: c.h * 0.32),
+      c.slot('logo', c.logo(c.h * 0.26, radius: BorderRadius.circular(999)), left: 14, top: 12),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900, color: c.text), left: c.w * 0.32, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.046), left: c.w * 0.32, top: c.h * 0.32),
       c.slot('company', c.txt(c.doc.company, color: c.accent, weight: FontWeight.w800, size: c.h * 0.044), left: 14, top: c.h * 0.52),
       c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.04), left: 14, bottom: 28),
       c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.038), left: 14, bottom: 10),
@@ -975,6 +1055,7 @@ Widget _layoutRoseGoldArc(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       CustomPaint(painter: _ArcPainter(c.accent.withValues(alpha: 0.85)), size: Size.infinite),
+      c.slot('logo', c.logo(c.h * 0.3, radius: BorderRadius.circular(999)), right: 14, top: 14),
       c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 14, top: 16),
       c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048), left: 14, top: c.h * 0.32),
       c.slot('company', c.txt(c.doc.company, color: Colors.white60, size: c.h * 0.044), left: 14, bottom: 32),
@@ -1034,8 +1115,9 @@ Widget _layoutCrystalline(_CardRenderCtx c) {
     children: [
       Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
       CustomPaint(painter: _CrystalPainter(c.accent.withValues(alpha: 0.25)), size: Size.infinite),
-      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 14, top: 14),
-      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046), left: 14, top: c.h * 0.32),
+      c.slot('logo', c.logo(c.h * 0.28, radius: BorderRadius.circular(999)), left: 14, top: 12),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: c.w * 0.34, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046), left: c.w * 0.34, top: c.h * 0.32),
       c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.042), left: 14, bottom: 32),
       c.slot('email', c.txt(c.doc.email, color: Colors.white70, size: c.h * 0.038), left: 14, bottom: 12),
     ],

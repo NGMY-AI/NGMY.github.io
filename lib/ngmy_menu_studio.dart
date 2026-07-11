@@ -37,14 +37,17 @@ Future<void> showNgmyMenuStudioDialog(
 }) {
   return showGeneralDialog<void>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: backend == NgmyStudioPublishBackend.localDevice ? 'Local Menu Studio' : 'Menu Studio',
     barrierColor: Colors.black.withValues(alpha: 0.92),
     transitionDuration: const Duration(milliseconds: 340),
-    pageBuilder: (_, __, ___) => _NgmyMenuStudio(
-      userEmail: userEmail,
-      backend: backend,
-      homeFilter: homeFilter,
+    pageBuilder: (_, __, ___) => PopScope(
+      canPop: false,
+      child: _NgmyMenuStudio(
+        userEmail: userEmail,
+        backend: backend,
+        homeFilter: homeFilter,
+      ),
     ),
     transitionBuilder: (_, anim, __, child) {
       final slide = Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
