@@ -13,7 +13,7 @@ import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 
-const _kBizCardHudColors = [Color(0xFF22C55E), Color(0xFF16A34A)];
+const _kBizCardHudColors = [Color(0xFF22C55E), Color(0xFF065F46), Color(0xFF134E4A)];
 
 /// Inline or full-screen business card designer.
 class NgmyBusinessCardStudio extends StatefulWidget {
@@ -876,7 +876,6 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   children: [
                     NgmyToolkitAliveHeader(
                       title: 'Business Card Studio',
-                      subtitle: '34 templates · emojis · colors · drag to design',
                       colors: _kBizCardHudColors,
                       pulse: pulse,
                       orbit: orbit,
@@ -935,7 +934,6 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
                 children: [
                   NgmyToolkitAliveHeader(
                     title: 'Business Card Studio',
-                    subtitle: '34 templates · emojis · colors · drag to design',
                     colors: _kBizCardHudColors,
                     pulse: pulse,
                     orbit: orbit,

@@ -471,11 +471,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     final title = widget._isLocal
         ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly ? 'Local Bio (Test)' : 'Local Menu (Test)')
         : 'Menu Studio';
-    final subtitle = widget._isLocal
-        ? (widget.homeFilter == NgmyStudioHomeFilter.biosOnly
-            ? 'Link-in-bio · your phone hosts · works on any device'
-            : 'Restaurant menus · your phone hosts · works on any device')
-        : 'Luxury menus · Bio pages · publish online · QR codes';
     final colors = _homeMode == 'bio' ? _kBioHudColors : _kMenuHudColors;
     return NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {
@@ -488,7 +483,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
             orbit: orbit,
             header: NgmyToolkitAliveHeader(
               title: title,
-              subtitle: subtitle,
               colors: colors,
               pulse: pulse,
               orbit: orbit,

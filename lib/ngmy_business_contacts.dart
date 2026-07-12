@@ -584,7 +584,7 @@ class _ContactCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 132,
+      height: 176,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -636,7 +636,7 @@ class _ContactCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 36, 10, 10),
+              padding: const EdgeInsets.fromLTRB(14, 36, 10, 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -678,20 +678,61 @@ class _ContactCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         if (contact.phone.isNotEmpty)
-                          Text(contact.phone, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.6)),
+                          InkWell(
+                            onTap: onCall,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: Text(
+                                contact.phone,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  letterSpacing: 0.6,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.white54,
+                                ),
+                              ),
+                            ),
+                          ),
                         if (contact.email.isNotEmpty)
-                          Text(contact.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)),
+                          InkWell(
+                            onTap: onEmail,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: Text(
+                                contact.email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 11,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.white38,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  Column(
-                    children: [
-                      if (contact.phone.isNotEmpty) _CardCircleBtn(icon: Icons.call_rounded, onTap: onCall),
-                      if (contact.email.isNotEmpty) _CardCircleBtn(icon: Icons.email_outlined, onTap: onEmail),
-                      _CardCircleBtn(icon: contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, onTap: onFavorite),
-                      _CardCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
-                      _CardCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
-                    ],
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 76,
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        if (contact.phone.isNotEmpty) _CardCircleBtn(icon: Icons.call_rounded, onTap: onCall),
+                        if (contact.email.isNotEmpty) _CardCircleBtn(icon: Icons.email_outlined, onTap: onEmail),
+                        _CardCircleBtn(icon: contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, onTap: onFavorite),
+                        _CardCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                        _CardCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                      ],
+                    ),
                   ),
                 ],
               ),

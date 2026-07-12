@@ -578,8 +578,9 @@ class _SupportEditorPageState extends State<_SupportEditorPage> {
     super.initState();
     final e = widget.existing;
     final t = widget.template;
-    _title = TextEditingController(text: e?.title ?? t?.title ?? '');
-    _provider = TextEditingController(text: e?.provider ?? t?.provider ?? '');
+    // Templates only set category — title/provider/phone stay empty for the user to fill.
+    _title = TextEditingController(text: e?.title ?? '');
+    _provider = TextEditingController(text: e?.provider ?? '');
     _phone = TextEditingController(text: e?.phone ?? '');
     _accountRef = TextEditingController(text: e?.accountRef ?? '');
     _extension = TextEditingController(text: e?.extension ?? '');
@@ -709,7 +710,7 @@ class _SupportCard extends StatelessWidget {
     final meta = [line.provider, line.category].where((e) => e.isNotEmpty).join(' · ');
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 128,
+      height: 168,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -768,7 +769,7 @@ class _SupportCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+              padding: const EdgeInsets.fromLTRB(14, 38, 10, 12),
               child: Row(
                 children: [
                   Expanded(
@@ -787,16 +788,32 @@ class _SupportCard extends StatelessWidget {
                         ],
                         const Spacer(),
                         if (line.phone.isNotEmpty)
-                          Text(
-                            line.phone,
-                            style: TextStyle(color: top, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.1),
+                          InkWell(
+                            onTap: onCall,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                line.phone,
+                                style: TextStyle(
+                                  color: top,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                  letterSpacing: 1.1,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: top.withValues(alpha: 0.55),
+                                ),
+                              ),
+                            ),
                           ),
                         if (line.accountRef.isNotEmpty)
                           Text('Ref ${line.accountRef}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 6),
                   Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (line.phone.isNotEmpty) _HotCircleBtn(icon: Icons.call_rounded, onTap: onCall, color: top),
                       if (line.accountRef.isNotEmpty) _HotCircleBtn(icon: Icons.copy_rounded, onTap: onCopyRef),

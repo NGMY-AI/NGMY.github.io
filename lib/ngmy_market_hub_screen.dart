@@ -69,7 +69,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 _hudFrame(
                   t: t,
                   title: 'Business Card Creator',
-                  subtitle: '37 luxurious templates · drag · save PNG',
+                  subtitle: '',
                   thumbHeight: thumbH,
                   colors: const [Color(0xFF22C55E), Color(0xFF065F46), Color(0xFF134E4A)],
                   pulse: pulse,
@@ -83,7 +83,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 _hudFrame(
                   t: t,
                   title: 'Menu Studio',
-                  subtitle: 'Restaurant menus · Bio pages · publish online · QR codes',
+                  subtitle: '',
                   thumbHeight: thumbH,
                   colors: const [Color(0xFFB8860B), Color(0xFFD4AF37), Color(0xFF3D2E1F)],
                   pulse: pulse,
@@ -101,7 +101,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 _hudFrame(
                   t: t,
                   title: 'Business Essentials',
-                  subtitle: 'Contacts · site map · hotlines — pick inside',
+                  subtitle: '',
                   thumbHeight: thumbH,
                   colors: const [Color(0xFF38BDF8), Color(0xFF1E3A8A), Color(0xFF0E7490)],
                   pulse: pulse,
@@ -216,15 +216,17 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             letterSpacing: 0.2,
           ),
         ),
-        const SizedBox(height: 3),
-        Text(
-          subtitle,
-          style: TextStyle(
-            color: t.subtitle,
-            fontWeight: FontWeight.w600,
-            fontSize: 12.5,
+        if (subtitle.trim().isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: t.subtitle,
+              fontWeight: FontWeight.w600,
+              fontSize: 12.5,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

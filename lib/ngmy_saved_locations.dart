@@ -649,7 +649,7 @@ class _LocationCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 128,
+      height: 160,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -700,7 +700,7 @@ class _LocationCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+              padding: const EdgeInsets.fromLTRB(14, 38, 10, 12),
               child: Row(
                 children: [
                   Container(
@@ -740,6 +740,7 @@ class _LocationCard extends StatelessWidget {
                     ),
                   ),
                   Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _LocCircleBtn(icon: Icons.navigation_rounded, onTap: onNavigate, color: accent),
                       _LocCircleBtn(icon: Icons.copy_rounded, onTap: onCopy),

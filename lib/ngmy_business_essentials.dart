@@ -249,13 +249,13 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyMedicineOrganizerDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Hotlines',
-                          count: _support,
+                          title: 'Site Map',
+                          count: _locations,
                           pulse: pulse,
                           scan: scan,
                           orbit: orbit,
                           phase: 0.3,
-                          onTap: () => _openCategory((ctx) => showNgmyQuickSupportDialog(ctx, userEmail: widget.userEmail)),
+                          onTap: () => _openCategory((ctx) => showNgmySavedLocationsDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
                           title: 'Quick Tasks',
@@ -267,13 +267,13 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyBusinessTasksDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Site Map',
-                          count: _locations,
+                          title: 'Hotlines',
+                          count: _support,
                           pulse: pulse,
                           scan: scan,
                           orbit: orbit,
                           phase: 0.42,
-                          onTap: () => _openCategory((ctx) => showNgmySavedLocationsDialog(ctx, userEmail: widget.userEmail)),
+                          onTap: () => _openCategory((ctx) => showNgmyQuickSupportDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
                           title: 'Live Capture',
