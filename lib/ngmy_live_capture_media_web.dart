@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class NgmyLiveCaptureMedia {
@@ -40,10 +39,11 @@ class NgmyLiveCaptureMedia {
   }
 
   static Widget playbackVideo({required String src, double height = 200}) {
-    final viewType = 'ngmy-live-play-${src.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
+    final blobUrl = toPlayableUrl(src, 'video/webm');
+    final viewType = 'ngmy-live-play-${blobUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
       final v = html.VideoElement()
-        ..src = src
+        ..src = blobUrl
         ..controls = true
         ..preload = 'auto'
         ..setAttribute('playsinline', 'true')
@@ -61,97 +61,160 @@ class NgmyLiveCaptureMedia {
     );
   }
 
-  static Future<NgmyCapturePlayer?> createPlayer(String src, {required bool video}) async {
+  /// Native audio element in a platform view — most reliable playback on web.
+  static Widget playbackAudio({required String src, double height = 54}) {
+    final blobUrl = toPlayableUrl(src, 'audio/webm');
+    final viewType = 'ngmy-live-audio-${blobUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
+    ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
+      final a = html.AudioElement()
+        ..src = blobUrl
+        ..controls = true
+        ..preload = 'auto'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.outline = 'none';
+      return a;
+    });
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: ColoredBox(
+        color: const Color(0xFF0F172A),
+        child: SizedBox(height: height, width: double.infinity, child: HtmlElementView(viewType: viewType)),
+      ),
+    );
+  }
+
+  static String toPlayableUrl(String src, String mimeType) {
+    if (src.startsWith('blob:')) return src;
+    if (src.startsWith('http://') || src.startsWith('https://')) return src;
     try {
+      final blob = dataUrlToBlob(src, mimeType);
+      return html.Url.createObjectUrlFromBlob(blob);
+    } catch (e) {
+      debugPrint('[live_capture] toPlayableUrl: $e');
+      return src;
+    }
+  }
+
+  static Future<NgmyCapturePlayer?> createPlayer(String src, {required bool video, String? mimeType}) async {
+    try {
+      final mime = mimeType ?? (video ? 'video/webm' : 'audio/webm');
+      final playUrl = toPlayableUrl(src, mime);
       if (video) {
         final el = html.VideoElement()
-          ..src = src
+          ..src = playUrl
           ..preload = 'auto'
           ..controls = false
-          ..setAttribute('playsinline', 'true');
-        el.style.display = 'none';
+          ..setAttribute('playsinline', 'true')
+          ..setAttribute('webkit-playsinline', 'true');
+        el.style
+          ..position = 'fixed'
+          ..left = '-10000px'
+          ..width = '1px'
+          ..height = '1px'
+          ..opacity = '0'
+          ..pointerEvents = 'none';
         html.document.body?.append(el);
         try {
-          await el.onLoadedMetadata.first.timeout(const Duration(seconds: 6));
+          await el.onLoadedMetadata.first.timeout(const Duration(seconds: 8));
         } catch (_) {}
-        return NgmyCapturePlayer._(el);
+        return NgmyCapturePlayer._(el, objectUrl: playUrl.startsWith('blob:') ? playUrl : null);
       }
+
       final el = html.AudioElement()
-        ..src = src
-        ..preload = 'auto';
+        ..src = playUrl
+        ..preload = 'auto'
+        ..controls = false;
+      // Hidden but not display:none — some browsers refuse to play display:none audio.
+      el.style
+        ..position = 'fixed'
+        ..left = '-10000px'
+        ..width = '1px'
+        ..height = '1px'
+        ..opacity = '0'
+        ..pointerEvents = 'none';
       html.document.body?.append(el);
       try {
-        await el.onLoadedMetadata.first.timeout(const Duration(seconds: 6));
-      } catch (_) {}
-      return NgmyCapturePlayer._(el);
+        await el.onCanPlay.first.timeout(const Duration(seconds: 8));
+      } catch (_) {
+        try {
+          await el.onLoadedMetadata.first.timeout(const Duration(seconds: 4));
+        } catch (_) {}
+      }
+      return NgmyCapturePlayer._(el, objectUrl: playUrl.startsWith('blob:') ? playUrl : null);
     } catch (e) {
       debugPrint('[live_capture] player: $e');
       return null;
     }
   }
 
-  /// Quiet download that avoids stealing focus / blurring the Flutter canvas.
-  static Future<void> downloadQuiet(String dataUrl, String mimeType, String title) async {
+  /// Sync blob + anchor click in one gesture. No awaits before click (avoids canvas blur).
+  static void downloadSync(String dataUrl, String mimeType, String title) {
     try {
-      late final String objectUrl;
-      late final bool revoke;
-      if (dataUrl.startsWith('blob:')) {
-        objectUrl = dataUrl;
-        revoke = false;
-      } else {
-        final blob = _dataUrlToBlob(dataUrl, mimeType);
-        objectUrl = html.Url.createObjectUrlFromBlob(blob);
-        revoke = true;
-      }
+      final blob = dataUrl.startsWith('blob:')
+          ? null
+          : dataUrlToBlob(dataUrl, mimeType.isEmpty ? 'application/octet-stream' : mimeType);
+      final objectUrl = dataUrl.startsWith('blob:')
+          ? dataUrl
+          : html.Url.createObjectUrlFromBlob(blob!);
       final name = '${title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}.${_extFor(mimeType)}';
       final a = html.AnchorElement(href: objectUrl)
         ..download = name
         ..style.display = 'none'
-        ..style.position = 'fixed'
-        ..style.left = '-9999px';
+        ..setAttribute('target', '_self');
       html.document.body?.append(a);
-      await Future<void>.delayed(const Duration(milliseconds: 40));
       a.click();
-      await Future<void>.delayed(const Duration(milliseconds: 280));
-      a.remove();
-      if (revoke) html.Url.revokeObjectUrl(objectUrl);
-      try {
-        html.document.activeElement?.blur();
-      } catch (_) {}
-      try {
-        (html.document.querySelector('flt-glass-pane') as html.HtmlElement?)?.focus();
-      } catch (_) {}
-      try {
-        (html.document.body as html.HtmlElement?)?.focus();
-      } catch (_) {}
+      // Cleanup after the browser has started the download — never block the gesture.
+      Timer(const Duration(seconds: 2), () {
+        try {
+          a.remove();
+        } catch (_) {}
+        if (!dataUrl.startsWith('blob:')) {
+          try {
+            html.Url.revokeObjectUrl(objectUrl);
+          } catch (_) {}
+        }
+      });
     } catch (e) {
-      debugPrint('[live_capture] downloadQuiet: $e');
+      debugPrint('[live_capture] downloadSync: $e');
     }
   }
 
-  static html.Blob _dataUrlToBlob(String dataUrl, String mimeType) {
+  static Future<void> downloadQuiet(String dataUrl, String mimeType, String title) async {
+    downloadSync(dataUrl, mimeType, title);
+  }
+
+  static html.Blob dataUrlToBlob(String dataUrl, String mimeType) {
     final comma = dataUrl.indexOf(',');
+    final header = comma >= 0 ? dataUrl.substring(0, comma) : '';
     final b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
+    final mimeMatch = RegExp(r'data:([^;]+)').firstMatch(header);
+    final mime = mimeMatch?.group(1) ?? mimeType;
     final bytes = html.window.atob(b64);
     final buffer = List<int>.generate(bytes.length, (i) => bytes.codeUnitAt(i) & 0xff);
-    return html.Blob([buffer], mimeType);
+    return html.Blob([buffer], mime);
   }
 
   static String _extFor(String mime) {
     if (mime.contains('mp4')) return 'mp4';
     if (mime.contains('ogg')) return 'ogg';
+    if (mime.contains('wav')) return 'wav';
     if (mime.contains('video')) return 'webm';
     return 'webm';
   }
 }
 
 class NgmyCapturePlayer {
-  NgmyCapturePlayer._(this._media);
+  NgmyCapturePlayer._(this._media, {this.objectUrl});
 
   final html.MediaElement _media;
+  final String? objectUrl;
   final _listeners = <VoidCallback>{};
   StreamSubscription<html.Event>? _timeSub;
   StreamSubscription<html.Event>? _endSub;
+  StreamSubscription<html.Event>? _playSub;
+  StreamSubscription<html.Event>? _pauseSub;
+  String? lastError;
 
   bool get playing => !_media.paused;
   double get position => (_media.currentTime).toDouble();
@@ -167,6 +230,8 @@ class NgmyCapturePlayer {
     _listeners.add(onTick);
     _timeSub ??= _media.onTimeUpdate.listen((_) => _emit());
     _endSub ??= _media.onEnded.listen((_) => _emit());
+    _playSub ??= _media.onPlay.listen((_) => _emit());
+    _pauseSub ??= _media.onPause.listen((_) => _emit());
   }
 
   void unlisten(VoidCallback onTick) {
@@ -180,11 +245,17 @@ class NgmyCapturePlayer {
   }
 
   Future<void> play() async {
+    lastError = null;
     try {
+      _media.volume = 1;
+      _media.muted = false;
       await _media.play();
       _emit();
     } catch (e) {
+      lastError = 'Could not play: $e';
       debugPrint('[live_capture] play: $e');
+      _emit();
+      rethrow;
     }
   }
 
@@ -195,9 +266,12 @@ class NgmyCapturePlayer {
 
   Future<void> seek(double seconds) async {
     try {
-      _media.currentTime = seconds.clamp(0, duration > 0 ? duration : seconds);
+      final max = duration > 0 ? duration : mathMax(seconds, 0);
+      _media.currentTime = seconds.clamp(0, max);
       _emit();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[live_capture] seek: $e');
+    }
   }
 
   Future<void> setRate(double rate) async {
@@ -208,9 +282,13 @@ class NgmyCapturePlayer {
     _emit();
   }
 
+  double mathMax(double a, double b) => a > b ? a : b;
+
   void dispose() {
     _timeSub?.cancel();
     _endSub?.cancel();
+    _playSub?.cancel();
+    _pauseSub?.cancel();
     _listeners.clear();
     try {
       _media.pause();
@@ -218,5 +296,11 @@ class NgmyCapturePlayer {
       _media.load();
       _media.remove();
     } catch (_) {}
+    final url = objectUrl;
+    if (url != null) {
+      try {
+        html.Url.revokeObjectUrl(url);
+      } catch (_) {}
+    }
   }
 }

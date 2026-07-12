@@ -20,7 +20,20 @@ class NgmyLiveCaptureMedia {
     );
   }
 
-  static Future<NgmyCapturePlayer?> createPlayer(String src, {required bool video}) async => null;
+  static Widget playbackAudio({required String src, double height = 54}) {
+    return Container(
+      height: height,
+      alignment: Alignment.center,
+      color: const Color(0xFF0F172A),
+      child: const Text('Audio playback needs the web app', style: TextStyle(color: Colors.white54)),
+    );
+  }
+
+  static String toPlayableUrl(String src, String mimeType) => src;
+
+  static Future<NgmyCapturePlayer?> createPlayer(String src, {required bool video, String? mimeType}) async => null;
+
+  static void downloadSync(String dataUrl, String mimeType, String title) {}
 
   static Future<void> downloadQuiet(String dataUrl, String mimeType, String title) async {}
 }
@@ -30,6 +43,7 @@ class NgmyCapturePlayer {
   double get position => 0;
   double get duration => 0;
   double playbackRate = 1;
+  String? lastError;
 
   Future<void> play() async {}
   Future<void> pause() async {}

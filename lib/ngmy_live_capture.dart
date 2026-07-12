@@ -556,8 +556,8 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
   NgmyCapturePlayer? _player;
   late final TextEditingController _titleC;
   late final AnimationController _wave;
-  bool _ready = false;
-  bool _downloading = false;
+  bool _booting = true;
+  String? _playError;
   double _pos = 0;
   double _dur = 0;
   bool _playing = false;
@@ -572,7 +572,15 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
   }
 
   Future<void> _boot() async {
-    final p = await NgmyLiveCaptureMedia.createPlayer(widget.item.dataUrl, video: widget.item.kind == 'video');
+    setState(() {
+      _booting = true;
+      _playError = null;
+    });
+    final p = await NgmyLiveCaptureMedia.createPlayer(
+      widget.item.dataUrl,
+      video: widget.item.kind == 'video',
+      mimeType: widget.item.mimeType,
+    );
     if (!mounted) {
       p?.dispose();
       return;
@@ -580,8 +588,9 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
     _player = p;
     p?.listen(_onTick);
     setState(() {
-      _ready = true;
-      _dur = p?.duration ?? widget.item.durationSec.toDouble();
+      _booting = false;
+      _dur = (p?.duration ?? 0) > 0 ? p!.duration : widget.item.durationSec.toDouble();
+      if (p == null) _playError = 'Could not load this recording for playback.';
     });
   }
 
@@ -591,6 +600,7 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
       _pos = _player!.position;
       _dur = _player!.duration > 0 ? _player!.duration : _dur;
       _playing = _player!.playing;
+      _playError = _player!.lastError;
     });
   }
 
@@ -605,17 +615,54 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
 
   Future<void> _toggle() async {
     final p = _player;
-    if (p == null) return;
-    if (p.playing) {
-      await p.pause();
-    } else {
-      await p.play();
+    if (p == null) {
+      await _boot();
+      return;
+    }
+    try {
+      if (p.playing) {
+        await p.pause();
+      } else {
+        await p.play();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _playError = p.lastError ?? 'Playback blocked — tap the audio bar below, then try again.');
+      }
     }
   }
 
-  Future<void> _saveTitle() async {
-    final next = _titleC.text.trim();
-    if (next.isEmpty || next == widget.item.title) return;
+  Future<void> _rename() async {
+    final c = TextEditingController(text: _titleC.text);
+    final next = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Rename', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          decoration: const InputDecoration(
+            hintText: 'Recording name',
+            hintStyle: TextStyle(color: Colors.white38),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF22D3EE))),
+          ),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, c.text.trim()),
+            child: const Text('Save', style: TextStyle(color: Color(0xFF22D3EE), fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+    c.dispose();
+    if (next == null || next.isEmpty || !mounted) return;
+    _titleC.text = next;
     widget.item.title = next;
     final items = await NgmyLiveCaptureStore.load(widget.userEmail);
     final i = items.indexWhere((e) => e.id == widget.item.id);
@@ -625,20 +672,20 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
     }
     await widget.onChanged();
     if (mounted) {
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name updated'), backgroundColor: Color(0xFF059669), behavior: SnackBarBehavior.floating),
+        const SnackBar(content: Text('Renamed'), backgroundColor: Color(0xFF059669), behavior: SnackBarBehavior.floating),
       );
     }
   }
 
-  Future<void> _download() async {
-    if (_downloading) return;
-    setState(() => _downloading = true);
-    // Yield a frame so the button press doesn't leave the canvas blurred.
-    await Future<void>.delayed(const Duration(milliseconds: 16));
-    await NgmyLiveCaptureEngine.downloadDataUrl(widget.item.dataUrl, widget.item.mimeType, widget.item.title);
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (mounted) setState(() => _downloading = false);
+  void _download() {
+    // Sync download in the same tap gesture — delayed awaits were blurring Flutter web.
+    NgmyLiveCaptureMedia.downloadSync(widget.item.dataUrl, widget.item.mimeType, widget.item.title);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Download started'), backgroundColor: Color(0xFF334155), behavior: SnackBarBehavior.floating),
+    );
   }
 
   Future<void> _delete() async {
@@ -679,16 +726,9 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
                   child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99))),
                 ),
                 const SizedBox(height: 14),
-                TextField(
-                  controller: _titleC,
+                Text(
+                  _titleC.text,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Recording name',
-                    hintStyle: TextStyle(color: Colors.white38),
-                  ),
-                  onSubmitted: (_) => _saveTitle(),
-                  onEditingComplete: _saveTitle,
                 ),
                 Text(
                   '${isVideo ? 'Video' : 'Voice Memo'} · ${_clock(widget.item.durationSec.toDouble())}',
@@ -697,95 +737,103 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> with SingleTickerProvi
                 const SizedBox(height: 16),
                 if (isVideo)
                   NgmyLiveCaptureMedia.playbackVideo(src: widget.item.dataUrl, height: 220)
-                else
+                else ...[
                   AnimatedBuilder(
                     animation: _wave,
-                    builder: (_, __) => _WaveBars(active: _playing, pulse: _wave.value),
+                    builder: (context, child) => _WaveBars(active: _playing, pulse: _wave.value),
                   ),
-                const SizedBox(height: 12),
-                if (!isVideo || _player != null) ...[
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFF22D3EE),
-                      inactiveTrackColor: Colors.white12,
-                      thumbColor: Colors.white,
-                      overlayColor: const Color(0xFF22D3EE).withValues(alpha: 0.2),
-                    ),
-                    child: Slider(
-                      value: _dur <= 0 ? 0 : _pos.clamp(0, _dur),
-                      max: _dur <= 0 ? 1 : _dur,
-                      onChanged: (v) => _player?.seek(v),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Text(_clock(_pos), style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                      const Spacer(),
-                      Text(_clock(_dur > 0 ? _dur : widget.item.durationSec.toDouble()), style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                    ],
-                  ),
+                  const SizedBox(height: 12),
+                  // Native browser audio controls — guaranteed playback on web.
+                  NgmyLiveCaptureMedia.playbackAudio(src: widget.item.dataUrl, height: 48),
+                ],
+                if (_booting) ...[
+                  const SizedBox(height: 10),
+                  const LinearProgressIndicator(minHeight: 2, color: Color(0xFF22D3EE), backgroundColor: Colors.white12),
+                ],
+                if (_playError != null) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _rateChip(0.5),
-                      _rateChip(1),
-                      _rateChip(1.5),
-                      _rateChip(2),
-                    ],
+                  Text(_playError!, style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                ],
+                const SizedBox(height: 12),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: const Color(0xFF22D3EE),
+                    inactiveTrackColor: Colors.white12,
+                    thumbColor: Colors.white,
+                    overlayColor: const Color(0xFF22D3EE).withValues(alpha: 0.2),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: () => _player?.seek((_pos - 5).clamp(0, _dur)),
-                        icon: const Icon(Icons.replay_5_rounded, color: Colors.white70, size: 30),
-                      ),
-                      const SizedBox(width: 10),
-                      Material(
-                        color: const Color(0xFF22D3EE),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _ready ? _toggle : null,
-                          child: SizedBox(
-                            width: 72,
-                            height: 72,
-                            child: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 40),
-                          ),
+                  child: Slider(
+                    value: _dur <= 0 ? 0 : _pos.clamp(0, _dur),
+                    max: _dur <= 0 ? 1 : _dur,
+                    onChanged: _player == null ? null : (v) => _player?.seek(v),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text(_clock(_pos), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    const Spacer(),
+                    Text(_clock(_dur > 0 ? _dur : widget.item.durationSec.toDouble()), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _rateChip(0.5),
+                    _rateChip(1),
+                    _rateChip(1.5),
+                    _rateChip(2),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _player == null ? null : () => _player?.seek((_pos - 5).clamp(0, _dur <= 0 ? 0 : _dur)),
+                      icon: const Icon(Icons.replay_5_rounded, color: Colors.white70, size: 30),
+                    ),
+                    const SizedBox(width: 10),
+                    Material(
+                      color: const Color(0xFF22D3EE),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _toggle,
+                        child: SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 40),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      IconButton(
-                        onPressed: () => _player?.seek((_pos + 5).clamp(0, _dur <= 0 ? 999 : _dur)),
-                        icon: const Icon(Icons.forward_5_rounded, color: Colors.white70, size: 30),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      onPressed: _player == null ? null : () => _player?.seek((_pos + 5).clamp(0, _dur <= 0 ? 9999 : _dur)),
+                      icon: const Icon(Icons.forward_5_rounded, color: Colors.white70, size: 30),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: _downloading ? null : _download,
+                        onPressed: _download,
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF334155),
                           foregroundColor: Colors.white,
                           minimumSize: const Size.fromHeight(48),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        icon: _downloading
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.download_rounded),
+                        icon: const Icon(Icons.download_rounded),
                         label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w800)),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _saveTitle,
+                        onPressed: _rename,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: const BorderSide(color: Colors.white24),

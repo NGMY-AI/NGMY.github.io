@@ -126,7 +126,7 @@ class NgmyLiveCaptureEngine {
   }
 
   static Future<void> downloadDataUrl(String dataUrl, String mimeType, String title) async {
-    await NgmyLiveCaptureMedia.downloadQuiet(dataUrl, mimeType, title);
+    NgmyLiveCaptureMedia.downloadSync(dataUrl, mimeType, title);
   }
 
   Future<void> _releaseStream() async {
