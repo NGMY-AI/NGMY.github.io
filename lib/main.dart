@@ -28128,6 +28128,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _emailC = TextEditingController();
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
+  final _familyMembersC = TextEditingController(text: '1');
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
@@ -28190,6 +28191,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _emailC.dispose();
     _cityC.dispose();
     _roomC.dispose();
+    _familyMembersC.dispose();
     super.dispose();
   }
 
@@ -28854,6 +28856,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
       return;
     }
+    final familyMembers = int.tryParse(_familyMembersC.text.trim()) ?? 0;
+    if (familyMembers < 1 || familyMembers > 99) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many family members (1–99).')));
+      return;
+    }
 
     if (targetUser != null && email.isNotEmpty && targetUser.email.toLowerCase().trim() != email) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Use your account email for self-enrollment.')));
@@ -28894,6 +28901,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       room: room,
       state: _selectedState,
       registryId: registryId,
+      familyMembers: familyMembers,
     );
 
     setState(() {
@@ -28910,6 +28918,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _emailC.clear();
         _cityC.clear();
         _roomC.clear();
+        _familyMembersC.text = '1';
         _activeTab = 2;
       }
     });
@@ -31697,6 +31706,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 dropdownMenuEntries: widget.config.rooms.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },
               ),
+              const SizedBox(height: 20),
+
+              const Text('Family Members *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _familyMembersC,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'How many people in this family?',
+                  hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                  filled: true,
+                  fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                ),
+              ),
               const SizedBox(height: 30),
 
               ElevatedButton(
@@ -31858,6 +31883,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _memberCard(UserData u, bool isDark, {bool manageActions = true}) {
+    final familyRaw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email)?['familyMembers'];
+    final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
@@ -31890,6 +31917,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
           _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
           _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
+          _memberInfo(
+            Icons.family_restroom_rounded,
+            '$familyCount family member${familyCount == 1 ? '' : 's'}',
+            Colors.teal,
+          ),
 
           const SizedBox(height: 20),
           Row(

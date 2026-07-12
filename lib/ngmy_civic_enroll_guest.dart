@@ -113,6 +113,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
+  final _familyMembersC = TextEditingController(text: '1');
 
   late final AnimationController _pulse;
   late final AnimationController _shimmer;
@@ -138,6 +139,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _nameC.dispose();
     _addressC.dispose();
     _phoneC.dispose();
+    _familyMembersC.dispose();
     super.dispose();
   }
 
@@ -267,6 +269,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final fullName = _nameC.text.trim();
     final address = _addressC.text.trim();
     final phone = _phoneC.text.trim();
+    final familyMembers = int.tryParse(_familyMembersC.text.trim()) ?? 0;
 
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
       _toast('Full Name must contain at least first and last name.');
@@ -278,6 +281,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
       _toast('Phone must contain numbers only (7-15 digits).');
+      return;
+    }
+    if (familyMembers < 1 || familyMembers > 99) {
+      _toast('Enter how many family members (1–99).');
       return;
     }
 
@@ -330,6 +337,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         room: '',
         state: _selectedState,
         registryId: registryId,
+        familyMembers: familyMembers,
       );
       remoteMembers.add(member);
 
@@ -813,6 +821,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: _dec('Phone *'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _glassField(
+                  child: TextField(
+                    controller: _familyMembersC,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: _dec('Family Members *'),
                   ),
                 ),
                 const SizedBox(height: 12),

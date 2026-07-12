@@ -31,6 +31,7 @@ class NgmyCivicRegistryMembers {
     required String room,
     required String state,
     required String registryId,
+    int familyMembers = 1,
     int helps = 0,
     int missed = 0,
     String? enrolledAt,
@@ -46,6 +47,7 @@ class NgmyCivicRegistryMembers {
       'room': room.trim(),
       'state': state.trim(),
       'registryId': registryId.trim(),
+      'familyMembers': familyMembers < 1 ? 1 : familyMembers,
       'helps': helps,
       'missed': missed,
       'enrolledAt': enrolledAt ?? DateTime.now().toUtc().toIso8601String(),
@@ -62,6 +64,7 @@ class NgmyCivicRegistryMembers {
       final keep = members[idx];
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
       next['missed'] = next['missed'] ?? keep['missed'] ?? 0;
+      next['familyMembers'] = next['familyMembers'] ?? keep['familyMembers'] ?? 1;
       next['enrolledAt'] = keep['enrolledAt'] ?? next['enrolledAt'];
       next['passportGranted'] = next['passportGranted'] ?? keep['passportGranted'] ?? false;
       next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
@@ -241,8 +244,12 @@ class NgmyCivicRegistryMembers {
     required String registryId,
     required int helps,
     required int missed,
+    int? familyMembers,
   }) {
     final existing = findByEmail(config, email);
+    final existingFamily = existing?['familyMembers'];
+    final family = familyMembers ??
+        (existingFamily is num ? existingFamily.toInt() : int.tryParse('${existingFamily ?? ''}') ?? 1);
     upsert(
       config,
       buildRecord(
@@ -256,6 +263,7 @@ class NgmyCivicRegistryMembers {
         room: room,
         state: state,
         registryId: registryId,
+        familyMembers: family,
         helps: helps,
         missed: missed,
         enrolledAt: existing?['enrolledAt']?.toString(),
