@@ -1565,6 +1565,8 @@ class AppConfig {
   List<Map<String, dynamic>> helpCampaignSpendings;
   List<String> openedContributionReceiptKeys;
   List<String> dismissedContributionReceiptKeys;
+  /// Shared tombstones — registrar receipt deletes sync to every user/device.
+  List<String> contributionReceiptRemovedKeys;
   List<Map<String, dynamic>> jobPosts;
   List<Map<String, dynamic>> jobWorkerApplications;
   List<Map<String, dynamic>> loanApplications;
@@ -1701,6 +1703,7 @@ class AppConfig {
     this.helpCampaignSpendings = const [],
     this.openedContributionReceiptKeys = const [],
     this.dismissedContributionReceiptKeys = const [],
+    this.contributionReceiptRemovedKeys = const [],
     this.jobPosts = const [],
     this.jobWorkerApplications = const [],
     List<Map<String, dynamic>>? loanApplications,
@@ -1854,6 +1857,7 @@ class AppConfig {
     'helpCampaignSpendings': helpCampaignSpendings,
     'openedContributionReceiptKeys': openedContributionReceiptKeys,
     'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys,
+    'contributionReceiptRemovedKeys': contributionReceiptRemovedKeys,
     'jobPosts': jobPosts,
     'jobWorkerApplications': jobWorkerApplications,
     'loanApplications': loanApplications,
@@ -1978,6 +1982,7 @@ class AppConfig {
     helpCampaignSpendings: List<Map<String, dynamic>>.from((json['helpCampaignSpendings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     openedContributionReceiptKeys: List<String>.from(json['openedContributionReceiptKeys'] ?? const []),
     dismissedContributionReceiptKeys: List<String>.from(json['dismissedContributionReceiptKeys'] ?? const []),
+    contributionReceiptRemovedKeys: List<String>.from(json['contributionReceiptRemovedKeys'] ?? const []),
     jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     loanApplications: List<Map<String, dynamic>>.from((json['loanApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -3248,6 +3253,9 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
       NgmyCivicReadState.mergeSets(keep.dismissedContributionReceiptKeys, next.dismissedContributionReceiptKeys),
     );
   }
+  next.contributionReceiptRemovedKeys = List<String>.from(
+    NgmyCivicReadState.mergeSets(keep.contributionReceiptRemovedKeys, next.contributionReceiptRemovedKeys),
+  );
 
   if (record.containsKey('ngmyHelperDailyMessageLimit')) {
     final v = record['ngmyHelperDailyMessageLimit'];
@@ -7940,6 +7948,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
     await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+    await ngmyHydrateCivicContributionReceiptRemoved(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud());
@@ -9398,6 +9407,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
         await ngmyHydrateCivicHelpModeFromAllBackups(next);
+        await ngmyHydrateCivicContributionReceiptRemoved(next);
         await ngmyHydrateCommunicatePaymentsFromAllBackups(next);
         await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
         await ngmyHydrateDocSharePaymentsFromAllBackups(next);
@@ -11421,6 +11431,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateWalletPaymentsFromAllBackups(_config);
       await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
       await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+      await ngmyHydrateCivicContributionReceiptRemoved(_config);
       await ngmyHydrateAppBrandingFromAllBackups(_config);
       if (mounted) _scheduleDeferredStartupRebuild();
     } catch (e) {
@@ -11504,6 +11515,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+          await ngmyHydrateCivicContributionReceiptRemoved(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
         } catch (_) {}
       }
@@ -11793,6 +11805,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateWalletPaymentsFromAllBackups(_config);
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+          await ngmyHydrateCivicContributionReceiptRemoved(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
@@ -28777,6 +28790,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Future<void> _refreshCivicHelpModeAndContributions() async {
     await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+    await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     final contributions = await ngmyFetchApprovedContributionsFromCloud();
     if (!mounted) return;
     setState(() => _communityContributions = contributions);
@@ -28785,6 +28799,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void _onCivicLiveRefresh() {
     if (!mounted) return;
     unawaited(_refreshCivicMembersFromCloud());
+    unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) {
+      if (mounted) setState(() {});
+    }));
   }
 
   @override
@@ -30539,18 +30556,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  void _deleteContributionReceipt(String key) {
-    if (key.trim().isEmpty) return;
-    _dismissedReceiptKeys.add(key);
-    if (!widget.config.dismissedContributionReceiptKeys.contains(key)) {
+  Future<void> _deleteContributionReceipt(String key) async {
+    final receiptKey = key.trim();
+    if (receiptKey.isEmpty) return;
+    _dismissedReceiptKeys.add(receiptKey);
+    if (!widget.config.dismissedContributionReceiptKeys.contains(receiptKey)) {
       widget.config.dismissedContributionReceiptKeys = [
         ...widget.config.dismissedContributionReceiptKeys,
-        key,
+        receiptKey,
       ];
     }
-    unawaited(_persistReceiptReadState());
-    widget.onDataChanged();
+    if (!widget.config.contributionReceiptRemovedKeys.contains(receiptKey)) {
+      widget.config.contributionReceiptRemovedKeys = [
+        ...widget.config.contributionReceiptRemovedKeys,
+        receiptKey,
+      ];
+    }
     if (mounted) setState(() {});
+    unawaited(_persistReceiptReadState());
+    final cloudOk = await ngmyPersistCivicContributionReceiptRemoved(widget.config, addedKey: receiptKey);
+    widget.onDataChanged();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cloudOk
+              ? 'Contribution receipt deleted for all users.'
+              : 'Receipt deleted on this device. Will sync to everyone when online.',
+        ),
+        backgroundColor: cloudOk ? Colors.green : Colors.orange,
+      ),
+    );
   }
 
   List<Map<String, dynamic>> _spendingsForCampaign(String campaignId) {
@@ -30727,8 +30764,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               child: InkWell(
                 onTap: () {
-                  _deleteContributionReceipt(campaignKey);
-                  onDeleted?.call();
+                  unawaited(_deleteContributionReceipt(campaignKey).then((_) {
+                    onDeleted?.call();
+                  }));
                 },
                 borderRadius: const BorderRadius.only(
                   topRight: Radius.circular(12),
@@ -30753,6 +30791,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           .toString();
       if (_dismissedReceiptKeys.contains(key)) continue;
       if (widget.config.dismissedContributionReceiptKeys.contains(key)) continue;
+      if (widget.config.contributionReceiptRemovedKeys.contains(key)) continue;
       if (_contributionReceiptExpired(key, meta)) continue;
       if (unreadOnly && _openedReceiptKeys.contains(key)) continue;
       groups.putIfAbsent(key, () => []).add(t);

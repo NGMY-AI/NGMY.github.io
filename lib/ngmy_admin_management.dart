@@ -34,6 +34,8 @@ const String _kNgmyHelperAiPrefsKey = 'ngmy_helper_ai_settings_v1';
 const String _kNgmyAppBrandingSettingsKey = 'ngmy_app_branding';
 const String _kNgmyCivicHelpModeSettingsKey = 'civic_help_mode_settings';
 const String _kNgmyCivicHelpModePrefsKey = 'ngmy_civic_help_mode_settings_v1';
+const String _kNgmyCivicReceiptRemovedSettingsKey = 'civic_contribution_receipt_removed';
+const String _kNgmyCivicReceiptRemovedPrefsKey = 'ngmy_civic_contribution_receipt_removed_v1';
 const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
@@ -1679,4 +1681,93 @@ Future<bool> ngmyPersistHelpCenterHubSettings(AppConfig config) async {
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
+}
+
+List<String> _stringIdListFromPayload(dynamic raw) {
+  if (raw is! List) return const [];
+  return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+}
+
+Map<String, dynamic> _civicReceiptRemovedPayload(AppConfig config) {
+  final ids = config.contributionReceiptRemovedKeys
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
+  return {
+    'ids': ids,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
+}
+
+void _applyCivicReceiptRemovedPayload(AppConfig config, Map<String, dynamic> payload) {
+  final incoming = _stringIdListFromPayload(payload['ids'] ?? payload['keys'] ?? payload['contributionReceiptRemovedKeys']);
+  if (incoming.isEmpty && !payload.containsKey('ids') && !payload.containsKey('keys')) return;
+  config.contributionReceiptRemovedKeys = List<String>.from(
+    NgmyCivicReadState.mergeSets(config.contributionReceiptRemovedKeys, incoming),
+  );
+}
+
+Future<void> _persistCivicReceiptRemovedLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCivicReceiptRemovedPrefsKey, jsonEncode(_civicReceiptRemovedPayload(config)));
+  } catch (e) {
+    debugPrint('[civic receipt removed] local backup: $e');
+  }
+}
+
+Future<Set<String>> _fetchCivicReceiptRemovedFromCloud() async {
+  final row = await _fetchNgmySettingSafe(_kNgmyCivicReceiptRemovedSettingsKey);
+  if (row == null) return {};
+  return _stringIdListFromPayload(row['ids'] ?? row['keys']).toSet();
+}
+
+Future<void> ngmyHydrateCivicContributionReceiptRemoved(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicReceiptRemovedPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyCivicReceiptRemovedPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[civic receipt removed] local hydrate: $e');
+  }
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    final cloud = await _fetchCivicReceiptRemovedFromCloud();
+    if (cloud.isEmpty) return;
+    config.contributionReceiptRemovedKeys = List<String>.from(
+      NgmyCivicReadState.mergeSets(config.contributionReceiptRemovedKeys, cloud),
+    );
+    await _persistCivicReceiptRemovedLocal(config);
+  } catch (e) {
+    debugPrint('[civic receipt removed] cloud hydrate: $e');
+  }
+}
+
+/// Registrar delete — shared tombstone so every user stops seeing this receipt.
+Future<bool> ngmyPersistCivicContributionReceiptRemoved(AppConfig config, {String? addedKey}) async {
+  final key = (addedKey ?? '').trim();
+  if (key.isNotEmpty && !config.contributionReceiptRemovedKeys.contains(key)) {
+    config.contributionReceiptRemovedKeys = [...config.contributionReceiptRemovedKeys, key];
+  }
+  await _persistCivicReceiptRemovedLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    final merged = {
+      ...await _fetchCivicReceiptRemovedFromCloud(),
+      ...config.contributionReceiptRemovedKeys.map((e) => e.trim()).where((e) => e.isNotEmpty),
+    };
+    config.contributionReceiptRemovedKeys = merged.toList()..sort();
+    await _persistCivicReceiptRemovedLocal(config);
+    return await _upsertNgmySettingSafe(_kNgmyCivicReceiptRemovedSettingsKey, _civicReceiptRemovedPayload(config));
+  } catch (e) {
+    debugPrint('[civic receipt removed] cloud save: $e');
+    return false;
+  }
 }
