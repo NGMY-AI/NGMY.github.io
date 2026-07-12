@@ -77,6 +77,57 @@ class NgmyCivicRegistryMembers {
     setList(config, members);
   }
 
+  /// Update an existing member in place (by original email or registry ID). Never adds a new row.
+  static Map<String, dynamic>? updateExisting(
+    dynamic config, {
+    required String originalEmail,
+    String registryId = '',
+    required Map<String, dynamic> fields,
+  }) {
+    final members = listFrom(config);
+    final fromEmail = emailKey(originalEmail);
+    final rid = registryId.trim().toUpperCase();
+    var idx = fromEmail.isEmpty
+        ? -1
+        : members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == fromEmail);
+    if (idx < 0 && rid.isNotEmpty) {
+      idx = members.indexWhere(
+        (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
+      );
+    }
+    if (idx < 0) return null;
+
+    final keep = Map<String, dynamic>.from(members[idx]);
+    final next = Map<String, dynamic>.from(keep);
+    for (final e in fields.entries) {
+      next[e.key] = e.value;
+    }
+
+    final newEmail = emailKey((next['email'] ?? keep['email'] ?? '').toString());
+    if (newEmail.isEmpty) return null;
+
+    // If email changed, ensure no other member already owns it.
+    if (newEmail != emailKey((keep['email'] ?? '').toString())) {
+      final clash = members.indexWhere(
+        (m) => emailKey((m['email'] ?? '').toString()) == newEmail,
+      );
+      if (clash >= 0 && clash != idx) return null;
+    }
+
+    next['email'] = newEmail;
+    next['registryId'] = (keep['registryId'] ?? next['registryId'] ?? '').toString();
+    next['helps'] = keep['helps'] ?? next['helps'] ?? 0;
+    next['missed'] = keep['missed'] ?? next['missed'] ?? 0;
+    next['enrolledAt'] = keep['enrolledAt'] ?? next['enrolledAt'];
+    next['passportGranted'] = keep['passportGranted'] ?? next['passportGranted'] ?? false;
+    next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
+    next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
+    next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
+    members[idx] = next;
+    setList(config, members);
+    return next;
+  }
+
   static bool passportGranted(Map<String, dynamic> member) => member['passportGranted'] == true;
 
   static String _phoneKey(String phone) => phone.replaceAll(RegExp(r'\D'), '');
@@ -215,6 +266,7 @@ class NgmyCivicRegistryMembers {
     String homeAddress = '',
     String phone = '',
     String? excludeEmail,
+    String? excludeRegistryId,
   }) {
     return findDuplicateInRecords(
       records: listFrom(config),
@@ -224,6 +276,7 @@ class NgmyCivicRegistryMembers {
       homeAddress: homeAddress,
       phone: phone,
       excludeEmail: excludeEmail,
+      excludeRegistryId: excludeRegistryId,
     );
   }
 
@@ -237,6 +290,7 @@ class NgmyCivicRegistryMembers {
     String homeAddress = '',
     String phone = '',
     String? excludeEmail,
+    String? excludeRegistryId,
   }) {
     final nameKey = _normName(fullName);
     final addrKey = _normAddress(homeAddress);
@@ -244,10 +298,13 @@ class NgmyCivicRegistryMembers {
     final dobKey = RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob.trim()) ? dob.trim() : '';
     final cityKey = city.trim().toLowerCase();
     final exclude = excludeEmail?.toLowerCase().trim() ?? '';
+    final excludeId = (excludeRegistryId ?? '').trim().toUpperCase();
 
     for (final m in records) {
       final email = emailKey((m['email'] ?? '').toString());
       if (exclude.isNotEmpty && email == exclude) continue;
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (excludeId.isNotEmpty && id == excludeId) continue;
 
       final existingName = _normName((m['fullName'] ?? '').toString());
       final existingAddr = _normAddress((m['homeAddress'] ?? '').toString());
@@ -369,13 +426,26 @@ class NgmyCivicRegistryMembers {
       return;
     }
     final merged = <String, Map<String, dynamic>>{};
-    for (final m in remoteMembers) {
-      final key = emailKey((m['email'] ?? '').toString());
-      if (key.isNotEmpty) merged[key] = m;
-    }
+    final idsOwned = <String>{};
+
+    // Keep local registrar edits first.
     for (final m in local) {
       final key = emailKey((m['email'] ?? '').toString());
-      if (key.isNotEmpty) merged[key] = m;
+      if (key.isEmpty) continue;
+      merged[key] = m;
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (id.isNotEmpty) idsOwned.add(id);
+    }
+
+    // Bring in remote-only members (guest self-enrollment, other devices).
+    for (final m in remoteMembers) {
+      final key = emailKey((m['email'] ?? '').toString());
+      if (key.isEmpty) continue;
+      if (merged.containsKey(key)) continue;
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (id.isNotEmpty && idsOwned.contains(id)) continue; // same person, different email key — do not duplicate
+      merged[key] = m;
+      if (id.isNotEmpty) idsOwned.add(id);
     }
     setList(config, merged.values.toList());
   }
