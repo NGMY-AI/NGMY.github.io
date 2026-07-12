@@ -449,6 +449,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   Widget _titleBadge(double pulse, double shimmer) {
+    const logoSize = 38.0;
     return Transform.scale(
       scale: 1.0 + pulse * 0.02,
       child: ClipRRect(
@@ -456,7 +457,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               gradient: LinearGradient(
@@ -476,10 +478,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
               ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Flexible(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: logoSize + 8),
                   child: Text(
                     'NGMY self enrollment',
                     textAlign: TextAlign.center,
@@ -494,24 +497,35 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.55 + pulse * 0.2), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 10),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Image.network(
-                      'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const ColoredBox(
-                        color: Color(0xFF0F172A),
-                        child: Icon(Icons.public, color: Colors.white, size: 18),
+                Positioned(
+                  right: 0,
+                  child: Container(
+                    width: logoSize,
+                    height: logoSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.7 + pulse * 0.2), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 10),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Padding(
+                      padding: const EdgeInsets.all(5),
+                      child: Image.asset(
+                        'assets/images/ngmy_logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Image.network(
+                          'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const ColoredBox(
+                            color: Colors.white,
+                            child: Center(
+                              child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 8, color: Color(0xFF1E3A5F))),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

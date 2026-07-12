@@ -28452,7 +28452,7 @@ class _AliveSearchFrameState extends State<_AliveSearchFrame> with SingleTickerP
         final t = Curves.easeInOut.transform(_pulse.value);
         final accent = Color.lerp(const Color(0xFF14B8A6), const Color(0xFF6366F1), t)!;
         return Container(
-          margin: const EdgeInsets.only(bottom: 14),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             color: base,
             borderRadius: BorderRadius.circular(22),
@@ -30085,84 +30085,83 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>$title</title>
 <style>
-  @page { margin: 16mm 12mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 0; padding: 16px 18px 26px; }
+  @page { size: letter; margin: 14mm 12mm; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    color: #111;
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    -webkit-text-size-adjust: 100%;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  * {
+    box-sizing: border-box;
+    transform: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    -webkit-filter: none !important;
+  }
+  .sheet { padding: 12px 10px 18px; }
   .masthead {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: end;
-    gap: 12px;
-    padding-bottom: 14px;
-    margin-bottom: 18px;
-    border-bottom: 3px solid #0f172a;
+    gap: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+    border-bottom: 2.5px solid #0f172a;
   }
-  .stamp {
-    justify-self: start;
-    text-align: left;
-    line-height: 1.2;
-    font-family: system-ui, -apple-system, sans-serif;
-  }
-  .stamp .date {
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    color: #0f172a;
-  }
-  .stamp .time {
-    margin-top: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #475569;
-  }
-  .header {
-    justify-self: center;
-    text-align: center;
-    max-width: 520px;
-  }
+  .stamp { justify-self: start; text-align: left; line-height: 1.15; }
+  .stamp .date { font-size: 14px; font-weight: 800; letter-spacing: 0.03em; color: #0f172a; }
+  .stamp .time { margin-top: 3px; font-size: 12px; font-weight: 700; color: #475569; }
+  .header { justify-self: center; text-align: center; max-width: 520px; }
   .header h1 {
     margin: 0;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
-    letter-spacing: 0.045em;
+    letter-spacing: 0.03em;
     line-height: 1.2;
-    text-decoration: underline;
-    text-decoration-thickness: 2.5px;
-    text-underline-offset: 8px;
+    border-bottom: 2.5px solid #0f172a;
+    display: inline-block;
+    padding-bottom: 4px;
   }
-  .members-chip {
-    justify-self: end;
-    align-self: start;
-    font-family: system-ui, -apple-system, sans-serif;
-    text-align: right;
-    min-width: 108px;
-  }
+  .members-chip { justify-self: end; align-self: start; text-align: right; min-width: 96px; }
   .members-chip .label {
-    font-size: 10px;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;
+  }
+  .members-chip .value { margin-top: 3px; font-size: 20px; font-weight: 900; color: #0f172a; line-height: 1; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td {
+    border: 1px solid #94a3b8;
+    padding: 8px 7px;
+    font-size: 12px;
+    vertical-align: top;
+    word-wrap: break-word;
+  }
+  th {
+    background: #f1f5f9;
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 0.02em;
     font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #64748b;
   }
-  .members-chip .value {
-    margin-top: 4px;
-    font-size: 22px;
-    font-weight: 900;
-    color: #0f172a;
-    line-height: 1;
-  }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #cbd5e1; padding: 10px 8px; font-size: 13px; vertical-align: top; }
-  th { background: #f1f5f9; text-align: left; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 0.02em; }
-  th:last-child, td:last-child { text-align: center; width: 88px; }
+  th:last-child, td:last-child { text-align: center; width: 84px; }
   @media print {
-    body { padding: 0; }
-    .masthead { margin-bottom: 14px; }
+    html, body { width: auto; height: auto; zoom: 1; }
+    .sheet { padding: 0; }
+    .masthead { margin-bottom: 10px; }
   }
 </style>
 </head>
 <body>
+  <div class="sheet">
   <div class="masthead">
     <div class="stamp">
       <div class="date">${_escapeHtml(dateStr)}</div>
@@ -30189,20 +30188,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       $rows
     </tbody>
   </table>
-  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 250); };</script>
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        try { window.focus(); } catch (e) {}
+        window.print();
+      }, 180);
+    });
+  </script>
 </body>
 </html>''';
 
     final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
     final fileName = 'ngmy-civic-roster-${state.replaceAll(RegExp(r'\s+'), '_')}-$stamp';
-    await ngmyDownloadCivicMemberReport(
+    await ngmyPrintCivicMemberReport(
       htmlContent: html,
       plainText: 'NGMY $state roster (${members.length} members)',
       fileName: fileName,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Print roster ready for $state (${members.length} members).'), backgroundColor: Colors.green),
+      SnackBar(content: Text('Print dialog opened for $state (${members.length} members).'), backgroundColor: Colors.green),
     );
   }
 
@@ -32957,113 +32964,92 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final statusColor = _statusColorForMissed(u.missed);
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.94, end: 1),
-      duration: const Duration(milliseconds: 460),
-      curve: Curves.easeOutBack,
-      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-      child: _AliveSearchFrame(
-        isDark: isDark,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: isDark
-                            ? const [Color(0xFF334155), Color(0xFF0F766E)]
-                            : const [Color(0xFFCCFBF1), Color(0xFFE0E7FF)],
-                      ),
-                      border: Border.all(color: isDark ? const Color(0xFF5EEAD4) : const Color(0xFF14B8A6), width: 1.6),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      initials.isEmpty ? '?' : initials,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: isDark ? Colors.white : const Color(0xFF0F766E),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16.5, color: ink, letterSpacing: -0.2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showPublicMemberProfile(u),
+        borderRadius: BorderRadius.circular(22),
+        child: _AliveSearchFrame(
+          isDark: isDark,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? const [Color(0xFF334155), Color(0xFF0F766E)]
+                              : const [Color(0xFFCCFBF1), Color(0xFFE0E7FF)],
                         ),
-                        if (showNicks)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
+                        border: Border.all(color: isDark ? const Color(0xFF5EEAD4) : const Color(0xFF14B8A6), width: 1.4),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        initials.isEmpty ? '?' : initials,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          color: isDark ? Colors.white : const Color(0xFF0F766E),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: ink, letterSpacing: -0.2),
+                          ),
+                          if (showNicks)
+                            Text(
                               nicks.join(' · '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                             ),
+                          Text(
+                            u.registryId ?? 'PENDING ID',
+                            style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 11),
                           ),
-                        const SizedBox(height: 4),
-                        Text(
-                          u.registryId ?? 'PENDING ID',
-                          style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 12.5),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: isDark ? 0.28 : 0.14),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.55)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: isDark ? 0.28 : 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.55)),
+                      ),
+                      child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.w900)),
                     ),
-                    child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _publicMetaChip(Icons.location_on_rounded, u.city ?? 'City n/a', const Color(0xFFEF4444), isDark),
-                  _publicMetaChip(Icons.meeting_room_rounded, u.room ?? 'Room n/a', const Color(0xFFF59E0B), isDark),
-                  _publicMetaChip(Icons.phone_rounded, u.phone.isEmpty ? 'No phone' : u.phone, const Color(0xFF64748B), isDark),
-                  _publicMetaChip(Icons.family_restroom_rounded, '$familyCount family', const Color(0xFF14B8A6), isDark),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text('${u.helps} helps', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w800, fontSize: 12)),
-                  const SizedBox(width: 10),
-                  Text('${u.missed} missed', style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w700, fontSize: 12)),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => _showPublicMemberProfile(u),
-                    icon: const Icon(Icons.visibility_rounded, size: 16),
-                    label: const Text('View', style: TextStyle(fontWeight: FontWeight.w800)),
-                    style: TextButton.styleFrom(
-                      foregroundColor: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _publicMetaChip(Icons.location_on_rounded, u.city ?? 'City n/a', const Color(0xFFEF4444), isDark)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _publicMetaChip(Icons.meeting_room_rounded, u.room ?? 'Room n/a', const Color(0xFFF59E0B), isDark)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _publicMetaChip(Icons.phone_rounded, u.phone.isEmpty ? 'No phone' : u.phone, const Color(0xFF64748B), isDark)),
+                    const SizedBox(width: 6),
+                    Expanded(child: _publicMetaChip(Icons.family_restroom_rounded, '$familyCount', const Color(0xFF14B8A6), isDark)),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -33072,24 +33058,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _publicMetaChip(IconData icon, String label, Color color, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withValues(alpha: isDark ? 0.16 : 0.08),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 6),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 140),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Expanded(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
             ),
           ),
         ],
@@ -33920,31 +33906,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
           child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
         ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF172554) : const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFF93C5FD).withOpacity(0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.groups_rounded, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                  const SizedBox(width: 8),
-                  Text('About Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E40AF))),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _aboutItem('Community-based identity and records system'),
-              _aboutItem('Public can verify if someone is registered and \'clean\''),
-              _aboutItem('Private details visible only to Admin & Authorized Registrars'),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -34012,19 +33973,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               Text('${u.missed} missed', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red)),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _aboutItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• ', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-          Expanded(child: Text(text, style: TextStyle(color: Colors.grey.shade700, fontSize: 11, height: 1.4))),
         ],
       ),
     );
