@@ -143,6 +143,7 @@ import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_id_scanner.dart';
 import 'ngmy_media_deep_link.dart';
 import 'ngmy_civic_enroll_link.dart';
+import 'ngmy_state_picker.dart';
 import 'ngmy_settings_cloud.dart';
 import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
@@ -29026,176 +29027,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showStatePicker() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final q = TextEditingController();
-    final filtered = ValueNotifier<List<String>>(_usStates);
-
-    void applyFilter() {
-      final s = q.text.trim().toLowerCase();
-      if (s.isEmpty) {
-        filtered.value = _usStates;
-        return;
-      }
-      filtered.value = _usStates.where((st) => st.toLowerCase().contains(s)).toList(growable: false);
-    }
-
-    q.addListener(applyFilter);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) {
-        final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
-        final border = isDark ? Colors.white10 : const Color(0xFFE5E7EB);
-        final text = isDark ? Colors.white : const Color(0xFF0F172A);
-        final muted = isDark ? Colors.white70 : Colors.black54;
-
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Navigator.pop(sheetCtx),
-          child: SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: GestureDetector(
-                onTap: () {},
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: border, width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.12),
-                        blurRadius: 26,
-                        offset: const Offset(0, 14),
-                      ),
-                    ],
-                  ),
-                  child: DraggableScrollableSheet(
-                    expand: false,
-                    initialChildSize: 0.75,
-                    minChildSize: 0.45,
-                    maxChildSize: 0.92,
-                    builder: (_, controller) {
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          left: 18,
-                          right: 18,
-                          top: 14,
-                          bottom: 14 + MediaQuery.viewInsetsOf(sheetCtx).bottom,
-                        ),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white24 : Colors.black12,
-                                borderRadius: BorderRadius.circular(99),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Select your state',
-                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Close',
-                                  onPressed: () => Navigator.pop(sheetCtx),
-                                  icon: Icon(Icons.close_rounded, color: muted),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white10 : const Color(0xFFF3F4F6),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: border),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.search_rounded, color: muted),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: q,
-                                      style: TextStyle(color: text, fontSize: 14),
-                                      decoration: InputDecoration(
-                                        hintText: 'Search state…',
-                                        hintStyle: TextStyle(color: muted),
-                                        border: InputBorder.none,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Clear',
-                                    onPressed: () => q.text = '',
-                                    icon: Icon(Icons.backspace_rounded, color: muted, size: 18),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Expanded(
-                              child: ValueListenableBuilder<List<String>>(
-                                valueListenable: filtered,
-                                builder: (_, states, __) {
-                                  if (states.isEmpty) {
-                                    return Center(
-                                      child: Text('No results', style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
-                                    );
-                                  }
-                                  return ListView.separated(
-                                    controller: controller,
-                                    itemCount: states.length,
-                                    separatorBuilder: (_, __) => Divider(height: 1, color: border),
-                                    itemBuilder: (_, i) {
-                                      final state = states[i];
-                                      final selected = state == _selectedState;
-                                      return ListTile(
-                                        dense: true,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                        title: Text(
-                                          state,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: text,
-                                          ),
-                                        ),
-                                        trailing: selected ? Icon(Icons.check_circle_rounded, color: Colors.greenAccent.shade400) : null,
-                                        onTap: () async {
-                                          Navigator.pop(sheetCtx);
-                                          await _applyCivicStateChange(state);
-                                        },
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      q.dispose();
-      filtered.dispose();
-    });
+    unawaited(() async {
+      final picked = await showNgmyStatePickerSheet(
+        context,
+        states: _usStates,
+        selected: _selectedState,
+        title: 'Choose state',
+      );
+      if (picked == null || !mounted) return;
+      await _applyCivicStateChange(picked);
+    }());
   }
 
   bool _memberMatchesHelpScope(UserData u) {
@@ -31635,7 +31476,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('Manual Enrollment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)), Text('Register a new member from scratch.', style: TextStyle(fontSize: 11, color: Colors.blueGrey))])),
               const SizedBox(height: 25),
 
-              const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _fullNameC,
@@ -31643,7 +31484,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Date of Birth *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Date of Birth', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _dobC,
@@ -31653,7 +31494,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('ID Type *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('ID Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _idTypeC.text,
@@ -31665,7 +31506,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
               _enrollField('Home Address', _addressC, 'Street address, Apt...'),
 
-              const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneC,
@@ -31675,7 +31516,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Email Address *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Email Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailC,
@@ -31684,7 +31525,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('City *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('City', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
@@ -31696,7 +31537,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Room *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
@@ -31708,7 +31549,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Family Members *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Family Members', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _familyMembersC,

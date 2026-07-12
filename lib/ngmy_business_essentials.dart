@@ -11,8 +11,8 @@ import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_local_bio_storage.dart';
-import 'ngmy_local_menu_storage.dart';
 import 'ngmy_local_studio.dart';
+import 'ngmy_live_capture.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -29,7 +29,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyPaperTraceCount(userEmail: userEmail),
-    ngmyLocalMenuCount(userEmail: userEmail),
+    ngmyLiveCaptureCount(userEmail: userEmail),
     ngmyLocalBioCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
@@ -82,7 +82,7 @@ const _categoryArt = <String, _CategoryArt>{
   'Quick Tasks': _CategoryArt(icon: Icons.task_alt_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
   'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
   'Paper Trace': _CategoryArt(icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
-  'Local Menu (Test)': _CategoryArt(icon: Icons.restaurant_menu_rounded, accent: Color(0xFF0EA5E9), gradient: [Color(0xFF0284C7), Color(0xFF0EA5E9)]),
+  'Live Capture': _CategoryArt(icon: Icons.fiber_manual_record_rounded, accent: Color(0xFFEF4444), gradient: [Color(0xFFDC2626), Color(0xFF06B6D4)]),
   'Local Bio (Test)': _CategoryArt(icon: Icons.link_rounded, accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
 };
 
@@ -95,7 +95,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _tasks = 0;
   int _reminders = 0;
   int _traces = 0;
-  int _localMenus = 0;
+  int _liveCaptures = 0;
   int _localBios = 0;
   bool _loading = true;
 
@@ -115,7 +115,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyPaperTraceCount(userEmail: widget.userEmail),
-      ngmyLocalMenuCount(userEmail: widget.userEmail),
+      ngmyLiveCaptureCount(userEmail: widget.userEmail),
       ngmyLocalBioCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
@@ -128,7 +128,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _tasks = results[5];
       _reminders = results[6];
       _traces = results[7];
-      _localMenus = results[8];
+      _liveCaptures = results[8];
       _localBios = results[9];
       _loading = false;
     });
@@ -286,13 +286,13 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyPaperTraceDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Local Menu (Test)',
-                          count: _localMenus,
+                          title: 'Live Capture',
+                          count: _liveCaptures,
                           pulse: pulse,
                           scan: scan,
                           orbit: orbit,
                           phase: 0.54,
-                          onTap: () => _openCategory((ctx) => showNgmyLocalMenuStudioDialog(ctx, userEmail: widget.userEmail)),
+                          onTap: () => _openCategory((ctx) => showNgmyLiveCaptureDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
                           title: 'Local Bio (Test)',

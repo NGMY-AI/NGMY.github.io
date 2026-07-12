@@ -12,6 +12,7 @@ import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
+import 'ngmy_state_picker.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_web_status_bar.dart';
 
@@ -34,12 +35,6 @@ const _kUsStates = <String>[
 bool ngmyIsGuestCivicEnrollLaunch() {
   if (ngmyPendingCivicSelfEnrollmentOpen) return true;
   return ngmyPeekCivicEnrollLaunchIntent();
-}
-
-bool _civicFlagOn(dynamic raw) {
-  if (raw == true || raw == 1) return true;
-  final s = raw?.toString().trim().toLowerCase() ?? '';
-  return s == 'true' || s == '1' || s == 'yes' || s == 'on';
 }
 
 void _applyEnrollChrome() {
@@ -506,6 +501,17 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       );
 
+  Future<void> _pickState() async {
+    final picked = await showNgmyStatePickerSheet(
+      context,
+      states: _kUsStates,
+      selected: _selectedState,
+      title: 'Choose state',
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _selectedState = picked);
+  }
+
   Widget _mottoBadge(double pulse, double shimmer) {
     return Transform.scale(
       scale: 1.0 + pulse * 0.03,
@@ -802,7 +808,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     controller: _nameC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     textCapitalization: TextCapitalization.words,
-                    decoration: _dec('Full Name *'),
+                    decoration: _dec('Full Name'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -810,7 +816,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   child: TextField(
                     controller: _addressC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    decoration: _dec('Home Address *'),
+                    decoration: _dec('Home Address'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -820,7 +826,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Phone *'),
+                    decoration: _dec('Phone'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -830,23 +836,28 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Family Members *'),
+                    decoration: _dec('Family Members'),
                   ),
                 ),
                 const SizedBox(height: 12),
                 _glassField(
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey('state-$_selectedState'),
-                    initialValue: _kUsStates.contains(_selectedState) ? _selectedState : _kUsStates.first,
-                    dropdownColor: const Color(0xFF1A1A1A),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    iconEnabledColor: _kMuted,
-                    decoration: _dec('State *'),
-                    items: _kUsStates.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _selectedState = v);
-                    },
+                  child: InkWell(
+                    onTap: _pickState,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InputDecorator(
+                      decoration: _dec('State'),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedState,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                            ),
+                          ),
+                          Icon(Icons.expand_more_rounded, color: Colors.white.withValues(alpha: 0.55)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 26),
