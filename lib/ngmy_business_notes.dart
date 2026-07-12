@@ -1020,17 +1020,34 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
       ),
     );
     if (result == null) return;
-    result.updatedAt = DateTime.now();
     final items = await _loadNotes(widget.userEmail);
-    items.removeWhere((e) => e.id == result.id);
-    if (result.pinned) {
-      items.insert(0, result);
-    } else {
-      final firstUnpinned = items.indexWhere((e) => !e.pinned);
-      if (firstUnpinned < 0) {
-        items.add(result);
+    final i = items.indexWhere((e) => e.id == result.id);
+    if (i >= 0) {
+      final prev = items[i];
+      final contentBumped = result.updatedAt.isAfter(prev.updatedAt);
+      items.removeAt(i);
+      if (result.pinned) {
+        items.insert(0, result);
+      } else if (contentBumped) {
+        final firstUnpinned = items.indexWhere((e) => !e.pinned);
+        if (firstUnpinned < 0) {
+          items.add(result);
+        } else {
+          items.insert(firstUnpinned, result);
+        }
       } else {
-        items.insert(firstUnpinned, result);
+        items.insert(i.clamp(0, items.length), result);
+      }
+    } else {
+      if (result.pinned) {
+        items.insert(0, result);
+      } else {
+        final firstUnpinned = items.indexWhere((e) => !e.pinned);
+        if (firstUnpinned < 0) {
+          items.add(result);
+        } else {
+          items.insert(firstUnpinned, result);
+        }
       }
     }
     await _saveNotes(widget.userEmail, items);
@@ -1516,6 +1533,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late final TextEditingController _body;
   late final FocusNode _bodyFocus;
   late final String _initialBody;
+  late final String _initialTitle;
   Timer? _autosave;
   bool _dirty = false;
   bool _previewMode = false;
@@ -1535,6 +1553,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _ensureParenMarkersInBody(_note);
     _storedBody = _note.body;
     _initialBody = _storedBody;
+    _initialTitle = _note.title;
     _title = TextEditingController(text: _note.title);
     _body = TextEditingController(text: _storedBody);
     _bodyFocus = FocusNode();
@@ -1740,10 +1759,15 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _bodyFocus.requestFocus();
   }
 
+  bool _hasTypedContentChange() {
+    return _title.text.trim() != _initialTitle.trim() || _storedBody.trim() != _initialBody.trim();
+  }
+
   bool _hasSaveableContent() {
-    if (_title.text.trim().isNotEmpty) return true;
-    if (_storedBody.trim().isEmpty) return false;
-    return _storedBody.trim() != _initialBody.trim();
+    if (widget.isNew) {
+      return _title.text.trim().isNotEmpty || _storedBody.trim().isNotEmpty;
+    }
+    return true;
   }
 
   void _markDirty() {
@@ -1753,20 +1777,41 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<void> _persist() async {
+    final contentChanged = widget.isNew || _hasTypedContentChange();
     _note.title = _title.text;
     _note.body = _storedBody;
-    _note.updatedAt = DateTime.now();
+    if (contentChanged) {
+      _note.updatedAt = DateTime.now();
+    }
     try {
       final items = await _loadNotes(widget.userEmail);
-      items.removeWhere((e) => e.id == _note.id);
-      if (_note.pinned) {
-        items.insert(0, _note);
-      } else {
-        final firstUnpinned = items.indexWhere((e) => !e.pinned);
-        if (firstUnpinned < 0) {
-          items.add(_note);
+      final i = items.indexWhere((e) => e.id == _note.id);
+      if (i >= 0) {
+        if (contentChanged) {
+          items.removeAt(i);
+          if (_note.pinned) {
+            items.insert(0, _note);
+          } else {
+            final firstUnpinned = items.indexWhere((e) => !e.pinned);
+            if (firstUnpinned < 0) {
+              items.add(_note);
+            } else {
+              items.insert(firstUnpinned, _note);
+            }
+          }
         } else {
-          items.insert(firstUnpinned, _note);
+          items[i] = _note;
+        }
+      } else {
+        if (_note.pinned) {
+          items.insert(0, _note);
+        } else {
+          final firstUnpinned = items.indexWhere((e) => !e.pinned);
+          if (firstUnpinned < 0) {
+            items.add(_note);
+          } else {
+            items.insert(firstUnpinned, _note);
+          }
         }
       }
       await _saveNotes(widget.userEmail, items);
@@ -1785,7 +1830,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   Future<bool> _onWillPop() async {
-    if (!_hasSaveableContent()) {
+    if (widget.isNew && !_hasSaveableContent()) {
       if (mounted) Navigator.pop(context, null);
       return false;
     }

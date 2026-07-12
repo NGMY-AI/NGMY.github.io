@@ -800,8 +800,6 @@ class _SupportCard extends StatelessWidget {
                                   fontWeight: FontWeight.w900,
                                   fontSize: 18,
                                   letterSpacing: 1.1,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: top.withValues(alpha: 0.55),
                                 ),
                               ),
                             ),

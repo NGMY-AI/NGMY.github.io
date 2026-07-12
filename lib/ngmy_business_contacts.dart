@@ -584,7 +584,7 @@ class _ContactCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 176,
+      height: 138,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -596,7 +596,6 @@ class _ContactCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         child: Stack(
           children: [
-            // Plastic contact card face
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -626,52 +625,63 @@ class _ContactCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [accent.withValues(alpha: 0.95), accent.withValues(alpha: 0.55)]),
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('CONTACT CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'CONTACT CARD',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: onFavorite,
+                        customBorder: const CircleBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: contact.favorite ? const Color(0xFFFBBF24) : Colors.white70,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 36, 10, 12),
+              padding: const EdgeInsets.fromLTRB(14, 36, 8, 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.5),
                       gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.55)]),
                     ),
                     alignment: Alignment.center,
-                    child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                    child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2),
-                              ),
-                            ),
-                            if (contact.favorite) const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 16),
-                          ],
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.2),
                         ),
                         if (company.isNotEmpty)
                           Text(company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           contact.category.toUpperCase(),
                           style: TextStyle(color: accent, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.2),
@@ -681,58 +691,33 @@ class _ContactCard extends StatelessWidget {
                           InkWell(
                             onTap: onCall,
                             borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1),
-                              child: Text(
-                                contact.phone,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13,
-                                  letterSpacing: 0.6,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Colors.white54,
-                                ),
-                              ),
+                            child: Text(
+                              contact.phone,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.6),
                             ),
                           ),
                         if (contact.email.isNotEmpty)
                           InkWell(
                             onTap: onEmail,
                             borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1),
-                              child: Text(
-                                contact.email,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.75),
-                                  fontSize: 11,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Colors.white38,
-                                ),
-                              ),
+                            child: Text(
+                              contact.email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  SizedBox(
-                    width: 76,
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      alignment: WrapAlignment.end,
-                      children: [
-                        if (contact.phone.isNotEmpty) _CardCircleBtn(icon: Icons.call_rounded, onTap: onCall),
-                        if (contact.email.isNotEmpty) _CardCircleBtn(icon: Icons.email_outlined, onTap: onEmail),
-                        _CardCircleBtn(icon: contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, onTap: onFavorite),
-                        _CardCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
-                        _CardCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
-                      ],
-                    ),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (contact.phone.isNotEmpty) _CardCircleBtn(icon: Icons.call_rounded, onTap: onCall),
+                      if (contact.email.isNotEmpty) _CardCircleBtn(icon: Icons.email_outlined, onTap: onEmail),
+                      _CardCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                      _CardCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                    ],
                   ),
                 ],
               ),

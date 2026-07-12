@@ -25400,7 +25400,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: panelBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: panelBorder, width: 1.25),
-            boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 14)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -25411,7 +25410,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Spacer(),
                   FilledButton(
                     onPressed: _convertPointsToCash,
-                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.white, minimumSize: const Size(96, 34)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: neutralAction,
+                      foregroundColor: neutralActionText,
+                      minimumSize: const Size(96, 34),
+                    ),
                     child: const Text('Convert'),
                   ),
                 ],
@@ -25429,7 +25432,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text('Convert to Cash', style: TextStyle(fontWeight: FontWeight.w600, color: primaryText)),
               const SizedBox(height: 3),
               Text('Every 100 pts =', style: TextStyle(fontSize: 12, color: softText)),
-              const Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF16A34A)))),
+              Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: primaryText))),
               Divider(color: panelBorder),
               Row(
                 children: [
@@ -25437,7 +25440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Spacer(),
                   Text(
                     '\$${pointsCash.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
+                    style: TextStyle(fontWeight: FontWeight.w900, color: primaryText),
                   ),
                 ],
               ),
