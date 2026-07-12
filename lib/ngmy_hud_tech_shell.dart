@@ -361,53 +361,77 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
     this.accent = const Color(0xFF67E8F9),
     this.borderRadius = 30,
     this.padding = EdgeInsets.zero,
+    this.bare = false,
   });
 
   final Widget child;
   final Color accent;
   final double borderRadius;
   final EdgeInsetsGeometry padding;
+  /// Border + soft sheen only — no solid fill so content shows through.
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
     final dark = NgmyHudInk.isDark(context);
+    final fill = bare
+        ? (dark
+            ? [
+                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withValues(alpha: 0.02),
+                Colors.transparent,
+              ]
+            : [
+                Colors.white.withValues(alpha: 0.10),
+                Colors.white.withValues(alpha: 0.04),
+                Colors.transparent,
+              ])
+        : (dark
+            ? [
+                Colors.white.withValues(alpha: 0.16),
+                const Color(0xFF0F172A).withValues(alpha: 0.42),
+                const Color(0xFF111827).withValues(alpha: 0.52),
+              ]
+            : [
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.30),
+                const Color(0xFFE0F2FE).withValues(alpha: 0.34),
+              ]);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: dark ? 0.18 : 0.14),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.22 : 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: bare
+            ? [
+                BoxShadow(
+                  color: accent.withValues(alpha: dark ? 0.12 : 0.10),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: accent.withValues(alpha: dark ? 0.18 : 0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: dark ? 0.22 : 0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          filter: ImageFilter.blur(sigmaX: bare ? 10 : 22, sigmaY: bare ? 10 : 22),
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(borderRadius),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: dark
-                    ? [
-                        Colors.white.withValues(alpha: 0.16),
-                        const Color(0xFF0F172A).withValues(alpha: 0.42),
-                        const Color(0xFF111827).withValues(alpha: 0.52),
-                      ]
-                    : [
-                        Colors.white.withValues(alpha: 0.55),
-                        Colors.white.withValues(alpha: 0.30),
-                        const Color(0xFFE0F2FE).withValues(alpha: 0.34),
-                      ],
+                colors: fill,
               ),
               border: Border.all(
                 color: accent.withValues(alpha: dark ? 0.48 : 0.36),
@@ -416,27 +440,28 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  top: 0,
-                  height: 16,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius - 2)),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.white.withValues(alpha: dark ? 0.20 : 0.48),
-                            Colors.white.withValues(alpha: 0),
-                          ],
+                if (!bare)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 0,
+                    height: 16,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius - 2)),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withValues(alpha: dark ? 0.20 : 0.48),
+                              Colors.white.withValues(alpha: 0),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 Padding(padding: padding, child: child),
               ],
             ),
@@ -632,6 +657,8 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
     required this.orbit,
     required this.child,
     this.header,
+    this.overlayHeader = false,
+    this.headerBare = false,
   });
 
   final List<Color> colors;
@@ -640,6 +667,10 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
   final double orbit;
   final Widget child;
   final Widget? header;
+  /// Float the header over content so menus scroll up behind it.
+  final bool overlayHeader;
+  /// Header frame without opaque fill.
+  final bool headerBare;
 
   @override
   Widget build(BuildContext context) {
@@ -655,6 +686,19 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
             Color.lerp(Colors.white, colors.first.withValues(alpha: 0.12), pulse)!,
             Color.lerp(const Color(0xFFE2E8F0), colors.last.withValues(alpha: 0.10), 1 - pulse)!,
           ];
+    final topInset = MediaQuery.paddingOf(context).top;
+    final headerBlock = header == null
+        ? null
+        : Padding(
+            padding: EdgeInsets.fromLTRB(12, overlayHeader ? topInset + 8 : 8, 12, 6),
+            child: NgmyToolkitGlassPillFrame(
+              accent: Color.lerp(colors.first, const Color(0xFF67E8F9), 0.35)!,
+              borderRadius: 30,
+              bare: headerBare,
+              child: header!,
+            ),
+          );
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -705,23 +749,28 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
             ),
           ),
         ),
-        Column(
-          children: [
-            if (header != null)
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                  child: NgmyToolkitGlassPillFrame(
-                    accent: Color.lerp(colors.first, const Color(0xFF67E8F9), 0.35)!,
-                    borderRadius: 30,
-                    child: header!,
-                  ),
-                ),
-              ),
-            Expanded(child: child),
-          ],
-        ),
+        if (overlayHeader) ...[
+          Positioned.fill(
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: child,
+            ),
+          ),
+          if (headerBlock != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: headerBlock,
+            ),
+        ] else
+          Column(
+            children: [
+              if (headerBlock != null) SafeArea(bottom: false, child: headerBlock),
+              Expanded(child: child),
+            ],
+          ),
       ],
     );
   }

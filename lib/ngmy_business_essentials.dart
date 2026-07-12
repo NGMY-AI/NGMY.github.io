@@ -149,6 +149,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             pulse: pulse,
             scan: scan,
             orbit: orbit,
+            overlayHeader: true,
+            headerBare: true,
             header: NgmyToolkitAliveHeader(
               title: 'Business Essentials',
               subtitle: 'Contacts · reminders · notes · tasks · local tools',
@@ -194,20 +196,16 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                  child: Text(
-                    'Organize contacts, reminders, notes, tasks & more — all saved locally',
-                    style: TextStyle(color: NgmyHudInk.subtitle(context), fontSize: 13, height: 1.35),
-                  ),
-                ),
                 if (_loading)
                   const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))))
                 else
                   Expanded(
-                    child: GridView.count(
+                    child: Builder(
+                      builder: (context) {
+                        final topPad = MediaQuery.paddingOf(context).top + 92;
+                        return GridView.count(
                       crossAxisCount: 2,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      padding: EdgeInsets.fromLTRB(16, topPad, 16, 24),
                       mainAxisSpacing: 10,
                       crossAxisSpacing: 10,
                       childAspectRatio: 1.35,
@@ -303,6 +301,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyColorBucketsDialog(ctx, userEmail: widget.userEmail)),
                         ),
                       ],
+                        );
+                      },
                     ),
                   ),
               ],

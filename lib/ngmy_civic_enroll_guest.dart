@@ -504,25 +504,47 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     height: logoSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.7 + pulse * 0.2), width: 1.5),
+                      gradient: const SweepGradient(
+                        colors: [
+                          Color(0xFFFFF4C2),
+                          Color(0xFFD4AF37),
+                          Color(0xFFB8860B),
+                          Color(0xFFF5E6A3),
+                          Color(0xFFD4AF37),
+                          Color(0xFF8B6914),
+                          Color(0xFFFFF4C2),
+                        ],
+                      ),
                       boxShadow: [
-                        BoxShadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 10),
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.45 + pulse * 0.2),
+                          blurRadius: 12,
+                          spreadRadius: 0.5,
+                        ),
                       ],
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Padding(
-                      padding: const EdgeInsets.all(5),
-                      child: Image.asset(
-                        'assets/images/ngmy_logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Image.network(
-                          'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const ColoredBox(
-                            color: Colors.white,
-                            child: Center(
-                              child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 8, color: Color(0xFF1E3A5F))),
+                    padding: const EdgeInsets.all(2.4),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Transform.scale(
+                        scale: 1.28,
+                        child: Image.asset(
+                          'assets/images/ngmy_logo.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorBuilder: (_, __, ___) => Image.network(
+                            'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            errorBuilder: (_, __, ___) => const ColoredBox(
+                              color: Colors.white,
+                              child: Center(
+                                child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 8, color: Color(0xFF1E3A5F))),
+                              ),
                             ),
                           ),
                         ),
