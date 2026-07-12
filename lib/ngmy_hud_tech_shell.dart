@@ -353,6 +353,100 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
   bool shouldRepaint(covariant NgmyHudMiniOrbPainter old) => old.pulse != pulse || old.orbit != orbit;
 }
 
+/// Frosted glass pill — matches home bottom-nav frame (transparent + curved ends).
+class NgmyToolkitGlassPillFrame extends StatelessWidget {
+  const NgmyToolkitGlassPillFrame({
+    super.key,
+    required this.child,
+    this.accent = const Color(0xFF67E8F9),
+    this.borderRadius = 30,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final Widget child;
+  final Color accent;
+  final double borderRadius;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: dark ? 0.18 : 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.22 : 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(borderRadius),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: dark
+                    ? [
+                        Colors.white.withValues(alpha: 0.16),
+                        const Color(0xFF0F172A).withValues(alpha: 0.42),
+                        const Color(0xFF111827).withValues(alpha: 0.52),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.55),
+                        Colors.white.withValues(alpha: 0.30),
+                        const Color(0xFFE0F2FE).withValues(alpha: 0.34),
+                      ],
+              ),
+              border: Border.all(
+                color: accent.withValues(alpha: dark ? 0.48 : 0.36),
+                width: 1.35,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: 0,
+                  height: 16,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius - 2)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withValues(alpha: dark ? 0.20 : 0.48),
+                            Colors.white.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(padding: padding, child: child),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Animated header used inside Creator Toolkit tools (dialogs + pages).
 class NgmyToolkitAliveHeader extends StatelessWidget {
   const NgmyToolkitAliveHeader({
@@ -383,14 +477,14 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
     final titleColor = NgmyHudInk.title(context);
     final subColor = NgmyHudInk.subtitle(context, pulse: pulse);
     return Padding(
-      padding: EdgeInsets.fromLTRB(dense ? 12 : 16, dense ? 10 : 14, 8, dense ? 6 : 8),
+      padding: EdgeInsets.fromLTRB(dense ? 12 : 14, dense ? 8 : 10, 6, dense ? 8 : 10),
       child: Row(
         children: [
           NgmyHudMiniOrb(
             colors: colors,
             pulse: pulse,
             orbit: orbit,
-            size: dense ? 40 : 46,
+            size: dense ? 40 : 44,
             icon: icon,
           ),
           const SizedBox(width: 12),
@@ -403,11 +497,8 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
                   style: TextStyle(
                     color: titleColor,
                     fontWeight: FontWeight.w900,
-                    fontSize: dense ? 16 : 18,
-                    letterSpacing: 0.4,
-                    shadows: [
-                      Shadow(color: colors.first.withValues(alpha: 0.45 + pulse * 0.25), blurRadius: 12),
-                    ],
+                    fontSize: dense ? 16 : 17,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
@@ -617,13 +708,16 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
         Column(
           children: [
             if (header != null)
-              NgmyHudTechFrame(
-                colors: colors,
-                pulse: pulse,
-                scan: scan,
-                orbit: orbit,
-                borderRadius: 0,
-                child: SafeArea(bottom: false, child: header!),
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                  child: NgmyToolkitGlassPillFrame(
+                    accent: Color.lerp(colors.first, const Color(0xFF67E8F9), 0.35)!,
+                    borderRadius: 30,
+                    child: header!,
+                  ),
+                ),
               ),
             Expanded(child: child),
           ],

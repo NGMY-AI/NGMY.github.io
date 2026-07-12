@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'dart:html' as html;
 
-/// Opens a real browser document and prints at 100% scale (avoids blurry blob previews).
+/// Opens a print-ready HTML document in a new tab (blob URL — works on current dart:html).
 Future<void> ngmyPrintCivicMemberReport({
   required String htmlContent,
   required String plainText,
   required String fileName,
 }) async {
-  final w = html.window.open('', '_blank', 'noopener,noreferrer');
-  if (w == null) {
+  final blob = html.Blob([utf8.encode(htmlContent)], 'text/html;charset=utf-8');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final opened = html.window.open(url, '_blank');
+  if (opened == null) {
+    html.Url.revokeObjectUrl(url);
     await ngmyDownloadCivicMemberReport(
       htmlContent: htmlContent,
       plainText: plainText,
@@ -16,15 +19,12 @@ Future<void> ngmyPrintCivicMemberReport({
     );
     return;
   }
-  try {
-    w.document.open();
-    w.document.write(htmlContent);
-    w.document.close();
-  } catch (_) {
-    final blob = html.Blob([utf8.encode(htmlContent)], 'text/html;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    w.location.href = url;
-  }
+  // Keep the blob alive long enough for the print dialog / preview.
+  Future<void>.delayed(const Duration(minutes: 2), () {
+    try {
+      html.Url.revokeObjectUrl(url);
+    } catch (_) {}
+  });
 }
 
 Future<void> ngmyDownloadCivicMemberReport({

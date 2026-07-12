@@ -170,7 +170,7 @@ jobs:
             echo "docs/ unchanged — skip push"
           fi
 
-          # Mirror to gh-pages branch root (ngmy.org Pages source is often gh-pages / root).
+          # Mirror to gh-pages branch root (best-effort; main/docs is the primary Pages source).
           git checkout --orphan gh-pages-deploy
           git rm -rf . 2>/dev/null || true
           cp -r _site/* .
@@ -178,4 +178,6 @@ jobs:
           printf '%s' 'ngmy.org' > CNAME
           git add -A
           git commit -m "Deploy web build to gh-pages for ngmy.org [skip ci]" || true
-          git push origin HEAD:gh-pages -f
+          if ! git push origin HEAD:gh-pages -f; then
+            echo "WARN: gh-pages mirror push failed — main/docs deploy already succeeded"
+          fi
