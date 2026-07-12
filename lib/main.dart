@@ -158,7 +158,6 @@ import 'ngmy_invoice_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
-import 'ngmy_civic_advisors_role_notes.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_admin.dart';
 import 'ngmy_app_builder.dart';
@@ -19455,6 +19454,355 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
 
 // --- ADMIN DASHBOARD ---
 
+class _AdminDashboardHeroBanner extends StatefulWidget {
+  const _AdminDashboardHeroBanner({
+    required this.isDark,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final bool isDark;
+  final String title;
+  final String subtitle;
+
+  @override
+  State<_AdminDashboardHeroBanner> createState() => _AdminDashboardHeroBannerState();
+}
+
+class _AdminDashboardHeroBannerState extends State<_AdminDashboardHeroBanner> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            gradient: LinearGradient(
+              begin: Alignment(-1 + t * 0.3, -1),
+              end: Alignment(1 - t * 0.2, 1),
+              colors: widget.isDark
+                  ? [
+                      Color.lerp(const Color(0xFF1E1B4B), const Color(0xFF312E81), t)!,
+                      const Color(0xFF0F172A),
+                      Color.lerp(const Color(0xFF134E4A), const Color(0xFF115E59), 1 - t)!,
+                    ]
+                  : [
+                      Color.lerp(const Color(0xFFEEF2FF), const Color(0xFFE0E7FF), t)!,
+                      Colors.white,
+                      Color.lerp(const Color(0xFFECFDF5), const Color(0xFFD1FAE5), 1 - t)!,
+                    ],
+            ),
+            border: Border.all(
+              color: widget.isDark
+                  ? Colors.white.withValues(alpha: 0.12 + t * 0.1)
+                  : const Color(0xFF6366F1).withValues(alpha: 0.18 + t * 0.12),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.12 + t * 0.1),
+                blurRadius: 18 + t * 8,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      Color.lerp(const Color(0xFF818CF8), const Color(0xFF6366F1), t)!,
+                      const Color(0xFF14B8A6),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.35 + t * 0.2), blurRadius: 12, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                        letterSpacing: -0.4,
+                        color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.subtitle,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: widget.isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AdminLiveStatsPanel extends StatefulWidget {
+  const _AdminLiveStatsPanel({
+    required this.isDark,
+    required this.users,
+    required this.pending,
+    required this.revenue,
+  });
+
+  final bool isDark;
+  final String users;
+  final String pending;
+  final String revenue;
+
+  @override
+  State<_AdminLiveStatsPanel> createState() => _AdminLiveStatsPanelState();
+}
+
+class _AdminLiveStatsPanelState extends State<_AdminLiveStatsPanel> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF151B2B) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Color.lerp(
+                widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                const Color(0xFF6366F1).withValues(alpha: widget.isDark ? 0.55 : 0.35),
+                t,
+              )!,
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.06 + t * 0.08),
+                blurRadius: 16 + t * 6,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color.lerp(const Color(0xFF22C55E), const Color(0xFF4ADE80), t),
+                      boxShadow: [BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.5), blurRadius: 6 + t * 4)],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'LIVE OVERVIEW',
+                    style: TextStyle(
+                      color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _statCell('Users', widget.users, Icons.people_alt_rounded, const Color(0xFF3B82F6))),
+                  Expanded(child: _statCell('Pending', widget.pending, Icons.pending_actions_rounded, const Color(0xFFF59E0B))),
+                  Expanded(child: _statCell('Revenue', widget.revenue, Icons.payments_rounded, const Color(0xFF10B981))),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _statCell(String label, String value, IconData icon, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: widget.isDark ? 0.22 : 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(height: 8),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: widget.isDark ? Colors.white : const Color(0xFF0F172A))),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+}
+
+class _AdminPulseMenuTile extends StatefulWidget {
+  const _AdminPulseMenuTile({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+  final int badgeCount;
+
+  @override
+  State<_AdminPulseMenuTile> createState() => _AdminPulseMenuTileState();
+}
+
+class _AdminPulseMenuTileState extends State<_AdminPulseMenuTile> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2100))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_pulse.value);
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              clipBehavior: Clip.none,
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(widget.color, widget.color.withValues(alpha: 0.85), t)!,
+                        widget.color.withValues(alpha: widget.isDark ? 0.55 : 0.72),
+                        widget.color.withValues(alpha: widget.isDark ? 0.38 : 0.55),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: widget.color.withValues(alpha: 0.28 + t * 0.18), blurRadius: 14 + t * 8, offset: const Offset(0, 6)),
+                    ],
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.22 + t * 0.16), width: 1.3),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.18 + t * 0.08),
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 3))],
+                            ),
+                            child: Icon(widget.icon, color: Colors.white, size: 24),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        widget.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Colors.white, height: 1.2),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.badgeCount > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        widget.badgeCount > 99 ? '99+' : '${widget.badgeCount}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, height: 1.1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class AdminDashboard extends StatefulWidget {
   final UserData user; final List<AppTransaction> allTransactions; final List<UserData> allUsers; final List<InvestmentPlan> globalPlans; final AppConfig config;
   final List<MediaPost> allMedia;
@@ -19751,57 +20099,83 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
 
-  Widget _adminHome(bool isDark) => SingleChildScrollView(
-    padding: const EdgeInsets.all(20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('System Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: isDark ? Colors.white : Colors.black)),
-        const SizedBox(height: 18),
-        Text('Management Menus', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 3,
-          mainAxisSpacing: 15,
-          crossAxisSpacing: 15,
-          childAspectRatio: 1.1,
-          children: [
-            _menuFrame('Civic Registry', Icons.account_balance_rounded, const Color(0xFF6200EE), () => unawaited(_openCivicRegistryAdmin(isDark)), isDark, badgeCount: NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications)),
-            _menuFrame('Payments', Icons.payments_outlined, const Color(0xFF0D9488), () => unawaited(_openPaymentsAdmin(isDark)), isDark),
-            _menuFrame('Pop Ups', Icons.view_in_ar_rounded, const Color(0xFF6366F1), () => unawaited(_openPopupsAdmin(isDark)), isDark),
-          ],
-        ),
-        const SizedBox(height: 28),
+  Widget _adminHome(bool isDark) {
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final pendingTx = widget.allTransactions.where((t) => t.status == TransactionStatus.pending).length;
+    final revenue = widget.allTransactions
+        .where((t) => t.status == TransactionStatus.approved && t.type == TransactionType.deposit)
+        .fold(0.0, (s, t) => s + t.amount);
+    final registrarPending = NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications);
 
-        // Overview Stats Frame
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.92, end: 1),
+            duration: const Duration(milliseconds: 560),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+            child: _AdminDashboardHeroBanner(
+              isDark: isDark,
+              title: 'System Hub',
+              subtitle: 'Command center for registry, payments & pop-ups',
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 22),
+          Text('Management', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          Text('Tap a tile to open tools', style: TextStyle(fontSize: 12, color: mute, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.92,
             children: [
-              const Text('QUICK STATS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              Row(children: [
-                Expanded(child: _miniStat('Users', '${widget.allUsers.length}', Icons.people, Colors.blue)),
-                Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.2)),
-                Expanded(child: _miniStat('Pending', '${widget.allTransactions.where((t)=>t.status == TransactionStatus.pending).length}', Icons.pending_actions, Colors.orange)),
-                Container(width: 1, height: 40, color: Colors.grey.withOpacity(0.2)),
-                Expanded(child: _miniStat('Revenue', '\$${formatCurrency(widget.allTransactions.where((t)=>t.status == TransactionStatus.approved && t.type == TransactionType.deposit).fold(0.0, (s,t)=>s+t.amount))}', Icons.monetization_on, Colors.green)),
-              ]),
+              _menuFrame(
+                'Civic Registry',
+                Icons.account_balance_rounded,
+                const Color(0xFF7C3AED),
+                () => unawaited(_openCivicRegistryAdmin(isDark)),
+                isDark,
+                badgeCount: registrarPending,
+                animDelayMs: 40,
+              ),
+              _menuFrame(
+                'Payments',
+                Icons.payments_outlined,
+                const Color(0xFF0D9488),
+                () => unawaited(_openPaymentsAdmin(isDark)),
+                isDark,
+                animDelayMs: 120,
+              ),
+              _menuFrame(
+                'Pop Ups',
+                Icons.view_in_ar_rounded,
+                const Color(0xFF4F46E5),
+                () => unawaited(_openPopupsAdmin(isDark)),
+                isDark,
+                animDelayMs: 200,
+              ),
             ],
           ),
-        ),
-        const SizedBox(height: 50),
-      ],
-    ),
-  );
+          const SizedBox(height: 24),
+          _AdminLiveStatsPanel(
+            isDark: isDark,
+            users: '${widget.allUsers.length}',
+            pending: '$pendingTx',
+            revenue: '\$${formatCurrency(revenue)}',
+          ),
+          const SizedBox(height: 28),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openPopupsAdmin(bool isDark) async {
     _showPopupsAdmin(isDark);
@@ -21006,13 +21380,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _miniStat(String l, String v, IconData i, Color c) => Column(children: [
-    Icon(i, color: c, size: 18),
-    const SizedBox(height: 5),
-    Text(v, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-    Text(l, style: const TextStyle(color: Colors.grey, fontSize: 9)),
-  ]);
-
   InputDecoration _adminInputDecoration({
     required String label,
     required bool isDark,
@@ -21037,76 +21404,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _menuFrame(String title, IconData icon, Color color, VoidCallback onTap, bool isDark, {int badgeCount = 0}) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Stack(
-        clipBehavior: Clip.none,
-        fit: StackFit.expand,
-        children: [
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  color.withOpacity(isDark ? 0.55 : 0.75),
-                  color.withOpacity(isDark ? 0.35 : 0.55),
-                  color.withOpacity(isDark ? 0.25 : 0.4),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(color: color.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6)),
-                BoxShadow(color: Colors.black.withOpacity(isDark ? 0.35 : 0.12), blurRadius: 6, offset: const Offset(0, 3)),
-              ],
-              border: Border.all(color: Colors.white.withOpacity(0.28), width: 1.2),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))],
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 24),
-                ),
-                const SizedBox(height: 10),
-                Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.white)),
-              ],
-            ),
-          ),
-          if (badgeCount > 0)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4)],
-                ),
-                child: Text(
-                  badgeCount > 99 ? '99+' : '$badgeCount',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, height: 1.1),
-                ),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
+  Widget _menuFrame(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+    bool isDark, {
+    int badgeCount = 0,
+    int animDelayMs = 0,
+  }) =>
+      TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Duration(milliseconds: 420 + animDelayMs),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) => Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Transform.translate(offset: Offset(0, (1 - t) * 14), child: child),
+        ),
+        child: _AdminPulseMenuTile(
+          title: title,
+          icon: icon,
+          color: color,
+          isDark: isDark,
+          badgeCount: badgeCount,
+          onTap: onTap,
+        ),
+      );
 
 
   Widget _adminMedia(bool isDark) {
@@ -28111,6 +28434,171 @@ class _AliveSearchFrame extends StatefulWidget {
 }
 
 class _AliveSearchFrameState extends State<_AliveSearchFrame> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final base = widget.isDark ? const Color(0xFF121826) : Colors.white;
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_pulse.value);
+        final accent = Color.lerp(const Color(0xFF14B8A6), const Color(0xFF6366F1), t)!;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: base,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: accent.withValues(alpha: 0.35 + t * 0.35), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.10 + t * 0.14),
+                blurRadius: 16 + t * 10,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(color: Colors.black.withValues(alpha: widget.isDark ? 0.22 : 0.05), blurRadius: 10),
+            ],
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: widget.isDark
+                  ? [base, Color.lerp(base, const Color(0xFF1E293B), 0.35 + t * 0.2)!]
+                  : [Colors.white, Color.lerp(Colors.white, const Color(0xFFF0FDFA), 0.5 + t * 0.3)!],
+            ),
+          ),
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
+
+int _ngmyLevenshtein(String a, String b) {
+  if (a == b) return 0;
+  if (a.isEmpty) return b.length;
+  if (b.isEmpty) return a.length;
+  final prev = List<int>.generate(b.length + 1, (i) => i);
+  for (var i = 0; i < a.length; i++) {
+    final cur = List<int>.filled(b.length + 1, 0);
+    cur[0] = i + 1;
+    for (var j = 0; j < b.length; j++) {
+      final cost = a[i] == b[j] ? 0 : 1;
+      cur[j + 1] = [
+        cur[j] + 1,
+        prev[j + 1] + 1,
+        prev[j] + cost,
+      ].reduce((x, y) => x < y ? x : y);
+    }
+    for (var j = 0; j <= b.length; j++) {
+      prev[j] = cur[j];
+    }
+  }
+  return prev[b.length];
+}
+
+double _ngmyFuzzyFieldScore(String query, String field) {
+  final q = query.trim().toLowerCase();
+  final f = field.trim().toLowerCase();
+  if (q.isEmpty) return 1;
+  if (f.isEmpty) return 0;
+  if (f == q) return 1;
+  if (f.contains(q)) return 0.96;
+  if (q.contains(f) && f.length >= 3) return 0.9;
+
+  var best = 0.0;
+  final words = f.split(RegExp(r'[^a-z0-9]+')).where((w) => w.isNotEmpty);
+  for (final w in words) {
+    if (w.startsWith(q) || q.startsWith(w)) {
+      best = best < 0.92 ? 0.92 : best;
+      continue;
+    }
+    final maxLen = w.length > q.length ? w.length : q.length;
+    if (maxLen == 0) continue;
+    final sim = 1.0 - (_ngmyLevenshtein(q, w) / maxLen);
+    if (sim > best) best = sim;
+  }
+
+  final maxFull = f.length > q.length ? f.length : q.length;
+  if (maxFull > 0) {
+    final fullSim = 1.0 - (_ngmyLevenshtein(q, f) / maxFull);
+    if (fullSim > best) best = fullSim;
+  }
+
+  // Soft token: allow 1–2 character typos on longer names.
+  if (q.length >= 3) {
+    for (final w in words) {
+      if ((w.length - q.length).abs() > 2) continue;
+      final d = _ngmyLevenshtein(q, w);
+      if (d <= 2 && w.length >= 3) {
+        final s = 0.88 - (d * 0.08);
+        if (s > best) best = s;
+      }
+    }
+  }
+  return best.clamp(0.0, 1.0);
+}
+
+double _ngmyCivicMemberSearchScore(String query, UserData u, List<String> nicks) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return 1;
+  final fields = <String>[
+    u.username,
+    u.fullName ?? '',
+    u.registryId ?? '',
+    u.city ?? '',
+    u.phone,
+    ...nicks,
+  ];
+  var best = 0.0;
+  for (final f in fields) {
+    final s = _ngmyFuzzyFieldScore(q, f);
+    if (s > best) best = s;
+  }
+  // Multi-word query: score each token against full name / username.
+  final tokens = q.split(RegExp(r'\s+')).where((t) => t.length >= 2).toList();
+  if (tokens.length > 1) {
+    final nameHay = '${u.fullName ?? ''} ${u.username}'.toLowerCase();
+    var tokenHits = 0.0;
+    for (final t in tokens) {
+      tokenHits += _ngmyFuzzyFieldScore(t, nameHay);
+    }
+    final avg = tokenHits / tokens.length;
+    if (avg > best) best = avg;
+  }
+  return best;
+}
+
+class _CivicBackupActionTile extends StatefulWidget {
+  const _CivicBackupActionTile({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.isDark,
+    required this.card,
+    required this.ink,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final bool isDark;
+  final Color card;
+  final Color ink;
+  final VoidCallback onTap;
+
+  @override
+  State<_CivicBackupActionTile> createState() => _CivicBackupActionTileState();
+}
+
+class _CivicBackupActionTileState extends State<_CivicBackupActionTile> with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
     ..repeat(reverse: true);
 
@@ -28122,28 +28610,82 @@ class _AliveSearchFrameState extends State<_AliveSearchFrame> with SingleTickerP
 
   @override
   Widget build(BuildContext context) {
-    final base = widget.isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final frame = widget.isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5);
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) {
         final t = Curves.easeInOut.transform(_pulse.value);
-        return Container(
-          margin: const EdgeInsets.only(bottom: 15),
-          decoration: BoxDecoration(
-            color: base,
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Color.lerp(frame.withOpacity(0.35), frame.withOpacity(0.85), t)!, width: 1.6),
-            boxShadow: [
-              BoxShadow(
-                color: frame.withOpacity(0.08 + t * 0.14),
-                blurRadius: 12 + t * 10,
-                offset: const Offset(0, 5),
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              height: 126,
+              padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color.lerp(widget.card, widget.accent.withValues(alpha: widget.isDark ? 0.22 : 0.12), 0.35 + t * 0.25)!,
+                    widget.card,
+                  ],
+                ),
+                border: Border.all(
+                  color: Color.lerp(
+                    widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    widget.accent.withValues(alpha: 0.75),
+                    0.25 + t * 0.55,
+                  )!,
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.accent.withValues(alpha: 0.12 + t * 0.16),
+                    blurRadius: 14 + t * 8,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              BoxShadow(color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.04), blurRadius: 10),
-            ],
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              widget.accent.withValues(alpha: 0.95),
+                              Color.lerp(widget.accent, Colors.black, 0.18)!,
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: widget.accent.withValues(alpha: 0.28 + t * 0.2),
+                              blurRadius: 12 + t * 6,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(widget.icon, color: Colors.white, size: 24),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: widget.ink, letterSpacing: -0.2),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: widget.child,
         );
       },
     );
@@ -28745,22 +29287,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<UserData> _registryMembersMatchingSearch() {
-    bool matchesFilters(UserData u) {
-      final stateMatch = u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase();
-      if (!stateMatch) return false;
-      if (_searchQuery.isEmpty) return true;
+    final q = _searchQuery.trim();
+    final pool = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((u) => u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase())
+        .toList();
+    if (q.isEmpty) return pool;
+
+    final scored = <({UserData u, double score})>[];
+    for (final u in pool) {
       final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
       final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-      final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
-          u.fullName?.toLowerCase().contains(_searchQuery) == true ||
-          u.registryId?.toLowerCase().contains(_searchQuery) == true ||
-          u.city?.toLowerCase().contains(_searchQuery) == true ||
-          u.phone.toLowerCase().contains(_searchQuery) ||
-          nicks.any((n) => n.toLowerCase().contains(_searchQuery));
-      return textMatch;
+      final score = _ngmyCivicMemberSearchScore(q, u, nicks);
+      // Keep close / partial / typo matches (Facebook-style).
+      if (score >= 0.48) scored.add((u: u, score: score));
     }
-
-    return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where(matchesFilters).toList();
+    scored.sort((a, b) {
+      final byScore = b.score.compareTo(a.score);
+      if (byScore != 0) return byScore;
+      final an = (a.u.fullName ?? a.u.username).toLowerCase();
+      final bn = (b.u.fullName ?? b.u.username).toLowerCase();
+      return an.compareTo(bn);
+    });
+    return scored.map((e) => e.u).toList();
   }
 
   Future<void> _persistReceiptReadState() async {
@@ -29539,40 +30087,94 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 <meta charset="utf-8"/>
 <title>$title</title>
 <style>
-  @page { margin: 18mm 14mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 0; padding: 18px 22px 28px; }
-  .topbar { display: flex; justify-content: flex-end; align-items: flex-start; min-height: 54px; margin-bottom: 8px; }
-  .stamp { text-align: right; line-height: 1.25; }
-  .stamp .date { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #111; }
-  .stamp .time { font-size: 12px; color: #555; margin-top: 2px; }
-  .header { text-align: center; margin: 4px 0 22px; }
-  .header h1 {
-    margin: 0;
-    font-size: 26px;
+  @page { margin: 16mm 12mm; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 0; padding: 16px 18px 26px; }
+  .masthead {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    border-bottom: 3px solid #0f172a;
+  }
+  .stamp {
+    justify-self: start;
+    text-align: left;
+    line-height: 1.2;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .stamp .date {
+    font-size: 15px;
     font-weight: 800;
     letter-spacing: 0.04em;
-    line-height: 1.25;
+    color: #0f172a;
   }
-  .header .count { margin-top: 8px; font-size: 12px; color: #666; font-family: system-ui, sans-serif; }
+  .stamp .time {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+  }
+  .header {
+    justify-self: center;
+    text-align: center;
+    max-width: 520px;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 0.045em;
+    line-height: 1.2;
+    text-decoration: underline;
+    text-decoration-thickness: 2.5px;
+    text-underline-offset: 8px;
+  }
+  .members-chip {
+    justify-self: end;
+    align-self: start;
+    font-family: system-ui, -apple-system, sans-serif;
+    text-align: right;
+    min-width: 108px;
+  }
+  .members-chip .label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  .members-chip .value {
+    margin-top: 4px;
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1;
+  }
   table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #ccc; padding: 10px 8px; font-size: 13px; vertical-align: top; }
-  th { background: #f3f4f6; text-align: left; }
+  th, td { border: 1px solid #cbd5e1; padding: 10px 8px; font-size: 13px; vertical-align: top; }
+  th { background: #f1f5f9; text-align: left; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 0.02em; }
+  th:last-child, td:last-child { text-align: center; width: 88px; }
   @media print {
     body { padding: 0; }
-    .topbar { margin-bottom: 4px; }
+    .masthead { margin-bottom: 14px; }
   }
 </style>
 </head>
 <body>
-  <div class="topbar">
+  <div class="masthead">
     <div class="stamp">
       <div class="date">${_escapeHtml(dateStr)}</div>
       <div class="time">${_escapeHtml(timeStr)}</div>
     </div>
-  </div>
-  <div class="header">
-    <h1>${_escapeHtml(title)}</h1>
-    <div class="count">${members.length} members</div>
+    <div class="header">
+      <h1>${_escapeHtml(title)}</h1>
+    </div>
+    <div class="members-chip">
+      <div class="label">Members</div>
+      <div class="value">${members.length}</div>
+    </div>
   </div>
   <table>
     <thead>
@@ -29616,7 +30218,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
     final card = isDark ? const Color(0xFF151C2C) : Colors.white;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mute = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -29628,37 +30229,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           required Color accent,
           required String title,
           required VoidCallback onTap,
+          int delayMs = 0,
         }) {
-          return Material(
-            color: card,
-            borderRadius: BorderRadius.circular(18),
-            child: InkWell(
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 380 + delayMs),
+            curve: Curves.easeOutBack,
+            builder: (context, t, child) => Opacity(
+              opacity: t.clamp(0.0, 1.0),
+              child: Transform.scale(scale: 0.92 + (t * 0.08), child: child),
+            ),
+            child: _CivicBackupActionTile(
+              icon: icon,
+              accent: accent,
+              title: title,
+              isDark: isDark,
+              card: card,
+              ink: ink,
               onTap: onTap,
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                height: 112,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: isDark ? const Color(0xFF243044) : const Color(0xFFE8ECF1)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: accent.withOpacity(isDark ? 0.2 : 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: accent, size: 20),
-                    ),
-                    const Spacer(),
-                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: ink)),
-                  ],
-                ),
-              ),
             ),
           );
         }
@@ -29719,6 +30307,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           icon: Icons.download_rounded,
                           accent: const Color(0xFF2563EB),
                           title: 'Download',
+                          delayMs: 0,
                           onTap: () {
                             Navigator.pop(ctx);
                             unawaited(_downloadCivicRegistryBackup());
@@ -29731,6 +30320,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           icon: Icons.upload_rounded,
                           accent: const Color(0xFF059669),
                           title: 'Upload',
+                          delayMs: 60,
                           onTap: () {
                             Navigator.pop(ctx);
                             unawaited(_uploadCivicRegistryBackup());
@@ -29747,6 +30337,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           icon: Icons.print_rounded,
                           accent: const Color(0xFFD97706),
                           title: 'Print roster',
+                          delayMs: 120,
                           onTap: () {
                             Navigator.pop(ctx);
                             unawaited(_downloadCivicPrintRoster());
@@ -29759,6 +30350,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           icon: Icons.pin_rounded,
                           accent: const Color(0xFF7C3AED),
                           title: 'PIN',
+                          delayMs: 180,
                           onTap: () {
                             Navigator.pop(ctx);
                             if (!canPin) {
@@ -32253,11 +32845,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               if (_activeTab == 1) _rankingsSection(isDark),
             ],
 
-            if (widget.user.isAdmin) ...[
-              const SizedBox(height: 24),
-              NgmyCivicAdvisorsRoleNotesCard(isDark: isDark),
-            ],
-
               const SizedBox(height: 50),
             ],
           ),
@@ -32312,7 +32899,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search members by name, ID, city...',
+              hintText: 'Search by name (typos OK), ID, city...',
               hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
               prefixIcon: const Icon(Icons.search, size: 22),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
@@ -32359,87 +32946,153 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
     final familyRaw = raw?['familyMembers'];
     final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+    final initials = displayName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+    final statusLabel = _statusLabelForMissed(u.missed);
+    final statusColor = _statusColorForMissed(u.missed);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
 
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.96, end: 1),
-      duration: const Duration(milliseconds: 420),
+      tween: Tween(begin: 0.94, end: 1),
+      duration: const Duration(milliseconds: 460),
       curve: Curves.easeOutBack,
       builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
       child: _AliveSearchFrame(
         isDark: isDark,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [Color(0xFF334155), Color(0xFF0F766E)]
+                            : const [Color(0xFFCCFBF1), Color(0xFFE0E7FF)],
+                      ),
+                      border: Border.all(color: isDark ? const Color(0xFF5EEAD4) : const Color(0xFF14B8A6), width: 1.6),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      initials.isEmpty ? '?' : initials,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: isDark ? Colors.white : const Color(0xFF0F766E),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                displayName,
-                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _statusColorForMissed(u.missed),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                _statusLabelForMissed(u.missed),
-                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16.5, color: ink, letterSpacing: -0.2),
                         ),
                         if (showNicks)
-                          Text(
-                            nicks.join(' · '),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              nicks.join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                             ),
                           ),
-                        Text(u.registryId ?? 'PENDING ID', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                        const SizedBox(height: 4),
+                        Text(
+                          u.registryId ?? 'PENDING ID',
+                          style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 12.5),
+                        ),
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('${u.helps} helps', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text('${u.missed} missed', style: const TextStyle(color: Colors.red, fontSize: 10)),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: isDark ? 0.28 : 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.55)),
+                    ),
+                    child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w900)),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
-              _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
-              _memberInfo(Icons.phone_android_rounded, u.phone.isEmpty ? 'No phone' : u.phone, Colors.black54),
-              _memberInfo(
-                Icons.family_restroom_rounded,
-                '$familyCount family member${familyCount == 1 ? '' : 's'}',
-                Colors.teal,
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _publicMetaChip(Icons.location_on_rounded, u.city ?? 'City n/a', const Color(0xFFEF4444), isDark),
+                  _publicMetaChip(Icons.meeting_room_rounded, u.room ?? 'Room n/a', const Color(0xFFF59E0B), isDark),
+                  _publicMetaChip(Icons.phone_rounded, u.phone.isEmpty ? 'No phone' : u.phone, const Color(0xFF64748B), isDark),
+                  _publicMetaChip(Icons.family_restroom_rounded, '$familyCount family', const Color(0xFF14B8A6), isDark),
+                ],
               ),
-              const SizedBox(height: 16),
-              Center(
-                child: _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showPublicMemberProfile(u)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text('${u.helps} helps', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w800, fontSize: 12)),
+                  const SizedBox(width: 10),
+                  Text('${u.missed} missed', style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w700, fontSize: 12)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _showPublicMemberProfile(u),
+                    icon: const Icon(Icons.visibility_rounded, size: 16),
+                    label: const Text('View', style: TextStyle(fontWeight: FontWeight.w800)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _publicMetaChip(IconData icon, String label, Color color, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.16 : 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.35 : 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF334155)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -32673,26 +33326,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _membersSection(bool isDark) {
-    bool matchesFilters(UserData u) {
+    final q = _searchQuery.trim();
+    final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((u) {
       final stateMatch = (u.state).trim().toLowerCase() == _selectedState.trim().toLowerCase();
-      final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
-          u.fullName?.toLowerCase().contains(_searchQuery) == true ||
-          u.registryId?.toLowerCase().contains(_searchQuery) == true ||
-          u.city?.toLowerCase().contains(_searchQuery) == true;
       final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
       final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
-      return stateMatch && textMatch && cityMatch && roomMatch;
+      if (!stateMatch || !cityMatch || !roomMatch) return false;
+      if (q.isEmpty) return true;
+      final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+      return _ngmyCivicMemberSearchScore(q, u, nicks) >= 0.48;
+    }).toList();
+    if (q.isNotEmpty) {
+      members.sort((a, b) {
+        final rawA = NgmyCivicRegistryMembers.findByEmail(widget.config, a.email);
+        final rawB = NgmyCivicRegistryMembers.findByEmail(widget.config, b.email);
+        final nicksA = rawA == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(rawA);
+        final nicksB = rawB == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(rawB);
+        final byScore = _ngmyCivicMemberSearchScore(q, b, nicksB).compareTo(_ngmyCivicMemberSearchScore(q, a, nicksA));
+        if (byScore != 0) return byScore;
+        return (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase());
+      });
+    } else {
+      final userOrder = <String, int>{
+        for (int i = 0; i < members.length; i++) members[i].email.toLowerCase().trim(): i,
+      };
+      members.sort((a, b) {
+        final aIndex = userOrder[a.email.toLowerCase().trim()] ?? -1;
+        final bIndex = userOrder[b.email.toLowerCase().trim()] ?? -1;
+        return bIndex.compareTo(aIndex);
+      });
     }
-
-    final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where(matchesFilters).toList();
-    final userOrder = <String, int>{
-      for (int i = 0; i < members.length; i++) members[i].email.toLowerCase().trim(): i,
-    };
-    members.sort((a, b) {
-      final aIndex = userOrder[a.email.toLowerCase().trim()] ?? -1;
-      final bIndex = userOrder[b.email.toLowerCase().trim()] ?? -1;
-      return bIndex.compareTo(aIndex);
-    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32702,7 +33366,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
         TextField(
           onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-          decoration: InputDecoration(hintText: 'Search members by name, ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+          decoration: InputDecoration(hintText: 'Search by name (typos OK), ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
         ),
         const SizedBox(height: 20),
 

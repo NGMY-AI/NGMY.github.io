@@ -456,7 +456,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               gradient: LinearGradient(
@@ -476,18 +476,47 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
               ],
             ),
-            child: Text(
-              'NGMY self enrollment',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8 + pulse * 0.3,
-                color: Colors.white,
-                shadows: [
-                  Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
-                ],
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    'NGMY self enrollment',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8 + pulse * 0.3,
+                      color: Colors.white,
+                      shadows: [
+                        Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.55 + pulse * 0.2), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 10),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.network(
+                      'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const ColoredBox(
+                        color: Color(0xFF0F172A),
+                        child: Icon(Icons.public, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
