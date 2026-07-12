@@ -60,7 +60,7 @@ class NgmyGuestCivicEnrollApp extends StatelessWidget {
     _applyEnrollChrome();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'EMO \'YA M\'MBONDO',
+      title: 'NGMY Self Enrollment',
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -272,8 +272,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Jina kamili linahitajika.');
       return;
     }
+    // Require at least first + last name (two non-empty words).
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
-      _toast('Andika jina la kwanza na la mwisho.');
+      _toast('Andika jina la kwanza na jina la mwisho.');
       return;
     }
     if (address.isEmpty) {
@@ -455,7 +456,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   Widget _titleBadge(double pulse, double shimmer) {
-    const logoSize = 46.0;
+    // Logo ring sits at the far end of the title bar; keep bar height the same.
+    const logoSize = 54.0;
     return Transform.scale(
       scale: 1.0 + pulse * 0.02,
       child: Stack(
@@ -468,7 +470,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.fromLTRB(16, 8, 58, 8),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
@@ -488,9 +490,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
                   ],
                 ),
-                // Keep title visually centered in the bar (logo floats on the end).
                 child: Text(
-                  "EMO 'YA M'MBONDO",
+                  'NGMY self enrollment',
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -508,7 +509,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
             ),
           ),
           Positioned(
-            right: 4,
+            right: -2,
             child: Container(
               width: logoSize,
               height: logoSize,
@@ -601,9 +602,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       context,
       states: _kUsStates,
       selected: _selectedState,
-      title: 'Chagua jimbo',
-      searchHint: 'Tafuta majimbo…',
-      emptyLabel: 'Hakuna matokeo',
+      title: 'Choose state',
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedState = picked);
@@ -643,7 +642,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               ],
             ),
             child: Text(
-              "Usajili · $_selectedState",
+              "EMO 'YA M'MBONDO · $_selectedState",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
