@@ -138,6 +138,10 @@ import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_id_card.dart';
+import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
+import 'ngmy_communicate_sync_download_io.dart'
+    if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_id_scanner.dart';
@@ -15679,24 +15683,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           displayName: widget.user.username,
                           civicIdRecord: () {
                             final u = widget.user;
-                            final rid = (u.registryId ?? '').trim();
-                            if (!u.isEnrolledInRegistry && rid.isEmpty) return null;
-                            return <String, dynamic>{
-                              'email': u.email,
-                              'fullName': (u.fullName ?? u.username).toString(),
-                              'dob': (u.dob ?? '').toString(),
-                              'idType': (u.idType ?? '').toString(),
-                              'homeAddress': (u.homeAddress ?? '').toString(),
-                              'phone': u.phone,
-                              'city': (u.city ?? '').toString(),
-                              'room': (u.room ?? '').toString(),
-                              'state': u.state,
-                              'registryId': rid,
-                              'idPhotoPath': (u.profilePicturePath ?? '').toString(),
-                              'passportGranted': true,
-                              'helps': u.helps,
-                              'missed': u.missed,
-                            };
+                            final fromRegistry = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+                                NgmyCivicRegistryMembers.passportForAppUser(
+                                  widget.config,
+                                  email: u.email,
+                                  phone: u.phone,
+                                );
+                            if (fromRegistry != null) {
+                              final rid = (fromRegistry['registryId'] ?? '').toString().trim();
+                              if (rid.isEmpty) return null;
+                              return Map<String, dynamic>.from(fromRegistry);
+                            }
+                            // Deleted from registry — do not resurrect from leftover profile fields.
+                            return null;
                           }(),
                         ),
                         // Extra air so tech frames sit a bit lower under the cards.
@@ -29200,16 +29199,45 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<bool> _removeRegistryMember(UserData member) async {
+    final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
+    final registryId = (member.registryId ?? '').trim();
     NgmyCivicRegistryMembers.removeByEmail(widget.config, member.email);
-    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, false);
-    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
-      widget.user.isEnrolledInRegistry = false;
+    if (registryId.isNotEmpty) {
+      final still = NgmyCivicRegistryMembers.findByRegistryId(widget.config, registryId);
+      if (still != null) {
+        NgmyCivicRegistryMembers.removeByEmail(widget.config, (still['email'] ?? '').toString());
+      }
     }
+    void clearCivicFields(UserData u) {
+      u.isEnrolledInRegistry = false;
+      u.registryId = '';
+      // Keep personal contact fields on the app account; strip registry standing so
+      // search/rankings/ID surfaces cannot resurrect them without a restore.
+      u.helps = 0;
+      u.missed = 0;
+    }
+
+    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, false);
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey,
+    );
+    if (accountIdx >= 0) clearCivicFields(widget.allUsers[accountIdx]);
+    // Also clear any app user linked by the same registry phone / linked passport email.
+    for (final u in widget.allUsers) {
+      final linked = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      if (linked != null) continue;
+      if (NgmyCivicRegistryMembers.emailKey(u.email) == emailKey ||
+          ((u.registryId ?? '').trim().isNotEmpty && (u.registryId ?? '').trim() == registryId)) {
+        clearCivicFields(u);
+      }
+    }
+    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == emailKey ||
+        ((widget.user.registryId ?? '').trim().isNotEmpty && (widget.user.registryId ?? '').trim() == registryId)) {
+      clearCivicFields(widget.user);
+    }
+
     final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
     var userCloudOk = true;
-    final accountIdx = widget.allUsers.indexWhere(
-      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
-    );
     if (await ngmyCanReachCloud() && accountIdx >= 0) {
       try {
         await Supabase.instance.client
@@ -29224,11 +29252,195 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
       await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
-      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(member.email)) {
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == emailKey) {
         await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
       }
     } catch (_) {}
     return membersCloudOk && userCloudOk;
+  }
+
+  Future<String?> _pickCivicBackupText() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json', 'ngmy'],
+        withData: true,
+      );
+      final file = result?.files.first;
+      if (file == null) return null;
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        return utf8.decode(file.bytes!);
+      }
+    } catch (_) {}
+    return ngmyPickBackupJsonViaBrowser();
+  }
+
+  Future<void> _downloadCivicRegistryBackup() async {
+    final envelope = NgmyCivicRegistryMembers.backupEnvelope(widget.config, state: _selectedState);
+    final count = envelope['memberCount'] as int? ?? 0;
+    if (count < 1) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members in this state to download yet.')),
+      );
+      return;
+    }
+    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
+    final stateSlug = _selectedState.trim().isEmpty ? 'all' : _selectedState.trim().replaceAll(RegExp(r'\s+'), '_');
+    final filename = 'ngmy-civic-registry-$stateSlug-$stamp.json';
+    final msg = await downloadNgmyAdvisorSyncJson(jsonEncode(envelope), filename);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Downloaded $count member(s). $msg'), backgroundColor: Colors.green),
+    );
+  }
+
+  Future<void> _uploadCivicRegistryBackup() async {
+    final raw = await _pickCivicBackupText();
+    if (raw == null || raw.trim().isEmpty) return;
+    List<Map<String, dynamic>> incoming;
+    try {
+      incoming = NgmyCivicRegistryMembers.membersFromBackupJson(raw);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That file is not a valid civic registry backup.')),
+      );
+      return;
+    }
+    if (incoming.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members found in that backup file.')),
+      );
+      return;
+    }
+
+    final result = NgmyCivicRegistryMembers.importMissingMembers(widget.config, incoming);
+    for (final m in result.restored) {
+      final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
+      if (email.isEmpty) continue;
+      _setCivicEnrollmentFlagForAccount(widget.allUsers, email, true);
+      final idx = widget.allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == email);
+      if (idx >= 0) {
+        final u = widget.allUsers[idx];
+        u.isEnrolledInRegistry = true;
+        u.registryId = (m['registryId'] ?? u.registryId ?? '').toString();
+        u.fullName = (m['fullName'] ?? u.fullName)?.toString();
+        u.helps = m['helps'] is num ? (m['helps'] as num).toInt() : u.helps;
+        u.missed = m['missed'] is num ? (m['missed'] as num).toInt() : u.missed;
+        u.state = (m['state'] ?? u.state).toString();
+        u.city = (m['city'] ?? u.city)?.toString();
+        u.room = (m['room'] ?? u.room)?.toString();
+        u.homeAddress = (m['homeAddress'] ?? u.homeAddress)?.toString();
+        u.phone = (m['phone'] ?? u.phone).toString();
+        u.dob = (m['dob'] ?? u.dob)?.toString();
+        u.idType = (m['idType'] ?? u.idType)?.toString();
+      }
+    }
+
+    final ok = await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.added < 1
+              ? 'No new members to restore — everyone in that file is already enrolled (${result.skipped} skipped).'
+              : 'Restored ${result.added} member(s)${result.skipped > 0 ? ', skipped ${result.skipped} already enrolled' : ''}. '
+                  'They are back in Members, Search, and Rankings.',
+        ),
+        backgroundColor: result.added > 0 ? (ok ? Colors.green : Colors.orange) : Colors.blueGrey,
+      ),
+    );
+  }
+
+  Future<void> _showCivicRegistryBackupSheet() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Registry backup · $_selectedState',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Download a file of enrolled members (including helps & rankings). Upload it later to bring back only people who are missing — already enrolled members stay as they are.',
+                  style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    unawaited(_downloadCivicRegistryBackup());
+                  },
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Download members file'),
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    unawaited(_uploadCivicRegistryBackup());
+                  },
+                  icon: const Icon(Icons.upload_file_rounded, size: 18),
+                  label: const Text('Upload backup to restore missing'),
+                ),
+                if (canPin) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _openCivicRegistryPinSheet(
+                        context,
+                        config: widget.config,
+                        reviewer: widget.user,
+                        onDataChanged: widget.onDataChanged,
+                        initialState: _selectedState,
+                      );
+                    },
+                    child: const Text('Registry PIN settings'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _persistCivicMemberActivity(UserData member) async {
@@ -32158,20 +32370,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 9))
                           else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
                             Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 9)),
-                          if (_canManageCivicRegistry() && (_isCivicRegistryKing(widget.user) || widget.user.isAdmin))
+                          if (_canManageCivicRegistry())
                             IconButton(
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                              icon: const Icon(Icons.pin_rounded, size: 16, color: Color(0xFF6200EE)),
-                              tooltip: 'Set state registry PIN',
-                              onPressed: () => _openCivicRegistryPinSheet(
-                                context,
-                                config: widget.config,
-                                reviewer: widget.user,
-                                onDataChanged: widget.onDataChanged,
-                                initialState: _selectedState,
+                              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                              tooltip: '',
+                              icon: Icon(
+                                Icons.pin_rounded,
+                                size: 15,
+                                color: (isDark ? Colors.white : Colors.black).withOpacity(0.14),
                               ),
+                              onPressed: _showCivicRegistryBackupSheet,
                             ),
                         ],
                       ),

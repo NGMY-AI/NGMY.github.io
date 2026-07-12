@@ -416,6 +416,99 @@ class NgmyCivicRegistryMembers {
         'savedAt': DateTime.now().toUtc().toIso8601String(),
       };
 
+  /// Full backup envelope for download (includes helps/missed/passport so rankings restore).
+  static Map<String, dynamic> backupEnvelope(dynamic config, {String state = ''}) {
+    final all = listFrom(config);
+    final st = state.trim().toLowerCase();
+    final members = st.isEmpty
+        ? all
+        : all.where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == st).toList();
+    return {
+      'type': 'ngmy_civic_registry_backup',
+      'version': 1,
+      'state': state.trim(),
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+      'memberCount': members.length,
+      'members': members,
+    };
+  }
+
+  static List<Map<String, dynamic>> membersFromBackupJson(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return const [];
+    final map = Map<String, dynamic>.from(decoded);
+    final list = map['members'] ?? map['civicRegistryMembers'];
+    if (list is! List) return const [];
+    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Smart restore: only add members that are not already enrolled (by email, registry ID, or identity).
+  /// Existing members are left untouched. Returns counts.
+  static ({int added, int skipped, List<Map<String, dynamic>> restored}) importMissingMembers(
+    dynamic config,
+    List<Map<String, dynamic>> incoming,
+  ) {
+    var added = 0;
+    var skipped = 0;
+    final restored = <Map<String, dynamic>>[];
+
+    for (final raw in incoming) {
+      final email = emailKey((raw['email'] ?? '').toString());
+      final registryId = (raw['registryId'] ?? '').toString().trim();
+      final fullName = (raw['fullName'] ?? '').toString();
+      final phone = (raw['phone'] ?? '').toString();
+      final address = (raw['homeAddress'] ?? '').toString();
+      final dob = (raw['dob'] ?? '').toString();
+      final city = (raw['city'] ?? '').toString();
+
+      var key = email;
+      if (key.isEmpty) {
+        final digits = _phoneKey(phone);
+        if (digits.length >= 7) {
+          key = 'civic.$digits@guest.ngmy';
+        } else {
+          skipped++;
+          continue;
+        }
+      }
+
+      if (findByEmail(config, key) != null) {
+        skipped++;
+        continue;
+      }
+      if (registryId.isNotEmpty && findByRegistryId(config, registryId) != null) {
+        skipped++;
+        continue;
+      }
+      final dup = findDuplicateInRecords(
+        records: listFrom(config),
+        fullName: fullName,
+        dob: dob,
+        city: city,
+        homeAddress: address,
+        phone: phone,
+        excludeEmail: key,
+        excludeRegistryId: registryId,
+      );
+      if (dup != null) {
+        skipped++;
+        continue;
+      }
+
+      final record = Map<String, dynamic>.from(raw)..['email'] = key;
+      if ((record['registryId'] ?? '').toString().trim().isEmpty && registryId.isNotEmpty) {
+        record['registryId'] = registryId;
+      }
+      upsert(config, record);
+      restored.add(Map<String, dynamic>.from(listFrom(config).firstWhere(
+        (m) => emailKey((m['email'] ?? '').toString()) == key,
+        orElse: () => record,
+      )));
+      added++;
+    }
+    return (added: added, skipped: skipped, restored: restored);
+  }
+
   static void applyPayload(dynamic config, Map<String, dynamic> payload) {
     final remote = payload['members'];
     if (remote is! List) return;
