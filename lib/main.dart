@@ -42,6 +42,7 @@ import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
 import 'ngmy_bio_guest.dart';
+import 'ngmy_civic_enroll_guest.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
@@ -403,20 +404,35 @@ void main() async {
 
   final oauthReturn = kIsWeb && ngmyUriHasOAuthCallback();
 
-  // Public /bio, /menu, etc. links should not wait on full local bootstrap.
-  final guestAppSlug = kIsWeb ? ngmyPublishedAppSlugFromLaunch() : null;
+  // Public /bio, /menu, civic enroll, etc. links should not wait on full local bootstrap.
+  if (kIsWeb) ngmyCaptureCivicEnrollLaunchIntent();
+  final isGuestCivicEnroll = kIsWeb && ngmyIsGuestCivicEnrollLaunch();
+  final guestAppSlug = kIsWeb && !isGuestCivicEnroll ? ngmyPublishedAppSlugFromLaunch() : null;
   final isGuestPublishedApp = guestAppSlug != null && guestAppSlug.trim().isNotEmpty;
-  final guestInvoiceSlug = kIsWeb && !isGuestPublishedApp ? ngmyPublishedInvoiceSlugFromLaunch() : null;
+  final guestInvoiceSlug = kIsWeb && !isGuestCivicEnroll && !isGuestPublishedApp ? ngmyPublishedInvoiceSlugFromLaunch() : null;
   final isGuestPublishedInvoice = guestInvoiceSlug != null && guestInvoiceSlug.trim().isNotEmpty;
-  final guestMenuSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice ? ngmyPublishedMenuSlugFromLaunch() : null;
+  final guestMenuSlug =
+      kIsWeb && !isGuestCivicEnroll && !isGuestPublishedApp && !isGuestPublishedInvoice ? ngmyPublishedMenuSlugFromLaunch() : null;
   final isGuestPublishedMenu = guestMenuSlug != null && guestMenuSlug.trim().isNotEmpty;
-  final guestBioSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu ? ngmyPublishedBioSlugFromLaunch() : null;
+  final guestBioSlug = kIsWeb &&
+          !isGuestCivicEnroll &&
+          !isGuestPublishedApp &&
+          !isGuestPublishedInvoice &&
+          !isGuestPublishedMenu
+      ? ngmyPublishedBioSlugFromLaunch()
+      : null;
   final isGuestPublishedBio = guestBioSlug != null && guestBioSlug.trim().isNotEmpty;
-  final guestLocalMenuSlug = kIsWeb && !isGuestPublishedApp && !isGuestPublishedInvoice && !isGuestPublishedMenu && !isGuestPublishedBio
+  final guestLocalMenuSlug = kIsWeb &&
+          !isGuestCivicEnroll &&
+          !isGuestPublishedApp &&
+          !isGuestPublishedInvoice &&
+          !isGuestPublishedMenu &&
+          !isGuestPublishedBio
       ? ngmyPublishedLocalMenuSlugFromLaunch()
       : null;
   final isGuestLocalPublishedMenu = guestLocalMenuSlug != null && guestLocalMenuSlug.trim().isNotEmpty;
   final guestLocalBioSlug = kIsWeb &&
+          !isGuestCivicEnroll &&
           !isGuestPublishedApp &&
           !isGuestPublishedInvoice &&
           !isGuestPublishedMenu &&
@@ -425,7 +441,8 @@ void main() async {
       ? ngmyPublishedLocalBioSlugFromLaunch()
       : null;
   final isGuestLocalPublishedBio = guestLocalBioSlug != null && guestLocalBioSlug.trim().isNotEmpty;
-  final isGuestLink = isGuestPublishedApp ||
+  final isGuestLink = isGuestCivicEnroll ||
+      isGuestPublishedApp ||
       isGuestPublishedInvoice ||
       isGuestPublishedMenu ||
       isGuestPublishedBio ||
@@ -499,7 +516,6 @@ void main() async {
     _ngmyInitialThemeMode = launchBootstrap.themeMode;
     _ngmyApplySystemChromeForThemeMode(_ngmyInitialThemeMode);
 
-    ngmyCaptureCivicEnrollLaunchIntent();
     ngmyCaptureMediaPostLaunchIntent();
     ngmyCaptureReferralLaunchIntent();
   }
@@ -523,6 +539,10 @@ void main() async {
   }
 
   runZonedGuarded(() {
+    if (isGuestCivicEnroll) {
+      runApp(const NgmyGuestCivicEnrollApp());
+      return;
+    }
     if (isGuestPublishedApp) {
       runApp(NgmyGuestPublishedApp(slug: guestAppSlug.trim().toLowerCase()));
       return;
@@ -24691,7 +24711,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String get _linkedReferralCode =>
       widget.user.referredByCode.trim().isNotEmpty ? widget.user.referredByCode.trim() : _savedReferredByCode.trim();
 
-  String get _accountId => 'NGMY/USR/${widget.user.email.hashCode.abs().toString().padLeft(6, '0').substring(0, 6)}';
   String get _referralCode => ngmyReferralCodeForEmail(widget.user.email);
 
   bool _canScanCivicRegistryIds() =>
@@ -25377,11 +25396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         orbit: orbit,
       ),
       const SizedBox(height: 15),
-      _box(context, 'Account Information', [
-        _pair('Account ID', _accountId),
-        Divider(color: panelBorder),
-        _pair('Account Type', widget.user.isAdmin ? 'System Administrator' : 'Premium Investor'),
-        const SizedBox(height: 14),
+      _box(context, 'Invite & Earn', [
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -25393,22 +25408,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text('🎁  Invite & Earn', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: primaryText)),
-                  ),
-                  IconButton(
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
                     tooltip: 'Copy invite link to share',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                     onPressed: _copyReferralInviteLink,
                     icon: const Icon(Icons.link_rounded, color: Color(0xFFA78BFA)),
                   ),
-                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(

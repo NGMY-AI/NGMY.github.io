@@ -7,10 +7,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 class NgmyCivicSelfEnrollment {
   static const _prefsKey = 'ngmy_civic_self_enrollment_v1';
 
-  static Map<String, dynamic> payload(dynamic config) => {
-        'civicSelfEnrollmentEnabled': (config as dynamic).civicSelfEnrollmentEnabled == true,
-        'savedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+  static Map<String, dynamic> payload(dynamic config) {
+    final c = config as dynamic;
+    final byState = <String, List<String>>{};
+    final rawByState = c.civicCitiesByState;
+    if (rawByState is Map) {
+      for (final e in rawByState.entries) {
+        final state = e.key.toString().trim();
+        if (state.isEmpty) continue;
+        final list = e.value;
+        if (list is List) {
+          byState[state] = list.map((x) => x.toString().trim()).where((x) => x.isNotEmpty).toList();
+        }
+      }
+    }
+    final cities = (c.cities is List)
+        ? (c.cities as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+    final rooms = (c.rooms is List)
+        ? (c.rooms as List).map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+    return {
+      'civicSelfEnrollmentEnabled': c.civicSelfEnrollmentEnabled == true,
+      'cities': cities,
+      'rooms': rooms,
+      'civicCitiesByState': byState,
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
 
   static DateTime? _savedAtOf(Map<String, dynamic> payload) =>
       DateTime.tryParse((payload['savedAt'] ?? '').toString());

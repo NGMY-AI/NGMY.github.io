@@ -10,6 +10,19 @@ String ngmyCivicSelfEnrollmentShareUrl() {
   return 'https://ngmy.org/?civic=enroll';
 }
 
+bool ngmyPeekCivicEnrollLaunchIntent() {
+  try {
+    if (ngmyPendingCivicSelfEnrollmentOpen) return true;
+    if (html.window.sessionStorage['ngmy_civic_enroll'] == '1') return true;
+    final uri = Uri.parse(html.window.location.href);
+    final civic = uri.queryParameters['civic']?.trim().toLowerCase();
+    final fragment = uri.fragment.trim().toLowerCase();
+    return civic == 'enroll' || fragment == 'civic-enroll' || fragment.contains('civic-enroll');
+  } catch (_) {
+    return false;
+  }
+}
+
 void ngmyCaptureCivicEnrollLaunchIntent() {
   try {
     final uri = Uri.parse(html.window.location.href);
@@ -18,14 +31,7 @@ void ngmyCaptureCivicEnrollLaunchIntent() {
     if (civic == 'enroll' || fragment == 'civic-enroll' || fragment.contains('civic-enroll')) {
       ngmyPendingCivicSelfEnrollmentOpen = true;
       html.window.sessionStorage['ngmy_civic_enroll'] = '1';
-      if (civic == 'enroll') {
-        final qp = Map<String, String>.from(uri.queryParameters)..remove('civic');
-        final clean = uri.replace(
-          queryParameters: qp.isEmpty ? null : qp,
-          fragment: uri.fragment,
-        );
-        html.window.history.replaceState(null, '', clean.toString());
-      }
+      // Keep ?civic=enroll in the URL so refresh still opens guest enrollment.
       return;
     }
     if (html.window.sessionStorage['ngmy_civic_enroll'] == '1') {

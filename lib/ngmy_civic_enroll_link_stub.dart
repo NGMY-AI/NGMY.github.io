@@ -2,6 +2,8 @@ bool ngmyPendingCivicSelfEnrollmentOpen = false;
 
 String ngmyCivicSelfEnrollmentShareUrl() => 'https://ngmy.org/?civic=enroll';
 
+bool ngmyPeekCivicEnrollLaunchIntent() => ngmyPendingCivicSelfEnrollmentOpen;
+
 void ngmyCaptureCivicEnrollLaunchIntent() {}
 
 bool ngmyTakePendingCivicSelfEnrollmentOpen() {
