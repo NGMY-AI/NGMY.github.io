@@ -29129,6 +29129,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    if (NgmyCivicRegistryMembers.emailKey(originalEmail) != NgmyCivicRegistryMembers.emailKey(email)) {
+      _setCivicEnrollmentFlagForAccount(widget.allUsers, originalEmail, false);
+    }
     final accountIdx = widget.allUsers.indexWhere(
       (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(email),
     );
@@ -29149,8 +29152,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _activeTab = 2;
     });
 
-    final displayUser = _civicMemberRecordToDisplayUser(updated, widget.allUsers);
-    final saved = await _persistRegistryMember(displayUser);
+    // Persist the updated registry row directly — do not rebuild from UserData (that was dropping edits).
+    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    final saved = await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    } catch (e) {
+      debugPrint('Member update local save failed: $e');
+    }
+    if (await ngmyCanReachCloud() && accountIdx >= 0) {
+      try {
+        await Supabase.instance.client
+            .from('users')
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
+            .timeout(kNgmyCloudWriteTimeout);
+      } catch (e) {
+        debugPrint('Member update enrollment flag upsert failed: $e');
+      }
+    }
     widget.onDataChanged();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -29300,7 +29322,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Downloaded $count $state member(s). This file only works for $state. $msg'),
+        content: Text('Downloaded $count $_selectedState member(s).'),
         backgroundColor: Colors.green,
       ),
     );
@@ -29405,78 +29427,156 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _showCivicRegistryBackupSheet() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
+    final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
+    final card = isDark ? const Color(0xFF151C2C) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF111827) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) {
+        Widget actionTile({
+          required IconData icon,
+          required Color accent,
+          required String title,
+          required String subtitle,
+          required VoidCallback onTap,
+        }) {
+          return Material(
+            color: card,
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: isDark ? const Color(0xFF243044) : const Color(0xFFE8ECF1)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(isDark ? 0.18 : 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: accent, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
+                          const SizedBox(height: 3),
+                          Text(subtitle, style: TextStyle(fontSize: 12, color: mute, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: mute.withOpacity(0.7)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white24 : Colors.black12,
-                      borderRadius: BorderRadius.circular(99),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Container(
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(isDark ? 0.45 : 0.12), blurRadius: 28, offset: const Offset(0, 10)),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : const Color(0xFFD0D5DD),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Registry backup · $_selectedState',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Registry Backup', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink, letterSpacing: -0.3)),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          _selectedState,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Download a $_selectedState-only members file (helps & rankings included). Upload restores only missing people, and only while you are in $_selectedState — another state’s backup will be rejected.',
-                  style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    unawaited(_downloadCivicRegistryBackup());
-                  },
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: const Text('Download members file'),
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    unawaited(_uploadCivicRegistryBackup());
-                  },
-                  icon: const Icon(Icons.upload_file_rounded, size: 18),
-                  label: const Text('Upload backup to restore missing'),
-                ),
-                if (canPin) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () {
+                  const SizedBox(height: 18),
+                  actionTile(
+                    icon: Icons.download_rounded,
+                    accent: const Color(0xFF2563EB),
+                    title: 'Download',
+                    subtitle: 'Save $_selectedState members',
+                    onTap: () {
                       Navigator.pop(ctx);
-                      _openCivicRegistryPinSheet(
-                        context,
-                        config: widget.config,
-                        reviewer: widget.user,
-                        onDataChanged: widget.onDataChanged,
-                        initialState: _selectedState,
-                      );
+                      unawaited(_downloadCivicRegistryBackup());
                     },
-                    child: const Text('Registry PIN settings'),
                   ),
+                  const SizedBox(height: 10),
+                  actionTile(
+                    icon: Icons.upload_rounded,
+                    accent: const Color(0xFF059669),
+                    title: 'Upload',
+                    subtitle: 'Restore missing members',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      unawaited(_uploadCivicRegistryBackup());
+                    },
+                  ),
+                  if (canPin) ...[
+                    const SizedBox(height: 10),
+                    actionTile(
+                      icon: Icons.pin_rounded,
+                      accent: const Color(0xFF7C3AED),
+                      title: 'PIN',
+                      subtitle: 'Registry access code',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _openCivicRegistryPinSheet(
+                          context,
+                          config: widget.config,
+                          reviewer: widget.user,
+                          onDataChanged: widget.onDataChanged,
+                          initialState: _selectedState,
+                        );
+                      },
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         );

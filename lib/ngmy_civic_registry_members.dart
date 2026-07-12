@@ -59,6 +59,7 @@ class NgmyCivicRegistryMembers {
     if (email.isEmpty) return;
     final members = listFrom(config);
     final next = Map<String, dynamic>.from(record)..['email'] = email;
+    final now = DateTime.now().toUtc().toIso8601String();
     final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == email);
     if (idx >= 0) {
       final keep = members[idx];
@@ -70,8 +71,11 @@ class NgmyCivicRegistryMembers {
       next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
       next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
       next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
+      next['updatedAt'] = now;
       members[idx] = next;
     } else {
+      next['enrolledAt'] = next['enrolledAt'] ?? now;
+      next['updatedAt'] = now;
       members.add(next);
     }
     setList(config, members);
@@ -123,6 +127,7 @@ class NgmyCivicRegistryMembers {
     next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
     next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
     next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
+    next['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     members[idx] = next;
     setList(config, members);
     return next;
@@ -557,6 +562,18 @@ class NgmyCivicRegistryMembers {
     return (added: added, skipped: skipped, restored: restored);
   }
 
+  static DateTime? _memberStamp(Map<String, dynamic> m) {
+    return DateTime.tryParse((m['updatedAt'] ?? m['enrolledAt'] ?? '').toString());
+  }
+
+  static Map<String, dynamic> _preferNewerMember(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final ta = _memberStamp(a);
+    final tb = _memberStamp(b);
+    if (tb == null) return a;
+    if (ta == null) return b;
+    return tb.isAfter(ta) ? b : a;
+  }
+
   static void applyPayload(dynamic config, Map<String, dynamic> payload) {
     final remote = payload['members'];
     if (remote is! List) return;
@@ -567,26 +584,40 @@ class NgmyCivicRegistryMembers {
       return;
     }
     final merged = <String, Map<String, dynamic>>{};
-    final idsOwned = <String>{};
+    final idsOwned = <String, String>{};
 
-    // Keep local registrar edits first.
     for (final m in local) {
       final key = emailKey((m['email'] ?? '').toString());
       if (key.isEmpty) continue;
       merged[key] = m;
       final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
-      if (id.isNotEmpty) idsOwned.add(id);
+      if (id.isNotEmpty) idsOwned[id] = key;
     }
 
-    // Bring in remote-only members (guest self-enrollment, other devices).
     for (final m in remoteMembers) {
       final key = emailKey((m['email'] ?? '').toString());
       if (key.isEmpty) continue;
-      if (merged.containsKey(key)) continue;
       final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
-      if (id.isNotEmpty && idsOwned.contains(id)) continue; // same person, different email key — do not duplicate
+      if (merged.containsKey(key)) {
+        merged[key] = _preferNewerMember(merged[key]!, m);
+        continue;
+      }
+      // Same registry ID under a different email — keep the newer profile, drop the older duplicate key.
+      if (id.isNotEmpty && idsOwned.containsKey(id)) {
+        final existingKey = idsOwned[id]!;
+        final existing = merged[existingKey];
+        if (existing != null) {
+          final newer = _preferNewerMember(existing, m);
+          if (identical(newer, m) || newer['email'] == m['email']) {
+            merged.remove(existingKey);
+            merged[key] = Map<String, dynamic>.from(m);
+            idsOwned[id] = key;
+          }
+        }
+        continue;
+      }
       merged[key] = m;
-      if (id.isNotEmpty) idsOwned.add(id);
+      if (id.isNotEmpty) idsOwned[id] = key;
     }
     setList(config, merged.values.toList());
   }
