@@ -71,6 +71,8 @@ class NgmyCivicRegistryMembers {
       next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
       next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
       next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
+      next['nicknames'] = next['nicknames'] ?? keep['nicknames'] ?? const <String>[];
+      if (!next.containsKey('showNicknames')) next['showNicknames'] = keep['showNicknames'] == true;
       next['updatedAt'] = now;
       members[idx] = next;
     } else {
@@ -127,10 +129,54 @@ class NgmyCivicRegistryMembers {
     next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
     next['passportGrantedAt'] = keep['passportGrantedAt'] ?? next['passportGrantedAt'];
     next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
+    next['nicknames'] = next['nicknames'] ?? keep['nicknames'] ?? const <String>[];
+    if (!fields.containsKey('showNicknames')) {
+      next['showNicknames'] = keep['showNicknames'] == true;
+    }
     next['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     members[idx] = next;
     setList(config, members);
     return next;
+  }
+
+  static List<String> nicknamesOf(Map<String, dynamic> member) {
+    final raw = member['nicknames'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .take(2)
+        .toList();
+  }
+
+  static bool showNicknamesPublicly(Map<String, dynamic> member) => member['showNicknames'] == true;
+
+  static String publicDisplayName(Map<String, dynamic>? member, {required String fullName, required String username}) {
+    if (member != null && showNicknamesPublicly(member)) {
+      final nicks = nicknamesOf(member);
+      if (nicks.isNotEmpty) return nicks.join(' · ');
+    }
+    final name = fullName.trim();
+    return name.isNotEmpty ? name : username.trim();
+  }
+
+  static void setNicknames(
+    dynamic config,
+    String email, {
+    required List<String> nicknames,
+    required bool showNicknames,
+  }) {
+    final m = findByEmail(config, email);
+    if (m == null) return;
+    final cleaned = nicknames.map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
+    upsert(
+      config,
+      {
+        ...m,
+        'nicknames': cleaned,
+        'showNicknames': showNicknames,
+      },
+    );
   }
 
   static bool passportGranted(Map<String, dynamic> member) => member['passportGranted'] == true;

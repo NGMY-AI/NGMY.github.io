@@ -144,6 +144,8 @@ import 'ngmy_communicate_sync_download_io.dart'
 import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_member_report.dart';
+import 'ngmy_civic_member_report_print_stub.dart'
+    if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
 import 'ngmy_civic_id_scanner.dart';
 import 'ngmy_media_deep_link.dart';
 import 'ngmy_civic_enroll_link.dart';
@@ -28685,12 +28687,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   List<UserData> _registryMembersMatchingSearch() {
     bool matchesFilters(UserData u) {
       final stateMatch = u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase();
-      final textMatch = _searchQuery.isEmpty ||
-          u.username.toLowerCase().contains(_searchQuery) ||
+      if (!stateMatch) return false;
+      if (_searchQuery.isEmpty) return true;
+      final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+      final textMatch = u.username.toLowerCase().contains(_searchQuery) ||
           u.fullName?.toLowerCase().contains(_searchQuery) == true ||
           u.registryId?.toLowerCase().contains(_searchQuery) == true ||
-          u.city?.toLowerCase().contains(_searchQuery) == true;
-      return stateMatch && textMatch;
+          u.city?.toLowerCase().contains(_searchQuery) == true ||
+          u.phone.toLowerCase().contains(_searchQuery) ||
+          nicks.any((n) => n.toLowerCase().contains(_searchQuery));
+      return textMatch;
     }
 
     return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where(matchesFilters).toList();
@@ -29424,6 +29431,94 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<void> _downloadCivicPrintRoster() async {
+    final state = _selectedState.trim();
+    if (state.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a state first.')));
+      return;
+    }
+    final members = NgmyCivicRegistryMembers.listFrom(widget.config)
+        .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == state.toLowerCase())
+        .toList()
+      ..sort((a, b) => (a['fullName'] ?? '').toString().toLowerCase().compareTo((b['fullName'] ?? '').toString().toLowerCase()));
+    if (members.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No members in $state to print.')));
+      return;
+    }
+
+    final rows = StringBuffer();
+    for (final m in members) {
+      final name = (m['fullName'] ?? '').toString().trim();
+      final phone = (m['phone'] ?? '').toString().trim();
+      final address = (m['homeAddress'] ?? '').toString().trim();
+      final familyRaw = m['familyMembers'];
+      final family = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+      rows.writeln('''
+      <tr>
+        <td>${_escapeHtml(name.isEmpty ? '—' : name)}</td>
+        <td>${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
+        <td>${_escapeHtml(address.isEmpty ? '—' : address)}</td>
+        <td style="text-align:center">${family}</td>
+      </tr>''');
+    }
+
+    final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>NGMY Civic Roster — $state</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 28px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .meta { color: #555; font-size: 12px; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 10px 8px; font-size: 13px; vertical-align: top; }
+  th { background: #f3f4f6; text-align: left; }
+  @media print { body { margin: 12px; } }
+</style>
+</head>
+<body>
+  <h1>$state Civic Registry Roster</h1>
+  <div class="meta">${members.length} members · printable paper list · ${DateTime.now().toLocal()}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>Address</th>
+        <th>Family size</th>
+      </tr>
+    </thead>
+    <tbody>
+      $rows
+    </tbody>
+  </table>
+  <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 250); };</script>
+</body>
+</html>''';
+
+    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
+    final fileName = 'ngmy-civic-roster-${state.replaceAll(RegExp(r'\s+'), '_')}-$stamp';
+    await ngmyDownloadCivicMemberReport(
+      htmlContent: html,
+      plainText: 'NGMY $state roster (${members.length} members)',
+      fileName: fileName,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Print roster ready for $state (${members.length} members).'), backgroundColor: Colors.green),
+    );
+  }
+
+  String _escapeHtml(String s) => s
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+
   Future<void> _showCivicRegistryBackupSheet() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
@@ -29437,11 +29532,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        Widget actionTile({
+        Widget gridBox({
           required IconData icon,
           required Color accent,
           required String title,
-          required String subtitle,
           required VoidCallback onTap,
         }) {
           return Material(
@@ -29451,34 +29545,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               onTap: onTap,
               borderRadius: BorderRadius.circular(18),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                height: 112,
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: isDark ? const Color(0xFF243044) : const Color(0xFFE8ECF1)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(isDark ? 0.18 : 0.12),
-                        borderRadius: BorderRadius.circular(14),
+                        color: accent.withOpacity(isDark ? 0.2 : 0.12),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(icon, color: accent, size: 22),
+                      child: Icon(icon, color: accent, size: 20),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
-                          const SizedBox(height: 3),
-                          Text(subtitle, style: TextStyle(fontSize: 12, color: mute, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: mute.withOpacity(0.7)),
+                    const Spacer(),
+                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: ink)),
                   ],
                 ),
               ),
@@ -29535,46 +29621,73 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  actionTile(
-                    icon: Icons.download_rounded,
-                    accent: const Color(0xFF2563EB),
-                    title: 'Download',
-                    subtitle: 'Save $_selectedState members',
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      unawaited(_downloadCivicRegistryBackup());
-                    },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: gridBox(
+                          icon: Icons.download_rounded,
+                          accent: const Color(0xFF2563EB),
+                          title: 'Download',
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            unawaited(_downloadCivicRegistryBackup());
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: gridBox(
+                          icon: Icons.upload_rounded,
+                          accent: const Color(0xFF059669),
+                          title: 'Upload',
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            unawaited(_uploadCivicRegistryBackup());
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
-                  actionTile(
-                    icon: Icons.upload_rounded,
-                    accent: const Color(0xFF059669),
-                    title: 'Upload',
-                    subtitle: 'Restore missing members',
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      unawaited(_uploadCivicRegistryBackup());
-                    },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: gridBox(
+                          icon: Icons.print_rounded,
+                          accent: const Color(0xFFD97706),
+                          title: 'Print roster',
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            unawaited(_downloadCivicPrintRoster());
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: gridBox(
+                          icon: Icons.pin_rounded,
+                          accent: const Color(0xFF7C3AED),
+                          title: 'PIN',
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            if (!canPin) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Only registry kings or admins can set the PIN.')),
+                              );
+                              return;
+                            }
+                            _openCivicRegistryPinSheet(
+                              context,
+                              config: widget.config,
+                              reviewer: widget.user,
+                              onDataChanged: widget.onDataChanged,
+                              initialState: _selectedState,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  if (canPin) ...[
-                    const SizedBox(height: 10),
-                    actionTile(
-                      icon: Icons.pin_rounded,
-                      accent: const Color(0xFF7C3AED),
-                      title: 'PIN',
-                      subtitle: 'Registry access code',
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _openCivicRegistryPinSheet(
-                          context,
-                          config: widget.config,
-                          reviewer: widget.user,
-                          onDataChanged: widget.onDataChanged,
-                          initialState: _selectedState,
-                        );
-                      },
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -30479,6 +30592,122 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showMemberProfile(UserData u) {
+    if (!_canManageCivicRegistry()) {
+      _showPublicMemberProfile(u);
+      return;
+    }
+    _showRegistrarMemberProfile(u);
+  }
+
+  void _showPublicMemberProfile(UserData u) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final displayName = NgmyCivicRegistryMembers.publicDisplayName(
+      raw,
+      fullName: u.fullName ?? '',
+      username: u.username,
+    );
+    final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+    final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
+    final contributions = widget.allTransactions
+        .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
+    final openClaims = widget.allTransactions
+        .where((t) => t.userEmail == u.email && t.type == TransactionType.claim && t.status == TransactionStatus.pending)
+        .length;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
+        final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+        final mute = isDark ? Colors.white60 : Colors.black54;
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          backgroundColor: panel,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          child: SelectionContainer.disabled(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Member profile', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink)),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                          if (showNicks) ...[
+                            const SizedBox(height: 6),
+                            Text('Nickname${nicks.length == 1 ? '' : 's'}', style: TextStyle(fontSize: 11, color: mute)),
+                            Text(nicks.join(' · '), style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
+                          ],
+                          const SizedBox(height: 10),
+                          _recordRow('Registry ID', u.registryId ?? 'N/A', isDark),
+                          _recordDivider(isDark),
+                          _recordRow('Phone', u.phone.isEmpty ? 'N/A' : u.phone, isDark),
+                          _recordDivider(isDark),
+                          _recordRow('State / City / Room', '${u.state} / ${u.city ?? 'N/A'} / ${u.room ?? 'N/A'}', isDark),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(child: _statCard('Helps', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
+                        const SizedBox(width: 10),
+                        Expanded(child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800)),
+                        const SizedBox(width: 10),
+                        Expanded(child: _statCard('Money Given', '\$${formatCurrency(contributionTotal)}', Colors.blue.shade50, Colors.blue.shade800)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Contribution records', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
+                    const SizedBox(height: 8),
+                    if (contributions.isEmpty)
+                      Text('No contribution records yet.', style: TextStyle(color: mute))
+                    else
+                      ...contributions.take(8).map(
+                        (t) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                          title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(_txReadableDetails(t)),
+                          trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: mute)),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showRegistrarMemberProfile(UserData u) {
     final contributions = widget.allTransactions
         .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .toList()
@@ -30626,6 +30855,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _nicknameAdminPanel(u, isDark),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -30714,6 +30945,93 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 ),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _nicknameAdminPanel(UserData member, bool isDark) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    final existing = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+    final nick1 = TextEditingController(text: existing.isNotEmpty ? existing[0] : '');
+    final nick2 = TextEditingController(text: existing.length > 1 ? existing[1] : '');
+    var showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw);
+
+    return StatefulBuilder(
+      builder: (ctx, setLocal) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A2233) : const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFFDBA74)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Public nicknames',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF9A3412)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: nick1,
+                decoration: InputDecoration(
+                  labelText: 'Nickname 1',
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nick2,
+                decoration: InputDecoration(
+                  labelText: 'Nickname 2',
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'Show nicknames when others search',
+                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
+                ),
+                value: showNicks,
+                onChanged: (v) => setLocal(() => showNicks = v),
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    NgmyCivicRegistryMembers.setNicknames(
+                      widget.config,
+                      member.email,
+                      nicknames: [nick1.text, nick2.text],
+                      showNicknames: showNicks,
+                    );
+                    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+                    await ngmyPersistCivicRegistryMembers(widget.config);
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+                    } catch (_) {}
+                    widget.onDataChanged();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nicknames saved.'), backgroundColor: Colors.green),
+                    );
+                    setLocal(() {});
+                  },
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEA580C)),
+                  child: const Text('Save nicknames'),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -31908,9 +32226,87 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            ..._registryMembersMatchingSearch().map((m) => _memberCard(m, isDark, manageActions: false)),
+            ..._registryMembersMatchingSearch().map((m) => _publicSearchMemberCard(m, isDark)),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _publicSearchMemberCard(UserData u, bool isDark) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final displayName = NgmyCivicRegistryMembers.publicDisplayName(
+      raw,
+      fullName: u.fullName ?? '',
+      username: u.username,
+    );
+    final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+    final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
+    final border = isDark ? const Color(0xFF334155) : const Color(0xFFDbe3F0);
+    final fill = isDark ? const Color(0xFF151C2C) : const Color(0xFFF8FAFF);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border, width: 1.4),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.06), blurRadius: 12, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _showPublicMemberProfile(u),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6200EE).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : '?',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF6200EE), fontSize: 18),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink)),
+                      if (showNicks)
+                        Text(nicks.join(' · '), style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
+                      const SizedBox(height: 4),
+                      Text(
+                        u.phone.isEmpty ? (u.registryId ?? 'Member') : u.phone,
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () => _showPublicMemberProfile(u),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('View', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
