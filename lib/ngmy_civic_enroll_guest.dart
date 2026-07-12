@@ -60,7 +60,7 @@ class NgmyGuestCivicEnrollApp extends StatelessWidget {
     _applyEnrollChrome();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'NGMY Self Enrollment',
+      title: 'EMO \'YA M\'MBONDO',
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -269,35 +269,35 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final state = _selectedState.trim();
 
     if (fullName.isEmpty) {
-      _toast('Full Name is required.');
+      _toast('Jina kamili linahitajika.');
       return;
     }
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
-      _toast('Full Name must contain at least first and last name.');
+      _toast('Andika jina la kwanza na la mwisho.');
       return;
     }
     if (address.isEmpty) {
-      _toast('Home Address is required.');
+      _toast('Anwani ya nyumbani inahitajika.');
       return;
     }
     if (phone.isEmpty) {
-      _toast('Phone is required.');
+      _toast('Nambari ya simu inahitajika.');
       return;
     }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
-      _toast('Phone must contain numbers only (7-15 digits).');
+      _toast('Simu iwe nambari tu (tarakimu 7–15).');
       return;
     }
     if (familyRaw.isEmpty) {
-      _toast('Family Members is required.');
+      _toast('Ukubwa wa familia unahitajika.');
       return;
     }
     if (familyMembers < 1 || familyMembers > 99) {
-      _toast('Enter how many family members (1–99).');
+      _toast('Andika ukubwa wa familia (1–99).');
       return;
     }
     if (state.isEmpty) {
-      _toast('State is required.');
+      _toast('Jimbo linahitajika.');
       return;
     }
 
@@ -333,7 +333,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         excludeEmail: email,
       );
       if (duplicate != null) {
-        _toast(NgmyCivicRegistryMembers.duplicateMessage(duplicate));
+        final name = (duplicate['fullName'] ?? '').toString().trim();
+        final id = (duplicate['registryId'] ?? '').toString().trim();
+        final parts = <String>[if (name.isNotEmpty) name else 'Mwanachama'];
+        if (id.isNotEmpty) parts.add('ID $id');
+        _toast(
+          'Tayari umesajiliwa — jina, anwani, au simu inafanana (${parts.join(' · ')}). Mtu mmoja hawezi kujisajili mara mbili.',
+        );
         setState(() => _submitting = false);
         return;
       }
@@ -362,7 +368,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       };
       final ok = await ngmyUpsertSettingsRowReliable(NgmyCivicRegistryMembers.cloudSettingsKey, payload);
       if (!ok) {
-        _toast('Could not save enrollment. Check your connection and try again.');
+        _toast('Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
         setState(() => _submitting = false);
         return;
       }
@@ -379,7 +385,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       ngmyInvalidateCloudReachabilityCache();
       if (!mounted) return;
       setState(() => _submitting = false);
-      _toast('Enrollment failed. Please try again.');
+      _toast('Usajili umeshindikana. Tafadhali jaribu tena.');
     }
   }
 
@@ -484,7 +490,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
                 // Keep title visually centered in the bar (logo floats on the end).
                 child: Text(
-                  'NGMY self enrollment',
+                  "EMO 'YA M'MBONDO",
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -535,10 +541,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Transform.scale(
-                  // Medium zoom — between the old tight crop and the tiny contain look.
-                  scale: 1.12,
+                  // Medium-strong zoom so letters stay readable in the circle.
+                  scale: 1.22,
                   child: Padding(
-                    padding: const EdgeInsets.all(2),
+                    padding: const EdgeInsets.all(1.5),
                     child: Image.asset(
                       'assets/images/ngmy_logo.png',
                       fit: BoxFit.contain,
@@ -595,7 +601,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       context,
       states: _kUsStates,
       selected: _selectedState,
-      title: 'Choose state',
+      title: 'Chagua jimbo',
+      searchHint: 'Tafuta majimbo…',
+      emptyLabel: 'Hakuna matokeo',
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedState = picked);
@@ -635,7 +643,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               ],
             ),
             child: Text(
-              "EMO'YA M'BEMBE M'MBOND0 · $_selectedState",
+              "Usajili · $_selectedState",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -686,7 +694,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                 )
               : const Text(
-                  'Complete Enrollment',
+                  'Kamilisha usajili',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white, letterSpacing: 0.4),
                 ),
         ),
@@ -733,7 +741,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
             children: [
               CircularProgressIndicator(color: _kAccent),
               SizedBox(height: 16),
-              Text('Opening enrollment…', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+              Text('Inafungua usajili…', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
             ],
           ),
         ),
@@ -783,7 +791,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                             Icon(Icons.wifi_off_rounded, color: Colors.white.withValues(alpha: 0.55), size: 34),
                             const SizedBox(height: 16),
                             const Text(
-                              'Could not load',
+                              'Haikuweza kupakia',
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
                               textAlign: TextAlign.center,
                             ),
@@ -802,7 +810,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                                 minimumSize: const Size(double.infinity, 46),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
-                              child: const Text('Try again', style: TextStyle(fontWeight: FontWeight.w700)),
+                              child: const Text('Jaribu tena', style: TextStyle(fontWeight: FontWeight.w700)),
                             ),
                           ],
                         ),
@@ -853,15 +861,15 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'You are enrolled',
+                        'Umesajiliwa',
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 10),
                       Text(
                         _registryId == null || _registryId!.isEmpty
-                            ? 'Your information is now in the Civic Registry.'
-                            : 'Registry ID: $_registryId\nYour information is now in the Civic Registry.',
+                            ? 'Maelezo yako sasa yamo katika Sajili ya Wananchi.'
+                            : 'Nambari ya sajili: $_registryId\nMaelezo yako sasa yamo katika Sajili ya Wananchi.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 15, height: 1.45, color: _kMuted),
                       ),
@@ -897,7 +905,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     controller: _nameC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     textCapitalization: TextCapitalization.words,
-                    decoration: _dec('Full Name'),
+                    decoration: _dec('Jina kamili'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -905,7 +913,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   child: TextField(
                     controller: _addressC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    decoration: _dec('Home Address'),
+                    decoration: _dec('Anwani ya nyumbani'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -915,7 +923,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Phone'),
+                    decoration: _dec('Simu'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -925,7 +933,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Family Members'),
+                    decoration: _dec('Ukubwa wa familia'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -934,7 +942,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     onTap: _pickState,
                     borderRadius: BorderRadius.circular(16),
                     child: InputDecorator(
-                      decoration: _dec('State'),
+                      decoration: _dec('Jimbo'),
                       child: Row(
                         children: [
                           Expanded(

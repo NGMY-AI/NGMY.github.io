@@ -6,6 +6,8 @@ Future<String?> showNgmyStatePickerSheet(
   required List<String> states,
   required String selected,
   String title = 'Choose state',
+  String searchHint = 'Search states…',
+  String emptyLabel = 'No matches',
 }) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final q = TextEditingController();
@@ -122,7 +124,7 @@ Future<String?> showNgmyStatePickerSheet(
                             autofocus: true,
                             style: TextStyle(color: text, fontWeight: FontWeight.w600),
                             decoration: InputDecoration(
-                              hintText: 'Search states…',
+                              hintText: searchHint,
                               hintStyle: TextStyle(color: muted),
                               border: InputBorder.none,
                             ),
@@ -138,7 +140,7 @@ Future<String?> showNgmyStatePickerSheet(
                     valueListenable: filtered,
                     builder: (_, list, _) {
                       if (list.isEmpty) {
-                        return Center(child: Text('No matches', style: TextStyle(color: muted, fontWeight: FontWeight.w700)));
+                        return Center(child: Text(emptyLabel, style: TextStyle(color: muted, fontWeight: FontWeight.w700)));
                       }
                       return ListView.builder(
                         padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
