@@ -28129,7 +28129,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _emailC = TextEditingController();
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
-  final _familyMembersC = TextEditingController(text: '1');
+  final _familyMembersC = TextEditingController();
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
@@ -28919,7 +28919,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _emailC.clear();
         _cityC.clear();
         _roomC.clear();
-        _familyMembersC.text = '1';
+        _familyMembersC.clear();
         _activeTab = 2;
       }
     });

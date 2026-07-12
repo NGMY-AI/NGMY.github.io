@@ -108,7 +108,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
-  final _familyMembersC = TextEditingController(text: '1');
+  final _familyMembersC = TextEditingController();
 
   late final AnimationController _pulse;
   late final AnimationController _shimmer;

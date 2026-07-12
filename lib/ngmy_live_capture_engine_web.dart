@@ -20,7 +20,6 @@ class NgmyLiveCaptureEngine {
   Completer<html.Blob?>? _stopCompleter;
   NgmyLiveCaptureResult? _last;
 
-  /// Live camera/mic stream for in-app preview while recording.
   Object? get previewStream => _stream;
 
   Future<bool> start({required bool video}) async {
@@ -40,7 +39,27 @@ class NgmyLiveCaptureEngine {
       _stream = await html.window.navigator.mediaDevices!.getUserMedia(constraints);
       _mime = _pickMime(video: video);
       _chunks.clear();
-      _recorder = html.MediaRecorder(_stream!, {'mimeType': _mime});
+
+      html.MediaRecorder? recorder;
+      // Prefer explicit mime, then fall back to browser default.
+      if (_mime.isNotEmpty) {
+        try {
+          recorder = html.MediaRecorder(_stream!, {'mimeType': _mime});
+        } catch (e) {
+          debugPrint('[live_capture] MediaRecorder mime $_mime failed: $e');
+        }
+      }
+      recorder ??= html.MediaRecorder(_stream!);
+      try {
+        final mt = recorder.mimeType;
+        if (mt != null && mt.trim().isNotEmpty) {
+          _mime = ngmyCleanMediaMime(mt);
+        }
+      } catch (_) {
+        _mime = ngmyCleanMediaMime(_mime);
+      }
+
+      _recorder = recorder;
       _recorder!.addEventListener('dataavailable', (html.Event e) {
         final event = e as html.BlobEvent;
         final data = event.data;
@@ -61,24 +80,27 @@ class NgmyLiveCaptureEngine {
   }
 
   String _pickMime({required bool video}) {
+    // Prefer broadly playable container types first (no codec params).
     final candidates = video
-        ? <String>['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
-        : <String>['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+        ? <String>['video/webm', 'video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus']
+        : <String>['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/webm;codecs=opus'];
     for (final m in candidates) {
       try {
         if (html.MediaRecorder.isTypeSupported(m)) return m;
       } catch (_) {}
     }
-    return video ? 'video/webm' : 'audio/webm';
+    return '';
   }
 
   Future<NgmyLiveCaptureResult?> stop() async {
     final recorder = _recorder;
     if (recorder == null) return null;
     _stopCompleter = Completer<html.Blob?>();
+    final cleanMime = ngmyCleanMediaMime(_mime.isEmpty ? (recorder.mimeType ?? 'application/octet-stream') : _mime);
+
     void onStop(html.Event _) {
       try {
-        final blob = _chunks.isEmpty ? null : html.Blob(_chunks, _mime);
+        final blob = _chunks.isEmpty ? null : html.Blob(_chunks, cleanMime);
         if (!(_stopCompleter?.isCompleted ?? true)) _stopCompleter!.complete(blob);
       } catch (e) {
         if (!(_stopCompleter?.isCompleted ?? true)) _stopCompleter!.completeError(e);
@@ -87,14 +109,19 @@ class NgmyLiveCaptureEngine {
 
     recorder.addEventListener('stop', onStop);
     try {
-      if (recorder.state != 'inactive') recorder.stop();
+      if (recorder.state != 'inactive') {
+        try {
+          recorder.requestData();
+        } catch (_) {}
+        recorder.stop();
+      }
     } catch (_) {}
     html.Blob? blob;
     try {
       blob = await _stopCompleter!.future.timeout(const Duration(seconds: 8));
     } catch (e) {
       lastError = 'Stop failed: $e';
-      blob = _chunks.isEmpty ? null : html.Blob(_chunks, _mime);
+      blob = _chunks.isEmpty ? null : html.Blob(_chunks, cleanMime);
     }
     recorder.removeEventListener('stop', onStop);
     await _releaseStream();
@@ -104,7 +131,8 @@ class NgmyLiveCaptureEngine {
       return null;
     }
     final dataUrl = await _blobToDataUrl(blob);
-    _last = NgmyLiveCaptureResult(dataUrl: dataUrl, mimeType: _mime);
+    _mime = cleanMime;
+    _last = NgmyLiveCaptureResult(dataUrl: dataUrl, mimeType: cleanMime);
     return _last;
   }
 

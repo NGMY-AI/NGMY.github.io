@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// Non-web stubs for Live Capture media helpers.
+String ngmyCleanMediaMime(String mime) {
+  final base = mime.split(';').first.trim().toLowerCase();
+  if (base.startsWith('audio/') || base.startsWith('video/') || base.startsWith('application/')) {
+    return base;
+  }
+  return 'application/octet-stream';
+}
+
 class NgmyLiveCaptureMedia {
-  static Widget liveCameraPreview({required Object? stream, double height = 180}) {
+  static Widget liveCameraPreview({required Object? stream, double height = 200}) {
     return Container(
       height: height,
       alignment: Alignment.center,
@@ -11,8 +18,9 @@ class NgmyLiveCaptureMedia {
     );
   }
 
-  static Widget playbackVideo({required String src, double height = 200}) {
+  static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
     return Container(
+      key: key,
       height: height,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(18)),
@@ -20,8 +28,9 @@ class NgmyLiveCaptureMedia {
     );
   }
 
-  static Widget playbackAudio({required String src, double height = 54}) {
+  static Widget playbackAudio({required String src, required String mimeType, double height = 52, Key? key}) {
     return Container(
+      key: key,
       height: height,
       alignment: Alignment.center,
       color: const Color(0xFF0F172A),

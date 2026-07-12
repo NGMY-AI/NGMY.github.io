@@ -82,7 +82,7 @@ const _categoryArt = <String, _CategoryArt>{
   'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
   'Paper Trace': _CategoryArt(icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
   'Live Capture': _CategoryArt(icon: Icons.fiber_manual_record_rounded, accent: Color(0xFFEF4444), gradient: [Color(0xFFDC2626), Color(0xFF06B6D4)]),
-  'Color Buckets': _CategoryArt(icon: Icons.water_drop_rounded, accent: Color(0xFF8B5CF6), gradient: [Color(0xFFEF4444), Color(0xFF3B82F6), Color(0xFF22C55E)]),
+  'Paint Mix': _CategoryArt(icon: Icons.palette_outlined, accent: Color(0xFFD6A800), gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)]),
 };
 
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
@@ -294,7 +294,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyLiveCaptureDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Color Buckets',
+                          title: 'Paint Mix',
                           count: _colorBuckets,
                           pulse: pulse,
                           scan: scan,
