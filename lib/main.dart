@@ -1598,6 +1598,8 @@ class AppConfig {
   List<Map<String, dynamic>> civicRegistrarApplications;
   /// Civic Registry members only — not general app user profiles.
   List<Map<String, dynamic>> civicRegistryMembers;
+  /// Tombstones so deletes sync to every registrar device.
+  List<Map<String, dynamic>> civicRegistryRemoved;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
   double familyTreeCreateFee;
@@ -1728,6 +1730,7 @@ class AppConfig {
     this.civicRegistryPin = '',
     List<Map<String, dynamic>>? civicRegistrarApplications,
     List<Map<String, dynamic>>? civicRegistryMembers,
+    List<Map<String, dynamic>>? civicRegistryRemoved,
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -1806,6 +1809,7 @@ class AppConfig {
         civicRegistryPinsByState = civicRegistryPinsByState ?? const {},
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         civicRegistryMembers = civicRegistryMembers ?? const [],
+        civicRegistryRemoved = civicRegistryRemoved ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
         adminDeletedUserEmails = adminDeletedUserEmails ?? const [],
         adminUserAccountStatusByEmail = adminUserAccountStatusByEmail ?? const {},
@@ -1879,6 +1883,7 @@ class AppConfig {
     'civicRegistryPin': civicRegistryPin,
     'civicRegistrarApplications': civicRegistrarApplications,
     'civicRegistryMembers': civicRegistryMembers,
+    'civicRegistryRemoved': civicRegistryRemoved,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
@@ -2013,6 +2018,9 @@ class AppConfig {
     ),
     civicRegistryMembers: List<Map<String, dynamic>>.from(
       (json['civicRegistryMembers'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    civicRegistryRemoved: List<Map<String, dynamic>>.from(
+      (json['civicRegistryRemoved'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
@@ -9384,6 +9392,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
         if (next.civicRegistryMembers.isEmpty && keepConfig.civicRegistryMembers.isNotEmpty) {
           next.civicRegistryMembers = keepConfig.civicRegistryMembers;
+        }
+        if (next.civicRegistryRemoved.isEmpty && keepConfig.civicRegistryRemoved.isNotEmpty) {
+          next.civicRegistryRemoved = keepConfig.civicRegistryRemoved;
         }
         await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
@@ -28090,6 +28101,55 @@ class _HelpCampaignSpendingLedgerSheetState extends State<_HelpCampaignSpendingL
   }
 }
 
+class _AliveSearchFrame extends StatefulWidget {
+  const _AliveSearchFrame({required this.isDark, required this.child});
+  final bool isDark;
+  final Widget child;
+
+  @override
+  State<_AliveSearchFrame> createState() => _AliveSearchFrameState();
+}
+
+class _AliveSearchFrameState extends State<_AliveSearchFrame> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final base = widget.isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final frame = widget.isDark ? const Color(0xFF6366F1) : const Color(0xFF4F46E5);
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(_pulse.value);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 15),
+          decoration: BoxDecoration(
+            color: base,
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Color.lerp(frame.withOpacity(0.35), frame.withOpacity(0.85), t)!, width: 1.6),
+            boxShadow: [
+              BoxShadow(
+                color: frame.withOpacity(0.08 + t * 0.14),
+                blurRadius: 12 + t * 10,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.04), blurRadius: 10),
+            ],
+          ),
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
+
 class CivicRegistryScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
@@ -29266,6 +29326,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
 
     final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
     var userCloudOk = true;
     if (await ngmyCanReachCloud() && accountIdx >= 0) {
       try {
@@ -29464,25 +29525,55 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       </tr>''');
     }
 
+    final now = DateTime.now().toLocal();
+    final dateStr =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final title = "EMO'YA M'BEMBE M'MBOND0 · $state";
+
     final html = '''
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>NGMY Civic Roster — $state</title>
+<title>$title</title>
 <style>
-  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 28px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .meta { color: #555; font-size: 12px; margin-bottom: 18px; }
+  @page { margin: 18mm 14mm; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #111; margin: 0; padding: 18px 22px 28px; }
+  .topbar { display: flex; justify-content: flex-end; align-items: flex-start; min-height: 54px; margin-bottom: 8px; }
+  .stamp { text-align: right; line-height: 1.25; }
+  .stamp .date { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: #111; }
+  .stamp .time { font-size: 12px; color: #555; margin-top: 2px; }
+  .header { text-align: center; margin: 4px 0 22px; }
+  .header h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+  }
+  .header .count { margin-top: 8px; font-size: 12px; color: #666; font-family: system-ui, sans-serif; }
   table { width: 100%; border-collapse: collapse; }
   th, td { border: 1px solid #ccc; padding: 10px 8px; font-size: 13px; vertical-align: top; }
   th { background: #f3f4f6; text-align: left; }
-  @media print { body { margin: 12px; } }
+  @media print {
+    body { padding: 0; }
+    .topbar { margin-bottom: 4px; }
+  }
 </style>
 </head>
 <body>
-  <h1>$state Civic Registry Roster</h1>
-  <div class="meta">${members.length} members · printable paper list · ${DateTime.now().toLocal()}</div>
+  <div class="topbar">
+    <div class="stamp">
+      <div class="date">${_escapeHtml(dateStr)}</div>
+      <div class="time">${_escapeHtml(timeStr)}</div>
+    </div>
+  </div>
+  <div class="header">
+    <h1>${_escapeHtml(title)}</h1>
+    <div class="count">${members.length} members</div>
+  </div>
   <table>
     <thead>
       <tr>
@@ -30635,7 +30726,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Member profile', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink)),
+                    Text('Full users information', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink)),
                     const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
@@ -30648,6 +30739,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Icon(Icons.badge_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Official Member Records',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: ink),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: _statusColorForMissed(u.missed),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  _statusLabelForMissed(u.missed),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
                           if (showNicks) ...[
                             const SizedBox(height: 6),
@@ -32242,69 +32357,87 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
     final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
-    final border = isDark ? const Color(0xFF334155) : const Color(0xFFDbe3F0);
-    final fill = isDark ? const Color(0xFF151C2C) : const Color(0xFFF8FAFF);
-    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final familyRaw = raw?['familyMembers'];
+    final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border, width: 1.4),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.06), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => _showPublicMemberProfile(u),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6200EE).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(14),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.96, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: _AliveSearchFrame(
+        isDark: isDark,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _statusColorForMissed(u.missed),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _statusLabelForMissed(u.missed),
+                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (showNicks)
+                          Text(
+                            nicks.join(' · '),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                            ),
+                          ),
+                        Text(u.registryId ?? 'PENDING ID', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                      ],
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : '?',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF6200EE), fontSize: 18),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink)),
-                      if (showNicks)
-                        Text(nicks.join(' · '), style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
-                      const SizedBox(height: 4),
-                      Text(
-                        u.phone.isEmpty ? (u.registryId ?? 'Member') : u.phone,
-                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-                      ),
+                      Text('${u.helps} helps', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('${u.missed} missed', style: const TextStyle(color: Colors.red, fontSize: 10)),
                     ],
                   ),
-                ),
-                FilledButton(
-                  onPressed: () => _showPublicMemberProfile(u),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('View', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
+              _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
+              _memberInfo(Icons.phone_android_rounded, u.phone.isEmpty ? 'No phone' : u.phone, Colors.black54),
+              _memberInfo(
+                Icons.family_restroom_rounded,
+                '$familyCount family member${familyCount == 1 ? '' : 's'}',
+                Colors.teal,
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showPublicMemberProfile(u)),
+              ),
+            ],
           ),
         ),
       ),

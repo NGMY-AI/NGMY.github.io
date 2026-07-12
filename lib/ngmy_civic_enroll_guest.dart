@@ -314,6 +314,17 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         }
       }
 
+      final remoteRemoved = <Map<String, dynamic>>[];
+      final removedRaw = latest['removed'] ?? latest['civicRegistryRemoved'];
+      if (removedRaw is List) {
+        for (final e in removedRaw) {
+          if (e is Map) remoteRemoved.add(Map<String, dynamic>.from(e));
+        }
+      }
+      remoteRemoved.removeWhere(
+        (r) => NgmyCivicRegistryMembers.emailKey((r['email'] ?? '').toString()) == email,
+      );
+
       final duplicate = NgmyCivicRegistryMembers.findDuplicateInRecords(
         records: remoteMembers,
         fullName: fullName,
@@ -345,6 +356,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
       final payload = {
         'members': remoteMembers,
+        'removed': remoteRemoved,
         'savedAt': DateTime.now().toUtc().toIso8601String(),
         'source': 'guest_self_enrollment',
       };
@@ -553,7 +565,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               ],
             ),
             child: Text(
-              "EMO 'YA MMBOND0 · $_selectedState",
+              "EMO'YA M'BEMBE M'MBOND0 · $_selectedState",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,

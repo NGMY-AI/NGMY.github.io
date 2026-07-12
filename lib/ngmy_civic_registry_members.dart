@@ -20,6 +20,45 @@ class NgmyCivicRegistryMembers {
     (config as dynamic).civicRegistryMembers = members;
   }
 
+  static List<Map<String, dynamic>> removedFrom(dynamic config) {
+    try {
+      final raw = (config as dynamic).civicRegistryRemoved;
+      if (raw is! List) return [];
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static void setRemoved(dynamic config, List<Map<String, dynamic>> removed) {
+    try {
+      (config as dynamic).civicRegistryRemoved = removed;
+    } catch (_) {}
+  }
+
+  static void _clearTombstone(dynamic config, String email) {
+    final key = emailKey(email);
+    if (key.isEmpty) return;
+    final next = removedFrom(config)
+      ..removeWhere((r) => emailKey((r['email'] ?? '').toString()) == key);
+    setRemoved(config, next);
+  }
+
+  static void _addTombstone(dynamic config, {required String email, String registryId = '', String state = ''}) {
+    final key = emailKey(email);
+    if (key.isEmpty) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    final next = removedFrom(config);
+    next.removeWhere((r) => emailKey((r['email'] ?? '').toString()) == key);
+    next.add({
+      'email': key,
+      'registryId': registryId.trim(),
+      'state': state.trim(),
+      'removedAt': now,
+    });
+    setRemoved(config, next);
+  }
+
   static Map<String, dynamic> buildRecord({
     required String email,
     required String fullName,
@@ -57,6 +96,7 @@ class NgmyCivicRegistryMembers {
   static void upsert(dynamic config, Map<String, dynamic> record) {
     final email = emailKey((record['email'] ?? '').toString());
     if (email.isEmpty) return;
+    _clearTombstone(config, email);
     final members = listFrom(config);
     final next = Map<String, dynamic>.from(record)..['email'] = email;
     final now = DateTime.now().toUtc().toIso8601String();
@@ -276,8 +316,12 @@ class NgmyCivicRegistryMembers {
   static void removeByEmail(dynamic config, String email) {
     final key = emailKey(email);
     if (key.isEmpty) return;
+    final existing = findByEmail(config, email);
+    final registryId = (existing?['registryId'] ?? '').toString();
+    final state = (existing?['state'] ?? '').toString();
     final members = listFrom(config)..removeWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
     setList(config, members);
+    _addTombstone(config, email: key, registryId: registryId, state: state);
   }
 
   static bool isEnrolled(dynamic config, String email) {
@@ -464,6 +508,7 @@ class NgmyCivicRegistryMembers {
 
   static Map<String, dynamic> payload(dynamic config) => {
         'members': listFrom(config),
+        'removed': removedFrom(config),
         'savedAt': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -624,11 +669,46 @@ class NgmyCivicRegistryMembers {
     final remote = payload['members'];
     if (remote is! List) return;
     final remoteMembers = remote.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+    // Merge delete tombstones from every device so removals stay removed everywhere.
+    final remoteRemovedRaw = payload['removed'] ?? payload['civicRegistryRemoved'];
+    final remoteRemoved = <Map<String, dynamic>>[];
+    if (remoteRemovedRaw is List) {
+      for (final e in remoteRemovedRaw) {
+        if (e is Map) remoteRemoved.add(Map<String, dynamic>.from(e));
+      }
+    }
+    final tombstones = <String, Map<String, dynamic>>{};
+    for (final r in [...removedFrom(config), ...remoteRemoved]) {
+      final key = emailKey((r['email'] ?? '').toString());
+      if (key.isEmpty) continue;
+      final prev = tombstones[key];
+      if (prev == null) {
+        tombstones[key] = r;
+        continue;
+      }
+      final a = DateTime.tryParse((prev['removedAt'] ?? '').toString());
+      final b = DateTime.tryParse((r['removedAt'] ?? '').toString());
+      if (b != null && (a == null || b.isAfter(a))) tombstones[key] = r;
+    }
+    setRemoved(config, tombstones.values.toList());
+
     final local = listFrom(config);
     if (local.isEmpty) {
-      setList(config, remoteMembers);
+      final filtered = remoteMembers.where((m) {
+        final key = emailKey((m['email'] ?? '').toString());
+        final tomb = tombstones[key];
+        if (tomb == null) return true;
+        final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
+        final updatedAt = _memberStamp(m);
+        if (removedAt == null) return false;
+        if (updatedAt != null && updatedAt.isAfter(removedAt)) return true; // re-enrolled after delete
+        return false;
+      }).toList();
+      setList(config, filtered);
       return;
     }
+
     final merged = <String, Map<String, dynamic>>{};
     final idsOwned = <String, String>{};
 
@@ -648,13 +728,12 @@ class NgmyCivicRegistryMembers {
         merged[key] = _preferNewerMember(merged[key]!, m);
         continue;
       }
-      // Same registry ID under a different email — keep the newer profile, drop the older duplicate key.
       if (id.isNotEmpty && idsOwned.containsKey(id)) {
         final existingKey = idsOwned[id]!;
         final existing = merged[existingKey];
         if (existing != null) {
           final newer = _preferNewerMember(existing, m);
-          if (identical(newer, m) || newer['email'] == m['email']) {
+          if (identical(newer, m) || emailKey((newer['email'] ?? '').toString()) == key) {
             merged.remove(existingKey);
             merged[key] = Map<String, dynamic>.from(m);
             idsOwned[id] = key;
@@ -665,6 +744,21 @@ class NgmyCivicRegistryMembers {
       merged[key] = m;
       if (id.isNotEmpty) idsOwned[id] = key;
     }
+
+    // Drop anyone with a tombstone newer than their last update (deleted on another device).
+    merged.removeWhere((key, m) {
+      final tomb = tombstones[key];
+      if (tomb == null) return false;
+      final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
+      final updatedAt = _memberStamp(m);
+      if (removedAt == null) return true;
+      if (updatedAt != null && updatedAt.isAfter(removedAt)) {
+        _clearTombstone(config, key); // resurrected after delete
+        return false;
+      }
+      return true;
+    });
+
     setList(config, merged.values.toList());
   }
 
