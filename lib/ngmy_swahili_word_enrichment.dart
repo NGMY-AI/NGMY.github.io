@@ -74,34 +74,32 @@ SwahiliRichWord _autoEnrich(SwahiliWord w) {
         w.example.split(' = ').last.trim(),
         parts,
       ),
-    _ex('Tumia: "${w.swahili}" katika sentensi yako.', 'Use: "${w.swahili}" in your own sentence.', parts),
-    _ex('Rudia kwa sauti: ${w.pronunciation}.', 'Repeat aloud: ${w.pronunciation}.', parts),
-    _ex('Andika kwenye daftari: ${w.swahili} — ${w.english}.', 'Write in your notebook: ${w.swahili} — ${w.english}.', parts),
-    _ex('Uliza rafiki: "${w.swahili}" inamaanisha nini?', 'Ask a friend: what does "${w.swahili}" mean in English?', parts),
+    _ex('Kwa Kiingereza: "${w.english}" katika sentensi yako.', 'In English: use "${w.english}" in your own sentence.', parts),
+    _ex('Sema kwa sauti kwa Kiingereza: "${w.english}".', 'Say it aloud in English: "${w.english}".', parts),
+    _ex('Andika kwenye daftari: ${w.english} — ${w.swahili}.', 'Write in your notebook: ${w.english} — ${w.swahili}.', parts),
+    _ex('Uliza rafiki: unasemaje "${w.swahili}" kwa Kiingereza?', 'Ask a friend: how do you say "${w.swahili}" in English?', parts),
   ];
 
   return SwahiliRichWord(
     base: w,
     explanationSw:
-        'Hili ni neno au sentensi ya Kiswahili: "${w.swahili}". Kwa Kiingereza linamaanisha "${w.english}". '
-        'Linatamkwa hivi: ${w.pronunciation}. '
-        'Soma kwa makini, rudia kwa sauti, kisha jaribu kutumia katika sentensi yako mwenyewe.',
+        'Neno la Kiingereza ni: "${w.english}". Kwa Kiswahili unalijua tayari: "${w.swahili}" (${w.pronunciation}). '
+        'Zoezi: soma "${w.english}" kwa makini, rudia kwa sauti, kisha jaribu kuitumia katika sentensi yako ya Kiingereza.',
     explanationEn:
-        'This is a Swahili word or phrase: "${w.swahili}". In English it means "${w.english}". '
-        'Pronounce it: ${w.pronunciation}. '
-        'Read carefully, repeat aloud, then try using it in your own sentence.',
+        'The English word is: "${w.english}". You already know it in Swahili: "${w.swahili}" (${w.pronunciation}). '
+        'Practice: read "${w.english}" carefully, repeat it aloud, then try using it in your own English sentence.',
     grammarSw: w.grammar.isNotEmpty
-        ? 'Sarufi: Hii ni muundo wa kimsingi — ${w.grammar}. Kumbuka muundo huu ukiunda sentensi mpya.'
-        : 'Sarufi: Angalia kila sehemu ya "${w.swahili}". Maneno mengi ya Kiswahili yana viambishi mwanzoni au mwishoni.',
+        ? 'Sarufi ya Kiingereza: Muundo huu wa kimsingi unalingana na wa Kiswahili — ${w.grammar}. Kumbuka muundo huu ukijenga sentensi mpya za Kiingereza.'
+        : 'Sarufi: Angalia kila sehemu ya "${w.english}" kwa Kiingereza. Jaribu kuitumia katika mazungumzo yako ya kila siku ya Kiingereza.',
     grammarEn: w.grammar.isNotEmpty
-        ? 'Grammar: This is the basic pattern — ${w.grammar}. Remember this pattern when you build new sentences.'
-        : 'Grammar: Look at each part of "${w.swahili}". Many Swahili words have prefixes or suffixes that change meaning.',
+        ? 'English grammar: This basic pattern matches the Swahili one — ${w.grammar}. Remember this pattern when you build new English sentences.'
+        : 'Grammar: Look at each part of "${w.english}" in English. Try using it in your everyday English conversations.',
     tips: [
-      _tip('Soma kwa sauti mara tatu: ${w.pronunciation}.', 'Read aloud three times: ${w.pronunciation}.'),
-      _tip('Funga macho, sema "${w.swahili}" bila kuangalia.', 'Close your eyes and say "${w.swahili}" without looking.'),
-      _tip('Andika neno hilo mara tano kwenye daftari lako.', 'Write the word five times in your notebook.'),
-      _tip('Tafuta mahali pa kutumia neno hili leo.', 'Find a place to use this word today.'),
-      _tip('Kumbuka maana ya Kiingereza: "${w.english}".', 'Remember the English meaning: "${w.english}".'),
+      _tip('Sema kwa sauti mara tatu kwa Kiingereza: "${w.english}".', 'Say it aloud three times in English: "${w.english}".'),
+      _tip('Funga macho, sema "${w.english}" kwa Kiingereza bila kuangalia.', 'Close your eyes and say "${w.english}" in English without looking.'),
+      _tip('Andika neno la Kiingereza mara tano kwenye daftari lako.', 'Write the English word five times in your notebook.'),
+      _tip('Tafuta mahali pa kutumia "${w.english}" kwa Kiingereza leo.', 'Find a place to use "${w.english}" in English today.'),
+      _tip('Kumbuka: kwa Kiswahili ni "${w.swahili}".', 'Remember: in Swahili it is "${w.swahili}".'),
     ],
     examples: examples,
   );
@@ -127,14 +125,14 @@ SwahiliRichWord Function(SwahiliWord) _rich(
 
 final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
   'Mimi': _rich(
-    'Mimi ni neno linaloonyesha WEWE mwenyewe unayezungumza. Unalitumia mwanzo wa sentensi unaposema kuhusu mambo yako: mimi niko hapa, mimi nina njaa, mimi ninafurahi.',
-    '"Mimi" means I or me — the person speaking. Use it at the start of a sentence about yourself: I am here, I am hungry, I am happy.',
-    'Sarufi: "Mimi" ni kiambishi nomino — mtu anayezungumza (mtu wa kwanza umoja). Baada yake weka "ni" au kitenzi: Mimi ni…, Mimi nina…, Mimi niko…',
-    'Grammar: "Mimi" is a subject pronoun — first person singular (I). After it use "ni" or a verb: I am…, I have…, I am at…',
+    'Kwa Kiingereza, "Mimi" ni "I" au "me" — mtu anayezungumza. Kiingereza hutumia "I" mwanzoni mwa sentensi ukizungumzia mambo yako: I am here, I am hungry, I am happy.',
+    'In English, "Mimi" is "I" or "me" — the person speaking. Use "I" at the start of a sentence about yourself: I am here, I am hungry, I am happy.',
+    'Sarufi ya Kiingereza: "I" huandikwa kwa herufi kubwa daima, popote ilipo kwenye sentensi. "Me" hutumika baada ya kitenzi: He loves me.',
+    'English grammar: "I" is always capitalized, wherever it falls in the sentence. "Me" is used after a verb: He loves me.',
     [
-      _tip('Usiogope kurudia "Mimi" — Watanzania na Wakenya wanalisikia kila siku.', 'Do not be afraid to repeat "Mimi" — Tanzanians and Kenyans hear it every day.'),
-      _tip('Unaweza kuacha "Mimi" na kusema tu "Niko hapa" — maana iko wazi.', 'You can drop "Mimi" and just say "Niko hapa" — the meaning is still clear.'),
-      _tip('Linganisha: Mimi (mimi) · Wewe (wewe) · Yeye (yeye mwingine).', 'Compare: Mimi (I) · Wewe (you) · Yeye (he/she).'),
+      _tip('Sema kwa Kiingereza mara tatu: "I" na "me".', 'Say it in English three times: "I" and "me".'),
+      _tip('Kumbuka: "I" ni herufi kubwa daima kwa Kiingereza — hata katikati ya sentensi.', 'Remember: "I" is always capital in English — even in the middle of a sentence.'),
+      _tip('Linganisha: I (mimi) · You (wewe) · He/She (yeye).', 'Compare: I (mimi) · You (wewe) · He/She (yeye).'),
     ],
     [
       _ex('Mimi ni mwanafunzi.', 'I am a student.', [_part('Mimi', 'I / me'), _part('ni', 'am / is'), _part('mwanafunzi', 'student')]),
@@ -144,14 +142,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Wewe / Ninyi': _rich(
-    '"Wewe" unamwambia mtu mmoja. "Ninyi" unawaambia watu wengi pamoja. Hivi ni vya pili — unazungumzia mtu unayemzungumza.',
-    '"Wewe" means you (one person). "Ninyi" means you all (many people). These are second person — you talk to the listener(s).',
-    'Sarufi: Wewe (umoja) · Ninyi (wingi). Baada yake: Wewe ni…, Ninyi mn…, Ninyi mko…',
-    'Grammar: Wewe (singular) · Ninyi (plural). After them: You are…, You all do…, You all are at…',
+    'Kwa Kiingereza, "Wewe" na "Ninyi" vyote ni "you" — neno moja tu, kwa mtu mmoja au wengi! Kiingereza hakina tofauti kama Kiswahili.',
+    '"Wewe" and "Ninyi" are both just "you" in English — one word covers both singular and plural! English doesn\'t distinguish the way Swahili does.',
+    'Sarufi ya Kiingereza: "You" haibadiliki kamwe — sawa kwa mtu mmoja au wengi, mwanaume au mwanamke.',
+    'English grammar: "You" never changes — the same word whether one person or many, male or female.',
     [
-      _tip('Heshima: kwa wazee unaweza kutumia "Nyinyi" badala ya "Ninyi".', 'Respect: with elders you can say "Nyinyi" instead of "Ninyi".'),
-      _tip('Katika swali: "Wewe ni nani?" = Who are you?', 'In a question: "Wewe ni nani?" = Who are you?'),
-      _tip('Usichanganye Wewe (mtu mmoja) na Sisi (sisi sote pamoja).', 'Do not mix up Wewe (one person) and Sisi (we / us together).'),
+      _tip('Sema kwa Kiingereza: "you" — mara tatu.', 'Say it in English: "you" — three times.'),
+      _tip('Kumbuka: Kiingereza hakina "Nyinyi" ya heshima — "you" pekee kwa kila mtu.', 'Remember: English has no polite "Nyinyi" — just "you" for everyone.'),
+      _tip('Swali: "Who are you?" = "Wewe ni nani?"', 'Question: "Who are you?" = "Wewe ni nani?"'),
     ],
     [
       _ex('Wewe ni rafiki yangu.', 'You are my friend.', [_part('Wewe', 'you'), _part('ni', 'are'), _part('rafiki yangu', 'my friend')]),
@@ -161,14 +159,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye': _rich(
-    '"Yeye" unazungumzia mtu mwingine — mwanaume AU mwanamke, Kiswahili hutumia neno moja!',
-    '"Yeye" means he or she — one word for both in Swahili. You talk about another person.',
-    'Sarufi: Yeye + ni / ana / yuko / ame… — mtu wa tatu umoja.',
-    'Grammar: Yeye + is / has / is at / has done… — third person singular.',
+    'Kwa Kiingereza, "Yeye" hugawanyika kuwa mbili: "he" (mwanaume) na "she" (mwanamke) — tofauti na Kiswahili ambacho hutumia neno moja.',
+    'In English, "Yeye" splits into two words: "he" (for a man) and "she" (for a woman) — unlike Swahili, which uses one word for both.',
+    'Sarufi ya Kiingereza: He + is/has/does (mwanaume). She + is/has/does (mwanamke).',
+    'English grammar: He + is/has/does (for a man). She + is/has/does (for a woman).',
     [
-      _tip('Ukisikia "yeye" bila jina, angalia aliyekuwa anazungumziwa hapo awali.', 'If you hear "yeye" without a name, look at who was being discussed before.'),
-      _tip('Kwa msichana: "Yeye ni mrembo." Kwa mvulana: "Yeye ni mtanashati."', 'For a girl: "She is beautiful." For a boy: "He is handsome."'),
-      _tip('Wengi: wao (they) — utajifunza baadaye.', 'Plural: wao (they) — you will learn that later.'),
+      _tip('Muhimu: Kiingereza kinahitaji ujue jinsia — "he" au "she", si "yeye" tu.', 'Important: English requires you to know the gender — "he" or "she", not just "yeye".'),
+      _tip('Kwa msichana: "She is beautiful." Kwa mvulana: "He is handsome."', 'For a girl: "She is beautiful." For a boy: "He is handsome."'),
+      _tip('Wingi kwa Kiingereza: "they" (wao) — utajifunza baadaye.', 'Plural in English: "they" (wao) — you will learn that later.'),
     ],
     [
       _ex('Yeye anakuja sasa.', 'He/She is coming now.', [_part('Yeye', 'he/she'), _part('anakuja', 'is coming'), _part('sasa', 'now')]),
@@ -178,14 +176,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Sisi': _rich(
-    '"Sisi" ni sisi sote — wewe na mimi pamoja, au kikundi unachokiwa nacho.',
-    '"Sisi" means we or us — you and me together, or a group you belong to.',
-    'Sarufi: Sisi + tun… / tuko… / tuna… — watu wa kwanza wingi.',
-    'Grammar: Sisi + we do… / we are at… / we have… — first person plural.',
+    'Kwa Kiingereza, "Sisi" ni "we" (kama mhusika) au "us" (baada ya kitenzi) — wewe na mimi pamoja, au kikundi chako.',
+    '"Sisi" is "we" (as the subject) or "us" (after a verb) in English — you and me together, or your group.',
+    'Sarufi ya Kiingereza: We + do/are/have (mwanzoni mwa sentensi). "Us" hutumika baada ya kitenzi: He helped us.',
+    'English grammar: We + do/are/have (at the start of a sentence). "Us" is used after a verb: He helped us.',
     [
-      _tip('Sisi vs Mimi: Mimi = mimi peke yangu. Sisi = mimi na wengine.', 'Sisi vs Mimi: Mimi = me alone. Sisi = me and others.'),
-      _tip('Kwa heshima: "Sisi" inaweza kujumuisha wasikilizaji.', 'For respect: "Sisi" can include the listeners — "We all should…"'),
-      _tip('Rudia: Sisi tunakula, Sisi tunaenda, Sisi tuko hapa.', 'Repeat: We are eating, We are going, We are here.'),
+      _tip('Sema kwa Kiingereza: "we" na "us".', 'Say it in English: "we" and "us".'),
+      _tip('We vs Us: "We" ni mhusika (We tunakula). "Us" ni baada ya kitenzi (He saw us).', 'We vs Us: "We" is the subject ("We are eating"). "Us" comes after the verb ("He saw us").'),
+      _tip('Rudia kwa Kiingereza: We are eating, We are going, We are here.', 'Repeat in English: We are eating, We are going, We are here.'),
     ],
     [
       _ex('Sisi tunakula chakula.', 'We are eating food.', [_part('Sisi', 'we'), _part('tunakula', 'we eat / are eating'), _part('chakula', 'food')]),
@@ -195,14 +193,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye ni mrefu': _rich(
-    'Sentensi kamili: unasema mtu fulani ana urefu. "Mrefu" = tall. "Ni" inaunganisha mtu na sifa.',
-    'Full sentence: you say someone is tall. "Mrefu" = tall. "Ni" links the person to the trait.',
-    'Sarufi: Yeye + ni + sifa (mrefu, mfupi, mzuri…). Muundo huu ni msingi wa maelezo.',
-    'Grammar: Yeye + is + adjective (tall, short, good…). This pattern is basic for descriptions.',
+    'Kwa Kiingereza: "He/She is tall." "Tall" ndilo neno la Kiingereza la "mrefu".',
+    'In English: "He/She is tall." "Tall" is the English word for "mrefu".',
+    'Sarufi ya Kiingereza: He/She + is + sifa (tall, short, nice…). Muundo huu ni msingi wa maelezo kwa Kiingereza.',
+    'English grammar: He/She + is + adjective (tall, short, nice…). This pattern is basic for descriptions in English.',
     [
-      _tip('Unaweza pia kusema: "Mrefu" peke yake ukionyesha kwa kidole.', 'You can also say just "Mrefu" while pointing with your finger.'),
-      _tip('Kinyume: Yeye ni mfupi. = He/She is short.', 'Opposite: Yeye ni mfupi. = He/She is short.'),
-      _tip('Kwa vitu: Mti ni mrefu (The tree is tall).', 'For things: Mti ni mrefu (The tree is tall).'),
+      _tip('Sema kwa Kiingereza: "He is tall" au "She is tall".', 'Say it in English: "He is tall" or "She is tall".'),
+      _tip('Kinyume kwa Kiingereza: short.', 'Opposite in English: short.'),
+      _tip('Kwa vitu: "The tree is tall."', 'For things: "The tree is tall."'),
     ],
     [
       _ex('Yeye ni mrefu kuliko mimi.', 'He/She is taller than me.', [_part('Yeye', 'he/she'), _part('ni mrefu', 'is tall'), _part('kuliko mimi', 'than me')]),
@@ -212,14 +210,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye ni mfupi': _rich(
-    'Unasema mtu ana urefu mdogo — mfupi. Kinyume cha mrefu.',
-    'You say someone has little height — short. Opposite of tall.',
-    'Sarufi: Yeye ni + sifa. Mfupi inaweza pia maana "fupi" kwa muda.',
-    'Grammar: Yeye is + trait. Mfupi can also mean short in time or length.',
+    'Kwa Kiingereza: "He/She is short." "Short" ndilo neno la Kiingereza la "mfupi".',
+    'In English: "He/She is short." "Short" is the English word for "mfupi".',
+    'Sarufi ya Kiingereza: He/She + is + short. "Short" pia inaweza kumaanisha muda mfupi kwa Kiingereza.',
+    'English grammar: He/She + is + short. "Short" can also mean brief in time in English.',
     [
-      _tip('Heshima muhimu — sifa za mwili zungumziwe kwa upendo.', 'Respect matters — talk about body traits kindly.'),
-      _tip('Pia: Fupi = short in height or length.', 'Also: Fupi = short in height or length.'),
-      _tip('Linganisha mrefu / mfupi kwa vitu: barabara fupi.', 'Compare tall/short for things: a short road.'),
+      _tip('Sema kwa Kiingereza: "He is short" au "She is short".', 'Say it in English: "He is short" or "She is short".'),
+      _tip('Kwa vitu: "This sofa is short."', 'For things: "This sofa is short."'),
+      _tip('Heshima muhimu — zungumzia sifa za mwili kwa upendo, hata kwa Kiingereza.', 'Respect matters — talk about body traits kindly, even in English.'),
     ],
     [
       _ex('Yeye ni mfupi lakini ana akili.', 'He/She is short but smart.', [_part('mfupi', 'short'), _part('ana akili', 'has intelligence')]),
@@ -229,14 +227,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye ni wangu': _rich(
-    'Unasema mtu au kitu ni chako — ni mali yako au uhusiano wako. "Wangu" = mine.',
-    'You say a person or thing is yours — your property or relationship. "Wangu" = mine (for people).',
-    'Sarufi: Kiambishi -angu (wangu, yangu, langu) kinabadilika kulingana na kiumbi.',
-    'Grammar: Possessive -angu (wangu, yangu, langu) changes with noun class.',
+    'Kwa Kiingereza: "He/She is mine." "Mine" ndilo neno la Kiingereza la "wangu".',
+    'In English: "He/She is mine." "Mine" is the English word for "wangu".',
+    'Sarufi ya Kiingereza: mine, yours, his/hers, ours, theirs — maneno haya hayabadiliki kulingana na kiumbi kama Kiswahili.',
+    'English grammar: mine, yours, his/hers, ours, theirs — these words don\'t change with noun class the way Swahili does.',
     [
-      _tip('Kwa mapenzi: "Wewe ni wangu" — ya kimapenzi.', 'Romantic: "You are mine" — use carefully.'),
-      _tip('Kwa vitu: Hii ni yangu (this is mine).', 'For things: Hii ni yangu (this is mine).'),
-      _tip('Kumbuka: -angu, -ako, -ake, -etu, -enu, -ao.', 'Remember: my, yours, his/hers, ours, yours (plural), theirs.'),
+      _tip('Sema kwa Kiingereza: "mine".', 'Say it in English: "mine".'),
+      _tip('Kwa vitu: "This is mine."', 'For things: "This is mine."'),
+      _tip('Kumbuka: "my" (kabla ya nomino) ni tofauti na "mine" (peke yake): "my friend" dhidi ya "This is mine."', 'Remember: "my" (before a noun) is different from "mine" (alone): "my friend" vs "This is mine."'),
     ],
     [
       _ex('Rafiki yangu — yeye ni wangu wa dhati.', 'My friend — he is truly mine.', [_part('Rafiki', 'friend'), _part('wa dhati', 'truly / sincerely')]),
@@ -246,14 +244,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye ni daktari': _rich(
-    'Unasema mtu ana taaluma ya udaktari — anahudumia wagonjwa.',
-    'You say someone has the profession of doctor — treats sick people.',
-    'Sarufi: Yeye ni + kazi/taaluma (daktari, mwalimu, mfanyakazi…).',
-    'Grammar: Yeye is + job/profession (doctor, teacher, worker…).',
+    'Kwa Kiingereza: "He/She is a doctor." "Doctor" ni karibu sawa na Kiswahili "daktari" — rahisi kukumbuka!',
+    'In English: "He/She is a doctor." "Doctor" is almost the same as the Swahili "daktari" — easy to remember!',
+    'Sarufi ya Kiingereza: He/She is a + kazi (a doctor, a teacher, a worker…). Kumbuka "a" kabla ya kazi kwa Kiingereza.',
+    'English grammar: He/She is a + job (a doctor, a teacher, a worker…). Remember the "a" before the job in English.',
     [
-      _tip('Heshima: Daktari — tumia "Daktari" mwanzo wa jina.', 'Respect: use "Daktari" before the name.'),
-      _tip('Swali: Yeye ni daktari? — Ndiyo.', 'Question: Is he/she a doctor? — Yes.'),
-      _tip('Mahali: Yeye ni daktari hospitalini.', 'Place: He/She is a doctor at the hospital.'),
+      _tip('Sema kwa Kiingereza: "doctor".', 'Say it in English: "doctor".'),
+      _tip('Swali: "Is he a doctor?" — "Yes."', 'Question: "Is he a doctor?" — "Yes."'),
+      _tip('Mahali: "He is a doctor at the hospital."', 'Place: "He is a doctor at the hospital."'),
     ],
     [
       _ex('Yeye ni daktari mzuri sana.', 'He/She is a very good doctor.', [_part('daktari mzuri', 'good doctor'), _part('sana', 'very')]),
@@ -263,14 +261,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Yeye ni maarufu': _rich(
-    'Maarufu = watu wengi wanamfahamu — famous.',
-    'Maarufu = many people know him/her — famous.',
-    'Sarufi: Maarufu ni sifa. Unaweza: mtu maarufu, nyimbo maarufu.',
-    'Grammar: Maarufu is an adjective. Famous person, famous song.',
+    'Kwa Kiingereza: "He/She is famous." "Famous" ndilo neno la Kiingereza la "maarufu".',
+    'In English: "He/She is famous." "Famous" is the English word for "maarufu".',
+    'Sarufi ya Kiingereza: "Famous" ni sifa (adjective). Unaweza: a famous person, a famous song.',
+    'English grammar: "Famous" is an adjective. You can say: a famous person, a famous song.',
     [
-      _tip('Sana = very — Yeye ni maarufu sana.', 'Sana = very — He/She is very famous.'),
-      _tip('Kinyume: si maarufu = not well known.', 'Opposite: si maarufu = not well known.'),
-      _tip('Tumia kwa kumtukuza mtu unayempenda.', 'Use it to praise someone you admire.'),
+      _tip('Sema kwa Kiingereza: "famous".', 'Say it in English: "famous".'),
+      _tip('Ongeza "very": "He is very famous."', 'Add "very": "He is very famous."'),
+      _tip('Tumia kumsifu mtu unayempenda, kwa Kiingereza.', 'Use it to praise someone you admire, in English.'),
     ],
     [
       _ex('Mwimbaji huyu ni maarufu duniani.', 'This singer is famous worldwide.', [_part('Mwimbaji', 'singer'), _part('duniani', 'in the world')]),
@@ -280,14 +278,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Wana furaha': _rich(
-    'Wana = wao wana. Furaha = happiness. Kawaida Kiswahili kinasema "wana furaha" — wana hali ya furaha.',
-    'Wana = they have. Furaha = happiness. Swahili often says "they have happiness" for they are happy.',
-    'Sarufi: Wao/Wana + furaha/huzuni/njaa… — hisia kwa wingi.',
-    'Grammar: They + happiness/sadness/hunger… — feelings in plural.',
+    'Kwa Kiingereza: "They are happy." Kiingereza hutumia "happy" (sifa), si "furaha" (nomino) kama Kiswahili.',
+    '"They are happy" in English. English uses "happy" (an adjective), not "furaha" (a noun) the way Swahili does.',
+    'Sarufi ya Kiingereza: They/He/She/I + am/is/are + happy. Muundo huu ni tofauti na "wana furaha" wa Kiswahili.',
+    'English grammar: They/He/She/I + am/is/are + happy. This differs from the Swahili "wana furaha" ("they have happiness") structure.',
     [
-      _tip('Umoja: Ana furaha (yeye ana furaha).', 'Singular: Ana furaha (he/she is happy).'),
-      _tip('Wewe: Una furaha. Mimi: Nina furaha.', 'You: Una furaha. I: Nina furaha.'),
-      _tip('Furaha — tabasamu na usemi mzuri.', 'Happiness — smile and kind words.'),
+      _tip('Sema kwa Kiingereza: "happy".', 'Say it in English: "happy".'),
+      _tip('Umoja kwa Kiingereza: "He is happy" / "She is happy".', 'Singular in English: "He is happy" / "She is happy".'),
+      _tip('Wewe: "You are happy." Mimi: "I am happy."', 'You: "You are happy." Me: "I am happy."'),
     ],
     [
       _ex('Watoto wana furaha leo.', 'The children are happy today.', [_part('Watoto', 'children'), _part('wana furaha', 'are happy')]),
@@ -297,14 +295,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Nina furaha': _rich(
-    'Unasema una hali njema — moyo wako una furaha. Ni jibu zuri pia kwa "Habari yako?"',
-    'You say you feel good — your heart has happiness. Good answer to "How are you?"',
-    'Sarufi: Nina + hisia/hali (furaha, huzuni, njaa, usingizi…).',
-    'Grammar: I have + feeling/state (happiness, sadness, hunger, sleepiness…).',
+    'Kwa Kiingereza: "I am happy." Ni jibu zuri kwa "How are you?"',
+    '"I am happy" in English. A good answer to "How are you?"',
+    'Sarufi ya Kiingereza: I + am + hisia (happy, sad, hungry, tired…).',
+    'English grammar: I + am + feeling (happy, sad, hungry, tired…).',
     [
-      _tip('Jibu: Habari? — Nina furaha! (au Nzuri!)', 'Answer: How are you? — I am happy! (or Fine!)'),
-      _tip('Ongeza "sana": Nina furaha sana = very happy.', 'Add "sana": Nina furaha sana = very happy.'),
-      _tip('Kinyume: Nina huzuni (I am sad).', 'Opposite: Nina huzuni (I am sad).'),
+      _tip('Jibu kwa Kiingereza: "How are you?" — "I am happy!" (au "Fine!")', 'Answer in English: "How are you?" — "I am happy!" (or "Fine!")'),
+      _tip('Ongeza "very": "I am very happy."', 'Add "very": "I am very happy."'),
+      _tip('Kinyume kwa Kiingereza: "I am sad."', 'Opposite in English: "I am sad."'),
     ],
     [
       _ex('Nina furaha kukuona.', 'I am happy to see you.', [_part('kukuona', 'to see you')]),
@@ -314,14 +312,14 @@ final Map<String, SwahiliRichWord Function(SwahiliWord)> _richBySwahili = {
     ],
   ),
   'Tuko hapa': _rich(
-    'Tuko = sisi tuko (mahali). Hapa = here — mahali unaposimama sasa.',
-    'Tuko = we are (at a place). Hapa = here — where you are standing now.',
-    'Sarufi: Tuko (sisi + mahali) · Uko (wewe) · Yuko (yeye) · Wako (nyinyi).',
-    'Grammar: Tuko (we are at) · Uko (you are at) · Yuko (he/she is at) · Wako (you all are at).',
+    'Kwa Kiingereza: "We are here." Hapa = here.',
+    '"We are here" in English. "Hapa" = "here".',
+    'Sarufi ya Kiingereza: We are here · You are here · He/She is here · You all are here — Kiingereza hakibadiliki kama "tuko/uko/yuko/wako" wa Kiswahili.',
+    'English grammar: We are here · You are here · He/She is here · You all are here — English doesn\'t change the way Swahili\'s "tuko/uko/yuko/wako" does.',
     [
-      _tip('Simu: Tuko njiani = We are on the way.', 'On the phone: Tuko njiani = We are on the way.'),
-      _tip('Hapa vs huko: hapa (here) · huko (there nearby) · kule (far).', 'Hapa vs huko: here · there nearby · far away.'),
-      _tip('Sisi tuko — fupisha "Tuko hapa."', 'We are here — shorten to "Tuko hapa."'),
+      _tip('Simu: "We are on the way."', 'On the phone: "We are on the way."'),
+      _tip('Here vs there kwa Kiingereza: "here" (hapa) · "there" (huko/kule).', 'Here vs there in English: "here" (hapa) · "there" (huko/kule).'),
+      _tip('Fupisha kwa Kiingereza: "We\'re here."', 'Shorten in English: "We\'re here."'),
     ],
     [
       _ex('Tuko hapa mlangoni.', 'We are here at the door.', [_part('mlangoni', 'at the door')]),

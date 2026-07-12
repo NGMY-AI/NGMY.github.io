@@ -42,7 +42,7 @@ void ngmyRegisterAiAppTools({
       },
       'swahili_school': (ctx) async {
         showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
-        return 'Opened Kiswahili School — learn Swahili with Mwalimu Amina.';
+        return 'Opened Kiswahili School — learn English with Mwalimu Amina.';
       },
       'mechanic_lab': (ctx) async {
         showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
