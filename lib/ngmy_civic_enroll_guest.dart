@@ -264,8 +264,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final fullName = _nameC.text.trim();
     final address = _addressC.text.trim();
     final phone = _phoneC.text.trim();
-    final familyMembers = int.tryParse(_familyMembersC.text.trim()) ?? 0;
+    final familyRaw = _familyMembersC.text.trim();
+    final familyMembers = int.tryParse(familyRaw) ?? 0;
+    final state = _selectedState.trim();
 
+    if (fullName.isEmpty) {
+      _toast('Full Name is required.');
+      return;
+    }
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
       _toast('Full Name must contain at least first and last name.');
       return;
@@ -274,12 +280,24 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Home Address is required.');
       return;
     }
+    if (phone.isEmpty) {
+      _toast('Phone is required.');
+      return;
+    }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
       _toast('Phone must contain numbers only (7-15 digits).');
       return;
     }
+    if (familyRaw.isEmpty) {
+      _toast('Family Members is required.');
+      return;
+    }
     if (familyMembers < 1 || familyMembers > 99) {
       _toast('Enter how many family members (1–99).');
+      return;
+    }
+    if (state.isEmpty) {
+      _toast('State is required.');
       return;
     }
 
@@ -296,22 +314,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         }
       }
 
-      final phoneKey = phone.replaceAll(RegExp(r'\D'), '');
-      final alreadyPhone = remoteMembers.any((m) {
-        final p = (m['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-        return p.isNotEmpty && p == phoneKey;
-      });
-      if (alreadyPhone) {
-        _toast('This phone number is already enrolled.');
-        setState(() => _submitting = false);
-        return;
-      }
-
       final duplicate = NgmyCivicRegistryMembers.findDuplicateInRecords(
         records: remoteMembers,
         fullName: fullName,
-        dob: '',
-        city: '',
+        homeAddress: address,
+        phone: phone,
         excludeEmail: email,
       );
       if (duplicate != null) {
@@ -320,7 +327,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         return;
       }
 
-      final registryId = _generateRegistryId(_selectedState);
+      final registryId = _generateRegistryId(state);
       final member = NgmyCivicRegistryMembers.buildRecord(
         email: email,
         fullName: fullName,
@@ -330,7 +337,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         phone: phone,
         city: '',
         room: '',
-        state: _selectedState,
+        state: state,
         registryId: registryId,
         familyMembers: familyMembers,
       );

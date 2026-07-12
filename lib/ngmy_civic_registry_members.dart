@@ -175,11 +175,18 @@ class NgmyCivicRegistryMembers {
     return null;
   }
 
+  static String _normName(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  static String _normAddress(String s) =>
+      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ').replaceAll(RegExp(r'[^\w\s]'), '');
+
   static Map<String, dynamic>? findDuplicateRecord({
     required dynamic config,
     required String fullName,
-    required String dob,
-    required String city,
+    String dob = '',
+    String city = '',
+    String homeAddress = '',
+    String phone = '',
     String? excludeEmail,
   }) {
     return findDuplicateInRecords(
@@ -187,19 +194,26 @@ class NgmyCivicRegistryMembers {
       fullName: fullName,
       dob: dob,
       city: city,
+      homeAddress: homeAddress,
+      phone: phone,
       excludeEmail: excludeEmail,
     );
   }
 
+  /// Blocks double enrollment when identity overlaps on:
+  /// name+address, name+phone, address+phone, same phone, or legacy name+dob/city.
   static Map<String, dynamic>? findDuplicateInRecords({
     required List<Map<String, dynamic>> records,
     required String fullName,
-    required String dob,
-    required String city,
+    String dob = '',
+    String city = '',
+    String homeAddress = '',
+    String phone = '',
     String? excludeEmail,
   }) {
-    final nameKey = fullName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-    if (nameKey.isEmpty) return null;
+    final nameKey = _normName(fullName);
+    final addrKey = _normAddress(homeAddress);
+    final phoneKey = _phoneKey(phone);
     final dobKey = RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob.trim()) ? dob.trim() : '';
     final cityKey = city.trim().toLowerCase();
     final exclude = excludeEmail?.toLowerCase().trim() ?? '';
@@ -207,27 +221,41 @@ class NgmyCivicRegistryMembers {
     for (final m in records) {
       final email = emailKey((m['email'] ?? '').toString());
       if (exclude.isNotEmpty && email == exclude) continue;
-      final existingName = (m['fullName'] ?? '').toString().trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-      if (existingName != nameKey) continue;
+
+      final existingName = _normName((m['fullName'] ?? '').toString());
+      final existingAddr = _normAddress((m['homeAddress'] ?? '').toString());
+      final existingPhone = _phoneKey((m['phone'] ?? '').toString());
       final existingDob = (m['dob'] ?? '').toString().trim();
       final existingCity = (m['city'] ?? '').toString().trim().toLowerCase();
-      final nameAndDob = dobKey.isNotEmpty && existingDob.isNotEmpty && dobKey == existingDob;
-      final nameAndCity = cityKey.isNotEmpty && existingCity.isNotEmpty && cityKey == existingCity;
-      if (nameAndDob || nameAndCity) return m;
+
+      final nameMatch = nameKey.isNotEmpty && existingName == nameKey;
+      final addrMatch = addrKey.isNotEmpty && existingAddr == addrKey;
+      final phoneMatch = phoneKey.length >= 7 && existingPhone.length >= 7 && phoneKey == existingPhone;
+
+      if (phoneMatch) return m;
+      if (nameMatch && addrMatch) return m;
+      if (nameMatch && phoneMatch) return m;
+      if (addrMatch && phoneMatch) return m;
+
+      if (nameMatch) {
+        final nameAndDob = dobKey.isNotEmpty && existingDob.isNotEmpty && dobKey == existingDob;
+        final nameAndCity = cityKey.isNotEmpty && existingCity.isNotEmpty && cityKey == existingCity;
+        if (nameAndDob || nameAndCity) return m;
+      }
     }
     return null;
   }
 
   static String duplicateMessage(Map<String, dynamic> existing) {
-    final name = (existing['fullName'] ?? '').toString();
+    final name = (existing['fullName'] ?? '').toString().trim();
     final id = (existing['registryId'] ?? '').toString().trim();
-    final city = (existing['city'] ?? '').toString().trim();
-    final dob = (existing['dob'] ?? '').toString().trim();
+    final phone = (existing['phone'] ?? '').toString().trim();
+    final address = (existing['homeAddress'] ?? '').toString().trim();
     final parts = <String>[if (name.isNotEmpty) name else 'Member'];
     if (id.isNotEmpty) parts.add('ID $id');
-    if (dob.isNotEmpty) parts.add('DOB $dob');
-    if (city.isNotEmpty) parts.add(city);
-    return 'A member is already enrolled with matching name and city or date of birth: ${parts.join(' · ')}.';
+    if (phone.isNotEmpty) parts.add(phone);
+    if (address.isNotEmpty) parts.add(address);
+    return 'Already enrolled — matching name, address, or phone was found (${parts.join(' · ')}). One person cannot enroll twice.';
   }
 
   static void syncFromFields(

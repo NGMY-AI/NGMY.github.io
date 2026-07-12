@@ -28876,6 +28876,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       fullName: fullName,
       dob: dob,
       city: city,
+      homeAddress: address,
+      phone: phone,
       excludeEmail: targetUser?.email ?? email,
     );
     if (duplicate != null) {
