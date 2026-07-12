@@ -15659,7 +15659,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     routeName: 'LoanServiceScreen',
                                   ),
                                 ),
-                            const Expanded(child: Center(child: NgmyHomeBrandBadge())),
+                            Expanded(child: Center(child: NgmyHomeBrandBadge(onTap: widget.onOpenAdminDashboard))),
                             _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
                           ],
                         ),

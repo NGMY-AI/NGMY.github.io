@@ -296,23 +296,110 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                                 final m = _items[i];
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 10),
+                                  height: 86,
                                   decoration: BoxDecoration(
-                                    color: t.listItemBg,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: accent.withValues(alpha: 0.25)),
-                                  ),
-                                  child: ListTile(
-                                    leading: CircleAvatar(backgroundColor: accent.withValues(alpha: 0.2), child: const Icon(Icons.medication_rounded, color: accent, size: 20)),
-                                    title: Text(m.name, style: TextStyle(color: t.title, fontWeight: FontWeight.w700)),
-                                    subtitle: Text('${m.dosage.isEmpty ? 'No dosage' : m.dosage} · ${m.timesPerDay}x/day${m.schedule.isNotEmpty ? ' · ${m.schedule}' : ''}', style: TextStyle(color: t.subtitle, fontSize: 12)),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(tooltip: 'Edit', onPressed: () => _openEditor(existing: m), icon: Icon(Icons.edit_rounded, color: t.muted, size: 20)),
-                                        IconButton(tooltip: 'Delete', onPressed: () => _delete(m), icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
+                                    borderRadius: BorderRadius.circular(16),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        accent.withValues(alpha: t.isDark ? 0.22 : 0.14),
+                                        t.listItemBg,
+                                        accent.withValues(alpha: t.isDark ? 0.10 : 0.06),
                                       ],
                                     ),
-                                    onTap: () => _openEditor(existing: m),
+                                    border: Border.all(color: accent.withValues(alpha: 0.38)),
+                                    boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 4))],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _openEditor(existing: m),
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 5,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [accent, accent.withValues(alpha: 0.45)],
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Padding(
+                                                padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 42,
+                                                      height: 42,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.65)]),
+                                                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 8)],
+                                                      ),
+                                                      alignment: Alignment.center,
+                                                      child: const Icon(Icons.medication_rounded, color: Colors.white, size: 20),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Text(
+                                                            m.name,
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 14),
+                                                          ),
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            m.dosage.isEmpty ? 'No dosage' : m.dosage,
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w600),
+                                                          ),
+                                                          const SizedBox(height: 3),
+                                                          Text(
+                                                            '${m.timesPerDay}x/day${m.schedule.isNotEmpty ? ' · ${m.schedule}' : ''}',
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(color: accent.withValues(alpha: 0.95), fontSize: 11, fontWeight: FontWeight.w700),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        IconButton(
+                                                          tooltip: 'Edit',
+                                                          onPressed: () => _openEditor(existing: m),
+                                                          icon: Icon(Icons.edit_rounded, color: t.muted, size: 18),
+                                                          visualDensity: VisualDensity.compact,
+                                                        ),
+                                                        IconButton(
+                                                          tooltip: 'Delete',
+                                                          onPressed: () => _delete(m),
+                                                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                                          visualDensity: VisualDensity.compact,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 );
                               },

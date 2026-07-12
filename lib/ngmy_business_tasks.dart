@@ -166,6 +166,35 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
     await _save(items);
   }
 
+  Future<void> _toggleDone(NgmyBusinessTask task) async {
+    task.done = !task.done;
+    final items = await _loadTasks(widget.userEmail);
+    final j = items.indexWhere((e) => e.id == task.id);
+    if (j >= 0) items[j] = task;
+    await _save(items);
+  }
+
+  Future<void> _deleteTask(NgmyBusinessTask task) async {
+    if (!task.done) return;
+    final t = NgmyHubTheme.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.dialogBg,
+        title: Text('Delete completed task?', style: TextStyle(color: t.title)),
+        content: Text(task.title, style: TextStyle(color: t.subtitle)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final items = await _loadTasks(widget.userEmail);
+    items.removeWhere((e) => e.id == task.id);
+    await _save(items);
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
@@ -237,44 +266,155 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
                                 : task.priority == 'Low'
                                     ? const Color(0xFF94A3B8)
                                     : _accent;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: t.listItemBg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: priColor.withValues(alpha: 0.25)),
-                              ),
-                              child: ListTile(
-                                leading: Checkbox(
-                                  value: task.done,
-                                  activeColor: _accent,
-                                  onChanged: (v) async {
-                                    task.done = v ?? false;
-                                    final items = await _loadTasks(widget.userEmail);
-                                    final j = items.indexWhere((e) => e.id == task.id);
-                                    if (j >= 0) items[j] = task;
-                                    await _save(items);
-                                  },
-                                ),
-                                title: Text(
-                                  task.title,
-                                  style: TextStyle(
-                                    color: t.title,
-                                    fontWeight: FontWeight.w700,
-                                    decoration: task.done ? TextDecoration.lineThrough : null,
-                                  ),
-                                ),
-                                subtitle: Text('${task.category} · ${task.priority}', style: TextStyle(color: t.subtitle, fontSize: 11)),
-                                trailing: IconButton(
-                                  icon: Icon(Icons.edit_outlined, color: t.muted, size: 18),
-                                  onPressed: () => _editTask(task),
-                                ),
-                                onTap: () => _editTask(task),
-                              ),
+                            return _TaskMiniCard(
+                              task: task,
+                              accent: _accent,
+                              priorityColor: priColor,
+                              onToggle: () => _toggleDone(task),
+                              onEdit: () => _editTask(task),
+                              onDelete: task.done ? () => _deleteTask(task) : null,
                             );
                           },
                         ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskMiniCard extends StatelessWidget {
+  const _TaskMiniCard({
+    required this.task,
+    required this.accent,
+    required this.priorityColor,
+    required this.onToggle,
+    required this.onEdit,
+    this.onDelete,
+  });
+
+  final NgmyBusinessTask task;
+  final Color accent;
+  final Color priorityColor;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = NgmyHubTheme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      height: 78,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            priorityColor.withValues(alpha: t.isDark ? 0.20 : 0.12),
+            t.listItemBg,
+            accent.withValues(alpha: t.isDark ? 0.08 : 0.05),
+          ],
+        ),
+        border: Border.all(color: priorityColor.withValues(alpha: task.done ? 0.22 : 0.42)),
+        boxShadow: [BoxShadow(color: priorityColor.withValues(alpha: 0.14), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [priorityColor, priorityColor.withValues(alpha: 0.4)],
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: task.done ? LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]) : null,
+                    color: task.done ? null : Colors.transparent,
+                    border: Border.all(color: task.done ? accent : priorityColor.withValues(alpha: 0.7), width: 2),
+                  ),
+                  child: task.done ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
+                ),
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: onEdit,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: t.title,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          decoration: task.done ? TextDecoration.lineThrough : null,
+                          decorationColor: t.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              color: priorityColor.withValues(alpha: 0.16),
+                              border: Border.all(color: priorityColor.withValues(alpha: 0.35)),
+                            ),
+                            child: Text(task.priority, style: TextStyle(color: priorityColor, fontSize: 10, fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              task.category,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (onDelete != null)
+              IconButton(
+                tooltip: 'Delete completed task',
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+              )
+            else
+              IconButton(
+                tooltip: 'Edit',
+                onPressed: onEdit,
+                icon: Icon(Icons.edit_outlined, color: t.muted, size: 18),
+              ),
           ],
         ),
       ),

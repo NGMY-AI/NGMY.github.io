@@ -1340,8 +1340,11 @@ class _WelcomeGlassFrame extends StatelessWidget {
 }
 
 /// Animated capital NGMY glass badge — sits between Loan Service and Local Growth.
+/// When [onTap] is set (admins only), tapping opens the admin dashboard.
 class NgmyHomeBrandBadge extends StatefulWidget {
-  const NgmyHomeBrandBadge({super.key});
+  const NgmyHomeBrandBadge({super.key, this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   State<NgmyHomeBrandBadge> createState() => _NgmyHomeBrandBadgeState();
@@ -1377,7 +1380,12 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
         final scale = 1.0 + pulse * 0.035;
         return Transform.scale(
           scale: scale,
-          child: ClipRRect(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(16),
+              child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
@@ -1433,6 +1441,8 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
                   ),
                 ),
               ),
+            ),
+          ),
             ),
           ),
         );

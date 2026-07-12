@@ -706,68 +706,119 @@ class _SupportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = NgmyHubTheme.of(context);
+    final meta = [line.provider, line.category].where((e) => e.isNotEmpty).join(' · ');
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      height: 86,
       decoration: BoxDecoration(
-        color: theme.listItemBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: theme.isDark ? 0.22 : 0.14),
+            theme.listItemBg,
+            accent.withValues(alpha: theme.isDark ? 0.10 : 0.06),
+          ],
+        ),
+        border: Border.all(color: accent.withValues(alpha: 0.38)),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 4))],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            contentPadding: const EdgeInsets.fromLTRB(14, 4, 8, 0),
-            leading: CircleAvatar(
-              backgroundColor: accent.withValues(alpha: 0.2),
-              child: Icon(icon, color: accent, size: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: line.emergency
+                      ? const [Color(0xFFEF4444), Color(0xFFF87171)]
+                      : [accent, accent.withValues(alpha: 0.45)],
+                ),
+              ),
             ),
-            title: Text(line.title, style: TextStyle(color: theme.title, fontWeight: FontWeight.w700)),
-            subtitle: Text(
-              [line.provider, line.category].where((e) => e.isNotEmpty).join(' · '),
-              style: TextStyle(color: theme.subtitle, fontSize: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: line.emergency
+                              ? const [Color(0xFFEF4444), Color(0xFFDC2626)]
+                              : [accent, accent.withValues(alpha: 0.65)],
+                        ),
+                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 8)],
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(icon, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            line.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.title, fontWeight: FontWeight.w800, fontSize: 14),
+                          ),
+                          if (meta.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.subtitle, fontSize: 11, fontWeight: FontWeight.w600)),
+                          ],
+                          if (line.phone.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(line.phone, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent.withValues(alpha: 0.95), fontSize: 11, fontWeight: FontWeight.w700)),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (line.phone.isNotEmpty)
+                              _SupportMiniBtn(icon: Icons.call_rounded, color: accent, onTap: onCall),
+                            if (line.accountRef.isNotEmpty)
+                              _SupportMiniBtn(icon: Icons.copy_rounded, color: theme.muted, onTap: onCopyRef),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _SupportMiniBtn(icon: Icons.edit_rounded, color: theme.muted, onTap: onEdit),
+                            _SupportMiniBtn(icon: Icons.delete_outline_rounded, color: const Color(0xFFEF4444), onTap: onDelete),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: theme.muted, size: 20)),
-                IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
-              ],
-            ),
-          ),
-          if (line.accountRef.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: Text('Ref: ${line.accountRef}', style: TextStyle(color: accent.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w600)),
-            ),
-          if (line.notes.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-              child: Text(line.notes, style: TextStyle(color: theme.muted, fontSize: 11)),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                if (line.phone.isNotEmpty)
-                  _SupportAction(icon: Icons.call_rounded, label: line.phone, color: accent, onTap: onCall),
-                if (line.accountRef.isNotEmpty)
-                  _SupportAction(icon: Icons.copy_rounded, label: 'Copy ref', color: theme.muted, onTap: onCopyRef),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SupportAction extends StatelessWidget {
-  const _SupportAction({required this.icon, required this.label, required this.color, required this.onTap});
-
+class _SupportMiniBtn extends StatelessWidget {
+  const _SupportMiniBtn({required this.icon, required this.color, required this.onTap});
   final IconData icon;
-  final String label;
   final Color color;
   final VoidCallback onTap;
 
@@ -775,23 +826,9 @@ class _SupportAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-          ],
-        ),
-      ),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(padding: const EdgeInsets.all(5), child: Icon(icon, size: 16, color: color)),
     );
   }
 }
+
