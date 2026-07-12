@@ -417,42 +417,88 @@ class NgmyCivicRegistryMembers {
       };
 
   /// Full backup envelope for download (includes helps/missed/passport so rankings restore).
-  static Map<String, dynamic> backupEnvelope(dynamic config, {String state = ''}) {
-    final all = listFrom(config);
-    final st = state.trim().toLowerCase();
-    final members = st.isEmpty
-        ? all
-        : all.where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == st).toList();
+  /// Always scoped to one state — files must not be restorable in another state.
+  static Map<String, dynamic> backupEnvelope(dynamic config, {required String state}) {
+    final st = state.trim();
+    if (st.isEmpty) {
+      return {
+        'type': 'ngmy_civic_registry_backup',
+        'version': 1,
+        'state': '',
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+        'memberCount': 0,
+        'members': <Map<String, dynamic>>[],
+      };
+    }
+    final key = st.toLowerCase();
+    final members = listFrom(config)
+        .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == key)
+        .map((m) => Map<String, dynamic>.from(m)..['state'] = st)
+        .toList();
     return {
       'type': 'ngmy_civic_registry_backup',
       'version': 1,
-      'state': state.trim(),
+      'state': st,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
       'memberCount': members.length,
       'members': members,
     };
   }
 
-  static List<Map<String, dynamic>> membersFromBackupJson(String raw) {
+  static String backupStateFromJson(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return '';
+    return (Map<String, dynamic>.from(decoded)['state'] ?? '').toString().trim();
+  }
+
+  static bool backupStateMatches(String backupState, String currentState) {
+    final a = backupState.trim().toLowerCase();
+    final b = currentState.trim().toLowerCase();
+    return a.isNotEmpty && b.isNotEmpty && a == b;
+  }
+
+  static List<Map<String, dynamic>> membersFromBackupJson(String raw, {String? requireState}) {
     final decoded = jsonDecode(raw);
     if (decoded is! Map) return const [];
     final map = Map<String, dynamic>.from(decoded);
+    final fileState = (map['state'] ?? '').toString().trim();
+    if (requireState != null && requireState.trim().isNotEmpty) {
+      if (!backupStateMatches(fileState, requireState)) return const [];
+    }
     final list = map['members'] ?? map['civicRegistryMembers'];
     if (list is! List) return const [];
-    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    final want = (requireState ?? fileState).trim().toLowerCase();
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((m) {
+          if (want.isEmpty) return false;
+          final ms = (m['state'] ?? fileState).toString().trim().toLowerCase();
+          return ms == want;
+        })
+        .toList();
   }
 
   /// Smart restore: only add members that are not already enrolled (by email, registry ID, or identity).
-  /// Existing members are left untouched. Returns counts.
+  /// Existing members are left untouched. Only members belonging to [requireState] are considered.
   static ({int added, int skipped, List<Map<String, dynamic>> restored}) importMissingMembers(
     dynamic config,
-    List<Map<String, dynamic>> incoming,
-  ) {
+    List<Map<String, dynamic>> incoming, {
+    required String requireState,
+  }) {
     var added = 0;
     var skipped = 0;
     final restored = <Map<String, dynamic>>[];
+    final stateKey = requireState.trim().toLowerCase();
+    if (stateKey.isEmpty) return (added: 0, skipped: incoming.length, restored: restored);
 
     for (final raw in incoming) {
+      final memberState = (raw['state'] ?? requireState).toString().trim();
+      if (memberState.toLowerCase() != stateKey) {
+        skipped++;
+        continue;
+      }
+
       final email = emailKey((raw['email'] ?? '').toString());
       final registryId = (raw['registryId'] ?? '').toString().trim();
       final fullName = (raw['fullName'] ?? '').toString();
@@ -495,7 +541,9 @@ class NgmyCivicRegistryMembers {
         continue;
       }
 
-      final record = Map<String, dynamic>.from(raw)..['email'] = key;
+      final record = Map<String, dynamic>.from(raw)
+        ..['email'] = key
+        ..['state'] = requireState.trim();
       if ((record['registryId'] ?? '').toString().trim().isEmpty && registryId.isNotEmpty) {
         record['registryId'] = registryId;
       }

@@ -29276,31 +29276,68 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _downloadCivicRegistryBackup() async {
-    final envelope = NgmyCivicRegistryMembers.backupEnvelope(widget.config, state: _selectedState);
+    final state = _selectedState.trim();
+    if (state.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state before downloading a backup.')),
+      );
+      return;
+    }
+    final envelope = NgmyCivicRegistryMembers.backupEnvelope(widget.config, state: state);
     final count = envelope['memberCount'] as int? ?? 0;
     if (count < 1) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No members in this state to download yet.')),
+        SnackBar(content: Text('No members in $state to download yet.')),
       );
       return;
     }
     final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
-    final stateSlug = _selectedState.trim().isEmpty ? 'all' : _selectedState.trim().replaceAll(RegExp(r'\s+'), '_');
+    final stateSlug = state.replaceAll(RegExp(r'\s+'), '_');
     final filename = 'ngmy-civic-registry-$stateSlug-$stamp.json';
     final msg = await downloadNgmyAdvisorSyncJson(jsonEncode(envelope), filename);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Downloaded $count member(s). $msg'), backgroundColor: Colors.green),
+      SnackBar(
+        content: Text('Downloaded $count $state member(s). This file only works for $state. $msg'),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
   Future<void> _uploadCivicRegistryBackup() async {
+    final currentState = _selectedState.trim();
+    if (currentState.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state before uploading a backup.')),
+      );
+      return;
+    }
+
     final raw = await _pickCivicBackupText();
     if (raw == null || raw.trim().isEmpty) return;
+
+    String fileState;
     List<Map<String, dynamic>> incoming;
     try {
-      incoming = NgmyCivicRegistryMembers.membersFromBackupJson(raw);
+      fileState = NgmyCivicRegistryMembers.backupStateFromJson(raw);
+      if (!NgmyCivicRegistryMembers.backupStateMatches(fileState, currentState)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              fileState.isEmpty
+                  ? 'This backup has no state lock. Only state-specific backups can be restored.'
+                  : 'This backup belongs to $fileState. It cannot be uploaded while you are in $currentState.',
+            ),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+      incoming = NgmyCivicRegistryMembers.membersFromBackupJson(raw, requireState: currentState);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -29311,12 +29348,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (incoming.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No members found in that backup file.')),
+        SnackBar(content: Text('No $currentState members found in that backup file.')),
       );
       return;
     }
 
-    final result = NgmyCivicRegistryMembers.importMissingMembers(widget.config, incoming);
+    final result = NgmyCivicRegistryMembers.importMissingMembers(
+      widget.config,
+      incoming,
+      requireState: currentState,
+    );
     for (final m in result.restored) {
       final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
       if (email.isEmpty) continue;
@@ -29329,7 +29370,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         u.fullName = (m['fullName'] ?? u.fullName)?.toString();
         u.helps = m['helps'] is num ? (m['helps'] as num).toInt() : u.helps;
         u.missed = m['missed'] is num ? (m['missed'] as num).toInt() : u.missed;
-        u.state = (m['state'] ?? u.state).toString();
+        u.state = currentState;
         u.city = (m['city'] ?? u.city)?.toString();
         u.room = (m['room'] ?? u.room)?.toString();
         u.homeAddress = (m['homeAddress'] ?? u.homeAddress)?.toString();
@@ -29352,8 +29393,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       SnackBar(
         content: Text(
           result.added < 1
-              ? 'No new members to restore — everyone in that file is already enrolled (${result.skipped} skipped).'
-              : 'Restored ${result.added} member(s)${result.skipped > 0 ? ', skipped ${result.skipped} already enrolled' : ''}. '
+              ? 'No new $currentState members to restore — everyone in that file is already enrolled (${result.skipped} skipped).'
+              : 'Restored ${result.added} $currentState member(s)${result.skipped > 0 ? ', skipped ${result.skipped} already enrolled' : ''}. '
                   'They are back in Members, Search, and Rankings.',
         ),
         backgroundColor: result.added > 0 ? (ok ? Colors.green : Colors.orange) : Colors.blueGrey,
@@ -29397,7 +29438,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Download a file of enrolled members (including helps & rankings). Upload it later to bring back only people who are missing — already enrolled members stay as they are.',
+                  'Download a $_selectedState-only members file (helps & rankings included). Upload restores only missing people, and only while you are in $_selectedState — another state’s backup will be rejected.',
                   style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                 ),
                 const SizedBox(height: 16),
