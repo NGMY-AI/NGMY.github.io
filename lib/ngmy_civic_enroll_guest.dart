@@ -449,7 +449,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   Widget _titleBadge(double pulse, double shimmer) {
-    const logoSize = 36.0;
+    const logoSize = 46.0;
     return Transform.scale(
       scale: 1.0 + pulse * 0.02,
       child: Stack(
@@ -462,7 +462,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 8, logoSize + 14, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
@@ -482,6 +482,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
                   ],
                 ),
+                // Keep title visually centered in the bar (logo floats on the end).
                 child: Text(
                   'NGMY self enrollment',
                   textAlign: TextAlign.center,
@@ -501,7 +502,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
             ),
           ),
           Positioned(
-            right: 6,
+            right: 4,
             child: Container(
               width: logoSize,
               height: logoSize,
@@ -526,26 +527,32 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(2.2),
+              padding: const EdgeInsets.all(2.4),
               child: Container(
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
                 clipBehavior: Clip.antiAlias,
-                padding: const EdgeInsets.all(4),
-                child: Image.asset(
-                  'assets/images/ngmy_logo.png',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                  errorBuilder: (_, __, ___) => Image.network(
-                    'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
-                    fit: BoxFit.contain,
-                    alignment: Alignment.center,
-                    errorBuilder: (_, __, ___) => const ColoredBox(
-                      color: Colors.white,
-                      child: Center(
-                        child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 7, color: Color(0xFF1E3A5F))),
+                child: Transform.scale(
+                  // Medium zoom — between the old tight crop and the tiny contain look.
+                  scale: 1.12,
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Image.asset(
+                      'assets/images/ngmy_logo.png',
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      errorBuilder: (_, __, ___) => Image.network(
+                        'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (_, __, ___) => const ColoredBox(
+                          color: Colors.white,
+                          child: Center(
+                            child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 8, color: Color(0xFF1E3A5F))),
+                          ),
+                        ),
                       ),
                     ),
                   ),
