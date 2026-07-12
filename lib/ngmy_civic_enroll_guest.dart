@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,12 +13,14 @@ import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
 import 'ngmy_supabase_config.dart';
+import 'ngmy_web_status_bar.dart';
 
 const _kCivicSelfEnrollmentSettingsKey = 'civic_self_enrollment_settings';
-const _kBg = Color(0xFF0B0F14);
-const _kPanel = Color(0xFF121821);
-const _kBorder = Color(0xFF243041);
-const _kAccent = Color(0xFF00B25A);
+/// Match main app dark chrome (`0xFF121212`) so status/nav bars do not clash.
+const _kBg = Color(0xFF121212);
+const _kAccent = Color(0xFF22D3EE);
+const _kAccentSoft = Color(0xFFA78BFA);
+const _kGreen = Color(0xFF10B981);
 const _kMuted = Color(0xFF94A3B8);
 
 const _kUsStates = <String>[
@@ -39,31 +42,47 @@ bool _civicFlagOn(dynamic raw) {
   return s == 'true' || s == '1' || s == 'yes' || s == 'on';
 }
 
+void _applyEnrollChrome() {
+  ngmyApplyWebStatusBarStyle(lightMode: false);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: _kBg,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: _kBg,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarDividerColor: _kBg,
+    ),
+  );
+}
+
 /// Standalone civic self-enrollment — no NGMY login required.
 class NgmyGuestCivicEnrollApp extends StatelessWidget {
   const NgmyGuestCivicEnrollApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    _applyEnrollChrome();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Civic Registry Enrollment',
+      title: 'NGMY Self Enrollment',
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: _kBg,
-        colorScheme: ColorScheme.fromSeed(seedColor: _kAccent, brightness: Brightness.dark),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: _kPanel,
-          labelStyle: const TextStyle(color: _kMuted),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBorder)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kAccent, width: 1.4)),
+        canvasColor: _kBg,
+        colorScheme: const ColorScheme.dark(
+          surface: _kBg,
+          primary: _kAccent,
+          secondary: _kAccentSoft,
         ),
-        dropdownMenuTheme: const DropdownMenuThemeData(
-          textStyle: TextStyle(color: Colors.white),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: _kBg,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
       ),
       theme: ThemeData(useMaterial3: true, brightness: Brightness.dark, scaffoldBackgroundColor: _kBg),
@@ -79,7 +98,7 @@ class NgmyGuestCivicEnrollScreen extends StatefulWidget {
   State<NgmyGuestCivicEnrollScreen> createState() => _NgmyGuestCivicEnrollScreenState();
 }
 
-class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen> {
+class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen> with TickerProviderStateMixin {
   bool _loading = true;
   bool _submitting = false;
   bool _enabled = false;
@@ -88,24 +107,27 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   String? _loadError;
   String? _registryId;
 
-  List<String> _rooms = const [];
   Map<String, List<String>> _citiesByState = const {};
   List<String> _legacyCities = const [];
   List<Map<String, dynamic>> _members = const [];
 
   String _selectedState = 'Georgia';
   final _nameC = TextEditingController();
-  final _dobC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
-  final _emailC = TextEditingController();
-  String? _idType;
   String? _city;
-  String? _room;
+
+  late final AnimationController _pulse;
+  late final AnimationController _shimmer;
+  late final AnimationController _orbit;
 
   @override
   void initState() {
     super.initState();
+    _applyEnrollChrome();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+    _shimmer = AnimationController(vsync: this, duration: const Duration(milliseconds: 3600))..repeat();
+    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10000))..repeat();
     ngmyTakePendingCivicSelfEnrollmentOpen();
     _selectedState = _stateFromLaunchUrl() ?? 'Georgia';
     unawaited(_load());
@@ -113,18 +135,18 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   @override
   void dispose() {
+    _pulse.dispose();
+    _shimmer.dispose();
+    _orbit.dispose();
     _nameC.dispose();
-    _dobC.dispose();
     _addressC.dispose();
     _phoneC.dispose();
-    _emailC.dispose();
     super.dispose();
   }
 
   String? _stateFromLaunchUrl() {
     try {
-      final uri = Uri.base;
-      final state = uri.queryParameters['state']?.trim();
+      final state = Uri.base.queryParameters['state']?.trim();
       if (state != null && state.isNotEmpty) {
         for (final s in _kUsStates) {
           if (s.toLowerCase() == state.toLowerCase()) return s;
@@ -157,10 +179,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
             },
           )
           .timeout(const Duration(seconds: 10));
-      if (resp.statusCode != 200) {
-        debugPrint('[civic_guest] config status ${resp.statusCode}');
-        return null;
-      }
+      if (resp.statusCode != 200) return null;
       final decoded = jsonDecode(resp.body);
       if (decoded is! List || decoded.isEmpty) return null;
       final row = decoded.first;
@@ -176,10 +195,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     if (_civicFlagOn(source['civicSelfEnrollmentEnabled'])) {
       _enabled = true;
     }
-    final rooms = source['rooms'];
-    if (rooms is List && rooms.isNotEmpty) {
-      _rooms = rooms.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
-    }
     final cities = source['cities'];
     if (cities is List && cities.isNotEmpty) {
       _legacyCities = cities.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
@@ -187,7 +202,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final byState = NgmyCivicRegistryStats.parseCivicCitiesByState(source['civicCitiesByState']);
     if (byState.isNotEmpty) {
       _citiesByState = byState;
-      if (!_kUsStates.contains(_selectedState) || (_citiesForState().isEmpty && byState.isNotEmpty)) {
+      if (_citiesForState().isEmpty) {
         final preferred = byState.keys.firstWhere(
           (k) => k.trim().toLowerCase() == _selectedState.toLowerCase(),
           orElse: () => byState.keys.first,
@@ -221,12 +236,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     if (!mounted) return;
 
     _enabled = false;
-    _rooms = const [];
     _legacyCities = const [];
     _citiesByState = const {};
     _members = const [];
 
-    // Any source saying ON wins — never let a stale OFF wipe a fresh ON from another store.
     if (configRow != null) _absorbCatalog(configRow);
     if (settings != null) _absorbCatalog(settings);
 
@@ -249,7 +262,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     setState(() {
       _loading = false;
       _city = cities.contains(_city) ? _city : null;
-      _room = _rooms.contains(_room) ? _room : null;
     });
   }
 
@@ -266,27 +278,20 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     return '$prefix${DateTime.now().microsecondsSinceEpoch}';
   }
 
+  String _guestEmailFromPhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return 'civic.$digits@guest.ngmy';
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
     final fullName = _nameC.text.trim();
-    final dob = _dobC.text.trim();
-    final idType = (_idType ?? '').trim();
     final address = _addressC.text.trim();
     final phone = _phoneC.text.trim();
-    final email = _emailC.text.trim().toLowerCase();
     final city = (_city ?? '').trim();
-    final room = (_room ?? '').trim();
 
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
       _toast('Full Name must contain at least first and last name.');
-      return;
-    }
-    if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
-      _toast('Date of Birth must be in MM/DD/YYYY format.');
-      return;
-    }
-    if (idType.isEmpty) {
-      _toast('Please select ID Type.');
       return;
     }
     if (address.isEmpty) {
@@ -295,10 +300,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
       _toast('Phone must contain numbers only (7-15 digits).');
-      return;
-    }
-    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-      _toast('Please enter a valid email address.');
       return;
     }
     final cities = _citiesForState();
@@ -310,14 +311,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('City is required.');
       return;
     }
-    if (_rooms.isNotEmpty && !_rooms.contains(room)) {
-      _toast('Please choose a room from the list.');
-      return;
-    }
-    if (room.isEmpty) {
-      _toast('Room is required.');
-      return;
-    }
+
+    final email = _guestEmailFromPhone(phone);
 
     setState(() => _submitting = true);
     try {
@@ -330,9 +325,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         }
       }
 
-      final emailKey = NgmyCivicRegistryMembers.emailKey(email);
-      if (remoteMembers.any((m) => NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString()) == emailKey)) {
-        _toast('This email is already enrolled in the Civic Registry.');
+      final phoneKey = phone.replaceAll(RegExp(r'\D'), '');
+      final alreadyPhone = remoteMembers.any((m) {
+        final p = (m['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+        return p.isNotEmpty && p == phoneKey;
+      });
+      if (alreadyPhone) {
+        _toast('This phone number is already enrolled.');
         setState(() => _submitting = false);
         return;
       }
@@ -340,7 +339,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       final duplicate = NgmyCivicRegistryMembers.findDuplicateInRecords(
         records: remoteMembers,
         fullName: fullName,
-        dob: dob,
+        dob: '',
         city: city,
         excludeEmail: email,
       );
@@ -354,12 +353,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       final member = NgmyCivicRegistryMembers.buildRecord(
         email: email,
         fullName: fullName,
-        dob: dob,
-        idType: idType,
+        dob: '',
+        idType: '',
         homeAddress: address,
         phone: phone,
         city: city,
-        room: room,
+        room: '',
         state: _selectedState,
         registryId: registryId,
       );
@@ -395,40 +394,232 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFF1F2937)));
   }
 
-  Widget _footerBrand() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 18, bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: _kBorder),
+  Widget _livingBackdrop(double pulse, double orbit) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: _kBg),
+        Positioned(
+          left: -80 + orbit * 40,
+          top: -40,
+          child: Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _kAccent.withValues(alpha: 0.16 + pulse * 0.08),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
         ),
-        child: Text(
-          "EMO 'YA MMBOND0 · $_selectedState",
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-            color: _kMuted,
+        Positioned(
+          right: -60,
+          top: 120 + pulse * 20,
+          child: Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _kAccentSoft.withValues(alpha: 0.14 + pulse * 0.08),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 40,
+          bottom: 40,
+          child: Container(
+            width: 160,
+            height: 160,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  _kGreen.withValues(alpha: 0.10 + pulse * 0.06),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _titleBadge(double pulse, double shimmer) {
+    return Transform.scale(
+      scale: 1.0 + pulse * 0.02,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(
+                begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
+                end: Alignment(1.2 - shimmer * 2.4, 0.6),
+                colors: [
+                  _kAccent.withValues(alpha: 0.22 + pulse * 0.12),
+                  Colors.white.withValues(alpha: 0.08),
+                  _kAccentSoft.withValues(alpha: 0.20 + pulse * 0.10),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.28 + pulse * 0.18),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Text(
+              'NGMY self enrollment',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8 + pulse * 0.3,
+                color: Colors.white,
+                shadows: [
+                  Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  InputDecoration _field(String label) => InputDecoration(labelText: label);
+  Widget _glassField({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _dec(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600),
+        floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      );
+
+  Widget _footerPlain() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+      child: Text(
+        "EMO 'YA MMBOND0 · $_selectedState",
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: Colors.white.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+
+  Widget _submitButton(double pulse, double shimmer) {
+    return GestureDetector(
+      onTap: _submitting ? null : _submit,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 54,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment(-1 + shimmer * 2, 0),
+            end: Alignment(1 - shimmer * 2, 1),
+            colors: [
+              Color.lerp(const Color(0xFF059669), const Color(0xFF10B981), pulse)!,
+              Color.lerp(const Color(0xFF0EA5E9), const Color(0xFF22D3EE), 1 - pulse)!,
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _kGreen.withValues(alpha: 0.28 + pulse * 0.22),
+              blurRadius: 18 + pulse * 10,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+        ),
+        child: Center(
+          child: _submitting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                )
+              : const Text(
+                  'Complete Enrollment',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white, letterSpacing: 0.4),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _shell({required Widget child}) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: _kBg,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: _kBg,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarDividerColor: _kBg,
+      ),
+      child: Scaffold(
+        backgroundColor: _kBg,
+        body: AnimatedBuilder(
+          animation: Listenable.merge([_pulse, _shimmer, _orbit]),
+          builder: (context, _) {
+            final pulse = Curves.easeInOut.transform(_pulse.value);
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                _livingBackdrop(pulse, _orbit.value),
+                SafeArea(child: child),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: _kBg,
-        body: Center(
+      return _shell(
+        child: const Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -442,287 +633,212 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
 
     if (_closed || _loadError != null) {
-      return Scaffold(
-        backgroundColor: _kBg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
-                      decoration: BoxDecoration(
-                        color: _kPanel,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: _kBorder),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 12)),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF1E293B),
-                              border: Border.all(color: const Color(0xFF334155)),
+      return _shell(
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, __) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          color: Colors.white.withValues(alpha: 0.05),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_rounded, color: Colors.white.withValues(alpha: 0.55), size: 34),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Enrollment closed',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                              textAlign: TextAlign.center,
                             ),
-                            child: const Icon(Icons.lock_rounded, color: Color(0xFF94A3B8), size: 30),
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Enrollment closed',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _loadError ??
-                                'Self-enrollment is not open for this registry right now. Please check back later or ask your administrator.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 14, height: 1.45, color: _kMuted),
-                          ),
-                          const SizedBox(height: 22),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
+                            const SizedBox(height: 10),
+                            Text(
+                              _loadError ??
+                                  'Self-enrollment is not open for this registry right now. Please check back later.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 14, height: 1.45, color: _kMuted),
+                            ),
+                            const SizedBox(height: 22),
+                            OutlinedButton(
                               onPressed: _load,
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.white,
-                                side: const BorderSide(color: _kBorder),
+                                side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                                 minimumSize: const Size(double.infinity, 46),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                               child: const Text('Check again', style: TextStyle(fontWeight: FontWeight.w700)),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              _footerBrand(),
-              const SizedBox(height: 12),
-            ],
-          ),
+            ),
+            _footerPlain(),
+          ],
         ),
       );
     }
 
     if (_done) {
-      return Scaffold(
-        backgroundColor: _kBg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.verified_rounded, size: 72, color: _kAccent),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'You are enrolled',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          _registryId == null || _registryId!.isEmpty
-                              ? 'Your information is now in the Civic Registry.'
-                              : 'Registry ID: $_registryId\nYour information is now in the Civic Registry.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 15, height: 1.45, color: _kMuted),
-                        ),
-                      ],
-                    ),
+      return _shell(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _pulse,
+                        builder: (_, __) {
+                          final pulse = Curves.easeInOut.transform(_pulse.value);
+                          return Icon(Icons.verified_rounded, size: 78, color: Color.lerp(_kGreen, _kAccent, pulse));
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'You are enrolled',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _registryId == null || _registryId!.isEmpty
+                            ? 'Your information is now in the Civic Registry.'
+                            : 'Registry ID: $_registryId\nYour information is now in the Civic Registry.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 15, height: 1.45, color: _kMuted),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              _footerBrand(),
-              const SizedBox(height: 12),
-            ],
-          ),
+            ),
+            _footerPlain(),
+          ],
         ),
       );
     }
 
     final cities = _citiesForState();
 
-    return Scaffold(
-      backgroundColor: _kBg,
-      appBar: AppBar(
-        title: const Text('Enroll Yourself'),
-        backgroundColor: const Color(0xFF0F172A),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Column(
+    return _shell(
+      child: Column(
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF052E1C),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF14532D)),
+                AnimatedBuilder(
+                  animation: Listenable.merge([_pulse, _shimmer]),
+                  builder: (_, __) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+                ),
+                const SizedBox(height: 22),
+                _glassField(
+                  child: TextField(
+                    controller: _nameC,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _dec('Full Name *'),
                   ),
-                  child: const Text(
-                    'No account or sign-in needed. Fill this form to enroll in the Civic Registry.',
-                    style: TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w600, color: Color(0xFF86EFAC)),
+                ),
+                const SizedBox(height: 12),
+                _glassField(
+                  child: TextField(
+                    controller: _addressC,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    decoration: _dec('Home Address *'),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _nameC,
-                  style: const TextStyle(color: Colors.white),
-                  textCapitalization: TextCapitalization.words,
-                  decoration: _field('Full Name *'),
+                const SizedBox(height: 12),
+                _glassField(
+                  child: TextField(
+                    controller: _phoneC,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: _dec('Phone *'),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _dobC,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), _DateSlashFormatter()],
-                  decoration: _field('Date of Birth (MM/DD/YYYY) *'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  key: ValueKey('id-$_idType'),
-                  initialValue: _idType,
-                  dropdownColor: _kPanel,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _field('ID Type *'),
-                  items: const ['National ID', 'Passport', 'Drivers License', 'Voters Card']
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _idType = v),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _addressC,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _field('Home Address *'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _phoneC,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: _field('Phone *'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _emailC,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _field('Email *'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  key: ValueKey('state-$_selectedState'),
-                  initialValue: _kUsStates.contains(_selectedState) ? _selectedState : _kUsStates.first,
-                  dropdownColor: _kPanel,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _field('State *'),
-                  items: _kUsStates.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      _selectedState = v;
-                      _city = null;
-                    });
-                  },
+                _glassField(
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('state-$_selectedState'),
+                    initialValue: _kUsStates.contains(_selectedState) ? _selectedState : _kUsStates.first,
+                    dropdownColor: const Color(0xFF1A1A1A),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    iconEnabledColor: _kMuted,
+                    decoration: _dec('State *'),
+                    items: _kUsStates.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() {
+                        _selectedState = v;
+                        _city = null;
+                      });
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (cities.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('city-$_selectedState-$_city'),
-                    initialValue: cities.contains(_city) ? _city : null,
-                    dropdownColor: _kPanel,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _field('City *'),
-                    items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setState(() => _city = v),
+                  _glassField(
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('city-$_selectedState-$_city'),
+                      initialValue: cities.contains(_city) ? _city : null,
+                      dropdownColor: const Color(0xFF1A1A1A),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      iconEnabledColor: _kMuted,
+                      decoration: _dec('City *'),
+                      items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setState(() => _city = v),
+                    ),
                   )
                 else
-                  TextFormField(
-                    initialValue: _city,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _field('City *'),
-                    onChanged: (v) => _city = v.trim(),
+                  _glassField(
+                    child: TextFormField(
+                      initialValue: _city,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      decoration: _dec('City *'),
+                      onChanged: (v) => _city = v.trim(),
+                    ),
                   ),
-                const SizedBox(height: 12),
-                if (_rooms.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('room-$_room'),
-                    initialValue: _rooms.contains(_room) ? _room : null,
-                    dropdownColor: _kPanel,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _field('Room *'),
-                    items: _rooms.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                    onChanged: (v) => setState(() => _room = v),
-                  )
-                else
-                  TextFormField(
-                    initialValue: _room,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _field('Room *'),
-                    onChanged: (v) => _room = v.trim(),
-                  ),
-                const SizedBox(height: 22),
-                FilledButton(
-                  onPressed: _submitting ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _kAccent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 52),
-                  ),
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                        )
-                      : const Text('Complete Enrollment', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 26),
+                AnimatedBuilder(
+                  animation: Listenable.merge([_pulse, _shimmer]),
+                  builder: (_, __) => _submitButton(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
               ],
             ),
           ),
-          _footerBrand(),
-          const SizedBox(height: 10),
+          _footerPlain(),
         ],
       ),
     );
-  }
-}
-
-class _DateSlashFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    final buf = StringBuffer();
-    for (var i = 0; i < digits.length && i < 8; i++) {
-      if (i == 2 || i == 4) buf.write('/');
-      buf.write(digits[i]);
-    }
-    final text = buf.toString();
-    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
   }
 }
