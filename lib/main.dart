@@ -43,6 +43,7 @@ import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
 import 'ngmy_bio_guest.dart';
 import 'ngmy_civic_enroll_guest.dart';
+import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
@@ -33545,16 +33546,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
                 _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
                 _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Delete Member?'),
-                      content: Text('Remove ${u.fullName ?? u.username} from registry? This only happens when you confirm.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-                      ],
-                    ),
+                  final confirm = await showNgmyLightConfirm(
+                    context,
+                    title: 'Remove this member?',
+                    message:
+                        'This will remove ${u.fullName ?? u.username} from the registry for your state. Only continue if you are sure.',
+                    cancelLabel: 'Keep',
+                    confirmLabel: 'Remove',
+                    icon: Icons.person_remove_rounded,
+                    destructive: true,
                   );
                   if (confirm != true) return;
                   setState(() {});

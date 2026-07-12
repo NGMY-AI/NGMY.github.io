@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
+import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
 import 'ngmy_state_picker.dart';
@@ -392,7 +393,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFF1F2937)));
+    showNgmyLightNotice(
+      context,
+      title: 'Tafadhali angalia',
+      message: msg,
+      okLabel: 'Sawa',
+      icon: Icons.edit_note_rounded,
+    );
   }
 
   Widget _livingBackdrop(double pulse, double orbit) {
