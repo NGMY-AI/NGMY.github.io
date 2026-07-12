@@ -7373,6 +7373,27 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
   }
 }
 
+Future<List<AppTransaction>> ngmyFetchCivicClaimsFromCloud() async {
+  if (!await ngmyCanReachCloud()) return [];
+  try {
+    final transData = await Supabase.instance.client
+        .from('transactions')
+        .select()
+        .eq('type', TransactionType.claim.index)
+        .order('timestamp', ascending: false)
+        .limit(400)
+        .timeout(kNgmyCloudLoadTimeout);
+    if (transData == null) return [];
+    return (transData as List)
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .where((t) => t.type == TransactionType.claim)
+        .toList();
+  } catch (e) {
+    debugPrint('[civic] claims fetch: $e');
+    return [];
+  }
+}
+
 class NGMYApp extends StatefulWidget {
   const NGMYApp({super.key, required this.launchBootstrap, this.deferBootstrapLoad = false});
 
@@ -28758,6 +28779,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _maintenanceQueued = false;
   Timer? _helpModePoll;
   List<AppTransaction> _communityContributions = [];
+  List<AppTransaction> _communityClaims = [];
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -28791,9 +28813,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _refreshCivicHelpModeAndContributions() async {
     await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
-    final contributions = await ngmyFetchApprovedContributionsFromCloud();
+    final results = await Future.wait([
+      ngmyFetchApprovedContributionsFromCloud(),
+      ngmyFetchCivicClaimsFromCloud(),
+    ]);
     if (!mounted) return;
-    setState(() => _communityContributions = contributions);
+    setState(() {
+      _communityContributions = results[0];
+      _communityClaims = results[1];
+    });
   }
 
   void _onCivicLiveRefresh() {
@@ -30507,6 +30535,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     for (final t in _communityContributions) {
       if (t.id.isNotEmpty) byId[t.id] = t;
     }
+    for (final t in _communityClaims) {
+      if (t.id.isNotEmpty) byId[t.id] = t;
+    }
     return byId.values.toList();
   }
 
@@ -31329,22 +31360,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showPublicMemberProfile(UserData u) {
+    unawaited(_refreshCivicHelpModeAndContributions().then((_) {
+      if (mounted) setState(() {});
+    }));
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
     final displayName = NgmyCivicRegistryMembers.publicDisplayName(
       raw,
       fullName: u.fullName ?? '',
       username: u.username,
     );
-    final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-    final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
-    final contributions = widget.allTransactions
-        .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+    final emailKey = u.email.toLowerCase().trim();
+    final contributions = _civicTransactionsForDisplay()
+        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final claims = _civicTransactionsForDisplay()
+        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.claim)
         .toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
-    final openClaims = widget.allTransactions
-        .where((t) => t.userEmail == u.email && t.type == TransactionType.claim && t.status == TransactionStatus.pending)
-        .length;
+    final openClaims = claims.where((t) => t.status == TransactionStatus.pending).length;
 
     showDialog(
       context: context,
@@ -31402,11 +31437,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
-                          if (showNicks) ...[
-                            const SizedBox(height: 6),
-                            Text('Nickname${nicks.length == 1 ? '' : 's'}', style: TextStyle(fontSize: 11, color: mute)),
-                            Text(nicks.join(' · '), style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8))),
-                          ],
                           const SizedBox(height: 10),
                           _recordRow('Registry ID', u.registryId ?? 'N/A', isDark),
                           _recordDivider(isDark),
@@ -31432,13 +31462,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     if (contributions.isEmpty)
                       Text('No contribution records yet.', style: TextStyle(color: mute))
                     else
-                      ...contributions.take(8).map(
+                      ...contributions.take(12).map(
                         (t) => ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.volunteer_activism, color: Colors.green),
                           title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(_txReadableDetails(t)),
+                          trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: mute)),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    Text('Claim records', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
+                    const SizedBox(height: 8),
+                    if (claims.isEmpty)
+                      Text('No claim records yet.', style: TextStyle(color: mute))
+                    else
+                      ...claims.take(12).map(
+                        (t) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            Icons.report_gmailerrorred_rounded,
+                            color: t.status == TransactionStatus.pending ? Colors.orange : Colors.grey,
+                          ),
+                          title: Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : 'Claim', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
                           trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: mute)),
                         ),
                       ),
@@ -32988,8 +33037,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       fullName: u.fullName ?? '',
       username: u.username,
     );
-    final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-    final showNicks = raw != null && NgmyCivicRegistryMembers.showNicknamesPublicly(raw) && nicks.isNotEmpty;
     final familyRaw = raw?['familyMembers'];
     final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
     final initials = displayName
@@ -33050,13 +33097,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: ink, letterSpacing: -0.2),
                           ),
-                          if (showNicks)
-                            Text(
-                              nicks.join(' · '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
-                            ),
                           Text(
                             u.registryId ?? 'PENDING ID',
                             style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 11),

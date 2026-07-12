@@ -194,7 +194,10 @@ class NgmyCivicRegistryMembers {
   static String publicDisplayName(Map<String, dynamic>? member, {required String fullName, required String username}) {
     if (member != null && showNicknamesPublicly(member)) {
       final nicks = nicknamesOf(member);
-      if (nicks.isNotEmpty) return nicks.join(' · ');
+      if (nicks.isNotEmpty) {
+        // Show nickname(s) as the normal public name — no "nickname" label.
+        return nicks.length == 1 ? nicks.first : nicks.join(' · ');
+      }
     }
     final name = fullName.trim();
     return name.isNotEmpty ? name : username.trim();
