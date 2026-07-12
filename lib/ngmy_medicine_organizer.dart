@@ -294,113 +294,11 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
                               itemCount: _items.length,
                               itemBuilder: (_, i) {
                                 final m = _items[i];
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  height: 86,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        accent.withValues(alpha: t.isDark ? 0.22 : 0.14),
-                                        t.listItemBg,
-                                        accent.withValues(alpha: t.isDark ? 0.10 : 0.06),
-                                      ],
-                                    ),
-                                    border: Border.all(color: accent.withValues(alpha: 0.38)),
-                                    boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 4))],
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () => _openEditor(existing: m),
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 5,
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.topCenter,
-                                                  end: Alignment.bottomCenter,
-                                                  colors: [accent, accent.withValues(alpha: 0.45)],
-                                                ),
-                                              ),
-                                            ),
-                                            Expanded(
-                                              child: Padding(
-                                                padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                                                child: Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 42,
-                                                      height: 42,
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.65)]),
-                                                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 8)],
-                                                      ),
-                                                      alignment: Alignment.center,
-                                                      child: const Icon(Icons.medication_rounded, color: Colors.white, size: 20),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        mainAxisAlignment: MainAxisAlignment.center,
-                                                        children: [
-                                                          Text(
-                                                            m.name,
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 14),
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            m.dosage.isEmpty ? 'No dosage' : m.dosage,
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w600),
-                                                          ),
-                                                          const SizedBox(height: 3),
-                                                          Text(
-                                                            '${m.timesPerDay}x/day${m.schedule.isNotEmpty ? ' · ${m.schedule}' : ''}',
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(color: accent.withValues(alpha: 0.95), fontSize: 11, fontWeight: FontWeight.w700),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        IconButton(
-                                                          tooltip: 'Edit',
-                                                          onPressed: () => _openEditor(existing: m),
-                                                          icon: Icon(Icons.edit_rounded, color: t.muted, size: 18),
-                                                          visualDensity: VisualDensity.compact,
-                                                        ),
-                                                        IconButton(
-                                                          tooltip: 'Delete',
-                                                          onPressed: () => _delete(m),
-                                                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                                                          visualDensity: VisualDensity.compact,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                return _MedicinePlasticCard(
+                                  medicine: m,
+                                  accent: accent,
+                                  onEdit: () => _openEditor(existing: m),
+                                  onDelete: () => _delete(m),
                                 );
                               },
                             ),
@@ -409,6 +307,197 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MedicinePlasticCard extends StatelessWidget {
+  const _MedicinePlasticCard({
+    required this.medicine,
+    required this.accent,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final NgmyMedicineEntry medicine;
+  final Color accent;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 128,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6)),
+          const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onEdit,
+          borderRadius: BorderRadius.circular(18),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFFFFF1F7),
+                          Color.lerp(const Color(0xFFFCE7F3), accent, 0.25)!,
+                          Color.lerp(const Color(0xFFFBCFE8), accent, 0.45)!,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -10,
+                  bottom: -16,
+                  child: Icon(Icons.medication_liquid_rounded, size: 100, color: accent.withValues(alpha: 0.14)),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 30,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Row(
+                        children: [
+                          const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.5)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(medicine.category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10)],
+                        ),
+                        child: const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              medicine.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFF831843), fontWeight: FontWeight.w900, fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              medicine.dosage.isEmpty ? 'Dosage not set' : medicine.dosage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: const Color(0xFF9D174D).withValues(alpha: 0.85), fontWeight: FontWeight.w700, fontSize: 12),
+                            ),
+                            const Spacer(),
+                            Row(
+                              children: [
+                                _MedChip(label: '${medicine.timesPerDay}x / day'),
+                                if (medicine.schedule.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Flexible(child: _MedChip(label: medicine.schedule)),
+                                ],
+                                if (medicine.remindersEnabled) ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.notifications_active_rounded, size: 14, color: Color(0xFFDB2777)),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        children: [
+                          _MedCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                          const SizedBox(height: 6),
+                          _MedCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MedChip extends StatelessWidget {
+  const _MedChip({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEC4899).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.35)),
+      ),
+      child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFBE185D), fontWeight: FontWeight.w800, fontSize: 10)),
+    );
+  }
+}
+
+class _MedCircleBtn extends StatelessWidget {
+  const _MedCircleBtn({required this.icon, required this.onTap, this.danger = false});
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool danger;
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.85),
+          border: Border.all(color: danger ? const Color(0xFFFCA5A5) : const Color(0xFFF9A8D4)),
+        ),
+        child: Icon(icon, size: 15, color: danger ? const Color(0xFFEF4444) : const Color(0xFFBE185D)),
       ),
     );
   }

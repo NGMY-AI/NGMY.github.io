@@ -158,15 +158,38 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
               orbit: orbit,
               icon: Icons.business_center_rounded,
               onClose: () => Navigator.pop(context),
-              trailing: IconButton(
-                tooltip: 'Transfer / backup',
-                onPressed: () async {
-                  final imported = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(builder: (_) => NgmyEssentialsTransferPage(userEmail: widget.userEmail)),
-                  );
-                  if (imported == true) await _reload();
-                },
-                icon: Icon(Icons.sync_alt_rounded, color: NgmyHudInk.icon(context), size: 20),
+              trailing: Tooltip(
+                message: 'Transfer / backup',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () async {
+                      final imported = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(builder: (_) => NgmyEssentialsTransferPage(userEmail: widget.userEmail)),
+                      );
+                      if (imported == true) await _reload();
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                            const Color(0xFF6366F1).withValues(alpha: 0.28),
+                          ],
+                        ),
+                        border: Border.all(color: NgmyHudInk.icon(context).withValues(alpha: 0.45), width: 1.4),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.25), blurRadius: 10),
+                        ],
+                      ),
+                      child: Icon(Icons.sync_alt_rounded, color: NgmyHudInk.icon(context), size: 18),
+                    ),
+                  ),
+                ),
               ),
             ),
             child: Column(

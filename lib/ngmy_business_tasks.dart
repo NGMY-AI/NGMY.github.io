@@ -235,7 +235,7 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
               height: 40,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: ['Active', 'All', 'Done'].map((f) {
+                children: ['Active', 'Done'].map((f) {
                   final sel = _filter == f;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -303,118 +303,161 @@ class _TaskMiniCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = NgmyHubTheme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      height: 78,
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 118,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            priorityColor.withValues(alpha: t.isDark ? 0.20 : 0.12),
-            t.listItemBg,
-            accent.withValues(alpha: t.isDark ? 0.08 : 0.05),
-          ],
-        ),
-        border: Border.all(color: priorityColor.withValues(alpha: task.done ? 0.22 : 0.42)),
-        boxShadow: [BoxShadow(color: priorityColor.withValues(alpha: 0.14), blurRadius: 10, offset: const Offset(0, 3))],
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: priorityColor.withValues(alpha: 0.28), blurRadius: 14, offset: const Offset(0, 5)),
+          const BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Row(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            Container(
-              width: 5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [priorityColor, priorityColor.withValues(alpha: 0.4)],
-                ),
-              ),
-            ),
-            InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 4, 0),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: task.done ? LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]) : null,
-                    color: task.done ? null : Colors.transparent,
-                    border: Border.all(color: task.done ? accent : priorityColor.withValues(alpha: 0.7), width: 2),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: task.done
+                        ? [
+                            const Color(0xFF14532D),
+                            Color.lerp(const Color(0xFF166534), accent, 0.35)!,
+                            const Color(0xFF052E16),
+                          ]
+                        : [
+                            const Color(0xFF0B1220),
+                            Color.lerp(const Color(0xFF111827), priorityColor, 0.4)!,
+                            Color.lerp(const Color(0xFF020617), accent, 0.45)!,
+                          ],
                   ),
-                  child: task.done ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) : null,
                 ),
               ),
             ),
-            Expanded(
-              child: InkWell(
-                onTap: onEdit,
+            Positioned(
+              right: -8,
+              top: -10,
+              child: Icon(Icons.task_alt_rounded, size: 96, color: Colors.white.withValues(alpha: 0.06)),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 28,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [priorityColor, priorityColor.withValues(alpha: 0.65)]),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
                     children: [
                       Text(
-                        task.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: t.title,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          decoration: task.done ? TextDecoration.lineThrough : null,
-                          decorationColor: t.muted,
-                        ),
+                        task.done ? 'COMPLETED TASK' : 'TASK CARD',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4),
                       ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(999),
-                              color: priorityColor.withValues(alpha: 0.16),
-                              border: Border.all(color: priorityColor.withValues(alpha: 0.35)),
-                            ),
-                            child: Text(task.priority, style: TextStyle(color: priorityColor, fontSize: 10, fontWeight: FontWeight.w800)),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              task.category,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
+                      const Spacer(),
+                      Text(task.priority.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.8)),
                     ],
                   ),
                 ),
               ),
             ),
-            if (onDelete != null)
-              IconButton(
-                tooltip: 'Delete completed task',
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
-              )
-            else
-              IconButton(
-                tooltip: 'Edit',
-                onPressed: onEdit,
-                icon: Icon(Icons.edit_outlined, color: t.muted, size: 18),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 36, 8, 10),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: onToggle,
+                    customBorder: const CircleBorder(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: task.done ? LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]) : null,
+                        color: task.done ? null : Colors.white.withValues(alpha: 0.08),
+                        border: Border.all(color: task.done ? accent : Colors.white.withValues(alpha: 0.45), width: 2),
+                      ),
+                      child: task.done ? const Icon(Icons.check_rounded, color: Colors.white, size: 20) : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: onEdit,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            task.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              decoration: task.done ? TextDecoration.lineThrough : null,
+                              decorationColor: Colors.white54,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white.withValues(alpha: 0.1),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            child: Text(task.category, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w700, fontSize: 10)),
+                          ),
+                          if (task.notes.trim().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(task.notes, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (onDelete != null)
+                    InkWell(
+                      onTap: onDelete,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.1),
+                          border: Border.all(color: const Color(0xFFFCA5A5).withValues(alpha: 0.5)),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFCA5A5), size: 16),
+                      ),
+                    )
+                  else
+                    InkWell(
+                      onTap: onEdit,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.1),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        child: const Icon(Icons.edit_outlined, color: Colors.white70, size: 15),
+                      ),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),

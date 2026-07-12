@@ -705,108 +705,106 @@ class _SupportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = NgmyHubTheme.of(context);
+    final top = line.emergency ? const Color(0xFFEF4444) : accent;
     final meta = [line.provider, line.category].where((e) => e.isNotEmpty).join(' · ');
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      height: 86,
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 128,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: theme.isDark ? 0.22 : 0.14),
-            theme.listItemBg,
-            accent.withValues(alpha: theme.isDark ? 0.10 : 0.06),
-          ],
-        ),
-        border: Border.all(color: accent.withValues(alpha: 0.38)),
-        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: top.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6)),
+          const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Row(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            Container(
-              width: 5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: line.emergency
-                      ? const [Color(0xFFEF4444), Color(0xFFF87171)]
-                      : [accent, accent.withValues(alpha: 0.45)],
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: line.emergency
+                        ? const [Color(0xFF450A0A), Color(0xFF7F1D1D), Color(0xFF991B1B)]
+                        : [
+                            const Color(0xFF1C1917),
+                            Color.lerp(const Color(0xFF292524), accent, 0.4)!,
+                            Color.lerp(const Color(0xFF0C0A09), accent, 0.55)!,
+                          ],
+                  ),
                 ),
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: line.emergency
-                              ? const [Color(0xFFEF4444), Color(0xFFDC2626)]
-                              : [accent, accent.withValues(alpha: 0.65)],
-                        ),
-                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 8)],
+            Positioned(
+              right: -8,
+              bottom: -12,
+              child: Icon(Icons.phone_in_talk_rounded, size: 100, color: Colors.white.withValues(alpha: 0.07)),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 30,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [top, top.withValues(alpha: 0.7)]),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      Text(
+                        line.emergency ? 'EMERGENCY HOTLINE' : 'HOTLINE CARD',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4),
                       ),
-                      alignment: Alignment.center,
-                      child: Icon(icon, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            line.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: theme.title, fontWeight: FontWeight.w800, fontSize: 14),
-                          ),
-                          if (meta.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.subtitle, fontSize: 11, fontWeight: FontWeight.w600)),
-                          ],
-                          if (line.phone.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(line.phone, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent.withValues(alpha: 0.95), fontSize: 11, fontWeight: FontWeight.w700)),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      const Spacer(),
+                      Icon(icon, color: Colors.white, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (line.phone.isNotEmpty)
-                              _SupportMiniBtn(icon: Icons.call_rounded, color: accent, onTap: onCall),
-                            if (line.accountRef.isNotEmpty)
-                              _SupportMiniBtn(icon: Icons.copy_rounded, color: theme.muted, onTap: onCopyRef),
-                          ],
+                        Text(
+                          line.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _SupportMiniBtn(icon: Icons.edit_rounded, color: theme.muted, onTap: onEdit),
-                            _SupportMiniBtn(icon: Icons.delete_outline_rounded, color: const Color(0xFFEF4444), onTap: onDelete),
-                          ],
-                        ),
+                        if (meta.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11, fontWeight: FontWeight.w600)),
+                        ],
+                        const Spacer(),
+                        if (line.phone.isNotEmpty)
+                          Text(
+                            line.phone,
+                            style: TextStyle(color: top, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.1),
+                          ),
+                        if (line.accountRef.isNotEmpty)
+                          Text('Ref ${line.accountRef}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Column(
+                    children: [
+                      if (line.phone.isNotEmpty) _HotCircleBtn(icon: Icons.call_rounded, onTap: onCall, color: top),
+                      if (line.accountRef.isNotEmpty) _HotCircleBtn(icon: Icons.copy_rounded, onTap: onCopyRef),
+                      _HotCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                      _HotCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -816,19 +814,33 @@ class _SupportCard extends StatelessWidget {
   }
 }
 
-class _SupportMiniBtn extends StatelessWidget {
-  const _SupportMiniBtn({required this.icon, required this.color, required this.onTap});
+class _HotCircleBtn extends StatelessWidget {
+  const _HotCircleBtn({required this.icon, required this.onTap, this.color, this.danger = false});
   final IconData icon;
-  final Color color;
   final VoidCallback onTap;
+  final Color? color;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(padding: const EdgeInsets.all(5), child: Icon(icon, size: 16, color: color)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+          ),
+          child: Icon(icon, size: 14, color: danger ? const Color(0xFFFCA5A5) : (color ?? Colors.white)),
+        ),
+      ),
     );
   }
 }
+
 

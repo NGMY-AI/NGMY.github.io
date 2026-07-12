@@ -578,124 +578,122 @@ class _ContactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = NgmyHubTheme.of(context);
     final title = contact.name.isNotEmpty ? contact.name : contact.company;
-    final subtitle = contact.company.isNotEmpty && contact.name.isNotEmpty ? contact.company : contact.category;
+    final company = contact.company.isNotEmpty && contact.name.isNotEmpty ? contact.company : '';
     final initial = title.isNotEmpty ? title[0].toUpperCase() : '?';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      height: 86,
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 132,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: t.isDark ? 0.22 : 0.14),
-            t.listItemBg,
-            accent.withValues(alpha: t.isDark ? 0.10 : 0.06),
-          ],
-        ),
-        border: Border.all(color: accent.withValues(alpha: 0.38)),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: accent.withValues(alpha: 0.16), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: accent.withValues(alpha: 0.28), blurRadius: 16, offset: const Offset(0, 6)),
+          const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Row(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            Container(
-              width: 5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [accent, accent.withValues(alpha: 0.45)],
+            // Plastic contact card face
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF0F172A),
+                      Color.lerp(const Color(0xFF1E293B), accent, 0.35)!,
+                      Color.lerp(const Color(0xFF0B1220), accent, 0.55)!,
+                    ],
+                  ),
                 ),
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.65)]),
-                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 8)],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+            Positioned(
+              right: -18,
+              top: -24,
+              child: Icon(Icons.contacts_rounded, size: 110, color: Colors.white.withValues(alpha: 0.06)),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 28,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [accent.withValues(alpha: 0.95), accent.withValues(alpha: 0.55)]),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('CONTACT CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6)),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 36, 10, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.5),
+                      gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.55)]),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 14),
-                                ),
-                              ),
-                              if (contact.favorite) const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 15),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w600),
-                          ),
-                          if (contact.phone.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              contact.phone,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: accent.withValues(alpha: 0.95), fontSize: 11, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    alignment: Alignment.center,
+                    child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (contact.phone.isNotEmpty)
-                              _MiniIconBtn(icon: Icons.call_rounded, color: accent, onTap: onCall),
-                            if (contact.email.isNotEmpty)
-                              _MiniIconBtn(icon: Icons.email_outlined, color: const Color(0xFF34D399), onTap: onEmail),
-                            _MiniIconBtn(icon: contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, color: const Color(0xFFFBBF24), onTap: onFavorite),
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.2),
+                              ),
+                            ),
+                            if (contact.favorite) const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 16),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _MiniIconBtn(icon: Icons.edit_rounded, color: t.muted, onTap: onEdit),
-                            _MiniIconBtn(icon: Icons.delete_outline_rounded, color: const Color(0xFFEF4444), onTap: onDelete),
-                            if (contact.phone.isNotEmpty) _MiniIconBtn(icon: Icons.copy_rounded, color: t.muted, onTap: onCopy),
-                          ],
+                        if (company.isNotEmpty)
+                          Text(company, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text(
+                          contact.category.toUpperCase(),
+                          style: TextStyle(color: accent, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.2),
                         ),
+                        const Spacer(),
+                        if (contact.phone.isNotEmpty)
+                          Text(contact.phone, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.6)),
+                        if (contact.email.isNotEmpty)
+                          Text(contact.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11)),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Column(
+                    children: [
+                      if (contact.phone.isNotEmpty) _CardCircleBtn(icon: Icons.call_rounded, onTap: onCall),
+                      if (contact.email.isNotEmpty) _CardCircleBtn(icon: Icons.email_outlined, onTap: onEmail),
+                      _CardCircleBtn(icon: contact.favorite ? Icons.star_rounded : Icons.star_outline_rounded, onTap: onFavorite),
+                      _CardCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                      _CardCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -705,21 +703,29 @@ class _ContactCard extends StatelessWidget {
   }
 }
 
-class _MiniIconBtn extends StatelessWidget {
-  const _MiniIconBtn({required this.icon, required this.color, required this.onTap});
-
+class _CardCircleBtn extends StatelessWidget {
+  const _CardCircleBtn({required this.icon, required this.onTap, this.danger = false});
   final IconData icon;
-  final Color color;
   final VoidCallback onTap;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.all(5),
-        child: Icon(icon, size: 16, color: color),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+          ),
+          child: Icon(icon, size: 13, color: danger ? const Color(0xFFFCA5A5) : Colors.white),
+        ),
       ),
     );
   }

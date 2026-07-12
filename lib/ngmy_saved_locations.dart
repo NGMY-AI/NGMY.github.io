@@ -641,90 +641,148 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = NgmyHubTheme.of(context);
+    final meta = [
+      location.category,
+      if (distanceLabel != null) distanceLabel,
+      if (location.visitCount > 0) '${location.visitCount} visits',
+    ].whereType<String>().join(' · ');
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 128,
       decoration: BoxDecoration(
-        color: t.listItemBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            contentPadding: const EdgeInsets.fromLTRB(14, 4, 8, 0),
-            leading: CircleAvatar(
-              backgroundColor: accent.withValues(alpha: 0.2),
-              child: Icon(Icons.place_rounded, color: accent, size: 20),
-            ),
-            title: Text(location.name, style: TextStyle(color: t.title, fontWeight: FontWeight.w700)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (location.address.isNotEmpty)
-                  Text(location.address, style: TextStyle(color: t.subtitle, fontSize: 12)),
-                Text(
-                  [location.category, if (distanceLabel != null) distanceLabel, if (location.visitCount > 0) '${location.visitCount} visits']
-                      .whereType<String>()
-                      .join(' · '),
-                  style: TextStyle(color: accent.withValues(alpha: 0.85), fontSize: 11),
-                ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(tooltip: 'Edit', onPressed: onEdit, icon: Icon(Icons.edit_rounded, color: t.muted, size: 20)),
-                IconButton(tooltip: 'Delete', onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                _LocAction(icon: Icons.navigation_rounded, label: 'Navigate', color: accent, onTap: onNavigate),
-                _LocAction(icon: Icons.copy_rounded, label: 'Copy', color: t.muted, onTap: onCopy),
-              ],
-            ),
-          ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6)),
+          const BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
         ],
       ),
-    );
-  }
-}
-
-class _LocAction extends StatelessWidget {
-  const _LocAction({required this.icon, required this.label, required this.color, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF052E1C),
+                      Color.lerp(const Color(0xFF064E3B), accent, 0.4)!,
+                      Color.lerp(const Color(0xFF022C22), accent, 0.55)!,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -12,
+              bottom: -18,
+              child: Icon(Icons.map_rounded, size: 110, color: Colors.white.withValues(alpha: 0.07)),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 30,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('SITE MAP CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.5)),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.65)]),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                    ),
+                    child: const Icon(Icons.place_rounded, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          location.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                        ),
+                        if (location.address.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(location.address, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w600)),
+                        ],
+                        const Spacer(),
+                        if (meta.isNotEmpty)
+                          Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11)),
+                        if (location.hasGps)
+                          Text(
+                            '${location.lat!.toStringAsFixed(4)}, ${location.lng!.toStringAsFixed(4)}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w600),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      _LocCircleBtn(icon: Icons.navigation_rounded, onTap: onNavigate, color: accent),
+                      _LocCircleBtn(icon: Icons.copy_rounded, onTap: onCopy),
+                      _LocCircleBtn(icon: Icons.edit_rounded, onTap: onEdit),
+                      _LocCircleBtn(icon: Icons.delete_outline_rounded, onTap: onDelete, danger: true),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
+class _LocCircleBtn extends StatelessWidget {
+  const _LocCircleBtn({required this.icon, required this.onTap, this.color, this.danger = false});
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+          ),
+          child: Icon(icon, size: 14, color: danger ? const Color(0xFFFCA5A5) : (color ?? Colors.white)),
+        ),
+      ),
+    );
+  }
+}
+
