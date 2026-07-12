@@ -854,14 +854,25 @@ Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
   NgmyAdminLiveRefresh.notify();
   await NgmyCivicSelfEnrollment.saveLocalBackup(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  final payload = NgmyCivicSelfEnrollment.payload(config);
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {
-    // Write settings row first (authoritative for members), then config column.
-    cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, NgmyCivicSelfEnrollment.payload(config));
-    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
-    // Retry settings once if the first upsert failed (table/RLS hiccup).
+    // REST-first so guest enroll links (anon) can read the same row.
+    cloudOk = await ngmyUpsertSettingsRowReliable(_kNgmyCivicSelfEnrollmentSettingsKey, payload);
     if (!cloudOk) {
-      cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, NgmyCivicSelfEnrollment.payload(config));
+      cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, payload);
+    }
+    await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+    await _persistOperationalConfigToCloud(config);
+    // Verify the public flag guests will read.
+    if (cloudOk) {
+      final verify = await ngmyFetchSettingsValueViaRest(_kNgmyCivicSelfEnrollmentSettingsKey);
+      final on = verify != null &&
+          (verify['civicSelfEnrollmentEnabled'] == true ||
+              verify['civicSelfEnrollmentEnabled']?.toString().toLowerCase() == 'true');
+      if (config.civicSelfEnrollmentEnabled && !on) {
+        cloudOk = await ngmyUpsertSettingsRowReliable(_kNgmyCivicSelfEnrollmentSettingsKey, payload);
+      }
     }
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
