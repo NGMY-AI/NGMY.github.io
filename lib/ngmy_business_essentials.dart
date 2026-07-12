@@ -10,8 +10,7 @@ import 'ngmy_paper_trace.dart';
 import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
-import 'ngmy_local_bio_storage.dart';
-import 'ngmy_local_studio.dart';
+import 'ngmy_color_buckets.dart';
 import 'ngmy_live_capture.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
@@ -30,7 +29,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyPaperTraceCount(userEmail: userEmail),
     ngmyLiveCaptureCount(userEmail: userEmail),
-    ngmyLocalBioCount(userEmail: userEmail),
+    ngmyColorBucketsCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -83,7 +82,7 @@ const _categoryArt = <String, _CategoryArt>{
   'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
   'Paper Trace': _CategoryArt(icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
   'Live Capture': _CategoryArt(icon: Icons.fiber_manual_record_rounded, accent: Color(0xFFEF4444), gradient: [Color(0xFFDC2626), Color(0xFF06B6D4)]),
-  'Local Bio (Test)': _CategoryArt(icon: Icons.link_rounded, accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
+  'Color Buckets': _CategoryArt(icon: Icons.water_drop_rounded, accent: Color(0xFF8B5CF6), gradient: [Color(0xFFEF4444), Color(0xFF3B82F6), Color(0xFF22C55E)]),
 };
 
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
@@ -96,7 +95,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _reminders = 0;
   int _traces = 0;
   int _liveCaptures = 0;
-  int _localBios = 0;
+  int _colorBuckets = 0;
   bool _loading = true;
 
   @override
@@ -116,7 +115,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyPaperTraceCount(userEmail: widget.userEmail),
       ngmyLiveCaptureCount(userEmail: widget.userEmail),
-      ngmyLocalBioCount(userEmail: widget.userEmail),
+      ngmyColorBucketsCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -129,7 +128,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _reminders = results[6];
       _traces = results[7];
       _liveCaptures = results[8];
-      _localBios = results[9];
+      _colorBuckets = results[9];
       _loading = false;
     });
   }
@@ -295,13 +294,13 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyLiveCaptureDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Local Bio (Test)',
-                          count: _localBios,
+                          title: 'Color Buckets',
+                          count: _colorBuckets,
                           pulse: pulse,
                           scan: scan,
                           orbit: orbit,
                           phase: 0.6,
-                          onTap: () => _openCategory((ctx) => showNgmyLocalBioStudioDialog(ctx, userEmail: widget.userEmail)),
+                          onTap: () => _openCategory((ctx) => showNgmyColorBucketsDialog(ctx, userEmail: widget.userEmail)),
                         ),
                       ],
                     ),

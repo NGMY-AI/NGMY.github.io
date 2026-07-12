@@ -3,6 +3,8 @@ import 'dart:html' as html;
 
 import 'package:flutter/foundation.dart';
 
+import 'ngmy_live_capture_media.dart';
+
 class NgmyLiveCaptureResult {
   const NgmyLiveCaptureResult({required this.dataUrl, required this.mimeType});
   final String dataUrl;
@@ -17,6 +19,9 @@ class NgmyLiveCaptureEngine {
   String _mime = 'audio/webm';
   Completer<html.Blob?>? _stopCompleter;
   NgmyLiveCaptureResult? _last;
+
+  /// Live camera/mic stream for in-app preview while recording.
+  Object? get previewStream => _stream;
 
   Future<bool> start({required bool video}) async {
     lastError = null;
@@ -45,7 +50,6 @@ class NgmyLiveCaptureEngine {
         lastError = 'Recorder error';
         debugPrint('[live_capture] recorder error: $e');
       });
-      // 1s timeslices keep data flowing if the tab is briefly backgrounded.
       _recorder!.start(1000);
       return true;
     } catch (e) {
@@ -122,23 +126,7 @@ class NgmyLiveCaptureEngine {
   }
 
   static Future<void> downloadDataUrl(String dataUrl, String mimeType, String title) async {
-    try {
-      final a = html.AnchorElement(href: dataUrl)
-        ..download = '${title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}.${_extFor(mimeType)}'
-        ..style.display = 'none';
-      html.document.body?.append(a);
-      a.click();
-      a.remove();
-    } catch (e) {
-      debugPrint('[live_capture] download: $e');
-    }
-  }
-
-  static String _extFor(String mime) {
-    if (mime.contains('mp4')) return 'mp4';
-    if (mime.contains('ogg')) return 'ogg';
-    if (mime.contains('video')) return 'webm';
-    return 'webm';
+    await NgmyLiveCaptureMedia.downloadQuiet(dataUrl, mimeType, title);
   }
 
   Future<void> _releaseStream() async {

@@ -7,6 +7,8 @@ class NgmyLiveCaptureResult {
 class NgmyLiveCaptureEngine {
   String? lastError;
 
+  Object? get previewStream => null;
+
   Future<bool> start({required bool video}) async {
     lastError = 'Live Capture needs a web browser with microphone/camera access.';
     return false;

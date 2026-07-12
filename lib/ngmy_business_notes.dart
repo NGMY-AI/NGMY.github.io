@@ -974,9 +974,13 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
       final q = _query.toLowerCase();
       return n.title.toLowerCase().contains(q) || n.body.toLowerCase().contains(q);
     }).toList();
+    // Pinned stay on top as a group; within non-pinned (and within pinned),
+    // most recently edited/updated notes rise to the top.
     list.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-      return b.updatedAt.compareTo(a.updatedAt);
+      final byUpdated = b.updatedAt.compareTo(a.updatedAt);
+      if (byUpdated != 0) return byUpdated;
+      return b.createdAt.compareTo(a.createdAt);
     });
     return list;
   }
@@ -1016,12 +1020,18 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
       ),
     );
     if (result == null) return;
+    result.updatedAt = DateTime.now();
     final items = await _loadNotes(widget.userEmail);
-    final i = items.indexWhere((e) => e.id == result.id);
-    if (i >= 0) {
-      items[i] = result;
-    } else {
+    items.removeWhere((e) => e.id == result.id);
+    if (result.pinned) {
       items.insert(0, result);
+    } else {
+      final firstUnpinned = items.indexWhere((e) => !e.pinned);
+      if (firstUnpinned < 0) {
+        items.add(result);
+      } else {
+        items.insert(firstUnpinned, result);
+      }
     }
     await _saveNotes(widget.userEmail, items);
     await _reload();
@@ -1748,11 +1758,16 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _note.updatedAt = DateTime.now();
     try {
       final items = await _loadNotes(widget.userEmail);
-      final i = items.indexWhere((e) => e.id == _note.id);
-      if (i >= 0) {
-        items[i] = _note;
-      } else {
+      items.removeWhere((e) => e.id == _note.id);
+      if (_note.pinned) {
         items.insert(0, _note);
+      } else {
+        final firstUnpinned = items.indexWhere((e) => !e.pinned);
+        if (firstUnpinned < 0) {
+          items.add(_note);
+        } else {
+          items.insert(firstUnpinned, _note);
+        }
       }
       await _saveNotes(widget.userEmail, items);
     } catch (_) {}
