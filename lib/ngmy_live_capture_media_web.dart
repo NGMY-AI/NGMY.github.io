@@ -82,12 +82,27 @@ class NgmyLiveCaptureMedia {
     }
   }
 
+  static bool get _isIOSSafari {
+    final ua = html.window.navigator.userAgent.toLowerCase();
+    final isIOS = ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod');
+    // iOS WebKit backs every browser there (Chrome/Firefox on iOS are Safari
+    // under the hood), so any iOS UA is enough — no need to also match "safari".
+    return isIOS;
+  }
+
   static void downloadSync(String dataUrl, String mimeType, String title) {
     try {
       final clean = ngmyCleanMediaMime(mimeType);
       final objectUrl = dataUrl.startsWith('blob:')
           ? dataUrl
           : html.Url.createObjectUrlFromBlob(dataUrlToBlob(dataUrl, clean));
+      // iOS Safari does not reliably honor the `download` attribute on blob
+      // URLs — it just silently does nothing. Opening the blob in a new tab
+      // instead lets the user use the native Share sheet to save it.
+      if (_isIOSSafari) {
+        html.window.open(objectUrl, '_blank');
+        return;
+      }
       final name = '${title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}.${_extFor(clean)}';
       final a = html.AnchorElement(href: objectUrl)
         ..download = name

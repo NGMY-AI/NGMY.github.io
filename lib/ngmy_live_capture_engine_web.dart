@@ -72,10 +72,28 @@ class NgmyLiveCaptureEngine {
       _recorder!.start(1000);
       return true;
     } catch (e) {
-      lastError = 'Permission or device error: $e';
+      lastError = _describeStartError(e);
       debugPrint('[live_capture] start: $e');
       await dispose();
       return false;
+    }
+  }
+
+  String _describeStartError(Object e) {
+    final name = e is html.DomException ? e.name : '';
+    switch (name) {
+      case 'NotAllowedError':
+        return 'Microphone/camera access was blocked. Allow it for ngmy.org in your browser or phone Settings, then try again.';
+      case 'NotFoundError':
+        return 'No microphone or camera was found on this device.';
+      case 'NotReadableError':
+        return 'Your camera or microphone is already being used by another app. Close it and try again.';
+      case 'OverconstrainedError':
+        return 'This device could not meet the recording settings requested. Try Voice instead of Video.';
+      case 'SecurityError':
+        return 'Recording is blocked on this connection. Make sure you are on https://ngmy.org.';
+      default:
+        return 'Could not start recording: $e';
     }
   }
 

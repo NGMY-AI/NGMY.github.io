@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_live_capture_blob_store.dart';
 import 'ngmy_live_capture_engine.dart';
 import 'ngmy_live_capture_media.dart';
 
@@ -51,7 +52,7 @@ class NgmyLiveCaptureItem {
   String title;
   final String kind; // audio | video
   final DateTime createdAt;
-  final String dataUrl;
+  String dataUrl;
   final String mimeType;
   final int durationSec;
 
@@ -60,7 +61,10 @@ class NgmyLiveCaptureItem {
         'title': title,
         'kind': kind,
         'createdAt': createdAt.toUtc().toIso8601String(),
-        'dataUrl': dataUrl,
+        // The media payload itself is kept out of SharedPreferences/localStorage
+        // (see NgmyLiveCaptureBlobStore) — a single recording can be several MB,
+        // which blows past the ~5-10MB per-origin localStorage quota on mobile.
+        'dataUrl': '',
         'mimeType': mimeType,
         'durationSec': durationSec,
       };
@@ -87,24 +91,52 @@ class NgmyLiveCaptureStore {
       if (raw == null || raw.isEmpty) return [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) return [];
-      return decoded
+      final items = decoded
           .whereType<Map>()
           .map((e) => NgmyLiveCaptureItem.fromJson(Map<String, dynamic>.from(e)))
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      for (final item in items) {
+        if (item.dataUrl.isEmpty) {
+          item.dataUrl = await NgmyLiveCaptureBlobStore.getDataUrl(item.id) ?? '';
+        }
+      }
+      return items;
     } catch (_) {
       return [];
     }
   }
 
-  static Future<void> save(String email, List<NgmyLiveCaptureItem> items) async {
+  /// Returns false if the recording could not be persisted for later — the
+  /// caller should still let the user play/download it in this session.
+  static Future<bool> save(String email, List<NgmyLiveCaptureItem> items) async {
+    final trimmed = items.take(12).toList();
+    final dropped = items.skip(12);
+    if (dropped.isNotEmpty) {
+      unawaited(NgmyLiveCaptureBlobStore.deleteMany(dropped.map((e) => e.id)));
+    }
+    var mediaOk = true;
+    for (final item in trimmed) {
+      if (item.dataUrl.isNotEmpty) {
+        final ok = await NgmyLiveCaptureBlobStore.putDataUrl(item.id, item.dataUrl);
+        if (!ok) mediaOk = false;
+      }
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
-      final trimmed = items.take(12).toList();
       await prefs.setString(_key(email), jsonEncode(trimmed.map((e) => e.toJson()).toList()));
+      return mediaOk;
     } catch (e) {
       debugPrint('[live_capture] save: $e');
+      return false;
     }
+  }
+
+  static Future<void> deleteItem(String email, String id) async {
+    final items = await load(email);
+    items.removeWhere((e) => e.id == id);
+    await save(email, items);
+    await NgmyLiveCaptureBlobStore.delete(id);
   }
 }
 
@@ -168,9 +200,14 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       durationSec: elapsedSec,
     );
     final existing = await NgmyLiveCaptureStore.load(email);
-    await NgmyLiveCaptureStore.save(email, [item, ...existing]);
+    final saved = await NgmyLiveCaptureStore.save(email, [item, ...existing]);
     // Do not auto-download — that was blurring the app. User downloads from the player.
-    lastStatus = 'Saved. Open it below to play, edit, or download.';
+    if (saved) {
+      lastStatus = 'Saved. Open it below to play, edit, or download.';
+    } else {
+      lastError = 'Captured, but your device is out of storage to keep it saved — '
+          'download it now below before you leave this screen.';
+    }
     notifyListeners();
     return item;
   }
@@ -630,9 +667,7 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
   }
 
   Future<void> _delete() async {
-    final items = await NgmyLiveCaptureStore.load(widget.userEmail);
-    items.removeWhere((e) => e.id == widget.item.id);
-    await NgmyLiveCaptureStore.save(widget.userEmail, items);
+    await NgmyLiveCaptureStore.deleteItem(widget.userEmail, widget.item.id);
     await widget.onChanged();
     if (mounted) Navigator.pop(context);
   }
@@ -674,7 +709,21 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
                   style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
-                if (isVideo)
+                if (widget.item.dataUrl.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: const Text(
+                      'This recording could not be kept on this device (storage was full when it was captured). Delete it and record again.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+                    ),
+                  )
+                else if (isVideo)
                   NgmyLiveCaptureMedia.playbackVideo(
                     key: ValueKey('vid-${widget.item.id}'),
                     src: widget.item.dataUrl,
@@ -699,7 +748,7 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: _download,
+                        onPressed: widget.item.dataUrl.isEmpty ? null : _download,
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF334155),
                           foregroundColor: Colors.white,
