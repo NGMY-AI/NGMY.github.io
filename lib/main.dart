@@ -2836,8 +2836,12 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  // Authoritative source is ngmy_settings (civic_self_enrollment_settings), not config row.
-  next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
+  // Prefer cloud config column when present; ngmy_settings hydrate still wins afterward.
+  if (record.containsKey('civicSelfEnrollmentEnabled')) {
+    next.civicSelfEnrollmentEnabled = record['civicSelfEnrollmentEnabled'] == true;
+  } else {
+    next.civicSelfEnrollmentEnabled = keep.civicSelfEnrollmentEnabled;
+  }
 
   if (record.containsKey('officialCashApp') || record.containsKey('official_cash_app')) {
     final remote = (record['officialCashApp'] ?? record['official_cash_app'] ?? '').toString().trim();
@@ -10856,7 +10860,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (key == _kNgmyCivicSelfEnrollmentSettingsKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
-          setState(() => NgmyCivicSelfEnrollment.applyPayload(_config, Map<String, dynamic>.from(value)));
+          setState(() => NgmyCivicSelfEnrollment.applyPayload(_config, Map<String, dynamic>.from(value), force: true));
           unawaited(NgmyCivicSelfEnrollment.saveLocalBackup(_config));
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
           NgmyAdminLiveRefresh.notify();
@@ -20831,6 +20835,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   );
                 },
               ),
+              if (widget.config.civicSelfEnrollmentEnabled)
+                ListTile(
+                  leading: const Icon(Icons.link_rounded, color: Color(0xFF6200EE)),
+                  title: const Text('Copy enrollment link', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Admin only — send this link so users can self-enroll'),
+                  trailing: const Icon(Icons.copy_rounded, color: Color(0xFF6200EE)),
+                  onTap: () async {
+                    final link = ngmyCivicSelfEnrollmentShareUrl();
+                    await Clipboard.setData(ClipboardData(text: link));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Enrollment link copied:\n$link'),
+                        backgroundColor: const Color(0xFF059669),
+                      ),
+                    );
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.pin_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Registry PIN', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -28429,7 +28451,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Enrollment link copied — share it with friends'),
+        content: Text('Enrollment link copied — send it to users (admin only)'),
         backgroundColor: Color(0xFF059669),
       ),
     );
@@ -29100,11 +29122,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               ),
                             ],
                           ),
-                        ),
-                        IconButton(
-                          tooltip: 'Copy enrollment link to share',
-                          onPressed: _copyCivicEnrollShareLink,
-                          icon: Icon(Icons.link_rounded, color: isDark ? const Color(0xFF8B5CF6) : const Color(0xFF6200EE)),
                         ),
                       ],
                     ),
@@ -31737,6 +31754,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
+                  if (widget.user.isAdmin && _selfEnrollmentEnabled)
+                    SelectionContainer.disabled(
+                      child: IconButton(
+                        onPressed: _copyCivicEnrollShareLink,
+                        icon: const Icon(Icons.link_rounded, color: Colors.white, size: 26),
+                        tooltip: 'Copy enrollment link (admin only)',
+                      ),
+                    ),
                   if (_selfEnrollmentEnabled)
                     SelectionContainer.disabled(
                       child: IconButton(

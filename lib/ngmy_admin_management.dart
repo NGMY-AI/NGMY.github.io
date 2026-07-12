@@ -837,11 +837,14 @@ Future<bool> ngmyPersistTranslatePaymentSettings(AppConfig config) async {
 }
 
 Future<void> ngmyHydrateCivicSelfEnrollmentFromAllBackups(AppConfig config) async {
+  final local = await NgmyCivicSelfEnrollment.loadLocalPayload();
   await NgmyCivicSelfEnrollment.hydrateLocal(config);
   if (await ngmyCanReachCloud()) {
     final row = await _fetchNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey);
     if (row != null && row.isNotEmpty) {
-      NgmyCivicSelfEnrollment.applyPayload(config, row);
+      NgmyCivicSelfEnrollment.applyCloudOverLocal(config, row, local);
+      // Keep local prefs aligned with the resolved value.
+      await NgmyCivicSelfEnrollment.saveLocalBackup(config);
     }
   }
 }
@@ -853,8 +856,13 @@ Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {
+    // Write settings row first (authoritative for members), then config column.
     cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, NgmyCivicSelfEnrollment.payload(config));
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
+    // Retry settings once if the first upsert failed (table/RLS hiccup).
+    if (!cloudOk) {
+      cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey, NgmyCivicSelfEnrollment.payload(config));
+    }
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
