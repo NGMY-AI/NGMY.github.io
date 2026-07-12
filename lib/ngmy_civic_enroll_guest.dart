@@ -449,118 +449,111 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   Widget _titleBadge(double pulse, double shimmer) {
-    const logoSize = 40.0;
+    const logoSize = 36.0;
     return Transform.scale(
       scale: 1.0 + pulse * 0.02,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: LinearGradient(
-                begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
-                end: Alignment(1.2 - shimmer * 2.4, 0.6),
-                colors: [
-                  _kAccent.withValues(alpha: 0.22 + pulse * 0.12),
-                  Colors.white.withValues(alpha: 0.08),
-                  _kAccentSoft.withValues(alpha: 0.20 + pulse * 0.10),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.28 + pulse * 0.18),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
-              ],
-            ),
-            child: SizedBox(
-              height: logoSize,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: logoSize + 10),
-                    child: Text(
-                      'NGMY self enrollment',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8 + pulse * 0.3,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
-                        ],
-                      ),
-                    ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 8, logoSize + 14, 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
+                    end: Alignment(1.2 - shimmer * 2.4, 0.6),
+                    colors: [
+                      _kAccent.withValues(alpha: 0.22 + pulse * 0.12),
+                      Colors.white.withValues(alpha: 0.08),
+                      _kAccentSoft.withValues(alpha: 0.20 + pulse * 0.10),
+                    ],
                   ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      width: logoSize,
-                      height: logoSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const SweepGradient(
-                          colors: [
-                            Color(0xFFFFF4C2),
-                            Color(0xFFD4AF37),
-                            Color(0xFFB8860B),
-                            Color(0xFFF5E6A3),
-                            Color(0xFFD4AF37),
-                            Color(0xFF8B6914),
-                            Color(0xFFFFF4C2),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFD4AF37).withValues(alpha: 0.45 + pulse * 0.2),
-                            blurRadius: 12,
-                            spreadRadius: 0.5,
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(2.4),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Transform.scale(
-                          scale: 1.28,
-                          child: Image.asset(
-                            'assets/images/ngmy_logo.png',
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            errorBuilder: (_, __, ___) => Image.network(
-                              'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
-                              fit: BoxFit.cover,
-                              alignment: Alignment.center,
-                              errorBuilder: (_, __, ___) => const ColoredBox(
-                                color: Colors.white,
-                                child: Center(
-                                  child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 8, color: Color(0xFF1E3A5F))),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.28 + pulse * 0.18),
+                    width: 1.2,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(color: _kAccent.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 18, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Text(
+                  'NGMY self enrollment',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.7 + pulse * 0.3,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+          Positioned(
+            right: 6,
+            child: Container(
+              width: logoSize,
+              height: logoSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const SweepGradient(
+                  colors: [
+                    Color(0xFFFFF4C2),
+                    Color(0xFFD4AF37),
+                    Color(0xFFB8860B),
+                    Color(0xFFF5E6A3),
+                    Color(0xFFD4AF37),
+                    Color(0xFF8B6914),
+                    Color(0xFFFFF4C2),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.45 + pulse * 0.2),
+                    blurRadius: 12,
+                    spreadRadius: 0.5,
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(2.2),
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  'assets/images/ngmy_logo.png',
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  errorBuilder: (_, __, ___) => Image.network(
+                    'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    errorBuilder: (_, __, ___) => const ColoredBox(
+                      color: Colors.white,
+                      child: Center(
+                        child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 7, color: Color(0xFF1E3A5F))),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
