@@ -28133,6 +28133,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
   final _familyMembersC = TextEditingController();
+  /// When set, Enroll tab is updating this member's registry email key.
+  String? _editingMemberOriginalEmail;
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
@@ -28817,6 +28819,51 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return '$prefix${DateTime.now().microsecondsSinceEpoch}';
   }
 
+  void _clearEnrollmentForm({bool clearEditing = true}) {
+    _fullNameC.clear();
+    _dobC.clear();
+    _idTypeC.text = 'National ID';
+    _addressC.clear();
+    _phoneC.clear();
+    _emailC.clear();
+    _cityC.clear();
+    _roomC.clear();
+    _familyMembersC.clear();
+    if (clearEditing) _editingMemberOriginalEmail = null;
+  }
+
+  void _openEnrollmentForMember(UserData u) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    const idTypes = ['National ID', 'Passport', 'Drivers License', 'Voters Card'];
+    final idType = (raw?['idType'] ?? u.idType ?? '').toString().trim();
+    final familyRaw = raw?['familyMembers'];
+    final familyStr = familyRaw is num ? '${familyRaw.toInt()}' : (familyRaw?.toString() ?? '').trim();
+    final state = (raw?['state'] ?? u.state).toString().trim();
+    final phoneDigits = (raw?['phone'] ?? u.phone).toString().replaceAll(RegExp(r'\D'), '');
+
+    setState(() {
+      _editingMemberOriginalEmail = NgmyCivicRegistryMembers.emailKey(u.email);
+      if (state.isNotEmpty) _selectedState = state;
+      _fullNameC.text = (raw?['fullName'] ?? u.fullName ?? u.username).toString();
+      _dobC.text = (raw?['dob'] ?? u.dob ?? '').toString();
+      _idTypeC.text = idTypes.contains(idType) ? idType : 'National ID';
+      _addressC.text = (raw?['homeAddress'] ?? u.homeAddress ?? '').toString();
+      _phoneC.text = phoneDigits;
+      _emailC.text = (raw?['email'] ?? u.email).toString();
+      _cityC.text = (raw?['city'] ?? u.city ?? '').toString();
+      _roomC.text = (raw?['room'] ?? u.room ?? '').toString();
+      _familyMembersC.text = familyStr;
+      _activeTab = 1;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Editing enrollment for ${_fullNameC.text.trim()}. Update any field, then save.'),
+        backgroundColor: const Color(0xFF2563EB),
+      ),
+    );
+  }
+
   Future<void> _registerMember({UserData? targetUser, BuildContext? closeSelfSheet}) async {
     final fullName = _fullNameC.text.trim();
     final dob = _dobC.text.trim();
@@ -28826,6 +28873,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final email = _emailC.text.trim().toLowerCase();
     final city = _cityC.text.trim();
     final room = _roomC.text.trim();
+    final editingEmail = (_editingMemberOriginalEmail ?? '').trim().toLowerCase();
+    final isEditing = targetUser == null && editingEmail.isNotEmpty;
+    final existingEdit = isEditing ? NgmyCivicRegistryMembers.findByEmail(widget.config, editingEmail) : null;
 
     final hasTwoNames = RegExp(r'^\S+\s+\S+').hasMatch(fullName);
     if (!hasTwoNames) {
@@ -28852,11 +28902,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
       return;
     }
-    if (!_citiesForSelectedState().contains(city)) {
+    final cities = _citiesForSelectedState();
+    final cityOk = cities.contains(city) ||
+        (isEditing && city.isNotEmpty && (existingEdit?['city'] ?? '').toString().trim() == city);
+    if (!cityOk) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a city from Manage Cities & Rooms.')));
       return;
     }
-    if (!widget.config.rooms.contains(room)) {
+    final roomOk = widget.config.rooms.contains(room) ||
+        (isEditing && room.isNotEmpty && (existingEdit?['room'] ?? '').toString().trim() == room);
+    if (!roomOk) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
       return;
     }
@@ -28871,6 +28926,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    final excludeEmail = isEditing ? editingEmail : (targetUser?.email ?? email);
     final duplicate = NgmyCivicRegistryMembers.findDuplicateRecord(
       config: widget.config,
       fullName: fullName,
@@ -28878,7 +28934,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       city: city,
       homeAddress: address,
       phone: phone,
-      excludeEmail: targetUser?.email ?? email,
+      excludeEmail: excludeEmail,
     );
     if (duplicate != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -28887,14 +28943,50 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    if (isEditing && NgmyCivicRegistryMembers.emailKey(editingEmail) != NgmyCivicRegistryMembers.emailKey(email)) {
+      final clash = NgmyCivicRegistryMembers.findByEmail(widget.config, email);
+      if (clash != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('That email already belongs to another enrolled member.')),
+        );
+        return;
+      }
+      final rekeyed = NgmyCivicRegistryMembers.rekeyEmail(
+        widget.config,
+        fromEmail: editingEmail,
+        toEmail: email,
+      );
+      if (!rekeyed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not update member email. Try again.')),
+        );
+        return;
+      }
+    }
+
+    final existingAfterRekey = isEditing
+        ? NgmyCivicRegistryMembers.findByEmail(widget.config, email)
+        : null;
     final accountIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-    var registryId = accountIdx >= 0 ? (widget.allUsers[accountIdx].registryId ?? '').trim() : '';
+    var registryId = (existingAfterRekey?['registryId'] ?? '').toString().trim();
+    if (registryId.isEmpty && accountIdx >= 0) {
+      registryId = (widget.allUsers[accountIdx].registryId ?? '').trim();
+    }
     if (registryId.isEmpty) registryId = _generateUniqueRegistryId(_selectedState);
     final existingIds = NgmyCivicRegistryMembers.listFrom(widget.config)
         .map((m) => (m['registryId'] ?? '').toString().trim())
         .where((id) => id.isNotEmpty)
         .toSet();
-    if (existingIds.contains(registryId)) registryId = _generateUniqueRegistryId(_selectedState);
+    if (!isEditing && existingIds.contains(registryId)) {
+      registryId = _generateUniqueRegistryId(_selectedState);
+    }
+
+    final helps = existingAfterRekey?['helps'] is num
+        ? (existingAfterRekey!['helps'] as num).toInt()
+        : 0;
+    final missed = existingAfterRekey?['missed'] is num
+        ? (existingAfterRekey!['missed'] as num).toInt()
+        : 0;
 
     final member = NgmyCivicRegistryMembers.buildRecord(
       email: email,
@@ -28908,23 +29000,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
       registryId: registryId,
       familyMembers: familyMembers,
+      helps: helps,
+      missed: missed,
+      enrolledAt: existingAfterRekey?['enrolledAt']?.toString(),
     );
 
     setState(() {
       NgmyCivicRegistryMembers.upsert(widget.config, member);
-      if (accountIdx >= 0) widget.allUsers[accountIdx].isEnrolledInRegistry = true;
+      if (accountIdx >= 0) {
+        widget.allUsers[accountIdx].isEnrolledInRegistry = true;
+        widget.allUsers[accountIdx].registryId = registryId;
+      }
       if (targetUser != null && NgmyCivicRegistryMembers.emailKey(targetUser.email) == NgmyCivicRegistryMembers.emailKey(email)) {
         widget.user.isEnrolledInRegistry = true;
       }
       if (targetUser == null) {
-        _fullNameC.clear();
-        _dobC.clear();
-        _addressC.clear();
-        _phoneC.clear();
-        _emailC.clear();
-        _cityC.clear();
-        _roomC.clear();
-        _familyMembersC.clear();
+        _clearEnrollmentForm();
         _activeTab = 2;
       }
     });
@@ -28937,8 +29028,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       SnackBar(
         content: Text(
           saved
-              ? 'Member enrolled and saved.'
-              : 'Member enrolled on this device. Will sync when online — run supabase/users_civic_enrollment_columns.sql if members vanish.',
+              ? (isEditing ? 'Member enrollment updated and saved.' : 'Member enrolled and saved.')
+              : (isEditing
+                  ? 'Member updated on this device. Will sync when online.'
+                  : 'Member enrolled on this device. Will sync when online — run supabase/users_civic_enrollment_columns.sql if members vanish.'),
         ),
         backgroundColor: saved ? Colors.green : Colors.orange,
       ),
@@ -30133,7 +30226,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.pop(ctx);
-                            _showEditMemberDialog(u);
+                            _openEnrollmentForMember(u);
                           },
                           icon: const Icon(Icons.edit_outlined),
                           label: const Text('Edit Information'),
@@ -30724,173 +30817,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  void _showEditMemberDialog(UserData u) {
-    final fullName = TextEditingController(text: u.fullName ?? u.username);
-    final phone = TextEditingController(text: u.phone);
-    final email = TextEditingController(text: u.email);
-    final address = TextEditingController(text: u.homeAddress ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final panelBg = isDark ? const Color(0xFF0F172A) : Colors.white;
-        final inputBg = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
-        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: panelBg,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.edit_note_rounded, color: Color(0xFF3B82F6)),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Update Member Record',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: fullName,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      filled: true,
-                      fillColor: inputBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: phone,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                    decoration: InputDecoration(
-                      labelText: 'Phone',
-                      filled: true,
-                      fillColor: inputBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      filled: true,
-                      fillColor: inputBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: address,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                    decoration: InputDecoration(
-                      labelText: 'Address',
-                      filled: true,
-                      fillColor: inputBg,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: borderColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName.text.trim())) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain two names.')));
-                              return;
-                            }
-                            if (!RegExp(r'^\d{7,15}$').hasMatch(phone.text.trim())) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must be numbers only.')));
-                              return;
-                            }
-                            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email.')));
-                              return;
-                            }
-                            final oldEmail = u.email;
-                            final newEmail = email.text.trim().toLowerCase();
-                            setState(() {
-                              u.fullName = fullName.text.trim();
-                              u.username = fullName.text.trim().split(' ').first;
-                              u.phone = phone.text.trim();
-                              u.email = newEmail;
-                              u.homeAddress = address.text.trim();
-                            });
-                            widget.onDataChanged();
-                            if (oldEmail != newEmail) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Email updated. New records will use this email.')));
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member information saved successfully.')));
-                            Navigator.pop(ctx);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Save Changes'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Map<String, dynamic>? _civicPassportForCurrentUser() => NgmyCivicRegistryMembers.passportForAppUser(
         widget.config,
         email: widget.user.email,
@@ -30997,13 +30923,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     }
     final appLabel = appUser?.username ?? linkEmail;
+    final memberEmailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Grant Registry Passport?'),
         content: Text(
-          'Link app user "$appLabel" to ${member.fullName ?? member.username} and grant their Registry ID '
-          '(${member.registryId ?? 'pending'}). They will see it at the top of Civic Registry when logged in.',
+          'Link app user "$appLabel" ($linkEmail) to ${member.fullName ?? member.username} and grant their Registry ID '
+          '(${member.registryId ?? 'pending'}). Their app account and civic registry record will stay connected.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -31012,21 +30939,70 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     );
     if (confirm != true) return;
-    setState(() => NgmyCivicRegistryMembers.grantPassport(widget.config, member.email, linkEmail));
+
+    var grantEmail = memberEmailKey;
+    setState(() {
+      // If guest-enrolled with a synthetic email but matched by phone, rekey to the app signup email.
+      if (NgmyCivicRegistryMembers.isGuestSyntheticEmail(memberEmailKey) &&
+          NgmyCivicRegistryMembers.emailKey(linkEmail) != memberEmailKey) {
+        final clash = NgmyCivicRegistryMembers.findByEmail(widget.config, linkEmail);
+        if (clash == null) {
+          final ok = NgmyCivicRegistryMembers.rekeyEmail(
+            widget.config,
+            fromEmail: memberEmailKey,
+            toEmail: linkEmail,
+          );
+          if (ok) grantEmail = NgmyCivicRegistryMembers.emailKey(linkEmail);
+        }
+      }
+      NgmyCivicRegistryMembers.grantPassport(widget.config, grantEmail, linkEmail);
+      _setCivicEnrollmentFlagForAccount(widget.allUsers, linkEmail, true);
+      final idx = widget.allUsers.indexWhere(
+        (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(linkEmail),
+      );
+      if (idx >= 0) {
+        final registryId = (NgmyCivicRegistryMembers.findByEmail(widget.config, grantEmail)?['registryId'] ?? member.registryId ?? '')
+            .toString()
+            .trim();
+        widget.allUsers[idx].isEnrolledInRegistry = true;
+        if (registryId.isNotEmpty) widget.allUsers[idx].registryId = registryId;
+        if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(linkEmail)) {
+          widget.user.isEnrolledInRegistry = true;
+          if (registryId.isNotEmpty) widget.user.registryId = registryId;
+        }
+      }
+    });
     final ok = await ngmyPersistCivicRegistryMembers(widget.config);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == NgmyCivicRegistryMembers.emailKey(linkEmail)) {
+        await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
+      }
     } catch (_) {}
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(linkEmail),
+    );
+    if (await ngmyCanReachCloud() && accountIdx >= 0) {
+      try {
+        await Supabase.instance.client
+            .from('users')
+            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
+            .timeout(kNgmyCloudWriteTimeout);
+      } catch (e) {
+        debugPrint('Passport grant enrollment flag upsert failed: $e');
+      }
+    }
     widget.onDataChanged();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Registry passport granted to $appLabel.' : 'Passport saved locally — will sync when online.'),
+        content: Text(ok ? 'Registry passport granted — $appLabel is connected to this civic record.' : 'Passport saved locally — will sync when online.'),
         backgroundColor: ok ? Colors.green : Colors.orange,
       ),
     );
-    final updated = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    final updated = NgmyCivicRegistryMembers.findByEmail(widget.config, grantEmail);
     if (updated != null && mounted) {
       _showCivicIdCardForRecord(updated);
     }
@@ -31082,7 +31058,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
           ] else if (appUser != null) ...[
             Text(
-              'App user "${appUser.username}" signed up with the same email or phone.',
+              'App user "${appUser.username}" signed up with the same email or phone — grant passport to connect their account to this civic record.',
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF166534)),
             ),
             const SizedBox(height: 10),
@@ -31097,7 +31073,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ),
           ] else
             Text(
-              'No matching app sign-up yet. When someone logs in with this email or phone, you can grant their passport here.',
+              'No matching app sign-up yet. When someone creates an app account with this member\'s email or phone, you can grant their passport here to connect them.',
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
             ),
         ],
@@ -31468,17 +31444,60 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
        u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
     ).toList();
+    final isEditing = (_editingMemberOriginalEmail ?? '').isNotEmpty;
+    final cityOptions = [
+      ..._citiesForSelectedState(),
+      if (_cityC.text.trim().isNotEmpty && !_citiesForSelectedState().contains(_cityC.text.trim())) _cityC.text.trim(),
+    ];
+    final roomOptions = [
+      ...widget.config.rooms,
+      if (_roomC.text.trim().isNotEmpty && !widget.config.rooms.contains(_roomC.text.trim())) _roomC.text.trim(),
+    ];
 
     return Column(
       children: [
         // MANUAL ENROLLMENT FORM
         Container(
+          key: ValueKey('enroll-form-${_editingMemberOriginalEmail ?? 'new'}-${_cityC.text}-${_roomC.text}-${_idTypeC.text}'),
           padding: const EdgeInsets.all(25),
           decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [Text('Manual Enrollment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)), Text('Register a new member from scratch.', style: TextStyle(fontSize: 11, color: Colors.blueGrey))])),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: (isEditing ? Colors.orange : Colors.blue).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEditing ? 'Update Member Enrollment' : 'Manual Enrollment',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isEditing ? Colors.orange.shade800 : Colors.blue),
+                    ),
+                    Text(
+                      isEditing
+                          ? 'All enrollment fields for this member are loaded below. Change anything you need, then save.'
+                          : 'Register a new member from scratch.',
+                      style: TextStyle(fontSize: 11, color: isEditing ? Colors.orange.shade700 : Colors.blueGrey),
+                    ),
+                  ],
+                ),
+              ),
+              if (isEditing) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => setState(_clearEnrollmentForm),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Cancel edit'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 25),
 
               const Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -31537,7 +31556,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 initialSelection: _cityC.text.isNotEmpty ? _cityC.text : null,
                 hintText: 'Select city',
                 inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
-                dropdownMenuEntries: _citiesForSelectedState().map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
+                dropdownMenuEntries: cityOptions.map((c) => DropdownMenuEntry(value: c, label: c)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _cityC.text = v); },
               ),
               const SizedBox(height: 20),
@@ -31549,7 +31568,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
                 hintText: 'Select room',
                 inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
-                dropdownMenuEntries: widget.config.rooms.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
+                dropdownMenuEntries: roomOptions.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },
               ),
               const SizedBox(height: 20),
@@ -31572,8 +31591,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
               ElevatedButton(
                 onPressed: _registerMember,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))),
-                child: const Text('Register Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isEditing ? const Color(0xFF2563EB) : const Color(0xFF00B25A),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                ),
+                child: Text(
+                  isEditing ? 'Save Enrollment Updates' : 'Register Member',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
             ],
           ),
@@ -31609,6 +31636,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   trailing: ElevatedButton(
                     onPressed: () {
                       setState(() {
+                        _editingMemberOriginalEmail = null;
                         _fullNameC.text = u.fullName ?? u.username;
                         _emailC.text = u.email;
                         _phoneC.text = u.phone;

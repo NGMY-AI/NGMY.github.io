@@ -81,19 +81,46 @@ class NgmyCivicRegistryMembers {
 
   static String _phoneKey(String phone) => phone.replaceAll(RegExp(r'\D'), '');
 
+  static bool isGuestSyntheticEmail(String email) => emailKey(email).endsWith('@guest.ngmy');
+
+  /// Change a member's email key while keeping the same registry record.
+  static bool rekeyEmail(dynamic config, {required String fromEmail, required String toEmail}) {
+    final from = emailKey(fromEmail);
+    final to = emailKey(toEmail);
+    if (from.isEmpty || to.isEmpty || from == to) return from == to && from.isNotEmpty;
+    if (findByEmail(config, to) != null) return false;
+    final members = listFrom(config);
+    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == from);
+    if (idx < 0) return false;
+    members[idx] = Map<String, dynamic>.from(members[idx])..['email'] = to;
+    setList(config, members);
+    return true;
+  }
+
   /// Email of an app account matching this civic record by email or phone.
   static String? findLinkableAppEmail(List<dynamic> allUsers, Map<String, dynamic> member) {
     final memberEmail = emailKey((member['email'] ?? '').toString());
     final memberPhone = _phoneKey((member['phone'] ?? '').toString());
     String? byPhone;
+    String? byPhoneLogin;
     for (final raw in allUsers) {
       final email = emailKey((raw.email ?? '').toString());
       final phone = _phoneKey((raw.phone ?? '').toString());
-      if (email.isEmpty) continue;
+      if (email.isEmpty || isGuestSyntheticEmail(email)) continue;
+      final isLogin = (() {
+        try {
+          return (raw as dynamic).isAppLoginAccount == true;
+        } catch (_) {
+          return false;
+        }
+      })();
       if (memberEmail.isNotEmpty && email == memberEmail) return email;
-      if (memberPhone.length >= 7 && phone == memberPhone) byPhone ??= email;
+      if (memberPhone.length >= 7 && phone == memberPhone) {
+        byPhone ??= email;
+        if (isLogin) byPhoneLogin ??= email;
+      }
     }
-    return byPhone;
+    return byPhoneLogin ?? byPhone;
   }
 
   /// Civic passport visible to a logged-in app user (granted + email or phone match).
