@@ -14534,29 +14534,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _maybeOpenCivicEnrollDeepLink() async {
-    if (!ngmyTakePendingCivicSelfEnrollmentOpen()) return;
-    if (!mounted) return;
-    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config);
-    if (!mounted) return;
-    if (!widget.config.civicSelfEnrollmentEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Self-enrollment is not open right now. Ask an admin to turn it on.')),
-      );
-      return;
-    }
-    await NgmyNavigator.push(
-      context,
-      CivicRegistryScreen(
-        user: widget.user,
-        allUsers: widget.allUsers,
-        allTransactions: widget.allTransactions,
-        onAddTransaction: widget.onAddTransaction,
-        onDataChanged: widget.onDataChanged,
-        config: widget.config,
-        openSelfEnrollmentOnStart: true,
-      ),
-      routeName: 'CivicRegistryScreen',
-    );
+    // Guest enroll opens from ?civic=enroll before login. Clear any leftover flag.
+    ngmyTakePendingCivicSelfEnrollmentOpen();
   }
 
   void _onAdminLiveRefresh() {
@@ -20836,34 +20815,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
               ),
               const SizedBox(height: 12),
-              SwitchListTile(
-                secondary: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF6200EE)),
-                title: const Text('Self-enrollment button', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Shows enroll icon on the purple Civic Registry header for members'),
-                value: widget.config.civicSelfEnrollmentEnabled,
-                onChanged: (v) async {
-                  setST(() => widget.config.civicSelfEnrollmentEnabled = v);
-                  ngmyAdminConfigMutationAt = DateTime.now();
-                  widget.onDataChanged();
-                  await NgmyCivicSelfEnrollment.saveLocalBackup(widget.config);
-                  final ok = await ngmyPersistCivicSelfEnrollmentSettings(widget.config);
-                  if (!context.mounted) return;
-                  setState(() {});
-                  ngmyAdminShowCloudSaveSnackBar(
-                    context,
-                    cloudOk: ok,
-                    success: v ? 'Self-enrollment is ON for all members' : 'Self-enrollment is OFF for all members',
-                  );
-                },
-              ),
-              if (widget.config.civicSelfEnrollmentEnabled)
-                ListTile(
+              ListTile(
                   leading: const Icon(Icons.link_rounded, color: Color(0xFF6200EE)),
                   title: const Text('Copy enrollment link', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Admin only — send this link so users can self-enroll'),
+                  subtitle: const Text('Send to users so they can enroll without signing in'),
                   trailing: const Icon(Icons.copy_rounded, color: Color(0xFF6200EE)),
                   onTap: () async {
-                    final link = ngmyCivicSelfEnrollmentShareUrl();
+                    final link = ngmyCivicSelfEnrollmentShareUrl(state: widget.user.state);
                     await Clipboard.setData(ClipboardData(text: link));
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -28174,7 +28132,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
   bool _maintenanceQueued = false;
-  bool _selfEnrollmentEnabled = false;
   Timer? _helpModePoll;
   List<AppTransaction> _communityContributions = [];
 
@@ -28191,8 +28148,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.initState();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
-    _selfEnrollmentEnabled = widget.config.civicSelfEnrollmentEnabled;
-    unawaited(_syncSelfEnrollmentFlag());
     unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers));
     _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
@@ -28200,9 +28155,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
       _checkRegistryUnlock();
-      if (widget.openSelfEnrollmentOnStart && _selfEnrollmentEnabled) {
-        _showSelfEnrollmentSheet();
-      }
       unawaited(_maybePromptCivicIdPhoto());
     });
     unawaited(_refreshCivicHelpModeAndContributions());
@@ -28241,23 +28193,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.dispose();
   }
 
-  Future<void> _syncSelfEnrollmentFlag() async {
-    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(widget.config);
-    if (!mounted) return;
-    final enabled = widget.config.civicSelfEnrollmentEnabled;
-    if (_selfEnrollmentEnabled != enabled) {
-      setState(() => _selfEnrollmentEnabled = enabled);
-    }
-  }
-
   Future<void> _copyCivicEnrollShareLink() async {
-    final link = ngmyCivicSelfEnrollmentShareUrl();
+    final link = ngmyCivicSelfEnrollmentShareUrl(state: _selectedState);
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Enrollment link copied — send it to users (admin only)'),
-        backgroundColor: Color(0xFF059669),
+      SnackBar(
+        content: Text('Enrollment link copied for $_selectedState — send it to users'),
+        backgroundColor: const Color(0xFF059669),
       ),
     );
   }
@@ -28268,11 +28211,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (oldWidget.user.email != widget.user.email) {
       unawaited(_hydrateReceiptReadState());
       unawaited(_hydrateRegistrarApplication());
-    }
-    if (oldWidget.config.civicSelfEnrollmentEnabled != widget.config.civicSelfEnrollmentEnabled) {
-      _selfEnrollmentEnabled = widget.config.civicSelfEnrollmentEnabled;
-    } else {
-      unawaited(_syncSelfEnrollmentFlag());
     }
     if (!_canBypassCivicGate()) {
       unawaited(_checkRegistryUnlock());
@@ -28871,158 +28809,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!existing.contains(candidate)) return candidate;
     }
     return '$prefix${DateTime.now().microsecondsSinceEpoch}';
-  }
-
-  void _showSelfEnrollmentSheet() {
-    if (_userIsCivicRegistryEnrolled(widget.config, widget.user)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are already enrolled in the registry.')));
-      return;
-    }
-    if (!_selfEnrollmentEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Self-enrollment is not available right now.')));
-      return;
-    }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nameC = TextEditingController(text: (widget.user.fullName ?? widget.user.username).trim());
-    final dobC = TextEditingController(text: widget.user.dob ?? '');
-    final idTypeC = TextEditingController(text: widget.user.idType ?? '');
-    final addressC = TextEditingController(text: widget.user.homeAddress ?? '');
-    final phoneC = TextEditingController(text: widget.user.phone);
-    final cityC = TextEditingController(text: widget.user.city ?? '');
-    final roomC = TextEditingController(text: widget.user.room ?? '');
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.88),
-              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F111A) : Colors.white,
-                borderRadius: BorderRadius.circular(26),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Enroll Yourself', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Same enrollment as a registrar would complete for you in $_selectedState.',
-                                style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: nameC,
-                      decoration: const InputDecoration(labelText: 'Full Name *'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: dobC,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), DateSlashFormatter()],
-                      decoration: const InputDecoration(labelText: 'Date of Birth (MM/DD/YYYY) *'),
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      value: idTypeC.text.isNotEmpty && ['National ID', 'Passport', 'Drivers License', 'Voters Card'].contains(idTypeC.text)
-                          ? idTypeC.text
-                          : null,
-                      decoration: const InputDecoration(labelText: 'ID Type *'),
-                      items: ['National ID', 'Passport', 'Drivers License', 'Voters Card']
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) idTypeC.text = v;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(controller: addressC, decoration: const InputDecoration(labelText: 'Home Address *')),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: phoneC,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(labelText: 'Phone *'),
-                    ),
-                    const SizedBox(height: 10),
-                    Text('Email: ${widget.user.email}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      value: _citiesForSelectedState().contains(cityC.text) ? cityC.text : null,
-                      decoration: const InputDecoration(labelText: 'City *'),
-                      items: _citiesForSelectedState().map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) {
-                        if (v != null) cityC.text = v;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    DropdownButtonFormField<String>(
-                      value: widget.config.rooms.contains(roomC.text) ? roomC.text : null,
-                      decoration: const InputDecoration(labelText: 'Room *'),
-                      items: widget.config.rooms.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                      onChanged: (v) {
-                        if (v != null) roomC.text = v;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () async {
-                        _fullNameC.text = nameC.text;
-                        _dobC.text = dobC.text;
-                        _idTypeC.text = idTypeC.text;
-                        _addressC.text = addressC.text;
-                        _phoneC.text = phoneC.text;
-                        _emailC.text = widget.user.email;
-                        _cityC.text = cityC.text;
-                        _roomC.text = roomC.text;
-                        final idx = widget.allUsers.indexWhere(
-                          (u) => u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim(),
-                        );
-                        final target = idx != -1 ? widget.allUsers[idx] : widget.user;
-                        await _registerMember(targetUser: target, closeSelfSheet: ctx);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF00B25A),
-                        minimumSize: const Size(double.infinity, 48),
-                      ),
-                      child: const Text('Complete Enrollment', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      nameC.dispose();
-      dobC.dispose();
-      idTypeC.dispose();
-      addressC.dispose();
-      phoneC.dispose();
-      cityC.dispose();
-      roomC.dispose();
-    });
   }
 
   Future<void> _registerMember({UserData? targetUser, BuildContext? closeSelfSheet}) async {
@@ -31559,24 +31345,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
-                  if (widget.user.isAdmin && _selfEnrollmentEnabled)
+                  if (_canManageCivicRegistry())
                     SelectionContainer.disabled(
                       child: IconButton(
                         onPressed: _copyCivicEnrollShareLink,
                         icon: const Icon(Icons.link_rounded, color: Colors.white, size: 26),
-                        tooltip: 'Copy enrollment link (admin only)',
-                      ),
-                    ),
-                  if (_selfEnrollmentEnabled)
-                    SelectionContainer.disabled(
-                      child: IconButton(
-                        onPressed: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? null : _showSelfEnrollmentSheet,
-                        icon: Icon(
-                          _userIsCivicRegistryEnrolled(widget.config, widget.user) ? Icons.verified_rounded : Icons.person_add_alt_1_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        tooltip: _userIsCivicRegistryEnrolled(widget.config, widget.user) ? 'You are enrolled' : 'Enroll yourself',
+                        tooltip: 'Copy enrollment link to send to users',
                       ),
                     ),
                 ],

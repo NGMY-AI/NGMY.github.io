@@ -2,11 +2,21 @@ import 'dart:html' as html;
 
 bool ngmyPendingCivicSelfEnrollmentOpen = false;
 
-String ngmyCivicSelfEnrollmentShareUrl() {
+String ngmyCivicSelfEnrollmentShareUrl({String? state}) {
   try {
     final origin = html.window.location.origin;
-    if (origin.isNotEmpty) return '$origin/?civic=enroll';
+    if (origin.isNotEmpty) {
+      final st = (state ?? '').trim();
+      if (st.isNotEmpty) {
+        return '$origin/?civic=enroll&state=${Uri.encodeQueryComponent(st)}';
+      }
+      return '$origin/?civic=enroll';
+    }
   } catch (_) {}
+  final st = (state ?? '').trim();
+  if (st.isNotEmpty) {
+    return 'https://ngmy.org/?civic=enroll&state=${Uri.encodeQueryComponent(st)}';
+  }
   return 'https://ngmy.org/?civic=enroll';
 }
 

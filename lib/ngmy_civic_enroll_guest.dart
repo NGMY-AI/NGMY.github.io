@@ -101,8 +101,6 @@ class NgmyGuestCivicEnrollScreen extends StatefulWidget {
 class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen> with TickerProviderStateMixin {
   bool _loading = true;
   bool _submitting = false;
-  bool _enabled = false;
-  bool _closed = false;
   bool _done = false;
   String? _loadError;
   String? _registryId;
@@ -115,7 +113,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
-  String? _city;
 
   late final AnimationController _pulse;
   late final AnimationController _shimmer;
@@ -192,9 +189,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   void _absorbCatalog(Map<String, dynamic> source) {
-    if (_civicFlagOn(source['civicSelfEnrollmentEnabled'])) {
-      _enabled = true;
-    }
     final cities = source['cities'];
     if (cities is List && cities.isNotEmpty) {
       _legacyCities = cities.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
@@ -216,26 +210,22 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     setState(() {
       _loading = true;
       _loadError = null;
-      _closed = false;
     });
 
-    Map<String, dynamic>? settings;
     Map<String, dynamic>? membersPayload;
     Map<String, dynamic>? configRow;
+    Map<String, dynamic>? settings;
 
     for (var attempt = 0; attempt < 5; attempt++) {
-      settings ??= await ngmyFetchSettingsValueReliable(_kCivicSelfEnrollmentSettingsKey);
       membersPayload ??= await ngmyFetchSettingsValueReliable(NgmyCivicRegistryMembers.cloudSettingsKey);
       configRow ??= await _fetchConfigCatalog();
-      final sawEnabled = (settings != null && _civicFlagOn(settings['civicSelfEnrollmentEnabled'])) ||
-          (configRow != null && _civicFlagOn(configRow['civicSelfEnrollmentEnabled']));
-      if (sawEnabled || (settings != null && configRow != null)) break;
+      settings ??= await ngmyFetchSettingsValueReliable(_kCivicSelfEnrollmentSettingsKey);
+      if (membersPayload != null || configRow != null || settings != null) break;
       if (attempt < 4) await Future<void>.delayed(Duration(milliseconds: 450 * (attempt + 1)));
     }
 
     if (!mounted) return;
 
-    _enabled = false;
     _legacyCities = const [];
     _citiesByState = const {};
     _members = const [];
@@ -250,19 +240,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       }
     }
 
-    if (!_enabled) {
-      setState(() {
-        _loading = false;
-        _closed = true;
-      });
-      return;
-    }
-
-    final cities = _citiesForState();
-    setState(() {
-      _loading = false;
-      _city = cities.contains(_city) ? _city : null;
-    });
+    if (!mounted) return;
+    setState(() => _loading = false);
   }
 
   String _generateRegistryId(String state) {
@@ -288,7 +267,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final fullName = _nameC.text.trim();
     final address = _addressC.text.trim();
     final phone = _phoneC.text.trim();
-    final city = (_city ?? '').trim();
 
     if (!RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
       _toast('Full Name must contain at least first and last name.');
@@ -300,15 +278,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
       _toast('Phone must contain numbers only (7-15 digits).');
-      return;
-    }
-    final cities = _citiesForState();
-    if (cities.isNotEmpty && !cities.contains(city)) {
-      _toast('Please choose a city from the list.');
-      return;
-    }
-    if (city.isEmpty) {
-      _toast('City is required.');
       return;
     }
 
@@ -340,7 +309,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         records: remoteMembers,
         fullName: fullName,
         dob: '',
-        city: city,
+        city: '',
         excludeEmail: email,
       );
       if (duplicate != null) {
@@ -357,7 +326,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         idType: '',
         homeAddress: address,
         phone: phone,
-        city: city,
+        city: '',
         room: '',
         state: _selectedState,
         registryId: registryId,
@@ -529,17 +498,53 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       );
 
-  Widget _footerPlain() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-      child: Text(
-        "EMO 'YA MMBOND0 · $_selectedState",
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: Colors.white.withValues(alpha: 0.45),
+  Widget _mottoBadge(double pulse, double shimmer) {
+    return Transform.scale(
+      scale: 1.0 + pulse * 0.03,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment(-1.0 + shimmer * 2.0, -0.3),
+                end: Alignment(1.0 - shimmer * 2.0, 0.5),
+                colors: [
+                  _kAccentSoft.withValues(alpha: 0.22 + pulse * 0.12),
+                  Colors.white.withValues(alpha: 0.06),
+                  _kAccent.withValues(alpha: 0.18 + pulse * 0.10),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.28 + pulse * 0.16),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kAccentSoft.withValues(alpha: 0.20 + pulse * 0.14),
+                  blurRadius: 16 + pulse * 8,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Text(
+              "EMO 'YA MMBOND0 · $_selectedState",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1 + pulse * 0.4,
+                color: Colors.white,
+                shadows: [
+                  Shadow(color: _kAccent.withValues(alpha: 0.4 + pulse * 0.2), blurRadius: 12),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -632,7 +637,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       );
     }
 
-    if (_closed || _loadError != null) {
+    if (_loadError != null) {
       return _shell(
         child: Column(
           children: [
@@ -640,8 +645,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: AnimatedBuilder(
-                animation: _pulse,
-                builder: (_, __) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+                animation: Listenable.merge([_pulse, _shimmer]),
+                builder: (context, child) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_pulse, _shimmer]),
+                builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
               ),
             ),
             Expanded(
@@ -664,17 +677,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.lock_rounded, color: Colors.white.withValues(alpha: 0.55), size: 34),
+                            Icon(Icons.wifi_off_rounded, color: Colors.white.withValues(alpha: 0.55), size: 34),
                             const SizedBox(height: 16),
                             const Text(
-                              'Enrollment closed',
+                              'Could not load',
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              _loadError ??
-                                  'Self-enrollment is not open for this registry right now. Please check back later.',
+                              _loadError!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontSize: 14, height: 1.45, color: _kMuted),
                             ),
@@ -687,7 +699,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                                 minimumSize: const Size(double.infinity, 46),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
-                              child: const Text('Check again', style: TextStyle(fontWeight: FontWeight.w700)),
+                              child: const Text('Try again', style: TextStyle(fontWeight: FontWeight.w700)),
                             ),
                           ],
                         ),
@@ -697,7 +709,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
               ),
             ),
-            _footerPlain(),
           ],
         ),
       );
@@ -707,6 +718,22 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       return _shell(
         child: Column(
           children: [
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_pulse, _shimmer]),
+                builder: (context, child) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_pulse, _shimmer]),
+                builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+              ),
+            ),
             Expanded(
               child: Center(
                 child: Padding(
@@ -716,7 +743,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     children: [
                       AnimatedBuilder(
                         animation: _pulse,
-                        builder: (_, __) {
+                        builder: (context, child) {
                           final pulse = Curves.easeInOut.transform(_pulse.value);
                           return Icon(Icons.verified_rounded, size: 78, color: Color.lerp(_kGreen, _kAccent, pulse));
                         },
@@ -740,24 +767,26 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
               ),
             ),
-            _footerPlain(),
           ],
         ),
       );
     }
-
-    final cities = _citiesForState();
 
     return _shell(
       child: Column(
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
               children: [
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
-                  builder: (_, __) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+                  builder: (context, child) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+                ),
+                const SizedBox(height: 12),
+                AnimatedBuilder(
+                  animation: Listenable.merge([_pulse, _shimmer]),
+                  builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
                 const SizedBox(height: 22),
                 _glassField(
@@ -798,47 +827,21 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     items: _kUsStates.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                     onChanged: (v) {
                       if (v == null) return;
-                      setState(() {
-                        _selectedState = v;
-                        _city = null;
-                      });
+                      setState(() => _selectedState = v);
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
-                if (cities.isNotEmpty)
-                  _glassField(
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('city-$_selectedState-$_city'),
-                      initialValue: cities.contains(_city) ? _city : null,
-                      dropdownColor: const Color(0xFF1A1A1A),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      iconEnabledColor: _kMuted,
-                      decoration: _dec('City *'),
-                      items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _city = v),
-                    ),
-                  )
-                else
-                  _glassField(
-                    child: TextFormField(
-                      initialValue: _city,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                      decoration: _dec('City *'),
-                      onChanged: (v) => _city = v.trim(),
-                    ),
-                  ),
                 const SizedBox(height: 26),
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
-                  builder: (_, __) => _submitButton(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
+                  builder: (context, child) => _submitButton(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
               ],
             ),
           ),
-          _footerPlain(),
         ],
       ),
     );
   }
 }
+
