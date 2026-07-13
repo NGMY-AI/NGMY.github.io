@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum VaultEngine { typeRush, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell }
+enum VaultEngine { wordMatch, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell }
 
 class VaultGameDef {
   const VaultGameDef({
@@ -37,19 +37,19 @@ const kVaultGames = <VaultGameDef>[
     shortTitle: 'Vault Sync',
     tagline: 'Tap when the arcs meet. Chase combos.',
     techLabel: 'SYNC',
-    engine: VaultEngine.typeRush,
+    engine: VaultEngine.wordMatch,
     colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
     icon: Icons.sync_rounded,
   ),
   VaultGameDef(
-    id: 'type_rush',
-    title: 'Type Rush',
-    shortTitle: 'Type Rush',
-    tagline: 'Type sentences & catch falling words for coins.',
-    techLabel: 'TYPE',
-    engine: VaultEngine.typeRush,
-    colors: [Color(0xFF22D3EE), Color(0xFF6366F1)],
-    icon: Icons.keyboard_rounded,
+    id: 'word_match',
+    title: 'Word Match',
+    shortTitle: 'Word Match',
+    tagline: 'Learn English or Kiswahili — earn coins.',
+    techLabel: 'WORDS',
+    engine: VaultEngine.wordMatch,
+    colors: [Color(0xFFA78BFA), Color(0xFFEC4899)],
+    icon: Icons.menu_book_rounded,
   ),
   VaultGameDef(
     id: 'neon_serpent',
@@ -202,6 +202,14 @@ class VaultProgressStore {
     return next;
   }
 
+  static Future<int> spendWalletCoins(int amount) async {
+    final prefs = await SharedPreferences.getInstance();
+    final have = prefs.getInt(_kWallet) ?? 0;
+    final next = math.max(0, have - amount);
+    await prefs.setInt(_kWallet, next);
+    return next;
+  }
+
   static Future<Map<String, VaultGameProgress>> loadAll() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -274,7 +282,7 @@ class VaultProgressStore {
 /// Result popped back to the arcade hub for coin-fly animation.
 class VaultGameResult {
   const VaultGameResult({required this.coinsEarned, required this.score});
-  final int coinsEarned;
+  final int coinsEarned; // can be negative when user lost coins
   final int score;
 }
 
@@ -337,7 +345,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
 
   VaultGameDef get g => widget.game;
   List<Color> get colors => g.colors;
-  bool get _isRainLevel => g.engine == VaultEngine.typeRush && _level % 2 == 0;
+  bool get _isRainLevel => g.engine == VaultEngine.wordMatch && _level % 2 == 0;
 
   @override
   void initState() {
@@ -370,7 +378,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
     if (!_playing || _levelClear) return;
     setState(() {
       switch (g.engine) {
-        case VaultEngine.typeRush:
+        case VaultEngine.wordMatch:
           if (_isRainLevel) {
             for (final w in _falling) {
               w.y += (0.004 + _level * 0.00055);
@@ -411,10 +419,8 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
             _obstacles.add(_LaneObstacle(x: _rng.nextDouble(), y: -0.1, w: 0.18 + _rng.nextDouble() * 0.12));
           }
           for (final o in _obstacles) {
-            if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
-              _progress = 0;
-              _feedback = 'CRASH';
-              _feedbackColor = const Color(0xFFEF4444);
+              if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
+              unawaited(_loseHit(coins: 4 + _level, msg: 'CRASH'));
               _obstacles.clear();
               break;
             }
@@ -476,9 +482,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
         }
       }
       if ((nh - r.body.first).distance < 0.03 && r.len > _snake.length) {
-        _progress = 0;
-        _feedback = 'EATEN';
-        _feedbackColor = const Color(0xFFEF4444);
+        unawaited(_loseHit(coins: 5 + _level, msg: 'EATEN'));
         _resetSnake();
       }
     }
@@ -522,7 +526,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _typeCtrl.clear();
     });
     if (g.engine == VaultEngine.neonSerpent) _resetSnake();
-    if (g.engine == VaultEngine.typeRush) {
+    if (g.engine == VaultEngine.wordMatch) {
       if (_isRainLevel) {
         _spawnTimer = Timer.periodic(Duration(milliseconds: (900 - _level * 40).clamp(420, 900)), (_) {
           if (!_playing || !mounted) return;
@@ -578,7 +582,21 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _feedback = '+$coins coins · $_progress/$_need';
       _feedbackColor = const Color(0xFFFBBF24);
     });
+    await VaultProgressStore.addWalletCoins(coins);
+    _banked += coins;
     if (_progress >= _need) await _clearLevel();
+  }
+
+  Future<void> _loseHit({required int coins, required String msg}) async {
+    HapticFeedback.heavyImpact();
+    final lost = coins.clamp(1, 99);
+    setState(() {
+      _progress = 0;
+      _sessionCoins -= lost;
+      _feedback = '$msg · -$lost coins';
+      _feedbackColor = const Color(0xFFEF4444);
+    });
+    await VaultProgressStore.spendWalletCoins(lost);
   }
 
   Future<void> _clearLevel() async {
@@ -592,14 +610,14 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _feedbackColor = const Color(0xFFFBBF24);
     });
     final nextLevel = (_level + 1).clamp(1, 10);
-    final toBank = _sessionCoins - _banked;
+    await VaultProgressStore.addWalletCoins(bonus);
+    _banked += bonus;
     final saved = await VaultProgressStore.saveRun(
       gameId: g.id,
       level: _level >= 10 ? 10 : nextLevel,
       score: _score,
-      coinsEarned: toBank,
+      coinsEarned: 0,
     );
-    _banked = _sessionCoins;
     if (!mounted) return;
     setState(() {
       _savedLevel = saved.level;
@@ -610,7 +628,11 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   Future<void> _finishToHub() async {
     final pending = _sessionCoins - _banked;
     if (pending > 0) {
-      await VaultProgressStore.saveRun(gameId: g.id, level: _level, score: _score, coinsEarned: pending);
+      await VaultProgressStore.addWalletCoins(pending);
+      _banked = _sessionCoins;
+      await VaultProgressStore.saveRun(gameId: g.id, level: _level, score: _score, coinsEarned: 0);
+    } else if (pending < 0) {
+      // losses already spent from wallet during play
       _banked = _sessionCoins;
     }
     if (!mounted) return;
@@ -619,7 +641,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
 
   void _onType(String value) {
     if (!_playing) return;
-    if (g.engine != VaultEngine.typeRush) return;
+    if (g.engine != VaultEngine.wordMatch) return;
     if (_isRainLevel) {
       final typed = value.trim().toLowerCase();
       final idx = _falling.indexWhere((w) => w.text == typed);
@@ -693,7 +715,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
               child: Text(_feedback, textAlign: TextAlign.center, style: TextStyle(color: _feedbackColor, fontWeight: FontWeight.w800, fontSize: 13)),
             ),
-            if (g.engine == VaultEngine.typeRush && _playing)
+            if (g.engine == VaultEngine.wordMatch && _playing)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: TextField(
@@ -759,7 +781,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
 
   Widget _field() {
     switch (g.engine) {
-      case VaultEngine.typeRush:
+      case VaultEngine.wordMatch:
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Stack(
@@ -884,11 +906,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
                         if (_playing && !_levelClear) await _nextEcho();
                       }
                     } else {
-                      setState(() {
-                        _progress = 0;
-                        _feedback = 'WRONG ECHO';
-                        _feedbackColor = const Color(0xFFEF4444);
-                      });
+                      unawaited(_loseHit(coins: 3 + _level, msg: 'WRONG ECHO'));
                       await _nextEcho();
                     }
                   },

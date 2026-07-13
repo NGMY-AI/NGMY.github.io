@@ -4,9 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'ngmy_vault_game_school.dart';
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_sync.dart';
+import 'ngmy_vault_word_match.dart';
 
 /// Vault Channel arcade — offline tech games with local level progress.
 class NgmyVaultArcadeScreen extends StatefulWidget {
@@ -80,7 +80,14 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
 
   Future<void> _openGame(VaultGameDef game) async {
     HapticFeedback.selectionClick();
-    final page = game.id == 'vault_sync' ? const NgmyVaultSyncScreen() : NgmyVaultLeveledGameScreen(game: game);
+    final Widget page;
+    if (game.id == 'vault_sync') {
+      page = const NgmyVaultSyncScreen();
+    } else if (game.id == 'word_match') {
+      page = const NgmyVaultWordMatchScreen();
+    } else {
+      page = NgmyVaultLeveledGameScreen(game: game);
+    }
     final result = await Navigator.of(context).push<Object?>(
       PageRouteBuilder(
         opaque: true,
@@ -94,26 +101,26 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
     );
     await _loadProgress();
     final earned = result is VaultGameResult ? result.coinsEarned : 0;
-    if (earned > 0 && mounted) _playCoinFly(earned);
+    if (earned != 0 && mounted) _playCoinFly(earned);
   }
 
   void _playCoinFly(int amount) {
     final box = _coinKey.currentContext?.findRenderObject() as RenderBox?;
     final target = box?.localToGlobal(Offset(box.size.width / 2, box.size.height / 2)) ?? Offset(MediaQuery.sizeOf(context).width - 48, 56);
     final start = Offset(MediaQuery.sizeOf(context).width / 2, MediaQuery.sizeOf(context).height * 0.55);
+    final losing = amount < 0;
     setState(() {
       _flying
         ..clear()
-        ..addAll(List.generate(math.min(12, math.max(5, amount ~/ 3)), (i) {
+        ..addAll(List.generate(math.min(12, math.max(5, amount.abs() ~/ 3)), (i) {
           return _FlyingCoin(
             id: DateTime.now().microsecondsSinceEpoch + i,
-            start: start + Offset((_rng.nextDouble() - 0.5) * 80, (_rng.nextDouble() - 0.5) * 40),
-            end: target,
+            start: losing ? target : start + Offset((_rng.nextDouble() - 0.5) * 80, (_rng.nextDouble() - 0.5) * 40),
+            end: losing ? start : target,
             delay: i * 0.05,
           );
         }));
     });
-    // Count up after arcs land.
     Future<void>.delayed(const Duration(milliseconds: 720), () async {
       if (!mounted) return;
       final from = _displayCoins;
@@ -132,21 +139,6 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
   }
 
   final _rng = math.Random();
-
-  Future<void> _openGameSchool() async {
-    HapticFeedback.selectionClick();
-    await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: true,
-        transitionDuration: const Duration(milliseconds: 380),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
-        pageBuilder: (context, anim, secondary) => FadeTransition(
-          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-          child: const NgmyVaultGameSchoolScreen(),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -296,10 +288,6 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-            child: _GameSchoolBanner(glow: glow, onTap: _openGameSchool),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
@@ -630,63 +618,6 @@ class _FlyingCoinLayerState extends State<_FlyingCoinLayer> with SingleTickerPro
           ),
         );
       },
-    );
-  }
-}
-
-class _GameSchoolBanner extends StatelessWidget {
-  const _GameSchoolBanner({required this.glow, required this.onTap});
-  final double glow;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const colors = [Color(0xFFFBBF24), Color(0xFFA78BFA), Color(0xFF34D399)];
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [colors[0].withValues(alpha: 0.32), const Color(0xFF120B1E), colors[1].withValues(alpha: 0.30)],
-            ),
-            border: Border.all(color: colors[0].withValues(alpha: 0.5 + glow * 0.25), width: 1.4),
-            boxShadow: [BoxShadow(color: colors[0].withValues(alpha: 0.22 * glow), blurRadius: 26, offset: const Offset(0, 10))],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(colors: colors),
-                  boxShadow: [BoxShadow(color: colors[0].withValues(alpha: 0.5), blurRadius: 16)],
-                ),
-                child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('GAME SCHOOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 14)),
-                    SizedBox(height: 3),
-                    Text('Learn English, earn coins, unlock upgrades — a whole category of its own.', style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.3)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

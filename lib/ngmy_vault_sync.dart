@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_vault_games.dart';
+
 /// Vault Channel — addictive timing game: tap when rings sync, chase combo + high score.
 class NgmyVaultSyncScreen extends StatefulWidget {
   const NgmyVaultSyncScreen({super.key});
@@ -155,6 +157,7 @@ class _NgmyVaultSyncScreenState extends State<NgmyVaultSyncScreen> with TickerPr
       _feedbackColor = const Color(0xFFEF4444);
       _targetAngle = math.Random().nextDouble() * math.pi * 2;
     });
+    unawaited(VaultProgressStore.spendWalletCoins(4));
     if (lives <= 0) _endRun();
   }
 
@@ -162,9 +165,13 @@ class _NgmyVaultSyncScreenState extends State<NgmyVaultSyncScreen> with TickerPr
     final isNewBest = _score > _best;
     if (isNewBest) _best = _score;
     unawaited(_saveBest());
+    final reward = (_score ~/ 20).clamp(0, 80);
+    if (reward > 0) unawaited(VaultProgressStore.addWalletCoins(reward));
     setState(() {
       _playing = false;
-      _feedback = isNewBest ? 'NEW BEST · $_score' : 'Run over · $_score pts';
+      _feedback = isNewBest
+          ? 'NEW BEST · $_score · +$reward coins'
+          : (reward > 0 ? 'Run over · $_score · +$reward coins' : 'Run over · $_score pts');
       _feedbackColor = isNewBest ? const Color(0xFFFBBF24) : Colors.white70;
     });
     _spin
