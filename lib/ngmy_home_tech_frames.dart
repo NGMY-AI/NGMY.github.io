@@ -3,11 +3,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_vault_pulse.dart';
+import 'ngmy_vault_spark.dart';
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
 /// Tapping a frame opens a full-screen pulse / scan animation.
-/// Vault Channel opens the daily Vault Pulse ritual after its secure boot.
+/// Vault Channel opens Daily Spark after a short secure boot.
 
 class NgmyHomeTechFramesPanel extends StatefulWidget {
   const NgmyHomeTechFramesPanel({super.key});
@@ -46,7 +46,7 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           reverseTransitionDuration: const Duration(milliseconds: 320),
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            child: const NgmyVaultPulseScreen(),
+            child: const NgmyVaultSparkScreen(),
           ),
         ),
       );
@@ -189,7 +189,7 @@ class _TechFrameSpec {
   static const vault = _TechFrameSpec(
     kind: _TechKind.vault,
     title: 'VAULT CHANNEL',
-    subtitle: 'Daily pulse · seal your day',
+    subtitle: 'Daily spark · one-tap mood',
     badge: 'SECURE',
     colors: [Color(0xFFFBBF24), Color(0xFFF97316), Color(0xFFEF4444)],
     icon: Icons.shield_rounded,

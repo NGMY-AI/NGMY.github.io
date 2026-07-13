@@ -14282,35 +14282,12 @@ class NgmyAdminLiveRefresh {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
-  static const _kMainTabKeyPrefix = 'ngmy_main_tab_idx_v1_';
-
-  Future<void> _persistMainTabIndex(int idx) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('$_kMainTabKeyPrefix${widget.user.email.toLowerCase().trim()}', idx.clamp(0, 6));
-    } catch (_) {}
-  }
-
-  Future<void> _restoreMainTabIndex() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getInt('$_kMainTabKeyPrefix${widget.user.email.toLowerCase().trim()}');
-      if (saved == null || !mounted) return;
-      final next = saved.clamp(0, 6);
-      if (next == _idx) return;
-      setState(() {
-        _idx = next;
-        _visitedTabs.add(next);
-      });
-    } catch (_) {}
-  }
 
   void _goToMainTab(int i, {bool refreshLegal = false}) {
     setState(() {
       _idx = i;
       _visitedTabs.add(i);
     });
-    unawaited(_persistMainTabIndex(i));
     if (i == 0) {
       WidgetsBinding.instance.scheduleForcedFrame();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -14740,7 +14717,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       onDataChanged: widget.onDataChanged,
     );
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
-    unawaited(_restoreMainTabIndex());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
