@@ -14,7 +14,16 @@ Future<void> ngmyPrintCivicMemberReport({
   required String plainText,
   required String fileName,
 }) async {
+  final previousTitle = html.document.title;
+  final previousHash = html.window.location.hash;
   try {
+    html.document.title = 'NGMY.ORG';
+    // Prefer a clean site URL in browser print chrome (no #civic-registry-screen).
+    if (previousHash.isNotEmpty) {
+      try {
+        html.window.history.replaceState(null, 'NGMY.ORG', html.window.location.pathname + html.window.location.search);
+      } catch (_) {}
+    }
     final iframe = html.IFrameElement()
       ..style.position = 'fixed'
       ..style.right = '0'
@@ -36,9 +45,25 @@ Future<void> ngmyPrintCivicMemberReport({
     final win = iframe.contentWindow;
     if (win == null) {
       iframe.remove();
+      try {
+        html.document.title = previousTitle;
+      } catch (_) {}
+      if (previousHash.isNotEmpty) {
+        try {
+          html.window.history.replaceState(
+            null,
+            previousTitle,
+            html.window.location.pathname + html.window.location.search + previousHash,
+          );
+        } catch (_) {}
+      }
       await _openInNewTab(htmlContent, plainText, fileName);
       return;
     }
+    try {
+      final doc = js_util.getProperty(win, 'document');
+      js_util.setProperty(doc, 'title', 'NGMY.ORG');
+    } catch (_) {}
     // WindowBase doesn't expose focus()/print() in dart:html's typed API —
     // call through JS interop since the underlying object is a real Window.
     try {
@@ -56,8 +81,32 @@ Future<void> ngmyPrintCivicMemberReport({
       try {
         iframe.remove();
       } catch (_) {}
+      try {
+        html.document.title = previousTitle;
+      } catch (_) {}
+      if (previousHash.isNotEmpty) {
+        try {
+          html.window.history.replaceState(
+            null,
+            previousTitle,
+            html.window.location.pathname + html.window.location.search + previousHash,
+          );
+        } catch (_) {}
+      }
     });
   } catch (e) {
+    try {
+      html.document.title = previousTitle;
+    } catch (_) {}
+    if (previousHash.isNotEmpty) {
+      try {
+        html.window.history.replaceState(
+          null,
+          previousTitle,
+          html.window.location.pathname + html.window.location.search + previousHash,
+        );
+      } catch (_) {}
+    }
     await _openInNewTab(htmlContent, plainText, fileName);
   }
 }

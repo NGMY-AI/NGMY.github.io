@@ -10,7 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
+import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_registry_id_card.dart';
+import 'ngmy_civic_registry_members.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
@@ -1498,12 +1500,17 @@ class NgmyHomeGlassCardsPanel extends StatefulWidget {
     required this.userEmail,
     this.displayName,
     this.civicIdRecord,
+    this.config,
+    this.onCivicIdPhotoSaved,
   });
 
   final String userEmail;
   final String? displayName;
   /// Current user's Civic Registry ID record (if enrolled) for pinning to home.
   final Map<String, dynamic>? civicIdRecord;
+  /// App config used to save Civic Registry ID photo before pinning to home.
+  final dynamic config;
+  final Future<void> Function()? onCivicIdPhotoSaved;
 
   @override
   State<NgmyHomeGlassCardsPanel> createState() => _NgmyHomeGlassCardsPanelState();
@@ -1931,6 +1938,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 autoPlay: _autoPlay,
                 slideStyle: _slideStyle,
                 civicIdRecord: widget.civicIdRecord,
+                config: widget.config,
+                onCivicIdPhotoSaved: widget.onCivicIdPhotoSaved,
                 onDeckSettingsChanged: (auto, style) => _setDeckPrefs(autoPlay: auto, style: style),
               ),
             ),
@@ -3541,6 +3550,8 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
     required this.slideStyle,
     required this.onDeckSettingsChanged,
     this.civicIdRecord,
+    this.config,
+    this.onCivicIdPhotoSaved,
   });
 
   final String userEmail;
@@ -3548,6 +3559,8 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
   final NgmyHomeCardSlideStyle slideStyle;
   final Future<void> Function(bool autoPlay, NgmyHomeCardSlideStyle style) onDeckSettingsChanged;
   final Map<String, dynamic>? civicIdRecord;
+  final dynamic config;
+  final Future<void> Function()? onCivicIdPhotoSaved;
 
   @override
   State<_NgmyAddSpendingSheet> createState() => _NgmyAddSpendingSheetState();
@@ -3632,15 +3645,54 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
     });
   }
 
-  void _pickCivicId() {
-    final record = widget.civicIdRecord;
+  Future<void> _pickCivicId() async {
+    var record = widget.civicIdRecord == null ? null : Map<String, dynamic>.from(widget.civicIdRecord!);
     if (record == null || record.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No Civic Registry ID on this account yet.')),
+        const SnackBar(content: Text('No Civic Registry ID on this account yet. Enroll in Civic Registry first.')),
       );
       return;
     }
+    var photo = (record['idPhotoPath'] ?? '').toString().trim();
+    if (photo.isEmpty) {
+      if (widget.config == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add your Civic Registry ID photo first, then try again.')),
+        );
+        return;
+      }
+      await showNgmyCivicIdPhotoSheet(
+        context,
+        config: widget.config,
+        email: widget.userEmail,
+        skippable: false,
+        onSaved: () async {
+          await widget.onCivicIdPhotoSaved?.call();
+        },
+      );
+      if (!mounted) return;
+      final refreshed = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.userEmail) ??
+          NgmyCivicRegistryMembers.findByRegistryId(
+            widget.config,
+            (record['registryId'] ?? '').toString(),
+          );
+      if (refreshed == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not find your Civic Registry ID after saving the photo.')),
+        );
+        return;
+      }
+      record = Map<String, dynamic>.from(refreshed);
+      photo = (record['idPhotoPath'] ?? '').toString().trim();
+      if (photo.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Add an ID photo first, then you can pin your Civic Registry ID.')),
+        );
+        return;
+      }
+    }
     final name = (record['fullName'] ?? record['registryId'] ?? 'Civic Registry ID').toString().trim();
+    if (!mounted) return;
     Navigator.pop(context, {
       'kind': 'civic_id',
       'civicIdJson': jsonEncode(record),

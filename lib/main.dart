@@ -15769,6 +15769,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         NgmyHomeGlassCardsPanel(
                           userEmail: widget.user.email,
                           displayName: widget.user.username,
+                          config: widget.config,
+                          onCivicIdPhotoSaved: () async {
+                            final ok = await ngmyPersistCivicRegistryMembers(widget.config);
+                            if (mounted) setState(() {});
+                            if (!ok && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('ID photo saved on this device — will sync when online.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          },
                           civicIdRecord: () {
                             final u = widget.user;
                             final fromRegistry = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
@@ -30201,11 +30214,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>ngmy.org</title>
+<title>NGMY.ORG</title>
 <style>
   @page {
     size: letter;
-    margin: 14mm 12mm 16mm 12mm;
+    margin: 14mm 12mm 18mm 12mm;
   }
   html, body {
     font-family: Georgia, "Times New Roman", serif;
@@ -30292,9 +30305,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
   col.name { width: 22%; }
-  col.phone { width: 18%; }
-  col.address { width: 52%; }
-  col.family { width: 8%; }
+  col.phone { width: 17%; }
+  col.address { width: 48%; }
+  col.family { width: 13%; }
   th, td {
     border: 1px solid #ccc;
     padding: 6px 8px;
@@ -30314,23 +30327,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     font-weight: 700;
   }
   th.family, td.family { text-align: center; }
-  .doc-footer {
-    margin-top: 18px;
-    text-align: center;
-    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #111;
+  th.family {
+    white-space: normal;
+    font-size: 10px;
+    line-height: 1.15;
+    padding: 6px 4px;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .print-site-mark {
+    display: none;
   }
   @media print {
-    .sheet { padding: 0 0 20px; }
+    .sheet { padding: 0 0 22px; }
     .masthead { margin-bottom: 12px; }
-    .doc-footer {
+    .print-site-mark {
+      display: block;
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      right: 12mm;
+      bottom: 6mm;
+      left: auto;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #111;
     }
   }
 </style>
@@ -30372,9 +30395,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       $rows
     </tbody>
   </table>
-  <div class="doc-footer">ngmy.org</div>
   </div>
+  <div class="print-site-mark">NGMY.ORG</div>
   <script>
+    try { document.title = 'NGMY.ORG'; } catch (e) {}
     window.addEventListener('load', function () {
       setTimeout(function () {
         try { window.focus(); } catch (e) {}
@@ -30394,7 +30418,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Print dialog opened for $state (${members.length} members).'), backgroundColor: Colors.green),
+      SnackBar(
+        content: Text(
+          'Print dialog opened for $state (${members.length} members). Turn off Headers and footers so date/URL do not print — NGMY.ORG is already at the bottom.',
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 6),
+      ),
     );
   }
 

@@ -94,10 +94,15 @@ Future<void> showNgmyCivicIdPhotoSheet(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Add your ID photo', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text(
+                      skippable ? 'Add your ID photo' : 'Add your ID photo first',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                    ),
                     const SizedBox(height: 8),
                     Text(
-                      'Optional — upload a portrait for your Civic Registry ID or passport card. You can skip and add one later from the ID icon.',
+                      skippable
+                          ? 'Optional — upload a portrait for your Civic Registry ID or passport card. You can skip and add one later from the ID icon.'
+                          : 'Upload a portrait photo for your Civic Registry ID before adding it to Home.',
                       style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                     ),
                     const SizedBox(height: 16),
