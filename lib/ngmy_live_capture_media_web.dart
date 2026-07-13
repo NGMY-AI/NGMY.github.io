@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
@@ -10,6 +12,26 @@ String ngmyCleanMediaMime(String mime) {
     return base;
   }
   return 'application/octet-stream';
+}
+
+Uint8List? _decodeDataUrlBytes(String dataUrl) {
+  try {
+    final comma = dataUrl.indexOf(',');
+    if (comma < 0) return base64Decode(dataUrl);
+    final header = dataUrl.substring(0, comma).toLowerCase();
+    final payload = dataUrl.substring(comma + 1);
+    if (header.contains(';base64')) {
+      var cleaned = payload.replaceAll(RegExp(r'\s'), '');
+      cleaned = cleaned.replaceAll('-', '+').replaceAll('_', '/');
+      final pad = cleaned.length % 4;
+      if (pad > 0) cleaned = cleaned.padRight(cleaned.length + (4 - pad), '=');
+      return base64Decode(cleaned);
+    }
+    return Uint8List.fromList(Uri.decodeComponent(payload).codeUnits);
+  } catch (e) {
+    debugPrint('[live_capture] decode dataUrl: $e');
+    return null;
+  }
 }
 
 class NgmyLiveCaptureMedia {
@@ -42,15 +64,21 @@ class NgmyLiveCaptureMedia {
       final playUrl = toPlayableUrl(src, mime);
       final html.MediaElement el = video
           ? (html.VideoElement()
-            ..src = playUrl
-            ..preload = 'auto'
             ..controls = false
+            ..preload = 'auto'
             ..setAttribute('playsinline', 'true')
             ..setAttribute('webkit-playsinline', 'true'))
           : (html.AudioElement()
-            ..src = playUrl
             ..preload = 'auto'
             ..controls = false);
+      try {
+        el.children.clear();
+        el.append(html.SourceElement()
+          ..src = playUrl
+          ..type = mime);
+      } catch (_) {
+        el.src = playUrl;
+      }
       el.style
         ..position = 'fixed'
         ..left = '-10000px'
@@ -62,18 +90,17 @@ class NgmyLiveCaptureMedia {
       html.document.body?.append(el);
       el.load();
       try {
-        await el.onLoadedMetadata.first.timeout(const Duration(seconds: 10));
+        await el.onLoadedMetadata.first.timeout(const Duration(seconds: 12));
       } catch (_) {}
-      // Probe whether the browser can actually decode this blob.
       try {
         el.muted = true;
         await el.play();
         el.pause();
         el.currentTime = 0;
         el.muted = false;
+        el.volume = 1;
       } catch (e) {
         debugPrint('[live_capture] probe play: $e');
-        // Still return player — UI may rely on native <audio>/<video> controls instead.
       }
       return NgmyCapturePlayer._(el, objectUrl: playUrl.startsWith('blob:') ? playUrl : null);
     } catch (e) {
@@ -84,10 +111,7 @@ class NgmyLiveCaptureMedia {
 
   static bool get _isIOSSafari {
     final ua = html.window.navigator.userAgent.toLowerCase();
-    final isIOS = ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod');
-    // iOS WebKit backs every browser there (Chrome/Firefox on iOS are Safari
-    // under the hood), so any iOS UA is enough — no need to also match "safari".
-    return isIOS;
+    return ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod');
   }
 
   static void downloadSync(String dataUrl, String mimeType, String title) {
@@ -96,9 +120,6 @@ class NgmyLiveCaptureMedia {
       final objectUrl = dataUrl.startsWith('blob:')
           ? dataUrl
           : html.Url.createObjectUrlFromBlob(dataUrlToBlob(dataUrl, clean));
-      // iOS Safari does not reliably honor the `download` attribute on blob
-      // URLs — it just silently does nothing. Opening the blob in a new tab
-      // instead lets the user use the native Share sheet to save it.
       if (_isIOSSafari) {
         html.window.open(objectUrl, '_blank');
         return;
@@ -131,12 +152,13 @@ class NgmyLiveCaptureMedia {
   static html.Blob dataUrlToBlob(String dataUrl, String mimeType) {
     final comma = dataUrl.indexOf(',');
     final header = comma >= 0 ? dataUrl.substring(0, comma) : '';
-    final b64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
     final mimeMatch = RegExp(r'data:([^;,]+)').firstMatch(header);
     final mime = ngmyCleanMediaMime(mimeMatch?.group(1) ?? mimeType);
-    final bytes = html.window.atob(b64);
-    final buffer = List<int>.generate(bytes.length, (i) => bytes.codeUnitAt(i) & 0xff);
-    return html.Blob([buffer], mime);
+    final bytes = _decodeDataUrlBytes(dataUrl);
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Could not decode capture data URL');
+    }
+    return html.Blob([bytes], mime);
   }
 
   static String _extFor(String mime) {
@@ -150,7 +172,6 @@ class NgmyLiveCaptureMedia {
   }
 }
 
-/// Camera preview that does NOT recreate the platform view every Flutter rebuild.
 class _StableCameraPreview extends StatefulWidget {
   const _StableCameraPreview({required this.stream, required this.height, this.mirror = true});
   final Object? stream;
@@ -256,24 +277,37 @@ class _StableMediaPlayback extends StatefulWidget {
 class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
   late final String _viewType;
   late final String _blobUrl;
+  late final String _mime;
   bool _registered = false;
+  NgmyCapturePlayer? _player;
+  bool _playing = false;
+  String? _playError;
 
   @override
   void initState() {
     super.initState();
-    final mime = ngmyCleanMediaMime(widget.mimeType);
-    _blobUrl = NgmyLiveCaptureMedia.toPlayableUrl(widget.src, mime);
+    _mime = ngmyCleanMediaMime(widget.mimeType);
+    _blobUrl = NgmyLiveCaptureMedia.toPlayableUrl(widget.src, _mime);
     _viewType = 'ngmy-play-${widget.video ? 'v' : 'a'}-${_blobUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
-    _register(mime);
+    _register();
+    unawaited(_bootPlayer());
   }
 
-  void _register(String mime) {
+  Future<void> _bootPlayer() async {
+    final p = await NgmyLiveCaptureMedia.createPlayer(widget.src, video: widget.video, mimeType: _mime);
+    if (!mounted) {
+      p?.dispose();
+      return;
+    }
+    setState(() => _player = p);
+  }
+
+  void _register() {
     if (_registered) return;
     _registered = true;
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
       if (widget.video) {
         final v = html.VideoElement()
-          ..src = _blobUrl
           ..controls = true
           ..preload = 'auto'
           ..setAttribute('playsinline', 'true')
@@ -284,27 +318,64 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
           ..style.objectFit = 'contain'
           ..style.backgroundColor = '#000'
           ..style.borderRadius = '16px';
+        try {
+          v.append(html.SourceElement()
+            ..src = _blobUrl
+            ..type = _mime);
+        } catch (_) {
+          v.src = _blobUrl;
+        }
         v.load();
         return v;
       }
       final a = html.AudioElement()
-        ..src = _blobUrl
         ..controls = true
         ..preload = 'auto'
         ..style.width = '100%'
-        ..style.height = '40px'
+        ..style.height = '44px'
         ..style.outline = 'none';
+      try {
+        a.append(html.SourceElement()
+          ..src = _blobUrl
+          ..type = _mime);
+      } catch (_) {
+        a.src = _blobUrl;
+      }
       a.load();
       return a;
     });
   }
 
+  Future<void> _togglePlay() async {
+    final p = _player;
+    if (p == null) {
+      setState(() => _playError = 'Player is still loading… tap again in a moment.');
+      return;
+    }
+    try {
+      if (_playing) {
+        await p.pause();
+        if (mounted) setState(() => _playing = false);
+      } else {
+        await p.play();
+        if (mounted) {
+          setState(() {
+            _playing = true;
+            _playError = p.lastError;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _playError = 'Could not play. Use the native controls above.');
+    }
+  }
+
   @override
   void dispose() {
-    // Keep blob URL alive while sheet is open; revoke after a delay so seeking still works.
+    _player?.dispose();
     final url = _blobUrl;
     if (url.startsWith('blob:')) {
-      Timer(const Duration(seconds: 30), () {
+      Timer(const Duration(seconds: 45), () {
         try {
           html.Url.revokeObjectUrl(url);
         } catch (_) {}
@@ -315,16 +386,37 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(widget.video ? 16 : 12),
-      child: ColoredBox(
-        color: const Color(0xFF0F172A),
-        child: SizedBox(
-          height: widget.height,
-          width: double.infinity,
-          child: HtmlElementView(viewType: _viewType),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(widget.video ? 16 : 12),
+          child: ColoredBox(
+            color: const Color(0xFF0F172A),
+            child: SizedBox(
+              height: widget.height,
+              width: double.infinity,
+              child: HtmlElementView(viewType: _viewType),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 10),
+        FilledButton.icon(
+          onPressed: _togglePlay,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF2563EB),
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(44),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          label: Text(_playing ? 'Pause' : 'Play', style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
+        if (_playError != null) ...[
+          const SizedBox(height: 6),
+          Text(_playError!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 11)),
+        ],
+      ],
     );
   }
 }
@@ -375,9 +467,10 @@ class NgmyCapturePlayer {
       await _media.play();
       _emit();
     } catch (e) {
-      lastError = 'Use the player bar above to play this capture.';
+      lastError = 'Tap Play again, or use the player bar above.';
       debugPrint('[live_capture] play: $e');
       _emit();
+      rethrow;
     }
   }
 

@@ -611,6 +611,36 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     );
   }
 
+  /// Soft rounded inner cells for family size (no sharp Material fill corners).
+  Widget _familySoftField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        color: Colors.white.withValues(alpha: 0.08),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 13),
+          floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+
   InputDecoration _dec(String label) => InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600),
@@ -950,58 +980,37 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 const SizedBox(height: 12),
                 _glassField(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
                           'Ukubwa wa familia',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.72),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        TextField(
+                        const SizedBox(height: 12),
+                        _familySoftField(
                           controller: _familyMembersC,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          decoration: _dec('Jumla (idadi ya watu)').copyWith(
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.06),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
+                          label: 'Jumla (idadi ya watu)',
                         ),
                         const SizedBox(height: 10),
                         Row(
                           children: [
                             Expanded(
-                              child: TextField(
+                              child: _familySoftField(
                                 controller: _familyMalesC,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                decoration: _dec('Wanaume (M)').copyWith(
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(alpha: 0.06),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
+                                label: 'Wanaume (M)',
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: TextField(
+                              child: _familySoftField(
                                 controller: _familyFemalesC,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                decoration: _dec('Wanawake (F)').copyWith(
-                                  filled: true,
-                                  fillColor: Colors.white.withValues(alpha: 0.06),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                ),
+                                label: 'Wanawake (F)',
                               ),
                             ),
                           ],

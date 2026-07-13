@@ -30205,9 +30205,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final familyLabel = (males > 0 || females > 0) ? '$family ($males M / $females F)' : '$family';
       rows.writeln('''
       <tr>
-        <td>${_escapeHtml(name.isEmpty ? '—' : name)}</td>
+        <td class="name">${_escapeHtml(name.isEmpty ? '—' : name)}</td>
         <td class="phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
-        <td>${_escapeHtml(address.isEmpty ? '—' : address)}</td>
+        <td class="address">${_escapeHtml(address.isEmpty ? '—' : address)}</td>
         <td class="family">${_escapeHtml(familyLabel)}</td>
       </tr>''');
     }
@@ -30316,34 +30316,48 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
-  col.name { width: 24%; }
-  col.phone { width: 22%; }
-  col.address { width: 40%; }
+  col.name { width: 22%; }
+  col.phone { width: 15%; }
+  col.address { width: 49%; }
   col.family { width: 14%; }
   th, td {
     border: 1px solid #ccc;
-    padding: 5px 7px;
-    font-size: 12px;
+    padding: 4px 6px;
+    font-size: 11px;
     font-weight: 400;
     vertical-align: middle;
-    height: 26px;
-    line-height: 1.2;
+    min-height: 22px;
+    height: auto;
+    line-height: 1.25;
+  }
+  td.name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   td.phone {
+    white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
-    font-size: 11px;
+    font-size: 10px;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
+  }
+  td.address {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-size: 10px;
+    line-height: 1.3;
   }
   th {
     background: #f3f4f6;
     text-align: left;
     font-size: 11px;
     font-weight: 700;
+    white-space: nowrap;
   }
   th.family, td.family { text-align: center; white-space: normal; font-size: 10px; line-height: 1.15; }
   th.family {

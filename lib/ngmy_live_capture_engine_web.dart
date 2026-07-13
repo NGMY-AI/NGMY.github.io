@@ -44,6 +44,17 @@ class NgmyLiveCaptureEngine {
     try {
       _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
       _ensureTracksLive(_stream!);
+      if (!_hasLiveTrack(_stream!, audio: true) && !video) {
+        lastError = 'Microphone track is not active. Allow mic access for ngmy.org and try again.';
+        await dispose();
+        return false;
+      }
+      if (video && !_hasLiveTrack(_stream!, audio: false)) {
+        lastError = 'Camera track is not active. Allow camera access for ngmy.org and try again.';
+        await dispose();
+        return false;
+      }
+
       _mime = _pickMime(video: video);
       _chunks.clear();
 
@@ -57,47 +68,31 @@ class NgmyLiveCaptureEngine {
       try {
         final mt = recorder.mimeType;
         if (mt != null && mt.trim().isNotEmpty) {
-          _mime = ngmyCleanMediaMime(mt);
+          _mime = mt.trim();
         }
-      } catch (_) {
-        _mime = ngmyCleanMediaMime(_mime);
-      }
+      } catch (_) {}
 
-      // Prefer EventTarget listeners — dart:html MediaRecorder stream getters
-      // are not available on every Flutter/Dart web SDK version.
       _dataSub = html.EventStreamProvider<html.Event>('dataavailable').forTarget(recorder).listen((html.Event e) {
-        try {
-          final data = (e as html.BlobEvent).data;
-          if (data != null && data.size > 0) {
-            _chunks.add(data);
-            debugPrint('[live_capture] chunk +${data.size}b (total ${_chunks.length})');
-          }
-        } catch (err) {
-          try {
-            final dynamic raw = e;
-            final dynamic data = raw.data;
-            if (data != null && data.size > 0) {
-              _chunks.add(data as html.Blob);
-            }
-          } catch (err2) {
-            debugPrint('[live_capture] dataavailable parse: $err / $err2');
-          }
-        }
+        _ingestChunk(e);
       });
       _errorSub = html.EventStreamProvider<html.Event>('error').forTarget(recorder).listen((html.Event e) {
         lastError = 'Recorder error while capturing.';
         debugPrint('[live_capture] recorder error: $e');
       });
 
-      // No timeslice — one final blob on stop is most reliable on Safari/iOS.
-      recorder.start();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Timeslice keeps chunks flowing — empty captures usually mean stop fired with no dataavailable.
+      try {
+        recorder.start(1000);
+      } catch (_) {
+        recorder.start();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
       if (recorder.state != 'recording') {
         lastError = 'Recorder did not enter recording state (state=${recorder.state}).';
         await dispose();
         return false;
       }
-      debugPrint('[live_capture] recording started mime=$_mime video=$_video');
+      debugPrint('[live_capture] recording started mime=$_mime video=$_video tracks=${_stream!.getTracks().length}');
       return true;
     } catch (e) {
       lastError = _describeStartError(e);
@@ -105,6 +100,40 @@ class NgmyLiveCaptureEngine {
       await dispose();
       return false;
     }
+  }
+
+  void _ingestChunk(html.Event e) {
+    try {
+      final data = (e as html.BlobEvent).data;
+      if (data != null && data.size > 0) {
+        _chunks.add(data);
+        debugPrint('[live_capture] chunk +${data.size}b (total ${_chunks.length})');
+        return;
+      }
+    } catch (_) {}
+    try {
+      final dynamic raw = e;
+      final dynamic data = raw.data;
+      if (data != null && data.size > 0) {
+        _chunks.add(data as html.Blob);
+        debugPrint('[live_capture] chunk(dyn) +${data.size}b (total ${_chunks.length})');
+      }
+    } catch (err) {
+      debugPrint('[live_capture] dataavailable parse: $err');
+    }
+  }
+
+  bool _hasLiveTrack(html.MediaStream stream, {required bool audio}) {
+    final tracks = audio ? stream.getAudioTracks() : stream.getVideoTracks();
+    return tracks.any((t) {
+      try {
+        final enabled = t.enabled == true;
+        final live = t.readyState == 'live';
+        return enabled && live;
+      } catch (_) {
+        return t.enabled == true;
+      }
+    });
   }
 
   Future<html.MediaStream> _openStream({
@@ -118,17 +147,31 @@ class NgmyLiveCaptureEngine {
     }
 
     if (!video) {
-      try {
-        return await devices.getUserMedia({'audio': true, 'video': false});
-      } catch (_) {
-        return await devices.getUserMedia({
+      final audioAttempts = <Map<String, dynamic>>[
+        {'audio': true, 'video': false},
+        {
           'audio': {
             'echoCancellation': true,
             'noiseSuppression': true,
+            'autoGainControl': true,
           },
           'video': false,
-        });
+        },
+        {
+          'audio': {'ideal': true},
+          'video': false,
+        },
+      ];
+      Object? lastErr;
+      for (final c in audioAttempts) {
+        try {
+          return await devices.getUserMedia(c);
+        } catch (e) {
+          lastErr = e;
+          debugPrint('[live_capture] getUserMedia audio failed: $e');
+        }
       }
+      throw lastErr ?? StateError('Could not open microphone');
     }
 
     final facing = facingMode == 'environment' ? 'environment' : 'user';
@@ -233,11 +276,11 @@ class NgmyLiveCaptureEngine {
   String _pickMime({required bool video}) {
     final candidates = _isAppleWebKit
         ? (video
-            ? <String>['video/mp4', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm', 'video/webm;codecs=vp8,opus']
-            : <String>['audio/mp4', 'audio/aac', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/webm;codecs=opus'])
+            ? <String>['video/mp4', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/webm']
+            : <String>['audio/mp4', 'audio/aac', 'audio/mpeg', 'audio/wav', 'audio/webm;codecs=opus', 'audio/webm'])
         : (video
             ? <String>['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
-            : <String>['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4']);
+            : <String>['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4']);
     for (final m in candidates) {
       try {
         if (html.MediaRecorder.isTypeSupported(m)) return m;
@@ -259,13 +302,14 @@ class NgmyLiveCaptureEngine {
       if (!stopDone.isCompleted) stopDone.complete();
     });
 
+    // Keep tracks alive until stop finishes — killing them early can drop the final chunk.
     try {
       final state = recorder.state;
       if (state == 'recording' || state == 'paused') {
         try {
           recorder.requestData();
         } catch (_) {}
-        await Future<void>.delayed(const Duration(milliseconds: 60));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
         recorder.stop();
       } else if (!stopDone.isCompleted) {
         stopDone.complete();
@@ -277,40 +321,44 @@ class NgmyLiveCaptureEngine {
     }
 
     try {
-      await stopDone.future.timeout(const Duration(seconds: 10));
+      await stopDone.future.timeout(const Duration(seconds: 12));
     } catch (_) {
       debugPrint('[live_capture] stop event timeout — using buffered chunks');
     }
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    // Allow a late final dataavailable after stop.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     try {
       await stopSub.cancel();
     } catch (_) {}
 
-    final cleanMime = ngmyCleanMediaMime(
-      _mime.isEmpty ? (recorder.mimeType ?? (_video ? 'video/webm' : 'audio/webm')) : _mime,
-    );
+    final blobMime = (_mime.trim().isNotEmpty
+            ? _mime
+            : (recorder.mimeType ?? (_video ? 'video/webm' : 'audio/webm')))
+        .trim();
+    final cleanMime = ngmyCleanMediaMime(blobMime);
 
     await _cancelSubs();
+    // Release hardware only after chunks are collected.
     await _releaseStream();
     _recorder = null;
 
     if (_chunks.isEmpty) {
       lastError =
-          'No audio/video data was captured. Make sure the mic/camera permission is allowed, keep this tab open while recording, and try again.';
+          'No audio/video data was captured. Make sure the mic/camera permission is allowed, keep this tab open while recording, speak for a second, then stop.';
       debugPrint('[live_capture] empty chunks after stop');
       return null;
     }
 
-    final blob = html.Blob(List<html.Blob>.from(_chunks), cleanMime);
+    final blob = html.Blob(List<html.Blob>.from(_chunks), blobMime);
     if (blob.size <= 0) {
       lastError = 'No audio/video data was captured.';
       return null;
     }
-    debugPrint('[live_capture] blob ready size=${blob.size} mime=$cleanMime chunks=${_chunks.length}');
+    debugPrint('[live_capture] blob ready size=${blob.size} mime=$blobMime chunks=${_chunks.length}');
 
     String dataUrl;
     try {
-      dataUrl = await _blobToDataUrl(blob).timeout(const Duration(seconds: 60));
+      dataUrl = await _blobToDataUrl(blob).timeout(const Duration(seconds: 90));
     } catch (e) {
       debugPrint('[live_capture] dataUrl convert failed, using object URL: $e');
       dataUrl = html.Url.createObjectUrlFromBlob(blob);
