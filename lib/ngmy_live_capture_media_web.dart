@@ -13,8 +13,8 @@ String ngmyCleanMediaMime(String mime) {
 }
 
 class NgmyLiveCaptureMedia {
-  static Widget liveCameraPreview({required Object? stream, double height = 200}) {
-    return _StableCameraPreview(stream: stream, height: height);
+  static Widget liveCameraPreview({required Object? stream, double height = 200, bool mirror = true}) {
+    return _StableCameraPreview(stream: stream, height: height, mirror: mirror);
   }
 
   static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
@@ -152,9 +152,10 @@ class NgmyLiveCaptureMedia {
 
 /// Camera preview that does NOT recreate the platform view every Flutter rebuild.
 class _StableCameraPreview extends StatefulWidget {
-  const _StableCameraPreview({required this.stream, required this.height});
+  const _StableCameraPreview({required this.stream, required this.height, this.mirror = true});
   final Object? stream;
   final double height;
+  final bool mirror;
 
   @override
   State<_StableCameraPreview> createState() => _StableCameraPreviewState();
@@ -189,7 +190,7 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
         ..style.height = '100%'
         ..style.objectFit = 'cover'
         ..style.backgroundColor = '#000'
-        ..style.transform = 'scaleX(-1)';
+        ..style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
       if (widget.stream is html.MediaStream) {
         v.srcObject = widget.stream as html.MediaStream;
       }
@@ -207,6 +208,9 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
     if (oldWidget.stream != widget.stream && _video != null && widget.stream is html.MediaStream) {
       _video!.srcObject = widget.stream as html.MediaStream;
       unawaited(_video!.play().catchError((_) {}));
+    }
+    if (oldWidget.mirror != widget.mirror && _video != null) {
+      _video!.style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
     }
   }
 

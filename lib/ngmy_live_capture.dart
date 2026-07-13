@@ -150,6 +150,10 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   String? lastError;
   String? lastStatus;
   bool videoMode = false;
+  /// `user` = front / selfie, `environment` = back camera.
+  String facingMode = 'user';
+  /// `youtube` = 16:9, `tiktok` = 9:16 vertical, `square` = 1:1.
+  String aspect = 'youtube';
   bool recording = false;
   int elapsedSec = 0;
 
@@ -158,7 +162,11 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   Future<bool> start({required String userEmail, required bool video}) async {
     lastError = null;
     lastStatus = null;
-    final ok = await _engine.start(video: video);
+    final ok = await _engine.start(
+      video: video,
+      facingMode: facingMode,
+      aspect: aspect,
+    );
     if (!ok) {
       lastError = _engine.lastError ?? 'Could not start recording on this device.';
       notifyListeners();
@@ -402,14 +410,44 @@ class _NgmyLiveCaptureScreenState extends State<NgmyLiveCaptureScreen> with Tick
                                   ),
                                 ],
                               ),
+                              if (_session.videoMode && !recording) ...[
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    _modeChip('Front', _session.facingMode == 'user', () {
+                                      setState(() => _session.facingMode = 'user');
+                                    }),
+                                    const SizedBox(width: 8),
+                                    _modeChip('Back', _session.facingMode == 'environment', () {
+                                      setState(() => _session.facingMode = 'environment');
+                                    }),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    _modeChip('YouTube', _session.aspect == 'youtube', () {
+                                      setState(() => _session.aspect = 'youtube');
+                                    }),
+                                    const SizedBox(width: 8),
+                                    _modeChip('TikTok', _session.aspect == 'tiktok', () {
+                                      setState(() => _session.aspect = 'tiktok');
+                                    }),
+                                    const SizedBox(width: 8),
+                                    _modeChip('Square', _session.aspect == 'square', () {
+                                      setState(() => _session.aspect = 'square');
+                                    }),
+                                  ],
+                                ),
+                              ],
                               if (recording && _session.videoMode) ...[
                                 const SizedBox(height: 14),
-                                // Keep outside pulse rebuild identity with a stable key.
                                 KeyedSubtree(
                                   key: ValueKey('cam-${identityHashCode(_session.previewStream)}'),
                                   child: NgmyLiveCaptureMedia.liveCameraPreview(
                                     stream: _session.previewStream,
-                                    height: 220,
+                                    height: _session.aspect == 'tiktok' ? 280 : 220,
+                                    mirror: _session.facingMode == 'user',
                                   ),
                                 ),
                               ] else if (recording && !_session.videoMode) ...[
@@ -420,10 +458,12 @@ class _NgmyLiveCaptureScreenState extends State<NgmyLiveCaptureScreen> with Tick
                               if (recording)
                                 const Text('LIVE · BACKGROUND SAFE', style: TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w900, letterSpacing: 1.2))
                               else
-                                const Text(
-                                  'Record voice or video. Preview while filming, then play and edit like Voice Memos.',
+                                Text(
+                                  _session.videoMode
+                                      ? 'Pick front/back camera and YouTube or TikTok size, then record. Play it back after you stop.'
+                                      : 'Record voice clearly. Play and download after you stop & save.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
+                                  style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                                 ),
                               const SizedBox(height: 16),
                               Row(

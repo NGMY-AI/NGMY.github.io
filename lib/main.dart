@@ -30124,97 +30124,129 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    final title = "EMO'YA M'BEMBE M'MBOND0 · $state";
+    final titleLine1 = "EMO'YA M'BEMBE";
+    final titleLine2 = "M'MBONDO · $state";
+    final title = '$titleLine1 $titleLine2';
 
     final html = '''
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>$title</title>
 <style>
-  @page { size: letter; margin: 14mm 12mm; }
-  html, body {
-    margin: 0;
-    padding: 0;
+  @page { margin: 16mm 12mm; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
     color: #111;
+    margin: 0;
+    padding: 16px 18px 26px;
     background: #fff;
-    font-family: Arial, Helvetica, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: geometricPrecision;
-    -webkit-text-size-adjust: 100%;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
   }
-  * {
-    box-sizing: border-box;
-    transform: none !important;
-    filter: none !important;
-    text-shadow: none !important;
-    -webkit-filter: none !important;
-  }
-  .sheet { padding: 12px 10px 18px; }
   .masthead {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
     align-items: end;
-    gap: 10px;
-    padding-bottom: 12px;
-    margin-bottom: 14px;
-    border-bottom: 2.5px solid #0f172a;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    border-bottom: 2px solid #111;
   }
-  .stamp { justify-self: start; text-align: left; line-height: 1.15; }
-  .stamp .date { font-size: 14px; font-weight: 800; letter-spacing: 0.03em; color: #0f172a; }
-  .stamp .time { margin-top: 3px; font-size: 12px; font-weight: 700; color: #475569; }
-  .header { justify-self: center; text-align: center; max-width: 520px; }
+  .stamp {
+    justify-self: start;
+    text-align: left;
+    line-height: 1.25;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  .stamp .date {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #111;
+    white-space: nowrap;
+  }
+  .stamp .time {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    white-space: nowrap;
+  }
+  .header {
+    justify-self: center;
+    text-align: center;
+    max-width: 520px;
+  }
   .header h1 {
     margin: 0;
     font-size: 28px;
     font-weight: 800;
-    letter-spacing: 0.03em;
-    line-height: 1.2;
-    border-bottom: 2.5px solid #0f172a;
-    display: inline-block;
-    padding-bottom: 4px;
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 7px;
   }
-  .members-chip { justify-self: end; align-self: start; text-align: right; min-width: 96px; }
+  .header h1 .line2 {
+    display: block;
+  }
+  .members-chip {
+    justify-self: end;
+    align-self: start;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    text-align: right;
+    min-width: 96px;
+  }
   .members-chip .label {
-    font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #666;
   }
-  .members-chip .value { margin-top: 3px; font-size: 20px; font-weight: 900; color: #0f172a; line-height: 1; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .members-chip .value {
+    margin-top: 4px;
+    font-size: 22px;
+    font-weight: 900;
+    color: #111;
+    line-height: 1;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
   th, td {
-    border: 1px solid #94a3b8;
-    padding: 8px 7px;
-    font-size: 12px;
+    border: 1px solid #ccc;
+    padding: 10px 8px;
+    font-size: 13px;
     vertical-align: top;
-    word-wrap: break-word;
+    font-weight: 400;
   }
   th {
-    background: #f1f5f9;
+    background: #f3f4f6;
     text-align: left;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 700;
   }
-  th:last-child, td:last-child { text-align: center; width: 84px; }
+  th:last-child, td:last-child { text-align: center; width: 88px; }
   @media print {
-    html, body { width: auto; height: auto; zoom: 1; }
-    .sheet { padding: 0; }
-    .masthead { margin-bottom: 10px; }
+    body { padding: 0; }
+    .masthead { margin-bottom: 14px; }
   }
 </style>
 </head>
 <body>
-  <div class="sheet">
   <div class="masthead">
     <div class="stamp">
       <div class="date">${_escapeHtml(dateStr)}</div>
       <div class="time">${_escapeHtml(timeStr)}</div>
     </div>
     <div class="header">
-      <h1>${_escapeHtml(title)}</h1>
+      <h1>
+        <span class="line1">${_escapeHtml(titleLine1)}</span>
+        <span class="line2">${_escapeHtml(titleLine2)}</span>
+      </h1>
     </div>
     <div class="members-chip">
       <div class="label">Members</div>
@@ -30234,7 +30266,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       $rows
     </tbody>
   </table>
-  </div>
   <script>
     window.addEventListener('load', function () {
       setTimeout(function () {
