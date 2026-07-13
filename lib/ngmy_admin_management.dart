@@ -893,6 +893,7 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(AppConfig config, Lis
 }
 
 Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {
+  // Deploy stamp: keep enroll + print roster fixes published to ngmy.org.
   ngmyAdminConfigMutationAt = DateTime.now();
   NgmyAdminLiveRefresh.notify();
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
