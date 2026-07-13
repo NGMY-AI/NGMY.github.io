@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum VaultEngine { wordMatch, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell }
+enum VaultEngine { wordMatch, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell, circuitPulse }
 
 class VaultGameDef {
   const VaultGameDef({
@@ -100,6 +100,16 @@ const kVaultGames = <VaultGameDef>[
     engine: VaultEngine.gravityWell,
     colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
     icon: Icons.blur_circular_rounded,
+  ),
+  VaultGameDef(
+    id: 'circuit_pulse',
+    title: 'Circuit Pulse',
+    shortTitle: 'Circuit Pulse',
+    tagline: 'Tap charged nodes before they fade.',
+    techLabel: 'CIRCUIT',
+    engine: VaultEngine.circuitPulse,
+    colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
+    icon: Icons.grid_view_rounded,
   ),
 ];
 
@@ -297,6 +307,7 @@ class NgmyVaultLeveledGameScreen extends StatefulWidget {
 
 class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen> with TickerProviderStateMixin {
   late final AnimationController _tick;
+  late final AnimationController _ambient;
   final _rng = math.Random();
   final _typeCtrl = TextEditingController();
   final _typeFocus = FocusNode();
@@ -322,10 +333,11 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   final List<_RivalSnake> _rivals = [];
   Offset _aim = const Offset(0, -1);
   Offset? _food;
-  double _snakeSpeed = 2.4;
+  double _snakeSpeed = 1.55;
 
   // orbs
   final List<_Orb> _orbs = [];
+  double _fxT = 0;
 
   // lane
   double _carX = 0.5;
@@ -343,6 +355,10 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   bool _dragging = false;
   Offset _well = const Offset(0.5, 0.28);
 
+  // circuit
+  final List<_CircuitNode> _nodes = [];
+  double _circuitSpawn = 0;
+
   VaultGameDef get g => widget.game;
   List<Color> get colors => g.colors;
   bool get _isRainLevel => g.engine == VaultEngine.wordMatch && _level % 2 == 0;
@@ -351,6 +367,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   void initState() {
     super.initState();
     _tick = AnimationController(vsync: this, duration: const Duration(milliseconds: 16))..addListener(_frame);
+    _ambient = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
     unawaited(_load());
   }
 
@@ -358,6 +375,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   void dispose() {
     _spawnTimer?.cancel();
     _tick.dispose();
+    _ambient.dispose();
     _typeCtrl.dispose();
     _typeFocus.dispose();
     super.dispose();
@@ -377,6 +395,7 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
   void _frame() {
     if (!_playing || _levelClear) return;
     setState(() {
+      _fxT = (_fxT + 0.016) % 1000;
       switch (g.engine) {
         case VaultEngine.wordMatch:
           if (_isRainLevel) {
@@ -399,11 +418,12 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
           break;
         case VaultEngine.orbRush:
           for (final o in _orbs) {
-            o.r += 0.004 + _level * 0.0004;
+            o.r += 0.0032 + _level * 0.00032;
+            o.spin += 0.04;
           }
           _orbs.removeWhere((o) {
             if (o.r >= o.maxR) {
-              _progress = math.max(0, _progress - 1);
+              unawaited(_loseHit(coins: 3 + _level, msg: 'ORB BURST'));
               return true;
             }
             return false;
@@ -412,14 +432,14 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
           break;
         case VaultEngine.laneDrift:
           for (final o in _obstacles) {
-            o.y += 0.012 + _level * 0.0012;
+            o.y += 0.009 + _level * 0.0009;
           }
           _obstacles.removeWhere((o) => o.y > 1.2);
           if (_obstacles.isEmpty || _obstacles.last.y > 0.28) {
             _obstacles.add(_LaneObstacle(x: _rng.nextDouble(), y: -0.1, w: 0.18 + _rng.nextDouble() * 0.12));
           }
           for (final o in _obstacles) {
-              if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
+            if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
               unawaited(_loseHit(coins: 4 + _level, msg: 'CRASH'));
               _obstacles.clear();
               break;
@@ -444,16 +464,33 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
           break;
         case VaultEngine.echoMatch:
           break;
+        case VaultEngine.circuitPulse:
+          _circuitSpawn += 0.016;
+          for (final n in _nodes) {
+            n.life -= 0.008 + _level * 0.0005;
+          }
+          _nodes.removeWhere((n) {
+            if (n.life <= 0) {
+              unawaited(_loseHit(coins: 2 + _level, msg: 'NODE FADE'));
+              return true;
+            }
+            return false;
+          });
+          if (_nodes.length < 2 + _level ~/ 3 && _circuitSpawn > 0.55) {
+            _circuitSpawn = 0;
+            _spawnCircuitNode();
+          }
+          break;
       }
     });
   }
 
   void _stepSnake() {
     if (_snake.isEmpty) return;
-    final head = _snake.first + _aim * (_snakeSpeed * 0.0045 * (1 + _level * 0.04));
+    final head = _snake.first + _aim * (_snakeSpeed * 0.00305 * (1 + _level * 0.028));
     final nh = Offset(head.dx.clamp(0.02, 0.98), head.dy.clamp(0.02, 0.98));
     _snake.insert(0, nh);
-    while (_snake.length > 8 + _progress * 2) {
+    while (_snake.length > 10 + _progress * 2) {
       _snake.removeLast();
     }
     if (_food != null && (nh - _food!).distance < 0.045) {
@@ -463,12 +500,11 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
     for (final r in _rivals) {
       final dir = (_snake.first - r.body.first);
       final n = dir.distance < 0.001 ? Offset(_rng.nextDouble() - 0.5, _rng.nextDouble() - 0.5) : dir / dir.distance;
-      final h = r.body.first + n * (0.003 + _level * 0.00025);
+      final h = r.body.first + n * (0.00185 + _level * 0.00014);
       r.body.insert(0, Offset(h.dx.clamp(0.02, 0.98), h.dy.clamp(0.02, 0.98)));
       while (r.body.length > r.len) {
         r.body.removeLast();
       }
-      // eat rival head if we hit their body and we're longer
       if (r.body.length > 1) {
         for (var i = 1; i < r.body.length; i++) {
           if ((nh - r.body[i]).distance < 0.03 && _snake.length >= r.len) {
@@ -504,6 +540,13 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
     _orbs.add(_Orb(x: 0.12 + _rng.nextDouble() * 0.76, y: 0.15 + _rng.nextDouble() * 0.55, r: 0.02, maxR: 0.09 + _rng.nextDouble() * 0.04));
   }
 
+  void _spawnCircuitNode() {
+    final col = _rng.nextInt(3);
+    final row = _rng.nextInt(3);
+    if (_nodes.any((n) => n.col == col && n.row == row)) return;
+    _nodes.add(_CircuitNode(col: col, row: row, life: 1.0));
+  }
+
   Future<void> _start() async {
     HapticFeedback.mediumImpact();
     _spawnTimer?.cancel();
@@ -517,6 +560,8 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _falling.clear();
       _orbs.clear();
       _obstacles.clear();
+      _nodes.clear();
+      _circuitSpawn = 0;
       _echo = [];
       _echoStep = 0;
       _probe = const Offset(0.5, 0.8);
@@ -526,6 +571,10 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _typeCtrl.clear();
     });
     if (g.engine == VaultEngine.neonSerpent) _resetSnake();
+    if (g.engine == VaultEngine.circuitPulse) {
+      _spawnCircuitNode();
+      _spawnCircuitNode();
+    }
     if (g.engine == VaultEngine.wordMatch) {
       if (_isRainLevel) {
         _spawnTimer = Timer.periodic(Duration(milliseconds: (900 - _level * 40).clamp(420, 900)), (_) {
@@ -710,7 +759,31 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
                 ],
               ),
             ),
-            Expanded(child: AnimatedBuilder(animation: _tick, builder: (_, __) => _field())),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_tick, _ambient]),
+                    builder: (_, __) => Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CustomPaint(
+                          painter: _ArenaHudPainter(
+                            colors: colors,
+                            pulse: Curves.easeInOut.transform(_ambient.value),
+                            scan: _ambient.value,
+                            orbit: (_ambient.value + _fxT * 0.02) % 1.0,
+                          ),
+                        ),
+                        _field(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
               child: Text(_feedback, textAlign: TextAlign.center, style: TextStyle(color: _feedbackColor, fontWeight: FontWeight.w800, fontSize: 13)),
@@ -843,8 +916,17 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
             if (!_playing) _start();
           },
           child: CustomPaint(
-            painter: _SnakePainter(colors: colors, snake: _snake, rivals: _rivals, food: _food),
-            child: const Center(child: Text('DRAG TO STEER', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
+            painter: _SnakePainter(
+              colors: colors,
+              snake: _snake,
+              rivals: _rivals,
+              food: _food,
+              pulse: Curves.easeInOut.transform(_ambient.value),
+              t: _fxT,
+            ),
+            child: !_playing
+                ? const Center(child: Text('DRAG TO STEER', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
+                : const SizedBox.expand(),
           ),
         );
       case VaultEngine.orbRush:
@@ -863,7 +945,10 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
                   unawaited(_gainHit(coins: 2 + _level));
                 }
               },
-              child: CustomPaint(painter: _OrbPainter(colors: colors, orbs: _orbs), size: Size.infinite),
+              child: CustomPaint(
+                painter: _OrbRushPainter(colors: colors, orbs: _orbs, pulse: _ambient.value, t: _fxT),
+                size: Size.infinite,
+              ),
             );
           },
         );
@@ -877,50 +962,77 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
             if (!_playing) _start();
           },
           child: CustomPaint(
-            painter: _LanePainter(colors: colors, carX: _carX, obstacles: _obstacles, t: _tick.value),
-            child: const Center(child: Text('DRAG TO DRIFT', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
+            painter: _LanePainter(colors: colors, carX: _carX, obstacles: _obstacles, t: _fxT, pulse: _ambient.value),
+            child: !_playing
+                ? const Center(child: Text('DRAG TO DRIFT', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
+                : const SizedBox.expand(),
           ),
         );
       case VaultEngine.echoMatch:
         return Center(
           child: SizedBox(
-            width: 260,
-            height: 260,
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12),
-              itemCount: 4,
-              itemBuilder: (_, i) {
-                final on = _echoFlash == i;
-                return GestureDetector(
-                  onTap: () async {
-                    if (!_playing) {
-                      await _start();
-                      return;
-                    }
-                    if (_echoShow) return;
-                    if (_echo[_echoStep] == i) {
-                      setState(() => _echoStep += 1);
-                      if (_echoStep >= _echo.length) {
-                        await _gainHit(coins: 4 + _level);
-                        if (_playing && !_levelClear) await _nextEcho();
-                      }
-                    } else {
-                      unawaited(_loseHit(coins: 3 + _level, msg: 'WRONG ECHO'));
-                      await _nextEcho();
-                    }
+            width: 280,
+            height: 280,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CustomPaint(
+                  size: const Size(280, 280),
+                  painter: _EchoRingsPainter(colors: colors, pulse: _ambient.value, flash: _echoFlash),
+                ),
+                GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14),
+                  itemCount: 4,
+                  itemBuilder: (_, i) {
+                    final on = _echoFlash == i;
+                    return GestureDetector(
+                      onTap: () async {
+                        if (!_playing) {
+                          await _start();
+                          return;
+                        }
+                        if (_echoShow) return;
+                        if (_echo[_echoStep] == i) {
+                          setState(() => _echoStep += 1);
+                          if (_echoStep >= _echo.length) {
+                            await _gainHit(coins: 4 + _level);
+                            if (_playing && !_levelClear) await _nextEcho();
+                          }
+                        } else {
+                          unawaited(_loseHit(coins: 3 + _level, msg: 'WRONG ECHO'));
+                          await _nextEcho();
+                        }
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 110),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: on
+                              ? LinearGradient(colors: colors)
+                              : LinearGradient(
+                                  colors: [
+                                    colors.first.withValues(alpha: 0.18 + _ambient.value * 0.08),
+                                    colors.last.withValues(alpha: 0.08),
+                                  ],
+                                ),
+                          border: Border.all(color: colors.first.withValues(alpha: on ? 0.98 : 0.4), width: on ? 2 : 1.2),
+                          boxShadow: on
+                              ? [BoxShadow(color: colors.first.withValues(alpha: 0.55), blurRadius: 22, offset: Offset.zero)]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.graphic_eq_rounded,
+                            color: on ? Colors.black87 : colors.first.withValues(alpha: 0.55 + _ambient.value * 0.35),
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    );
                   },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 90),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: on ? LinearGradient(colors: colors) : null,
-                      color: on ? null : Colors.white.withValues(alpha: 0.07),
-                      border: Border.all(color: colors.first.withValues(alpha: on ? 0.95 : 0.35)),
-                    ),
-                  ),
-                );
-              },
+                ),
+              ],
             ),
           ),
         );
@@ -951,7 +1063,41 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
                   _vel = Offset(v.dx / 1400, v.dy / 1400);
                 });
               },
-              child: CustomPaint(painter: _GravityPainter(colors: colors, probe: _probe, well: _well), size: Size.infinite),
+              child: CustomPaint(
+                painter: _GravityPainter(colors: colors, probe: _probe, well: _well, pulse: _ambient.value, t: _fxT),
+                size: Size.infinite,
+              ),
+            );
+          },
+        );
+      case VaultEngine.circuitPulse:
+        return LayoutBuilder(
+          builder: (context, c) {
+            return GestureDetector(
+              onTapDown: (d) {
+                if (!_playing) {
+                  _start();
+                  return;
+                }
+                final cellW = c.maxWidth / 3;
+                final cellH = c.maxHeight / 3;
+                final col = (d.localPosition.dx / cellW).floor().clamp(0, 2);
+                final row = (d.localPosition.dy / cellH).floor().clamp(0, 2);
+                final hit = _nodes.indexWhere((n) => n.col == col && n.row == row);
+                if (hit >= 0) {
+                  setState(() => _nodes.removeAt(hit));
+                  unawaited(_gainHit(coins: 3 + _level));
+                } else {
+                  unawaited(_loseHit(coins: 2 + _level, msg: 'MISS'));
+                }
+              },
+              child: CustomPaint(
+                painter: _CircuitPainter(colors: colors, nodes: _nodes, pulse: _ambient.value, t: _fxT),
+                size: Size.infinite,
+                child: !_playing
+                    ? const Center(child: Text('TAP LIVE NODES', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
+                    : null,
+              ),
             );
           },
         );
@@ -978,6 +1124,7 @@ class _Orb {
   final double y;
   double r;
   final double maxR;
+  double spin = 0;
 }
 
 class _LaneObstacle {
@@ -987,29 +1134,177 @@ class _LaneObstacle {
   final double w;
 }
 
+class _CircuitNode {
+  _CircuitNode({required this.col, required this.row, required this.life});
+  final int col;
+  final int row;
+  double life;
+}
+
+class _ArenaHudPainter extends CustomPainter {
+  _ArenaHudPainter({required this.colors, required this.pulse, required this.scan, required this.orbit});
+  final List<Color> colors;
+  final double pulse;
+  final double scan;
+  final double orbit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [const Color(0xFF07101C), colors.first.withValues(alpha: 0.12), const Color(0xFF050A12)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, bg);
+
+    final grid = Paint()..color = colors.first.withValues(alpha: 0.07 + pulse * 0.04)..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 28) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (var y = 0.0; y < size.height; y += 28) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+
+    final corner = Paint()
+      ..color = colors.last.withValues(alpha: 0.55 + pulse * 0.35)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    const L = 18.0;
+    canvas.drawLine(const Offset(10, 10), const Offset(10 + L, 10), corner);
+    canvas.drawLine(const Offset(10, 10), const Offset(10, 10 + L), corner);
+    canvas.drawLine(Offset(size.width - 10, 10), Offset(size.width - 10 - L, 10), corner);
+    canvas.drawLine(Offset(size.width - 10, 10), Offset(size.width - 10, 10 + L), corner);
+    canvas.drawLine(Offset(10, size.height - 10), Offset(10 + L, size.height - 10), corner);
+    canvas.drawLine(Offset(10, size.height - 10), Offset(10, size.height - 10 - L), corner);
+    canvas.drawLine(Offset(size.width - 10, size.height - 10), Offset(size.width - 10 - L, size.height - 10), corner);
+    canvas.drawLine(Offset(size.width - 10, size.height - 10), Offset(size.width - 10, size.height - 10 - L), corner);
+
+    final sy = size.height * scan;
+    canvas.drawRect(
+      Rect.fromLTWH(8, sy - 16, size.width - 16, 32),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, colors.first.withValues(alpha: 0.16), Colors.transparent],
+        ).createShader(Rect.fromLTWH(0, sy - 16, size.width, 32)),
+    );
+
+    final cx = size.width - 28.0;
+    final cy = 28.0;
+    for (var i = 0; i < 6; i++) {
+      final a = orbit * math.pi * 2 + i * (math.pi / 3);
+      canvas.drawCircle(
+        Offset(cx + math.cos(a) * 10, cy + math.sin(a) * 10),
+        1.6,
+        Paint()..color = colors.last.withValues(alpha: 0.75),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArenaHudPainter old) => true;
+}
+
 class _SnakePainter extends CustomPainter {
-  _SnakePainter({required this.colors, required this.snake, required this.rivals, required this.food});
+  _SnakePainter({
+    required this.colors,
+    required this.snake,
+    required this.rivals,
+    required this.food,
+    required this.pulse,
+    required this.t,
+  });
   final List<Color> colors;
   final List<Offset> snake;
   final List<_RivalSnake> rivals;
   final Offset? food;
+  final double pulse;
+  final double t;
 
   @override
   void paint(Canvas canvas, Size size) {
-    void drawSnake(List<Offset> body, Color a, Color b) {
-      for (var i = body.length - 1; i >= 0; i--) {
-        final p = Offset(body[i].dx * size.width, body[i].dy * size.height);
-        final t = i / math.max(1, body.length - 1);
-        canvas.drawCircle(p, i == 0 ? 11 : 8 - t * 2, Paint()..color = Color.lerp(a, b, t)!);
+    void drawSerpent(List<Offset> body, Color a, Color b, {required bool hero}) {
+      if (body.length < 2) return;
+      final path = Path();
+      final pts = body.map((p) => Offset(p.dx * size.width, p.dy * size.height)).toList();
+      path.moveTo(pts.first.dx, pts.first.dy);
+      for (var i = 1; i < pts.length; i++) {
+        final prev = pts[i - 1];
+        final cur = pts[i];
+        final mid = Offset((prev.dx + cur.dx) / 2, (prev.dy + cur.dy) / 2);
+        path.quadraticBezierTo(prev.dx, prev.dy, mid.dx, mid.dy);
       }
+      path.lineTo(pts.last.dx, pts.last.dy);
+
+      final glow = Paint()
+        ..color = a.withValues(alpha: hero ? 0.28 + pulse * 0.18 : 0.16)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = hero ? 22 : 16
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(path, glow);
+
+      final stroke = Paint()
+        ..shader = LinearGradient(colors: [a, b]).createShader(Offset.zero & size)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = hero ? 14 : 10
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(path, stroke);
+
+      final core = Paint()
+        ..color = Colors.white.withValues(alpha: hero ? 0.55 : 0.28)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = hero ? 4.5 : 3
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(path, core);
+
+      for (var i = 0; i < pts.length; i++) {
+        final tt = i / math.max(1, pts.length - 1);
+        final r = (hero ? 7.5 : 5.5) - tt * (hero ? 2.5 : 1.8);
+        canvas.drawCircle(
+          pts[i],
+          r,
+          Paint()..color = Color.lerp(a, b, tt)!.withValues(alpha: 0.9),
+        );
+        if (i % 2 == 0) {
+          canvas.drawCircle(pts[i], r * 0.35, Paint()..color = Colors.white.withValues(alpha: 0.35));
+        }
+      }
+
+      final head = pts.first;
+      final dir = pts.length > 1 ? (pts.first - pts[1]) : const Offset(0, -1);
+      final n = dir.distance < 0.001 ? const Offset(0, -1) : dir / dir.distance;
+      final perp = Offset(-n.dy, n.dx);
+      canvas.drawCircle(head, hero ? 11 : 8, Paint()..color = a);
+      canvas.drawCircle(head, hero ? 11 : 8, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: 0.7));
+      final eyeOff = perp * (hero ? 4.2 : 3.2) + n * (hero ? 2.5 : 1.8);
+      canvas.drawCircle(head + eyeOff, hero ? 2.2 : 1.6, Paint()..color = Colors.white);
+      canvas.drawCircle(head - eyeOff + n * (hero ? 2.5 : 1.8), hero ? 2.2 : 1.6, Paint()..color = Colors.white);
+      canvas.drawCircle(head + eyeOff, hero ? 0.9 : 0.7, Paint()..color = Colors.black87);
+      canvas.drawCircle(head - eyeOff + n * (hero ? 2.5 : 1.8), hero ? 0.9 : 0.7, Paint()..color = Colors.black87);
     }
 
-    drawSnake(snake, colors.first, colors.last);
+    drawSerpent(snake, colors.first, colors.last, hero: true);
     for (final r in rivals) {
-      drawSnake(r.body, const Color(0xFFEF4444), const Color(0xFFF97316));
+      drawSerpent(r.body, const Color(0xFFF43F5E), const Color(0xFFFB923C), hero: false);
     }
     if (food != null) {
-      canvas.drawCircle(Offset(food!.dx * size.width, food!.dy * size.height), 8, Paint()..color = const Color(0xFFFBBF24));
+      final p = Offset(food!.dx * size.width, food!.dy * size.height);
+      final beat = 1 + math.sin(t * 4) * 0.12 + pulse * 0.08;
+      canvas.drawCircle(p, 16 * beat, Paint()..color = const Color(0xFFFBBF24).withValues(alpha: 0.22));
+      canvas.drawCircle(
+        p,
+        8 * beat,
+        Paint()
+          ..shader = const RadialGradient(colors: [Color(0xFFFFF7AE), Color(0xFFFBBF24), Color(0xFFF59E0B)])
+              .createShader(Rect.fromCircle(center: p, radius: 10)),
+      );
+      canvas.drawCircle(p, 2.5, Paint()..color = Colors.white.withValues(alpha: 0.9));
     }
   }
 
@@ -1017,70 +1312,240 @@ class _SnakePainter extends CustomPainter {
   bool shouldRepaint(covariant _SnakePainter old) => true;
 }
 
-class _OrbPainter extends CustomPainter {
-  _OrbPainter({required this.colors, required this.orbs});
+class _OrbRushPainter extends CustomPainter {
+  _OrbRushPainter({required this.colors, required this.orbs, required this.pulse, required this.t});
   final List<Color> colors;
   final List<_Orb> orbs;
+  final double pulse;
+  final double t;
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final o in orbs) {
       final p = Offset(o.x * size.width, o.y * size.height);
       final rr = o.r * size.shortestSide;
-      canvas.drawCircle(p, rr, Paint()..color = colors.first.withValues(alpha: 0.2));
-      canvas.drawCircle(p, rr * 0.7, Paint()..shader = RadialGradient(colors: colors).createShader(Rect.fromCircle(center: p, radius: rr)));
+      canvas.drawCircle(p, rr * 1.45, Paint()..color = colors.first.withValues(alpha: 0.12 + pulse * 0.08));
+      canvas.drawCircle(
+        p,
+        rr,
+        Paint()
+          ..shader = RadialGradient(colors: [Colors.white.withValues(alpha: 0.75), colors.first, colors.last.withValues(alpha: 0.55)])
+              .createShader(Rect.fromCircle(center: p, radius: rr)),
+      );
+      canvas.drawCircle(
+        p,
+        rr + 3 + pulse * 2,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white.withValues(alpha: 0.45),
+      );
+      for (var i = 0; i < 4; i++) {
+        final a = o.spin + i * (math.pi / 2) + t;
+        canvas.drawCircle(
+          Offset(p.dx + math.cos(a) * (rr + 8), p.dy + math.sin(a) * (rr + 8)),
+          2,
+          Paint()..color = colors.last.withValues(alpha: 0.8),
+        );
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _OrbPainter old) => true;
+  bool shouldRepaint(covariant _OrbRushPainter old) => true;
 }
 
 class _LanePainter extends CustomPainter {
-  _LanePainter({required this.colors, required this.carX, required this.obstacles, required this.t});
+  _LanePainter({required this.colors, required this.carX, required this.obstacles, required this.t, required this.pulse});
   final List<Color> colors;
   final double carX;
   final List<_LaneObstacle> obstacles;
   final double t;
+  final double pulse;
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (var i = 0; i < 8; i++) {
-      final y = ((i / 8) + t) % 1.0 * size.height;
-      canvas.drawRect(Rect.fromLTWH(size.width * 0.48, y, 4, 28), Paint()..color = Colors.white24);
-    }
-    for (final o in obstacles) {
+    final road = RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.08, 0, size.width * 0.84, size.height), const Radius.circular(18));
+    canvas.drawRRect(road, Paint()..color = const Color(0xFF0A1524).withValues(alpha: 0.85));
+    canvas.drawRRect(
+      road,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = colors.first.withValues(alpha: 0.35 + pulse * 0.2),
+    );
+
+    for (var i = 0; i < 12; i++) {
+      final y = ((i / 12) + (t * 0.04) % 1.0) % 1.0 * size.height;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(o.x * size.width, o.y * size.height), width: o.w * size.width, height: 28), const Radius.circular(8)),
-        Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.85),
+        RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.485, y, 5, 26), const Radius.circular(3)),
+        Paint()..color = Colors.white.withValues(alpha: 0.28 + pulse * 0.15),
       );
     }
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(carX * size.width, size.height * 0.82), width: 44, height: 64), const Radius.circular(12)),
-      Paint()..shader = LinearGradient(colors: colors).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
+    for (final o in obstacles) {
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(o.x * size.width, o.y * size.height), width: o.w * size.width, height: 30),
+        const Radius.circular(10),
+      );
+      canvas.drawRRect(rect, Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.88));
+      canvas.drawRRect(
+        rect,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFFFCA5A5),
+      );
+    }
+    final car = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(carX * size.width, size.height * 0.82), width: 46, height: 68),
+      const Radius.circular(14),
     );
+    canvas.drawRRect(
+      car,
+      Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: colors).createShader(car.outerRect),
+    );
+    canvas.drawRRect(
+      car,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: 0.65),
+    );
+    canvas.drawCircle(Offset(carX * size.width, size.height * 0.78), 5, Paint()..color = Colors.white.withValues(alpha: 0.85));
   }
 
   @override
   bool shouldRepaint(covariant _LanePainter old) => true;
 }
 
+class _EchoRingsPainter extends CustomPainter {
+  _EchoRingsPainter({required this.colors, required this.pulse, required this.flash});
+  final List<Color> colors;
+  final double pulse;
+  final int? flash;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    for (var i = 3; i >= 1; i--) {
+      canvas.drawCircle(
+        c,
+        40.0 * i + pulse * 6,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = colors.first.withValues(alpha: 0.12 * i + (flash != null ? 0.08 : 0)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EchoRingsPainter old) => true;
+}
+
 class _GravityPainter extends CustomPainter {
-  _GravityPainter({required this.colors, required this.probe, required this.well});
+  _GravityPainter({required this.colors, required this.probe, required this.well, required this.pulse, required this.t});
   final List<Color> colors;
   final Offset probe;
   final Offset well;
+  final double pulse;
+  final double t;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = Offset(well.dx * size.width, well.dy * size.height);
     final p = Offset(probe.dx * size.width, probe.dy * size.height);
-    canvas.drawCircle(w, 34, Paint()..color = colors.first.withValues(alpha: 0.2));
-    canvas.drawCircle(w, 16, Paint()..color = const Color(0xFFFBBF24));
-    canvas.drawCircle(p, 12, Paint()..color = colors.last);
-    canvas.drawLine(p, w, Paint()..color = Colors.white24..strokeWidth = 2);
+    for (var i = 4; i >= 1; i--) {
+      canvas.drawCircle(
+        w,
+        18.0 * i + pulse * 4 + math.sin(t * 3) * 2,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = colors.first.withValues(alpha: 0.1 * i),
+      );
+    }
+    canvas.drawCircle(
+      w,
+      18,
+      Paint()
+        ..shader = RadialGradient(colors: [const Color(0xFFFFF7AE), const Color(0xFFFBBF24), colors.first.withValues(alpha: 0.4)])
+            .createShader(Rect.fromCircle(center: w, radius: 18)),
+    );
+    final dash = Paint()
+      ..color = Colors.white.withValues(alpha: 0.28)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final path = Path()..moveTo(p.dx, p.dy)..lineTo(w.dx, w.dy);
+    canvas.drawPath(path, dash);
+    canvas.drawCircle(p, 16 + pulse * 2, Paint()..color = colors.last.withValues(alpha: 0.2));
+    canvas.drawCircle(
+      p,
+      11,
+      Paint()
+        ..shader = RadialGradient(colors: [Colors.white, colors.last]).createShader(Rect.fromCircle(center: p, radius: 11)),
+    );
+    canvas.drawCircle(p, 3, Paint()..color = Colors.black87);
   }
 
   @override
   bool shouldRepaint(covariant _GravityPainter old) => true;
+}
+
+class _CircuitPainter extends CustomPainter {
+  _CircuitPainter({required this.colors, required this.nodes, required this.pulse, required this.t});
+  final List<Color> colors;
+  final List<_CircuitNode> nodes;
+  final double pulse;
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cellW = size.width / 3;
+    final cellH = size.height / 3;
+    final line = Paint()
+      ..color = colors.first.withValues(alpha: 0.18 + pulse * 0.08)
+      ..strokeWidth = 1.2;
+    for (var i = 1; i < 3; i++) {
+      canvas.drawLine(Offset(cellW * i, 12), Offset(cellW * i, size.height - 12), line);
+      canvas.drawLine(Offset(12, cellH * i), Offset(size.width - 12, cellH * i), line);
+    }
+    for (var r = 0; r < 3; r++) {
+      for (var c = 0; c < 3; c++) {
+        final center = Offset(cellW * (c + 0.5), cellH * (r + 0.5));
+        canvas.drawCircle(center, 10, Paint()..color = Colors.white.withValues(alpha: 0.06));
+        canvas.drawCircle(
+          center,
+          10,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..color = colors.last.withValues(alpha: 0.25),
+        );
+      }
+    }
+    for (final n in nodes) {
+      final center = Offset(cellW * (n.col + 0.5), cellH * (n.row + 0.5));
+      final beat = 0.75 + n.life * 0.45 + math.sin(t * 6 + n.col) * 0.05;
+      canvas.drawCircle(center, 28 * beat, Paint()..color = colors.first.withValues(alpha: 0.18 * n.life));
+      canvas.drawCircle(
+        center,
+        16 * beat,
+        Paint()
+          ..shader = RadialGradient(colors: [Colors.white, colors.first, colors.last])
+              .createShader(Rect.fromCircle(center: center, radius: 18)),
+      );
+      canvas.drawCircle(
+        center,
+        18 * beat,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white.withValues(alpha: 0.55 + pulse * 0.3),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CircuitPainter old) => true;
 }

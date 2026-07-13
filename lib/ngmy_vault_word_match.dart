@@ -373,7 +373,18 @@ class _NgmyVaultWordMatchScreenState extends State<NgmyVaultWordMatchScreen> {
       goal: _goal,
       onRoundDone: _onRoundDone,
       onExit: _exit,
+      onSwitchTrack: _track == WordTrack.kiswahili ? null : _switchTrack,
     );
+  }
+
+  Future<void> _switchTrack() async {
+    await WordMatchSessionStore.clearActive();
+    await WordMatchSessionStore.clearRetry();
+    if (!mounted) return;
+    setState(() {
+      _track = null;
+      _progress = 0;
+    });
   }
 }
 
@@ -407,7 +418,7 @@ class _TrackPicker extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(18, 0, 18, 12),
-              child: Text('Your choice stays locked until you finish that path.', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600, fontSize: 13)),
+              child: Text('Pick a path. English tracks can switch later with the corner icon — Kiswahili stays locked until finished.', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600, fontSize: 13)),
             ),
             Expanded(
               child: ListView(
@@ -470,6 +481,7 @@ class _WordMatchPlay extends StatefulWidget {
     required this.goal,
     required this.onRoundDone,
     required this.onExit,
+    this.onSwitchTrack,
   });
 
   final WordTrack track;
@@ -477,18 +489,22 @@ class _WordMatchPlay extends StatefulWidget {
   final int goal;
   final Future<void> Function({required bool won, required int coinsDelta}) onRoundDone;
   final VoidCallback onExit;
+  final VoidCallback? onSwitchTrack;
 
   @override
   State<_WordMatchPlay> createState() => _WordMatchPlayState();
 }
 
-class _WordMatchPlayState extends State<_WordMatchPlay> {
+class _WordMatchPlayState extends State<_WordMatchPlay> with TickerProviderStateMixin {
   static const _roundLen = 8;
   static const _winCoins = 5;
   static const _loseCoins = 3;
   static const _clearBonus = 12;
   static const _failPenalty = 8;
 
+  late final AnimationController _pulse;
+  late final AnimationController _scan;
+  late final AnimationController _orbit;
   final _rng = math.Random();
   List<_WMPair> _round = [];
   int _qi = 0;
@@ -508,12 +524,18 @@ class _WordMatchPlayState extends State<_WordMatchPlay> {
   @override
   void initState() {
     super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat(reverse: true);
+    _scan = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400))..repeat();
+    _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 9000))..repeat();
     unawaited(_bootRound());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _pulse.dispose();
+    _scan.dispose();
+    _orbit.dispose();
     super.dispose();
   }
 
@@ -649,6 +671,16 @@ class _WordMatchPlayState extends State<_WordMatchPlay> {
       backgroundColor: const Color(0xFF030712),
       body: Stack(
         children: [
+          AnimatedBuilder(
+            animation: Listenable.merge([_pulse, _scan, _orbit]),
+            builder: (context, _) {
+              final pulse = Curves.easeInOut.transform(_pulse.value);
+              return CustomPaint(
+                painter: _WordMatchHudPainter(colors: colors, pulse: pulse, scan: _scan.value, orbit: _orbit.value),
+                child: const SizedBox.expand(),
+              );
+            },
+          ),
           SafeArea(
             child: Column(
               children: [
@@ -697,26 +729,77 @@ class _WordMatchPlayState extends State<_WordMatchPlay> {
                         Text(promptLabel, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w700, fontSize: 12)),
                         const SizedBox(height: 12),
                         if (_round.isNotEmpty)
-                          TweenAnimationBuilder<double>(
-                            key: ValueKey(_qi),
-                            tween: Tween(begin: 0.9, end: 1),
-                            duration: const Duration(milliseconds: 320),
-                            curve: Curves.easeOutBack,
-                            builder: (context, s, child) => Transform.scale(scale: s, child: child),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 14),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(18),
-                                gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.24), colors.last.withValues(alpha: 0.14)]),
-                                border: Border.all(color: colors.first.withValues(alpha: 0.5)),
-                              ),
-                              child: Text(
-                                _current.prompt,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, height: 1.25, decoration: TextDecoration.none),
-                              ),
-                            ),
+                          AnimatedBuilder(
+                            animation: Listenable.merge([_pulse, _scan, _orbit]),
+                            builder: (context, _) {
+                              final pulse = Curves.easeInOut.transform(_pulse.value);
+                              return TweenAnimationBuilder<double>(
+                                key: ValueKey(_qi),
+                                tween: Tween(begin: 0.92, end: 1),
+                                duration: const Duration(milliseconds: 340),
+                                curve: Curves.easeOutBack,
+                                builder: (context, s, child) => Transform.scale(scale: s, child: child),
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(18),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            colors.first.withValues(alpha: 0.28 + pulse * 0.1),
+                                            const Color(0xFF0B1424),
+                                            colors.last.withValues(alpha: 0.18),
+                                          ],
+                                        ),
+                                        border: Border.all(color: colors.first.withValues(alpha: 0.45 + pulse * 0.25), width: 1.4),
+                                        boxShadow: [
+                                          BoxShadow(color: colors.first.withValues(alpha: 0.18 + pulse * 0.12), blurRadius: 22, offset: const Offset(0, 8)),
+                                        ],
+                                      ),
+                                      child: Text(
+                                        _current.prompt,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, height: 1.25, decoration: TextDecoration.none),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: CustomPaint(
+                                        size: const Size(28, 28),
+                                        painter: _MiniOrbitPainter(color: colors.last, orbit: _orbit.value),
+                                      ),
+                                    ),
+                                    if (widget.onSwitchTrack != null)
+                                      Positioned(
+                                        top: 4,
+                                        left: 4,
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: widget.onSwitchTrack,
+                                            borderRadius: BorderRadius.circular(99),
+                                            child: Ink(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.black.withValues(alpha: 0.35),
+                                                border: Border.all(color: colors.first.withValues(alpha: 0.55)),
+                                              ),
+                                              child: Icon(Icons.grid_view_rounded, size: 14, color: colors.first.withValues(alpha: 0.95)),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         const SizedBox(height: 18),
                         ..._options.asMap().entries.map((e) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _option(e.key, e.value))),
@@ -871,4 +954,71 @@ class _CleanResultSheet extends StatelessWidget {
       ],
     );
   }
+}
+
+class _WordMatchHudPainter extends CustomPainter {
+  _WordMatchHudPainter({required this.colors, required this.pulse, required this.scan, required this.orbit});
+  final List<Color> colors;
+  final double pulse;
+  final double scan;
+  final double orbit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [const Color(0xFF061018), colors.first.withValues(alpha: 0.1), const Color(0xFF030712)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, bg);
+
+    final grid = Paint()..color = colors.first.withValues(alpha: 0.06 + pulse * 0.04)..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 26) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (var y = 0.0; y < size.height; y += 26) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+
+    final sy = size.height * scan;
+    canvas.drawRect(
+      Rect.fromLTWH(0, sy - 18, size.width, 36),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, colors.first.withValues(alpha: 0.14), Colors.transparent],
+        ).createShader(Rect.fromLTWH(0, sy - 18, size.width, 36)),
+    );
+
+    final cx = size.width - 26.0;
+    final cy = 54.0;
+    for (var i = 0; i < 6; i++) {
+      final a = orbit * math.pi * 2 + i * (math.pi / 3);
+      canvas.drawCircle(Offset(cx + math.cos(a) * 9, cy + math.sin(a) * 9), 1.5, Paint()..color = colors.last.withValues(alpha: 0.75));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WordMatchHudPainter old) => true;
+}
+
+class _MiniOrbitPainter extends CustomPainter {
+  _MiniOrbitPainter({required this.color, required this.orbit});
+  final Color color;
+  final double orbit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    canvas.drawCircle(c, 8, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = color.withValues(alpha: 0.45));
+    for (var i = 0; i < 4; i++) {
+      final a = orbit * math.pi * 2 + i * (math.pi / 2);
+      canvas.drawCircle(Offset(c.dx + math.cos(a) * 8, c.dy + math.sin(a) * 8), 1.4, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniOrbitPainter old) => old.orbit != orbit;
 }

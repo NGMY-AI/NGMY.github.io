@@ -300,18 +300,24 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
             ),
           ),
           Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 18),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.05,
-              ),
-              itemCount: kVaultGames.length,
-              itemBuilder: (context, i) {
-                final g = kVaultGames[i];
-                return _GameTile(game: g, progress: _progress[g.id], onTap: () => _openGame(g));
+            child: AnimatedBuilder(
+              animation: _glow,
+              builder: (context, _) {
+                final pulse = Curves.easeInOut.transform(_glow.value);
+                return GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 18),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.05,
+                  ),
+                  itemCount: kVaultGames.length,
+                  itemBuilder: (context, i) {
+                    final g = kVaultGames[i];
+                    return _GameTile(game: g, progress: _progress[g.id], onTap: () => _openGame(g), pulse: pulse);
+                  },
+                );
               },
             ),
           ),
@@ -421,11 +427,12 @@ class _GameAdCard extends StatelessWidget {
 }
 
 class _GameTile extends StatelessWidget {
-  const _GameTile({required this.game, required this.progress, required this.onTap});
+  const _GameTile({required this.game, required this.progress, required this.onTap, required this.pulse});
 
   final VaultGameDef game;
   final VaultGameProgress? progress;
   final VoidCallback onTap;
+  final double pulse;
 
   @override
   Widget build(BuildContext context) {
@@ -438,31 +445,55 @@ class _GameTile extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: const Color(0xFF0D1422),
-            border: Border.all(color: game.colors.first.withValues(alpha: 0.4)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                game.colors.first.withValues(alpha: 0.18 + pulse * 0.08),
+                const Color(0xFF0D1422),
+                game.colors.last.withValues(alpha: 0.12),
+              ],
+            ),
+            border: Border.all(color: game.colors.first.withValues(alpha: 0.35 + pulse * 0.25)),
+            boxShadow: [
+              BoxShadow(color: game.colors.first.withValues(alpha: 0.12 * pulse), blurRadius: 14, offset: const Offset(0, 6)),
+            ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: game.colors)),
-                child: Icon(game.icon, color: Colors.black.withValues(alpha: 0.78), size: 24),
+              Positioned(
+                right: -6,
+                top: -8,
+                child: Icon(game.icon, size: 52, color: game.colors.first.withValues(alpha: 0.12 + pulse * 0.06)),
               ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  game.shortTitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
-                ),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: game.colors),
+                      boxShadow: [BoxShadow(color: game.colors.first.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10)],
+                    ),
+                    child: Icon(game.icon, color: Colors.black.withValues(alpha: 0.78), size: 22),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      game.shortTitle,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text('LV $level', style: TextStyle(color: game.colors.first.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 10)),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text('Lv $level', style: TextStyle(color: game.colors.first.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 10)),
             ],
           ),
         ),
