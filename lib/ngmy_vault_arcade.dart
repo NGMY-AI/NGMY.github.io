@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
+import 'ngmy_vault_new_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
 
@@ -86,6 +87,18 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
       page = const NgmyVaultSyncScreen();
     } else if (game.id == 'word_match') {
       page = const NgmyVaultWordMatchScreen();
+    } else if (game.id == 'color_sprint') {
+      page = const NgmyVaultColorSprintGame();
+    } else if (game.id == 'beat_bounce') {
+      page = const NgmyVaultBeatBounceGame();
+    } else if (game.id == 'maze_dash') {
+      page = const NgmyVaultMazeDashGame();
+    } else if (game.id == 'stack_tower') {
+      page = const NgmyVaultStackTowerGame();
+    } else if (game.id == 'reflex_grid') {
+      page = const NgmyVaultReflexGridGame();
+    } else if (game.id == 'memory_flip') {
+      page = const NgmyVaultMemoryFlipGame();
     } else if (game.engine == VaultEngine.neonSerpent) {
       page = NgmyVaultLeveledGameScreen(game: game);
     } else {
