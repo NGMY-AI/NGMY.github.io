@@ -29,6 +29,11 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
   int _adIndex = 0;
   Map<String, VaultGameProgress> _progress = {};
 
+  int _walletCoins = 0;
+  int _displayCoins = 0;
+  final List<_FlyingCoin> _flying = [];
+  final GlobalKey _coinKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -62,17 +67,21 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
 
   Future<void> _loadProgress() async {
     final map = await VaultProgressStore.loadAll();
+    final wallet = await VaultProgressStore.walletCoins();
     if (!mounted) return;
-    setState(() => _progress = map);
+    setState(() {
+      _progress = map;
+      _walletCoins = wallet;
+      if (_flying.isEmpty) _displayCoins = wallet;
+    });
   }
 
-  int get _totalXp => _progress.values.fold(0, (a, b) => a + b.xp);
   int get _cleared => _progress.values.fold(0, (a, b) => a + b.level.clamp(0, 10));
 
   Future<void> _openGame(VaultGameDef game) async {
     HapticFeedback.selectionClick();
     final page = game.id == 'vault_sync' ? const NgmyVaultSyncScreen() : NgmyVaultLeveledGameScreen(game: game);
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push<Object?>(
       PageRouteBuilder(
         opaque: true,
         transitionDuration: const Duration(milliseconds: 380),
@@ -84,7 +93,45 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
       ),
     );
     await _loadProgress();
+    final earned = result is VaultGameResult ? result.coinsEarned : 0;
+    if (earned > 0 && mounted) _playCoinFly(earned);
   }
+
+  void _playCoinFly(int amount) {
+    final box = _coinKey.currentContext?.findRenderObject() as RenderBox?;
+    final target = box?.localToGlobal(Offset(box.size.width / 2, box.size.height / 2)) ?? Offset(MediaQuery.sizeOf(context).width - 48, 56);
+    final start = Offset(MediaQuery.sizeOf(context).width / 2, MediaQuery.sizeOf(context).height * 0.55);
+    setState(() {
+      _flying
+        ..clear()
+        ..addAll(List.generate(math.min(12, math.max(5, amount ~/ 3)), (i) {
+          return _FlyingCoin(
+            id: DateTime.now().microsecondsSinceEpoch + i,
+            start: start + Offset((_rng.nextDouble() - 0.5) * 80, (_rng.nextDouble() - 0.5) * 40),
+            end: target,
+            delay: i * 0.05,
+          );
+        }));
+    });
+    // Count up after arcs land.
+    Future<void>.delayed(const Duration(milliseconds: 720), () async {
+      if (!mounted) return;
+      final from = _displayCoins;
+      final to = _walletCoins;
+      const steps = 18;
+      for (var i = 1; i <= steps; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 28));
+        if (!mounted) return;
+        setState(() => _displayCoins = from + ((to - from) * (i / steps)).round());
+      }
+      setState(() {
+        _displayCoins = _walletCoins;
+        _flying.clear();
+      });
+    });
+  }
+
+  final _rng = math.Random();
 
   Future<void> _openGameSchool() async {
     HapticFeedback.selectionClick();
@@ -116,6 +163,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 painter: _ArcadeBootBackdrop(colors: _bootColors, spin: _spin.value, wave: _wave.value, boot: boot),
               ),
               if (!_ready) _bootOverlay(boot) else _hubBody(),
+              ..._flying.map((c) => _FlyingCoinLayer(coin: c)),
             ],
           );
         },
@@ -197,7 +245,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 const Expanded(
                   child: Text('VAULT CHANNEL', style: TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 14)),
                 ),
-                _chip(Icons.bolt_rounded, '$_totalXp XP'),
+                _chip(Icons.monetization_on_rounded, '$_displayCoins', key: _coinKey),
                 const SizedBox(width: 8),
                 _chip(Icons.flag_rounded, '$_cleared LV'),
               ],
@@ -259,7 +307,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
               children: [
                 Text('TECH GAMES', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 12)),
                 const Spacer(),
-                Text('10 levels each · offline', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w600, fontSize: 11)),
+                Text('Coins · addictive offline play', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w600, fontSize: 11)),
               ],
             ),
           ),
@@ -270,7 +318,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 crossAxisCount: 3,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 0.78,
+                childAspectRatio: 1.05,
               ),
               itemCount: kVaultGames.length,
               itemBuilder: (context, i) {
@@ -284,8 +332,9 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
     );
   }
 
-  Widget _chip(IconData icon, String text) {
+  Widget _chip(IconData icon, String text, {Key? key}) {
     return Container(
+      key: key,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.07),
@@ -397,37 +446,36 @@ class _GameTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             color: const Color(0xFF0D1422),
             border: Border.all(color: game.colors.first.withValues(alpha: 0.4)),
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-            child: Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: game.colors)),
-                  child: Icon(game.icon, color: Colors.black.withValues(alpha: 0.78), size: 22),
-                ),
-                const SizedBox(height: 8),
-                Text(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: game.colors)),
+                child: Icon(game.icon, color: Colors.black.withValues(alpha: 0.78), size: 24),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
                   game.shortTitle,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, height: 1.15),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
                 ),
-                const Spacer(),
-                Text('Lv $level/10', style: TextStyle(color: game.colors.first.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 11)),
-                const SizedBox(height: 2),
-                Text(game.techLabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontWeight: FontWeight.w700, fontSize: 9)),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text('Lv $level', style: TextStyle(color: game.colors.first.withValues(alpha: 0.9), fontWeight: FontWeight.w800, fontSize: 10)),
+            ],
           ),
         ),
       ),
@@ -516,6 +564,74 @@ class _ArcadeBootBackdrop extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArcadeBootBackdrop old) => old.spin != spin || old.wave != wave || old.boot != boot;
+}
+
+class _FlyingCoin {
+  _FlyingCoin({required this.id, required this.start, required this.end, required this.delay});
+  final int id;
+  final Offset start;
+  final Offset end;
+  final double delay;
+}
+
+class _FlyingCoinLayer extends StatefulWidget {
+  const _FlyingCoinLayer({required this.coin});
+  final _FlyingCoin coin;
+
+  @override
+  State<_FlyingCoinLayer> createState() => _FlyingCoinLayerState();
+}
+
+class _FlyingCoinLayerState extends State<_FlyingCoinLayer> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 780));
+    Future<void>.delayed(Duration(milliseconds: (widget.coin.delay * 1000).round()), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic.transform(_c.value);
+        final pos = Offset.lerp(widget.coin.start, widget.coin.end, t)!;
+        final scale = 1.2 - t * 0.45;
+        final opacity = (1.0 - (t - 0.75).clamp(0.0, 1.0) * 4).clamp(0.0, 1.0);
+        return Positioned(
+          left: pos.dx - 12,
+          top: pos.dy - 12,
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF97316)]),
+                  boxShadow: [BoxShadow(color: const Color(0xFFFBBF24).withValues(alpha: 0.55), blurRadius: 12)],
+                ),
+                child: const Icon(Icons.monetization_on_rounded, size: 16, color: Colors.black87),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _GameSchoolBanner extends StatelessWidget {

@@ -2576,27 +2576,23 @@ class _CivicIdCardBody extends StatelessWidget {
       builder: (context, c) {
         const designW = 360.0;
         final designH = designW / 1.586;
-        // Fill the card width; allow a modest vertical crop so left/right gutters disappear.
-        final fitW = c.maxWidth / designW;
-        final fitH = c.maxHeight / designH;
-        final scale = math.max(fitW * 1.04, math.min(fitW, fitH) * 1.55);
+        // Cover the whole card face so left/right (and top/bottom) gutters disappear.
         return ColoredBox(
           color: const Color(0xFF0B1220),
           child: ClipRect(
-            child: Center(
-              child: SizedBox(
-                width: designW * scale,
-                height: designH * scale,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: SizedBox(
-                    width: designW,
-                    height: designH,
-                    child: NgmyCivicRegistryIdCard(
-                      record: record!,
-                      photoPath: photo.isEmpty ? null : photo,
-                      scale: 1,
-                    ),
+            child: SizedBox(
+              width: c.maxWidth,
+              height: c.maxHeight,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: designW,
+                  height: designH,
+                  child: NgmyCivicRegistryIdCard(
+                    record: record!,
+                    photoPath: photo.isEmpty ? null : photo,
+                    scale: 1,
                   ),
                 ),
               ),

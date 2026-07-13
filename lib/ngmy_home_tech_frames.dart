@@ -189,7 +189,7 @@ class _TechFrameSpec {
   static const vault = _TechFrameSpec(
     kind: _TechKind.vault,
     title: 'VAULT CHANNEL',
-    subtitle: 'Arcade · 10-level tech games',
+    subtitle: 'Coins · typing · neon serpent',
     badge: 'SECURE',
     colors: [Color(0xFFFBBF24), Color(0xFFF97316), Color(0xFFEF4444)],
     icon: Icons.shield_rounded,

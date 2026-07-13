@@ -6,17 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum VaultEngine {
-  laserPrism,
-  radarSwipe,
-  orbitDodge,
-  hexFuse,
-  wireFlow,
-  byteSlice,
-  dockPulse,
-  neuronLink,
-  chronoGate,
-}
+enum VaultEngine { typeRush, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell }
 
 class VaultGameDef {
   const VaultGameDef({
@@ -40,154 +30,183 @@ class VaultGameDef {
   final IconData icon;
 }
 
-/// Vault Sync is opened separately; these are the rebuilt distinct leveled games.
 const kVaultGames = <VaultGameDef>[
   VaultGameDef(
     id: 'vault_sync',
     title: 'Vault Sync',
     shortTitle: 'Vault Sync',
     tagline: 'Tap when the arcs meet. Chase combos.',
-    techLabel: 'SYNC RING',
-    engine: VaultEngine.laserPrism, // unused for sync
+    techLabel: 'SYNC',
+    engine: VaultEngine.typeRush,
     colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
     icon: Icons.sync_rounded,
   ),
   VaultGameDef(
-    id: 'laser_prism',
-    title: 'Laser Prism',
-    shortTitle: 'Laser Prism',
-    tagline: 'Spin the prism. Light the target node.',
-    techLabel: 'BEAM',
-    engine: VaultEngine.laserPrism,
+    id: 'type_rush',
+    title: 'Type Rush',
+    shortTitle: 'Type Rush',
+    tagline: 'Type sentences & catch falling words for coins.',
+    techLabel: 'TYPE',
+    engine: VaultEngine.typeRush,
     colors: [Color(0xFF22D3EE), Color(0xFF6366F1)],
-    icon: Icons.auto_awesome_rounded,
+    icon: Icons.keyboard_rounded,
   ),
   VaultGameDef(
-    id: 'radar_swipe',
-    title: 'Radar Sweep',
-    shortTitle: 'Radar Sweep',
-    tagline: 'Swipe toward each blip as the radar passes.',
-    techLabel: 'RADAR',
-    engine: VaultEngine.radarSwipe,
-    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
-    icon: Icons.radar_rounded,
+    id: 'neon_serpent',
+    title: 'Neon Serpent',
+    shortTitle: 'Neon Serpent',
+    tagline: 'Steer with your finger. Eat rivals. Grow.',
+    techLabel: 'SNAKE',
+    engine: VaultEngine.neonSerpent,
+    colors: [Color(0xFF34D399), Color(0xFFA3E635)],
+    icon: Icons.gesture_rounded,
   ),
   VaultGameDef(
-    id: 'orbit_dodge',
-    title: 'Orbit Dodge',
-    shortTitle: 'Orbit Dodge',
-    tagline: 'Tap to boost your probe through debris rings.',
-    techLabel: 'ORBIT',
-    engine: VaultEngine.orbitDodge,
-    colors: [Color(0xFFA78BFA), Color(0xFFEC4899)],
-    icon: Icons.public_rounded,
-  ),
-  VaultGameDef(
-    id: 'hex_fuse',
-    title: 'Hex Fuse',
-    shortTitle: 'Hex Fuse',
-    tagline: 'Tap matching hex pulses before they fade.',
-    techLabel: 'HEX',
-    engine: VaultEngine.hexFuse,
-    colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-    icon: Icons.hexagon_rounded,
-  ),
-  VaultGameDef(
-    id: 'wire_flow',
-    title: 'Wire Flow',
-    shortTitle: 'Wire Flow',
-    tagline: 'Hold and ride the current along the live wire.',
-    techLabel: 'WIRE',
-    engine: VaultEngine.wireFlow,
-    colors: [Color(0xFF60A5FA), Color(0xFF818CF8)],
-    icon: Icons.cable_rounded,
-  ),
-  VaultGameDef(
-    id: 'byte_slice',
-    title: 'Byte Slice',
-    shortTitle: 'Byte Slice',
-    tagline: 'Swipe-cut falling code blocks on the beat.',
-    techLabel: 'SLICE',
-    engine: VaultEngine.byteSlice,
-    colors: [Color(0xFF4ADE80), Color(0xFF22C55E)],
-    icon: Icons.content_cut_rounded,
-  ),
-  VaultGameDef(
-    id: 'dock_pulse',
-    title: 'Dock Pulse',
-    shortTitle: 'Dock Pulse',
-    tagline: 'Release in the docking window to lock in.',
-    techLabel: 'DOCK',
-    engine: VaultEngine.dockPulse,
-    colors: [Color(0xFFFBBF24), Color(0xFF84CC16)],
-    icon: Icons.rocket_launch_rounded,
-  ),
-  VaultGameDef(
-    id: 'neuron_link',
-    title: 'Neuron Link',
-    shortTitle: 'Neuron Link',
-    tagline: 'Connect twin neurons with animated arcs.',
-    techLabel: 'NEURAL',
-    engine: VaultEngine.neuronLink,
+    id: 'orb_rush',
+    title: 'Orb Rush',
+    shortTitle: 'Orb Rush',
+    tagline: 'Pop glowing orbs before they burst.',
+    techLabel: 'ORBS',
+    engine: VaultEngine.orbRush,
     colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
-    icon: Icons.hub_rounded,
+    icon: Icons.bubble_chart_rounded,
   ),
   VaultGameDef(
-    id: 'chrono_gate',
-    title: 'Chrono Gate',
-    shortTitle: 'Chrono Gate',
-    tagline: 'Hold open while the chrono rings overlap.',
-    techLabel: 'CHRONO',
-    engine: VaultEngine.chronoGate,
-    colors: [Color(0xFF67E8F9), Color(0xFF3B82F6)],
-    icon: Icons.timelapse_rounded,
+    id: 'lane_drift',
+    title: 'Lane Drift',
+    shortTitle: 'Lane Drift',
+    tagline: 'Finger-steer through neon traffic lanes.',
+    techLabel: 'DRIFT',
+    engine: VaultEngine.laneDrift,
+    colors: [Color(0xFF60A5FA), Color(0xFF38BDF8)],
+    icon: Icons.speed_rounded,
+  ),
+  VaultGameDef(
+    id: 'echo_match',
+    title: 'Echo Match',
+    shortTitle: 'Echo Match',
+    tagline: 'Replay the pulse chain. Climb 10 echoes.',
+    techLabel: 'ECHO',
+    engine: VaultEngine.echoMatch,
+    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
+    icon: Icons.graphic_eq_rounded,
+  ),
+  VaultGameDef(
+    id: 'gravity_well',
+    title: 'Gravity Well',
+    shortTitle: 'Gravity Well',
+    tagline: 'Sling your probe into coin wells.',
+    techLabel: 'GRAV',
+    engine: VaultEngine.gravityWell,
+    colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
+    icon: Icons.blur_circular_rounded,
   ),
 ];
 
-List<Color> _levelPalette(VaultGameDef g, int level) {
-  final shift = (level - 1) * 18.0;
-  Color hueShift(Color c) {
-    final hsl = HSLColor.fromColor(c);
-    return hsl.withHue((hsl.hue + shift) % 360).toColor();
-  }
-  return [hueShift(g.colors.first), hueShift(g.colors.last)];
-}
+// Large offline banks for Type Rush
+const kVaultSentences = <String>[
+  'Systems online and ready',
+  'Sync the vault channel now',
+  'Type faster to earn coins',
+  'Neon lights fill the grid',
+  'Hold the line no matter what',
+  'Data packets move like rain',
+  'Keep your focus razor sharp',
+  'Unlock the next pulse level',
+  'Charge the core before midnight',
+  'Every word is a new reward',
+  'Swipe through the signal storm',
+  'Build speed without mistakes',
+  'The future runs on keystrokes',
+  'Catch the falling code words',
+  'Stay calm under pressure',
+  'Accuracy beats empty speed',
+  'Vault coins stack in real time',
+  'Design ten steps of mastery',
+  'Make every level feel alive',
+  'Your streak is your power',
+  'Firewalls melt under pressure',
+  'Route the beam through glass',
+  'Orbit the debris with grace',
+  'Rewrite the protocol cleanly',
+  'Never drop the live current',
+  'Cut the byte on the beat',
+  'Dock soft into the bay',
+  'Link two neurons at once',
+  'Open the chrono gate gently',
+  'Coins fly home when you win',
+];
+
+const kVaultWords = <String>[
+  'vault', 'sync', 'pulse', 'neon', 'orbit', 'laser', 'grid', 'core', 'byte', 'packet',
+  'signal', 'quantum', 'cipher', 'firewall', 'memory', 'cache', 'node', 'mesh', 'drift', 'boost',
+  'combo', 'streak', 'level', 'coin', 'reward', 'focus', 'speed', 'precision', 'charge', 'glow',
+  'spark', 'flux', 'vector', 'matrix', 'kernel', 'thread', 'frame', 'render', 'shader', 'pixel',
+  'audio', 'relay', 'beacon', 'portal', 'gate', 'prism', 'helix', 'nova', 'flare', 'surge',
+  'rapid', 'swift', 'clean', 'sharp', 'bright', 'heavy', 'light', 'solid', 'fluid', 'static',
+  'dynamic', 'online', 'secure', 'local', 'offline', 'arcade', 'serpent', 'orb', 'echo', 'well',
+  'type', 'rush', 'catch', 'match', 'link', 'hold', 'tap', 'drag', 'swipe', 'steer',
+  'grow', 'eat', 'win', 'rise', 'fall', 'climb', 'clear', 'unlock', 'upgrade', 'design',
+];
 
 class VaultGameProgress {
-  const VaultGameProgress({this.best = 0, this.plays = 0, this.xp = 0, this.level = 1, this.bestCombo = 0});
+  const VaultGameProgress({this.best = 0, this.plays = 0, this.coins = 0, this.level = 1, this.bestCombo = 0});
 
   final int best;
   final int plays;
-  final int xp;
+  final int coins;
   final int level;
   final int bestCombo;
+
+  /// Legacy alias used by older hub code paths.
+  int get xp => coins;
 
   Map<String, dynamic> toJson() => {
         'best': best,
         'plays': plays,
-        'xp': xp,
+        'coins': coins,
+        'xp': coins,
         'level': level,
         'bestCombo': bestCombo,
-        'stars': (level / 4).floor().clamp(0, 3),
       };
 
-  factory VaultGameProgress.fromJson(Map map) => VaultGameProgress(
-        best: (map['best'] as num?)?.toInt() ?? 0,
-        plays: (map['plays'] as num?)?.toInt() ?? 0,
-        xp: (map['xp'] as num?)?.toInt() ?? 0,
-        level: ((map['level'] as num?)?.toInt() ?? 1).clamp(1, 10),
-        bestCombo: (map['bestCombo'] as num?)?.toInt() ?? 0,
-      );
+  factory VaultGameProgress.fromJson(Map map) {
+    final coins = (map['coins'] as num?)?.toInt() ?? (map['xp'] as num?)?.toInt() ?? 0;
+    return VaultGameProgress(
+      best: (map['best'] as num?)?.toInt() ?? 0,
+      plays: (map['plays'] as num?)?.toInt() ?? 0,
+      coins: coins,
+      level: ((map['level'] as num?)?.toInt() ?? 1).clamp(1, 10),
+      bestCombo: (map['bestCombo'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class VaultProgressStore {
-  static const _k = 'ngmy_vault_arcade_progress_v2';
+  static const _k = 'ngmy_vault_arcade_progress_v3';
+  static const _kWallet = 'ngmy_vault_arcade_wallet_v1';
+
+  static Future<int> walletCoins() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_kWallet) ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static Future<int> addWalletCoins(int amount) async {
+    final prefs = await SharedPreferences.getInstance();
+    final next = (prefs.getInt(_kWallet) ?? 0) + amount;
+    await prefs.setInt(_kWallet, next);
+    return next;
+  }
 
   static Future<Map<String, VaultGameProgress>> loadAll() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final out = <String, VaultGameProgress>{};
-      final raw = prefs.getString(_k) ?? prefs.getString('ngmy_vault_arcade_progress_v1');
+      final raw = prefs.getString(_k) ?? prefs.getString('ngmy_vault_arcade_progress_v2') ?? prefs.getString('ngmy_vault_arcade_progress_v1');
       if (raw != null) {
         final decoded = jsonDecode(raw);
         if (decoded is Map) {
@@ -206,7 +225,7 @@ class VaultProgressStore {
           out['vault_sync'] = VaultGameProgress(
             best: math.max(prev.best, best),
             plays: math.max(prev.plays, best > 0 ? 1 : 0),
-            xp: prev.xp,
+            coins: prev.coins,
             level: prev.level,
             bestCombo: math.max(prev.bestCombo, bestCombo),
           );
@@ -218,18 +237,18 @@ class VaultProgressStore {
     }
   }
 
-  static Future<VaultGameProgress> saveLevel({
+  static Future<VaultGameProgress> saveRun({
     required String gameId,
     required int level,
     required int score,
-    required int xpGain,
+    required int coinsEarned,
   }) async {
     final all = await loadAll();
     final prev = all[gameId] ?? const VaultGameProgress();
     final next = VaultGameProgress(
       best: math.max(prev.best, score),
       plays: prev.plays + 1,
-      xp: prev.xp + xpGain,
+      coins: prev.coins + coinsEarned,
       level: math.max(prev.level, level.clamp(1, 10)),
       bestCombo: prev.bestCombo,
     );
@@ -237,12 +256,28 @@ class VaultProgressStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_k, jsonEncode(all.map((k, v) => MapEntry(k, v.toJson()))));
+      if (coinsEarned > 0) await addWalletCoins(coinsEarned);
     } catch (_) {}
     return next;
   }
+
+  /// Back-compat for older call sites.
+  static Future<VaultGameProgress> saveLevel({
+    required String gameId,
+    required int level,
+    required int score,
+    required int xpGain,
+  }) =>
+      saveRun(gameId: gameId, level: level, score: score, coinsEarned: xpGain);
 }
 
-/// Shared leveled shell — 10 steps, no hearts, clear target then next level.
+/// Result popped back to the arcade hub for coin-fly animation.
+class VaultGameResult {
+  const VaultGameResult({required this.coinsEarned, required this.score});
+  final int coinsEarned;
+  final int score;
+}
+
 class NgmyVaultLeveledGameScreen extends StatefulWidget {
   const NgmyVaultLeveledGameScreen({super.key, required this.game});
 
@@ -254,72 +289,69 @@ class NgmyVaultLeveledGameScreen extends StatefulWidget {
 
 class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen> with TickerProviderStateMixin {
   late final AnimationController _tick;
-  late final AnimationController _flash;
   final _rng = math.Random();
+  final _typeCtrl = TextEditingController();
+  final _typeFocus = FocusNode();
 
   int _level = 1;
+  int _savedLevel = 1;
+  int _score = 0;
+  int _sessionCoins = 0;
   int _progress = 0;
   int _need = 3;
-  int _score = 0;
-  int _savedLevel = 1;
   bool _playing = false;
   bool _levelClear = false;
-  String _feedback = 'Clear the target to unlock the next design';
+  String _feedback = 'Earn coins. Clear 10 levels.';
   Color _feedbackColor = Colors.white70;
 
-  // laser
-  double _prism = 0;
-  double _targetAngle = 1.2;
+  // type rush
+  String _prompt = '';
+  final List<_FallWord> _falling = [];
+  Timer? _spawnTimer;
 
-  // radar
-  double _blipAngle = 0.8;
-  bool _blipLive = true;
+  // snake
+  final List<Offset> _snake = [];
+  final List<_RivalSnake> _rivals = [];
+  Offset _aim = const Offset(0, -1);
+  Offset? _food;
+  double _snakeSpeed = 2.4;
 
-  // orbit
-  double _shipR = 0.55;
-  double _hazard = 0;
+  // orbs
+  final List<_Orb> _orbs = [];
 
-  // hex
-  int _hexFocus = 0;
-  List<int> _hexLit = const [];
+  // lane
+  double _carX = 0.5;
+  final List<_LaneObstacle> _obstacles = [];
 
-  // wire
-  double _wireT = 0;
-  bool _holdingWire = false;
+  // echo
+  List<int> _echo = [];
+  int _echoStep = 0;
+  bool _echoShow = false;
+  int? _echoFlash;
 
-  // byte
-  double _byteY = -0.2;
-  int _byteLane = 1;
-  int _sliceLane = 1;
-
-  // dock
-  double _dockV = 0;
-
-  // neuron
-  int? _picked;
-  List<int> _pairs = const [0, 1, 2, 3, 4, 5];
-  final Set<int> _linked = {};
-
-  // chrono
-  bool _holdingGate = false;
+  // gravity
+  Offset _probe = const Offset(0.5, 0.8);
+  Offset _vel = Offset.zero;
+  bool _dragging = false;
+  Offset _well = const Offset(0.5, 0.28);
 
   VaultGameDef get g => widget.game;
-  List<Color> get colors => _levelPalette(g, _level);
+  List<Color> get colors => g.colors;
+  bool get _isRainLevel => g.engine == VaultEngine.typeRush && _level % 2 == 0;
 
   @override
   void initState() {
     super.initState();
-    _tick = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
-    _flash = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
-    _tick.addListener(_onTick);
+    _tick = AnimationController(vsync: this, duration: const Duration(milliseconds: 16))..addListener(_frame);
     unawaited(_load());
   }
 
   @override
   void dispose() {
-    _tick.removeListener(_onTick);
+    _spawnTimer?.cancel();
     _tick.dispose();
-    _flash.dispose();
+    _typeCtrl.dispose();
+    _typeFocus.dispose();
     super.dispose();
   }
 
@@ -330,152 +362,244 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
     setState(() {
       _savedLevel = (p?.level ?? 1).clamp(1, 10);
       _level = _savedLevel;
-      _need = _needFor(_level);
+      _need = 2 + _level;
     });
   }
 
-  int _needFor(int level) => 2 + level; // 3..12
-
-  double get _speed => 0.85 + _level * 0.12;
-
-  void _onTick() {
+  void _frame() {
     if (!_playing || _levelClear) return;
-    var failMsg = '';
-    var doHit = false;
     setState(() {
       switch (g.engine) {
-        case VaultEngine.orbitDodge:
-          _hazard = (_hazard + 0.012 * _speed) % (math.pi * 2);
-          final shipA = _tick.value * math.pi * 2;
-          final d = _angleDelta(shipA, _hazard);
-          if (d < 0.28 && _shipR > 0.42 && _shipR < 0.72) {
-            failMsg = 'HIT DEBRIS';
-          }
-          _shipR = (_shipR - 0.0025 * _speed).clamp(0.22, 0.92);
-          break;
-        case VaultEngine.byteSlice:
-          _byteY += 0.016 * _speed;
-          if (_byteY > 1.05) {
-            _byteY = -0.15;
-            failMsg = 'MISSED BYTE';
-            _byteLane = _rng.nextInt(3);
-          }
-          break;
-        case VaultEngine.wireFlow:
-          if (_holdingWire) {
-            _wireT += 0.01 * _speed;
-            if (_wireT >= 1) {
-              _wireT = 0;
-              doHit = true;
+        case VaultEngine.typeRush:
+          if (_isRainLevel) {
+            for (final w in _falling) {
+              w.y += (0.004 + _level * 0.00055);
             }
-          } else {
-            _wireT = (_wireT - 0.008).clamp(0.0, 1.0);
+            _falling.removeWhere((w) {
+              if (w.y >= 1.0) {
+                _progress = math.max(0, _progress - 1);
+                _feedback = 'WORD DROPPED';
+                _feedbackColor = const Color(0xFFEF4444);
+                return true;
+              }
+              return false;
+            });
           }
           break;
-        case VaultEngine.dockPulse:
-          _dockV = (math.sin(_tick.value * math.pi * 2 * (0.7 + _level * 0.08)) + 1) / 2;
+        case VaultEngine.neonSerpent:
+          _stepSnake();
           break;
-        case VaultEngine.chronoGate:
-        case VaultEngine.laserPrism:
-        case VaultEngine.radarSwipe:
-        case VaultEngine.hexFuse:
-        case VaultEngine.neuronLink:
+        case VaultEngine.orbRush:
+          for (final o in _orbs) {
+            o.r += 0.004 + _level * 0.0004;
+          }
+          _orbs.removeWhere((o) {
+            if (o.r >= o.maxR) {
+              _progress = math.max(0, _progress - 1);
+              return true;
+            }
+            return false;
+          });
+          if (_orbs.length < 3 + _level ~/ 2) _spawnOrb();
+          break;
+        case VaultEngine.laneDrift:
+          for (final o in _obstacles) {
+            o.y += 0.012 + _level * 0.0012;
+          }
+          _obstacles.removeWhere((o) => o.y > 1.2);
+          if (_obstacles.isEmpty || _obstacles.last.y > 0.28) {
+            _obstacles.add(_LaneObstacle(x: _rng.nextDouble(), y: -0.1, w: 0.18 + _rng.nextDouble() * 0.12));
+          }
+          for (final o in _obstacles) {
+            if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
+              _progress = 0;
+              _feedback = 'CRASH';
+              _feedbackColor = const Color(0xFFEF4444);
+              _obstacles.clear();
+              break;
+            }
+          }
+          break;
+        case VaultEngine.gravityWell:
+          if (!_dragging) {
+            final to = _well - _probe;
+            _vel += to * 0.0018;
+            _vel *= 0.992;
+            _probe += _vel * 0.02;
+            if (_probe.dx < 0.05 || _probe.dx > 0.95) _vel = Offset(-_vel.dx * 0.8, _vel.dy);
+            if (_probe.dy < 0.05 || _probe.dy > 0.95) _vel = Offset(_vel.dx, -_vel.dy * 0.8);
+            _probe = Offset(_probe.dx.clamp(0.05, 0.95), _probe.dy.clamp(0.05, 0.95));
+            if ((_probe - _well).distance < 0.07) {
+              _well = Offset(0.2 + _rng.nextDouble() * 0.6, 0.15 + _rng.nextDouble() * 0.45);
+              _vel *= 0.2;
+              unawaited(_gainHit(coins: 4 + _level));
+            }
+          }
+          break;
+        case VaultEngine.echoMatch:
           break;
       }
     });
-    if (failMsg.isNotEmpty) _failStep(failMsg);
-    if (doHit) unawaited(_hit());
   }
 
-  double _angleDelta(double a, double b) {
-    var d = (a - b) % (math.pi * 2);
-    if (d > math.pi) d -= math.pi * 2;
-    if (d < -math.pi) d += math.pi * 2;
-    return d.abs();
+  void _stepSnake() {
+    if (_snake.isEmpty) return;
+    final head = _snake.first + _aim * (_snakeSpeed * 0.0045 * (1 + _level * 0.04));
+    final nh = Offset(head.dx.clamp(0.02, 0.98), head.dy.clamp(0.02, 0.98));
+    _snake.insert(0, nh);
+    while (_snake.length > 8 + _progress * 2) {
+      _snake.removeLast();
+    }
+    if (_food != null && (nh - _food!).distance < 0.045) {
+      _food = Offset(0.1 + _rng.nextDouble() * 0.8, 0.1 + _rng.nextDouble() * 0.8);
+      unawaited(_gainHit(coins: 3 + _level));
+    }
+    for (final r in _rivals) {
+      final dir = (_snake.first - r.body.first);
+      final n = dir.distance < 0.001 ? Offset(_rng.nextDouble() - 0.5, _rng.nextDouble() - 0.5) : dir / dir.distance;
+      final h = r.body.first + n * (0.003 + _level * 0.00025);
+      r.body.insert(0, Offset(h.dx.clamp(0.02, 0.98), h.dy.clamp(0.02, 0.98)));
+      while (r.body.length > r.len) {
+        r.body.removeLast();
+      }
+      // eat rival head if we hit their body and we're longer
+      if (r.body.length > 1) {
+        for (var i = 1; i < r.body.length; i++) {
+          if ((nh - r.body[i]).distance < 0.03 && _snake.length >= r.len) {
+            r.len = math.max(3, r.len - 2);
+            while (r.body.length > r.len) {
+              r.body.removeLast();
+            }
+            unawaited(_gainHit(coins: 6 + _level));
+            break;
+          }
+        }
+      }
+      if ((nh - r.body.first).distance < 0.03 && r.len > _snake.length) {
+        _progress = 0;
+        _feedback = 'EATEN';
+        _feedbackColor = const Color(0xFFEF4444);
+        _resetSnake();
+      }
+    }
   }
 
-  void _start() {
+  void _resetSnake() {
+    _snake
+      ..clear()
+      ..addAll([const Offset(0.5, 0.6), const Offset(0.5, 0.64), const Offset(0.5, 0.68)]);
+    _aim = const Offset(0, -1);
+    _food = Offset(0.3 + _rng.nextDouble() * 0.4, 0.25 + _rng.nextDouble() * 0.3);
+    _rivals
+      ..clear()
+      ..add(_RivalSnake(len: 5, body: [const Offset(0.2, 0.3), const Offset(0.2, 0.34), const Offset(0.2, 0.38)]))
+      ..add(_RivalSnake(len: 4, body: [const Offset(0.8, 0.4), const Offset(0.76, 0.4), const Offset(0.72, 0.4)]));
+  }
+
+  void _spawnOrb() {
+    _orbs.add(_Orb(x: 0.12 + _rng.nextDouble() * 0.76, y: 0.15 + _rng.nextDouble() * 0.55, r: 0.02, maxR: 0.09 + _rng.nextDouble() * 0.04));
+  }
+
+  Future<void> _start() async {
     HapticFeedback.mediumImpact();
+    _spawnTimer?.cancel();
     setState(() {
       _playing = true;
       _levelClear = false;
       _progress = 0;
-      _need = _needFor(_level);
-      _feedback = 'Level $_level · hit $_need targets';
+      _need = 3 + _level;
+      _feedback = 'Level $_level · earn coins';
       _feedbackColor = Colors.white70;
-      _prism = 0;
-      _targetAngle = _rng.nextDouble() * math.pi * 2;
-      _blipAngle = _rng.nextDouble() * math.pi * 2;
-      _blipLive = true;
-      _shipR = 0.55;
-      _hazard = _rng.nextDouble() * math.pi * 2;
-      _hexFocus = _rng.nextInt(7);
-      _hexLit = [_hexFocus];
-      _wireT = 0;
-      _holdingWire = false;
-      _byteY = -0.2;
-      _byteLane = _rng.nextInt(3);
-      _sliceLane = 1;
-      _dockV = 0;
-      _picked = null;
-      _pairs = List.generate(6, (i) => i ~/ 2)..shuffle(_rng);
-      _linked.clear();
-      _holdingGate = false;
-      _tick
-        ..duration = Duration(milliseconds: (1600 / _speed).round())
-        ..repeat();
+      _falling.clear();
+      _orbs.clear();
+      _obstacles.clear();
+      _echo = [];
+      _echoStep = 0;
+      _probe = const Offset(0.5, 0.8);
+      _vel = Offset.zero;
+      _well = Offset(0.3 + _rng.nextDouble() * 0.4, 0.25);
+      _carX = 0.5;
+      _typeCtrl.clear();
+    });
+    if (g.engine == VaultEngine.neonSerpent) _resetSnake();
+    if (g.engine == VaultEngine.typeRush) {
+      if (_isRainLevel) {
+        _spawnTimer = Timer.periodic(Duration(milliseconds: (900 - _level * 40).clamp(420, 900)), (_) {
+          if (!_playing || !mounted) return;
+          setState(() {
+            _falling.add(_FallWord(text: kVaultWords[_rng.nextInt(kVaultWords.length)], x: 0.1 + _rng.nextDouble() * 0.7, y: -0.05));
+          });
+        });
+      } else {
+        _nextSentence();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => _typeFocus.requestFocus());
+    }
+    if (g.engine == VaultEngine.echoMatch) await _nextEcho();
+    _tick.repeat();
+  }
+
+  void _nextSentence() {
+    _prompt = kVaultSentences[_rng.nextInt(kVaultSentences.length)];
+    _typeCtrl.clear();
+    setState(() {});
+  }
+
+  Future<void> _nextEcho() async {
+    _echo = [..._echo, _rng.nextInt(4)];
+    _echoStep = 0;
+    setState(() {
+      _echoShow = true;
+      _feedback = 'Watch';
+    });
+    for (final n in _echo) {
+      if (!mounted || !_playing) return;
+      setState(() => _echoFlash = n);
+      await Future<void>.delayed(Duration(milliseconds: (380 - _level * 12).clamp(180, 380)));
+      if (!mounted) return;
+      setState(() => _echoFlash = null);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+    if (!mounted) return;
+    setState(() {
+      _echoShow = false;
+      _feedback = 'Repeat';
     });
   }
 
-  Future<void> _hit() async {
+  int _banked = 0;
+
+  Future<void> _gainHit({required int coins}) async {
     HapticFeedback.lightImpact();
-    unawaited(_flash.forward(from: 0));
     setState(() {
       _progress += 1;
-      _score += 10 + _level * 4;
-      _feedback = 'LOCKED $_progress / $_need';
-      _feedbackColor = colors.first;
-      _targetAngle = (_targetAngle + 0.9 + _rng.nextDouble()) % (math.pi * 2);
-      _blipAngle = _rng.nextDouble() * math.pi * 2;
-      _blipLive = true;
-      _hexFocus = _rng.nextInt(7);
-      _hexLit = [_hexFocus, if (_level > 4) (_hexFocus + 3) % 7];
-      _byteY = -0.2;
-      _byteLane = _rng.nextInt(3);
-      _picked = null;
+      _score += coins * 2;
+      _sessionCoins += coins;
+      _feedback = '+$coins coins · $_progress/$_need';
+      _feedbackColor = const Color(0xFFFBBF24);
     });
     if (_progress >= _need) await _clearLevel();
   }
 
-  void _failStep(String msg) {
-    HapticFeedback.heavyImpact();
-    setState(() {
-      _progress = 0;
-      _feedback = msg;
-      _feedbackColor = const Color(0xFFEF4444);
-      _shipR = 0.55;
-      _wireT = 0;
-      _holdingWire = false;
-      _byteY = -0.2;
-      _linked.clear();
-      _picked = null;
-    });
-  }
-
   Future<void> _clearLevel() async {
+    _spawnTimer?.cancel();
+    final bonus = 12 + _level * 4;
     setState(() {
       _levelClear = true;
       _playing = false;
-      _feedback = _level >= 10 ? 'MAXED · ALL 10 DESIGNS CLEARED' : 'LEVEL $_level CLEAR · NEXT DESIGN UNLOCKED';
+      _sessionCoins += bonus;
+      _feedback = _level >= 10 ? 'MAXED · COINS BANKED' : 'LEVEL $_level CLEAR · +$bonus BONUS';
       _feedbackColor = const Color(0xFFFBBF24);
     });
     final nextLevel = (_level + 1).clamp(1, 10);
-    final saved = await VaultProgressStore.saveLevel(
+    final toBank = _sessionCoins - _banked;
+    final saved = await VaultProgressStore.saveRun(
       gameId: g.id,
       level: _level >= 10 ? 10 : nextLevel,
       score: _score,
-      xpGain: 20 + _level * 8,
+      coinsEarned: toBank,
     );
+    _banked = _sessionCoins;
     if (!mounted) return;
     setState(() {
       _savedLevel = saved.level;
@@ -483,619 +607,462 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
     });
   }
 
-  void _onLaserDrag(DragUpdateDetails d) {
+  Future<void> _finishToHub() async {
+    final pending = _sessionCoins - _banked;
+    if (pending > 0) {
+      await VaultProgressStore.saveRun(gameId: g.id, level: _level, score: _score, coinsEarned: pending);
+      _banked = _sessionCoins;
+    }
+    if (!mounted) return;
+    Navigator.pop(context, VaultGameResult(coinsEarned: _sessionCoins, score: _score));
+  }
+
+  void _onType(String value) {
     if (!_playing) return;
-    setState(() => _prism = (_prism + d.delta.dx * 0.01) % (math.pi * 2));
-  }
-
-  void _onLaserTap() {
-    if (!_playing) {
-      _start();
+    if (g.engine != VaultEngine.typeRush) return;
+    if (_isRainLevel) {
+      final typed = value.trim().toLowerCase();
+      final idx = _falling.indexWhere((w) => w.text == typed);
+      if (idx >= 0) {
+        setState(() => _falling.removeAt(idx));
+        _typeCtrl.clear();
+        unawaited(_gainHit(coins: 3 + _level));
+      }
       return;
     }
-    final beam = _prism + math.pi / 2;
-    if (_angleDelta(beam, _targetAngle) < 0.22) {
-      _hit();
-    } else {
-      _failStep('BEAM MISS');
-    }
-  }
-
-  void _onRadarSwipe(DragEndDetails d) {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    if (!_blipLive) return;
-    final v = d.velocity.pixelsPerSecond;
-    final swipe = math.atan2(v.dy, v.dx);
-    final sweep = _tick.value * math.pi * 2;
-    if (_angleDelta(sweep, _blipAngle) > 0.55) {
-      _failStep('OUT OF SWEEP');
-      return;
-    }
-    if (_angleDelta(swipe, _blipAngle) < 0.7) {
-      _hit();
-    } else {
-      _failStep('WRONG VECTOR');
-    }
-  }
-
-  void _onOrbitTap() {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    setState(() => _shipR = (_shipR + 0.12).clamp(0.22, 0.95));
-    // Score when boosting through safe corridor repeatedly
-    if (_shipR > 0.7) _hit();
-  }
-
-  void _onHexTap(int i) {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    if (_hexLit.contains(i)) {
-      _hit();
-    } else {
-      _failStep('WRONG HEX');
-    }
-  }
-
-  void _onWireStart() {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    setState(() => _holdingWire = true);
-  }
-
-  void _onWireEnd() {
-    if (!_playing) return;
-    if (_wireT < 0.85) _failStep('CURRENT BROKE');
-    setState(() => _holdingWire = false);
-  }
-
-  void _onByteSwipe(DragEndDetails d) {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    final v = d.primaryVelocity ?? 0;
-    setState(() {
-      if (v < -80) _sliceLane = (_sliceLane - 1).clamp(0, 2);
-      if (v > 80) _sliceLane = (_sliceLane + 1).clamp(0, 2);
-    });
-    if (_byteY > 0.55 && _byteY < 0.9 && _sliceLane == _byteLane) {
-      _hit();
-    }
-  }
-
-  void _onDockRelease() {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    final window = 0.14 / (0.8 + _level * 0.05);
-    if ((_dockV - 0.62).abs() < window) {
-      _hit();
-    } else {
-      _failStep('DOCK FAIL');
-    }
-  }
-
-  void _onNeuronTap(int i) {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    if (_linked.contains(i)) return;
-    if (_picked == null) {
-      setState(() => _picked = i);
-      return;
-    }
-    if (_picked == i) {
-      setState(() => _picked = null);
-      return;
-    }
-    if (_pairs[_picked!] == _pairs[i]) {
-      _linked.add(_picked!);
-      _linked.add(i);
-      setState(() => _picked = null);
-      _hit();
-    } else {
-      setState(() => _picked = null);
-      _failStep('BAD LINK');
-    }
-  }
-
-  void _onGateStart() {
-    if (!_playing) {
-      _start();
-      return;
-    }
-    setState(() => _holdingGate = true);
-  }
-
-  void _onGateEnd() {
-    if (!_playing || !_holdingGate) return;
-    setState(() => _holdingGate = false);
-    final a = _tick.value * math.pi * 2;
-    final b = _tick.value * math.pi * 2 * (1.15 + _level * 0.03);
-    if (_angleDelta(a, b) < 0.28) {
-      _hit();
-    } else {
-      _failStep('GATE CLOSED');
+    if (value.toLowerCase().trim() == _prompt.toLowerCase()) {
+      unawaited(_gainHit(coins: 5 + _level));
+      _nextSentence();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _finishToHub();
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFF030712),
       body: SafeArea(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_tick, _flash]),
-          builder: (context, _) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 14, 0),
-                  child: Row(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 14, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: _finishToHub,
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20),
+                  ),
+                  Expanded(child: Text(g.title.toUpperCase(), style: TextStyle(color: colors.first, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 12))),
+                  _pill(Icons.monetization_on_rounded, '$_sessionCoins'),
+                  const SizedBox(width: 8),
+                  _pill(Icons.flag_rounded, 'LV $_level/10'),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-                      Expanded(child: Text(g.title.toUpperCase(), style: TextStyle(color: colors.first, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 12))),
-                      _pill('LV $_level/10'),
+                      Text('Target $_progress/$_need', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+                      const Spacer(),
+                      Text('Best LV $_savedLevel', style: TextStyle(color: colors.first.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 11)),
                     ],
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          _pill('$_score'),
-                          const SizedBox(width: 8),
-                          Text('Target $_progress/$_need', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
-                          const Spacer(),
-                          Text('Best LV $_savedLevel', style: TextStyle(color: colors.first.withValues(alpha: 0.8), fontWeight: FontWeight.w800, fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(99),
-                        child: LinearProgressIndicator(
-                          value: _need == 0 ? 0 : _progress / _need,
-                          minHeight: 7,
-                          backgroundColor: Colors.white12,
-                          color: colors.first,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(child: _field()),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
-                  child: Text(_feedback, textAlign: TextAlign.center, style: TextStyle(color: _feedbackColor, fontWeight: FontWeight.w800, fontSize: 13)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _levelClear
-                          ? (_level >= 10 ? () => Navigator.pop(context) : _start)
-                          : (_playing ? null : _start),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors[1],
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: colors[1].withValues(alpha: 0.35),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: Text(
-                        _levelClear ? (_level >= 10 ? 'DONE' : 'ENTER LEVEL $_level') : (_playing ? 'IN PROGRESS' : 'START LEVEL $_level'),
-                        style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
-                      ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: _need == 0 ? 0 : (_progress / _need).clamp(0.0, 1.0),
+                      minHeight: 7,
+                      backgroundColor: Colors.white12,
+                      color: colors.first,
                     ),
                   ),
+                ],
+              ),
+            ),
+            Expanded(child: AnimatedBuilder(animation: _tick, builder: (_, __) => _field())),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+              child: Text(_feedback, textAlign: TextAlign.center, style: TextStyle(color: _feedbackColor, fontWeight: FontWeight.w800, fontSize: 13)),
+            ),
+            if (g.engine == VaultEngine.typeRush && _playing)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: TextField(
+                  controller: _typeCtrl,
+                  focusNode: _typeFocus,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                  cursorColor: colors.first,
+                  decoration: InputDecoration(
+                    hintText: _isRainLevel ? 'Type falling words…' : 'Type the sentence…',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.06),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: colors.first.withValues(alpha: 0.45))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: colors.first.withValues(alpha: 0.35))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: colors.first, width: 1.4)),
+                  ),
+                  onChanged: _onType,
+                  textInputAction: TextInputAction.done,
                 ),
-              ],
-            );
-          },
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _levelClear ? (_level >= 10 ? _finishToHub : _start) : (_playing ? null : _start),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.last,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: colors.last.withValues(alpha: 0.35),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text(
+                    _levelClear ? (_level >= 10 ? 'COLLECT COINS' : 'NEXT LEVEL $_level') : (_playing ? 'PLAYING' : 'START LEVEL $_level'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
       ),
     );
   }
 
-  Widget _pill(String t) {
+  Widget _pill(IconData icon, String t) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(999)),
-      child: Text(t, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFFFBBF24)),
+          const SizedBox(width: 4),
+          Text(t, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+        ],
+      ),
     );
   }
 
   Widget _field() {
     switch (g.engine) {
-      case VaultEngine.laserPrism:
-        return GestureDetector(
-          onHorizontalDragUpdate: _onLaserDrag,
-          onTap: _onLaserTap,
-          child: CustomPaint(
-            painter: _LaserPainter(colors: colors, prism: _prism, target: _targetAngle, t: _tick.value, flash: _flash.value),
-            child: const Center(child: Text('DRAG · TAP', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
+      case VaultEngine.typeRush:
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              if (!_isRainLevel)
+                Center(
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey(_prompt),
+                    tween: Tween(begin: 0.85, end: 1),
+                    duration: const Duration(milliseconds: 420),
+                    curve: Curves.easeOutBack,
+                    builder: (context, s, child) => Transform.scale(scale: s, child: child),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: LinearGradient(colors: [colors.first.withValues(alpha: 0.25), colors.last.withValues(alpha: 0.18)]),
+                        border: Border.all(color: colors.first.withValues(alpha: 0.55)),
+                      ),
+                      child: Text(
+                        _playing ? _prompt : 'Start to type glowing sentences',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.3),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ..._falling.map((w) {
+                  return Positioned(
+                    left: w.x * MediaQuery.sizeOf(context).width * 0.75,
+                    top: 20 + w.y * (MediaQuery.sizeOf(context).height * 0.42),
+                    child: Transform.scale(
+                      scale: 1 + math.sin(w.y * 12) * 0.08,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(colors: colors),
+                          boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.45), blurRadius: 16)],
+                        ),
+                        child: Text(w.text, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0.5)),
+                      ),
+                    ),
+                  );
+                }),
+            ],
           ),
         );
-      case VaultEngine.radarSwipe:
+      case VaultEngine.neonSerpent:
         return GestureDetector(
-          onPanEnd: _onRadarSwipe,
+          onPanUpdate: (d) {
+            if (!_playing) return;
+            final v = d.delta;
+            if (v.distance < 0.5) return;
+            setState(() => _aim = Offset(v.dx, v.dy) / v.distance);
+          },
           onTap: () {
             if (!_playing) _start();
           },
           child: CustomPaint(
-            painter: _RadarPainter(colors: colors, sweep: _tick.value * math.pi * 2, blip: _blipAngle, live: _blipLive, flash: _flash.value),
-            child: const Center(child: Text('SWIPE TO BLIP', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
+            painter: _SnakePainter(colors: colors, snake: _snake, rivals: _rivals, food: _food),
+            child: const Center(child: Text('DRAG TO STEER', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
           ),
         );
-      case VaultEngine.orbitDodge:
+      case VaultEngine.orbRush:
+        return LayoutBuilder(
+          builder: (context, c) {
+            return GestureDetector(
+              onTapDown: (d) {
+                if (!_playing) {
+                  _start();
+                  return;
+                }
+                final p = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight);
+                final hit = _orbs.indexWhere((o) => (Offset(o.x, o.y) - p).distance < o.r + 0.03);
+                if (hit >= 0) {
+                  setState(() => _orbs.removeAt(hit));
+                  unawaited(_gainHit(coins: 2 + _level));
+                }
+              },
+              child: CustomPaint(painter: _OrbPainter(colors: colors, orbs: _orbs), size: Size.infinite),
+            );
+          },
+        );
+      case VaultEngine.laneDrift:
         return GestureDetector(
-          onTap: _onOrbitTap,
-          child: CustomPaint(
-            painter: _OrbitPainter(colors: colors, shipR: _shipR, hazard: _hazard, shipA: _tick.value * math.pi * 2, flash: _flash.value),
-            child: const Center(child: Text('TAP BOOST', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
-          ),
-        );
-      case VaultEngine.hexFuse:
-        return Center(
-          child: SizedBox(
-            width: 280,
-            height: 280,
-            child: CustomPaint(
-              painter: _HexPainter(colors: colors, lit: _hexLit, t: _tick.value, flash: _flash.value),
-              child: Stack(
-                children: List.generate(7, (i) {
-                  final p = _hexPoint(i, 280);
-                  return Positioned(
-                    left: p.dx - 28,
-                    top: p.dy - 28,
-                    width: 56,
-                    height: 56,
-                    child: GestureDetector(onTap: () => _onHexTap(i), behavior: HitTestBehavior.opaque),
-                  );
-                }),
-              ),
-            ),
-          ),
-        );
-      case VaultEngine.wireFlow:
-        return GestureDetector(
-          onTapDown: (_) => _onWireStart(),
-          onTapUp: (_) => _onWireEnd(),
-          onTapCancel: _onWireEnd,
-          child: CustomPaint(
-            painter: _WirePainter(colors: colors, t: _wireT, pulse: _tick.value, holding: _holdingWire),
-            child: Center(child: Text(_holdingWire ? 'HOLD' : 'HOLD THE CURRENT', style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
-          ),
-        );
-      case VaultEngine.byteSlice:
-        return GestureDetector(
-          onHorizontalDragEnd: _onByteSwipe,
+          onHorizontalDragUpdate: (d) {
+            if (!_playing) return;
+            setState(() => _carX = (_carX + d.delta.dx / 280).clamp(0.08, 0.92));
+          },
           onTap: () {
             if (!_playing) _start();
           },
           child: CustomPaint(
-            painter: _BytePainter(colors: colors, y: _byteY, lane: _byteLane, slice: _sliceLane, t: _tick.value),
-            child: const Center(child: Text('SWIPE LANES', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
+            painter: _LanePainter(colors: colors, carX: _carX, obstacles: _obstacles, t: _tick.value),
+            child: const Center(child: Text('DRAG TO DRIFT', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
           ),
         );
-      case VaultEngine.dockPulse:
-        return GestureDetector(
-          onTapDown: (_) {
-            if (!_playing) _start();
-          },
-          onTapUp: (_) => _onDockRelease(),
-          child: CustomPaint(
-            painter: _DockPainter(colors: colors, v: _dockV, level: _level, flash: _flash.value),
-            child: const Center(child: Text('RELEASE IN WINDOW', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
-          ),
-        );
-      case VaultEngine.neuronLink:
+      case VaultEngine.echoMatch:
         return Center(
           child: SizedBox(
-            width: 300,
-            height: 300,
-            child: CustomPaint(
-              painter: _NeuronPainter(colors: colors, pairs: _pairs, linked: _linked, picked: _picked, t: _tick.value),
-              child: Stack(
-                children: List.generate(6, (i) {
-                  final a = -math.pi / 2 + i * math.pi / 3;
-                  final c = Offset(150 + math.cos(a) * 110, 150 + math.sin(a) * 110);
-                  return Positioned(
-                    left: c.dx - 26,
-                    top: c.dy - 26,
-                    width: 52,
-                    height: 52,
-                    child: GestureDetector(onTap: () => _onNeuronTap(i), behavior: HitTestBehavior.opaque),
-                  );
-                }),
-              ),
+            width: 260,
+            height: 260,
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12),
+              itemCount: 4,
+              itemBuilder: (_, i) {
+                final on = _echoFlash == i;
+                return GestureDetector(
+                  onTap: () async {
+                    if (!_playing) {
+                      await _start();
+                      return;
+                    }
+                    if (_echoShow) return;
+                    if (_echo[_echoStep] == i) {
+                      setState(() => _echoStep += 1);
+                      if (_echoStep >= _echo.length) {
+                        await _gainHit(coins: 4 + _level);
+                        if (_playing && !_levelClear) await _nextEcho();
+                      }
+                    } else {
+                      setState(() {
+                        _progress = 0;
+                        _feedback = 'WRONG ECHO';
+                        _feedbackColor = const Color(0xFFEF4444);
+                      });
+                      await _nextEcho();
+                    }
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 90),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: on ? LinearGradient(colors: colors) : null,
+                      color: on ? null : Colors.white.withValues(alpha: 0.07),
+                      border: Border.all(color: colors.first.withValues(alpha: on ? 0.95 : 0.35)),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );
-      case VaultEngine.chronoGate:
-        return GestureDetector(
-          onTapDown: (_) => _onGateStart(),
-          onTapUp: (_) => _onGateEnd(),
-          onTapCancel: _onGateEnd,
-          child: CustomPaint(
-            painter: _ChronoPainter(colors: colors, t: _tick.value, holding: _holdingGate, level: _level, flash: _flash.value),
-            child: Center(child: Text(_holdingGate ? 'HOLD' : 'HOLD ON OVERLAP', style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w900))),
-          ),
+      case VaultEngine.gravityWell:
+        return LayoutBuilder(
+          builder: (context, c) {
+            return GestureDetector(
+              onPanStart: (d) {
+                if (!_playing) {
+                  _start();
+                  return;
+                }
+                setState(() {
+                  _dragging = true;
+                  _probe = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight);
+                  _vel = Offset.zero;
+                });
+              },
+              onPanUpdate: (d) {
+                if (!_dragging) return;
+                setState(() => _probe = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight));
+              },
+              onPanEnd: (d) {
+                if (!_dragging) return;
+                final v = d.velocity.pixelsPerSecond;
+                setState(() {
+                  _dragging = false;
+                  _vel = Offset(v.dx / 1400, v.dy / 1400);
+                });
+              },
+              child: CustomPaint(painter: _GravityPainter(colors: colors, probe: _probe, well: _well), size: Size.infinite),
+            );
+          },
         );
     }
   }
-
-  Offset _hexPoint(int i, double size) {
-    if (i == 0) return Offset(size / 2, size / 2);
-    final a = -math.pi / 2 + (i - 1) * math.pi / 3;
-    return Offset(size / 2 + math.cos(a) * 90, size / 2 + math.sin(a) * 90);
-  }
 }
 
-// ── Painters ─────────────────────────────────────────────────────────────────
-
-class _LaserPainter extends CustomPainter {
-  _LaserPainter({required this.colors, required this.prism, required this.target, required this.t, required this.flash});
-  final List<Color> colors;
-  final double prism;
-  final double target;
-  final double t;
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.shortestSide * 0.34;
-    canvas.drawCircle(c, r, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white24);
-    final beam = prism + math.pi / 2;
-    final tip = Offset(c.dx + math.cos(beam) * r * 1.15, c.dy + math.sin(beam) * r * 1.15);
-    canvas.drawLine(c, tip, Paint()..color = colors.first.withValues(alpha: 0.9)..strokeWidth = 4 + flash * 6..strokeCap = StrokeCap.round);
-    final tx = c.dx + math.cos(target) * r;
-    final ty = c.dy + math.sin(target) * r;
-    canvas.drawCircle(Offset(tx, ty), 12 + math.sin(t * math.pi * 2) * 2, Paint()..color = colors.last);
-    // prism body
-    final path = Path();
-    for (var i = 0; i < 3; i++) {
-      final a = prism + i * math.pi * 2 / 3;
-      final p = Offset(c.dx + math.cos(a) * 28, c.dy + math.sin(a) * 28);
-      if (i == 0) path.moveTo(p.dx, p.dy); else path.lineTo(p.dx, p.dy);
-    }
-    path.close();
-    canvas.drawPath(path, Paint()..shader = LinearGradient(colors: colors).createShader(Rect.fromCircle(center: c, radius: 30)));
-  }
-
-  @override
-  bool shouldRepaint(covariant _LaserPainter old) => old.prism != prism || old.target != target || old.t != t || old.flash != flash;
+class _FallWord {
+  _FallWord({required this.text, required this.x, required this.y});
+  final String text;
+  final double x;
+  double y;
 }
 
-class _RadarPainter extends CustomPainter {
-  _RadarPainter({required this.colors, required this.sweep, required this.blip, required this.live, required this.flash});
-  final List<Color> colors;
-  final double sweep;
-  final double blip;
-  final bool live;
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.shortestSide * 0.36;
-    for (var i = 1; i <= 3; i++) {
-      canvas.drawCircle(c, r * i / 3, Paint()..style = PaintingStyle.stroke..color = Colors.white24);
-    }
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), sweep - 0.2, 0.55, true, Paint()..color = colors.first.withValues(alpha: 0.18));
-    canvas.drawLine(c, Offset(c.dx + math.cos(sweep) * r, c.dy + math.sin(sweep) * r), Paint()..color = colors.first..strokeWidth = 3);
-    if (live) {
-      canvas.drawCircle(Offset(c.dx + math.cos(blip) * r * 0.72, c.dy + math.sin(blip) * r * 0.72), 8 + flash * 8, Paint()..color = colors.last);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RadarPainter old) => old.sweep != sweep || old.blip != blip || old.flash != flash;
+class _RivalSnake {
+  _RivalSnake({required this.len, required this.body});
+  int len;
+  final List<Offset> body;
 }
 
-class _OrbitPainter extends CustomPainter {
-  _OrbitPainter({required this.colors, required this.shipR, required this.hazard, required this.shipA, required this.flash});
-  final List<Color> colors;
-  final double shipR;
-  final double hazard;
-  final double shipA;
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final maxR = size.shortestSide * 0.4;
-    canvas.drawCircle(c, maxR * 0.35, Paint()..style = PaintingStyle.stroke..color = Colors.white24);
-    canvas.drawCircle(c, maxR * 0.62, Paint()..style = PaintingStyle.stroke..color = Colors.white24);
-    canvas.drawCircle(c, maxR * 0.9, Paint()..style = PaintingStyle.stroke..color = Colors.white24);
-    final hx = c.dx + math.cos(hazard) * maxR * 0.62;
-    final hy = c.dy + math.sin(hazard) * maxR * 0.62;
-    canvas.drawCircle(Offset(hx, hy), 16, Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.85));
-    final sx = c.dx + math.cos(shipA) * maxR * shipR;
-    final sy = c.dy + math.sin(shipA) * maxR * shipR;
-    canvas.drawCircle(Offset(sx, sy), 10 + flash * 6, Paint()..color = colors.first);
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrbitPainter old) => old.shipR != shipR || old.hazard != hazard || old.shipA != shipA;
-}
-
-class _HexPainter extends CustomPainter {
-  _HexPainter({required this.colors, required this.lit, required this.t, required this.flash});
-  final List<Color> colors;
-  final List<int> lit;
-  final double t;
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (var i = 0; i < 7; i++) {
-      final p = i == 0 ? Offset(size.width / 2, size.height / 2) : Offset(size.width / 2 + math.cos(-math.pi / 2 + (i - 1) * math.pi / 3) * 90, size.height / 2 + math.sin(-math.pi / 2 + (i - 1) * math.pi / 3) * 90);
-      final on = lit.contains(i);
-      final path = Path();
-      for (var k = 0; k < 6; k++) {
-        final a = t * math.pi * 2 * 0.05 + k * math.pi / 3;
-        final q = Offset(p.dx + math.cos(a) * 26, p.dy + math.sin(a) * 26);
-        if (k == 0) path.moveTo(q.dx, q.dy); else path.lineTo(q.dx, q.dy);
-      }
-      path.close();
-      canvas.drawPath(path, Paint()..color = on ? colors.first.withValues(alpha: 0.85 + flash * 0.15) : Colors.white.withValues(alpha: 0.08));
-      canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = on ? colors.last : Colors.white24);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _HexPainter old) => old.lit != lit || old.t != t || old.flash != flash;
-}
-
-class _WirePainter extends CustomPainter {
-  _WirePainter({required this.colors, required this.t, required this.pulse, required this.holding});
-  final List<Color> colors;
-  final double t;
-  final double pulse;
-  final bool holding;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path();
-    path.moveTo(40, size.height * 0.7);
-    path.cubicTo(size.width * 0.25, size.height * 0.2, size.width * 0.55, size.height * 0.9, size.width - 40, size.height * 0.35);
-    canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = Colors.white12..strokeCap = StrokeCap.round);
-    canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 4..color = colors.first.withValues(alpha: 0.35)..strokeCap = StrokeCap.round);
-    final metric = path.computeMetrics().first;
-    final tip = metric.getTangentForOffset(metric.length * t.clamp(0.0, 1.0))!.position;
-    canvas.drawCircle(tip, holding ? 12 + pulse * 4 : 8, Paint()..color = colors.last);
-  }
-
-  @override
-  bool shouldRepaint(covariant _WirePainter old) => old.t != t || old.holding != holding || old.pulse != pulse;
-}
-
-class _BytePainter extends CustomPainter {
-  _BytePainter({required this.colors, required this.y, required this.lane, required this.slice, required this.t});
-  final List<Color> colors;
+class _Orb {
+  _Orb({required this.x, required this.y, required this.r, required this.maxR});
+  final double x;
   final double y;
-  final int lane;
-  final int slice;
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width / 3;
-    for (var i = 0; i < 3; i++) {
-      final rect = RRect.fromRectAndRadius(Rect.fromLTWH(i * w + 8, 20, w - 16, size.height - 40), const Radius.circular(14));
-      canvas.drawRRect(rect, Paint()..color = Colors.white.withValues(alpha: i == slice ? 0.12 : 0.04));
-      canvas.drawRRect(rect, Paint()..style = PaintingStyle.stroke..color = i == slice ? colors.first : Colors.white10);
-    }
-    final by = 20 + y * (size.height - 80);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(lane * w + 18, by, w - 36, 34), const Radius.circular(8)),
-      Paint()..shader = LinearGradient(colors: colors).createShader(Rect.fromLTWH(lane * w, by, w, 34)),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(slice * w + 22, size.height - 54, w - 44, 16), const Radius.circular(8)),
-      Paint()..color = Colors.white.withValues(alpha: 0.85),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BytePainter old) => old.y != y || old.lane != lane || old.slice != slice;
+  double r;
+  final double maxR;
 }
 
-class _DockPainter extends CustomPainter {
-  _DockPainter({required this.colors, required this.v, required this.level, required this.flash});
-  final List<Color> colors;
-  final double v;
-  final int level;
-  final double flash;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final track = RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.2, size.height * 0.2, size.width * 0.6, size.height * 0.6), const Radius.circular(24));
-    canvas.drawRRect(track, Paint()..color = Colors.white10);
-    final winH = (0.12 / (0.8 + level * 0.05)) * size.height * 0.6;
-    final winY = size.height * 0.2 + size.height * 0.6 * 0.55;
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(size.width * 0.2, winY, size.width * 0.6, winH), const Radius.circular(12)), Paint()..color = const Color(0xFF34D399).withValues(alpha: 0.45));
-    final shipY = size.height * 0.2 + (1 - v) * size.height * 0.6;
-    canvas.drawCircle(Offset(size.width / 2, shipY), 14 + flash * 8, Paint()..color = colors.first);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DockPainter old) => old.v != v || old.flash != flash || old.level != level;
+class _LaneObstacle {
+  _LaneObstacle({required this.x, required this.y, required this.w});
+  final double x;
+  double y;
+  final double w;
 }
 
-class _NeuronPainter extends CustomPainter {
-  _NeuronPainter({required this.colors, required this.pairs, required this.linked, required this.picked, required this.t});
+class _SnakePainter extends CustomPainter {
+  _SnakePainter({required this.colors, required this.snake, required this.rivals, required this.food});
   final List<Color> colors;
-  final List<int> pairs;
-  final Set<int> linked;
-  final int? picked;
-  final double t;
+  final List<Offset> snake;
+  final List<_RivalSnake> rivals;
+  final Offset? food;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    for (var i = 0; i < 6; i++) {
-      for (var j = i + 1; j < 6; j++) {
-        if (linked.contains(i) && linked.contains(j) && pairs[i] == pairs[j]) {
-          final a = _pt(i, c);
-          final b = _pt(j, c);
-          canvas.drawLine(a, b, Paint()..color = colors.first.withValues(alpha: 0.7)..strokeWidth = 3);
-        }
+    void drawSnake(List<Offset> body, Color a, Color b) {
+      for (var i = body.length - 1; i >= 0; i--) {
+        final p = Offset(body[i].dx * size.width, body[i].dy * size.height);
+        final t = i / math.max(1, body.length - 1);
+        canvas.drawCircle(p, i == 0 ? 11 : 8 - t * 2, Paint()..color = Color.lerp(a, b, t)!);
       }
     }
-    for (var i = 0; i < 6; i++) {
-      final p = _pt(i, c);
-      final on = linked.contains(i) || picked == i;
-      canvas.drawCircle(p, 22 + (on ? math.sin(t * math.pi * 2) * 2 : 0), Paint()..color = on ? colors.first : Colors.white24);
-      canvas.drawCircle(p, 8, Paint()..color = Colors.white);
+
+    drawSnake(snake, colors.first, colors.last);
+    for (final r in rivals) {
+      drawSnake(r.body, const Color(0xFFEF4444), const Color(0xFFF97316));
+    }
+    if (food != null) {
+      canvas.drawCircle(Offset(food!.dx * size.width, food!.dy * size.height), 8, Paint()..color = const Color(0xFFFBBF24));
     }
   }
 
-  Offset _pt(int i, Offset c) {
-    final a = -math.pi / 2 + i * math.pi / 3;
-    return Offset(c.dx + math.cos(a) * 110, c.dy + math.sin(a) * 110);
-  }
-
   @override
-  bool shouldRepaint(covariant _NeuronPainter old) => old.picked != picked || old.linked != linked || old.t != t;
+  bool shouldRepaint(covariant _SnakePainter old) => true;
 }
 
-class _ChronoPainter extends CustomPainter {
-  _ChronoPainter({required this.colors, required this.t, required this.holding, required this.level, required this.flash});
+class _OrbPainter extends CustomPainter {
+  _OrbPainter({required this.colors, required this.orbs});
   final List<Color> colors;
-  final double t;
-  final bool holding;
-  final int level;
-  final double flash;
+  final List<_Orb> orbs;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.shortestSide * 0.34;
-    final a = t * math.pi * 2;
-    final b = t * math.pi * 2 * (1.15 + level * 0.03);
-    canvas.drawCircle(c, r, Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = Colors.white24);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r), a, 0.9, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 8..color = colors.first..strokeCap = StrokeCap.round);
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r - 18), b, 0.9, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 8..color = colors.last..strokeCap = StrokeCap.round);
-    if (holding) canvas.drawCircle(c, 30 + flash * 10, Paint()..color = colors.first.withValues(alpha: 0.25));
+    for (final o in orbs) {
+      final p = Offset(o.x * size.width, o.y * size.height);
+      final rr = o.r * size.shortestSide;
+      canvas.drawCircle(p, rr, Paint()..color = colors.first.withValues(alpha: 0.2));
+      canvas.drawCircle(p, rr * 0.7, Paint()..shader = RadialGradient(colors: colors).createShader(Rect.fromCircle(center: p, radius: rr)));
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _ChronoPainter old) => old.t != t || old.holding != holding || old.flash != flash;
+  bool shouldRepaint(covariant _OrbPainter old) => true;
+}
+
+class _LanePainter extends CustomPainter {
+  _LanePainter({required this.colors, required this.carX, required this.obstacles, required this.t});
+  final List<Color> colors;
+  final double carX;
+  final List<_LaneObstacle> obstacles;
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < 8; i++) {
+      final y = ((i / 8) + t) % 1.0 * size.height;
+      canvas.drawRect(Rect.fromLTWH(size.width * 0.48, y, 4, 28), Paint()..color = Colors.white24);
+    }
+    for (final o in obstacles) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(o.x * size.width, o.y * size.height), width: o.w * size.width, height: 28), const Radius.circular(8)),
+        Paint()..color = const Color(0xFFEF4444).withValues(alpha: 0.85),
+      );
+    }
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(carX * size.width, size.height * 0.82), width: 44, height: 64), const Radius.circular(12)),
+      Paint()..shader = LinearGradient(colors: colors).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _LanePainter old) => true;
+}
+
+class _GravityPainter extends CustomPainter {
+  _GravityPainter({required this.colors, required this.probe, required this.well});
+  final List<Color> colors;
+  final Offset probe;
+  final Offset well;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = Offset(well.dx * size.width, well.dy * size.height);
+    final p = Offset(probe.dx * size.width, probe.dy * size.height);
+    canvas.drawCircle(w, 34, Paint()..color = colors.first.withValues(alpha: 0.2));
+    canvas.drawCircle(w, 16, Paint()..color = const Color(0xFFFBBF24));
+    canvas.drawCircle(p, 12, Paint()..color = colors.last);
+    canvas.drawLine(p, w, Paint()..color = Colors.white24..strokeWidth = 2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GravityPainter old) => true;
 }
