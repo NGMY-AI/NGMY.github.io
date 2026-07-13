@@ -1,8 +1,13 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
 /// Raster paper backgrounds for Marriage Agreement templates (portrait 9:16).
+/// Every style below is built from authentic Central African textile and
+/// regalia motifs — Kuba-cloth chevrons and diamond lattices, cowrie-shell
+/// bead trim, basket-weave crosshatch, sunburst medallions, and the Lake
+/// Tanganyika/Fizi wave line — rather than plain rectangle frames.
 enum NgmyMarriagePaperStyle {
   congoHeritage,
   classicParchment,
@@ -27,30 +32,39 @@ String ngmyMarriagePaperDataUrl(NgmyMarriagePaperStyle style) {
 
 img.Color _c(int argb, [int a = 255]) => img.ColorRgba8((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, a);
 
+// Canvas is a modest step up from the original 360x640 — enough to print
+// noticeably crisper without ballooning the base64 payload embedded in
+// every saved deck (this JSON is kept in localStorage, which has a small
+// per-origin quota).
+const int _w = 480;
+const int _h = 854;
+
 img.Image _renderPaper(NgmyMarriagePaperStyle style) {
   switch (style) {
     case NgmyMarriagePaperStyle.congoHeritage:
-      return _heritagePaper(0xFF0A1F12, 0xFF1A3D2B, 0xFFD4AF37, tricolor: false);
+      return _fiziMidnight();
     case NgmyMarriagePaperStyle.classicParchment:
-      return _parchmentPaper(sideBand: true, frame: 0xFF8B4513, inner: 0xFF1D4D2B);
+      return _lakesideIvory();
     case NgmyMarriagePaperStyle.officialCream:
-      return _creamPaper(flagCorners: true);
+      return _sudKivuSeal();
     case NgmyMarriagePaperStyle.ceremonialDiamond:
-      return _diamondBorderPaper();
+      return _kubaWeave();
     case NgmyMarriagePaperStyle.forestGold:
-      return _heritagePaper(0xFF0F2E1A, 0xFF1D4D2B, 0xFFD4AF37, tricolor: true);
+      return _emeraldFizi();
     case NgmyMarriagePaperStyle.ivoryElegance:
-      return _ivoryPaper();
+      return _pearlRosegold();
     case NgmyMarriagePaperStyle.crimsonTradition:
-      return _parchmentPaper(sideBand: false, frame: 0xFFB22222, inner: 0xFF1D4D2B, topBand: 0xFFB22222);
+      return _rubyRoot();
     case NgmyMarriagePaperStyle.goldenFrame:
-      return _goldFramePaper();
+      return _royalAmber();
     case NgmyMarriagePaperStyle.unityHands:
-      return _creamPaper(flagCorners: false, watermark: true);
+      return _umojaWeave();
     case NgmyMarriagePaperStyle.ngmyOfficial:
-      return _officialPaper();
+      return _republiqueOfficielle();
   }
 }
+
+// ── Base drawing helpers ─────────────────────────────────────────────────────
 
 void _vGradient(img.Image im, int top, int bottom) {
   for (var y = 0; y < im.height; y++) {
@@ -67,174 +81,300 @@ void _fill(img.Image im, int x, int y, int w, int h, int color) {
   img.fillRect(im, x1: x, y1: y, x2: x + w, y2: y + h, color: _c(color));
 }
 
-/// Elegant antialiased frame — replaces flat filled-rectangle bars, which
-/// looked crude/pixelated, with a crisp, smooth line like a real letterpress
-/// border.
-void _border(img.Image im, int x, int y, int w, int h, int color, int t) {
+/// Thin antialiased rectangular frame line (not a flat filled bar).
+void _border(img.Image im, int x, int y, int w, int h, int color, double t) {
   final c = _c(color);
-  final thickness = t.toDouble().clamp(1, 6);
-  img.drawLine(im, x1: x, y1: y, x2: x + w, y2: y, color: c, antialias: true, thickness: thickness);
-  img.drawLine(im, x1: x, y1: y + h, x2: x + w, y2: y + h, color: c, antialias: true, thickness: thickness);
-  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + h, color: c, antialias: true, thickness: thickness);
-  img.drawLine(im, x1: x + w, y1: y, x2: x + w, y2: y + h, color: c, antialias: true, thickness: thickness);
+  img.drawLine(im, x1: x, y1: y, x2: x + w, y2: y, color: c, antialias: true, thickness: t);
+  img.drawLine(im, x1: x, y1: y + h, x2: x + w, y2: y + h, color: c, antialias: true, thickness: t);
+  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + h, color: c, antialias: true, thickness: t);
+  img.drawLine(im, x1: x + w, y1: y, x2: x + w, y2: y + h, color: c, antialias: true, thickness: t);
 }
 
 void _fillDiamond(img.Image im, num cx, num cy, num r, img.Color color) {
   img.fillPolygon(
     im,
-    vertices: [
-      img.Point(cx, cy - r),
-      img.Point(cx + r, cy),
-      img.Point(cx, cy + r),
-      img.Point(cx - r, cy),
-    ],
+    vertices: [img.Point(cx, cy - r), img.Point(cx + r, cy), img.Point(cx, cy + r), img.Point(cx - r, cy)],
     color: color,
   );
 }
 
-/// Small ornamental diamond + bracket ticks at each corner of a frame —
-/// the classic formal-certificate corner flourish.
-void _cornerFlourish(img.Image im, int x, int y, int w, int h, int color, {int r = 5, int tick = 16}) {
+/// N-pointed star polygon — sunburst medallions and corner marks.
+void _star(img.Image im, num cx, num cy, double outerR, double innerR, int points, img.Color color, {double rotation = -math.pi / 2}) {
+  final verts = <img.Point>[];
+  for (var i = 0; i < points * 2; i++) {
+    final r = i.isEven ? outerR : innerR;
+    final a = rotation + (i * math.pi / points);
+    verts.add(img.Point(cx + r * math.cos(a), cy + r * math.sin(a)));
+  }
+  img.fillPolygon(im, vertices: verts, color: color);
+}
+
+/// Zigzag chevron trim band — classic Kuba-cloth geometric weave.
+void _chevronBand(img.Image im, int x, int y, int w, int h, int base, int peak) {
+  _fill(im, x, y, w, h, base);
+  final step = (h * 1.1).clamp(10, w.toDouble());
+  var cx = x.toDouble();
+  while (cx < x + w) {
+    final left = cx;
+    final mid = (cx + step / 2).clamp(x.toDouble(), (x + w).toDouble());
+    final right = (cx + step).clamp(x.toDouble(), (x + w).toDouble());
+    img.fillPolygon(
+      im,
+      vertices: [img.Point(left, y + h), img.Point(mid, y.toDouble()), img.Point(right, y + h)],
+      color: _c(peak),
+    );
+    cx += step;
+  }
+}
+
+/// Row of small beads — cowrie-shell trim used along frame edges.
+void _beadRow(img.Image im, int x, int y, int w, List<int> colors, {double radius = 4}) {
+  final gap = (radius * 3.2).clamp(6, w.toDouble());
+  var cx = x + gap / 2;
+  var i = 0;
+  while (cx < x + w) {
+    img.drawCircle(im, x: cx.round(), y: y, radius: radius.round(), color: _c(colors[i % colors.length]), antialias: true);
+    cx += gap;
+    i++;
+  }
+}
+
+/// Basket-weave crosshatch texture — unity/community motif.
+void _weaveBand(img.Image im, int x, int y, int w, int h, int color, {int spacing = 16, double alpha = 0.55}) {
+  final c = _c(color, (255 * alpha).round());
+  for (var i = -h; i < w + h; i += spacing) {
+    img.drawLine(im, x1: x + i, y1: y, x2: x + i + h, y2: y + h, color: c, antialias: true, thickness: 1.4);
+  }
+  for (var i = 0; i < w + 2 * h; i += spacing) {
+    img.drawLine(im, x1: x + i, y1: y, x2: x + i - h, y2: y + h, color: c, antialias: true, thickness: 1.4);
+  }
+}
+
+/// Gentle ripple lines — Lake Tanganyika / Fizi shoreline motif.
+void _waveLines(img.Image im, int x, int y, int w, int rows, double amplitude, double wavelength, int color) {
+  for (var row = 0; row < rows; row++) {
+    final baseY = y + row * amplitude * 2.6;
+    img.Point? prev;
+    for (var px = x; px <= x + w; px += 3) {
+      final py = baseY + amplitude * math.sin((px - x) / wavelength * 2 * math.pi + row * 0.6);
+      final pt = img.Point(px.toDouble(), py);
+      if (prev != null) {
+        img.drawLine(im, x1: prev.xi, y1: prev.yi, x2: pt.xi, y2: pt.yi, color: _c(color), antialias: true, thickness: 1.6);
+      }
+      prev = pt;
+    }
+  }
+}
+
+/// Lattice of interlocking diamonds — Kuba raffia-cloth weave.
+void _diamondLattice(img.Image im, int x, int y, int w, int h, List<int> colors) {
+  final cell = h.toDouble();
+  final cols = (w / cell).ceil() + 1;
+  var i = 0;
+  for (var row = 0; row < 2; row++) {
+    for (var col = -1; col < cols; col++) {
+      final cx = x + col * cell + (row.isOdd ? cell / 2 : 0);
+      final cy = y + row * h / 2;
+      if (cx < x - cell || cx > x + w + cell) continue;
+      _fillDiamond(im, cx, cy, cell * 0.42, _c(colors[i % colors.length]));
+      i++;
+    }
+  }
+}
+
+void _cornerFlourish(img.Image im, int x, int y, int w, int h, int color, {double r = 5, double tick = 16}) {
   final c = _c(color);
-  final corners = [
-    (x, y, 1, 1),
-    (x + w, y, -1, 1),
-    (x, y + h, 1, -1),
-    (x + w, y + h, -1, -1),
-  ];
+  final corners = [(x, y, 1, 1), (x + w, y, -1, 1), (x, y + h, 1, -1), (x + w, y + h, -1, -1)];
   for (final (cx, cy, sx, sy) in corners) {
     _fillDiamond(im, cx, cy, r, c);
-    img.drawLine(im, x1: cx, y1: cy, x2: cx + sx * tick, y2: cy, color: c, antialias: true, thickness: 1.4);
-    img.drawLine(im, x1: cx, y1: cy, x2: cx, y2: cy + sy * tick, color: c, antialias: true, thickness: 1.4);
+    img.drawLine(im, x1: cx, y1: cy, x2: (cx + sx * tick).round(), y2: cy, color: c, antialias: true, thickness: 1.4);
+    img.drawLine(im, x1: cx, y1: cy, x2: cx, y2: (cy + sy * tick).round(), color: c, antialias: true, thickness: 1.4);
   }
 }
 
-/// Real diamond/lozenge ribbon trim (previously flat solid-color stripes,
-/// which didn't read as "diamond" at all) tiled along a strip — works for
-/// both horizontal (top/bottom) and vertical (side) bands.
-void _diamondStrip(img.Image im, int x, int y, int w, int h) {
-  const colors = [0xFFCE1021, 0xFFF7D618, 0xFF1D4D2B, 0xFFD4AF37, 0xFF007FFF];
-  _fill(im, x, y, w, h, 0xFFF5E6C8);
-  final horizontal = w >= h;
-  final thin = (horizontal ? h : w).toDouble();
-  final long = (horizontal ? w : h).toDouble();
-  final cell = thin.clamp(8, 999);
-  final count = (long / cell).ceil().clamp(1, 300);
-  for (var i = 0; i < count; i++) {
-    final centerAlong = i * cell + cell / 2;
-    if (centerAlong - cell / 2 > long) break;
-    final cx = horizontal ? x + centerAlong : x + w / 2;
-    final cy = horizontal ? y + h / 2 : y + centerAlong;
-    final r = cell * 0.34;
-    _fillDiamond(im, cx, cy, r, _c(colors[i % colors.length]));
+void _starCorners(img.Image im, int x, int y, int w, int h, int color, {double outerR = 10, double innerR = 4, int points = 5}) {
+  final c = _c(color);
+  for (final p in [(x, y), (x + w, y), (x, y + h), (x + w, y + h)]) {
+    _star(im, p.$1, p.$2, outerR, innerR, points, c);
   }
 }
 
-void _flagCorner(img.Image im, int x, int y) {
-  _fill(im, x, y, 18, 6, 0xFF007FFF);
-  _fill(im, x, y + 6, 18, 6, 0xFFF7D618);
-  _fill(im, x, y + 12, 18, 6, 0xFFCE1021);
+// ── Templates ────────────────────────────────────────────────────────────────
+
+/// Fizi Midnight — deep indigo night sky with a gold Kuba chevron trim and
+/// sunburst star corners.
+img.Image _fiziMidnight() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFF0B1330, 0xFF1B2A5C);
+  const gold = 0xFFE3B341;
+  _chevronBand(im, 0, 0, _w, 22, 0xFF0B1330, gold);
+  _chevronBand(im, 0, _h - 22, _w, 22, 0xFF0B1330, gold);
+  _border(im, 14, 34, _w - 28, _h - 68, gold, 2.2);
+  _border(im, 20, 40, _w - 40, _h - 80, gold, 1);
+  _starCorners(im, 14, 34, _w - 28, _h - 68, gold, outerR: 11, innerR: 4.5);
+  _star(im, _w / 2, _h * 0.42, 44, 18, 8, _c(gold, 26));
+  return im;
 }
 
-void _softCircle(img.Image im, int cx, int cy, int radius, int color, int alpha) {
-  for (var dy = -radius; dy <= radius; dy++) {
-    for (var dx = -radius; dx <= radius; dx++) {
-      if (dx * dx + dy * dy <= radius * radius) {
-        final px = cx + dx;
-        final py = cy + dy;
-        if (px >= 0 && py >= 0 && px < im.width && py < im.height) {
-          im.setPixel(px, py, _c(color, alpha));
-        }
-      }
+/// Lakeside Ivory — warm ivory paper with teal Lake Tanganyika ripple trim
+/// and a bronze frame.
+img.Image _lakesideIvory() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFDF6, 0xFFF3E7CE);
+  const teal = 0xFF0F8A8A;
+  const bronze = 0xFF9C6B2E;
+  _waveLines(im, 0, 20, _w, 3, 4, 70, teal);
+  _waveLines(im, 0, _h - 40, _w, 3, 4, 70, teal);
+  _border(im, 18, 46, _w - 36, _h - 92, bronze, 2.4);
+  _border(im, 24, 52, _w - 48, _h - 104, teal, 1);
+  _beadRow(im, 30, 46, _w - 60, [teal, bronze, 0xFFD4AF37], radius: 3.2);
+  return im;
+}
+
+/// Sud-Kivu Seal — crisp white paper with tricolor wedge corners (not old
+/// striped bars) and a black official double hairline.
+img.Image _sudKivuSeal() {
+  final im = img.Image(width: _w, height: _h);
+  img.fill(im, color: _c(0xFFFFFFFE));
+  _border(im, 16, 16, _w - 32, _h - 32, 0xFF111111, 2);
+  _border(im, 22, 22, _w - 44, _h - 44, 0xFF111111, 0.8);
+  const tri = [0xFF007FFF, 0xFFF7D618, 0xFFCE1021];
+  for (var i = 0; i < 3; i++) {
+    final corners = [
+      (16, 16, 1, 1),
+      (_w - 16, 16, -1, 1),
+      (16, _h - 16, 1, -1),
+      (_w - 16, _h - 16, -1, -1),
+    ];
+    for (final (cx, cy, sx, sy) in corners) {
+      final s = 26.0 - i * 7;
+      img.fillPolygon(
+        im,
+        vertices: [
+          img.Point(cx, cy),
+          img.Point(cx + sx * s, cy.toDouble()),
+          img.Point(cx.toDouble(), cy + sy * s),
+        ],
+        color: _c(tri[i]),
+      );
     }
   }
+  return im;
 }
 
-img.Image _heritagePaper(int bg1, int bg2, int gold, {required bool tricolor}) {
-  final im = img.Image(width: 360, height: 640);
-  _vGradient(im, bg2, bg1);
-  if (tricolor) {
-    _fill(im, 0, 0, 360, 8, 0xFF007FFF);
-    _fill(im, 0, 8, 360, 8, 0xFFF7D618);
-    _fill(im, 0, 16, 360, 8, 0xFFCE1021);
+/// Kuba Weave — terracotta raffia-cloth field with an interlocking diamond
+/// lattice border, the closest kin to real Kuba textile design.
+img.Image _kubaWeave() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFB5652A, 0xFF7A3E17);
+  const cream = 0xFFF3E2C4;
+  const ink = 0xFF241203;
+  _fill(im, 0, 0, _w, 34, cream);
+  _fill(im, 0, _h - 34, _w, 34, cream);
+  _diamondLattice(im, 0, 0, _w, 34, [ink, 0xFFD4AF37]);
+  _diamondLattice(im, 0, _h - 34, _w, 34, [ink, 0xFFD4AF37]);
+  _border(im, 16, 46, _w - 32, _h - 92, cream, 2.4);
+  _border(im, 22, 52, _w - 44, _h - 104, 0xFFD4AF37, 1);
+  _starCorners(im, 16, 46, _w - 32, _h - 92, cream, outerR: 9, innerR: 6, points: 8);
+  return im;
+}
+
+/// Emerald Fizi — rich emerald field, gold sunburst corner medallions,
+/// double thin gold frame.
+img.Image _emeraldFizi() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFF0E3B27, 0xFF14532D);
+  const gold = 0xFFD4AF37;
+  _fill(im, 0, 0, _w, 6, 0xFF007FFF);
+  _border(im, 16, 22, _w - 32, _h - 44, gold, 2.2);
+  _border(im, 22, 28, _w - 44, _h - 56, gold, 0.9);
+  for (final p in [(16, 22), (_w - 16, 22), (16, _h - 22), (_w - 16, _h - 22)]) {
+    _star(im, p.$1, p.$2, 20, 8, 10, _c(gold));
   }
-  _border(im, 10, 26, 340, 594, gold, 3);
-  _border(im, 18, 34, 324, 578, gold, 1);
-  _cornerFlourish(im, 10, 26, 340, 594, gold);
-  _diamondStrip(im, 0, 608, 360, 32);
-  _softCircle(im, 180, 300, 70, gold, 20);
+  _star(im, _w / 2, _h * 0.46, 60, 24, 10, _c(gold, 22));
   return im;
 }
 
-img.Image _parchmentPaper({required bool sideBand, required int frame, required int inner, int? topBand}) {
-  final im = img.Image(width: 360, height: 640);
-  _vGradient(im, 0xFFFFFEF8, 0xFFE8D8B8);
-  if (topBand != null) _fill(im, 0, 0, 360, 6, topBand);
-  if (sideBand) _diamondStrip(im, 0, 0, 22, 640);
-  final ox = sideBand ? 28 : 10;
-  final ow = sideBand ? 322 : 340;
-  _border(im, ox, 10, ow, 610, frame, 3);
-  _border(im, ox + 6, 16, ow - 12, 598, inner, 1);
-  _cornerFlourish(im, ox, 10, ow, 610, frame);
-  _softCircle(im, 180, 280, 90, 0xFFD4AF37, 15);
+/// Pearl & Rosegold — soft blush paper, delicate rose-gold hairline frame
+/// and bead trim; the most minimal, elegant design of the set.
+img.Image _pearlRosegold() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFF7F5, 0xFFF6E4E2);
+  const rose = 0xFFB76E79;
+  _border(im, 26, 30, _w - 52, _h - 60, rose, 1.2);
+  _border(im, 32, 36, _w - 64, _h - 72, rose, 0.7);
+  _beadRow(im, 40, 30, _w - 80, [rose], radius: 2.4);
+  _beadRow(im, 40, _h - 30, _w - 80, [rose], radius: 2.4);
   return im;
 }
 
-img.Image _creamPaper({required bool flagCorners, bool watermark = false}) {
-  final im = img.Image(width: 360, height: 640);
-  _vGradient(im, 0xFFFFFFFE, 0xFFF5F0E6);
-  _border(im, 8, 8, 344, 624, 0xFFD4AF37, 3);
-  _border(im, 14, 14, 332, 612, 0xFF1D4D2B, 1);
-  if (flagCorners) {
-    for (final p in [(8, 8), (334, 8), (8, 622), (334, 622)]) {
-      _flagCorner(im, p.$1, p.$2);
-    }
-  } else {
-    _cornerFlourish(im, 8, 8, 344, 624, 0xFFD4AF37);
+/// Ruby Root — deep burgundy field with a black-and-gold chevron trim and
+/// gold star corners; the boldest, most traditional-feeling design.
+img.Image _rubyRoot() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFF5C0A17, 0xFF3B0A12);
+  const gold = 0xFFE3B341;
+  _chevronBand(im, 0, 0, _w, 20, 0xFF1A0508, gold);
+  _chevronBand(im, 0, _h - 20, _w, 20, 0xFF1A0508, gold);
+  _border(im, 14, 32, _w - 28, _h - 64, gold, 2);
+  _starCorners(im, 14, 32, _w - 28, _h - 64, gold, outerR: 10, innerR: 4);
+  return im;
+}
+
+/// Royal Amber — gold IS the field (not just the accent) with a dark
+/// bronze triple-line frame and ornate star corners; the most premium of
+/// the ten.
+img.Image _royalAmber() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFF3C969, 0xFFC9932F);
+  const bronze = 0xFF5C3A11;
+  _border(im, 12, 12, _w - 24, _h - 24, bronze, 3);
+  _border(im, 20, 20, _w - 40, _h - 40, bronze, 1);
+  _border(im, 26, 26, _w - 52, _h - 52, bronze, 0.6);
+  _starCorners(im, 12, 12, _w - 24, _h - 24, bronze, outerR: 13, innerR: 5, points: 6);
+  return im;
+}
+
+/// Umoja Weave ("umoja" = unity, Swahili) — warm sand field with a
+/// basket-weave crosshatch border band, green and gold bead trim.
+img.Image _umojaWeave() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFF1DFBB, 0xFFE3C589);
+  const green = 0xFF1D4D2B;
+  const gold = 0xFFB8860B;
+  _fill(im, 0, 0, _w, 30, 0xFFF7EFD9);
+  _fill(im, 0, _h - 30, _w, 30, 0xFFF7EFD9);
+  _weaveBand(im, 0, 0, _w, 30, green, spacing: 14);
+  _weaveBand(im, 0, _h - 30, _w, 30, green, spacing: 14);
+  _beadRow(im, 24, 15, _w - 48, [green, gold], radius: 3);
+  _beadRow(im, 24, _h - 15, _w - 48, [green, gold], radius: 3);
+  _border(im, 16, 40, _w - 32, _h - 80, green, 1.6);
+  _cornerFlourish(im, 16, 40, _w - 32, _h - 80, gold, r: 5, tick: 14);
+  return im;
+}
+
+/// République Officielle — the official state-facing design: cream paper,
+/// full DRC tricolor band, and a big Fizi / Sud-Kivu civil stamp seal.
+img.Image _republiqueOfficielle() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFFFE, 0xFFF6F3EA);
+  _fill(im, 0, 0, (_w / 3).round(), 12, 0xFF007FFF);
+  _fill(im, (_w / 3).round(), 0, (_w / 3).round(), 12, 0xFFF7D618);
+  _fill(im, (_w * 2 / 3).round(), 0, _w - (_w * 2 / 3).round(), 12, 0xFFCE1021);
+  _border(im, 12, 20, _w - 24, _h - 40, 0xFF007FFF, 2.4);
+  _border(im, 18, 26, _w - 36, _h - 52, 0xFFCE1021, 0.8);
+  _cornerFlourish(im, 12, 20, _w - 24, _h - 40, 0xFFF7D618, r: 4, tick: 12);
+
+  // Fizi / Sud-Kivu civil stamp — concentric rings + star, bottom-right.
+  final sx = (_w * 0.78).round();
+  final sy = (_h * 0.90).round();
+  for (var r = 46; r <= 49; r++) {
+    img.drawCircle(im, x: sx, y: sy, radius: r, color: _c(0xFFCE1021), antialias: true);
   }
-  if (watermark) _softCircle(im, 180, 300, 85, 0xFF1D4D2B, 12);
-  return im;
-}
-
-img.Image _diamondBorderPaper() {
-  final im = _parchmentPaper(sideBand: false, frame: 0xFFD4AF37, inner: 0xFF1D4D2B);
-  _diamondStrip(im, 0, 0, 360, 18);
-  _diamondStrip(im, 0, 622, 360, 18);
-  _diamondStrip(im, 0, 0, 18, 640);
-  _diamondStrip(im, 342, 0, 18, 640);
-  return im;
-}
-
-img.Image _ivoryPaper() {
-  final im = img.Image(width: 360, height: 640);
-  img.fill(im, color: _c(0xFFFFFAF0));
-  _border(im, 20, 20, 320, 600, 0xFFB8860B, 1);
-  _border(im, 26, 26, 308, 588, 0xFF1D4D2B, 1);
-  _cornerFlourish(im, 20, 20, 320, 600, 0xFFB8860B, r: 4, tick: 12);
-  return im;
-}
-
-img.Image _goldFramePaper() {
-  final im = _parchmentPaper(sideBand: false, frame: 0xFFD4AF37, inner: 0xFFB8860B);
-  _border(im, 4, 4, 352, 632, 0xFFD4AF37, 5);
-  _border(im, 16, 16, 328, 608, 0xFFD4AF37, 1);
-  _cornerFlourish(im, 4, 4, 352, 632, 0xFFD4AF37, r: 6, tick: 18);
-  return im;
-}
-
-img.Image _officialPaper() {
-  final im = _creamPaper(flagCorners: false);
-  _fill(im, 0, 0, 120, 10, 0xFF007FFF);
-  _fill(im, 120, 0, 120, 10, 0xFFF7D618);
-  _fill(im, 240, 0, 120, 10, 0xFFCE1021);
-  _border(im, 8, 14, 344, 618, 0xFF007FFF, 3);
-  _cornerFlourish(im, 8, 14, 344, 618, 0xFF007FFF, r: 4, tick: 12);
-  for (var r = 34; r <= 36; r++) {
-    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFCE1021), antialias: true);
+  for (var r = 37; r <= 39; r++) {
+    img.drawCircle(im, x: sx, y: sy, radius: r, color: _c(0xFFD4AF37), antialias: true);
   }
-  for (var r = 28; r <= 30; r++) {
-    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFD4AF37), antialias: true);
-  }
+  _star(im, sx, sy, 14, 6, 6, _c(0xFF007FFF));
   return im;
 }
 

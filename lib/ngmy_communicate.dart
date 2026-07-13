@@ -657,11 +657,18 @@ class NgmyCommunicateAvatar extends StatefulWidget {
 
 class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Uint8List? _bytes;
+  Timer? _retryTimer;
 
   @override
   void initState() {
     super.initState();
     unawaited(_bootstrapBytes());
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _bootstrapBytes() async {
@@ -686,6 +693,17 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
       } catch (_) {}
     }
     await _resolveNetwork();
+    // The app also warms this same cache in the background at startup
+    // (ngmyWarmCommunicateAvatarsFromConfig). If this widget mounted before
+    // that finished, it would fall back to the emoji forever with no way to
+    // know bytes showed up later — so give it one more look shortly after.
+    if (mounted && (_bytes == null || _bytes!.isEmpty)) {
+      _retryTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted && (_bytes == null || _bytes!.isEmpty)) {
+          unawaited(_resolveNetwork());
+        }
+      });
+    }
   }
 
   @override

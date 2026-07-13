@@ -1967,20 +1967,38 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 ),
                 child: Row(
                   children: [
-                    _selChip(Icons.format_bold, null, () {
-                      _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
-                    }, isDark),
-                    _selChip(Icons.format_italic, null, () {
-                      _mutate(() => el.fontStyle = el.fontStyle == FontStyle.italic ? FontStyle.normal : FontStyle.italic);
-                    }, isDark),
-                    _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
-                    _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
-                    const Spacer(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _selChip(Icons.format_bold, null, () {
+                              _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
+                            }, isDark),
+                            _selChip(Icons.format_italic, null, () {
+                              _mutate(() => el.fontStyle = el.fontStyle == FontStyle.italic ? FontStyle.normal : FontStyle.italic);
+                            }, isDark),
+                            _selChip(Icons.format_underlined_rounded, null, () {
+                              _mutate(() => el.decoration = el.decoration == TextDecoration.underline ? TextDecoration.none : TextDecoration.underline);
+                            }, isDark),
+                            _selChip(Icons.format_list_bulleted_rounded, null, () {
+                              _mutate(() => el.bulletList = !el.bulletList);
+                            }, isDark),
+                            _selChip(_alignIcon(el.align), null, () {
+                              _mutate(() => el.align = _nextAlign(el.align));
+                            }, isDark),
+                            _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
+                            _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       '${el.fontSize.toInt()} pt',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                   ],
                 ),
               ),
@@ -2034,6 +2052,30 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  IconData _alignIcon(TextAlign align) {
+    switch (align) {
+      case TextAlign.center:
+        return Icons.format_align_center_rounded;
+      case TextAlign.right:
+      case TextAlign.end:
+        return Icons.format_align_right_rounded;
+      default:
+        return Icons.format_align_left_rounded;
+    }
+  }
+
+  TextAlign _nextAlign(TextAlign align) {
+    switch (align) {
+      case TextAlign.left:
+      case TextAlign.start:
+        return TextAlign.center;
+      case TextAlign.center:
+        return TextAlign.right;
+      default:
+        return TextAlign.left;
+    }
+  }
+
   Widget _selChip(IconData icon, String? label, VoidCallback onTap, bool isDark, {bool accent = false, bool danger = false}) {
     final fg = danger
         ? const Color(0xFFEF4444)
@@ -2046,6 +2088,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          // Icon buttons never need keyboard focus themselves — without this,
+          // tapping one steals focus from the text field being edited and
+          // dismisses the on-screen keyboard.
+          canRequestFocus: false,
           borderRadius: BorderRadius.circular(12),
           child: Ink(
             decoration: BoxDecoration(

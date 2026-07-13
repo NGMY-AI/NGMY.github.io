@@ -570,6 +570,30 @@ Future<String?> ngmyAiGenerateReply(
   return null;
 }
 
+/// True when an error looks like "no internet"/connectivity failure rather
+/// than a real API/config problem — covers the browser-specific wording for
+/// this (Safari says "Load failed", Chrome says "Failed to fetch", etc.),
+/// none of which contain the word "network" itself.
+bool ngmyIsOfflineOrNetworkError(String err) {
+  final e = err.toLowerCase();
+  return e.contains('timeout') ||
+      e.contains('socket') ||
+      e.contains('network') ||
+      e.contains('failed to fetch') ||
+      e.contains('load failed') ||
+      e.contains('clientexception') ||
+      e.contains('connection') ||
+      e.contains('offline') ||
+      e.contains('dns') ||
+      e.contains('unreachable') ||
+      e.contains('handshake');
+}
+
+/// Friendly, on-brand copy for when the device has no internet — never a
+/// raw exception message or URL.
+const String kNgmyOfflineAiMessage =
+    "NGMY AI can't reach the internet right now. Connect to Wi-Fi or mobile data and we'll be right back!";
+
 /// User-facing error when AI returns null.
 String ngmyAiHelperFailureMessage({
   required String apiKey,
@@ -581,6 +605,9 @@ String ngmyAiHelperFailureMessage({
   }
   final provider = ngmyAiProviderLabel(creds.provider);
   final err = (lastError ?? '').trim();
+  if (ngmyIsOfflineOrNetworkError(err)) {
+    return kNgmyOfflineAiMessage;
+  }
   if (err.contains('proxy not deployed') || err.contains('404')) {
     return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the $kNgmySupabaseAiFunction Edge Function, then try again.';
   }
@@ -660,14 +687,15 @@ Future<String> ngmyResolveGeminiApiKey({
   return key;
 }
 
-/// Advisor chat errors — never blame the user for having internet.
+/// Advisor chat errors — never blame the user for having internet, and
+/// never surface a raw exception message or URL.
 String ngmyCommunicateAiFailureMessage({required String apiKey, String? lastError}) {
   final err = (lastError ?? '').trim();
   if (apiKey.trim().isEmpty) {
     return 'NGMY AI is still loading — wait a few seconds and send again. If this keeps happening, ask an admin to verify AI settings.';
   }
-  if (err.toLowerCase().contains('timeout') || err.toLowerCase().contains('socket') || err.toLowerCase().contains('network')) {
-    return 'Network hiccup — your message did not reach NGMY AI. Tap send again.';
+  if (ngmyIsOfflineOrNetworkError(err)) {
+    return kNgmyOfflineAiMessage;
   }
   final base = ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: lastError);
   return base.replaceAll('NGMY Helper', 'Your advisor');
