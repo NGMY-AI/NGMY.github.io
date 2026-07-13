@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -1674,9 +1676,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         final t = Curves.easeInOut.transform(_framePulse.value);
         return ClipRRect(
           borderRadius: BorderRadius.circular(22),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: Container(
+          child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 14,
+              child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -1750,8 +1753,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           margin: const EdgeInsets.only(bottom: 10),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 12,
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(

@@ -1607,7 +1607,7 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
                     ? InteractiveViewer(
                         minScale: 0.5,
                         maxScale: 4,
-                        child: Image.memory(_bytes!, fit: BoxFit.contain),
+                        child: Image.memory(_bytes!, fit: BoxFit.contain, filterQuality: FilterQuality.high),
                       )
                     : const SizedBox.shrink(),
       ),

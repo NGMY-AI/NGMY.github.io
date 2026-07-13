@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 
 bool ngmyUserPhoneOnFile(String phone) {
@@ -146,8 +148,9 @@ class _NgmyPhoneRequiredGateState extends State<NgmyPhoneRequiredGate> {
         Positioned.fill(
           child: ColoredBox(
             color: isDark ? const Color(0xF0050810) : const Color(0xF5F7FB),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 10,
               child: SafeArea(
                 child: Center(
                   child: SingleChildScrollView(

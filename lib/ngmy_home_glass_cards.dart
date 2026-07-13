@@ -18,6 +18,7 @@ import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
+import 'ngmy_platform_graphics.dart';
 
 /// Local-only (device storage, no database) spending + notes cards for Home.
 /// Everything here lives in SharedPreferences, keyed per user email.
@@ -1205,8 +1206,9 @@ class NgmyFrostedCard extends StatelessWidget {
                   )
                 : ClipRRect(
                     borderRadius: BorderRadius.circular(28),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+                    child: ngmyClipBackdrop(
+                      borderRadius: BorderRadius.circular(28),
+                      sigma: blurSigma,
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(28),
@@ -1261,8 +1263,9 @@ class _GlassChip extends StatelessWidget {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: isLight ? 2 : 8, sigmaY: isLight ? 2 : 8),
+      child: ngmyClipBackdrop(
+        borderRadius: BorderRadius.circular(10),
+        sigma: isLight ? 2 : 8,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 108),
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
@@ -1273,12 +1276,12 @@ class _GlassChip extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: isLight
                   ? [
-                      Colors.white.withValues(alpha: 0.95),
-                      const Color(0xFFE2E8F0).withValues(alpha: 0.92),
+                      Colors.white,
+                      const Color(0xFFE2E8F0),
                     ]
                   : [
-                      Colors.white.withValues(alpha: 0.28),
-                      Colors.white.withValues(alpha: 0.10),
+                      const Color(0xFF334155),
+                      const Color(0xFF1E293B),
                     ],
             ),
             border: Border.all(color: isLight ? const Color(0xFF94A3B8) : Colors.white.withValues(alpha: 0.45)),
@@ -1310,8 +1313,9 @@ class _WelcomeGlassFrame extends StatelessWidget {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: isLight ? 2 : 8, sigmaY: isLight ? 2 : 8),
+      child: ngmyClipBackdrop(
+        borderRadius: BorderRadius.circular(10),
+        sigma: isLight ? 2 : 8,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 112),
           padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
@@ -1322,12 +1326,12 @@ class _WelcomeGlassFrame extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: isLight
                   ? [
-                      Colors.white.withValues(alpha: 0.96),
-                      const Color(0xFFE2E8F0).withValues(alpha: 0.94),
+                      Colors.white,
+                      const Color(0xFFE2E8F0),
                     ]
                   : [
-                      Colors.white.withValues(alpha: 0.30),
-                      Colors.white.withValues(alpha: 0.10),
+                      const Color(0xFF334155),
+                      const Color(0xFF1E293B),
                     ],
             ),
             border: Border.all(color: isLight ? const Color(0xFF94A3B8) : Colors.white.withValues(alpha: 0.48)),
@@ -1413,8 +1417,9 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
               borderRadius: BorderRadius.circular(16),
               child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.circular(16),
+              sigma: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                 decoration: BoxDecoration(
@@ -1425,13 +1430,13 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
                     colors: isLight
                         ? [
                             const Color(0xFF60A5FA).withValues(alpha: 0.22 + pulse * 0.12),
-                            Colors.white.withValues(alpha: 0.55),
+                            Colors.white,
                             const Color(0xFF8B5CF6).withValues(alpha: 0.18 + pulse * 0.10),
                           ]
                         : [
-                            const Color(0xFF60A5FA).withValues(alpha: 0.28 + pulse * 0.14),
-                            Colors.white.withValues(alpha: 0.12),
-                            const Color(0xFFA78BFA).withValues(alpha: 0.26 + pulse * 0.12),
+                            const Color(0xFF1E3A5F),
+                            const Color(0xFF1E293B),
+                            const Color(0xFF312E81),
                           ],
                   ),
                   border: Border.all(
@@ -2487,7 +2492,7 @@ class _ImageCardBodyState extends State<_ImageCardBody> {
       width: double.infinity,
       height: double.infinity,
       gaplessPlayback: true,
-      filterQuality: FilterQuality.medium,
+      filterQuality: FilterQuality.high,
     );
   }
 }

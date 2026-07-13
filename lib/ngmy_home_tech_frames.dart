@@ -1,8 +1,8 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_platform_graphics.dart';
 import 'ngmy_vault_arcade.dart';
 
 /// Home “tech deck” under the spending cards — robotic HUD frames with motion.
@@ -235,8 +235,9 @@ class _TechFrameCard extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: isLight ? 6 : 18, sigmaY: isLight ? 6 : 18),
+            child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.circular(24),
+              sigma: isLight ? 6 : 18,
               child: Container(
                 width: double.infinity,
                 height: double.infinity,
@@ -248,16 +249,16 @@ class _TechFrameCard extends StatelessWidget {
                     end: Alignment.bottomRight,
                     colors: isLight
                         ? [
-                            Colors.white.withValues(alpha: 0.96),
-                            spec.colors.first.withValues(alpha: 0.16 + pulse * 0.08),
-                            spec.colors.last.withValues(alpha: 0.12),
+                            Colors.white,
+                            Color.lerp(Colors.white, spec.colors.first, 0.14)!,
+                            Color.lerp(const Color(0xFFF1F5F9), spec.colors.last, 0.10)!,
                             const Color(0xFFF1F5F9),
                           ]
                         : [
-                            Colors.white.withValues(alpha: 0.10),
-                            spec.colors.first.withValues(alpha: 0.16 + pulse * 0.08),
-                            spec.colors.last.withValues(alpha: 0.12),
-                            Colors.black.withValues(alpha: 0.18),
+                            const Color(0xFF0B1220),
+                            Color.lerp(const Color(0xFF0B1220), spec.colors.first, 0.22)!,
+                            Color.lerp(const Color(0xFF020617), spec.colors.last, 0.16)!,
+                            const Color(0xFF020617),
                           ],
                   ),
                   border: isLight
@@ -597,10 +598,7 @@ class _TechPulseExperienceState extends State<_TechPulseExperience> with TickerP
             return Stack(
               fit: StackFit.expand,
               children: [
-                BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18 * boot, sigmaY: 18 * boot),
-                  child: Container(color: const Color(0xFF030712).withValues(alpha: 0.72 * boot)),
-                ),
+                Container(color: const Color(0xFF030712).withValues(alpha: 0.88 * boot)),
                 CustomPaint(
                   painter: _ExperienceBackdropPainter(
                     colors: spec.colors,

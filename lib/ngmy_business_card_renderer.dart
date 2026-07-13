@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_platform_graphics.dart';
+
 import 'ngmy_business_card_models.dart';
 
 /// Renders business cards with distinct modern layouts (not color-only variants).
@@ -363,8 +365,9 @@ Widget _layoutGlassFrost(_CardRenderCtx c) {
       Positioned(right: -c.w * 0.15, top: -c.h * 0.2, child: CircleAvatar(radius: c.h * 0.55, backgroundColor: c.accent.withValues(alpha: 0.22))),
       Positioned(left: -c.w * 0.1, bottom: -c.h * 0.25, child: CircleAvatar(radius: c.h * 0.45, backgroundColor: Colors.white.withValues(alpha: 0.08))),
       ClipRRect(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: ngmyClipBackdrop(
+          borderRadius: BorderRadius.zero,
+          sigma: 8,
           child: Container(color: Colors.white.withValues(alpha: 0.06)),
         ),
       ),

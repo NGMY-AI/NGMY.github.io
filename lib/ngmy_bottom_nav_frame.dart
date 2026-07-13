@@ -1,6 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 
 /// Layout for the classic pill bottom nav (matches FloatingTitle-style bar).
 class NgmyBottomNavMetrics {
@@ -93,10 +93,6 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-                    child: const SizedBox.expand(),
-                  ),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(radius),
@@ -105,14 +101,14 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
                         end: Alignment.bottomCenter,
                         colors: isDark
                             ? [
-                                Colors.white.withValues(alpha: 0.16 + t * 0.04),
-                                const Color(0xFF0F172A).withValues(alpha: 0.42),
-                                const Color(0xFF111827).withValues(alpha: 0.52),
+                                const Color(0xFF1E293B),
+                                const Color(0xFF0F172A),
+                                const Color(0xFF111827),
                               ]
                             : [
-                                Colors.white.withValues(alpha: 0.52 + t * 0.06),
-                                Colors.white.withValues(alpha: 0.30),
-                                const Color(0xFFE0F2FE).withValues(alpha: 0.34),
+                                Colors.white,
+                                const Color(0xFFF8FAFC),
+                                const Color(0xFFE0F2FE),
                               ],
                       ),
                       border: Border.all(

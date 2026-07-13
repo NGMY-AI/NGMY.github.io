@@ -569,7 +569,7 @@ bool ngmyCommunicateProfileMatchesSearch(NgmyCommunicateProfile profile, String 
   return aliases.any((a) => a.contains(q) || q.contains(a));
 }
 
-/// Frosted glass panel — semi-transparent so the background shows through.
+/// Crisp panel for Advisors — solid surfaces so text and photos stay sharp.
 Widget _loveGlassPanel({
   required Widget child,
   BuildContext? context,
@@ -579,29 +579,14 @@ Widget _loveGlassPanel({
   double fillAlpha = 0.48,
 }) {
   final dark = isDark ?? (context != null && Theme.of(context!).brightness == Brightness.dark);
-  // Callers often pass 0.06–0.08 — map to a readable glass opacity.
-  final opacity = fillAlpha < 0.2 ? (dark ? 0.44 : 0.52) : fillAlpha.clamp(0.32, 0.72);
-  return ngmyClipBackdrop(
+  return ClipRRect(
     borderRadius: borderRadius,
-    sigma: blur,
     child: Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? [
-                  const Color(0xFF2A3448).withValues(alpha: opacity),
-                  const Color(0xFF141A26).withValues(alpha: opacity * 0.9),
-                ]
-              : [
-                  Colors.white.withValues(alpha: opacity + 0.06),
-                  const Color(0xFFEEF2FF).withValues(alpha: opacity),
-                ],
-        ),
+        color: dark ? const Color(0xFF1A2233) : Colors.white,
         borderRadius: borderRadius,
         border: Border.all(
-          color: dark ? Colors.white.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.78),
+          color: dark ? Colors.white.withValues(alpha: 0.16) : const Color(0xFFE2E8F0),
           width: 1.1,
         ),
         boxShadow: [
@@ -748,7 +733,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           height: widget.size,
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          filterQuality: FilterQuality.medium,
+          filterQuality: FilterQuality.high,
           errorBuilder: (_, __, ___) => _emojiFallback(),
         ),
       );
@@ -1209,16 +1194,7 @@ class _Companion3DCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: floatCtrl,
       builder: (context, _) {
-        final phase = (floatCtrl.value + index * 0.15) % 1.0;
-        final tiltY = (phase - 0.5) * 0.12;
-        final tiltX = math.sin(phase * math.pi * 2) * 0.04;
-        return Transform(
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0012)
-            ..rotateY(tiltY)
-            ..rotateX(tiltX),
-          alignment: Alignment.center,
-          child: NgmyHudTechFrame(
+        return NgmyHudTechFrame(
             colors: colors,
             pulse: pulse,
             scan: scan,
@@ -1280,7 +1256,6 @@ class _Companion3DCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
         );
       },
     );
@@ -1663,6 +1638,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         width: 200,
         fit: BoxFit.cover,
         gaplessPlayback: true,
+        filterQuality: FilterQuality.high,
         errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
       );
     } catch (_) {

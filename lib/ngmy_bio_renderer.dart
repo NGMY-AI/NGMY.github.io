@@ -4,6 +4,8 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_bio_effects.dart';
@@ -848,9 +850,10 @@ class NgmyBioPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: lightweight || kIsWeb
             ? panel
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: panel,
+            : ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 12,
+              child: panel,
               ),
       ),
     );
@@ -1349,9 +1352,10 @@ class NgmyBioPreview extends StatelessWidget {
     if (tpl.linkStyle == NgmyBioLinkStyle.glass && !lightweight) {
       card = ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: DecoratedBox(decoration: decoration, child: padded),
+        child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 16,
+              child: DecoratedBox(decoration: decoration, child: padded),
         ),
       );
     } else {

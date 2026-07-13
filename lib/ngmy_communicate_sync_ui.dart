@@ -628,9 +628,7 @@ class _SyncActionTile extends StatelessWidget {
       color: accent ? kNgmyAdvisorsHubAccent.withValues(alpha: 0.05) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Opacity(
-          opacity: disabled ? 0.45 : 1,
-          child: Padding(
+        child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
             child: Row(
               children: [
@@ -647,7 +645,9 @@ class _SyncActionTile extends StatelessWidget {
                   ),
                   child: Icon(
                     icon,
-                    color: accent ? Colors.white : kNgmyAdvisorsHubAccent,
+                    color: disabled
+                        ? palette.muted
+                        : (accent ? Colors.white : kNgmyAdvisorsHubAccent),
                     size: 22,
                   ),
                 ),
@@ -661,7 +661,7 @@ class _SyncActionTile extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
-                          color: palette.title,
+                          color: disabled ? palette.muted : palette.title,
                           height: 1.2,
                         ),
                       ),
@@ -692,7 +692,6 @@ class _SyncActionTile extends StatelessWidget {
               ],
             ),
           ),
-        ),
       ),
     );
   }
@@ -766,11 +765,9 @@ class _SyncAdvisorTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Opacity(
-          opacity: onTap == null ? 0.45 : 1,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-            child: Row(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          child: Row(
               children: [
                 Container(
                   width: 46,
@@ -778,15 +775,15 @@ class _SyncAdvisorTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        kNgmyAdvisorsHubAccent.withValues(alpha: 0.18),
-                        kNgmyAdvisorsHubAccent2.withValues(alpha: 0.12),
+                        kNgmyAdvisorsHubAccent.withValues(alpha: onTap == null ? 0.08 : 0.18),
+                        kNgmyAdvisorsHubAccent2.withValues(alpha: onTap == null ? 0.06 : 0.12),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.support_agent_rounded, color: kNgmyAdvisorsHubAccent, size: 22),
+                  child: Icon(Icons.support_agent_rounded, color: onTap == null ? palette.muted : kNgmyAdvisorsHubAccent, size: 22),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -797,7 +794,7 @@ class _SyncAdvisorTile extends StatelessWidget {
                         name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: palette.title),
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: onTap == null ? palette.muted : palette.title),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -833,7 +830,6 @@ class _SyncAdvisorTile extends StatelessWidget {
               ],
             ),
           ),
-        ),
       ),
     );
   }
@@ -1134,8 +1130,9 @@ class _NgmyAdvisorSyncScanPageState extends State<_NgmyAdvisorSyncScanPage> {
           const SizedBox(width: 2),
           SizedBox(
             height: compact ? 24 : 28,
-            child: FittedBox(
-              fit: BoxFit.contain,
+            width: compact ? 42 : 48,
+            child: Transform.scale(
+              scale: compact ? 0.78 : 0.85,
               child: CupertinoSwitch(
                 value: value,
                 onChanged: onChanged,

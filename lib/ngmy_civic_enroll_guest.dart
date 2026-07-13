@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
@@ -488,8 +490,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 16,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 8, 58, 8),
@@ -597,9 +600,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   Widget _glassField({required Widget child}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
+      child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 10,
+              child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: Colors.white.withValues(alpha: 0.05),
@@ -665,9 +669,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       scale: 1.0 + pulse * 0.03,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
+        child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 12,
+              child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
@@ -825,9 +830,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: Container(
+                    child: ngmyClipBackdrop(
+              borderRadius: BorderRadius.zero,
+              sigma: 14,
+              child: Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(maxWidth: 420),
                         padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),

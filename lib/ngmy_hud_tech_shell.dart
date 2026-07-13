@@ -1,7 +1,8 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import 'ngmy_platform_graphics.dart';
 
 /// Ink / surface tokens for HUD chrome — dark mode unchanged, light mode readable.
 class NgmyHudInk {
@@ -13,8 +14,8 @@ class NgmyHudInk {
       isDark(context) ? Colors.white : const Color(0xFF0F172A);
 
   static Color subtitle(BuildContext context, {double pulse = 0}) => isDark(context)
-      ? Colors.white.withValues(alpha: 0.58 + pulse * 0.08)
-      : const Color(0xFF475569);
+      ? Colors.white.withValues(alpha: 0.82 + pulse * 0.06)
+      : const Color(0xFF334155);
 
   static Color muted(BuildContext context) =>
       isDark(context) ? Colors.white54 : const Color(0xFF64748B);
@@ -109,17 +110,18 @@ class NgmyHudTechFrame extends StatelessWidget {
     final glow = 0.35 + pulse * 0.35;
     final scanV = (scan + phase) % 1.0;
     final orbitV = (orbit + phase * 0.7) % 1.0;
+    // Opaque fills only — translucent + BackdropFilter made Advisors look milky/blurry.
     final fill = dark
         ? [
-            const Color(0xFF0B1220).withValues(alpha: 0.92),
-            colors.first.withValues(alpha: 0.28 + pulse * 0.12),
-            colors.last.withValues(alpha: 0.22),
-            const Color(0xFF020617).withValues(alpha: 0.95),
+            const Color(0xFF0B1220),
+            Color.lerp(const Color(0xFF0B1220), colors.first, 0.28 + pulse * 0.08)!,
+            Color.lerp(const Color(0xFF020617), colors.last, 0.18)!,
+            const Color(0xFF020617),
           ]
         : [
-            Colors.white.withValues(alpha: 0.98),
-            colors.first.withValues(alpha: 0.14 + pulse * 0.08),
-            colors.last.withValues(alpha: 0.10),
+            Colors.white,
+            Color.lerp(Colors.white, colors.first, 0.12 + pulse * 0.06)!,
+            Color.lerp(const Color(0xFFF8FAFC), colors.last, 0.08)!,
             const Color(0xFFF8FAFC),
           ];
     final borderColor = dark
@@ -166,12 +168,7 @@ class NgmyHudTechFrame extends StatelessWidget {
               ),
               child: child,
             );
-            // Heavy blur milks light pastel backgrounds — keep crisp in light mode.
-            if (!dark) return content;
-            return BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: content,
-            );
+            return content;
           },
         ),
       ),
@@ -388,14 +385,14 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
               ])
         : (dark
             ? [
-                Colors.white.withValues(alpha: 0.16),
-                const Color(0xFF0F172A).withValues(alpha: 0.42),
-                const Color(0xFF111827).withValues(alpha: 0.52),
+                const Color(0xFF1E293B),
+                const Color(0xFF0F172A),
+                const Color(0xFF111827),
               ]
             : [
-                Colors.white.withValues(alpha: 0.55),
-                Colors.white.withValues(alpha: 0.30),
-                const Color(0xFFE0F2FE).withValues(alpha: 0.34),
+                Colors.white,
+                const Color(0xFFF8FAFC),
+                const Color(0xFFE0F2FE),
               ]);
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -421,11 +418,10 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
                 ),
               ],
       ),
-      child: ClipRRect(
+      child: ngmyClipBackdrop(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: bare ? 10 : 22, sigmaY: bare ? 10 : 22),
-          child: DecoratedBox(
+        sigma: bare ? 10 : 22,
+        child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(borderRadius),
               gradient: LinearGradient(
@@ -466,7 +462,6 @@ class NgmyToolkitGlassPillFrame extends StatelessWidget {
               ],
             ),
           ),
-        ),
       ),
     );
   }
