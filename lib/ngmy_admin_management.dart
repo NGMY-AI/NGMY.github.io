@@ -899,8 +899,18 @@ Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {
-    cloudOk = await _upsertNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey, NgmyCivicRegistryMembers.payload(config));
+    // Merge cloud first so a local enroll never overwrites members added by
+    // self-enrollment or another registrar on a different device.
+    final row = await _fetchNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey);
+    if (row != null && row.isNotEmpty) {
+      NgmyCivicRegistryMembers.applyPayload(config, row);
+    }
+    cloudOk = await _upsertNgmySettingSafe(
+      NgmyCivicRegistryMembers.cloudSettingsKey,
+      NgmyCivicRegistryMembers.payload(config),
+    );
   }
+  await NgmyCivicRegistryMembers.saveLocalBackup(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
 }

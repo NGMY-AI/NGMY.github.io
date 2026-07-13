@@ -29469,10 +29469,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   String _generateUniqueRegistryId(String state) {
     final prefix = state.length >= 2 ? state.substring(0, 2).toUpperCase() : 'ST';
-    final existing = widget.allUsers
-        .map((u) => (u.registryId ?? '').trim())
-        .where((id) => id.isNotEmpty)
-        .toSet();
+    final existing = <String>{
+      ...widget.allUsers.map((u) => (u.registryId ?? '').trim()).where((id) => id.isNotEmpty),
+      ...NgmyCivicRegistryMembers.listFrom(widget.config)
+          .map((m) => (m['registryId'] ?? '').toString().trim())
+          .where((id) => id.isNotEmpty),
+    };
     for (int i = 0; i < 5000; i++) {
       final candidate = '$prefix${math.Random().nextInt(8999999) + 1000000}';
       if (!existing.contains(candidate)) return candidate;
@@ -29602,6 +29604,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    final accountIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    // New registrar enrollments use a phone-based guest key (same as self-enroll)
+    // so each person becomes a NEW member. Reusing one typed email used to replace
+    // the previous enrollment via upsert-by-email.
+    final phoneDigits = phone.replaceAll(RegExp(r'\D'), '');
+    final String registryEmail;
+    if (targetUser != null) {
+      registryEmail = email;
+    } else if (accountIdx >= 0) {
+      registryEmail = email;
+    } else {
+      registryEmail = 'civic.$phoneDigits@guest.ngmy';
+    }
+
     final duplicate = NgmyCivicRegistryMembers.findDuplicateRecord(
       config: widget.config,
       fullName: fullName,
@@ -29609,7 +29625,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       city: city,
       homeAddress: address,
       phone: phone,
-      excludeEmail: targetUser?.email ?? email,
+      excludeEmail: targetUser?.email ?? registryEmail,
     );
     if (duplicate != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -29618,7 +29634,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final accountIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    // Block only when this phone guest key is already enrolled as someone else.
+    final existingByKey = NgmyCivicRegistryMembers.findByEmail(widget.config, registryEmail);
+    if (existingByKey != null && targetUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(NgmyCivicRegistryMembers.duplicateMessage(existingByKey))),
+      );
+      return;
+    }
+
     var registryId = accountIdx >= 0 ? (widget.allUsers[accountIdx].registryId ?? '').trim() : '';
     if (registryId.isEmpty) registryId = _generateUniqueRegistryId(_selectedState);
     final existingIds = NgmyCivicRegistryMembers.listFrom(widget.config)
@@ -29628,7 +29652,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (existingIds.contains(registryId)) registryId = _generateUniqueRegistryId(_selectedState);
 
     final member = NgmyCivicRegistryMembers.buildRecord(
-      email: email,
+      email: registryEmail,
       fullName: fullName,
       dob: dob,
       idType: idType,
@@ -29640,6 +29664,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       registryId: registryId,
       familyMembers: familyMembers,
     );
+    if (email.isNotEmpty && NgmyCivicRegistryMembers.emailKey(email) != NgmyCivicRegistryMembers.emailKey(registryEmail)) {
+      member['contactEmail'] = email;
+    }
 
     setState(() {
       NgmyCivicRegistryMembers.upsert(widget.config, member);
