@@ -12,6 +12,7 @@ Future<void> ngmyDownloadCivicMemberReport({
   required String htmlContent,
   required String plainText,
   required String fileName,
+  List<int>? pdfBytes,
 }) async {
   await Clipboard.setData(ClipboardData(text: plainText));
 }

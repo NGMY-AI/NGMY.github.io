@@ -31628,6 +31628,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    _familySizeInfoFrame(
+                      NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+                          NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? ''),
+                      isDark,
+                    ),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(child: _statCard('Helps', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
@@ -31790,6 +31796,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  _familySizeInfoFrame(
+                    NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+                        NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? ''),
+                    isDark,
                   ),
                   const SizedBox(height: 16),
                   Container(
@@ -32035,6 +32047,69 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Widget _familySizeInfoFrame(Map<String, dynamic>? raw, bool isDark) {
+    final familyRaw = raw?['familyMembers'];
+    final total = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+    final malesRaw = raw?['familyMales'];
+    final femalesRaw = raw?['familyFemales'];
+    final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
+    final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? Colors.white60 : const Color(0xFF64748B);
+    Widget cell(String label, String value) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: mute)),
+              const SizedBox(height: 4),
+              Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: ink)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF0FDFA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFF99F6E4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.family_restroom_rounded, color: isDark ? const Color(0xFF5EEAD4) : const Color(0xFF0F766E)),
+              const SizedBox(width: 8),
+              Text('Ukubwa wa familia', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              cell('Jumla', '$total'),
+              const SizedBox(width: 8),
+              cell('Wanaume (M)', '$males'),
+              const SizedBox(width: 8),
+              cell('Wanawake (F)', '$females'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _recordRow(String label, String value, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -32136,8 +32211,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final total = contributionTotal ?? contrib.fold<double>(0.0, (sum, t) => sum + t.amount);
     final open = openClaims ?? claimList.where((c) => c.status == TransactionStatus.pending).length;
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
     final passportGranted = raw != null && NgmyCivicRegistryMembers.passportGranted(raw);
+    final familyRaw = raw?['familyMembers'];
+    final familyTotal = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+    final malesRaw = raw?['familyMales'];
+    final femalesRaw = raw?['familyFemales'];
+    final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
+    final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
 
     final report = StringBuffer()
       ..writeln('FULL MEMBER INFORMATION')
@@ -32153,6 +32235,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..writeln('Room: ${u.room ?? 'N/A'}')
       ..writeln('Status: ${_statusLabelForMissed(u.missed)}')
       ..writeln('Registry Passport: ${passportGranted ? 'Granted' : 'Not granted'}')
+      ..writeln('Family size (Jumla): $familyTotal')
+      ..writeln('Wanaume (M): $males')
+      ..writeln('Wanawake (F): $females')
       ..writeln('')
       ..writeln('--- CONTACT ---')
       ..writeln('Home Address: ${u.homeAddress ?? 'N/A'}')
@@ -33676,8 +33761,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _memberCard(UserData u, bool isDark, {bool manageActions = true}) {
-    final familyRaw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email)?['familyMembers'];
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
+    final familyRaw = raw?['familyMembers'];
     final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+    final malesRaw = raw?['familyMales'];
+    final femalesRaw = raw?['familyFemales'];
+    final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
+    final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
+    final familyLabel = (males > 0 || females > 0)
+        ? '$familyCount family · $males M / $females F'
+        : '$familyCount family member${familyCount == 1 ? '' : 's'}';
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
@@ -33712,7 +33806,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
           _memberInfo(
             Icons.family_restroom_rounded,
-            '$familyCount family member${familyCount == 1 ? '' : 's'}',
+            familyLabel,
             Colors.teal,
           ),
 

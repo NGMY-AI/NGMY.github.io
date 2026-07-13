@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_civic_member_report_pdf.dart';
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
 
@@ -425,6 +426,33 @@ Future<void> showNgmyCivicMemberReportSheet(
   final html = ngmyBuildCivicMemberReportHtmlFromData(data);
   final isDark = Theme.of(context).brightness == Brightness.dark;
 
+  Future<void> downloadPdf() async {
+    try {
+      final bytes = await ngmyBuildCivicMemberReportPdfBytes(data);
+      await ngmyDownloadCivicMemberReport(
+        htmlContent: html,
+        plainText: plainText,
+        fileName: memberName,
+        pdfBytes: bytes,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF downloaded — open it or share it with others.'),
+            backgroundColor: Color(0xFF059669),
+          ),
+        );
+      }
+    } catch (e) {
+      await ngmyDownloadCivicMemberReport(htmlContent: html, plainText: plainText, fileName: memberName);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF failed — downloaded HTML report instead.')),
+        );
+      }
+    }
+  }
+
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -467,9 +495,9 @@ Future<void> showNgmyCivicMemberReportSheet(
                         icon: const Icon(Icons.print_outlined),
                       ),
                       IconButton(
-                        tooltip: 'Download',
-                        onPressed: () => ngmyDownloadCivicMemberReport(htmlContent: html, plainText: plainText, fileName: memberName),
-                        icon: const Icon(Icons.download_outlined),
+                        tooltip: 'Download PDF',
+                        onPressed: downloadPdf,
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
                       ),
                       IconButton(
                         tooltip: 'Copy text',
@@ -501,9 +529,9 @@ Future<void> showNgmyCivicMemberReportSheet(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => ngmyDownloadCivicMemberReport(htmlContent: html, plainText: plainText, fileName: memberName),
-                            icon: const Icon(Icons.download_outlined, size: 18),
-                            label: const Text('Download'),
+                            onPressed: downloadPdf,
+                            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                            label: const Text('Download PDF'),
                           ),
                         ),
                         const SizedBox(width: 10),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js_util' as js_util;
+import 'dart:typed_data';
 
 String _ngmyLocationPathAndSearch() {
   final path = html.window.location.pathname ?? '/';
@@ -141,12 +142,27 @@ Future<void> ngmyDownloadCivicMemberReport({
   required String htmlContent,
   required String plainText,
   required String fileName,
+  Uint8List? pdfBytes,
 }) async {
   final safe = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '_').trim();
+  final base = safe.isEmpty ? 'civic_member_report' : safe;
+  if (pdfBytes != null && pdfBytes.isNotEmpty) {
+    final blob = html.Blob([pdfBytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..download = '$base.pdf'
+      ..click();
+    Timer(const Duration(seconds: 2), () {
+      try {
+        html.Url.revokeObjectUrl(url);
+      } catch (_) {}
+    });
+    return;
+  }
   final blob = html.Blob([utf8.encode(htmlContent)], 'text/html;charset=utf-8');
   final url = html.Url.createObjectUrlFromBlob(blob);
   html.AnchorElement(href: url)
-    ..download = '${safe.isEmpty ? 'civic_member_report' : safe}.html'
+    ..download = '$base.html'
     ..click();
   html.Url.revokeObjectUrl(url);
 }
