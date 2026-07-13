@@ -4,9 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_sync.dart';
-import 'ngmy_vault_tech_skills.dart';
 import 'ngmy_vault_word_match.dart';
 
 /// Vault Channel arcade — offline tech games with local level progress.
@@ -89,7 +89,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
     } else if (game.engine == VaultEngine.neonSerpent) {
       page = NgmyVaultLeveledGameScreen(game: game);
     } else {
-      page = NgmyVaultTechSkillScreen(game: game);
+      page = NgmyVaultArcadePlayScreen(game: game);
     }
     final result = await Navigator.of(context).push<Object?>(
       PageRouteBuilder(
@@ -462,19 +462,15 @@ class _GameTile extends StatelessWidget {
               BoxShadow(color: game.colors.first.withValues(alpha: 0.12 * pulse), blurRadius: 14, offset: const Offset(0, 6)),
             ],
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -6,
-                top: -8,
-                child: Icon(game.icon, size: 52, color: game.colors.first.withValues(alpha: 0.12 + pulse * 0.06)),
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(colors: game.colors),
@@ -483,21 +479,18 @@ class _GameTile extends StatelessWidget {
                     child: Icon(game.icon, color: Colors.black.withValues(alpha: 0.78), size: 22),
                   ),
                   const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      game.shortTitle,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
-                    ),
+                  Text(
+                    game.shortTitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, height: 1.15),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text('LV $level', style: TextStyle(color: game.colors.first.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 10)),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

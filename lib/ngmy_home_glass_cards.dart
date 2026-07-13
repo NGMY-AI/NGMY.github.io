@@ -25,6 +25,30 @@ import 'ngmy_platform_graphics.dart';
 
 // ── Data models ────────────────────────────────────────────────────────────
 
+class NgmyReceiptItem {
+  const NgmyReceiptItem({required this.name, required this.price, this.qty = 1});
+
+  final String name;
+  final double price;
+  final int qty;
+
+  double get lineTotal => price * qty;
+
+  NgmyReceiptItem copyWith({String? name, double? price, int? qty}) => NgmyReceiptItem(
+        name: name ?? this.name,
+        price: price ?? this.price,
+        qty: qty ?? this.qty,
+      );
+
+  Map<String, dynamic> toJson() => {'name': name, 'price': price, 'qty': qty};
+
+  factory NgmyReceiptItem.fromJson(Map<String, dynamic> j) => NgmyReceiptItem(
+        name: j['name']?.toString() ?? '',
+        price: (j['price'] as num?)?.toDouble() ?? 0,
+        qty: ((j['qty'] as num?)?.toInt() ?? 1).clamp(1, 999),
+      );
+}
+
 class NgmySpendingEntry {
   const NgmySpendingEntry({
     required this.id,
@@ -42,6 +66,8 @@ class NgmySpendingEntry {
     this.businessCardJson = '',
     this.civicIdJson = '',
     this.cardTemplateId = '',
+    this.receiptItems = const [],
+    this.receiptMerchant = '',
   });
 
   final String id;
@@ -67,6 +93,10 @@ class NgmySpendingEntry {
   final String civicIdJson;
   /// Money-card face template id (see [kNgmyMoneyCardTemplates]).
   final String cardTemplateId;
+  /// Line items on a real receipt (item + qty + price).
+  final List<NgmyReceiptItem> receiptItems;
+  /// Store / merchant name printed on the receipt.
+  final String receiptMerchant;
 
   bool get hasImage => imageBase64.trim().isNotEmpty;
   bool get isPassword => category == 'Password';
@@ -74,11 +104,14 @@ class NgmySpendingEntry {
       pinnedEssentialsKind.trim().isNotEmpty || pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
   bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
   bool get hasCivicId => civicIdJson.trim().isNotEmpty;
+  bool get hasReceipt => receiptItems.isNotEmpty;
   bool get hideModePill =>
       hasImage || isPassword || hasBusinessCard || hasCivicId || (hasPinnedEssentials && amount <= 0);
   /// Money / category face that should fill the whole frosted card like a photo.
   bool get showsCreditFace =>
       !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !(hasPinnedEssentials && amount <= 0);
+
+  double get receiptTotal => receiptItems.fold(0.0, (a, b) => a + b.lineTotal);
 
   NgmySpendingEntry copyWith({
     String? id,
@@ -96,6 +129,8 @@ class NgmySpendingEntry {
     String? businessCardJson,
     String? civicIdJson,
     String? cardTemplateId,
+    List<NgmyReceiptItem>? receiptItems,
+    String? receiptMerchant,
   }) =>
       NgmySpendingEntry(
         id: id ?? this.id,
@@ -113,6 +148,8 @@ class NgmySpendingEntry {
         businessCardJson: businessCardJson ?? this.businessCardJson,
         civicIdJson: civicIdJson ?? this.civicIdJson,
         cardTemplateId: cardTemplateId ?? this.cardTemplateId,
+        receiptItems: receiptItems ?? this.receiptItems,
+        receiptMerchant: receiptMerchant ?? this.receiptMerchant,
       );
 
   Map<String, dynamic> toJson() => {
@@ -131,25 +168,38 @@ class NgmySpendingEntry {
         'businessCardJson': businessCardJson,
         'civicIdJson': civicIdJson,
         'cardTemplateId': cardTemplateId,
+        'receiptItems': receiptItems.map((e) => e.toJson()).toList(),
+        'receiptMerchant': receiptMerchant,
       };
 
-  factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) => NgmySpendingEntry(
-        id: j['id']?.toString() ?? '',
-        amount: (j['amount'] as num?)?.toDouble() ?? 0,
-        description: j['description']?.toString() ?? '',
-        category: j['category']?.toString() ?? 'Other',
-        date: DateTime.tryParse(j['date']?.toString() ?? '') ?? DateTime.now(),
-        note: j['note']?.toString() ?? '',
-        imageBase64: j['imageBase64']?.toString() ?? '',
-        passwordEmail: j['passwordEmail']?.toString() ?? '',
-        passwordSecret: j['passwordSecret']?.toString() ?? '',
-        pinnedNoteText: j['pinnedNoteText']?.toString() ?? '',
-        pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
-        pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
-        businessCardJson: j['businessCardJson']?.toString() ?? '',
-        civicIdJson: j['civicIdJson']?.toString() ?? '',
-        cardTemplateId: j['cardTemplateId']?.toString() ?? '',
-      );
+  factory NgmySpendingEntry.fromJson(Map<String, dynamic> j) {
+    final rawItems = j['receiptItems'];
+    final items = <NgmyReceiptItem>[];
+    if (rawItems is List) {
+      for (final e in rawItems) {
+        if (e is Map) items.add(NgmyReceiptItem.fromJson(Map<String, dynamic>.from(e)));
+      }
+    }
+    return NgmySpendingEntry(
+      id: j['id']?.toString() ?? '',
+      amount: (j['amount'] as num?)?.toDouble() ?? 0,
+      description: j['description']?.toString() ?? '',
+      category: j['category']?.toString() ?? 'Other',
+      date: DateTime.tryParse(j['date']?.toString() ?? '') ?? DateTime.now(),
+      note: j['note']?.toString() ?? '',
+      imageBase64: j['imageBase64']?.toString() ?? '',
+      passwordEmail: j['passwordEmail']?.toString() ?? '',
+      passwordSecret: j['passwordSecret']?.toString() ?? '',
+      pinnedNoteText: j['pinnedNoteText']?.toString() ?? '',
+      pinnedAlarmText: j['pinnedAlarmText']?.toString() ?? '',
+      pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
+      businessCardJson: j['businessCardJson']?.toString() ?? '',
+      civicIdJson: j['civicIdJson']?.toString() ?? '',
+      cardTemplateId: j['cardTemplateId']?.toString() ?? '',
+      receiptItems: items,
+      receiptMerchant: j['receiptMerchant']?.toString() ?? '',
+    );
+  }
 }
 
 class NgmyHomeNote {
@@ -1789,7 +1839,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     }
   }
 
-  bool _registerTripleTap(String id) {
+  bool _registerDoubleTap(String id) {
     final now = DateTime.now();
     if (_lastTapId != id || _lastTapAt == null || now.difference(_lastTapAt!) > const Duration(milliseconds: 450)) {
       _tapCount = 1;
@@ -1798,7 +1848,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     }
     _lastTapAt = now;
     _lastTapId = id;
-    if (_tapCount >= 3) {
+    if (_tapCount >= 2) {
       _tapCount = 0;
       _lastTapAt = null;
       _lastTapId = null;
@@ -1809,47 +1859,20 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
 
   Future<void> _editSpendingAmount(NgmySpendingEntry entry) async {
     if (!entry.showsCreditFace) return;
-    final amountC = TextEditingController(text: entry.amount > 0 ? entry.amount.toStringAsFixed(entry.amount % 1 == 0 ? 0 : 2) : '');
-    final descC = TextEditingController(text: entry.description);
-    final saved = await showDialog<bool>(
+    final result = await showModalBottomSheet<_SpendEditResult>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF0B1220) : Colors.white,
-          title: Text('Edit spending', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w900)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountC,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                autofocus: true,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w800, fontSize: 22),
-                decoration: const InputDecoration(labelText: 'Amount', prefixText: '\$ '),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descC,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                decoration: const InputDecoration(labelText: 'For'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-          ],
-        );
-      },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _SpendReceiptEditorSheet(entry: entry),
     );
-    final amount = double.tryParse(amountC.text.trim()) ?? 0;
-    amountC.dispose();
-    final desc = descC.text.trim();
-    descC.dispose();
-    if (saved != true || !mounted || amount <= 0) return;
-    final next = entry.copyWith(amount: amount, description: desc.isEmpty ? entry.description : desc, date: DateTime.now());
+    if (result == null || !mounted) return;
+    final next = entry.copyWith(
+      amount: result.amount,
+      description: result.description,
+      receiptMerchant: result.merchant,
+      receiptItems: result.items,
+      date: DateTime.now(),
+    );
     setState(() {
       _spending = _spending.map((e) => e.id == entry.id ? next : e).toList();
     });
@@ -2287,7 +2310,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () {
-                    if (_registerTripleTap(entry.id)) _editSpendingAmount(entry);
+                    if (_registerDoubleTap(entry.id)) _editSpendingAmount(entry);
                   },
                   child: card,
                 );
@@ -2348,7 +2371,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () {
-                    if (_registerTripleTap('note_${note.id}')) _editNote(note);
+                    if (_registerDoubleTap('note_${note.id}')) _editNote(note);
                   },
                   child: card,
                 );
@@ -4889,6 +4912,309 @@ class _NgmyRoboticDeleteDialogState extends State<_NgmyRoboticDeleteDialog> with
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SpendEditResult {
+  const _SpendEditResult({
+    required this.amount,
+    required this.description,
+    required this.merchant,
+    required this.items,
+  });
+  final double amount;
+  final String description;
+  final String merchant;
+  final List<NgmyReceiptItem> items;
+}
+
+class _SpendReceiptEditorSheet extends StatefulWidget {
+  const _SpendReceiptEditorSheet({required this.entry});
+  final NgmySpendingEntry entry;
+
+  @override
+  State<_SpendReceiptEditorSheet> createState() => _SpendReceiptEditorSheetState();
+}
+
+class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
+  late final TextEditingController _merchant;
+  late final TextEditingController _title;
+  late final TextEditingController _itemName;
+  late final TextEditingController _itemPrice;
+  late final TextEditingController _itemQty;
+  late List<NgmyReceiptItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _merchant = TextEditingController(text: widget.entry.receiptMerchant.isNotEmpty ? widget.entry.receiptMerchant : widget.entry.description);
+    _title = TextEditingController(text: widget.entry.description);
+    _itemName = TextEditingController();
+    _itemPrice = TextEditingController();
+    _itemQty = TextEditingController(text: '1');
+    _items = List<NgmyReceiptItem>.from(widget.entry.receiptItems);
+    if (_items.isEmpty && widget.entry.amount > 0) {
+      _items = [NgmyReceiptItem(name: widget.entry.description.isEmpty ? 'Purchase' : widget.entry.description, price: widget.entry.amount)];
+    }
+  }
+
+  @override
+  void dispose() {
+    _merchant.dispose();
+    _title.dispose();
+    _itemName.dispose();
+    _itemPrice.dispose();
+    _itemQty.dispose();
+    super.dispose();
+  }
+
+  double get _total => _items.fold(0.0, (a, b) => a + b.lineTotal);
+
+  void _addItem() {
+    final name = _itemName.text.trim();
+    final price = double.tryParse(_itemPrice.text.trim()) ?? 0;
+    final qty = int.tryParse(_itemQty.text.trim()) ?? 1;
+    if (name.isEmpty || price <= 0) return;
+    setState(() {
+      _items = [..._items, NgmyReceiptItem(name: name, price: price, qty: qty.clamp(1, 999))];
+      _itemName.clear();
+      _itemPrice.clear();
+      _itemQty.text = '1';
+    });
+  }
+
+  void _save() {
+    final merchant = _merchant.text.trim();
+    final title = _title.text.trim().isEmpty ? (merchant.isEmpty ? 'Spending' : merchant) : _title.text.trim();
+    final total = _items.isEmpty ? 0.0 : _total;
+    if (total <= 0) return;
+    Navigator.pop(
+      context,
+      _SpendEditResult(
+        amount: total,
+        description: title,
+        merchant: merchant,
+        items: List<NgmyReceiptItem>.from(_items),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final paper = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white54 : const Color(0xFF64748B);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0B1220) : const Color(0xFFECF2F8),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99))),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+                child: Row(
+                  children: [
+                    Text('Edit spending', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                    const Spacer(),
+                    TextButton(onPressed: () => Navigator.pop(context), child: Text('Close', style: TextStyle(color: muted, fontWeight: FontWeight.w700))),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                      decoration: BoxDecoration(
+                        color: paper,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFCBD5E1)),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 18, offset: const Offset(0, 8))],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('RECEIPT', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w900, letterSpacing: 2.2, fontSize: 11)),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _merchant,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18),
+                            decoration: InputDecoration(
+                              hintText: 'Store / merchant',
+                              hintStyle: TextStyle(color: muted),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                          ),
+                          TextField(
+                            controller: _title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 12),
+                            decoration: InputDecoration(
+                              hintText: 'Trip label (optional)',
+                              hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                          ),
+                          Divider(color: muted.withValues(alpha: 0.35), height: 20),
+                          Row(
+                            children: [
+                              Expanded(child: Text('ITEM', style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
+                              SizedBox(width: 48, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
+                              SizedBox(width: 72, child: Text('PRICE', textAlign: TextAlign.right, style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
+                              const SizedBox(width: 28),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (_items.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              child: Text('Add items you bought', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
+                            )
+                          else
+                            ..._items.asMap().entries.map((e) {
+                              final i = e.key;
+                              final item = e.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(item.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 13)),
+                                          Text('\$${item.lineTotal.toStringAsFixed(2)}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: 48, child: Text('${item.qty}', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800))),
+                                    SizedBox(width: 72, child: Text('\$${item.price.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(color: ink, fontWeight: FontWeight.w800))),
+                                    SizedBox(
+                                      width: 28,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                        onPressed: () => setState(() => _items = [..._items]..removeAt(i)),
+                                        icon: Icon(Icons.close_rounded, size: 16, color: muted),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          Divider(color: muted.withValues(alpha: 0.35), height: 18),
+                          Row(
+                            children: [
+                              Text('TOTAL', style: TextStyle(color: ink, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                              const Spacer(),
+                              Text('\$${_total.toStringAsFixed(2)}', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(DateTime.now().toLocal().toString().split('.').first, textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('Add receipt line', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: TextField(
+                            controller: _itemName,
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: 'What did you buy?',
+                              filled: true,
+                              fillColor: paper,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _itemQty,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: 'Qty',
+                              filled: true,
+                              fillColor: paper,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _itemPrice,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                            decoration: InputDecoration(
+                              hintText: '\$',
+                              filled: true,
+                              fillColor: paper,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _addItem,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add item to receipt', style: TextStyle(fontWeight: FontWeight.w800)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ink,
+                        minimumSize: const Size(0, 46),
+                        side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFF94A3B8)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: FilledButton(
+                  onPressed: _items.isEmpty ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFBBF24),
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor: Colors.white24,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text('Save receipt � \$${_total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

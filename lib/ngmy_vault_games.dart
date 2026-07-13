@@ -9,12 +9,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum VaultEngine {
   wordMatch,
   neonSerpent,
-  firewallGate,
-  binaryLab,
-  terminalOps,
-  apiMapper,
-  cipherCrack,
-  portSweep,
+  pulseForge,
+  laserLane,
+  orbPop,
+  helixHold,
+  nodeDash,
+  gravityHook,
 }
 
 class VaultGameDef {
@@ -71,67 +71,67 @@ const kVaultGames = <VaultGameDef>[
     colors: [Color(0xFF34D399), Color(0xFF22D3EE)],
     icon: Icons.polyline_rounded,
   ),
-  // Row 2 — tech skills
+  // Row 2 — playable arcade
   VaultGameDef(
-    id: 'firewall_gate',
-    title: 'Firewall Gate',
-    shortTitle: 'Firewall',
-    tagline: 'Allow safe packets. Block threats.',
-    techLabel: 'FIREWALL',
-    engine: VaultEngine.firewallGate,
-    colors: [Color(0xFF22C55E), Color(0xFFEF4444)],
-    icon: Icons.security_rounded,
-  ),
-  VaultGameDef(
-    id: 'binary_lab',
-    title: 'Binary Lab',
-    shortTitle: 'Binary Lab',
-    tagline: 'Decode binary into decimal under pressure.',
-    techLabel: 'BINARY',
-    engine: VaultEngine.binaryLab,
-    colors: [Color(0xFF60A5FA), Color(0xFF818CF8)],
-    icon: Icons.memory_rounded,
-  ),
-  VaultGameDef(
-    id: 'terminal_ops',
-    title: 'Terminal Ops',
-    shortTitle: 'Terminal',
-    tagline: 'Pick the right shell command for the job.',
-    techLabel: 'SHELL',
-    engine: VaultEngine.terminalOps,
-    colors: [Color(0xFFA3E635), Color(0xFF14B8A6)],
-    icon: Icons.terminal_rounded,
-  ),
-  // Row 3 — tech skills
-  VaultGameDef(
-    id: 'api_mapper',
-    title: 'API Mapper',
-    shortTitle: 'API Mapper',
-    tagline: 'Match HTTP methods, codes, and routes.',
-    techLabel: 'API',
-    engine: VaultEngine.apiMapper,
-    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
-    icon: Icons.hub_rounded,
-  ),
-  VaultGameDef(
-    id: 'cipher_crack',
-    title: 'Cipher Crack',
-    shortTitle: 'Cipher',
-    tagline: 'Break Caesar shifts on live signals.',
-    techLabel: 'CIPHER',
-    engine: VaultEngine.cipherCrack,
-    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
-    icon: Icons.key_rounded,
-  ),
-  VaultGameDef(
-    id: 'port_sweep',
-    title: 'Port Sweep',
-    shortTitle: 'Port Sweep',
-    tagline: 'Scan live ports. Skip honeypots.',
-    techLabel: 'PORTS',
-    engine: VaultEngine.portSweep,
+    id: 'pulse_forge',
+    title: 'Pulse Forge',
+    shortTitle: 'Pulse Forge',
+    tagline: 'Tap when the rings sync — forge combos.',
+    techLabel: 'PULSE',
+    engine: VaultEngine.pulseForge,
     colors: [Color(0xFF22D3EE), Color(0xFF6366F1)],
     icon: Icons.radar_rounded,
+  ),
+  VaultGameDef(
+    id: 'laser_lane',
+    title: 'Laser Lane',
+    shortTitle: 'Laser Lane',
+    tagline: 'Steer clear of neon beams.',
+    techLabel: 'LASER',
+    engine: VaultEngine.laserLane,
+    colors: [Color(0xFF60A5FA), Color(0xFF38BDF8)],
+    icon: Icons.speed_rounded,
+  ),
+  VaultGameDef(
+    id: 'orb_pop',
+    title: 'Orb Pop',
+    shortTitle: 'Orb Pop',
+    tagline: 'Pop charged orbs before they burst.',
+    techLabel: 'ORBS',
+    engine: VaultEngine.orbPop,
+    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
+    icon: Icons.bubble_chart_rounded,
+  ),
+  // Row 3 — playable arcade
+  VaultGameDef(
+    id: 'helix_hold',
+    title: 'Helix Hold',
+    shortTitle: 'Helix Hold',
+    tagline: 'Hold on the glowing mark to score.',
+    techLabel: 'HELIX',
+    engine: VaultEngine.helixHold,
+    colors: [Color(0xFFA3E635), Color(0xFF14B8A6)],
+    icon: Icons.sync_alt_rounded,
+  ),
+  VaultGameDef(
+    id: 'node_dash',
+    title: 'Node Dash',
+    shortTitle: 'Node Dash',
+    tagline: 'Hit live nodes before they fade.',
+    techLabel: 'NODES',
+    engine: VaultEngine.nodeDash,
+    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
+    icon: Icons.grid_view_rounded,
+  ),
+  VaultGameDef(
+    id: 'gravity_hook',
+    title: 'Gravity Hook',
+    shortTitle: 'Gravity Hook',
+    tagline: 'Sling your probe into coin wells.',
+    techLabel: 'GRAV',
+    engine: VaultEngine.gravityHook,
+    colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
+    icon: Icons.blur_circular_rounded,
   ),
 ];
 
@@ -438,12 +438,12 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
         case VaultEngine.neonSerpent:
           _stepSnake();
           break;
-        case VaultEngine.firewallGate:
-        case VaultEngine.binaryLab:
-        case VaultEngine.terminalOps:
-        case VaultEngine.apiMapper:
-        case VaultEngine.cipherCrack:
-        case VaultEngine.portSweep:
+        case VaultEngine.pulseForge:
+        case VaultEngine.laserLane:
+        case VaultEngine.orbPop:
+        case VaultEngine.helixHold:
+        case VaultEngine.nodeDash:
+        case VaultEngine.gravityHook:
           break;
       }
     });
@@ -888,12 +888,12 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
                 : const SizedBox.expand(),
           ),
         );
-      case VaultEngine.firewallGate:
-      case VaultEngine.binaryLab:
-      case VaultEngine.terminalOps:
-      case VaultEngine.apiMapper:
-      case VaultEngine.cipherCrack:
-      case VaultEngine.portSweep:
+      case VaultEngine.pulseForge:
+      case VaultEngine.laserLane:
+      case VaultEngine.orbPop:
+      case VaultEngine.helixHold:
+      case VaultEngine.nodeDash:
+      case VaultEngine.gravityHook:
         return const Center(child: Text('Open from arcade hub', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)));
     }
   }
