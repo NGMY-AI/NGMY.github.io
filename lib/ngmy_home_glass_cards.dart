@@ -2571,23 +2571,26 @@ class _CivicIdCardBody extends StatelessWidget {
       builder: (context, c) {
         const designW = 360.0;
         final designH = designW / 1.586;
-        // Fit (contain) — never cover/zoom past the home card frame.
-        final scale = math.min(c.maxWidth / designW, c.maxHeight / designH);
+        // Slight zoom past pure contain so left/right black gutters shrink without a harsh crop.
+        final fit = math.min(c.maxWidth / designW, c.maxHeight / designH);
+        final scale = fit * 1.055;
         return ColoredBox(
           color: const Color(0xFF0B1220),
-          child: Center(
-            child: SizedBox(
-              width: designW * scale,
-              height: designH * scale,
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: designW,
-                  height: designH,
-                  child: NgmyCivicRegistryIdCard(
-                    record: record!,
-                    photoPath: photo.isEmpty ? null : photo,
-                    scale: 1,
+          child: ClipRect(
+            child: Center(
+              child: SizedBox(
+                width: designW * scale,
+                height: designH * scale,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: designW,
+                    height: designH,
+                    child: NgmyCivicRegistryIdCard(
+                      record: record!,
+                      photoPath: photo.isEmpty ? null : photo,
+                      scale: 1,
+                    ),
                   ),
                 ),
               ),
