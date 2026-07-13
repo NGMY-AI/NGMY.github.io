@@ -6,7 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum VaultEngine { wordMatch, neonSerpent, orbRush, laneDrift, echoMatch, gravityWell, circuitPulse }
+enum VaultEngine {
+  wordMatch,
+  neonSerpent,
+  firewallGate,
+  binaryLab,
+  terminalOps,
+  apiMapper,
+  cipherCrack,
+  portSweep,
+}
 
 class VaultGameDef {
   const VaultGameDef({
@@ -31,6 +40,7 @@ class VaultGameDef {
 }
 
 const kVaultGames = <VaultGameDef>[
+  // Row 1
   VaultGameDef(
     id: 'vault_sync',
     title: 'Vault Sync',
@@ -55,61 +65,73 @@ const kVaultGames = <VaultGameDef>[
     id: 'neon_serpent',
     title: 'Neon Serpent',
     shortTitle: 'Neon Serpent',
-    tagline: 'Steer with your finger. Eat rivals. Grow.',
+    tagline: 'Steer the data worm. Absorb nodes. Grow.',
     techLabel: 'SNAKE',
     engine: VaultEngine.neonSerpent,
-    colors: [Color(0xFF34D399), Color(0xFFA3E635)],
-    icon: Icons.gesture_rounded,
+    colors: [Color(0xFF34D399), Color(0xFF22D3EE)],
+    icon: Icons.polyline_rounded,
+  ),
+  // Row 2 — tech skills
+  VaultGameDef(
+    id: 'firewall_gate',
+    title: 'Firewall Gate',
+    shortTitle: 'Firewall',
+    tagline: 'Allow safe packets. Block threats.',
+    techLabel: 'FIREWALL',
+    engine: VaultEngine.firewallGate,
+    colors: [Color(0xFF22C55E), Color(0xFFEF4444)],
+    icon: Icons.security_rounded,
   ),
   VaultGameDef(
-    id: 'orb_rush',
-    title: 'Orb Rush',
-    shortTitle: 'Orb Rush',
-    tagline: 'Pop glowing orbs before they burst.',
-    techLabel: 'ORBS',
-    engine: VaultEngine.orbRush,
+    id: 'binary_lab',
+    title: 'Binary Lab',
+    shortTitle: 'Binary Lab',
+    tagline: 'Decode binary into decimal under pressure.',
+    techLabel: 'BINARY',
+    engine: VaultEngine.binaryLab,
+    colors: [Color(0xFF60A5FA), Color(0xFF818CF8)],
+    icon: Icons.memory_rounded,
+  ),
+  VaultGameDef(
+    id: 'terminal_ops',
+    title: 'Terminal Ops',
+    shortTitle: 'Terminal',
+    tagline: 'Pick the right shell command for the job.',
+    techLabel: 'SHELL',
+    engine: VaultEngine.terminalOps,
+    colors: [Color(0xFFA3E635), Color(0xFF14B8A6)],
+    icon: Icons.terminal_rounded,
+  ),
+  // Row 3 — tech skills
+  VaultGameDef(
+    id: 'api_mapper',
+    title: 'API Mapper',
+    shortTitle: 'API Mapper',
+    tagline: 'Match HTTP methods, codes, and routes.',
+    techLabel: 'API',
+    engine: VaultEngine.apiMapper,
     colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
-    icon: Icons.bubble_chart_rounded,
+    icon: Icons.hub_rounded,
   ),
   VaultGameDef(
-    id: 'lane_drift',
-    title: 'Lane Drift',
-    shortTitle: 'Lane Drift',
-    tagline: 'Finger-steer through neon traffic lanes.',
-    techLabel: 'DRIFT',
-    engine: VaultEngine.laneDrift,
-    colors: [Color(0xFF60A5FA), Color(0xFF38BDF8)],
-    icon: Icons.speed_rounded,
-  ),
-  VaultGameDef(
-    id: 'echo_match',
-    title: 'Echo Match',
-    shortTitle: 'Echo Match',
-    tagline: 'Replay the pulse chain. Climb 10 echoes.',
-    techLabel: 'ECHO',
-    engine: VaultEngine.echoMatch,
+    id: 'cipher_crack',
+    title: 'Cipher Crack',
+    shortTitle: 'Cipher',
+    tagline: 'Break Caesar shifts on live signals.',
+    techLabel: 'CIPHER',
+    engine: VaultEngine.cipherCrack,
     colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
-    icon: Icons.graphic_eq_rounded,
+    icon: Icons.key_rounded,
   ),
   VaultGameDef(
-    id: 'gravity_well',
-    title: 'Gravity Well',
-    shortTitle: 'Gravity Well',
-    tagline: 'Sling your probe into coin wells.',
-    techLabel: 'GRAV',
-    engine: VaultEngine.gravityWell,
-    colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
-    icon: Icons.blur_circular_rounded,
-  ),
-  VaultGameDef(
-    id: 'circuit_pulse',
-    title: 'Circuit Pulse',
-    shortTitle: 'Circuit Pulse',
-    tagline: 'Tap charged nodes before they fade.',
-    techLabel: 'CIRCUIT',
-    engine: VaultEngine.circuitPulse,
-    colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
-    icon: Icons.grid_view_rounded,
+    id: 'port_sweep',
+    title: 'Port Sweep',
+    shortTitle: 'Port Sweep',
+    tagline: 'Scan live ports. Skip honeypots.',
+    techLabel: 'PORTS',
+    engine: VaultEngine.portSweep,
+    colors: [Color(0xFF22D3EE), Color(0xFF6366F1)],
+    icon: Icons.radar_rounded,
   ),
 ];
 
@@ -416,70 +438,12 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
         case VaultEngine.neonSerpent:
           _stepSnake();
           break;
-        case VaultEngine.orbRush:
-          for (final o in _orbs) {
-            o.r += 0.0032 + _level * 0.00032;
-            o.spin += 0.04;
-          }
-          _orbs.removeWhere((o) {
-            if (o.r >= o.maxR) {
-              unawaited(_loseHit(coins: 3 + _level, msg: 'ORB BURST'));
-              return true;
-            }
-            return false;
-          });
-          if (_orbs.length < 3 + _level ~/ 2) _spawnOrb();
-          break;
-        case VaultEngine.laneDrift:
-          for (final o in _obstacles) {
-            o.y += 0.009 + _level * 0.0009;
-          }
-          _obstacles.removeWhere((o) => o.y > 1.2);
-          if (_obstacles.isEmpty || _obstacles.last.y > 0.28) {
-            _obstacles.add(_LaneObstacle(x: _rng.nextDouble(), y: -0.1, w: 0.18 + _rng.nextDouble() * 0.12));
-          }
-          for (final o in _obstacles) {
-            if ((o.x - _carX).abs() < o.w * 0.55 && o.y > 0.72 && o.y < 0.92) {
-              unawaited(_loseHit(coins: 4 + _level, msg: 'CRASH'));
-              _obstacles.clear();
-              break;
-            }
-          }
-          break;
-        case VaultEngine.gravityWell:
-          if (!_dragging) {
-            final to = _well - _probe;
-            _vel += to * 0.0018;
-            _vel *= 0.992;
-            _probe += _vel * 0.02;
-            if (_probe.dx < 0.05 || _probe.dx > 0.95) _vel = Offset(-_vel.dx * 0.8, _vel.dy);
-            if (_probe.dy < 0.05 || _probe.dy > 0.95) _vel = Offset(_vel.dx, -_vel.dy * 0.8);
-            _probe = Offset(_probe.dx.clamp(0.05, 0.95), _probe.dy.clamp(0.05, 0.95));
-            if ((_probe - _well).distance < 0.07) {
-              _well = Offset(0.2 + _rng.nextDouble() * 0.6, 0.15 + _rng.nextDouble() * 0.45);
-              _vel *= 0.2;
-              unawaited(_gainHit(coins: 4 + _level));
-            }
-          }
-          break;
-        case VaultEngine.echoMatch:
-          break;
-        case VaultEngine.circuitPulse:
-          _circuitSpawn += 0.016;
-          for (final n in _nodes) {
-            n.life -= 0.008 + _level * 0.0005;
-          }
-          _nodes.removeWhere((n) {
-            if (n.life <= 0) {
-              unawaited(_loseHit(coins: 2 + _level, msg: 'NODE FADE'));
-              return true;
-            }
-            return false;
-          });
-          if (_nodes.length < 2 + _level ~/ 3 && _circuitSpawn > 0.55) {
-            _circuitSpawn = 0;
-            _spawnCircuitNode();
-          }
+        case VaultEngine.firewallGate:
+        case VaultEngine.binaryLab:
+        case VaultEngine.terminalOps:
+        case VaultEngine.apiMapper:
+        case VaultEngine.cipherCrack:
+        case VaultEngine.portSweep:
           break;
       }
     });
@@ -571,10 +535,6 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       _typeCtrl.clear();
     });
     if (g.engine == VaultEngine.neonSerpent) _resetSnake();
-    if (g.engine == VaultEngine.circuitPulse) {
-      _spawnCircuitNode();
-      _spawnCircuitNode();
-    }
     if (g.engine == VaultEngine.wordMatch) {
       if (_isRainLevel) {
         _spawnTimer = Timer.periodic(Duration(milliseconds: (900 - _level * 40).clamp(420, 900)), (_) {
@@ -588,7 +548,6 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => _typeFocus.requestFocus());
     }
-    if (g.engine == VaultEngine.echoMatch) await _nextEcho();
     _tick.repeat();
   }
 
@@ -925,186 +884,20 @@ class _NgmyVaultLeveledGameScreenState extends State<NgmyVaultLeveledGameScreen>
               t: _fxT,
             ),
             child: !_playing
-                ? const Center(child: Text('DRAG TO STEER', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
+                ? const Center(child: Text('STEER THE DATA WORM', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
                 : const SizedBox.expand(),
           ),
         );
-      case VaultEngine.orbRush:
-        return LayoutBuilder(
-          builder: (context, c) {
-            return GestureDetector(
-              onTapDown: (d) {
-                if (!_playing) {
-                  _start();
-                  return;
-                }
-                final p = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight);
-                final hit = _orbs.indexWhere((o) => (Offset(o.x, o.y) - p).distance < o.r + 0.03);
-                if (hit >= 0) {
-                  setState(() => _orbs.removeAt(hit));
-                  unawaited(_gainHit(coins: 2 + _level));
-                }
-              },
-              child: CustomPaint(
-                painter: _OrbRushPainter(colors: colors, orbs: _orbs, pulse: _ambient.value, t: _fxT),
-                size: Size.infinite,
-              ),
-            );
-          },
-        );
-      case VaultEngine.laneDrift:
-        return GestureDetector(
-          onHorizontalDragUpdate: (d) {
-            if (!_playing) return;
-            setState(() => _carX = (_carX + d.delta.dx / 280).clamp(0.08, 0.92));
-          },
-          onTap: () {
-            if (!_playing) _start();
-          },
-          child: CustomPaint(
-            painter: _LanePainter(colors: colors, carX: _carX, obstacles: _obstacles, t: _fxT, pulse: _ambient.value),
-            child: !_playing
-                ? const Center(child: Text('DRAG TO DRIFT', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
-                : const SizedBox.expand(),
-          ),
-        );
-      case VaultEngine.echoMatch:
-        return Center(
-          child: SizedBox(
-            width: 280,
-            height: 280,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CustomPaint(
-                  size: const Size(280, 280),
-                  painter: _EchoRingsPainter(colors: colors, pulse: _ambient.value, flash: _echoFlash),
-                ),
-                GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14),
-                  itemCount: 4,
-                  itemBuilder: (_, i) {
-                    final on = _echoFlash == i;
-                    return GestureDetector(
-                      onTap: () async {
-                        if (!_playing) {
-                          await _start();
-                          return;
-                        }
-                        if (_echoShow) return;
-                        if (_echo[_echoStep] == i) {
-                          setState(() => _echoStep += 1);
-                          if (_echoStep >= _echo.length) {
-                            await _gainHit(coins: 4 + _level);
-                            if (_playing && !_levelClear) await _nextEcho();
-                          }
-                        } else {
-                          unawaited(_loseHit(coins: 3 + _level, msg: 'WRONG ECHO'));
-                          await _nextEcho();
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 110),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          gradient: on
-                              ? LinearGradient(colors: colors)
-                              : LinearGradient(
-                                  colors: [
-                                    colors.first.withValues(alpha: 0.18 + _ambient.value * 0.08),
-                                    colors.last.withValues(alpha: 0.08),
-                                  ],
-                                ),
-                          border: Border.all(color: colors.first.withValues(alpha: on ? 0.98 : 0.4), width: on ? 2 : 1.2),
-                          boxShadow: on
-                              ? [BoxShadow(color: colors.first.withValues(alpha: 0.55), blurRadius: 22, offset: Offset.zero)]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.graphic_eq_rounded,
-                            color: on ? Colors.black87 : colors.first.withValues(alpha: 0.55 + _ambient.value * 0.35),
-                            size: 28,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      case VaultEngine.gravityWell:
-        return LayoutBuilder(
-          builder: (context, c) {
-            return GestureDetector(
-              onPanStart: (d) {
-                if (!_playing) {
-                  _start();
-                  return;
-                }
-                setState(() {
-                  _dragging = true;
-                  _probe = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight);
-                  _vel = Offset.zero;
-                });
-              },
-              onPanUpdate: (d) {
-                if (!_dragging) return;
-                setState(() => _probe = Offset(d.localPosition.dx / c.maxWidth, d.localPosition.dy / c.maxHeight));
-              },
-              onPanEnd: (d) {
-                if (!_dragging) return;
-                final v = d.velocity.pixelsPerSecond;
-                setState(() {
-                  _dragging = false;
-                  _vel = Offset(v.dx / 1400, v.dy / 1400);
-                });
-              },
-              child: CustomPaint(
-                painter: _GravityPainter(colors: colors, probe: _probe, well: _well, pulse: _ambient.value, t: _fxT),
-                size: Size.infinite,
-              ),
-            );
-          },
-        );
-      case VaultEngine.circuitPulse:
-        return LayoutBuilder(
-          builder: (context, c) {
-            return GestureDetector(
-              onTapDown: (d) {
-                if (!_playing) {
-                  _start();
-                  return;
-                }
-                final cellW = c.maxWidth / 3;
-                final cellH = c.maxHeight / 3;
-                final col = (d.localPosition.dx / cellW).floor().clamp(0, 2);
-                final row = (d.localPosition.dy / cellH).floor().clamp(0, 2);
-                final hit = _nodes.indexWhere((n) => n.col == col && n.row == row);
-                if (hit >= 0) {
-                  setState(() => _nodes.removeAt(hit));
-                  unawaited(_gainHit(coins: 3 + _level));
-                } else {
-                  unawaited(_loseHit(coins: 2 + _level, msg: 'MISS'));
-                }
-              },
-              child: CustomPaint(
-                painter: _CircuitPainter(colors: colors, nodes: _nodes, pulse: _ambient.value, t: _fxT),
-                size: Size.infinite,
-                child: !_playing
-                    ? const Center(child: Text('TAP LIVE NODES', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w900, letterSpacing: 1.2)))
-                    : null,
-              ),
-            );
-          },
-        );
+      case VaultEngine.firewallGate:
+      case VaultEngine.binaryLab:
+      case VaultEngine.terminalOps:
+      case VaultEngine.apiMapper:
+      case VaultEngine.cipherCrack:
+      case VaultEngine.portSweep:
+        return const Center(child: Text('Open from arcade hub', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)));
     }
   }
 }
-
 class _FallWord {
   _FallWord({required this.text, required this.x, required this.y});
   final String text;
@@ -1223,88 +1016,125 @@ class _SnakePainter extends CustomPainter {
   final double pulse;
   final double t;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    void drawSerpent(List<Offset> body, Color a, Color b, {required bool hero}) {
-      if (body.length < 2) return;
-      final path = Path();
-      final pts = body.map((p) => Offset(p.dx * size.width, p.dy * size.height)).toList();
-      path.moveTo(pts.first.dx, pts.first.dy);
-      for (var i = 1; i < pts.length; i++) {
-        final prev = pts[i - 1];
-        final cur = pts[i];
-        final mid = Offset((prev.dx + cur.dx) / 2, (prev.dy + cur.dy) / 2);
-        path.quadraticBezierTo(prev.dx, prev.dy, mid.dx, mid.dy);
+  Path _hex(Offset c, double r) {
+    final p = Path();
+    for (var i = 0; i < 6; i++) {
+      final a = -math.pi / 2 + i * math.pi / 3;
+      final o = Offset(c.dx + math.cos(a) * r, c.dy + math.sin(a) * r);
+      if (i == 0) {
+        p.moveTo(o.dx, o.dy);
+      } else {
+        p.lineTo(o.dx, o.dy);
       }
-      path.lineTo(pts.last.dx, pts.last.dy);
+    }
+    p.close();
+    return p;
+  }
 
-      final glow = Paint()
-        ..color = a.withValues(alpha: hero ? 0.28 + pulse * 0.18 : 0.16)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = hero ? 22 : 16
-        ..strokeCap = StrokeCap.round;
-      canvas.drawPath(path, glow);
+  void _drawWorm(Canvas canvas, Size size, List<Offset> body, Color a, Color b, {required bool hero}) {
+    if (body.isEmpty) return;
+    final pts = body.map((p) => Offset(p.dx * size.width, p.dy * size.height)).toList();
 
-      final stroke = Paint()
-        ..shader = LinearGradient(colors: [a, b]).createShader(Offset.zero & size)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = hero ? 14 : 10
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-      canvas.drawPath(path, stroke);
-
-      final core = Paint()
-        ..color = Colors.white.withValues(alpha: hero ? 0.55 : 0.28)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = hero ? 4.5 : 3
-        ..strokeCap = StrokeCap.round;
-      canvas.drawPath(path, core);
-
-      for (var i = 0; i < pts.length; i++) {
-        final tt = i / math.max(1, pts.length - 1);
-        final r = (hero ? 7.5 : 5.5) - tt * (hero ? 2.5 : 1.8);
-        canvas.drawCircle(
-          pts[i],
-          r,
-          Paint()..color = Color.lerp(a, b, tt)!.withValues(alpha: 0.9),
-        );
-        if (i % 2 == 0) {
-          canvas.drawCircle(pts[i], r * 0.35, Paint()..color = Colors.white.withValues(alpha: 0.35));
-        }
-      }
-
-      final head = pts.first;
-      final dir = pts.length > 1 ? (pts.first - pts[1]) : const Offset(0, -1);
-      final n = dir.distance < 0.001 ? const Offset(0, -1) : dir / dir.distance;
-      final perp = Offset(-n.dy, n.dx);
-      canvas.drawCircle(head, hero ? 11 : 8, Paint()..color = a);
-      canvas.drawCircle(head, hero ? 11 : 8, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = Colors.white.withValues(alpha: 0.7));
-      final eyeOff = perp * (hero ? 4.2 : 3.2) + n * (hero ? 2.5 : 1.8);
-      canvas.drawCircle(head + eyeOff, hero ? 2.2 : 1.6, Paint()..color = Colors.white);
-      canvas.drawCircle(head - eyeOff + n * (hero ? 2.5 : 1.8), hero ? 2.2 : 1.6, Paint()..color = Colors.white);
-      canvas.drawCircle(head + eyeOff, hero ? 0.9 : 0.7, Paint()..color = Colors.black87);
-      canvas.drawCircle(head - eyeOff + n * (hero ? 2.5 : 1.8), hero ? 0.9 : 0.7, Paint()..color = Colors.black87);
+    // Link cables between segments
+    for (var i = 0; i < pts.length - 1; i++) {
+      final tt = i / math.max(1, pts.length - 1);
+      canvas.drawLine(
+        pts[i],
+        pts[i + 1],
+        Paint()
+          ..color = Color.lerp(a, b, tt)!.withValues(alpha: 0.55)
+          ..strokeWidth = hero ? 5.5 : 3.5
+          ..strokeCap = StrokeCap.round,
+      );
+      canvas.drawLine(
+        pts[i],
+        pts[i + 1],
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.25)
+          ..strokeWidth = hero ? 1.6 : 1.1
+          ..strokeCap = StrokeCap.round,
+      );
     }
 
-    drawSerpent(snake, colors.first, colors.last, hero: true);
+    // Hex module body (tail → head so head paints last)
+    for (var i = pts.length - 1; i >= 0; i--) {
+      final tt = i / math.max(1, pts.length - 1);
+      final r = (hero ? 11.0 : 8.0) - tt * (hero ? 3.5 : 2.5);
+      final fill = Color.lerp(a, b, tt)!;
+      final hex = _hex(pts[i], r);
+      canvas.drawPath(hex, Paint()..color = fill.withValues(alpha: 0.92));
+      canvas.drawPath(
+        hex,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = Colors.white.withValues(alpha: 0.55 + pulse * 0.2),
+      );
+      // inner chip
+      canvas.drawCircle(pts[i], r * 0.28, Paint()..color = Colors.black.withValues(alpha: 0.35));
+      canvas.drawCircle(pts[i], r * 0.14, Paint()..color = Colors.white.withValues(alpha: 0.55));
+    }
+
+    final head = pts.first;
+    final dir = pts.length > 1 ? (pts.first - pts[1]) : const Offset(0, -1);
+    final n = dir.distance < 0.001 ? const Offset(0, -1) : dir / dir.distance;
+    final perp = Offset(-n.dy, n.dx);
+    final headR = hero ? 13.0 : 9.5;
+    final crown = _hex(head, headR);
+    canvas.drawPath(crown, Paint()..color = a);
+    canvas.drawPath(
+      crown,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = Colors.white.withValues(alpha: 0.85),
+    );
+    // sensor bar
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: head + n * (headR * 0.15), width: headR * 1.1, height: 4),
+        const Radius.circular(2),
+      ),
+      Paint()..color = const Color(0xFF0B1220),
+    );
+    // LED eyes
+    final eye = head + n * 2;
+    canvas.drawCircle(eye + perp * 4.2, 2.4, Paint()..color = const Color(0xFF67E8F9));
+    canvas.drawCircle(eye - perp * 4.2, 2.4, Paint()..color = const Color(0xFF67E8F9));
+    canvas.drawCircle(eye + perp * 4.2, 1.0, Paint()..color = Colors.white);
+    canvas.drawCircle(eye - perp * 4.2, 1.0, Paint()..color = Colors.white);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _drawWorm(canvas, size, snake, colors.first, colors.last, hero: true);
     for (final r in rivals) {
-      drawSerpent(r.body, const Color(0xFFF43F5E), const Color(0xFFFB923C), hero: false);
+      _drawWorm(canvas, size, r.body, const Color(0xFFF43F5E), const Color(0xFFFB923C), hero: false);
     }
     if (food != null) {
       final p = Offset(food!.dx * size.width, food!.dy * size.height);
-      final beat = 1 + math.sin(t * 4) * 0.12 + pulse * 0.08;
-      canvas.drawCircle(p, 16 * beat, Paint()..color = const Color(0xFFFBBF24).withValues(alpha: 0.22));
-      canvas.drawCircle(
-        p,
-        8 * beat,
-        Paint()
-          ..shader = const RadialGradient(colors: [Color(0xFFFFF7AE), Color(0xFFFBBF24), Color(0xFFF59E0B)])
-              .createShader(Rect.fromCircle(center: p, radius: 10)),
+      final beat = 1 + math.sin(t * 3.5) * 0.1 + pulse * 0.06;
+      final node = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: p, width: 22 * beat, height: 22 * beat),
+        const Radius.circular(5),
       );
-      canvas.drawCircle(p, 2.5, Paint()..color = Colors.white.withValues(alpha: 0.9));
+      canvas.drawRRect(node, Paint()..color = const Color(0xFFFBBF24).withValues(alpha: 0.2));
+      canvas.drawRRect(
+        node,
+        Paint()
+          ..shader = const LinearGradient(colors: [Color(0xFFFFF7AE), Color(0xFFFBBF24), Color(0xFF22D3EE)])
+              .createShader(Rect.fromCenter(center: p, width: 24, height: 24)),
+      );
+      canvas.drawRRect(
+        node,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = Colors.white.withValues(alpha: 0.75),
+      );
+      // tiny hash mark
+      canvas.drawLine(p + const Offset(-4, 0), p + const Offset(4, 0), Paint()..color = Colors.black54..strokeWidth = 1.5);
+      canvas.drawLine(p + const Offset(0, -4), p + const Offset(0, 4), Paint()..color = Colors.black54..strokeWidth = 1.5);
     }
   }
 

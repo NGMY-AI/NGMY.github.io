@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_sync.dart';
+import 'ngmy_vault_tech_skills.dart';
 import 'ngmy_vault_word_match.dart';
 
 /// Vault Channel arcade — offline tech games with local level progress.
@@ -85,8 +86,10 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
       page = const NgmyVaultSyncScreen();
     } else if (game.id == 'word_match') {
       page = const NgmyVaultWordMatchScreen();
-    } else {
+    } else if (game.engine == VaultEngine.neonSerpent) {
       page = NgmyVaultLeveledGameScreen(game: game);
+    } else {
+      page = NgmyVaultTechSkillScreen(game: game);
     }
     final result = await Navigator.of(context).push<Object?>(
       PageRouteBuilder(
