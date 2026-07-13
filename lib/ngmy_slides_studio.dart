@@ -1828,36 +1828,157 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFE8EEF6),
-      resizeToAvoidBottomInset: true,
+      // Avoid double-inset with MainScreen + iOS keyboard (caused the black void).
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                if (!editing) _editorTopBar(deck, isDark, compact: compact),
+                if (!hideChrome) _modernRibbon(isDark, compact: compact),
+                if (compact && _selectedElement() != null && !hideChrome)
+                  _mobileSelectionBar(isDark),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (wide && !hideChrome) SizedBox(width: 132, child: _slideStrip(isDark, vertical: true)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            if (compact && !hideChrome) SizedBox(height: 72, child: _slideStrip(isDark, vertical: false)),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: _canvas(slide, isDark, tight: editing || keyboardOpen),
+                              ),
+                            ),
+                            if (_shouldShowNotesPanel(compact) && !keyboardOpen && !editing)
+                              _notesPanel(slide, isDark, compact: compact),
+                          ],
+                        ),
+                      ),
+                      if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 240, child: _formatPanel(isDark)),
+                    ],
+                  ),
+                ),
+                if (!keyboardOpen && !editing)
+                  SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
+              ],
+            ),
+            if (editing && compact) _mobileTextEditOverlay(isDark, keyboardInset: keyboardInset),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Full-width phone editor above the keyboard — no black dead space under the slide.
+  Widget _mobileTextEditOverlay(bool isDark, {required double keyboardInset}) {
+    final el = _selectedElement();
+    if (el == null || el.type != NgmySlideElementType.text) return const SizedBox.shrink();
+    final c = _controllerFor(el);
+    final node = _focusNodeFor(el);
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.55),
         child: Column(
           children: [
-            _editorTopBar(deck, isDark, compact: compact),
-            if (!hideChrome) _modernRibbon(isDark, compact: compact),
-            if (compact && _selectedElement() != null && !hideChrome)
-              _mobileSelectionBar(isDark),
-            if (editing && compact) _mobileTypingBar(isDark),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (wide && !hideChrome) SizedBox(width: 132, child: _slideStrip(isDark, vertical: true)),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        if (compact && !hideChrome) SizedBox(height: 72, child: _slideStrip(isDark, vertical: false)),
-                        Expanded(child: _canvas(slide, isDark)),
-                        if (_shouldShowNotesPanel(compact) && !keyboardOpen) _notesPanel(slide, isDark, compact: compact),
-                      ],
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: Row(
+                  children: [
+                    Text(
+                      'Edit text',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w900, fontSize: 15),
                     ),
-                  ),
-                  if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 240, child: _formatPanel(isDark)),
-                ],
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        _stopTextEditing();
+                        setState(() {});
+                      },
+                      child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF60A5FA))),
+                    ),
+                  ],
+                ),
               ),
             ),
-            // Keep space for the app bottom nav only when the keyboard is closed.
-            if (!keyboardOpen) SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF111827) : Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.45)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 20)],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: TextField(
+                      controller: c,
+                      focusNode: node,
+                      autofocus: true,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: el.fontWeight,
+                        fontStyle: el.fontStyle,
+                        decoration: el.decoration,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        height: 1.35,
+                      ),
+                      cursorColor: const Color(0xFF2563EB),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'Type here…',
+                        hintStyle: TextStyle(color: Color(0xFF94A3B8)),
+                      ),
+                      onChanged: (v) => _updateElementText(el.id, v),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Quick format strip sits just above the keyboard.
+            Padding(
+              padding: EdgeInsets.fromLTRB(12, 0, 12, 10 + keyboardInset),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    _selChip(Icons.format_bold, null, () {
+                      _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
+                    }, isDark),
+                    _selChip(Icons.format_italic, null, () {
+                      _mutate(() => el.fontStyle = el.fontStyle == FontStyle.italic ? FontStyle.normal : FontStyle.italic);
+                    }, isDark),
+                    _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
+                    _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
+                    const Spacer(),
+                    Text(
+                      '${el.fontSize.toInt()} pt',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1902,48 +2023,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           const Spacer(),
           _selChip(Icons.delete_outline_rounded, null, _deleteSelected, isDark, danger: true),
           _selChip(Icons.check_rounded, 'Done', () => _selectElement(null), isDark),
-        ],
-      ),
-    );
-  }
-
-  Widget _mobileTypingBar(bool isDark) {
-    final el = _selectedElement();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.45)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.keyboard_rounded, size: 18, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Typing…',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-            ),
-          ),
-          if (el != null && el.type == NgmySlideElementType.text) ...[
-            _selChip(Icons.format_bold, null, () {
-              _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
-            }, isDark),
-            _selChip(Icons.format_italic, null, () {
-              _mutate(() => el.fontStyle = el.fontStyle == FontStyle.italic ? FontStyle.normal : FontStyle.italic);
-            }, isDark),
-            _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
-            _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
-          ],
-          TextButton(
-            onPressed: () {
-              _stopTextEditing();
-              setState(() {});
-            },
-            child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
-          ),
         ],
       ),
     );
@@ -2683,11 +2762,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
-  Widget _canvas(NgmySlide slide, bool isDark) {
+  Widget _canvas(NgmySlide slide, bool isDark, {bool tight = false}) {
     final aspect = _activeDeck?.aspectValue ?? 16 / 9;
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
+      padding: EdgeInsets.all(tight ? 8 : 16),
+      child: Align(
+        alignment: Alignment.topCenter,
         child: AspectRatio(
           aspectRatio: aspect,
           child: GestureDetector(
@@ -2824,12 +2904,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     : NgmySlideElementView(
                         element: e,
                         scale: scale,
-                        editing: _editingTextId == e.id,
+                        editing: _editingTextId == e.id && !_isCompactLayout(context),
                         selected: selected,
                         compactText: marriageField,
                         controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
                         focusNode: e.type == NgmySlideElementType.text ? _focusNodeFor(e) : null,
-                        onTextChanged: _editingTextId == e.id ? (v) => _updateElementText(e.id, v) : null,
+                        onTextChanged: _editingTextId == e.id && !_isCompactLayout(context)
+                            ? (v) => _updateElementText(e.id, v)
+                            : null,
                         onTap: () {
                           if (!selectable) return;
                           if (_editingTextId == e.id) return;

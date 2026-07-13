@@ -27,7 +27,7 @@
       var embedded = '__NGMY_DEPLOY_ID__';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
-      function forceRefreshForBuild(serverBuild) {
+      function forceRefreshForBuild(serverBuild, opts) {
         if (!serverBuild) return;
         // Up to date: live HTML shell matches server — never reload on SW activate alone.
         if (serverBuild === embedded) {
@@ -36,8 +36,22 @@
         }
         var onceKey = 'ngmy_force_reload_' + serverBuild;
         if (sessionStorage.getItem(onceKey)) return;
+
+        // While the app is open and visible, queue reload until the user leaves
+        // (prevents mid-session refreshes that kick people back to Home).
+        var defer = opts && opts.deferIfVisible;
+        var visible = true;
+        try {
+          visible = document.visibilityState !== 'hidden';
+        } catch (e) {}
+        if (defer && visible) {
+          try { localStorage.setItem('ngmy_pending_deploy', serverBuild); } catch (e2) {}
+          return;
+        }
+
         sessionStorage.setItem(onceKey, '1');
         try { localStorage.setItem(KEY, serverBuild); } catch (e) {}
+        try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e3) {}
         var done = function () { location.replace(location.pathname + location.search + (location.search ? '&' : '?') + '_=' + Date.now()); };
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function (regs) {
@@ -57,9 +71,19 @@
       fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (v) {
-          if (v && v.build_number) forceRefreshForBuild(v.build_number);
+          if (v && v.build_number) forceRefreshForBuild(v.build_number, { deferIfVisible: false });
         })
         .catch(function () {});
+
+      // Apply a deferred deploy only after the user backgrounds / closes the tab.
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'hidden') return;
+        var pending = null;
+        try { pending = localStorage.getItem('ngmy_pending_deploy'); } catch (e) {}
+        if (pending && pending !== embedded) {
+          forceRefreshForBuild(pending, { deferIfVisible: false });
+        }
+      });
     })();
   </script>
 
@@ -69,7 +93,7 @@
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', function (ev) {
           if (ev.data && ev.data.type === 'NGMY_NEW_VERSION' && ev.data.build && window.__ngmyForceRefreshForBuild) {
-            window.__ngmyForceRefreshForBuild(ev.data.build);
+            window.__ngmyForceRefreshForBuild(ev.data.build, { deferIfVisible: true });
           }
         });
       }

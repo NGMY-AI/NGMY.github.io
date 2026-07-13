@@ -14169,9 +14169,9 @@ class _NgmyLazyTabSlotState extends State<_NgmyLazyTabSlot> {
 
   void _refreshOnBalanceChange() {
     if (!mounted || _content == null) return;
-    // Only rebuild tabs that display wallet balance — not Media, Creator, Advisors, etc.
-    const balanceTabs = {0, 1, 2};
-    if (!balanceTabs.contains(widget.tabIndex)) return;
+    // Only rebuild the Home tab for live balance — remounting Slides/Market
+    // mid-session felt like the app was refreshing / kicking users out.
+    if (widget.tabIndex != 0) return;
     setState(() => _content = widget.buildContent());
   }
 
@@ -14282,6 +14282,43 @@ class NgmyAdminLiveRefresh {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
+  static const _kMainTabKeyPrefix = 'ngmy_main_tab_idx_v1_';
+
+  Future<void> _persistMainTabIndex(int idx) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('$_kMainTabKeyPrefix${widget.user.email.toLowerCase().trim()}', idx.clamp(0, 6));
+    } catch (_) {}
+  }
+
+  Future<void> _restoreMainTabIndex() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getInt('$_kMainTabKeyPrefix${widget.user.email.toLowerCase().trim()}');
+      if (saved == null || !mounted) return;
+      final next = saved.clamp(0, 6);
+      if (next == _idx) return;
+      setState(() {
+        _idx = next;
+        _visitedTabs.add(next);
+      });
+    } catch (_) {}
+  }
+
+  void _goToMainTab(int i, {bool refreshLegal = false}) {
+    setState(() {
+      _idx = i;
+      _visitedTabs.add(i);
+    });
+    unawaited(_persistMainTabIndex(i));
+    if (i == 0) {
+      WidgetsBinding.instance.scheduleForcedFrame();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
+    if (refreshLegal || i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
+  }
   bool _offline = false;
   bool _investPurchaseInFlight = false;
   Timer? _onlineCheck;
@@ -14641,10 +14678,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _adminTabRefreshDebounce?.cancel();
     _adminTabRefreshDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      _tabPagesKey = null;
-      _tabContentBuilders = null;
-      // Home tab does not use tab builders — skip rebuild while admin is on home.
-      if (_idx != 0) setState(() {});
+      // Never wipe open tab content (Slides editor, etc.) — only refresh Home in place.
+      if (_idx == 0) {
+        setState(() {});
+        return;
+      }
+      // Non-home tabs: leave mounted content alone so users stay where they are.
     });
   }
 
@@ -14658,10 +14697,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 4)) {
       return;
     }
+    // Request a frame only — do not setState (that remounted tabs and kicked users around).
     WidgetsBinding.instance.scheduleForcedFrame();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _idx != 0) setState(() {});
-    });
   }
 
   @override void initState() {
@@ -14703,6 +14740,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       onDataChanged: widget.onDataChanged,
     );
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
+    unawaited(_restoreMainTabIndex());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
       _ngmyApplyMidnightClockReset(widget.user);
@@ -14807,7 +14845,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (mounted) {
         unawaited(NgmyClockInMissResetDialog.show(
           context,
-          onGoToInvest: () => setState(() => _idx = 1),
+          onGoToInvest: () => _goToMainTab(1, refreshLegal: true),
         ));
       }
     }
@@ -14872,7 +14910,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshManagementData: widget.onRefreshManagementData,
         onRefreshAdminMedia: widget.onRefreshAdminMedia,
         onPurgeBrokenMedia: widget.onPurgeBrokenMedia,
-        onOpenInvest: () => setState(() => _idx = 1),
+        onOpenInvest: () => _goToMainTab(1, refreshLegal: true),
         onOpenAdminDashboard: widget.user.isAdmin ? _openAdminDashboardFromHome : null,
         ),
       ),
@@ -15116,6 +15154,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shellBg = Theme.of(context).scaffoldBackgroundColor;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 40;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -15141,6 +15180,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           onResolvePhoneFromCloud: _resolveUserPhoneFromCloud,
           child: Scaffold(
         extendBody: true,
+        resizeToAvoidBottomInset: true,
         backgroundColor: shellBg,
         body: _idx == 0
             ? _buildHomeTabWidget()
@@ -15167,7 +15207,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
-        bottomNavigationBar: _buildBottomNavBar(),
+        // Hide bottom nav while typing — it sat above the keyboard as a black block.
+        bottomNavigationBar: keyboardOpen ? null : _buildBottomNavBar(),
         ),
         ),
       ),
@@ -15245,10 +15286,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() {
-              _idx = 5;
-              _visitedTabs.add(5);
-            }),
+            onTap: () => _goToMainTab(5),
             customBorder: const CircleBorder(),
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
@@ -15264,13 +15302,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              setState(() {
-                _idx = 1;
-                _visitedTabs.add(1);
-              });
-              unawaited(widget.onRefreshLegalAndPlans?.call());
-            },
+            onTap: () => _goToMainTab(1, refreshLegal: true),
             customBorder: const CircleBorder(),
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
@@ -15286,19 +15318,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              setState(() {
-                _idx = i;
-                _visitedTabs.add(i);
-              });
-              if (i == 0) {
-                WidgetsBinding.instance.scheduleForcedFrame();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() {});
-                });
-              }
-              if (i == 1 || i == 6) unawaited(widget.onRefreshLegalAndPlans?.call());
-            },
+            onTap: () => _goToMainTab(i),
             customBorder: const CircleBorder(),
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
@@ -15327,10 +15347,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() {
-              _idx = i;
-              _visitedTabs.add(i);
-            }),
+            onTap: () => _goToMainTab(i),
             customBorder: const CircleBorder(),
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
