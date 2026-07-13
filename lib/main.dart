@@ -33,6 +33,7 @@ import 'ngmy_app_knowledge.dart';
 import 'ngmy_wallet_decisions.dart';
 import 'ngmy_news_retention.dart';
 import 'ngmy_helper_music.dart';
+import 'ngmy_helpers_rank_paper.dart';
 import 'ngmy_weekend_clock_overlay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_back_scope.dart';
@@ -34099,6 +34100,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           iconColor: Colors.green,
           title: 'Top Helpers',
           isDark: isDark,
+          onIconTap: () => _showHelpersRankPaper(
+            kind: NgmyHelpersRankKind.top,
+            stateName: st,
+            users: topHelpers,
+          ),
         ),
         const SizedBox(height: 10),
         if (topHelpers.isEmpty)
@@ -34112,6 +34118,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           iconColor: Colors.orange,
           title: 'Least Helpers',
           isDark: isDark,
+          onIconTap: () => _showHelpersRankPaper(
+            kind: NgmyHelpersRankKind.least,
+            stateName: st,
+            users: leastHelpers,
+          ),
         ),
         const SizedBox(height: 10),
         if (leastHelpers.isEmpty)
@@ -34125,6 +34136,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           iconColor: Colors.red,
           title: 'Non-Helpers (Red Status)',
           isDark: isDark,
+          onIconTap: () => _showHelpersRankPaper(
+            kind: NgmyHelpersRankKind.non,
+            stateName: st,
+            users: nonHelpers,
+          ),
         ),
         const SizedBox(height: 10),
         if (nonHelpers.isEmpty)
@@ -34163,13 +34179,50 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     required Color iconColor,
     required String title,
     required bool isDark,
+    VoidCallback? onIconTap,
   }) {
     return Row(
       children: [
-        Icon(icon, color: iconColor, size: 22),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onIconTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+          ),
+        ),
         const SizedBox(width: 8),
         Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
       ],
+    );
+  }
+
+  Future<void> _showHelpersRankPaper({
+    required NgmyHelpersRankKind kind,
+    required String stateName,
+    required List<UserData> users,
+  }) {
+    final rows = users
+        .asMap()
+        .entries
+        .map(
+          (e) => NgmyHelperRankRow(
+            rank: e.key + 1,
+            name: (e.value.fullName ?? e.value.username).trim(),
+            registryId: (e.value.registryId ?? '').trim(),
+            helps: e.value.helps,
+            missed: e.value.missed,
+          ),
+        )
+        .toList();
+    return showNgmyHelpersRankPaper(
+      context,
+      kind: kind,
+      stateName: stateName,
+      rows: rows,
     );
   }
 

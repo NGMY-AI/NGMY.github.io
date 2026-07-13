@@ -3,6 +3,12 @@ import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js_util' as js_util;
 
+String _ngmyLocationPathAndSearch() {
+  final path = html.window.location.pathname ?? '/';
+  final search = html.window.location.search ?? '';
+  return '$path$search';
+}
+
 /// Prints the styled HTML document via a hidden same-tab iframe. This avoids
 /// both `window.open` + `document.write` (blocked by newer dart:html/browser
 /// security) and opening a separate tab from a blob URL (popup blockers, and
@@ -21,7 +27,7 @@ Future<void> ngmyPrintCivicMemberReport({
     // Prefer a clean site URL in browser print chrome (no #civic-registry-screen).
     if (previousHash.isNotEmpty) {
       try {
-        html.window.history.replaceState(null, 'NGMY.ORG', html.window.location.pathname + html.window.location.search);
+        html.window.history.replaceState(null, 'NGMY.ORG', _ngmyLocationPathAndSearch());
       } catch (_) {}
     }
     final iframe = html.IFrameElement()
@@ -53,7 +59,7 @@ Future<void> ngmyPrintCivicMemberReport({
           html.window.history.replaceState(
             null,
             previousTitle,
-            html.window.location.pathname + html.window.location.search + previousHash,
+            '${_ngmyLocationPathAndSearch()}$previousHash',
           );
         } catch (_) {}
       }
@@ -89,7 +95,7 @@ Future<void> ngmyPrintCivicMemberReport({
           html.window.history.replaceState(
             null,
             previousTitle,
-            html.window.location.pathname + html.window.location.search + previousHash,
+            '${_ngmyLocationPathAndSearch()}$previousHash',
           );
         } catch (_) {}
       }
@@ -103,7 +109,7 @@ Future<void> ngmyPrintCivicMemberReport({
         html.window.history.replaceState(
           null,
           previousTitle,
-          html.window.location.pathname + html.window.location.search + previousHash,
+          '${_ngmyLocationPathAndSearch()}$previousHash',
         );
       } catch (_) {}
     }
