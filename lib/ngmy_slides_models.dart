@@ -544,7 +544,7 @@ class NgmySlidesTemplates {
             y: 0.24,
             w: 0.88,
             h: 0.68,
-            text: '• Click to add content\n• Use the toolbar to format text\n• Add images and shapes from Insert',
+            text: '• Tap text to select, then Edit to type\n• Use Format for size & color\n• Add images and shapes from Insert',
             fontSize: 20,
             fontWeight: FontWeight.w500,
             color: theme.bodyColor.value,

@@ -28,7 +28,7 @@ class NgmyHelpCenterScreen extends StatefulWidget {
   State<NgmyHelpCenterScreen> createState() => _NgmyHelpCenterScreenState();
 }
 
-class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with SingleTickerProviderStateMixin {
+class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with TickerProviderStateMixin {
   late NgmyHelpCenterConfig _cfg;
   NgmyHelpCenterService? _selected;
   late final TextEditingController _notesC;
@@ -52,6 +52,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   late final TextEditingController _preferredScheduleC;
   late final TextEditingController _urgencyC;
   late final AnimationController _pulse;
+  late final AnimationController _enter;
   String _reference = '';
   bool _cashAppOpened = false;
 
@@ -80,6 +81,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _preferredScheduleC = TextEditingController();
     _urgencyC = TextEditingController();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+    _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
   }
 
   @override
@@ -105,7 +107,26 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
     _preferredScheduleC.dispose();
     _urgencyC.dispose();
     _pulse.dispose();
+    _enter.dispose();
     super.dispose();
+  }
+
+  Animation<double> _stagger(double begin, double end) {
+    return CurvedAnimation(
+      parent: _enter,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    );
+  }
+
+  Widget _enterBlock({required double begin, required double end, required Widget child, Offset from = const Offset(0, 0.08)}) {
+    final anim = _stagger(begin, end);
+    return FadeTransition(
+      opacity: anim,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: from, end: Offset.zero).animate(anim),
+        child: child,
+      ),
+    );
   }
 
   void _selectService(NgmyHelpCenterService s) {
@@ -318,14 +339,18 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                       ? ListView(
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
                           children: [
-                            _posterCard(isDark),
+                            _enterBlock(begin: 0.0, end: 0.35, child: _posterCard(isDark)),
                             const SizedBox(height: 22),
-                            _stepsRow(isDark),
+                            _enterBlock(begin: 0.12, end: 0.48, child: _stepsRow(isDark)),
                             const SizedBox(height: 22),
-                            Text('CHOOSE A SERVICE', style: TextStyle(fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
+                            _enterBlock(
+                              begin: 0.2,
+                              end: 0.55,
+                              child: Text('CHOOSE A SERVICE', style: TextStyle(fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
+                            ),
                             const SizedBox(height: 12),
                             if (services.isEmpty)
-                              _emptyServices(isDark)
+                              _enterBlock(begin: 0.25, end: 0.6, child: _emptyServices(isDark))
                             else
                               GridView.builder(
                                 shrinkWrap: true,
@@ -337,14 +362,40 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
                                   childAspectRatio: 0.92,
                                 ),
                                 itemCount: services.length,
-                                itemBuilder: (_, i) => _serviceGridTile(services[i], isDark),
+                                itemBuilder: (_, i) {
+                                  final t0 = (0.22 + i * 0.06).clamp(0.0, 0.85);
+                                  final t1 = (t0 + 0.28).clamp(0.0, 1.0);
+                                  return _enterBlock(
+                                    begin: t0,
+                                    end: t1,
+                                    from: Offset(i.isEven ? -0.06 : 0.06, 0.1),
+                                    child: _serviceGridTile(services[i], isDark),
+                                  );
+                                },
                               ),
-                            if (_selected != null) ...[
-                              const SizedBox(height: 8),
-                              _summaryCard(isDark),
-                              const SizedBox(height: 16),
-                              _contactButtons(isDark),
-                            ],
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 380),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, anim) => FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(anim),
+                                  child: child,
+                                ),
+                              ),
+                              child: _selected == null
+                                  ? const SizedBox.shrink(key: ValueKey('hc-none'))
+                                  : Column(
+                                      key: ValueKey('hc-${_selected!.id}'),
+                                      children: [
+                                        const SizedBox(height: 8),
+                                        _summaryCard(isDark),
+                                        const SizedBox(height: 16),
+                                        _contactButtons(isDark),
+                                      ],
+                                    ),
+                            ),
                           ],
                         )
                       : _disabledState(isDark),
@@ -497,62 +548,81 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Single
   Widget _serviceGridTile(NgmyHelpCenterService s, bool isDark) {
     final selected = _selected?.id == s.id;
     final isMoney = ngmyHelpCenterIsSendMoney(s);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _selectService(s),
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: selected
-                ? LinearGradient(colors: [_accent.withOpacity(0.22), _accent2.withOpacity(0.18)])
-                : null,
-            color: selected ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-            border: Border.all(color: selected ? _accent.withOpacity(0.65) : (isDark ? Colors.white12 : Colors.black12), width: selected ? 1.6 : 1),
-            boxShadow: selected ? [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 14)] : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: isMoney
-                        ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                        : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
+    return AnimatedScale(
+      scale: selected ? 1.04 : 1.0,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutBack,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _selectService(s),
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: selected
+                  ? LinearGradient(colors: [_accent.withOpacity(0.22), _accent2.withOpacity(0.18)])
+                  : null,
+              color: selected ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+              border: Border.all(color: selected ? _accent.withOpacity(0.65) : (isDark ? Colors.white12 : Colors.black12), width: selected ? 1.6 : 1),
+              boxShadow: selected ? [BoxShadow(color: _accent.withOpacity(0.22), blurRadius: 16)] : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, __) => Transform.scale(
+                    scale: selected ? 1.0 + _pulse.value * 0.04 : 1.0,
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: LinearGradient(
+                          colors: isMoney
+                              ? [const Color(0xFF059669), const Color(0xFF10B981)]
+                              : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
+                        ),
+                        boxShadow: selected
+                            ? [BoxShadow(color: _accent.withOpacity(0.35 + _pulse.value * 0.2), blurRadius: 12)]
+                            : null,
+                      ),
+                      child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
+                    ),
                   ),
                 ),
-                child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                s.name,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-              ),
-              if (s.description.isNotEmpty) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
-                  s.description,
+                  s.name,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, height: 1.2, color: isDark ? Colors.white60 : Colors.black54),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                ),
+                if (s.description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    s.description,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 9, height: 1.2, color: isDark ? Colors.white60 : Colors.black54),
+                  ),
+                ],
+                AnimatedOpacity(
+                  opacity: selected ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
+                  ),
                 ),
               ],
-              if (selected)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
-                ),
-            ],
+            ),
           ),
         ),
       ),

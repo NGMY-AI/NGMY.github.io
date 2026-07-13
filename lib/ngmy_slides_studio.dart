@@ -38,15 +38,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   NgmySlideDeck? _activeDeck;
   int _slideIndex = 0;
   String? _selectedElementId;
+  /// Only set while the user is actively typing — keeps format chrome off the keyboard.
+  String? _editingTextId;
   bool _loading = true;
   bool _showNotes = false;
   String _ribbonTab = 'Home';
   bool _colorApplyAllSlides = false;
+  /// Desktop side format panel; phones use a sheet opened on demand.
+  bool _showDesktopFormat = true;
   Timer? _autosaveTimer;
 
   final List<_UndoSnapshot> _undo = [];
   final List<_UndoSnapshot> _redo = [];
   final Map<String, TextEditingController> _textControllers = {};
+  final Map<String, FocusNode> _textFocusNodes = {};
   final Map<String, TextEditingController> _notesControllers = {};
   String? _notesSlideId;
   bool _isDraft = false;
@@ -66,6 +71,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     _framePulse.dispose();
     for (final c in _textControllers.values) {
       c.dispose();
+    }
+    for (final n in _textFocusNodes.values) {
+      n.dispose();
     }
     for (final c in _notesControllers.values) {
       c.dispose();
@@ -152,6 +160,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       c.dispose();
     }
     _textControllers.clear();
+    for (final n in _textFocusNodes.values) {
+      n.dispose();
+    }
+    _textFocusNodes.clear();
   }
 
   void _syncTextControllersForCurrentSlide() {
@@ -161,11 +173,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     for (final id in _textControllers.keys.toList()) {
       if (!ids.contains(id)) {
         _textControllers.remove(id)?.dispose();
+        _textFocusNodes.remove(id)?.dispose();
       }
     }
     for (final e in slide.elements) {
       if (e.type != NgmySlideElementType.text) continue;
       final c = _textControllers.putIfAbsent(e.id, () => TextEditingController(text: e.text));
+      _textFocusNodes.putIfAbsent(e.id, () => FocusNode());
       if (c.text != e.text) c.text = e.text;
     }
   }
@@ -182,15 +196,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final el = _findElement(elementId);
     if (el == null || el.text == value) return;
     el.text = value;
+    var needsRebuild = false;
     if (_activeDeck?.isMarriageAgreement == true) {
       ngmyMarriageAutoFitField(el, value);
       final slide = _currentSlide;
       if (slide != null) ngmyMarriagePackRow(slide, el.y + el.h * 0.5);
+      needsRebuild = true;
     }
     _commitDraftIfNeeded();
     _syncDeckIntoList();
     _scheduleAutosave();
-    if (mounted) setState(() {});
+    // Avoid rebuilding while typing — keeps the phone keyboard stable.
+    if (needsRebuild && mounted) setState(() {});
   }
 
   void _updateSlideNotes(String slideId, String value) {
@@ -225,11 +242,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _closeEditor() {
+    _stopTextEditing(unfocus: true);
     if (_isDraft) {
       setState(() {
         _activeDeck = null;
         _isDraft = false;
         _selectedElementId = null;
+        _editingTextId = null;
         _clearTextControllers();
       });
       return;
@@ -238,6 +257,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     setState(() {
       _activeDeck = null;
       _selectedElementId = null;
+      _editingTextId = null;
       _clearTextControllers();
     });
   }
@@ -466,6 +486,46 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     return _textControllers.putIfAbsent(el.id, () => TextEditingController(text: el.text));
   }
 
+  FocusNode _focusNodeFor(NgmySlideElement el) {
+    return _textFocusNodes.putIfAbsent(el.id, () => FocusNode());
+  }
+
+  bool get _isEditingText => _editingTextId != null;
+
+  void _stopTextEditing({bool unfocus = true}) {
+    if (_editingTextId == null && !unfocus) return;
+    final id = _editingTextId;
+    if (id != null) {
+      final el = _findElement(id);
+      final c = _textControllers[id];
+      if (el != null && c != null && c.text != el.text) el.text = c.text;
+    }
+    _editingTextId = null;
+    if (unfocus) FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _startTextEditing(String id) {
+    final el = _findElement(id);
+    if (el == null || el.type != NgmySlideElementType.text) return;
+    final placeholder = el.text.trim().toLowerCase();
+    if (placeholder == 'click to edit text' || placeholder == 'tap to edit text' || placeholder == 'double-tap to edit') {
+      el.text = '';
+      _controllerFor(el).text = '';
+    }
+    setState(() {
+      _selectedElementId = id;
+      _editingTextId = id;
+      _showNotes = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _editingTextId != id) return;
+      final node = _focusNodeFor(el);
+      node.requestFocus();
+      final c = _controllerFor(el);
+      c.selection = TextSelection.collapsed(offset: c.text.length);
+    });
+  }
+
   void _selectElement(String? id) {
     final prevId = _selectedElementId;
     if (prevId != null && prevId != id) {
@@ -475,15 +535,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         if (c != null && c.text != prev.text) prev.text = c.text;
       }
     }
+    final leavingEdit = _editingTextId != null && _editingTextId != id;
     setState(() {
+      if (leavingEdit) _editingTextId = null;
       _selectedElementId = id;
       if (id != null) {
+        _showDesktopFormat = true;
         final el = _findElement(id);
         if (el != null && el.type == NgmySlideElementType.text) {
           _controllerFor(el).text = el.text;
         }
+      } else {
+        _editingTextId = null;
       }
     });
+    if (leavingEdit || id == null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
   }
 
   void _addTextBox() {
@@ -495,7 +563,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         y: 0.2,
         w: 0.7,
         h: 0.22,
-        text: 'Click to edit text',
+        text: 'Tap to edit text',
         fontSize: 24,
         color: _theme.bodyColor.value,
       );
@@ -543,10 +611,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   void _deleteSelected() {
     final id = _selectedElementId;
     if (id == null || _currentSlide == null) return;
+    if (_editingTextId == id) _stopTextEditing(unfocus: true);
     _mutate(() {
       _currentSlide!.elements.removeWhere((e) => e.id == id);
       _selectedElementId = null;
+      _editingTextId = null;
       _textControllers.remove(id)?.dispose();
+      _textFocusNodes.remove(id)?.dispose();
     });
   }
 
@@ -1196,16 +1267,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   bool _shouldShowNotesPanel(bool compact) {
     if (!_showNotes) return false;
+    if (_isEditingText) return false;
     if (!compact) return true;
     const hiddenTabs = {'Design', 'Transitions', 'Insert'};
     return !hiddenTabs.contains(_ribbonTab);
   }
 
+  /// Format panel never auto-opens on phones (covers the keyboard). Desktop keeps a side panel.
   bool _shouldShowFormatPanel(bool compact) {
     if (_selectedElement() == null) return false;
-    if (!compact) return true;
-    const hiddenTabs = {'Design', 'Transitions'};
-    return !hiddenTabs.contains(_ribbonTab);
+    if (_isEditingText) return false;
+    if (compact) return false;
+    return _showDesktopFormat;
   }
 
   Widget _transitionChip(NgmySlideTransition tr, bool selected, Color accent, bool isDark, VoidCallback onTap) {
@@ -1351,7 +1424,91 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _dismissFormatPanel() {
-    setState(() => _selectedElementId = null);
+    setState(() {
+      _showDesktopFormat = false;
+      if (_isCompactLayout(context)) {
+        _selectedElementId = null;
+        _editingTextId = null;
+      }
+    });
+    if (_isCompactLayout(context)) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+  }
+
+  Future<void> _openMobileFormatSheet() async {
+    final el = _selectedElement();
+    if (el == null) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: StatefulBuilder(
+            builder: (ctx, setSheet) {
+              return DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.52,
+                minChildSize: 0.34,
+                maxChildSize: 0.9,
+                builder: (_, scrollCtrl) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF111827) : Colors.white,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                          child: Row(
+                            children: [
+                              Text('Format', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView(
+                            controller: scrollCtrl,
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                            children: [
+                              _formatPanel(
+                                isDark,
+                                compact: true,
+                                embedded: true,
+                                onLocalChanged: () {
+                                  setSheet(() {});
+                                  if (mounted) setState(() {});
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showDeckActionsSheet(NgmySlideDeck deck, bool isDark) async {
@@ -1664,76 +1821,228 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final compact = _isCompactLayout(context);
     final wide = !compact;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardOpen = keyboardInset > 40;
+    final editing = _isEditingText;
+    final hideChrome = keyboardOpen || editing;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFE2E8F0),
+      backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFE8EEF6),
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            _editorTopBar(deck, isDark),
-            _ribbon(isDark),
+            _editorTopBar(deck, isDark, compact: compact),
+            if (!hideChrome) _modernRibbon(isDark, compact: compact),
+            if (compact && _selectedElement() != null && !hideChrome)
+              _mobileSelectionBar(isDark),
+            if (editing && compact) _mobileTypingBar(isDark),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (wide) SizedBox(width: 132, child: _slideStrip(isDark, vertical: true)),
+                  if (wide && !hideChrome) SizedBox(width: 132, child: _slideStrip(isDark, vertical: true)),
                   Expanded(
                     child: Column(
                       children: [
-                        if (compact) SizedBox(height: 76, child: _slideStrip(isDark, vertical: false)),
+                        if (compact && !hideChrome) SizedBox(height: 72, child: _slideStrip(isDark, vertical: false)),
                         Expanded(child: _canvas(slide, isDark)),
-                        if (_shouldShowNotesPanel(compact)) _notesPanel(slide, isDark, compact: compact),
+                        if (_shouldShowNotesPanel(compact) && !keyboardOpen) _notesPanel(slide, isDark, compact: compact),
                       ],
                     ),
                   ),
-                  if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 220, child: _formatPanel(isDark)),
+                  if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 240, child: _formatPanel(isDark)),
                 ],
               ),
             ),
-            if (compact && _shouldShowFormatPanel(compact)) SizedBox(height: 200, child: _formatPanel(isDark, compact: true)),
-            SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
+            // Keep space for the app bottom nav only when the keyboard is closed.
+            if (!keyboardOpen) SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
           ],
         ),
       ),
     );
   }
 
-  Widget _editorTopBar(NgmySlideDeck deck, bool isDark) {
+  Widget _mobileSelectionBar(bool isDark) {
+    final el = _selectedElement();
+    if (el == null) return const SizedBox.shrink();
+    final isText = el.type == NgmySlideElementType.text;
     return Container(
-      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111827) : Colors.white,
-        border: Border(bottom: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0))),
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [Colors.white, const Color(0xFFF8FAFC)],
+        ),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Row(
         children: [
-          IconButton(
-            tooltip: 'Back to library',
-            onPressed: _closeEditor,
-            icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-          ),
+          if (isText)
+            _selChip(Icons.edit_rounded, 'Edit', () => _startTextEditing(el.id), isDark, accent: true),
+          _selChip(Icons.tune_rounded, 'Format', () {
+            if (_isCompactLayout(context)) {
+              unawaited(_openMobileFormatSheet());
+            } else {
+              setState(() => _showDesktopFormat = true);
+            }
+          }, isDark),
+          if (isText) ...[
+            _selChip(Icons.format_bold, null, () {
+              _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
+            }, isDark),
+            _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
+            _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
+          ],
+          const Spacer(),
+          _selChip(Icons.delete_outline_rounded, null, _deleteSelected, isDark, danger: true),
+          _selChip(Icons.check_rounded, 'Done', () => _selectElement(null), isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileTypingBar(bool isDark) {
+    final el = _selectedElement();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.keyboard_rounded, size: 18, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              deck.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+              'Typing…',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF475569)),
             ),
           ),
-          IconButton(
-            tooltip: 'Download PDF',
-            onPressed: () => unawaited(_downloadPdf()),
-            icon: Icon(Icons.picture_as_pdf_outlined, color: isDark ? const Color(0xFFB8860B) : const Color(0xFF2563EB)),
+          if (el != null && el.type == NgmySlideElementType.text) ...[
+            _selChip(Icons.format_bold, null, () {
+              _mutate(() => el.fontWeight = el.fontWeight == FontWeight.bold ? FontWeight.w500 : FontWeight.bold);
+            }, isDark),
+            _selChip(Icons.format_italic, null, () {
+              _mutate(() => el.fontStyle = el.fontStyle == FontStyle.italic ? FontStyle.normal : FontStyle.italic);
+            }, isDark),
+            _selChip(Icons.text_increase_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize + 2).clamp(10, 96)), isDark),
+            _selChip(Icons.text_decrease_rounded, null, () => _mutate(() => el.fontSize = (el.fontSize - 2).clamp(10, 96)), isDark),
+          ],
+          TextButton(
+            onPressed: () {
+              _stopTextEditing();
+              setState(() {});
+            },
+            child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selChip(IconData icon, String? label, VoidCallback onTap, bool isDark, {bool accent = false, bool danger = false}) {
+    final fg = danger
+        ? const Color(0xFFEF4444)
+        : accent
+            ? Colors.white
+            : (isDark ? Colors.white70 : const Color(0xFF334155));
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: accent
+                  ? const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)])
+                  : null,
+              color: accent ? null : (isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: label == null ? 10 : 12, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: fg),
+                  if (label != null) ...[
+                    const SizedBox(width: 5),
+                    Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: fg)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _editorTopBar(NgmySlideDeck deck, bool isDark, {required bool compact}) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [Colors.white, const Color(0xFFF0F9FF)],
+        ),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFDBEAFE), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.18 : 0.10), blurRadius: 18, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: [
+          _topIconBtn(Icons.arrow_back_ios_new_rounded, 'Back', _closeEditor, isDark),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  deck.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: compact ? 14 : 15,
+                    letterSpacing: -0.2,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  '${deck.slides.length} slides · ${_slideIndex + 1} of ${deck.slides.length}',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : const Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+          _topIconBtn(Icons.undo_rounded, 'Undo', _undo.isEmpty ? null : _undoAction, isDark),
+          _topIconBtn(Icons.redo_rounded, 'Redo', _redo.isEmpty ? null : _redoAction, isDark),
+          _topIconBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_downloadPdf()), isDark),
           PopupMenuButton<String>(
+            tooltip: 'More',
+            padding: EdgeInsets.zero,
             icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white70 : const Color(0xFF475569)),
             onSelected: (v) async {
               switch (v) {
-                case 'undo':
-                  _undoAction();
-                case 'redo':
-                  _redoAction();
                 case 'share':
                   await _shareOutline();
                 case 'timer':
@@ -1761,49 +2070,90 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               }
             },
             itemBuilder: (_) => [
-              PopupMenuItem(value: 'undo', enabled: _undo.isNotEmpty, child: const Text('Undo')),
-              PopupMenuItem(value: 'redo', enabled: _redo.isNotEmpty, child: const Text('Redo')),
               const PopupMenuItem(value: 'share', child: Text('Share text outline')),
               PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
             ],
           ),
-          FilledButton(
-            onPressed: _startSlideshow,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              minimumSize: const Size(0, 36),
+          const SizedBox(width: 4),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _startSlideshow,
+              borderRadius: BorderRadius.circular(14),
+              child: Ink(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)]),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 2),
+                      Text('Play', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
           ),
         ],
       ),
     );
   }
 
-  Widget _ribbon(bool isDark) {
+  Widget _topIconBtn(IconData icon, String tip, VoidCallback? onTap, bool isDark) {
+    return IconButton(
+      tooltip: tip,
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, size: 20, color: onTap == null ? (isDark ? Colors.white24 : Colors.black26) : (isDark ? Colors.white70 : const Color(0xFF334155))),
+    );
+  }
+
+  Widget _modernRibbon(bool isDark, {required bool compact}) {
     final tabs = ['Home', 'Insert', 'School', 'Tools', 'Design', 'Transitions', 'View'];
     return Container(
-      color: isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: isDark ? const Color(0xFF111827).withValues(alpha: 0.92) : Colors.white.withValues(alpha: 0.96),
+        border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
             child: Row(
               children: tabs.map((t) {
                 final sel = _ribbonTab == t;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: TextButton(
-                    onPressed: () => setState(() => _ribbonTab = t),
-                    style: TextButton.styleFrom(
-                      backgroundColor: sel ? (isDark ? const Color(0xFF2563EB) : const Color(0xFFDBEAFE)) : Colors.transparent,
-                      foregroundColor: sel ? (isDark ? Colors.white : const Color(0xFF1D4ED8)) : (isDark ? Colors.white70 : const Color(0xFF475569)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _ribbonTab = t),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        gradient: sel
+                            ? const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF6366F1)])
+                            : null,
+                        color: sel ? null : (isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9)),
+                      ),
+                      child: Text(
+                        t,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: sel ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF475569)),
+                        ),
+                      ),
                     ),
-                    child: Text(t, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 );
               }).toList(),
@@ -1811,7 +2161,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+            padding: EdgeInsets.fromLTRB(8, 2, 8, compact ? 8 : 10),
             child: _ribbonTools(isDark),
           ),
         ],
@@ -2095,7 +2445,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 _mutate(() => el.bulletList = !el.bulletList);
               }, isDark),
               _fontSizeStepper(el, isDark),
-              if (el != null && !el.fileName.startsWith('__design__')) _elementTransitionPicker(isDark),
+              if (!el.fileName.startsWith('__design__')) _elementTransitionPicker(isDark),
               _ribbonBtn(Icons.delete_forever_outlined, 'Delete', _deleteSelected, isDark),
             ],
           ],
@@ -2211,19 +2561,36 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   Widget _ribbonBtn(IconData icon, String label, VoidCallback onTap, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: isDark ? Colors.white70 : const Color(0xFF334155)),
-              const SizedBox(height: 2),
-              Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-            ],
+      padding: const EdgeInsets.only(right: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 18, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                  const SizedBox(height: 3),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white60 : const Color(0xFF475569),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -2324,7 +2691,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         child: AspectRatio(
           aspectRatio: aspect,
           child: GestureDetector(
-            onTap: () => _selectElement(null),
+            onTap: () {
+              _stopTextEditing();
+              _selectElement(null);
+            },
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final w = constraints.maxWidth;
@@ -2405,8 +2775,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           }
           if (selectable) _selectElement(e.id);
         },
+        onDoubleTap: selectable && e.type == NgmySlideElementType.text
+            ? () => _startTextEditing(e.id)
+            : null,
         onPanUpdate: movable
             ? (d) {
+                if (_editingTextId == e.id) return;
                 setState(() {
                   e.x = (e.x + d.delta.dx / cw).clamp(-0.3, 1.2);
                   e.y = (e.y + d.delta.dy / ch).clamp(-0.3, 1.2);
@@ -2424,9 +2798,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: selected ? (marriageField ? const Color(0xFFB8860B) : accentColor) : Colors.transparent,
+                    color: selected
+                        ? (_editingTextId == e.id
+                            ? const Color(0xFF22C55E)
+                            : (marriageField ? const Color(0xFFB8860B) : accentColor))
+                        : Colors.transparent,
                     width: selected ? 2 : 0,
                   ),
+                  borderRadius: BorderRadius.circular(selected ? 6 : 0),
                   color: signZone
                       ? const Color(0xFFB8860B).withValues(alpha: 0.08)
                       : (e.type == NgmySlideElementType.signature ? Colors.transparent : null),
@@ -2445,17 +2824,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     : NgmySlideElementView(
                         element: e,
                         scale: scale,
-                        editing: e.type == NgmySlideElementType.text,
+                        editing: _editingTextId == e.id,
                         selected: selected,
                         compactText: marriageField,
                         controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
-                        onTextChanged: selected && e.type == NgmySlideElementType.text ? (v) => _updateElementText(e.id, v) : null,
+                        focusNode: e.type == NgmySlideElementType.text ? _focusNodeFor(e) : null,
+                        onTextChanged: _editingTextId == e.id ? (v) => _updateElementText(e.id, v) : null,
                         onTap: () {
-                          if (selectable) _selectElement(e.id);
+                          if (!selectable) return;
+                          if (_editingTextId == e.id) return;
+                          _selectElement(e.id);
                         },
+                        onDoubleTap: selectable && e.type == NgmySlideElementType.text
+                            ? () => _startTextEditing(e.id)
+                            : null,
                       ),
               ),
-              if (selected && movable)
+              if (selected && movable && _editingTextId != e.id)
                 Positioned(
                   right: -4,
                   bottom: -4,
@@ -2493,6 +2878,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       child: const Icon(Icons.open_in_full_rounded, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              if (selected && e.type == NgmySlideElementType.text && _editingTextId != e.id && _isCompactLayout(context))
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: -28,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () => _startTextEditing(e.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8)],
+                        ),
+                        child: const Text('Edit text', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                      ),
                     ),
                   ),
                 ),
@@ -2565,12 +2970,115 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
-  Widget _formatPanel(bool isDark, {bool compact = false}) {
-    final el = _selectedElement()!;
+  Widget _formatPanel(bool isDark, {bool compact = false, bool embedded = false, VoidCallback? onLocalChanged}) {
+    final el = _selectedElement();
+    if (el == null) return const SizedBox.shrink();
+    void apply(VoidCallback fn) {
+      _mutate(fn);
+      onLocalChanged?.call();
+    }
     final colors = [
       0xFF111827, 0xFFFFFFFF, 0xFF2563EB, 0xFF059669, 0xFFDC2626,
       0xFF7C3AED, 0xFFEA580C, 0xFF334155,
     ];
+    final maxW = (1.0 - el.x).clamp(0.06, 1.0);
+    final maxH = (1.0 - el.y).clamp(0.06, 1.0);
+    final maxX = (1.0 - el.w).clamp(0.01, 1.0);
+    final maxY = (1.0 - el.h).clamp(0.01, 1.0);
+    final body = ListView(
+      physics: embedded ? const NeverScrollableScrollPhysics() : null,
+      shrinkWrap: embedded,
+      children: [
+        if (!embedded)
+          Row(
+            children: [
+              Text('Format', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+              const Spacer(),
+              _panelDoneButton(onDone: _dismissFormatPanel, isDark: isDark),
+            ],
+          ),
+        if (!embedded) const SizedBox(height: 10),
+        Text('Size', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+        Row(
+          children: [
+            const Text('W', style: TextStyle(fontSize: 10)),
+            Expanded(child: Slider(value: el.w.clamp(0.05, maxW), min: 0.05, max: maxW, onChanged: (v) => apply(() => el.w = v))),
+          ],
+        ),
+        Row(
+          children: [
+            const Text('H', style: TextStyle(fontSize: 10)),
+            Expanded(child: Slider(value: el.h.clamp(0.05, maxH), min: 0.05, max: maxH, onChanged: (v) => apply(() => el.h = v))),
+          ],
+        ),
+        if (el.type == NgmySlideElementType.text)
+          Row(
+            children: [
+              const Text('Font', style: TextStyle(fontSize: 10)),
+              Expanded(child: Slider(value: el.fontSize.clamp(10, 96), min: 10, max: 96, onChanged: (v) => apply(() => el.fontSize = v))),
+            ],
+          ),
+        if (el.type == NgmySlideElementType.image || el.type == NgmySlideElementType.signature || el.type == NgmySlideElementType.pdf) ...[
+          Text('Crop / position', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          Row(children: [const Text('X', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.x.clamp(0.0, maxX), min: 0, max: maxX, onChanged: (v) => apply(() => el.x = v)))]),
+          Row(children: [const Text('Y', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.y.clamp(0.0, maxY), min: 0, max: maxY, onChanged: (v) => apply(() => el.y = v)))]),
+        ],
+        const SizedBox(height: 8),
+        if (el.type == NgmySlideElementType.text) ...[
+          Text('Text color', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: colors.map((c) {
+              return GestureDetector(
+                onTap: () => apply(() => el.color = c),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Color(c),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: el.color == c ? const Color(0xFF2563EB) : Colors.grey, width: el.color == c ? 2 : 1),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<TextAlign>(
+            segments: const [
+              ButtonSegment(value: TextAlign.left, icon: Icon(Icons.format_align_left, size: 16)),
+              ButtonSegment(value: TextAlign.center, icon: Icon(Icons.format_align_center, size: 16)),
+              ButtonSegment(value: TextAlign.right, icon: Icon(Icons.format_align_right, size: 16)),
+            ],
+            selected: {el.align},
+            onSelectionChanged: (s) => apply(() => el.align = s.first),
+          ),
+        ],
+        if (el.type == NgmySlideElementType.shape) ...[
+          Text('Fill', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          Wrap(
+            spacing: 6,
+            children: colors.map((c) => GestureDetector(
+                  onTap: () => apply(() => el.fillColor = c),
+                  child: Container(width: 22, height: 22, decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle)),
+                )).toList(),
+          ),
+        ],
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () {
+            if (embedded && Navigator.of(context).canPop()) Navigator.of(context).pop();
+            _deleteSelected();
+          },
+          icon: const Icon(Icons.delete_outline, size: 16),
+          label: const Text('Delete element'),
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+        ),
+      ],
+    );
+    if (embedded) return body;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
@@ -2579,93 +3087,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         border: compact ? Border(top: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0))) : null,
         boxShadow: compact ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, -4))] : null,
       ),
-      child: ListView(
-        children: [
-          Row(
-            children: [
-              Text('Format', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-              const Spacer(),
-              _panelDoneButton(onDone: _dismissFormatPanel, isDark: isDark),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text('Size', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-          Row(
-            children: [
-              const Text('W', style: TextStyle(fontSize: 10)),
-              Expanded(child: Slider(value: el.w, min: 0.05, max: 1.0 - el.x, onChanged: (v) => _mutate(() => el.w = v))),
-            ],
-          ),
-          Row(
-            children: [
-              const Text('H', style: TextStyle(fontSize: 10)),
-              Expanded(child: Slider(value: el.h, min: 0.05, max: 1.0 - el.y, onChanged: (v) => _mutate(() => el.h = v))),
-            ],
-          ),
-          if (el.type == NgmySlideElementType.text)
-            Row(
-              children: [
-                const Text('Font', style: TextStyle(fontSize: 10)),
-                Expanded(child: Slider(value: el.fontSize, min: 10, max: 96, onChanged: (v) => _mutate(() => el.fontSize = v))),
-              ],
-            ),
-          if (el.type == NgmySlideElementType.image || el.type == NgmySlideElementType.signature || el.type == NgmySlideElementType.pdf) ...[
-            Text('Crop / position', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-            Row(children: [const Text('X', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.x, min: 0, max: 1 - el.w, onChanged: (v) => _mutate(() => el.x = v)))]),
-            Row(children: [const Text('Y', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.y, min: 0, max: 1 - el.h, onChanged: (v) => _mutate(() => el.y = v)))]),
-          ],
-          const SizedBox(height: 8),
-          if (el.type == NgmySlideElementType.text) ...[
-            Text('Text color', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: colors.map((c) {
-                return GestureDetector(
-                  onTap: () => _mutate(() => el.color = c),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: Color(c),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: el.color == c ? const Color(0xFF2563EB) : Colors.grey, width: el.color == c ? 2 : 1),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<TextAlign>(
-              segments: const [
-                ButtonSegment(value: TextAlign.left, icon: Icon(Icons.format_align_left, size: 16)),
-                ButtonSegment(value: TextAlign.center, icon: Icon(Icons.format_align_center, size: 16)),
-                ButtonSegment(value: TextAlign.right, icon: Icon(Icons.format_align_right, size: 16)),
-              ],
-              selected: {el.align},
-              onSelectionChanged: (s) => _mutate(() => el.align = s.first),
-            ),
-          ],
-          if (el.type == NgmySlideElementType.shape) ...[
-            Text('Fill', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
-            Wrap(
-              spacing: 6,
-              children: colors.map((c) => GestureDetector(
-                    onTap: () => _mutate(() => el.fillColor = c),
-                    child: Container(width: 22, height: 22, decoration: BoxDecoration(color: Color(c), shape: BoxShape.circle)),
-                  )).toList(),
-            ),
-          ],
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _deleteSelected,
-            icon: const Icon(Icons.delete_outline, size: 16),
-            label: const Text('Delete element'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-          ),
-        ],
-      ),
+      child: body,
     );
   }
 

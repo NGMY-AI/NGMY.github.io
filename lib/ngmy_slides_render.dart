@@ -18,8 +18,10 @@ class NgmySlideElementView extends StatelessWidget {
     this.selected = false,
     this.compactText = false,
     this.controller,
+    this.focusNode,
     this.onTextChanged,
     this.onTap,
+    this.onDoubleTap,
   });
 
   final NgmySlideElement element;
@@ -28,8 +30,10 @@ class NgmySlideElementView extends StatelessWidget {
   final bool selected;
   final bool compactText;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onTextChanged;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
 
   @override
   Widget build(BuildContext context) {
@@ -62,34 +66,45 @@ class NgmySlideElementView extends StatelessWidget {
     final align = _alignToAlignment(element.align);
 
     Widget child;
-    if (editing && selected && controller != null) {
+    if (editing && controller != null) {
       child = TextField(
         key: ValueKey('slide_tf_${element.id}'),
         controller: controller,
+        focusNode: focusNode,
+        autofocus: false,
         maxLines: null,
         minLines: 1,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
         style: style,
         strutStyle: strut,
         textAlign: element.align,
         textAlignVertical: TextAlignVertical.top,
-        decoration: InputDecoration(
+        cursorColor: const Color(0xFF2563EB),
+        decoration: const InputDecoration(
           border: InputBorder.none,
           isDense: true,
           contentPadding: EdgeInsets.zero,
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.06),
+          hintText: 'Type here…',
+          hintStyle: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         ),
         onChanged: onTextChanged,
-        onTap: onTap,
       );
     } else {
+      final display = element.text.trim().isEmpty ? 'Tap to select · Edit to type' : element.text;
+      final empty = element.text.trim().isEmpty ||
+          element.text.trim().toLowerCase() == 'click to edit text' ||
+          element.text.trim().toLowerCase() == 'tap to edit text';
       child = GestureDetector(
         onTap: onTap,
+        onDoubleTap: onDoubleTap,
         behavior: HitTestBehavior.opaque,
         child: Text(
-          element.text,
+          empty ? 'Tap to select · Edit to type' : display,
           key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
-          style: style,
+          style: empty
+              ? style.copyWith(color: Color(element.color).withValues(alpha: 0.45), fontStyle: FontStyle.italic)
+              : style,
           strutStyle: strut,
           textAlign: element.align,
           softWrap: true,
