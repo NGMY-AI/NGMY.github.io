@@ -1499,6 +1499,7 @@ class NgmyHomeGlassCardsPanel extends StatefulWidget {
     super.key,
     required this.userEmail,
     this.displayName,
+    this.profilePicturePath,
     this.civicIdRecord,
     this.config,
     this.onCivicIdPhotoSaved,
@@ -1506,6 +1507,8 @@ class NgmyHomeGlassCardsPanel extends StatefulWidget {
 
   final String userEmail;
   final String? displayName;
+  /// App profile photo — reused for Civic ID home card when registry photo is empty.
+  final String? profilePicturePath;
   /// Current user's Civic Registry ID record (if enrolled) for pinning to home.
   final Map<String, dynamic>? civicIdRecord;
   /// App config used to save Civic Registry ID photo before pinning to home.
@@ -1938,6 +1941,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 autoPlay: _autoPlay,
                 slideStyle: _slideStyle,
                 civicIdRecord: widget.civicIdRecord,
+                profilePicturePath: widget.profilePicturePath,
                 config: widget.config,
                 onCivicIdPhotoSaved: widget.onCivicIdPhotoSaved,
                 onDeckSettingsChanged: (auto, style) => _setDeckPrefs(autoPlay: auto, style: style),
@@ -3550,6 +3554,7 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
     required this.slideStyle,
     required this.onDeckSettingsChanged,
     this.civicIdRecord,
+    this.profilePicturePath,
     this.config,
     this.onCivicIdPhotoSaved,
   });
@@ -3559,6 +3564,7 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
   final NgmyHomeCardSlideStyle slideStyle;
   final Future<void> Function(bool autoPlay, NgmyHomeCardSlideStyle style) onDeckSettingsChanged;
   final Map<String, dynamic>? civicIdRecord;
+  final String? profilePicturePath;
   final dynamic config;
   final Future<void> Function()? onCivicIdPhotoSaved;
 
@@ -3653,7 +3659,8 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       );
       return;
     }
-    var photo = (record['idPhotoPath'] ?? '').toString().trim();
+    // Reuse Civic Registry ID photo or the account profile picture — no second upload needed.
+    var photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
     if (photo.isEmpty) {
       if (widget.config == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3683,13 +3690,17 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
         return;
       }
       record = Map<String, dynamic>.from(refreshed);
-      photo = (record['idPhotoPath'] ?? '').toString().trim();
+      photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
       if (photo.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Add an ID photo first, then you can pin your Civic Registry ID.')),
         );
         return;
       }
+    }
+    // Persist resolved photo onto the pinned card JSON so the home card shows it.
+    if ((record['idPhotoPath'] ?? '').toString().trim().isEmpty && photo.isNotEmpty) {
+      record = {...record, 'idPhotoPath': photo};
     }
     final name = (record['fullName'] ?? record['registryId'] ?? 'Civic Registry ID').toString().trim();
     if (!mounted) return;

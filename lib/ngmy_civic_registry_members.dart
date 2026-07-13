@@ -71,10 +71,15 @@ class NgmyCivicRegistryMembers {
     required String state,
     required String registryId,
     int familyMembers = 1,
+    int familyMales = 0,
+    int familyFemales = 0,
     int helps = 0,
     int missed = 0,
     String? enrolledAt,
   }) {
+    final total = familyMembers < 1 ? 1 : familyMembers;
+    final males = familyMales < 0 ? 0 : familyMales;
+    final females = familyFemales < 0 ? 0 : familyFemales;
     return {
       'email': emailKey(email),
       'fullName': fullName.trim(),
@@ -86,7 +91,9 @@ class NgmyCivicRegistryMembers {
       'room': room.trim(),
       'state': state.trim(),
       'registryId': registryId.trim(),
-      'familyMembers': familyMembers < 1 ? 1 : familyMembers,
+      'familyMembers': total,
+      'familyMales': males,
+      'familyFemales': females,
       'helps': helps,
       'missed': missed,
       'enrolledAt': enrolledAt ?? DateTime.now().toUtc().toIso8601String(),
@@ -130,6 +137,8 @@ class NgmyCivicRegistryMembers {
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
       next['missed'] = next['missed'] ?? keep['missed'] ?? 0;
       next['familyMembers'] = next['familyMembers'] ?? keep['familyMembers'] ?? 1;
+      next['familyMales'] = next['familyMales'] ?? keep['familyMales'] ?? 0;
+      next['familyFemales'] = next['familyFemales'] ?? keep['familyFemales'] ?? 0;
       next['enrolledAt'] = keep['enrolledAt'] ?? next['enrolledAt'];
       next['passportGranted'] = next['passportGranted'] ?? keep['passportGranted'] ?? false;
       next['linkedAppEmail'] = (next['linkedAppEmail'] ?? keep['linkedAppEmail'] ?? '').toString();
@@ -259,7 +268,21 @@ class NgmyCivicRegistryMembers {
 
   static bool passportGranted(Map<String, dynamic> member) => member['passportGranted'] == true;
 
-  static String _phoneKey(String phone) => phone.replaceAll(RegExp(r'\D'), '');
+  static String _phoneKey(String phone) {
+    var digits = phone.replaceAll(RegExp(r'\D'), '');
+    // US numbers often stored with leading country code 1.
+    if (digits.length == 11 && digits.startsWith('1')) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
+  /// Last 10 digits when available — matches 10-digit US phones across formatting.
+  static String _phoneMatchKey(String phone) {
+    final digits = _phoneKey(phone);
+    if (digits.length >= 10) return digits.substring(digits.length - 10);
+    return digits;
+  }
 
   static bool isGuestSyntheticEmail(String email) => emailKey(email).endsWith('@guest.ngmy');
 
@@ -445,7 +468,7 @@ class NgmyCivicRegistryMembers {
   }
 
   /// Blocks double enrollment when identity overlaps on:
-  /// name+address, name+phone, address+phone, same phone, or legacy name+dob/city.
+  /// same phone, name+address, name+phone, address+phone, name+dob, or name+city.
   static Map<String, dynamic>? findDuplicateInRecords({
     required List<Map<String, dynamic>> records,
     required String fullName,
@@ -458,7 +481,7 @@ class NgmyCivicRegistryMembers {
   }) {
     final nameKey = _normName(fullName);
     final addrKey = _normAddress(homeAddress);
-    final phoneKey = _phoneKey(phone);
+    final phoneKey = _phoneMatchKey(phone);
     final dobKey = RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob.trim()) ? dob.trim() : '';
     final cityKey = city.trim().toLowerCase();
     final exclude = excludeEmail?.toLowerCase().trim() ?? '';
@@ -472,7 +495,7 @@ class NgmyCivicRegistryMembers {
 
       final existingName = _normName((m['fullName'] ?? '').toString());
       final existingAddr = _normAddress((m['homeAddress'] ?? '').toString());
-      final existingPhone = _phoneKey((m['phone'] ?? '').toString());
+      final existingPhone = _phoneMatchKey((m['phone'] ?? '').toString());
       final existingDob = (m['dob'] ?? '').toString().trim();
       final existingCity = (m['city'] ?? '').toString().trim().toLowerCase();
 
@@ -480,15 +503,20 @@ class NgmyCivicRegistryMembers {
       final addrMatch = addrKey.isNotEmpty && existingAddr == addrKey;
       final phoneMatch = phoneKey.length >= 7 && existingPhone.length >= 7 && phoneKey == existingPhone;
 
+      // Same phone number = same person (even under a different email / registry id).
       if (phoneMatch) return m;
+      // Name + birthday
+      if (nameMatch && dobKey.isNotEmpty && existingDob.isNotEmpty && dobKey == existingDob) return m;
+      // Name + address (+ optional phone already covered)
       if (nameMatch && addrMatch) return m;
       if (nameMatch && phoneMatch) return m;
       if (addrMatch && phoneMatch) return m;
+      // Name + address + phone (explicit triple — already covered by pairs above)
+      if (nameMatch && addrMatch && phoneMatch) return m;
 
       if (nameMatch) {
-        final nameAndDob = dobKey.isNotEmpty && existingDob.isNotEmpty && dobKey == existingDob;
         final nameAndCity = cityKey.isNotEmpty && existingCity.isNotEmpty && cityKey == existingCity;
-        if (nameAndDob || nameAndCity) return m;
+        if (nameAndCity) return m;
       }
     }
     return null;
@@ -499,11 +527,13 @@ class NgmyCivicRegistryMembers {
     final id = (existing['registryId'] ?? '').toString().trim();
     final phone = (existing['phone'] ?? '').toString().trim();
     final address = (existing['homeAddress'] ?? '').toString().trim();
+    final dob = (existing['dob'] ?? '').toString().trim();
     final parts = <String>[if (name.isNotEmpty) name else 'Member'];
     if (id.isNotEmpty) parts.add('ID $id');
     if (phone.isNotEmpty) parts.add(phone);
+    if (dob.isNotEmpty) parts.add('DOB $dob');
     if (address.isNotEmpty) parts.add(address);
-    return 'Already enrolled — matching name, address, or phone was found (${parts.join(' · ')}). One person cannot enroll twice.';
+    return 'Already enrolled — matching name, birthday, address, or phone was found (${parts.join(' · ')}). One person cannot be registered twice.';
   }
 
   static void syncFromFields(

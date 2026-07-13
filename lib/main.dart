@@ -15770,6 +15770,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         NgmyHomeGlassCardsPanel(
                           userEmail: widget.user.email,
                           displayName: widget.user.username,
+                          profilePicturePath: widget.user.profilePicturePath,
                           config: widget.config,
                           onCivicIdPhotoSaved: () async {
                             final ok = await ngmyPersistCivicRegistryMembers(widget.config);
@@ -29674,7 +29675,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
 
     // Use the email the controller typed — never invent @guest.ngmy addresses.
-    // Same email is allowed for multiple registrar-enrolled members (forceNew).
+    // Same email is allowed for multiple registrar-enrolled members (forceNew),
+    // but identity duplicates (phone / name+dob / name+address) are still blocked.
+    // Do NOT exclude by email for registrar enroll — that hid prior members who share an email.
     final registryEmail = targetUser != null ? email : email;
 
     final duplicate = NgmyCivicRegistryMembers.findDuplicateRecord(
@@ -29684,7 +29687,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       city: city,
       homeAddress: address,
       phone: phone,
-      excludeEmail: targetUser?.email ?? (registryEmail.isEmpty ? null : registryEmail),
+      excludeEmail: targetUser?.email,
     );
     if (duplicate != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -30187,16 +30190,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final rows = StringBuffer();
     for (final m in members) {
       final name = (m['fullName'] ?? '').toString().trim();
-      final phone = ngmyFormatPhoneDisplay((m['phone'] ?? '').toString().trim());
+      final phoneDigits = (m['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+      // Prefer full 10-digit US display; fall back to whatever digits we have.
+      final phone = phoneDigits.isEmpty
+          ? ''
+          : ngmyFormatPhoneDisplay(phoneDigits.length >= 10 ? phoneDigits.substring(phoneDigits.length - 10) : phoneDigits);
       final address = (m['homeAddress'] ?? '').toString().trim();
       final familyRaw = m['familyMembers'];
       final family = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+      final malesRaw = m['familyMales'];
+      final femalesRaw = m['familyFemales'];
+      final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
+      final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
+      final familyLabel = (males > 0 || females > 0) ? '$family ($males M / $females F)' : '$family';
       rows.writeln('''
       <tr>
         <td>${_escapeHtml(name.isEmpty ? '—' : name)}</td>
-        <td>${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
+        <td class="phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
         <td>${_escapeHtml(address.isEmpty ? '—' : address)}</td>
-        <td class="family">${family}</td>
+        <td class="family">${_escapeHtml(familyLabel)}</td>
       </tr>''');
     }
 
@@ -30208,7 +30220,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         '$hour12:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
     final titleLine1 = "EMO'YA M'BEMBE";
     final titleLine2 = "M'MBONDO · $state";
-    final title = '$titleLine1 $titleLine2';
 
     final html = '''
 <!DOCTYPE html>
@@ -30219,7 +30230,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 <style>
   @page {
     size: letter;
-    margin: 14mm 12mm 18mm 12mm;
+    margin: 12mm 10mm 14mm 10mm;
   }
   html, body {
     font-family: Georgia, "Times New Roman", serif;
@@ -30228,7 +30239,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     padding: 0;
     background: #fff;
   }
-  .sheet { padding: 8px 4px 28px; }
+  .sheet { padding: 4px 2px 8px; }
   .masthead {
     display: grid;
     grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
@@ -30305,21 +30316,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
-  col.name { width: 22%; }
-  col.phone { width: 17%; }
-  col.address { width: 48%; }
-  col.family { width: 13%; }
+  col.name { width: 24%; }
+  col.phone { width: 22%; }
+  col.address { width: 40%; }
+  col.family { width: 14%; }
   th, td {
     border: 1px solid #ccc;
-    padding: 6px 8px;
+    padding: 5px 7px;
     font-size: 12px;
     font-weight: 400;
     vertical-align: middle;
-    height: 28px;
+    height: 26px;
     line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  td.phone {
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
   }
   th {
     background: #f3f4f6;
@@ -30327,35 +30345,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     font-size: 11px;
     font-weight: 700;
   }
-  th.family, td.family { text-align: center; }
+  th.family, td.family { text-align: center; white-space: normal; font-size: 10px; line-height: 1.15; }
   th.family {
-    white-space: normal;
-    font-size: 10px;
-    line-height: 1.15;
-    padding: 6px 4px;
     overflow: visible;
     text-overflow: clip;
   }
-  .print-site-mark {
-    display: none;
-  }
   @media print {
-    .sheet { padding: 0 0 22px; }
-    .masthead { margin-bottom: 12px; }
-    .print-site-mark {
-      display: block;
-      position: fixed;
-      right: 12mm;
-      bottom: 6mm;
-      left: auto;
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #111;
-    }
+    .sheet { padding: 0; }
+    .masthead { margin-bottom: 10px; }
   }
 </style>
 </head>
@@ -30397,7 +30394,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     </tbody>
   </table>
   </div>
-  <div class="print-site-mark">NGMY.ORG</div>
   <script>
     try { document.title = 'NGMY.ORG'; } catch (e) {}
     window.addEventListener('load', function () {
@@ -30421,10 +30417,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Print dialog opened for $state (${members.length} members). Turn off Headers and footers so date/URL do not print — NGMY.ORG is already at the bottom.',
+          'Print dialog opened for $state (${members.length} members). Turn off Headers and footers in the print dialog to hide date/time and page URL — title is set to NGMY.ORG.',
         ),
         backgroundColor: Colors.green,
-        duration: const Duration(seconds: 6),
+        duration: const Duration(seconds: 7),
       ),
     );
   }

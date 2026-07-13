@@ -110,6 +110,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
   final _familyMembersC = TextEditingController();
+  final _familyMalesC = TextEditingController();
+  final _familyFemalesC = TextEditingController();
 
   late final AnimationController _pulse;
   late final AnimationController _shimmer;
@@ -136,6 +138,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _addressC.dispose();
     _phoneC.dispose();
     _familyMembersC.dispose();
+    _familyMalesC.dispose();
+    _familyFemalesC.dispose();
     super.dispose();
   }
 
@@ -267,6 +271,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final phone = _phoneC.text.trim();
     final familyRaw = _familyMembersC.text.trim();
     final familyMembers = int.tryParse(familyRaw) ?? 0;
+    final males = int.tryParse(_familyMalesC.text.trim()) ?? -1;
+    final females = int.tryParse(_familyFemalesC.text.trim()) ?? -1;
     final state = _selectedState.trim();
 
     if (fullName.isEmpty) {
@@ -296,6 +302,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
     if (familyMembers < 1 || familyMembers > 99) {
       _toast('Andika ukubwa wa familia (1–99).');
+      return;
+    }
+    if (males < 0 || females < 0) {
+      _toast('Andika idadi ya wanaume na wanawake.');
+      return;
+    }
+    if (males + females != familyMembers) {
+      _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
       return;
     }
     if (state.isEmpty) {
@@ -332,7 +346,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         fullName: fullName,
         homeAddress: address,
         phone: phone,
-        excludeEmail: email,
       );
       if (duplicate != null) {
         final name = (duplicate['fullName'] ?? '').toString().trim();
@@ -359,6 +372,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         state: state,
         registryId: registryId,
         familyMembers: familyMembers,
+        familyMales: males,
+        familyFemales: females,
       );
       remoteMembers.add(member);
 
@@ -934,12 +949,65 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
                 const SizedBox(height: 12),
                 _glassField(
-                  child: TextField(
-                    controller: _familyMembersC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Ukubwa wa familia'),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Ukubwa wa familia',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _familyMembersC,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: _dec('Jumla (idadi ya watu)').copyWith(
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.06),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _familyMalesC,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                decoration: _dec('Wanaume (M)').copyWith(
+                                  filled: true,
+                                  fillColor: Colors.white.withValues(alpha: 0.06),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _familyFemalesC,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                decoration: _dec('Wanawake (F)').copyWith(
+                                  filled: true,
+                                  fillColor: Colors.white.withValues(alpha: 0.06),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_civic_member_report_print_stub.dart'
+    if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
+
 /// One row on the helpers ranking paper.
 class NgmyHelperRankRow {
   const NgmyHelperRankRow({
@@ -109,6 +112,89 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
   final String stateName;
   final List<NgmyHelperRankRow> rows;
 
+  String _esc(String s) => s
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+
+  Future<void> _printPaper() async {
+    final now = DateTime.now().toLocal();
+    final dateStr =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final buf = StringBuffer();
+    for (final r in rows) {
+      buf.writeln('''
+      <tr>
+        <td class="rank">${r.rank}</td>
+        <td>${_esc(r.name.isEmpty ? '—' : r.name)}</td>
+        <td class="num">${r.helps}</td>
+        <td class="num">${r.missed}</td>
+      </tr>''');
+    }
+    final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>NGMY.ORG</title>
+<style>
+  @page { size: letter; margin: 8mm 8mm 10mm 8mm; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #111;
+    font-family: Georgia, "Times New Roman", serif; }
+  .sheet { padding: 2px; }
+  h1 { margin: 0 0 2px; font-size: 18px; font-weight: 800; text-decoration: underline;
+    text-underline-offset: 3px; }
+  .sub { margin: 0 0 8px; font-size: 10px; color: #444; font-family: system-ui, sans-serif; }
+  .meta { display: flex; justify-content: space-between; font-size: 10px;
+    font-family: system-ui, sans-serif; margin-bottom: 6px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed;
+    font-family: system-ui, sans-serif; }
+  th, td { border: 1px solid #ccc; padding: 2px 5px; font-size: 9px; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 14px; }
+  th { background: #f3f4f6; text-align: left; font-weight: 800; font-size: 8px; }
+  td.rank, th.rank, td.num, th.num { text-align: center; }
+  col.rank { width: 8%; } col.name { width: 62%; } col.helps { width: 15%; } col.missed { width: 15%; }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="meta"><span>$dateStr</span><span>${_esc(stateName.toUpperCase())} · ${rows.length} wanachama</span></div>
+    <h1>${_esc(kind.swahiliTitle)}</h1>
+    <p class="sub">${_esc(kind.swahiliSubtitle)}</p>
+    <table>
+      <colgroup>
+        <col class="rank"/><col class="name"/><col class="helps"/><col class="missed"/>
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="rank">#</th>
+          <th>Jina</th>
+          <th class="num">Misaada</th>
+          <th class="num">Amekosa</th>
+        </tr>
+      </thead>
+      <tbody>
+        $buf
+      </tbody>
+    </table>
+  </div>
+  <script>
+    try { document.title = 'NGMY.ORG'; } catch (e) {}
+    window.addEventListener('load', function () {
+      setTimeout(function () { try { window.print(); } catch (e) {} }, 160);
+    });
+  </script>
+</body>
+</html>''';
+    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
+    await ngmyPrintCivicMemberReport(
+      htmlContent: html,
+      plainText: '${kind.swahiliTitle} · $stateName (${rows.length})',
+      fileName: 'ngmy-${kind.name}-helpers-$stamp',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now().toLocal();
@@ -121,11 +207,11 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
     return SafeArea(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 740),
           child: Material(
             color: Colors.transparent,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Column(
                 children: [
                   Expanded(
@@ -155,15 +241,12 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
-                                        colors: [
-                                          kind.softFill,
-                                          const Color(0xFFF8F4EC),
-                                        ],
+                                        colors: [kind.softFill, const Color(0xFFF8F4EC)],
                                       ),
                                       border: Border(
                                         bottom: BorderSide(color: kind.accent.withValues(alpha: 0.35), width: 1.4),
@@ -180,7 +263,6 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                                 color: kind.accent.withValues(alpha: 0.85),
-                                                letterSpacing: 0.4,
                                               ),
                                             ),
                                             const Spacer(),
@@ -195,31 +277,31 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: 8),
                                         Text(
                                           kind.swahiliTitle,
                                           style: TextStyle(
                                             fontFamily: 'Georgia',
-                                            fontSize: 26,
+                                            fontSize: 24,
                                             fontWeight: FontWeight.w900,
-                                            height: 1.15,
+                                            height: 1.1,
                                             color: const Color(0xFF1C1917),
                                             decoration: TextDecoration.underline,
                                             decorationColor: kind.accent.withValues(alpha: 0.55),
                                             decorationThickness: 2,
                                           ),
                                         ),
-                                        const SizedBox(height: 6),
+                                        const SizedBox(height: 4),
                                         Text(
                                           kind.swahiliSubtitle,
                                           style: const TextStyle(
-                                            fontSize: 12,
-                                            height: 1.35,
+                                            fontSize: 11,
+                                            height: 1.3,
                                             color: Color(0xFF57534E),
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        const SizedBox(height: 10),
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             _chip('Wanachama', '${rows.length}', kind.accent),
@@ -238,12 +320,12 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                   ),
                                   if (rows.isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
                                       child: SizedBox(
-                                        height: 88,
+                                        height: 56,
                                         child: CustomPaint(
                                           painter: _HelpersBarChartPainter(
-                                            rows: rows.take(8).toList(),
+                                            rows: rows.take(10).toList(),
                                             kind: kind,
                                             chartMax: chartMax,
                                           ),
@@ -251,18 +333,18 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                                  const Padding(
+                                    padding: EdgeInsets.fromLTRB(14, 2, 14, 0),
                                     child: Row(
-                                      children: const [
-                                        SizedBox(width: 28, child: Text('#', style: _colHead)),
+                                      children: [
+                                        SizedBox(width: 24, child: Text('#', style: _colHead)),
                                         Expanded(flex: 4, child: Text('Jina', style: _colHead)),
                                         Expanded(child: Text('Misaada', style: _colHead, textAlign: TextAlign.right)),
                                         Expanded(child: Text('Amekosa', style: _colHead, textAlign: TextAlign.right)),
                                       ],
                                     ),
                                   ),
-                                  const Divider(height: 12, thickness: 1, color: Color(0xFFD6D3D1)),
+                                  const Divider(height: 8, thickness: 1, color: Color(0xFFD6D3D1)),
                                   Expanded(
                                     child: rows.isEmpty
                                         ? const Center(
@@ -276,59 +358,45 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                             ),
                                           )
                                         : ListView.builder(
-                                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
                                             itemCount: rows.length,
                                             itemBuilder: (context, i) {
                                               final r = rows[i];
                                               final zebra = i.isEven;
                                               return Container(
-                                                margin: const EdgeInsets.only(bottom: 6),
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                                                margin: const EdgeInsets.only(bottom: 3),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                                                 decoration: BoxDecoration(
-                                                  color: zebra ? Colors.white.withValues(alpha: 0.72) : kind.softFill.withValues(alpha: 0.55),
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  color: zebra
+                                                      ? Colors.white.withValues(alpha: 0.72)
+                                                      : kind.softFill.withValues(alpha: 0.55),
+                                                  borderRadius: BorderRadius.circular(8),
                                                   border: Border.all(color: kind.accent.withValues(alpha: 0.12)),
                                                 ),
                                                 child: Row(
                                                   children: [
                                                     SizedBox(
-                                                      width: 28,
+                                                      width: 24,
                                                       child: Text(
                                                         '${r.rank}',
                                                         style: TextStyle(
                                                           fontWeight: FontWeight.w900,
-                                                          fontSize: 15,
+                                                          fontSize: 12,
                                                           color: kind.accent,
                                                         ),
                                                       ),
                                                     ),
                                                     Expanded(
                                                       flex: 4,
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            r.name.isEmpty ? '—' : r.name,
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: const TextStyle(
-                                                              fontWeight: FontWeight.w800,
-                                                              fontSize: 13,
-                                                              color: Color(0xFF1C1917),
-                                                            ),
-                                                          ),
-                                                          if (r.registryId.isNotEmpty)
-                                                            Text(
-                                                              r.registryId,
-                                                              maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
-                                                              style: TextStyle(
-                                                                fontSize: 10,
-                                                                fontWeight: FontWeight.w700,
-                                                                color: kind.accent.withValues(alpha: 0.85),
-                                                              ),
-                                                            ),
-                                                        ],
+                                                      child: Text(
+                                                        r.name.isEmpty ? '—' : r.name,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 12,
+                                                          color: Color(0xFF1C1917),
+                                                        ),
                                                       ),
                                                     ),
                                                     Expanded(
@@ -337,7 +405,7 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                                         textAlign: TextAlign.right,
                                                         style: const TextStyle(
                                                           fontWeight: FontWeight.w800,
-                                                          fontSize: 12,
+                                                          fontSize: 11,
                                                           color: Color(0xFF15803D),
                                                         ),
                                                       ),
@@ -348,7 +416,7 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                                         textAlign: TextAlign.right,
                                                         style: const TextStyle(
                                                           fontWeight: FontWeight.w800,
-                                                          fontSize: 12,
+                                                          fontSize: 11,
                                                           color: Color(0xFFB91C1C),
                                                         ),
                                                       ),
@@ -360,29 +428,14 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                                           ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                                    child: Row(
-                                      children: [
-                                        const Text(
-                                          'NGMY · Sajili ya Kiraia',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 0.3,
-                                            color: Color(0xFF78716C),
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          'NGMY.ORG',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 1.2,
-                                            color: kind.accent,
-                                          ),
-                                        ),
-                                      ],
+                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                                    child: Text(
+                                      'NGMY · Sajili ya Kiraia',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: kind.accent.withValues(alpha: 0.7),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -393,19 +446,36 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: kind.accent,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 46),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _printPaper,
+                          icon: const Icon(Icons.print_rounded, size: 18),
+                          label: const Text('Chapisha', style: TextStyle(fontWeight: FontWeight.w800)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kind.accent,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 46),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
                       ),
-                      child: const Text('Funga', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kind.accent,
+                            side: BorderSide(color: kind.accent.withValues(alpha: 0.55), width: 1.4),
+                            minimumSize: const Size(0, 46),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Funga', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -425,7 +495,7 @@ class _NgmyHelpersRankPaperDialog extends StatelessWidget {
 
   Widget _chip(String label, String value, Color accent) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(999),
@@ -461,13 +531,6 @@ class _PaperGrainPainter extends CustomPainter {
         ],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, edge);
-
-    final rule = Paint()
-      ..color = const Color(0xFFD6D3D1).withValues(alpha: 0.35)
-      ..strokeWidth = 1;
-    for (var y = 120.0; y < size.height - 40; y += 22) {
-      canvas.drawLine(Offset(18, y), Offset(size.width - 18, y), rule);
-    }
   }
 
   @override
@@ -489,18 +552,18 @@ class _HelpersBarChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (rows.isEmpty) return;
     final n = rows.length;
-    final gap = 6.0;
+    final gap = 4.0;
     final barW = (size.width - gap * (n - 1)) / n;
-    final baseY = size.height - 4;
+    final baseY = size.height - 2;
 
     for (var i = 0; i < n; i++) {
       final r = rows[i];
       final value = kind == NgmyHelpersRankKind.non ? r.missed : r.helps;
-      final h = (value / chartMax) * (size.height - 18);
+      final h = (value / chartMax) * (size.height - 10);
       final x = i * (barW + gap);
       final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, baseY - h, barW, math.max(4, h)),
-        const Radius.circular(6),
+        Rect.fromLTWH(x, baseY - h, barW, math.max(3, h)),
+        const Radius.circular(5),
       );
       final paint = Paint()
         ..shader = LinearGradient(
