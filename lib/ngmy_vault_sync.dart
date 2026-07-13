@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -312,7 +310,7 @@ class _NgmyVaultSyncScreenState extends State<NgmyVaultSyncScreen> with TickerPr
                           height: 280,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: _colors.first.withValues(alpha: 0.35 * (1 - flash)), blurRadius: 40, spread: Offset.zero)],
+                            boxShadow: [BoxShadow(color: _colors.first.withValues(alpha: 0.35 * (1 - flash)), blurRadius: 40, offset: Offset.zero)],
                           ),
                         ),
                       CustomPaint(
