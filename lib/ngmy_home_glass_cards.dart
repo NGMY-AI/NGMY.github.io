@@ -23,7 +23,7 @@ import 'ngmy_platform_graphics.dart';
 /// Local-only (device storage, no database) spending + notes cards for Home.
 /// Everything here lives in SharedPreferences, keyed per user email.
 
-// ── Data models ────────────────────────────────────────────────────────────
+// ?? Data models ????????????????????????????????????????????????????????????
 
 class NgmyReceiptItem {
   const NgmyReceiptItem({required this.name, required this.price, this.qty = 1});
@@ -85,7 +85,7 @@ class NgmySpendingEntry {
   final String pinnedNoteText;
   /// Snapshot text pinned from alarms / medicine reminders.
   final String pinnedAlarmText;
-  /// Essentials category label (Contacts, Notes, Hotlines, …).
+  /// Essentials category label (Contacts, Notes, Hotlines, ?).
   final String pinnedEssentialsKind;
   /// JSON of a pinned NgmyBusinessCardDocument.
   final String businessCardJson;
@@ -228,7 +228,7 @@ class NgmyHomeNote {
       );
 }
 
-// ── Local storage (SharedPreferences only — nothing leaves the device) ─────
+// ?? Local storage (SharedPreferences only ? nothing leaves the device) ?????
 
 class NgmyHomeLocalStore {
   NgmyHomeLocalStore._();
@@ -266,8 +266,9 @@ class NgmyHomeLocalStore {
       } catch (_) {}
       return e;
     }).toList();
+    final payload = jsonEncode(lean.map((e) => e.toJson()).toList());
     try {
-      await prefs.setString(_spendingKey(email), jsonEncode(lean.map((e) => e.toJson()).toList()));
+      await prefs.setString(_spendingKey(email), payload);
     } catch (err) {
       // Last-resort: drop photo/image payloads and retry so cards still persist.
       final stripped = lean
@@ -275,6 +276,9 @@ class NgmyHomeLocalStore {
           .toList();
       await prefs.setString(_spendingKey(email), jsonEncode(stripped.map((e) => e.toJson()).toList()));
     }
+    try {
+      await prefs.reload();
+    } catch (_) {}
   }
 
   static Future<List<NgmyHomeNote>> loadNotes(String email) async {
@@ -386,8 +390,8 @@ enum NgmyHomeCardSlideStyle {
 extension NgmyHomeCardSlideStyleX on NgmyHomeCardSlideStyle {
   String get label => switch (this) {
         NgmyHomeCardSlideStyle.dropDown => 'Drop',
-        NgmyHomeCardSlideStyle.slideLeft => 'Sweep ←',
-        NgmyHomeCardSlideStyle.slideRight => 'Sweep →',
+        NgmyHomeCardSlideStyle.slideLeft => 'Sweep ?',
+        NgmyHomeCardSlideStyle.slideRight => 'Sweep ?',
         NgmyHomeCardSlideStyle.fade => 'Fade',
         NgmyHomeCardSlideStyle.flipScale => 'Flip',
         NgmyHomeCardSlideStyle.slideUp => 'Lift',
@@ -434,7 +438,7 @@ List<Color> ngmyCreditThemeColors(String category) {
   }
 }
 
-/// Luxurious payment-card face templates (Log spending → money categories).
+/// Luxurious payment-card face templates (Log spending ? money categories).
 enum NgmyMoneyCardPattern {
   luxeGradient,
   diagonal,
@@ -453,7 +457,7 @@ enum NgmyMoneyCardPattern {
   diamondNoir,
 }
 
-/// Where amount / copy sit on the card face — keeps each luxe design distinct.
+/// Where amount / copy sit on the card face ? keeps each luxe design distinct.
 enum NgmyMoneyCardLayout {
   classic,
   amountTopRight,
@@ -479,7 +483,7 @@ class NgmyMoneyCardTemplate {
 }
 
 const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
-  // Row 1 — redesigned with unique luxe structure
+  // Row 1 ? redesigned with unique luxe structure
   NgmyMoneyCardTemplate(
     id: 'midnight_gold',
     label: 'Midnight Gold',
@@ -515,7 +519,7 @@ const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
     pattern: NgmyMoneyCardPattern.crystalFacet,
     layout: NgmyMoneyCardLayout.amountTopRight,
   ),
-  // Row 2 — Carbon + Emerald kept; more crystal / rose / diamond
+  // Row 2 ? Carbon + Emerald kept; more crystal / rose / diamond
   NgmyMoneyCardTemplate(
     id: 'carbon_noir',
     label: 'Carbon Noir',
@@ -551,7 +555,7 @@ const kNgmyMoneyCardTemplates = <NgmyMoneyCardTemplate>[
     pattern: NgmyMoneyCardPattern.diamondNoir,
     layout: NgmyMoneyCardLayout.amountMidLeft,
   ),
-  // Row 3 — Atelier Luxe
+  // Row 3 ? Atelier Luxe
   NgmyMoneyCardTemplate(
     id: 'imperial_gold',
     label: 'Imperial Gold',
@@ -604,7 +608,7 @@ List<Color> ngmyMoneyCardAccent(NgmySpendingEntry entry) {
   return ngmyCreditThemeColors(entry.category);
 }
 
-/// Three rows × four categories for the Log spending sheet.
+/// Three rows ? four categories for the Log spending sheet.
 const _kSpendingCategories = <String, IconData>{
   // Row 1
   'Food': Icons.restaurant_rounded,
@@ -641,7 +645,7 @@ String _monthLong(int m) => const [
 
 String ngmyHomeDateTabLabel(DateTime date) => '${_weekdayLong(date.weekday)}, ${date.day} ${_monthLong(date.month)}';
 
-// ── Generic swipeable glass card stack ──────────────────────────────────────
+// ?? Generic swipeable glass card stack ??????????????????????????????????????
 
 class NgmyGlassCardStack<T> extends StatefulWidget {
   const NgmyGlassCardStack({
@@ -698,7 +702,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   double _fromScale = 1, _toScale = 1;
   double _fromAngle = 0, _toAngle = 0;
 
-  /// Peek strip for each card behind the front — peeks sit ABOVE the front card.
+  /// Peek strip for each card behind the front ? peeks sit ABOVE the front card.
   static const _peek = 14.0;
   /// Front + up to 4 cards behind it.
   static const _maxBehind = 4;
@@ -739,7 +743,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     }
     if (oldWidget.items.length == widget.items.length && identical(oldWidget.items, widget.items)) return;
     final next = List<T>.of(widget.items);
-    // Newly added cards are prepended by the panel — keep that order so the new card is front.
+    // Newly added cards are prepended by the panel ? keep that order so the new card is front.
     if (widget.items.length > oldWidget.items.length) {
       setState(() {
         _order = next;
@@ -897,7 +901,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     _animCtrl.stop();
     _exitAnimating = false;
     setState(() {
-      // Only the front card moves — drag down to send it away / reveal the next card.
+      // Only the front card moves ? drag down to send it away / reveal the next card.
       _frontDrag = (_frontDrag + d.delta.dy).clamp(0.0, 200.0);
     });
   }
@@ -944,7 +948,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
     return SizedBox(
       height: stackHeight,
       child: GestureDetector(
-        // Only the cards themselves — opaque empty space was blocking Core/Vault below.
+        // Only the cards themselves ? opaque empty space was blocking Core/Vault below.
         behavior: HitTestBehavior.deferToChild,
         onVerticalDragUpdate: _onVerticalDragUpdate,
         onVerticalDragEnd: _onVerticalDragEnd,
@@ -985,7 +989,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
                   ),
                 ),
               ),
-            // Front card — always starts at the top of this stack.
+            // Front card ? always starts at the top of this stack.
             Positioned(
               top: _frontDrag,
               left: 0,
@@ -1017,7 +1021,7 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
   }
 }
 
-// ── Date tab (sports-card style) ────────────────────────────────────────────
+// ?? Date tab (sports-card style) ????????????????????????????????????????????
 
 class _NgmyDateTab extends StatelessWidget {
   const _NgmyDateTab({required this.label, this.emphasized = true});
@@ -1105,7 +1109,7 @@ class _DateTabPainter extends CustomPainter {
       oldDelegate.emphasized != emphasized || oldDelegate.lightMode != lightMode;
 }
 
-// ── Frosted glass card shell ────────────────────────────────────────────────
+// ?? Frosted glass card shell ????????????????????????????????????????????????
 
 class NgmyFrostedCard extends StatelessWidget {
   const NgmyFrostedCard({
@@ -1419,7 +1423,7 @@ class _WelcomeGlassFrame extends StatelessWidget {
   }
 }
 
-/// Animated capital NGMY glass badge — sits between Loan Service and Local Growth.
+/// Animated capital NGMY glass badge ? sits between Loan Service and Local Growth.
 /// When [onTap] is set (admins only), tapping opens the admin dashboard.
 class NgmyHomeBrandBadge extends StatefulWidget {
   const NgmyHomeBrandBadge({super.key, this.onTap});
@@ -1569,7 +1573,7 @@ class _GlassIconButton extends StatelessWidget {
   }
 }
 
-// ── Home panel ──────────────────────────────────────────────────────────────
+// ?? Home panel ??????????????????????????????????????????????????????????????
 
 enum _NgmyHomeCardKind { spending, notes }
 
@@ -1586,7 +1590,7 @@ class NgmyHomeGlassCardsPanel extends StatefulWidget {
 
   final String userEmail;
   final String? displayName;
-  /// App profile photo — reused for Civic ID home card when registry photo is empty.
+  /// App profile photo ? reused for Civic ID home card when registry photo is empty.
   final String? profilePicturePath;
   /// Current user's Civic Registry ID record (if enrolled) for pinning to home.
   final Map<String, dynamic>? civicIdRecord;
@@ -1735,7 +1739,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         final displayEncode = jsonEncode(display);
         if (leanEncode != e.civicIdJson) changed = true;
         next.add(e.copyWith(civicIdJson: displayEncode));
-        // Persist lean version without bloating prefs — swap after loop via save of lean copies.
+        // Persist lean version without bloating prefs ? swap after loop via save of lean copies.
       } catch (_) {
         next.add(e);
       }
@@ -1859,24 +1863,37 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
 
   Future<void> _editSpendingAmount(NgmySpendingEntry entry) async {
     if (!entry.showsCreditFace) return;
-    final result = await showModalBottomSheet<_SpendEditResult>(
+    final result = await showDialog<_SpendEditResult>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _SpendReceiptEditorSheet(entry: entry),
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
+        child: _SpendReceiptPopup(entry: entry),
+      ),
     );
     if (result == null || !mounted) return;
     final next = entry.copyWith(
       amount: result.amount,
       description: result.description,
       receiptMerchant: result.merchant,
-      receiptItems: result.items,
+      receiptItems: List<NgmyReceiptItem>.from(result.items),
       date: DateTime.now(),
+      note: '', // keep card face clean ? receipt holds the detail
     );
-    setState(() {
-      _spending = _spending.map((e) => e.id == entry.id ? next : e).toList();
-    });
-    await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    final updated = _spending.map((e) => e.id == entry.id ? next : e).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    setState(() => _spending = updated);
+    await NgmyHomeLocalStore.saveSpending(widget.userEmail, updated);
+    // Reload from disk so a failed/partial write can?t leave stale UI.
+    final verified = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
+    if (!mounted) return;
+    if (verified.isEmpty) return;
+    verified.sort((a, b) => b.date.compareTo(a.date));
+    final front = _frontSpendingId;
+    _moveIdToFront(verified, (e) => e.id, front);
+    setState(() => _spending = verified);
   }
 
   Future<void> _editNote(NgmyHomeNote note) async {
@@ -1894,7 +1911,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
             maxLines: 8,
             autofocus: true,
             style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.w700, height: 1.35),
-            decoration: const InputDecoration(hintText: 'Write your note…'),
+            decoration: const InputDecoration(hintText: 'Write your note?'),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -2263,7 +2280,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                         Icon(Icons.savings_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
                         const SizedBox(height: 10),
                         Text(
-                          'No spending yet — tap + to add',
+                          'No spending yet ? tap + to add',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
                         ),
@@ -2309,9 +2326,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 if (!isFront || !entry.showsCreditFace) return card;
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: () {
-                    if (_registerDoubleTap(entry.id)) _editSpendingAmount(entry);
-                  },
+                  onTap: () => _editSpendingAmount(entry),
                   child: card,
                 );
               },
@@ -2345,7 +2360,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                         Icon(Icons.sticky_note_2_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
                         const SizedBox(height: 10),
                         Text(
-                          'No notes yet — tap + to write one',
+                          'No notes yet ? tap + to write one',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
                         ),
@@ -2400,7 +2415,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            _alarmHoldTitle.isEmpty ? 'Alarm due — confirm to resume slides' : '$_alarmHoldTitle · confirm seen',
+                            _alarmHoldTitle.isEmpty ? 'Alarm due ? confirm to resume slides' : '$_alarmHoldTitle ? confirm seen',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5),
@@ -2693,7 +2708,7 @@ class _PasswordCardBodyState extends State<_PasswordCardBody> {
                   Text('EMAIL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.0, color: Colors.white.withValues(alpha: 0.55))),
                   const SizedBox(height: 2),
                   Text(
-                    entry.passwordEmail.isEmpty ? '—' : entry.passwordEmail,
+                    entry.passwordEmail.isEmpty ? '?' : entry.passwordEmail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
@@ -2706,8 +2721,8 @@ class _PasswordCardBodyState extends State<_PasswordCardBody> {
                       Expanded(
                         child: Text(
                           secret.isEmpty
-                              ? '—'
-                              : (_show ? secret : '•' * math.min(secret.length.clamp(6, 14), 14)),
+                              ? '?'
+                              : (_show ? secret : '?' * math.min(secret.length.clamp(6, 14), 14)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -2818,13 +2833,9 @@ class _CreditCardSpendBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final tpl = ngmyMoneyCardTemplateById(entry.cardTemplateId);
     final colors = tpl.colors;
-    final cardNote = entry.note.trim();
-    final desc = entry.description.isEmpty ? 'Expense' : entry.description;
     final amount = '-\$${entry.amount.toStringAsFixed(2)}';
-    final total = 'TOTAL  -\$${totalSpent.toStringAsFixed(2)}';
-    final day = ngmyHomeDateTabLabel(entry.date).split(',').first;
-    final catIcon = _kSpendingCategories[entry.category] ?? Icons.credit_card_rounded;
     final ink = _luxeInkFor(tpl);
+    final muted = ink.withValues(alpha: 0.62);
 
     return Stack(
       fit: StackFit.expand,
@@ -2844,16 +2855,30 @@ class _CreditCardSpendBody extends StatelessWidget {
         ..._luxeDecor(tpl, colors),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 54, 16, 18),
-          child: _luxeLayout(
-            tpl: tpl,
-            ink: ink,
-            catIcon: catIcon,
-            category: entry.category.toUpperCase(),
-            desc: desc,
-            amount: amount,
-            total: total,
-            day: day,
-            cardNote: cardNote,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Spacer(),
+              Text(
+                amount,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: ink,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 34,
+                  letterSpacing: 0.4,
+                  height: 1.05,
+                  shadows: [Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tap for receipt',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.3),
+              ),
+              const Spacer(),
+            ],
           ),
         ),
       ],
@@ -3013,7 +3038,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Vertical monolith — huge amount left, meta right
+      // Vertical monolith ? huge amount left, meta right
       case 'obsidian_steel':
         return Row(children: [
           const SizedBox(width: 10),
@@ -3036,7 +3061,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           ])),
         ]);
 
-      // Script stack — desc top, hairline, amount bottom-left
+      // Script stack ? desc top, hairline, amount bottom-left
       case 'champagne_noir':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -3060,7 +3085,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Facet frame — amount inside bottom-right bordered panel
+      // Facet frame ? amount inside bottom-right bordered panel
       case 'royal_violet':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('CRYSTAL VIOLET', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
@@ -3085,7 +3110,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Tide bar — amount sits on a frosted horizontal band
+      // Tide bar ? amount sits on a frosted horizontal band
       case 'ocean_platinum':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -3112,7 +3137,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Tech ledger — amount top-left, monospace feel, double rules
+      // Tech ledger ? amount top-left, monospace feel, double rules
       case 'carbon_noir':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -3135,7 +3160,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Emerald pill — amount in a glowing pill mid-card
+      // Emerald pill ? amount in a glowing pill mid-card
       case 'emerald_luxe':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 18),
@@ -3166,7 +3191,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Frost center — huge centered amount between thin rules
+      // Frost center ? huge centered amount between thin rules
       case 'marble_ink':
         return Column(children: [
           Row(children: [
@@ -3188,7 +3213,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Aurora fan — amount on right rail
+      // Aurora fan ? amount on right rail
       case 'aurora_vault':
         return Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3212,7 +3237,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           ),
         ]);
 
-      // Seal stamp — circular amount badge top-right
+      // Seal stamp ? circular amount badge top-right
       case 'mesh_sapphire':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3235,7 +3260,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Imperial banner — amount inside top gold ribbon
+      // Imperial banner ? amount inside top gold ribbon
       case 'imperial_gold':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 4),
@@ -3264,7 +3289,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           note(),
         ]);
 
-      // Mirror split — left copy, right amount column with rail
+      // Mirror split ? left copy, right amount column with rail
       case 'sterling_silver':
         return Row(children: [
           const SizedBox(width: 8),
@@ -3288,7 +3313,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           ])),
         ]);
 
-      // Prism panel — amount in frosted bottom-right plate
+      // Prism panel ? amount in frosted bottom-right plate
       case 'crystal_prism':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('PRISM ATELIER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: muted)),
@@ -3310,7 +3335,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           ]),
         ]);
 
-      // Rose rail — amount mid-left, dark rail right with meta
+      // Rose rail ? amount mid-left, dark rail right with meta
       case 'rose_sovereign':
         return Row(children: [
           Expanded(flex: 7, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3335,7 +3360,7 @@ class _CreditCardSpendBody extends StatelessWidget {
           ])),
         ]);
 
-      // Noir ledger — amount under double rule at top
+      // Noir ledger ? amount under double rule at top
       case 'black_diamond':
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -3560,7 +3585,7 @@ class _MoneyCardPatternPainter extends CustomPainter {
         );
         break;
       case NgmyMoneyCardPattern.crystalFacet:
-        // Unique facet geometry per crystal card — not the same cut twice.
+        // Unique facet geometry per crystal card ? not the same cut twice.
         final id = template.id;
         late final List<List<Offset>> facets;
         if (id == 'royal_violet') {
@@ -3680,7 +3705,7 @@ class _NoteCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Note body only — no "NOTE" / "Notes" title. Text fills the card face.
+    // Note body only ? no "NOTE" / "Notes" title. Text fills the card face.
     return Padding(
       padding: EdgeInsets.fromLTRB(16, isFront ? 54 : 20, isFront ? 52 : 16, isFront ? 52 : 20),
       child: Align(
@@ -3697,7 +3722,7 @@ class _NoteCardContent extends StatelessWidget {
   }
 }
 
-// ── Add sheets ───────────────────────────────────────────────────────────
+// ?? Add sheets ???????????????????????????????????????????????????????????
 
 class _NgmyAddSpendingSheet extends StatefulWidget {
   const _NgmyAddSpendingSheet({
@@ -3784,7 +3809,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
     if (!mounted) return;
     if (cards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No business cards yet — create one in Business Card Studio first.')),
+        const SnackBar(content: Text('No business cards yet ? create one in Business Card Studio first.')),
       );
       return;
     }
@@ -3811,7 +3836,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       );
       return;
     }
-    // Reuse Civic Registry ID photo or the account profile picture — no second upload needed.
+    // Reuse Civic Registry ID photo or the account profile picture ? no second upload needed.
     var photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
     if (photo.isEmpty) {
       if (widget.config == null) {
@@ -4058,7 +4083,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Device vault · stays local',
+                                  'Device vault ? stays local',
                                   style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.58 + t * 0.08), fontWeight: FontWeight.w600),
                                 ),
                               ],
@@ -4220,7 +4245,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                             _hudAction(
                               icon: Icons.hub_rounded,
                               label: (_pinnedKind != null || _pinnedNote != null || _pinnedAlarm != null)
-                                  ? 'Essentials vault · pinned ✓'
+                                  ? 'Essentials vault ? pinned ?'
                                   : 'Open Essentials vault',
                               onTap: _pickEssentialsPin,
                               t: t,
@@ -4332,7 +4357,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                                 if (row == 2) ...[
                                   Text('ATELIER LUXE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.3, color: muted)),
                                   const SizedBox(height: 2),
-                                  Text('Gold · Crystal · Rose · Diamond', style: TextStyle(fontSize: 11, color: muted.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
+                                  Text('Gold ? Crystal ? Rose ? Diamond', style: TextStyle(fontSize: 11, color: muted.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 8),
                                 ],
                                 Row(
@@ -4652,7 +4677,7 @@ class _NgmyAddNoteSheetState extends State<_NgmyAddNoteSheet> {
                       scrollPadding: const EdgeInsets.only(bottom: 120),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.4, color: ink),
                       decoration: InputDecoration(
-                        hintText: 'Write anything…',
+                        hintText: 'Write anything?',
                         hintStyle: TextStyle(color: muted),
                         filled: true,
                         fillColor: fieldBg,
@@ -4931,17 +4956,16 @@ class _SpendEditResult {
   final List<NgmyReceiptItem> items;
 }
 
-class _SpendReceiptEditorSheet extends StatefulWidget {
-  const _SpendReceiptEditorSheet({required this.entry});
+class _SpendReceiptPopup extends StatefulWidget {
+  const _SpendReceiptPopup({required this.entry});
   final NgmySpendingEntry entry;
 
   @override
-  State<_SpendReceiptEditorSheet> createState() => _SpendReceiptEditorSheetState();
+  State<_SpendReceiptPopup> createState() => _SpendReceiptPopupState();
 }
 
-class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
+class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
   late final TextEditingController _merchant;
-  late final TextEditingController _title;
   late final TextEditingController _itemName;
   late final TextEditingController _itemPrice;
   late final TextEditingController _itemQty;
@@ -4950,21 +4974,30 @@ class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
   @override
   void initState() {
     super.initState();
-    _merchant = TextEditingController(text: widget.entry.receiptMerchant.isNotEmpty ? widget.entry.receiptMerchant : widget.entry.description);
-    _title = TextEditingController(text: widget.entry.description);
+    final e = widget.entry;
+    _merchant = TextEditingController(
+      text: e.receiptMerchant.trim().isNotEmpty
+          ? e.receiptMerchant.trim()
+          : (e.description.trim().isNotEmpty ? e.description.trim() : ''),
+    );
     _itemName = TextEditingController();
     _itemPrice = TextEditingController();
     _itemQty = TextEditingController(text: '1');
-    _items = List<NgmyReceiptItem>.from(widget.entry.receiptItems);
-    if (_items.isEmpty && widget.entry.amount > 0) {
-      _items = [NgmyReceiptItem(name: widget.entry.description.isEmpty ? 'Purchase' : widget.entry.description, price: widget.entry.amount)];
+    _items = List<NgmyReceiptItem>.from(e.receiptItems);
+    if (_items.isEmpty && e.amount > 0) {
+      _items = [
+        NgmyReceiptItem(
+          name: e.description.trim().isEmpty ? 'Item' : e.description.trim(),
+          price: e.amount,
+          qty: 1,
+        ),
+      ];
     }
   }
 
   @override
   void dispose() {
     _merchant.dispose();
-    _title.dispose();
     _itemName.dispose();
     _itemPrice.dispose();
     _itemQty.dispose();
@@ -4975,7 +5008,7 @@ class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
 
   void _addItem() {
     final name = _itemName.text.trim();
-    final price = double.tryParse(_itemPrice.text.trim()) ?? 0;
+    final price = double.tryParse(_itemPrice.text.trim().replaceAll('\$', '')) ?? 0;
     final qty = int.tryParse(_itemQty.text.trim()) ?? 1;
     if (name.isEmpty || price <= 0) return;
     setState(() {
@@ -4987,15 +5020,13 @@ class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
   }
 
   void _save() {
-    final merchant = _merchant.text.trim();
-    final title = _title.text.trim().isEmpty ? (merchant.isEmpty ? 'Spending' : merchant) : _title.text.trim();
-    final total = _items.isEmpty ? 0.0 : _total;
-    if (total <= 0) return;
+    if (_items.isEmpty || _total <= 0) return;
+    final merchant = _merchant.text.trim().isEmpty ? 'Store' : _merchant.text.trim();
     Navigator.pop(
       context,
       _SpendEditResult(
-        amount: total,
-        description: title,
+        amount: _total,
+        description: merchant,
         merchant: merchant,
         items: List<NgmyReceiptItem>.from(_items),
       ),
@@ -5004,219 +5035,275 @@ class _SpendReceiptEditorSheetState extends State<_SpendReceiptEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final paper = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
-    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white54 : const Color(0xFF64748B);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    const ink = Color(0xFF1A1A1A);
+    const muted = Color(0xFF6B7280);
+    final when = DateTime.now();
+    final stamp =
+        '${when.year}-${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')}  ${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0B1220) : const Color(0xFFECF2F8),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99))),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-                child: Row(
-                  children: [
-                    Text('Edit spending', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
-                    const Spacer(),
-                    TextButton(onPressed: () => Navigator.pop(context), child: Text('Close', style: TextStyle(color: muted, fontWeight: FontWeight.w700))),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-                      decoration: BoxDecoration(
-                        color: paper,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFCBD5E1)),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 18, offset: const Offset(0, 8))],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text('RECEIPT', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w900, letterSpacing: 2.2, fontSize: 11)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _merchant,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18),
-                            decoration: InputDecoration(
-                              hintText: 'Store / merchant',
-                              hintStyle: TextStyle(color: muted),
-                              border: InputBorder.none,
-                              isDense: true,
-                            ),
-                          ),
-                          TextField(
-                            controller: _title,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 12),
-                            decoration: InputDecoration(
-                              hintText: 'Trip label (optional)',
-                              hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
-                              border: InputBorder.none,
-                              isDense: true,
-                            ),
-                          ),
-                          Divider(color: muted.withValues(alpha: 0.35), height: 20),
-                          Row(
-                            children: [
-                              Expanded(child: Text('ITEM', style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
-                              SizedBox(width: 48, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
-                              SizedBox(width: 72, child: Text('PRICE', textAlign: TextAlign.right, style: TextStyle(color: muted, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 1))),
-                              const SizedBox(width: 28),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          if (_items.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              child: Text('Add items you bought', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
-                            )
-                          else
-                            ..._items.asMap().entries.map((e) {
-                              final i = e.key;
-                              final item = e.value;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(item.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 13)),
-                                          Text('\$${item.lineTotal.toStringAsFixed(2)}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
-                                        ],
-                                      ),
-                                    ),
-                                    SizedBox(width: 48, child: Text('${item.qty}', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800))),
-                                    SizedBox(width: 72, child: Text('\$${item.price.toStringAsFixed(2)}', textAlign: TextAlign.right, style: TextStyle(color: ink, fontWeight: FontWeight.w800))),
-                                    SizedBox(
-                                      width: 28,
-                                      child: IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                        onPressed: () => setState(() => _items = [..._items]..removeAt(i)),
-                                        icon: Icon(Icons.close_rounded, size: 16, color: muted),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                          Divider(color: muted.withValues(alpha: 0.35), height: 18),
-                          Row(
-                            children: [
-                              Text('TOTAL', style: TextStyle(color: ink, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                              const Spacer(),
-                              Text('\$${_total.toStringAsFixed(2)}', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 22)),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(DateTime.now().toLocal().toString().split('.').first, textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 10)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text('Add receipt line', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: TextField(
-                            controller: _itemName,
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              hintText: 'What did you buy?',
-                              filled: true,
-                              fillColor: paper,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _itemQty,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              hintText: 'Qty',
-                              filled: true,
-                              fillColor: paper,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _itemPrice,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                            decoration: InputDecoration(
-                              hintText: '\$',
-                              filled: true,
-                              fillColor: paper,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset * 0.35 : 0),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340, maxHeight: 560),
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBF2),
+                      borderRadius: BorderRadius.circular(4),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 14)),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: _addItem,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Add item to receipt', style: TextStyle(fontWeight: FontWeight.w800)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ink,
-                        minimumSize: const Size(0, 46),
-                        side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFF94A3B8)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(height: 10, width: double.infinity, child: CustomPaint(painter: _ReceiptEdgePainter(top: true))),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                            child: DefaultTextStyle(
+                              style: const TextStyle(
+                                color: ink,
+                                fontFamily: 'Courier',
+                                fontFamilyFallback: ['Courier New', 'monospace'],
+                                decoration: TextDecoration.none,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Text('*** RECEIPT ***', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 12)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: _merchant,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16, fontFamily: 'Courier', decoration: TextDecoration.none),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      hintText: 'STORE NAME',
+                                      hintStyle: TextStyle(color: muted, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  Text(stamp, textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 10)),
+                                  const SizedBox(height: 4),
+                                  const Text('--------------------------------', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 11)),
+                                  const SizedBox(height: 6),
+                                  const Row(
+                                    children: [
+                                      Expanded(child: Text('ITEM', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
+                                      SizedBox(width: 36, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
+                                      SizedBox(width: 64, child: Text('AMT', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
+                                      SizedBox(width: 22),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (_items.isEmpty)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 16),
+                                      child: Text('No items yet', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12)),
+                                    )
+                                  else
+                                    ..._items.asMap().entries.map((e) {
+                                      final i = e.key;
+                                      final item = e.value;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 6),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item.name.toUpperCase(),
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, height: 1.2),
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              width: 36,
+                                              child: Text('${item.qty}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                            ),
+                                            SizedBox(
+                                              width: 64,
+                                              child: Text(
+                                                item.lineTotal.toStringAsFixed(2),
+                                                textAlign: TextAlign.right,
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              width: 22,
+                                              child: InkWell(
+                                                onTap: () => setState(() => _items = [..._items]..removeAt(i)),
+                                                child: const Icon(Icons.close, size: 14, color: muted),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  const Text('--------------------------------', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 11)),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                                      const Spacer(),
+                                      Text(
+                                        '\$${_total.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text('Add item', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: muted)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 4,
+                                        child: TextField(
+                                          controller: _itemName,
+                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: 'What did you buy?',
+                                            hintStyle: const TextStyle(color: muted, fontSize: 11),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                            filled: true,
+                                            fillColor: const Color(0xFFF3EFE6),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      SizedBox(
+                                        width: 42,
+                                        child: TextField(
+                                          controller: _itemQty,
+                                          keyboardType: TextInputType.number,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: '#',
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                            filled: true,
+                                            fillColor: const Color(0xFFF3EFE6),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      SizedBox(
+                                        width: 70,
+                                        child: TextField(
+                                          controller: _itemPrice,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: '0.00',
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                            filled: true,
+                                            fillColor: const Color(0xFFF3EFE6),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton(
+                                    onPressed: _addItem,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: ink,
+                                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                      minimumSize: const Size(0, 36),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    ),
+                                    child: const Text('+ ADD LINE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text('THANK YOU', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 10, width: double.infinity, child: CustomPaint(painter: _ReceiptEdgePainter(top: false))),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _items.isEmpty ? null : _save,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFFBBF24),
+                          foregroundColor: Colors.black,
+                          disabledBackgroundColor: Colors.white24,
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Save  \$${_total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
                       ),
                     ),
                   ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: FilledButton(
-                  onPressed: _items.isEmpty ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFBBF24),
-                    foregroundColor: Colors.black,
-                    disabledBackgroundColor: Colors.white24,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text('Save receipt � \$${_total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ReceiptEdgePainter extends CustomPainter {
+  _ReceiptEdgePainter({required this.top});
+  final bool top;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    const step = 8.0;
+    if (top) {
+      path.moveTo(0, size.height);
+      for (var x = 0.0; x <= size.width; x += step) {
+        path.lineTo(x + step / 2, 0);
+        path.lineTo(x + step, size.height);
+      }
+      path.lineTo(size.width, size.height);
+      path.close();
+    } else {
+      path.moveTo(0, 0);
+      for (var x = 0.0; x <= size.width; x += step) {
+        path.lineTo(x + step / 2, size.height);
+        path.lineTo(x + step, 0);
+      }
+      path.lineTo(size.width, 0);
+      path.close();
+    }
+    canvas.drawPath(path, Paint()..color = const Color(0xFFFFFBF2));
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReceiptEdgePainter old) => old.top != top;
 }
