@@ -29776,7 +29776,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final idType = idTypeRaw.isNotEmpty ? idTypeRaw : (existing['idType'] ?? '').toString().trim();
     final address = keep(_addressC.text, 'homeAddress');
     final phoneRaw = _phoneC.text.trim();
-    final phone = phoneRaw.isNotEmpty ? phoneRaw : (existing['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+    final phone = phoneRaw.isNotEmpty
+        ? phoneRaw.replaceAll(RegExp(r'\D'), '')
+        : (existing['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
     final emailRaw = _emailC.text.trim().toLowerCase();
     final email = emailRaw.isNotEmpty
         ? emailRaw
@@ -30180,15 +30182,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         <td>${_escapeHtml(name.isEmpty ? '—' : name)}</td>
         <td>${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
         <td>${_escapeHtml(address.isEmpty ? '—' : address)}</td>
-        <td style="text-align:center">${family}</td>
+        <td class="family">${family}</td>
       </tr>''');
     }
 
     final now = DateTime.now().toLocal();
     final dateStr =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final hour12 = now.hour % 12 == 0 ? 12 : now.hour % 12;
     final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        '$hour12:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
     final titleLine1 = "EMO'YA M'BEMBE";
     final titleLine2 = "M'MBONDO · $state";
     final title = '$titleLine1 $titleLine2';
@@ -30198,23 +30201,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>$title</title>
+<title>ngmy.org</title>
 <style>
-  @page { margin: 16mm 12mm; }
-  body {
+  @page {
+    size: letter;
+    margin: 14mm 12mm 16mm 12mm;
+  }
+  html, body {
     font-family: Georgia, "Times New Roman", serif;
     color: #111;
     margin: 0;
-    padding: 16px 18px 26px;
+    padding: 0;
     background: #fff;
   }
+  .sheet { padding: 8px 4px 28px; }
   .masthead {
     display: grid;
-    grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+    grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
     align-items: end;
-    gap: 12px;
-    padding-bottom: 14px;
-    margin-bottom: 18px;
+    gap: 10px;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
     border-bottom: 2px solid #111;
   }
   .stamp {
@@ -30262,7 +30269,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     align-self: start;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     text-align: right;
-    min-width: 96px;
+    min-width: 88px;
   }
   .members-chip .label {
     font-size: 10px;
@@ -30281,29 +30288,55 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
+  col.name { width: 22%; }
+  col.phone { width: 18%; }
+  col.address { width: 52%; }
+  col.family { width: 8%; }
   th, td {
     border: 1px solid #ccc;
-    padding: 10px 8px;
-    font-size: 13px;
-    vertical-align: top;
+    padding: 6px 8px;
+    font-size: 12px;
     font-weight: 400;
+    vertical-align: middle;
+    height: 28px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   th {
     background: #f3f4f6;
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
-  th:last-child, td:last-child { text-align: center; width: 88px; }
+  th.family, td.family { text-align: center; }
+  .doc-footer {
+    margin-top: 18px;
+    text-align: center;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #111;
+  }
   @media print {
-    body { padding: 0; }
-    .masthead { margin-bottom: 14px; }
+    .sheet { padding: 0 0 20px; }
+    .masthead { margin-bottom: 12px; }
+    .doc-footer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
   }
 </style>
 </head>
 <body>
+  <div class="sheet">
   <div class="masthead">
     <div class="stamp">
       <div class="date">${_escapeHtml(dateStr)}</div>
@@ -30321,18 +30354,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     </div>
   </div>
   <table>
+    <colgroup>
+      <col class="name"/>
+      <col class="phone"/>
+      <col class="address"/>
+      <col class="family"/>
+    </colgroup>
     <thead>
       <tr>
         <th>Name</th>
         <th>Phone</th>
         <th>Address</th>
-        <th>Family size</th>
+        <th class="family">Family size</th>
       </tr>
     </thead>
     <tbody>
       $rows
     </tbody>
   </table>
+  <div class="doc-footer">ngmy.org</div>
+  </div>
   <script>
     window.addEventListener('load', function () {
       setTimeout(function () {
