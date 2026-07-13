@@ -652,6 +652,38 @@ class DateSlashFormatter extends TextInputFormatter {
   }
 }
 
+/// Formats phone as 123-456-7890 (dashes after 3 and 6 digits).
+class PhoneDashFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > 15) {
+      return oldValue;
+    }
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i == 3 || i == 6) buf.write('-');
+      buf.write(digits[i]);
+    }
+    final text = buf.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+String ngmyFormatPhoneDisplay(String raw) {
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return '';
+  final buf = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i == 3 || i == 6) buf.write('-');
+    buf.write(digits[i]);
+  }
+  return buf.toString();
+}
+
 String formatCurrency(double amount) {
   String str = amount.toStringAsFixed(2);
   List<String> parts = str.split('.');
@@ -2575,13 +2607,22 @@ bool _userIsCivicRegistryEnrolled(AppConfig config, UserData user) =>
 
 UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> allUsers) {
   final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
-  final idx = allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == email);
-  final u = idx >= 0 ? UserData.fromJson(allUsers[idx].toJson()) : UserData(email: email, username: email.split('@').first);
+  final registryId = (m['registryId'] ?? '').toString().trim();
+  final fullName = (m['fullName'] ?? '').toString().trim();
+  final idx = email.isEmpty
+      ? -1
+      : allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == email);
+  final u = idx >= 0
+      ? UserData.fromJson(allUsers[idx].toJson())
+      : UserData(
+          email: email,
+          username: fullName.isNotEmpty ? fullName : (registryId.isNotEmpty ? registryId : 'Member'),
+        );
   u.isEnrolledInRegistry = true;
-  u.fullName = (m['fullName'] ?? u.fullName ?? u.username).toString();
+  u.fullName = fullName.isNotEmpty ? fullName : (u.fullName ?? u.username);
   u.dob = (m['dob'] ?? u.dob ?? '').toString();
   u.idType = (m['idType'] ?? u.idType ?? '').toString();
-  u.registryId = (m['registryId'] ?? u.registryId ?? '').toString();
+  u.registryId = registryId.isNotEmpty ? registryId : (u.registryId ?? '').toString();
   u.homeAddress = (m['homeAddress'] ?? u.homeAddress ?? '').toString();
   u.phone = (m['phone'] ?? u.phone).toString();
   u.city = (m['city'] ?? '').toString();
@@ -29522,7 +29563,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _idTypeC.text = idTypes.contains(idType) ? idType : (idType.isEmpty ? 'National ID' : idType);
       if (!idTypes.contains(_idTypeC.text)) _idTypeC.text = 'National ID';
       _addressC.text = (raw?['homeAddress'] ?? u.homeAddress ?? '').toString();
-      _phoneC.text = phoneDigits;
+      _phoneC.text = ngmyFormatPhoneDisplay(phoneDigits);
       _emailC.text = (raw?['email'] ?? u.email).toString();
       _cityC.text = (raw?['city'] ?? u.city ?? '').toString();
       _roomC.text = (raw?['room'] ?? u.room ?? '').toString();
@@ -29555,17 +29596,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final dob = _dobC.text.trim();
     final idType = _idTypeC.text.trim();
     final address = _addressC.text.trim();
-    final phone = _phoneC.text.trim();
+    final phoneDigits = _phoneC.text.replaceAll(RegExp(r'\D'), '');
+    final phone = phoneDigits;
     final email = _emailC.text.trim().toLowerCase();
     final city = _cityC.text.trim();
     final room = _roomC.text.trim();
+    final isRegistrarManual = targetUser == null;
 
     final hasTwoNames = RegExp(r'^\S+\s+\S+').hasMatch(fullName);
     if (!hasTwoNames) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain at least first and last name.')));
       return;
     }
-    if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
+    if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of Birth must be in MM/DD/YYYY format.')));
+      return;
+    }
+    if (!isRegistrarManual && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of Birth must be in MM/DD/YYYY format.')));
       return;
     }
@@ -29581,7 +29628,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must contain numbers only (7-15 digits).')));
       return;
     }
-    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+    if (email.isNotEmpty && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
+      return;
+    }
+    if (!isRegistrarManual && email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
       return;
     }
@@ -29589,7 +29640,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a city from Manage Cities & Rooms.')));
       return;
     }
-    if (!widget.config.rooms.contains(room)) {
+    if (room.isNotEmpty && !widget.config.rooms.contains(room)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
+      return;
+    }
+    if (!isRegistrarManual && (room.isEmpty || !widget.config.rooms.contains(room))) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please choose a room from Manage Cities & Rooms.')));
       return;
     }
@@ -29604,19 +29659,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final accountIdx = widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-    // New registrar enrollments use a phone-based guest key (same as self-enroll)
-    // so each person becomes a NEW member. Reusing one typed email used to replace
-    // the previous enrollment via upsert-by-email.
-    final phoneDigits = phone.replaceAll(RegExp(r'\D'), '');
-    final String registryEmail;
-    if (targetUser != null) {
-      registryEmail = email;
-    } else if (accountIdx >= 0) {
-      registryEmail = email;
-    } else {
-      registryEmail = 'civic.$phoneDigits@guest.ngmy';
-    }
+    // Use the email the controller typed — never invent @guest.ngmy addresses.
+    // Same email is allowed for multiple registrar-enrolled members (forceNew).
+    final registryEmail = targetUser != null ? email : email;
 
     final duplicate = NgmyCivicRegistryMembers.findDuplicateRecord(
       config: widget.config,
@@ -29625,7 +29670,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       city: city,
       homeAddress: address,
       phone: phone,
-      excludeEmail: targetUser?.email ?? registryEmail,
+      excludeEmail: targetUser?.email ?? (registryEmail.isEmpty ? null : registryEmail),
     );
     if (duplicate != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -29634,15 +29679,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    // Block only when this phone guest key is already enrolled as someone else.
-    final existingByKey = NgmyCivicRegistryMembers.findByEmail(widget.config, registryEmail);
-    if (existingByKey != null && targetUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(NgmyCivicRegistryMembers.duplicateMessage(existingByKey))),
-      );
-      return;
-    }
-
+    final accountIdx = email.isEmpty
+        ? -1
+        : widget.allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
     var registryId = accountIdx >= 0 ? (widget.allUsers[accountIdx].registryId ?? '').trim() : '';
     if (registryId.isEmpty) registryId = _generateUniqueRegistryId(_selectedState);
     final existingIds = NgmyCivicRegistryMembers.listFrom(widget.config)
@@ -29664,12 +29703,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       registryId: registryId,
       familyMembers: familyMembers,
     );
-    if (email.isNotEmpty && NgmyCivicRegistryMembers.emailKey(email) != NgmyCivicRegistryMembers.emailKey(registryEmail)) {
-      member['contactEmail'] = email;
-    }
 
     setState(() {
-      NgmyCivicRegistryMembers.upsert(widget.config, member);
+      NgmyCivicRegistryMembers.upsert(
+        widget.config,
+        member,
+        forceNew: isRegistrarManual,
+      );
       if (accountIdx >= 0) {
         widget.allUsers[accountIdx].isEnrolledInRegistry = true;
         widget.allUsers[accountIdx].registryId = registryId;
@@ -29911,12 +29951,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<bool> _removeRegistryMember(UserData member) async {
     final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final registryId = (member.registryId ?? '').trim();
-    NgmyCivicRegistryMembers.removeByEmail(widget.config, member.email);
     if (registryId.isNotEmpty) {
-      final still = NgmyCivicRegistryMembers.findByRegistryId(widget.config, registryId);
-      if (still != null) {
-        NgmyCivicRegistryMembers.removeByEmail(widget.config, (still['email'] ?? '').toString());
-      }
+      NgmyCivicRegistryMembers.removeByRegistryId(widget.config, registryId);
+    } else if (emailKey.isNotEmpty) {
+      NgmyCivicRegistryMembers.removeByEmail(widget.config, member.email);
     }
     void clearCivicFields(UserData u) {
       u.isEnrolledInRegistry = false;
@@ -30133,7 +30171,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final rows = StringBuffer();
     for (final m in members) {
       final name = (m['fullName'] ?? '').toString().trim();
-      final phone = (m['phone'] ?? '').toString().trim();
+      final phone = ngmyFormatPhoneDisplay((m['phone'] ?? '').toString().trim());
       final address = (m['homeAddress'] ?? '').toString().trim();
       final familyRaw = m['familyMembers'];
       final family = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
@@ -30202,20 +30240,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   .header {
     justify-self: center;
     text-align: center;
-    max-width: 520px;
+    max-width: 420px;
   }
   .header h1 {
     margin: 0;
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 800;
-    letter-spacing: 0.04em;
-    line-height: 1.25;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
     text-decoration: underline;
     text-decoration-thickness: 2px;
-    text-underline-offset: 7px;
+    text-underline-offset: 6px;
   }
+  .header h1 .line1,
   .header h1 .line2 {
     display: block;
+    white-space: nowrap;
   }
   .members-chip {
     justify-self: end;
@@ -33293,7 +33333,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Date of Birth', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Date of Birth (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _dobC,
@@ -33320,12 +33360,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               TextField(
                 controller: _phoneC,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(hintText: 'Numbers only', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
+                inputFormatters: [PhoneDashFormatter()],
+                decoration: InputDecoration(hintText: '123-456-7890', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
 
-              const Text('Email Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Email Address (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailC,
@@ -33346,12 +33386,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Room', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Room (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
                 initialSelection: _roomC.text.isNotEmpty ? _roomC.text : null,
-                hintText: 'Select room',
+                hintText: 'Select room (optional)',
                 inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
                 dropdownMenuEntries: roomOptions.map((r) => DropdownMenuEntry(value: r, label: r)).toList(),
                 onSelected: (v) { if (v != null) setState(() => _roomC.text = v); },

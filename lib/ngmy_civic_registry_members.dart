@@ -93,14 +93,38 @@ class NgmyCivicRegistryMembers {
     };
   }
 
-  static void upsert(dynamic config, Map<String, dynamic> record) {
-    final email = emailKey((record['email'] ?? '').toString());
-    if (email.isEmpty) return;
-    _clearTombstone(config, email);
+  static void upsert(dynamic config, Map<String, dynamic> record, {bool forceNew = false}) {
     final members = listFrom(config);
-    final next = Map<String, dynamic>.from(record)..['email'] = email;
+    final next = Map<String, dynamic>.from(record);
+    final email = emailKey((next['email'] ?? '').toString());
+    next['email'] = email;
+    final rid = (next['registryId'] ?? '').toString().trim();
     final now = DateTime.now().toUtc().toIso8601String();
-    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == email);
+
+    // Registrar can enroll without email; registryId is the unique row key.
+    if (email.isEmpty && rid.isEmpty) return;
+    if (email.isNotEmpty) _clearTombstone(config, email);
+
+    if (forceNew) {
+      if (rid.isEmpty) return;
+      next['enrolledAt'] = next['enrolledAt'] ?? now;
+      next['updatedAt'] = now;
+      members.removeWhere(
+        (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid.toUpperCase(),
+      );
+      members.add(next);
+      setList(config, members);
+      return;
+    }
+
+    var idx = rid.isNotEmpty
+        ? members.indexWhere(
+            (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid.toUpperCase(),
+          )
+        : -1;
+    if (idx < 0 && email.isNotEmpty) {
+      idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == email);
+    }
     if (idx >= 0) {
       final keep = members[idx];
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
@@ -113,6 +137,9 @@ class NgmyCivicRegistryMembers {
       next['idPhotoPath'] = (next['idPhotoPath'] ?? keep['idPhotoPath'] ?? '').toString();
       next['nicknames'] = next['nicknames'] ?? keep['nicknames'] ?? const <String>[];
       if (!next.containsKey('showNicknames')) next['showNicknames'] = keep['showNicknames'] == true;
+      if ((next['registryId'] ?? '').toString().trim().isEmpty) {
+        next['registryId'] = keep['registryId'] ?? rid;
+      }
       next['updatedAt'] = now;
       members[idx] = next;
     } else {
@@ -121,6 +148,14 @@ class NgmyCivicRegistryMembers {
       members.add(next);
     }
     setList(config, members);
+  }
+
+  static String _mergeKey(Map<String, dynamic> m) {
+    final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+    if (id.isNotEmpty) return 'id:$id';
+    final em = emailKey((m['email'] ?? '').toString());
+    if (em.isNotEmpty) return 'em:$em';
+    return '';
   }
 
   /// Update an existing member in place (by original email or registry ID). Never adds a new row.
@@ -322,9 +357,40 @@ class NgmyCivicRegistryMembers {
     final existing = findByEmail(config, email);
     final registryId = (existing?['registryId'] ?? '').toString();
     final state = (existing?['state'] ?? '').toString();
-    final members = listFrom(config)..removeWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
+    // Only remove the first match with this email (shared emails are allowed).
+    final members = listFrom(config);
+    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
+    if (idx >= 0) members.removeAt(idx);
     setList(config, members);
     _addTombstone(config, email: key, registryId: registryId, state: state);
+  }
+
+  static void removeByRegistryId(dynamic config, String registryId) {
+    final rid = registryId.trim().toUpperCase();
+    if (rid.isEmpty) return;
+    final members = listFrom(config);
+    final idx = members.indexWhere(
+      (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
+    );
+    if (idx < 0) return;
+    final existing = members[idx];
+    final email = emailKey((existing['email'] ?? '').toString());
+    final state = (existing['state'] ?? '').toString();
+    members.removeAt(idx);
+    setList(config, members);
+    if (email.isNotEmpty) {
+      _addTombstone(config, email: email, registryId: rid, state: state);
+    } else {
+      final next = removedFrom(config);
+      next.removeWhere((r) => (r['registryId'] ?? '').toString().trim().toUpperCase() == rid);
+      next.add({
+        'email': '',
+        'registryId': rid,
+        'state': state,
+        'removedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      setRemoved(config, next);
+    }
   }
 
   static bool isEnrolled(dynamic config, String email) {
@@ -456,10 +522,15 @@ class NgmyCivicRegistryMembers {
     required int missed,
     int? familyMembers,
   }) {
-    final existing = findByEmail(config, email);
+    final existing = findByEmail(config, email) ??
+        (registryId.trim().isEmpty ? null : findByRegistryId(config, registryId));
     final existingFamily = existing?['familyMembers'];
     final family = familyMembers ??
         (existingFamily is num ? existingFamily.toInt() : int.tryParse('${existingFamily ?? ''}') ?? 1);
+    final rid = registryId.trim().isNotEmpty
+        ? registryId.trim()
+        : (existing?['registryId'] ?? '').toString().trim();
+    if (emailKey(email).isEmpty && rid.isEmpty) return;
     upsert(
       config,
       buildRecord(
@@ -472,7 +543,7 @@ class NgmyCivicRegistryMembers {
         city: city,
         room: room,
         state: state,
-        registryId: registryId,
+        registryId: rid,
         familyMembers: family,
         helps: helps,
         missed: missed,
@@ -683,7 +754,9 @@ class NgmyCivicRegistryMembers {
     }
     final tombstones = <String, Map<String, dynamic>>{};
     for (final r in [...removedFrom(config), ...remoteRemoved]) {
-      final key = emailKey((r['email'] ?? '').toString());
+      final email = emailKey((r['email'] ?? '').toString());
+      final rid = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      final key = email.isNotEmpty ? 'em:$email' : (rid.isNotEmpty ? 'id:$rid' : '');
       if (key.isEmpty) continue;
       final prev = tombstones[key];
       if (prev == null) {
@@ -696,71 +769,35 @@ class NgmyCivicRegistryMembers {
     }
     setRemoved(config, tombstones.values.toList());
 
-    final local = listFrom(config);
-    if (local.isEmpty) {
-      final filtered = remoteMembers.where((m) {
-        final key = emailKey((m['email'] ?? '').toString());
-        final tomb = tombstones[key];
-        if (tomb == null) return true;
-        final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
-        final updatedAt = _memberStamp(m);
-        if (removedAt == null) return false;
-        if (updatedAt != null && updatedAt.isAfter(removedAt)) return true; // re-enrolled after delete
-        return false;
-      }).toList();
-      setList(config, filtered);
-      return;
-    }
-
-    final merged = <String, Map<String, dynamic>>{};
-    final idsOwned = <String, String>{};
-
-    for (final m in local) {
-      final key = emailKey((m['email'] ?? '').toString());
-      if (key.isEmpty) continue;
-      merged[key] = m;
-      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
-      if (id.isNotEmpty) idsOwned[id] = key;
-    }
-
-    for (final m in remoteMembers) {
-      final key = emailKey((m['email'] ?? '').toString());
-      if (key.isEmpty) continue;
-      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
-      if (merged.containsKey(key)) {
-        merged[key] = _preferNewerMember(merged[key]!, m);
-        continue;
-      }
-      if (id.isNotEmpty && idsOwned.containsKey(id)) {
-        final existingKey = idsOwned[id]!;
-        final existing = merged[existingKey];
-        if (existing != null) {
-          final newer = _preferNewerMember(existing, m);
-          if (identical(newer, m) || emailKey((newer['email'] ?? '').toString()) == key) {
-            merged.remove(existingKey);
-            merged[key] = Map<String, dynamic>.from(m);
-            idsOwned[id] = key;
-          }
-        }
-        continue;
-      }
-      merged[key] = m;
-      if (id.isNotEmpty) idsOwned[id] = key;
-    }
-
-    // Drop anyone with a tombstone newer than their last update (deleted on another device).
-    merged.removeWhere((key, m) {
-      final tomb = tombstones[key];
+    bool isTombstoned(Map<String, dynamic> m) {
+      final email = emailKey((m['email'] ?? '').toString());
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      Map<String, dynamic>? tomb;
+      if (email.isNotEmpty) tomb = tombstones['em:$email'];
+      tomb ??= rid.isNotEmpty ? tombstones['id:$rid'] : null;
       if (tomb == null) return false;
       final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
       final updatedAt = _memberStamp(m);
       if (removedAt == null) return true;
-      if (updatedAt != null && updatedAt.isAfter(removedAt)) {
-        _clearTombstone(config, key); // resurrected after delete
-        return false;
-      }
+      if (updatedAt != null && updatedAt.isAfter(removedAt)) return false;
       return true;
-    });
+    }
+
+    final local = listFrom(config);
+    if (local.isEmpty) {
+      setList(config, remoteMembers.where((m) => _mergeKey(m).isNotEmpty && !isTombstoned(m)).toList());
+      return;
+    }
+
+    // Key by registryId so duplicate/shared emails from registrar enroll stay as separate members.
+    final merged = <String, Map<String, dynamic>>{};
+    for (final m in [...local, ...remoteMembers]) {
+      final key = _mergeKey(m);
+      if (key.isEmpty) continue;
+      if (isTombstoned(m)) continue;
+      final prev = merged[key];
+      merged[key] = prev == null ? m : _preferNewerMember(prev, m);
+    }
 
     setList(config, merged.values.toList());
   }
