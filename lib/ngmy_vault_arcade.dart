@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_vault_game_school.dart';
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_sync.dart';
 
@@ -83,6 +84,21 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
       ),
     );
     await _loadProgress();
+  }
+
+  Future<void> _openGameSchool() async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: const Duration(milliseconds: 380),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (context, anim, secondary) => FadeTransition(
+          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+          child: const NgmyVaultGameSchoolScreen(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -232,6 +248,10 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 ],
               ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: _GameSchoolBanner(glow: glow, onTap: _openGameSchool),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
@@ -496,4 +516,61 @@ class _ArcadeBootBackdrop extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ArcadeBootBackdrop old) => old.spin != spin || old.wave != wave || old.boot != boot;
+}
+
+class _GameSchoolBanner extends StatelessWidget {
+  const _GameSchoolBanner({required this.glow, required this.onTap});
+  final double glow;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = [Color(0xFFFBBF24), Color(0xFFA78BFA), Color(0xFF34D399)];
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colors[0].withValues(alpha: 0.32), const Color(0xFF120B1E), colors[1].withValues(alpha: 0.30)],
+            ),
+            border: Border.all(color: colors[0].withValues(alpha: 0.5 + glow * 0.25), width: 1.4),
+            boxShadow: [BoxShadow(color: colors[0].withValues(alpha: 0.22 * glow), blurRadius: 26, offset: const Offset(0, 10))],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(colors: colors),
+                  boxShadow: [BoxShadow(color: colors[0].withValues(alpha: 0.5), blurRadius: 16)],
+                ),
+                child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('GAME SCHOOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 14)),
+                    SizedBox(height: 3),
+                    Text('Learn English, earn coins, unlock upgrades — a whole category of its own.', style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.3)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
