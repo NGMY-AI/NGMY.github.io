@@ -2572,8 +2572,9 @@ class _CivicIdCardBody extends StatelessWidget {
         const designW = 360.0;
         final designH = designW / 1.586;
         // Slight zoom past pure contain so left/right black gutters shrink without a harsh crop.
+        // Applied four +5.5% nudges from original fit (1.055^4 ≈ 1.239).
         final fit = math.min(c.maxWidth / designW, c.maxHeight / designH);
-        final scale = fit * 1.113;
+        final scale = fit * 1.239;
         return ColoredBox(
           color: const Color(0xFF0B1220),
           child: ClipRect(
