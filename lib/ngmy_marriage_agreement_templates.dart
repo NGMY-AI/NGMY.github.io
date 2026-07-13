@@ -615,40 +615,51 @@ class _NgmyMarriageTemplatePickerSheet extends StatelessWidget {
       maxChildSize: 0.96,
       builder: (_, scrollCtrl) => Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111827) : Colors.white,
+          color: isDark ? const Color(0xFF14110A) : const Color(0xFFFFFDF7),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
               child: Column(
                 children: [
                   Center(
                     child: Container(
                       width: 40,
                       height: 4,
-                      decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(11),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF1D4D2B), Color(0xFF0F2E1A)]),
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFE6C15C), Color(0xFFB8860B), Color(0xFF8B6914)],
+                          ),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
+                          boxShadow: [BoxShadow(color: const Color(0xFFB8860B).withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))],
                         ),
-                        child: const Icon(Icons.article_rounded, color: Colors.white, size: 22),
+                        child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Choose a paper template', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                            Text('10 formal Marriage Agreement designs', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text('Choose a paper template', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF1A1208))),
+                            const SizedBox(height: 2),
+                            const Text('10 professionally designed certificates', style: TextStyle(fontSize: 11.5, color: Color(0xFF8B6914), fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),
@@ -660,12 +671,12 @@ class _NgmyMarriageTemplatePickerSheet extends StatelessWidget {
             Expanded(
               child: GridView.builder(
                 controller: scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.56,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 0.62,
                 ),
                 itemCount: kNgmyMarriagePaperTemplates.length,
                 itemBuilder: (_, i) {
@@ -694,37 +705,56 @@ class _TemplateCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-            color: isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.35 : 0.4)),
+            color: isDark ? const Color(0xFF1F1A0F) : Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  margin: const EdgeInsets.fromLTRB(9, 9, 9, 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 6, offset: const Offset(0, 2))],
+                  ),
+                  clipBehavior: Clip.antiAlias,
                   child: AspectRatio(
                     aspectRatio: 9 / 16,
                     child: ngmyMarriageTemplateLivePreview(template.id),
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              Container(
+                padding: const EdgeInsets.fromLTRB(11, 8, 11, 11),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.18 : 0.16))),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(template.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                    const SizedBox(height: 2),
+                    Text(
+                      template.name,
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 0.1, color: isDark ? Colors.white : const Color(0xFF1A1208)),
+                    ),
+                    const SizedBox(height: 3),
                     Text(
                       template.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 9, color: isDark ? Colors.white54 : const Color(0xFF64748B), height: 1.3),
+                      style: TextStyle(fontSize: 9.5, color: isDark ? Colors.white54 : const Color(0xFF7A6A45), height: 1.32),
                     ),
                   ],
                 ),

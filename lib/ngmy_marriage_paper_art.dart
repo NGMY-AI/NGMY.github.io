@@ -67,19 +67,66 @@ void _fill(img.Image im, int x, int y, int w, int h, int color) {
   img.fillRect(im, x1: x, y1: y, x2: x + w, y2: y + h, color: _c(color));
 }
 
+/// Elegant antialiased frame — replaces flat filled-rectangle bars, which
+/// looked crude/pixelated, with a crisp, smooth line like a real letterpress
+/// border.
 void _border(img.Image im, int x, int y, int w, int h, int color, int t) {
-  _fill(im, x, y, w, t, color);
-  _fill(im, x, y + h - t, w, t, color);
-  _fill(im, x, y, t, h, color);
-  _fill(im, x + w - t, y, t, h, color);
+  final c = _c(color);
+  final thickness = t.toDouble().clamp(1, 6);
+  img.drawLine(im, x1: x, y1: y, x2: x + w, y2: y, color: c, antialias: true, thickness: thickness);
+  img.drawLine(im, x1: x, y1: y + h, x2: x + w, y2: y + h, color: c, antialias: true, thickness: thickness);
+  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + h, color: c, antialias: true, thickness: thickness);
+  img.drawLine(im, x1: x + w, y1: y, x2: x + w, y2: y + h, color: c, antialias: true, thickness: thickness);
 }
 
+void _fillDiamond(img.Image im, num cx, num cy, num r, img.Color color) {
+  img.fillPolygon(
+    im,
+    vertices: [
+      img.Point(cx, cy - r),
+      img.Point(cx + r, cy),
+      img.Point(cx, cy + r),
+      img.Point(cx - r, cy),
+    ],
+    color: color,
+  );
+}
+
+/// Small ornamental diamond + bracket ticks at each corner of a frame —
+/// the classic formal-certificate corner flourish.
+void _cornerFlourish(img.Image im, int x, int y, int w, int h, int color, {int r = 5, int tick = 16}) {
+  final c = _c(color);
+  final corners = [
+    (x, y, 1, 1),
+    (x + w, y, -1, 1),
+    (x, y + h, 1, -1),
+    (x + w, y + h, -1, -1),
+  ];
+  for (final (cx, cy, sx, sy) in corners) {
+    _fillDiamond(im, cx, cy, r, c);
+    img.drawLine(im, x1: cx, y1: cy, x2: cx + sx * tick, y2: cy, color: c, antialias: true, thickness: 1.4);
+    img.drawLine(im, x1: cx, y1: cy, x2: cx, y2: cy + sy * tick, color: c, antialias: true, thickness: 1.4);
+  }
+}
+
+/// Real diamond/lozenge ribbon trim (previously flat solid-color stripes,
+/// which didn't read as "diamond" at all) tiled along a strip — works for
+/// both horizontal (top/bottom) and vertical (side) bands.
 void _diamondStrip(img.Image im, int x, int y, int w, int h) {
   const colors = [0xFFCE1021, 0xFFF7D618, 0xFF1D4D2B, 0xFFD4AF37, 0xFF007FFF];
-  final dw = (w / 16).ceil().clamp(1, w);
-  for (var i = 0; i < 16; i++) {
-    final c = colors[i % colors.length];
-    _fill(im, x + i * dw, y, dw - 1, h, c);
+  _fill(im, x, y, w, h, 0xFFF5E6C8);
+  final horizontal = w >= h;
+  final thin = (horizontal ? h : w).toDouble();
+  final long = (horizontal ? w : h).toDouble();
+  final cell = thin.clamp(8, 999);
+  final count = (long / cell).ceil().clamp(1, 300);
+  for (var i = 0; i < count; i++) {
+    final centerAlong = i * cell + cell / 2;
+    if (centerAlong - cell / 2 > long) break;
+    final cx = horizontal ? x + centerAlong : x + w / 2;
+    final cy = horizontal ? y + h / 2 : y + centerAlong;
+    final r = cell * 0.34;
+    _fillDiamond(im, cx, cy, r, _c(colors[i % colors.length]));
   }
 }
 
@@ -113,6 +160,7 @@ img.Image _heritagePaper(int bg1, int bg2, int gold, {required bool tricolor}) {
   }
   _border(im, 10, 26, 340, 594, gold, 3);
   _border(im, 18, 34, 324, 578, gold, 1);
+  _cornerFlourish(im, 10, 26, 340, 594, gold);
   _diamondStrip(im, 0, 608, 360, 32);
   _softCircle(im, 180, 300, 70, gold, 20);
   return im;
@@ -127,6 +175,7 @@ img.Image _parchmentPaper({required bool sideBand, required int frame, required 
   final ow = sideBand ? 322 : 340;
   _border(im, ox, 10, ow, 610, frame, 3);
   _border(im, ox + 6, 16, ow - 12, 598, inner, 1);
+  _cornerFlourish(im, ox, 10, ow, 610, frame);
   _softCircle(im, 180, 280, 90, 0xFFD4AF37, 15);
   return im;
 }
@@ -140,6 +189,8 @@ img.Image _creamPaper({required bool flagCorners, bool watermark = false}) {
     for (final p in [(8, 8), (334, 8), (8, 622), (334, 622)]) {
       _flagCorner(im, p.$1, p.$2);
     }
+  } else {
+    _cornerFlourish(im, 8, 8, 344, 624, 0xFFD4AF37);
   }
   if (watermark) _softCircle(im, 180, 300, 85, 0xFF1D4D2B, 12);
   return im;
@@ -159,6 +210,7 @@ img.Image _ivoryPaper() {
   img.fill(im, color: _c(0xFFFFFAF0));
   _border(im, 20, 20, 320, 600, 0xFFB8860B, 1);
   _border(im, 26, 26, 308, 588, 0xFF1D4D2B, 1);
+  _cornerFlourish(im, 20, 20, 320, 600, 0xFFB8860B, r: 4, tick: 12);
   return im;
 }
 
@@ -166,6 +218,7 @@ img.Image _goldFramePaper() {
   final im = _parchmentPaper(sideBand: false, frame: 0xFFD4AF37, inner: 0xFFB8860B);
   _border(im, 4, 4, 352, 632, 0xFFD4AF37, 5);
   _border(im, 16, 16, 328, 608, 0xFFD4AF37, 1);
+  _cornerFlourish(im, 4, 4, 352, 632, 0xFFD4AF37, r: 6, tick: 18);
   return im;
 }
 
@@ -175,11 +228,12 @@ img.Image _officialPaper() {
   _fill(im, 120, 0, 120, 10, 0xFFF7D618);
   _fill(im, 240, 0, 120, 10, 0xFFCE1021);
   _border(im, 8, 14, 344, 618, 0xFF007FFF, 3);
+  _cornerFlourish(im, 8, 14, 344, 618, 0xFF007FFF, r: 4, tick: 12);
   for (var r = 34; r <= 36; r++) {
-    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFCE1021));
+    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFCE1021), antialias: true);
   }
   for (var r = 28; r <= 30; r++) {
-    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFD4AF37));
+    img.drawCircle(im, x: 300, y: 580, radius: r, color: _c(0xFFD4AF37), antialias: true);
   }
   return im;
 }

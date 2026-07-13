@@ -189,8 +189,9 @@ class _NgmyMarriageStatePickerSheetState extends State<_NgmyMarriageStatePickerS
       maxChildSize: 0.95,
       builder: (_, scrollCtrl) => Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111827) : Colors.white,
+          color: isDark ? const Color(0xFF14110A) : const Color(0xFFFFFDF7),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [
@@ -203,27 +204,37 @@ class _NgmyMarriageStatePickerSheetState extends State<_NgmyMarriageStatePickerS
                     child: Container(
                       width: 40,
                       height: 4,
-                      decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(11),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFF8B6914)]),
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFE6C15C), Color(0xFFB8860B), Color(0xFF8B6914)],
+                          ),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
+                          boxShadow: [BoxShadow(color: const Color(0xFFB8860B).withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))],
                         ),
-                        child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 22),
+                        child: const Icon(Icons.map_rounded, color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Choose your U.S. state', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                            Text('Watermark: EMO YA M\'BONDO [STATE]', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text('Choose your U.S. state', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF1A1208))),
+                            const SizedBox(height: 2),
+                            const Text('Sets the certificate\'s state watermark', style: TextStyle(fontSize: 11.5, color: Color(0xFF8B6914), fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),
@@ -237,29 +248,69 @@ class _NgmyMarriageStatePickerSheetState extends State<_NgmyMarriageStatePickerS
                       hintText: 'Search states...',
                       prefixIcon: const Icon(Icons.search_rounded, size: 20),
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF1F2937) : const Color(0xFFF1F5F9),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      fillColor: isDark ? const Color(0xFF241D10) : const Color(0xFFF7EFD9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFB8860B), width: 1.4),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: ListView.builder(
+              child: ListView.separated(
                 controller: scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
                 itemCount: _filtered.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, i) {
                   final st = _filtered[i];
-                  return ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFB8860B).withValues(alpha: 0.15),
-                      child: Text(st.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFB8860B), fontSize: 13)),
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(context, st),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: isDark ? const Color(0xFF1F1A0F) : Colors.white,
+                          border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.18 : 0.22)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.16 : 0.14),
+                                border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4)),
+                              ),
+                              child: Text(st.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFB8860B), fontSize: 13)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                st,
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1A1208)),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: const Color(0xFFD4AF37).withValues(alpha: 0.7)),
+                          ],
+                        ),
+                      ),
                     ),
-                    title: Text(st, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(ngmyMarriageWatermarkForState(st), style: const TextStyle(fontSize: 10)),
-                    onTap: () => Navigator.pop(context, st),
                   );
                 },
               ),

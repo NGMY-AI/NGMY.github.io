@@ -1868,7 +1868,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                   SizedBox(height: compact ? 72 : widget.bottomScrollPadding),
               ],
             ),
-            if (editing && compact) _mobileTextEditOverlay(isDark, keyboardInset: keyboardInset),
+            if (editing && compact) _mobileTextEditOverlay(isDark),
           ],
         ),
       ),
@@ -1876,7 +1876,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   /// Full-width phone editor above the keyboard — no black dead space under the slide.
-  Widget _mobileTextEditOverlay(bool isDark, {required double keyboardInset}) {
+  Widget _mobileTextEditOverlay(bool isDark) {
     final el = _selectedElement();
     if (el == null || el.type != NgmySlideElementType.text) return const SizedBox.shrink();
     final c = _controllerFor(el);
@@ -1949,9 +1949,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 ),
               ),
             ),
-            // Quick format strip sits just above the keyboard.
+            // Quick format strip sits just above the keyboard. The keyboard
+            // itself is already accounted for by MainScreen's ancestor
+            // Scaffold (resizeToAvoidBottomInset: true) shrinking the space
+            // given to this whole editor — adding keyboardInset again here
+            // double-reserved space and left an empty black gap above the
+            // keyboard (the "black void" this screen's Scaffold comment
+            // already warns about).
             Padding(
-              padding: EdgeInsets.fromLTRB(12, 0, 12, 10 + keyboardInset),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
@@ -2478,7 +2484,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         return Row(
           children: [
             _ribbonBtn(Icons.notes_rounded, _showNotes ? 'Hide Notes' : 'Show Notes', () => setState(() => _showNotes = !_showNotes), isDark),
-            _ribbonBtn(Icons.picture_as_pdf_outlined, 'Download PDF', () => unawaited(_downloadPdf()), isDark),
             _ribbonBtn(Icons.print_rounded, 'Print deck', () {
               final deck = _activeDeck;
               if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
@@ -3250,26 +3255,31 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         if (onTrailingTap != null) ...[
           const SizedBox(width: 8),
           Transform.translate(
-            offset: const Offset(0, -3),
+            offset: const Offset(0, -7),
             child: Tooltip(
               message: 'Marriage agreement (Hati ya Kuhowesha)',
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onTrailingTap,
-                  borderRadius: BorderRadius.circular(10),
+                  customBorder: const CircleBorder(),
                   child: Ink(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFB8860B), Color(0xFF8B6914)]),
-                      borderRadius: BorderRadius.circular(10),
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFE6C15C), Color(0xFFB8860B), Color(0xFF8B6914)],
+                      ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.3),
                       boxShadow: [
-                        BoxShadow(color: marriageAccent.withValues(alpha: 0.28), blurRadius: 6, offset: const Offset(0, 2)),
+                        BoxShadow(color: marriageAccent.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
                       ],
                     ),
                     child: const SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: Icon(Icons.description_rounded, color: Colors.white, size: 16),
+                      width: 38,
+                      height: 38,
+                      child: Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 19),
                     ),
                   ),
                 ),
