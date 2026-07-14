@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_roster.dart';
 import 'ngmy_ai_client.dart';
@@ -651,8 +652,9 @@ List<Color> _ngmyAdvisorBadgeColors(String roleLabel) {
 }
 
 /// Compact worn badge on advisor cards / chat — tap for the full NGMY ID card.
-Widget _roleBadge(String label, {bool small = false, VoidCallback? onTap}) {
-  final colors = _ngmyAdvisorBadgeColors(label);
+Widget _roleBadgeForProfile(NgmyCommunicateProfile profile, {bool small = false, VoidCallback? onTap}) {
+  final copy = ngmyAdvisorBadgeCopy(name: profile.name, role: profile.role);
+  final colors = _ngmyAdvisorBadgeColors(profile.roleBadgeLabel);
   final chip = Container(
     padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: small ? 3 : 4),
     decoration: BoxDecoration(
@@ -676,13 +678,17 @@ Widget _roleBadge(String label, {bool small = false, VoidCallback? onTap}) {
       children: [
         Icon(Icons.verified_rounded, color: Colors.white, size: small ? 9 : 11),
         SizedBox(width: small ? 3 : 4),
-        Text(
-          'NGMY · $label',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: small ? 7.5 : 8.5,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.2,
+        Flexible(
+          child: Text(
+            'NGMY · ${copy.roleTitle}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: small ? 7.5 : 8.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
       ],
@@ -698,10 +704,8 @@ Widget _roleBadge(String label, {bool small = false, VoidCallback? onTap}) {
 
 Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfile profile) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final role = profile.roleBadgeLabel;
-  final colors = _ngmyAdvisorBadgeColors(role);
-  final bio = profile.bio.trim();
-  final vibe = profile.personality.trim();
+  final copy = ngmyAdvisorBadgeCopy(name: profile.name, role: profile.role);
+  final colors = _ngmyAdvisorBadgeColors(profile.roleBadgeLabel);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -773,10 +777,10 @@ Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfi
                             ),
                           ),
                           const SizedBox(height: 6),
-                          _roleBadge(role),
+                          _roleBadgeForProfile(profile),
                           const SizedBox(height: 8),
                           Text(
-                            '${profile.genderLabel} · ID ${profile.id.trim().isEmpty ? 'pending' : profile.id.trim()}',
+                            '${profile.genderLabel} · Verified $kNgmyAdvisorsHubTitle',
                             style: TextStyle(
                               color: isDark ? Colors.white70 : Colors.black54,
                               fontSize: 12,
@@ -793,35 +797,22 @@ Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfi
                   isDark: isDark,
                   icon: Icons.work_outline_rounded,
                   title: 'Role',
-                  body: role,
+                  body: copy.roleTitle,
                 ),
-                if (bio.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _advisorBadgeInfoRow(
-                    isDark: isDark,
-                    icon: Icons.info_outline_rounded,
-                    title: 'About',
-                    body: bio,
-                  ),
-                ],
-                if (vibe.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _advisorBadgeInfoRow(
-                    isDark: isDark,
-                    icon: Icons.auto_awesome_rounded,
-                    title: 'Style',
-                    body: vibe,
-                  ),
-                ],
-                if (bio.isEmpty && vibe.isEmpty) ...[
-                  const SizedBox(height: 8),
-                  _advisorBadgeInfoRow(
-                    isDark: isDark,
-                    icon: Icons.support_agent_rounded,
-                    title: 'About',
-                    body: 'Certified $role on $kNgmyAdvisorsHubTitle — ready to help you chat and get answers.',
-                  ),
-                ],
+                const SizedBox(height: 8),
+                _advisorBadgeInfoRow(
+                  isDark: isDark,
+                  icon: Icons.info_outline_rounded,
+                  title: 'About',
+                  body: copy.about,
+                ),
+                const SizedBox(height: 8),
+                _advisorBadgeInfoRow(
+                  isDark: isDark,
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'Style',
+                  body: copy.style,
+                ),
                 const SizedBox(height: 14),
                 Text(
                   'Issued by $kNgmyAdvisorsHubTitle',
@@ -1671,8 +1662,8 @@ class _Companion3DCard extends StatelessWidget {
                     style: TextStyle(color: subColor, fontSize: 11),
                   ),
                   const SizedBox(height: 6),
-                  _roleBadge(
-                    profile.roleBadgeLabel,
+                  _roleBadgeForProfile(
+                    profile,
                     small: true,
                     onTap: () => showNgmyAdvisorBadgeCard(context, profile),
                   ),
@@ -2446,35 +2437,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             child: ListView.builder(
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(16, topPad, 16, bottomPad),
-              itemCount: _messages.length + (_busy ? 1 : 0) + (_messages.isEmpty && _loaded ? 1 : 0),
+              itemCount: _messages.length + (_busy ? 1 : 0),
               itemBuilder: (context, i) {
-                if (_messages.isEmpty && _loaded && i == 0) {
-                  final emptyHint = _isDebater
-                      ? 'Debate here anytime — or paste what they said on iMessage/WhatsApp and get a reply to send back.'
-                      : _isTextCoach
-                          ? 'Paste a chat or screenshot — pick a mode from the dropdown.'
-                      : _isTranslator
-                      ? 'Tell ${widget.profile.name} what you want to practice in $_translatorLearningLang — simple words only.'
-                      : _isMshauri
-                          ? 'Say hi to ${widget.profile.name} — talk normal, like texting someone from the community.'
-                          : _allowsPhotoUpload
-                          ? 'Ask ${widget.profile.name} anything — tap 📷 to send homework photos for step-by-step help.'
-                          : ngmyCommunicateRoleIsRomantic(widget.profile.role)
-                              ? 'Say something sweet to ${widget.profile.name}… 💜'
-                              : 'Start a conversation with ${widget.profile.name}…';
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        emptyHint,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: mutedText, fontSize: 14, fontStyle: FontStyle.italic),
-                      ),
-                    ),
-                  );
-                }
-                final offset = (_messages.isEmpty && _loaded) ? 1 : 0;
-                if (_busy && i == _messages.length + offset) {
+                if (_busy && i == _messages.length) {
                   return Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -2486,7 +2451,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     ),
                   );
                 }
-                final m = _messages[i - offset];
+                final m = _messages[i];
                 final user = m['role'] == 'user';
                 return Align(
                   alignment: user ? Alignment.centerRight : Alignment.centerLeft,
@@ -2585,7 +2550,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                               const SizedBox(height: 3),
                               GestureDetector(
                                 onTap: () => showNgmyAdvisorBadgeCard(context, widget.profile),
-                                child: _roleBadge(widget.profile.roleBadgeLabel, small: true),
+                                child: _roleBadgeForProfile(widget.profile, small: true),
                               ),
                               const SizedBox(height: 2),
                               Text(

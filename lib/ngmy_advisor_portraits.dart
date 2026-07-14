@@ -107,6 +107,8 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('mariam') || hit('miriam') || hit('maryam') || hit('dusabe')) return 'person_miriam';
   // New romantic advisor — check before generic "suzana".
   if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
+  // Elder Wisdom Advisor — older woman portrait asset.
+  if (hit('amani') || (hit('mshauri') && n.contains('amani'))) return 'marriage_advisor_f';
   // Spelling variants used in the app / by the user.
   if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey') || hit('benet')) {
     return 'person_susie';

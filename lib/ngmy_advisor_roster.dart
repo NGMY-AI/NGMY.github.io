@@ -16,6 +16,10 @@ const _kYoungFemaleOrder = <String>[
 const _kMaleOrder = <String>[
   'ALEX REMY',
   'JEREMIAH NESTO',
+];
+
+/// Older women at the bottom — MSHAURI AMANI (Wisdom Advisor) is always last.
+const _kOlderFemaleOrder = <String>[
   'MSHAURI AMANI',
 ];
 
@@ -32,6 +36,7 @@ const _kOlderFemaleRoles = <String>{
   'mentor',
   'life_coach',
   'career_coach',
+  'mshauri',
 };
 
 bool _nameLooksLike(String name, String needle) {
@@ -58,7 +63,7 @@ String? _canonicalNameFor(Map<String, dynamic> m) {
   if (n.isEmpty) return null;
   final role = _roleOf(m);
 
-  for (final full in [..._kYoungFemaleOrder, ..._kMaleOrder]) {
+  for (final full in [..._kYoungFemaleOrder, ..._kMaleOrder, ..._kOlderFemaleOrder]) {
     if (n == full.toLowerCase()) return full;
   }
 
@@ -89,7 +94,9 @@ String? _canonicalNameFor(Map<String, dynamic> m) {
 
 String _forcedGenderFor(String canonicalName, String fallback) {
   if (_kMaleOrder.contains(canonicalName)) return 'male';
-  if (_kYoungFemaleOrder.contains(canonicalName)) return 'female';
+  if (_kYoungFemaleOrder.contains(canonicalName) || _kOlderFemaleOrder.contains(canonicalName)) {
+    return 'female';
+  }
   return fallback == 'male' ? 'male' : 'female';
 }
 
@@ -102,7 +109,10 @@ int _sortKey(Map<String, dynamic> m) {
   final mi = _kMaleOrder.indexOf(name);
   if (mi >= 0) return 100 + mi;
   if (gender == 'male') return 200;
-  if (_kOlderFemaleRoles.contains(role)) return 300;
+  // Other older women before the wisdom elder.
+  if (_kOlderFemaleRoles.contains(role) && name != 'MSHAURI AMANI') return 300;
+  final oi = _kOlderFemaleOrder.indexOf(name);
+  if (oi >= 0) return 400 + oi; // MSHAURI AMANI last
   if (gender != 'male') return 50;
   return 250;
 }
@@ -119,8 +129,8 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
     'avatarUrl': '',
     'active': true,
     'bio':
-        'NGMY Advisors — warm girlfriend energy. Open to talk about anything: dating, life, dreams, going out. '
-            'Not easy to win over — standards matter — but she stays open and real.',
+        'SUZANA VANESSA is a Personal Connection Advisor on NGMY Advisors — open to real conversation '
+            'about dating, life, and companionship, with professionalism and self-respect.',
     'personality':
         'You are SUZANA VANESSA, a beautiful young woman (about 21–22). Flirt carefully: warm, playful, '
             'hard to get at first — never desperate. People can ask you out or talk to you like a girlfriend; '
@@ -129,8 +139,24 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
   };
 }
 
+Map<String, dynamic> _mshauriAmaniWisdomPatch(Map<String, dynamic> existing) {
+  return {
+    ...existing,
+    'name': 'MSHAURI AMANI',
+    'gender': 'female',
+    'role': 'mshauri',
+    'emoji': '👵',
+    'bio':
+        'MSHAURI AMANI is the Wisdom Advisor of NGMY Advisors — an older woman of experience offering '
+            'community wisdom, patience, and time-tested guidance.',
+    'personality':
+        'You are MSHAURI AMANI, an older African woman and Wisdom Advisor. Speak with mature grace, '
+            'patience, and community wisdom. Give grounded life advice. Never flirt. Sound like a respected elder.',
+  };
+}
+
 /// Renames known advisors, forces FIRST LAST in CAPS, adds SUZANA VANESSA,
-/// orders: Mariam → young women → guys → older women.
+/// orders: Mariam → young women → guys → older women (Wisdom Advisor last).
 /// Returns true when [config.communicateProfiles] was mutated.
 bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
   final raw = (config as dynamic).communicateProfiles;
@@ -157,7 +183,6 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       changed = true;
       row['name'] = upper;
       row['gender'] = gender;
-      // Drop old face when Malcolm/Kenny become women so female portraits apply.
       if (gender != oldGender) {
         row['avatarUrl'] = '';
         row['avatar_url'] = '';
@@ -168,6 +193,24 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
     } else if ((row['name'] ?? '').toString() != upper) {
       changed = true;
       row['name'] = upper;
+    }
+
+    // Last advisor: older woman Wisdom Advisor (never male).
+    if (upper == 'MSHAURI AMANI') {
+      final patched = _mshauriAmaniWisdomPatch(row);
+      if (patched['gender'] != row['gender'] ||
+          patched['role'] != row['role'] ||
+          patched['bio'] != row['bio'] ||
+          patched['personality'] != row['personality'] ||
+          patched['emoji'] != row['emoji']) {
+        changed = true;
+        if (row['gender'] == 'male') {
+          patched['avatarUrl'] = '';
+          patched['avatar_url'] = '';
+        }
+        next.add(patched);
+        continue;
+      }
     }
     next.add(row);
   }
@@ -202,17 +245,22 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       final v = next[i];
       var role = roleLike;
       if (role == 'companion') role = 'romantic';
+      final template = _suzanaVanessaMap(roleLikeMariam: role);
       final name = (v['name'] ?? '').toString();
       final gender = _genderOf(v);
       final curRole = _roleOf(v);
-      if (name != 'SUZANA VANESSA' || gender != 'female' || curRole != role) {
-        final template = _suzanaVanessaMap(roleLikeMariam: role);
+      final bio = (v['bio'] ?? '').toString();
+      // Refresh Vanessa public bio if it still has the old casual wording.
+      final bioNeedsPolish = bio.trim().isEmpty ||
+          bio.contains('warm girlfriend energy') ||
+          bio.contains('Not easy to win over');
+      if (name != 'SUZANA VANESSA' || gender != 'female' || curRole != role || bioNeedsPolish) {
         next[i] = {
           ...v,
           'name': 'SUZANA VANESSA',
           'gender': 'female',
           'role': role,
-          'bio': (v['bio'] ?? '').toString().trim().isEmpty ? template['bio'] : v['bio'],
+          'bio': bioNeedsPolish ? template['bio'] : v['bio'],
           'personality':
               (v['personality'] ?? '').toString().trim().isEmpty ? template['personality'] : v['personality'],
         };
@@ -234,7 +282,8 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
     } else {
       for (var i = 0; i < next.length; i++) {
         if ((next[i]['id'] ?? '') != (profiles[i]['id'] ?? '') ||
-            (next[i]['name'] ?? '') != (profiles[i]['name'] ?? '')) {
+            (next[i]['name'] ?? '') != (profiles[i]['name'] ?? '') ||
+            (next[i]['gender'] ?? '') != (profiles[i]['gender'] ?? '')) {
           changed = true;
           break;
         }
