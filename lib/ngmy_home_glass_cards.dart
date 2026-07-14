@@ -2361,10 +2361,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                                           : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                   isFront: isFront,
                   showDateTab: revealDates,
-                  // Civic Registry ID: middle date tab only (no welcome / today / X), but + still opens add/remove sheet.
+                  // Civic Registry ID: middle date tab only — no welcome / today / X / +.
                   welcomeName: isFront && !isCivic ? name : null,
                   onDelete: isFront && !isCivic ? () => _deleteSpending(entry.id) : null,
-                  onAdd: isFront ? _openAddSheet : null,
+                  onAdd: isFront && !isCivic ? _openAddSheet : null,
                   footer: isFront && !entry.hideModePill ? _modePill() : null,
                   fillBleed: entry.hasImage ||
                       entry.showsCreditFace ||

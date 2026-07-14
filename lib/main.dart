@@ -30392,15 +30392,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       return;
     }
-    final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
+    // Stable per-state name so re-downloads can Replace the previous backup
+    // instead of piling up timestamped copies.
     final stateSlug = state.replaceAll(RegExp(r'\s+'), '_');
-    final filename = 'ngmy-civic-registry-$stateSlug-$stamp.json';
-    final msg = await downloadNgmyAdvisorSyncJson(jsonEncode(envelope), filename);
+    final filename = 'ngmy-civic-registry-$stateSlug.json';
+    final msg = await downloadNgmyAdvisorSyncJson(jsonEncode(envelope), filename, allowReplace: true);
     if (!mounted) return;
+    final cancelled = msg.toLowerCase().contains('cancelled');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Downloaded $count $_selectedState member(s).'),
-        backgroundColor: Colors.green,
+        content: Text(
+          cancelled
+              ? msg
+              : 'Backup ready ($count $_selectedState member(s)). $msg',
+        ),
+        backgroundColor: cancelled ? Colors.blueGrey : Colors.green,
       ),
     );
   }
