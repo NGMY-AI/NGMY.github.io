@@ -785,19 +785,34 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   }
 
   void _openFullscreen() {
-    final bytes = _bytes;
-    if (bytes == null || bytes.isEmpty) return;
-    unawaited(showNgmyAdvisorPortraitFullscreen(
-      context,
-      bytes: bytes,
-      name: widget.profile.name,
-    ));
+    unawaited(() async {
+      // Always prefer the full bundled portrait bytes (uncropped whole photo).
+      Uint8List bytes;
+      try {
+        bytes = await ngmyAdvisorPortraitBytesAsync(
+          id: widget.profile.id,
+          gender: widget.profile.gender,
+          role: widget.profile.role,
+          name: widget.profile.name,
+        );
+      } catch (_) {
+        bytes = _bytes ?? Uint8List(0);
+      }
+      if (bytes.isEmpty) bytes = _bytes ?? Uint8List(0);
+      if (bytes.isEmpty || !mounted) return;
+      await showNgmyAdvisorPortraitFullscreen(
+        context,
+        bytes: bytes,
+        name: widget.profile.name,
+      );
+    }());
   }
 
   @override
   Widget build(BuildContext context) {
     Widget inner;
     if (_bytes != null && _bytes!.isNotEmpty) {
+      // Circle crops for the list/chat header only — fullscreen uses full photo.
       inner = ClipOval(
         child: Image.memory(
           _bytes!,
@@ -830,7 +845,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         child: inner,
       ),
     );
-    if (!widget.openFullscreenOnTap || _bytes == null || _bytes!.isEmpty) return face;
+    if (!widget.openFullscreenOnTap) return face;
     return GestureDetector(
       onTap: _openFullscreen,
       behavior: HitTestBehavior.opaque,
@@ -848,22 +863,32 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Close photo',
-    barrierColor: Colors.black.withValues(alpha: 0.92),
+    barrierColor: Colors.black.withValues(alpha: 0.94),
     transitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (ctx, anim, secondary) {
+      final size = MediaQuery.sizeOf(ctx);
       return SafeArea(
         child: Material(
           color: Colors.transparent,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              Center(
+              // Full uncropped photo (letterboxed). Circle crop is only for small avatars.
+              Positioned.fill(
                 child: InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 4,
-                  child: Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
+                  minScale: 0.5,
+                  maxScale: 6,
+                  child: Center(
+                    child: Image.memory(
+                      bytes,
+                      width: size.width,
+                      height: size.height,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
+                      isAntiAlias: true,
+                    ),
                   ),
                 ),
               ),
@@ -876,7 +901,12 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
                     Expanded(
                       child: Text(
                         name.trim().isEmpty ? 'Photo' : name.trim(),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -895,10 +925,7 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
     transitionBuilder: (ctx, anim, secondary, child) {
       return FadeTransition(
         opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-          child: child,
-        ),
+        child: child,
       );
     },
   );
@@ -1362,6 +1389,7 @@ class _Companion3DCard extends StatelessWidget {
                           profile: profile,
                           size: 72,
                           glow: true,
+                          openFullscreenOnTap: true,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1777,13 +1805,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final bytes = base64Decode(b64);
       if (bytes.isEmpty) throw StateError('empty');
-      return Image.memory(
-        bytes,
-        width: 200,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
+      return GestureDetector(
+        onTap: () {
+          unawaited(showNgmyAdvisorPortraitFullscreen(
+            context,
+            bytes: bytes,
+            name: widget.profile.name,
+          ));
+        },
+        child: Image.memory(
+          bytes,
+          width: 220,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
+        ),
       );
     } catch (_) {
       return const Icon(Icons.broken_image_outlined, color: Colors.white54);
