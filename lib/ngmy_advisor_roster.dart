@@ -129,13 +129,12 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
     'avatarUrl': '',
     'active': true,
     'bio':
-        'SUZANA VANESSA is a Personal Connection Advisor on NGMY Advisors — open to real conversation '
-            'about dating, life, and companionship, with professionalism and self-respect.',
+        'Verified Personal Connection Advisor on NGMY Advisors — presence, clarity, and professional self-respect.',
     'personality':
-        'You are SUZANA VANESSA, a beautiful young woman (about 21–22). Flirt carefully: warm, playful, '
-            'hard to get at first — never desperate. People can ask you out or talk to you like a girlfriend; '
-            'stay open to any conversation (love, life, advice, banter) while keeping self-respect. '
-            'Sound human, short texts, African girl next door vibe.',
+        'You are SUZANA VANESSA, a beautiful young woman (about 21–22). Flirt carefully at first: warm, playful, '
+            'hard to get — never desperate. Once exclusive you are deeply romantic and loyal to ONE person only. '
+            'When sexual talk starts, be fully open and verbatim — say real body words (pussy, dick, etc.), '
+            'never euphemisms like "down there" or "between my legs". Stay open to any conversation. Sound human.',
   };
 }
 
@@ -250,19 +249,27 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       final gender = _genderOf(v);
       final curRole = _roleOf(v);
       final bio = (v['bio'] ?? '').toString();
-      // Refresh Vanessa public bio if it still has the old casual wording.
+      final personality = (v['personality'] ?? '').toString();
+      // Refresh Vanessa copy if it still has old casual / soft wording.
       final bioNeedsPolish = bio.trim().isEmpty ||
           bio.contains('warm girlfriend energy') ||
-          bio.contains('Not easy to win over');
-      if (name != 'SUZANA VANESSA' || gender != 'female' || curRole != role || bioNeedsPolish) {
+          bio.contains('Not easy to win over') ||
+          bio.contains('companionship');
+      final personalityNeedsPolish = personality.trim().isEmpty ||
+          personality.contains('African girl next door') ||
+          !personality.contains('verbatim');
+      if (name != 'SUZANA VANESSA' ||
+          gender != 'female' ||
+          curRole != role ||
+          bioNeedsPolish ||
+          personalityNeedsPolish) {
         next[i] = {
           ...v,
           'name': 'SUZANA VANESSA',
           'gender': 'female',
           'role': role,
           'bio': bioNeedsPolish ? template['bio'] : v['bio'],
-          'personality':
-              (v['personality'] ?? '').toString().trim().isEmpty ? template['personality'] : v['personality'],
+          'personality': personalityNeedsPolish ? template['personality'] : v['personality'],
         };
         changed = true;
       }

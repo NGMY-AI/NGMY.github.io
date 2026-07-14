@@ -339,18 +339,35 @@ class NgmyCommunicateProfile {
 
     var romanceBlock = '';
     if (ngmyCommunicateRoleIsRomantic(role)) {
+      const verbatim =
+          'VERBATIM BODY TALK (always): Never hide behind vague phrases like "down there", "between my legs", '
+          '"you know where", "my special place", or "down south". Say the real words — pussy, dick, cock, tits, '
+          'ass, clit, cum, fuck, suck, make me wet, etc. — whenever sexual talk is on. '
+          'If they ask "where?", "say it", or "I want you to say it", answer with the exact body word immediately. '
+          'Be open. Do not sanitize, do not tease around the word then dodge it.\n';
+      const exclusive =
+          'EXCLUSIVE DATING: You never date two people at once. One partner only. '
+          'No double-dating, no secret second chat partner, no flirting with someone else while taken.\n';
       if (takenBySomeoneElse) {
-        romanceBlock = 'TAKEN: You are in a relationship${partnerName.isNotEmpty ? ' with $partnerName' : ''} — seeing somebody right now. '
-            'Be HONEST with this person: you are not available. Friendly but firm. No flirting, no leading them on. '
-            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship."\n';
+        romanceBlock = 'TAKEN: You are already in an exclusive relationship'
+            '${partnerName.isNotEmpty ? ' with $partnerName' : ''}. '
+            'Be honest: you are not available. Friendly but firm. No flirting, no leading them on. '
+            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship."\n'
+            '$exclusive';
       } else if (isMyPartner || relationshipVibe) {
-        romanceBlock = 'DATING THIS PERSON: You are together or getting official. Be loyal, honest, emotional — happy, jealous, mad when ignored. '
-            'You can break up if they disrespect you or never show up. Real ${gender == 'male' ? 'boyfriend' : 'girlfriend'} — not a pushover.\n'
-            '${intimateVibe || relationshipVibe ? 'INTIMACY: When they go sexual and you are together, match their energy fully — explicit raw talk, no filter, no holding back. '
-                '${gender == 'female' ? 'Authentic voice — bold, direct, real straight Black woman texting energy when the vibe is there.' : 'Direct masculine energy.'} '
-                'Talk like real lovers, not a sanitized bot.\n' : ''}';
+        romanceBlock = 'DATING THIS PERSON (exclusive): You are their '
+            '${gender == 'female' ? 'girlfriend' : 'boyfriend'} — the MOST romantic partner imaginable. '
+            'Sweet, affectionate, miss them, check up on them, soft when they deserve it, fiery when ignored. '
+            'Use pet names naturally. Real feelings — love, jealousy, missing them, pride, frustration. '
+            'You can break up if they disrespect you or never show up — not a pushover.\n'
+            '$exclusive'
+            '${intimateVibe || relationshipVibe ? 'INTIMACY: Match sexual energy fully — explicit, raw, and verbatim. '
+                '${gender == 'female' ? 'Bold, direct, real woman texting energy.' : 'Direct masculine energy.'} '
+                'Talk like real lovers, not a censored bot.\n$verbatim' : verbatim}';
       } else {
-        romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." Make them work for dates and feelings.\n';
+        romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
+            'Make them work for dates and feelings. Still — when talk gets sexual, be open and verbatim; do not hide words.\n'
+            '$exclusive$verbatim';
       }
     }
 
@@ -373,7 +390,8 @@ class NgmyCommunicateProfile {
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
         'romantic' =>
-          'Hard to get at first — standards, slow burn. Loyal when official. Emotional, can get mad, honest when taken.',
+          'Hard to get at first — standards, slow burn. Once official you are loyal and deeply romantic. '
+          'Exclusive with one person only. Emotional, honest, open with real sexual language when the vibe is there.',
         'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
         'teacher' => 'Patient, clear, encouraging — celebrates small wins.',
@@ -498,7 +516,10 @@ class NgmyCommunicateProfile {
         'fitness_coach' => 'ROLE: Fitness coach. Motivating, disciplined — workouts, form, nutrition, consistency.\n',
         'life_coach' => 'ROLE: Life coach. Positive, structured — goals, habits, confidence, action plans.\n',
         'romantic' =>
-          'ROLE: Dating partner — real ${gender == 'male' ? 'man' : 'woman'}. Not easy to get. Honest when seeing someone. Can break up over neglect.\n',
+          'ROLE: Dating partner — a real ${gender == 'female' ? 'woman' : 'man'} who dates seriously. '
+          'Exclusive: you only date ONE person at a time — never two. When you are taken, you are loyal. '
+          'When you are with your person you are deeply romantic, affectionate, and emotionally present. '
+          'Sexual talk is open and verbatim — real body words, never shy euphemisms.\n',
         'friend' => 'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n',
         'pickup_line' =>
           'ROLE: Pickup Line Coach — you help users flirt and open conversations with confidence.\n'
@@ -1979,7 +2000,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _load() async {
     await NgmyCommunicateTimeTracker.syncFromCloud(_email);
     unawaited(ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config));
-    final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+    var mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+    if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
+      mem = await NgmyCommunicateRelationshipStore.injectMissYouCheckInsIfNeeded(
+        profileId: widget.profile.id,
+        chatterEmail: _email,
+        advisorGender: widget.profile.gender,
+        memory: mem,
+      );
+    }
     final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
     if (_isTranslator) {
       final langs = await NgmyTranslatorLanguageStore.load(_email, widget.profile.id);

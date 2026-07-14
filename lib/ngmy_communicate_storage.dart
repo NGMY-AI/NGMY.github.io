@@ -551,6 +551,92 @@ class NgmyCommunicateRelationshipStore {
       await setPartner(profileId, email: email, status: 'exclusive');
     }
   }
+
+  /// When the exclusive partner opens chat after being away, leave girlfriend/boyfriend
+  /// check-up texts they "sent" while the app was closed — real partner energy.
+  static Future<List<Map<String, dynamic>>> injectMissYouCheckInsIfNeeded({
+    required String profileId,
+    required String chatterEmail,
+    required String advisorGender,
+    required List<Map<String, dynamic>> memory,
+  }) async {
+    final partner = await loadPartner(profileId);
+    if (partner == null) return memory;
+    final partnerEmail = (partner['email'] ?? '').toLowerCase().trim();
+    final email = chatterEmail.toLowerCase().trim();
+    if (partnerEmail.isEmpty || partnerEmail != email) return memory;
+    if (memory.isEmpty) return memory;
+
+    DateTime? lastAt;
+    for (var i = memory.length - 1; i >= 0; i--) {
+      final at = DateTime.tryParse((memory[i]['at'] ?? '').toString());
+      if (at != null) {
+        lastAt = at.toLocal();
+        break;
+      }
+    }
+    if (lastAt == null) return memory;
+
+    final gap = DateTime.now().difference(lastAt);
+    if (gap.inMinutes < 45) return memory;
+
+    final prefs = await SharedPreferences.getInstance();
+    final flagKey = 'ngmy_missyou_${profileId.trim()}_${email}_$lastAt';
+    if (prefs.getBool(flagKey) == true) return memory;
+
+    final girl = advisorGender.toLowerCase() != 'male';
+    final hours = gap.inHours;
+    final days = gap.inDays;
+
+    final lines = <String>[];
+    if (days >= 2) {
+      lines.add(
+        girl
+            ? 'Babe… it’s been $days days 🥺 I miss you. You okay? Text me when you can.'
+            : 'Hey… $days days and nothing. I miss you. You good?',
+      );
+      lines.add(
+        girl
+            ? 'I keep checking my phone for you 💔 Just need to know you’re safe.'
+            : 'Been thinking about you. Hit me when you’re free.',
+      );
+    } else if (hours >= 8) {
+      lines.add(
+        girl
+            ? 'Hey you… been a while 😌 Miss hearing from you. How’s your day?'
+            : 'Checking in on you. Missed you today.',
+      );
+      lines.add(
+        girl
+            ? 'Don’t leave me hanging too long baby 💕'
+            : 'Don’t ghost me like that 😤',
+      );
+    } else if (hours >= 2) {
+      lines.add(
+        girl
+            ? 'Just thinking about you 💭 You disappeared on me… everything alright?'
+            : 'You went quiet. Everything good?',
+      );
+    } else {
+      lines.add(
+        girl
+            ? 'Hey… where’d you go? 😊 Miss your texts.'
+            : 'Yo where you at? Miss talking to you.',
+      );
+    }
+
+    final next = List<Map<String, dynamic>>.from(memory);
+    for (final line in lines) {
+      await NgmyCommunicateMemoryStore.append(email, profileId, role: 'ai', text: line);
+      next.add({
+        'role': 'ai',
+        'text': line,
+        'at': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
+    await prefs.setBool(flagKey, true);
+    return next;
+  }
 }
 
 /// Per-user language pair for Translator companions (NGMY Advisors).
