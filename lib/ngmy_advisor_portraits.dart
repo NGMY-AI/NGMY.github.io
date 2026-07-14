@@ -1,20 +1,27 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 
-/// Illustrated fallback portraits for NGMY Advisors — used whenever an
-/// advisor has no uploaded photo (or it fails to load) instead of a plain
-/// emoji. Drawn entirely in code (no network, no bundled photo assets), so
-/// they work fully offline and carry no real-person likeness. Styled as
-/// warm, modern flat-illustration portraits of Black/African men and women
-/// with a range of natural hairstyles.
+/// Photoreal African advisor portraits bundled under [assets/images/advisors/].
+/// When a role+gender photo is missing, we fall back to a local illustrated
+/// portrait (same offline behavior as before — never a blank emoji if we can help).
+
 const int _kPortraitSize = 220;
 
 enum _HairStyle { afro, braids, locs, bantuKnots, headwrap, fadeShort, twists, bald }
 
 class _PortraitSpec {
-  const _PortraitSpec({required this.skin, required this.hair, required this.style, required this.bg, this.beard = false, this.earrings = false, this.wrapColors});
+  const _PortraitSpec({
+    required this.skin,
+    required this.hair,
+    required this.style,
+    required this.bg,
+    this.beard = false,
+    this.earrings = false,
+    this.wrapColors,
+  });
   final int skin;
   final int hair;
   final _HairStyle style;
@@ -24,7 +31,6 @@ class _PortraitSpec {
   final List<int>? wrapColors;
 }
 
-// ── Female variants ──────────────────────────────────────────────────────────
 const List<_PortraitSpec> _femaleSpecs = [
   _PortraitSpec(skin: 0xFFB07A56, hair: 0xFF1B1210, style: _HairStyle.afro, bg: [0xFF0F766E, 0xFF134E4A], earrings: true),
   _PortraitSpec(skin: 0xFF8A5A3B, hair: 0xFF150F0C, style: _HairStyle.braids, bg: [0xFFBE185D, 0xFF831843], earrings: true),
@@ -34,7 +40,6 @@ const List<_PortraitSpec> _femaleSpecs = [
   _PortraitSpec(skin: 0xFF4A2E1C, hair: 0xFF0C0806, style: _HairStyle.locs, bg: [0xFF2563EB, 0xFF1D4ED8], earrings: true),
 ];
 
-// ── Male variants ────────────────────────────────────────────────────────────
 const List<_PortraitSpec> _maleSpecs = [
   _PortraitSpec(skin: 0xFF9C6B47, hair: 0xFF150F0C, style: _HairStyle.fadeShort, bg: [0xFF1E3A8A, 0xFF1E40AF]),
   _PortraitSpec(skin: 0xFFB07A56, hair: 0xFF1B1210, style: _HairStyle.afro, bg: [0xFF166534, 0xFF14532D]),
@@ -45,26 +50,112 @@ const List<_PortraitSpec> _maleSpecs = [
 ];
 
 final _portraitCache = <String, Uint8List>{};
+final _assetCache = <String, Uint8List>{};
+var _assetsWarmed = false;
 
-/// Deterministically picks and renders a portrait for the given advisor
-/// id/gender — the same advisor always gets the same portrait.
-Uint8List ngmyAdvisorPortraitBytes({required String id, required String gender}) {
+/// Map roles that share a photo when a dedicated shot isn’t bundled yet.
+const _kRolePhotoAlias = <String, String>{
+  'counselor': 'therapist',
+  'life_coach': 'therapist',
+  'mentor': 'career_coach',
+  'debater': 'bible_study_teacher',
+  'translator': 'teacher',
+  'friend': 'companion',
+  'romantic': 'companion',
+  'pickup_line': 'companion',
+  'smart_mouth': 'companion',
+  'text_coach': 'companion',
+  'pastor': 'pastor', // male asset; female falls to companion_f / illustrated
+};
+
+/// Asset path for a photoreal advisor portrait (may not exist — callers must fall back).
+String ngmyAdvisorPortraitAssetPath({
+  required String gender,
+  required String role,
+}) {
+  final g = gender.trim().toLowerCase() == 'male' ? 'm' : 'f';
+  var r = role.trim().toLowerCase();
+  if (r.isEmpty) r = 'companion';
+  r = _kRolePhotoAlias[r] ?? r;
+  // Roles with only one gender asset: map the opposite gender sanely.
+  if (r == 'pastor' && g == 'f') r = 'bible_study_teacher';
+  if (r == 'mshauri' && g == 'f') r = 'marriage_advisor';
+  if (r == 'fitness_coach' && g == 'f') r = 'companion';
+  if (r == 'career_coach' && g == 'f') r = 'financial_advisor';
+  if (r == 'therapist' && g == 'm') r = 'career_coach';
+  return 'assets/images/advisors/${r}_$g.jpg';
+}
+
+Future<void> ngmyWarmAdvisorPortraitAssets() async {
+  if (_assetsWarmed) return;
+  _assetsWarmed = true;
+  const keys = <String>[
+    'lawyer_m', 'lawyer_f', 'teacher_m', 'teacher_f',
+    'financial_advisor_m', 'financial_advisor_f', 'pastor_m',
+    'bible_study_teacher_m', 'bible_study_teacher_f',
+    'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
+    'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
+  ];
+  await Future.wait(keys.map((k) async {
+    final path = 'assets/images/advisors/$k.jpg';
+    try {
+      final data = await rootBundle.load(path);
+      _assetCache[path] = data.buffer.asUint8List();
+    } catch (_) {}
+  }));
+}
+
+/// Prefer photoreal asset bytes for [role]+[gender]; otherwise illustrated PNG.
+Uint8List ngmyAdvisorPortraitBytes({
+  required String id,
+  required String gender,
+  String role = '',
+}) {
+  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role);
+  final fromAsset = _assetCache[path];
+  if (fromAsset != null && fromAsset.isNotEmpty) return fromAsset;
+
   final isMale = gender.trim().toLowerCase() == 'male';
   final specs = isMale ? _maleSpecs : _femaleSpecs;
   final hash = id.trim().isEmpty ? 0 : id.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
-  final spec = specs[hash % specs.length];
-  final key = '${isMale ? 'm' : 'f'}${hash % specs.length}';
+  final roleHash = role.codeUnits.fold<int>(0, (a, c) => (a * 17 + c) & 0x7fffffff);
+  final idx = (hash + roleHash) % specs.length;
+  final key = 'ill_${isMale ? 'm' : 'f'}_$idx';
   final cached = _portraitCache[key];
   if (cached != null) return cached;
-  final bytes = Uint8List.fromList(img.encodePng(_renderPortrait(spec)));
+  final bytes = Uint8List.fromList(img.encodePng(_renderPortrait(specs[idx])));
   _portraitCache[key] = bytes;
   return bytes;
 }
 
-String ngmyAdvisorPortraitDataUrl({required String id, required String gender}) =>
-    'data:image/png;base64,${base64Encode(ngmyAdvisorPortraitBytes(id: id, gender: gender))}';
+Future<Uint8List> ngmyAdvisorPortraitBytesAsync({
+  required String id,
+  required String gender,
+  String role = '',
+}) async {
+  await ngmyWarmAdvisorPortraitAssets();
+  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role);
+  if (!_assetCache.containsKey(path)) {
+    try {
+      final data = await rootBundle.load(path);
+      _assetCache[path] = data.buffer.asUint8List();
+    } catch (_) {}
+  }
+  return ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role);
+}
 
-img.Color _c(int argb, [int a = 255]) => img.ColorRgba8((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, a);
+String ngmyAdvisorPortraitDataUrl({
+  required String id,
+  required String gender,
+  String role = '',
+}) {
+  final bytes = ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role);
+  final mime = bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 ? 'image/jpeg' : 'image/png';
+  return 'data:$mime;base64,${base64Encode(bytes)}';
+}
+
+img.Color _c(int argb, [int a = 255]) =>
+    img.ColorRgba8((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, a);
 
 void _vGradient(img.Image im, int top, int bottom) {
   for (var y = 0; y < im.height; y++) {
@@ -72,137 +163,115 @@ void _vGradient(img.Image im, int top, int bottom) {
     final r = ((top >> 16) & 0xFF) * (1 - t) + ((bottom >> 16) & 0xFF) * t;
     final g = ((top >> 8) & 0xFF) * (1 - t) + ((bottom >> 8) & 0xFF) * t;
     final b = (top & 0xFF) * (1 - t) + (bottom & 0xFF) * t;
-    img.drawLine(im, x1: 0, y1: y, x2: im.width - 1, y2: y, color: img.ColorRgb8(r.round().clamp(0, 255), g.round().clamp(0, 255), b.round().clamp(0, 255)));
+    img.drawLine(
+      im,
+      x1: 0,
+      y1: y,
+      x2: im.width - 1,
+      y2: y,
+      color: img.ColorRgb8(r.round().clamp(0, 255), g.round().clamp(0, 255), b.round().clamp(0, 255)),
+    );
   }
 }
 
 void _fillDiamond(img.Image im, num cx, num cy, num r, img.Color color) {
-  img.fillPolygon(im, vertices: [img.Point(cx, cy - r), img.Point(cx + r, cy), img.Point(cx, cy + r), img.Point(cx - r, cy)], color: color);
-}
-
-img.Image _renderPortrait(_PortraitSpec spec) {
-  final s = _kPortraitSize;
-  final im = img.Image(width: s, height: s);
-  _vGradient(im, spec.bg.first, spec.bg.last);
-
-  final cx = s / 2;
-  final headCy = s * 0.56;
-  final headR = s * 0.27;
-  final skin = _c(spec.skin);
-  final hair = _c(spec.hair);
-
-  // Shoulders / body base.
   img.fillPolygon(
     im,
-    vertices: [
-      img.Point(cx - s * 0.42, s.toDouble()),
-      img.Point(cx - s * 0.30, s * 0.86),
-      img.Point(cx, s * 0.80),
-      img.Point(cx + s * 0.30, s * 0.86),
-      img.Point(cx + s * 0.42, s.toDouble()),
-    ],
-    color: _c(spec.hair == spec.skin ? 0xFF1F2937 : 0xFF1F2937, 255),
+    vertices: [img.Point(cx, cy - r), img.Point(cx + r, cy), img.Point(cx, cy + r), img.Point(cx - r, cy)],
+    color: color,
   );
+}
 
-  // Hair drawn BEHIND the head first for voluminous styles.
-  if (spec.style == _HairStyle.afro) {
-    img.drawCircle(im, x: cx.round(), y: headCy.round(), radius: (headR * 1.42).round(), color: hair, antialias: true);
-  }
-
-  // Head.
-  img.drawCircle(im, x: cx.round(), y: headCy.round(), radius: headR.round(), color: skin, antialias: true);
-
-  // Ears.
-  for (final side in [-1, 1]) {
-    img.drawCircle(im, x: (cx + side * headR * 0.94).round(), y: headCy.round(), radius: (headR * 0.14).round(), color: skin, antialias: true);
-    if (spec.earrings) {
-      img.drawCircle(im, x: (cx + side * headR * 0.94).round(), y: (headCy + headR * 0.16).round(), radius: (headR * 0.06).round(), color: _c(0xFFD4AF37), antialias: true);
-    }
-  }
-
-  // Hairstyles drawn on top of / around the head outline.
+void _drawHair(img.Image im, _PortraitSpec spec, double cx, double cy, double headR) {
+  final hair = _c(spec.hair);
   switch (spec.style) {
     case _HairStyle.afro:
-      break; // already drawn behind
-    case _HairStyle.fadeShort:
-      img.drawCircle(im, x: cx.round(), y: (headCy - headR * 0.30).round(), radius: (headR * 1.02).round(), color: hair, antialias: true);
-      img.drawCircle(im, x: cx.round(), y: (headCy + headR * 0.08).round(), radius: (headR * 0.98).round(), color: skin, antialias: true);
-      img.drawCircle(im, x: cx.round(), y: (headCy - headR * 0.42).round(), radius: (headR * 0.86).round(), color: hair, antialias: true);
-      break;
-    case _HairStyle.bald:
-      img.drawCircle(im, x: (cx - headR * 0.35).round(), y: (headCy - headR * 0.5).round(), radius: (headR * 0.28).round(), color: _c(0xFFFFFFFF, 40), antialias: true);
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.15).round(), radius: (headR * 1.25).round(), color: hair);
       break;
     case _HairStyle.braids:
-    case _HairStyle.locs:
-    case _HairStyle.twists:
-      final count = spec.style == _HairStyle.braids ? 7 : (spec.style == _HairStyle.twists ? 5 : 6);
-      final strandW = headR * (spec.style == _HairStyle.locs ? 0.16 : 0.12);
-      final length = s * (spec.style == _HairStyle.locs ? 0.5 : 0.4);
-      for (var i = 0; i < count; i++) {
-        final t = count == 1 ? 0.5 : i / (count - 1);
-        final x = cx - headR * 1.05 + t * headR * 2.1;
-        img.fillRect(im, x1: (x - strandW / 2).round(), y1: (headCy - headR * 0.5).round(), x2: (x + strandW / 2).round(), y2: (headCy - headR * 0.5 + length).round(), color: hair, radius: strandW / 2);
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.35).round(), radius: (headR * 0.95).round(), color: hair);
+      for (var i = -3; i <= 3; i++) {
+        img.fillCircle(im, x: (cx + i * headR * 0.22).round(), y: (cy + headR * 0.55).round(), radius: (headR * 0.12).round(), color: hair);
       }
-      img.drawCircle(im, x: cx.round(), y: (headCy - headR * 0.55).round(), radius: (headR * 0.92).round(), color: hair, antialias: true);
-      img.drawCircle(im, x: cx.round(), y: headCy.round(), radius: headR.round(), color: skin, antialias: true);
-      for (var i = 0; i < count; i++) {
-        final t = count == 1 ? 0.5 : i / (count - 1);
-        final x = cx - headR * 1.05 + t * headR * 2.1;
-        img.fillRect(im, x1: (x - strandW / 2).round(), y1: (headCy - headR * 0.5).round(), x2: (x + strandW / 2).round(), y2: (headCy - headR * 0.5 + length).round(), color: hair, radius: strandW / 2);
+      break;
+    case _HairStyle.locs:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.25).round(), radius: (headR * 1.05).round(), color: hair);
+      for (var i = -2; i <= 2; i++) {
+        img.fillRect(
+          im,
+          x1: (cx + i * headR * 0.28 - headR * 0.08).round(),
+          y1: (cy + headR * 0.2).round(),
+          x2: (cx + i * headR * 0.28 + headR * 0.08).round(),
+          y2: (cy + headR * 1.15).round(),
+          color: hair,
+        );
       }
       break;
     case _HairStyle.bantuKnots:
-      img.drawCircle(im, x: cx.round(), y: (headCy - headR * 0.55).round(), radius: (headR * 0.9).round(), color: hair, antialias: true);
-      img.drawCircle(im, x: cx.round(), y: headCy.round(), radius: headR.round(), color: skin, antialias: true);
-      for (final dx in [-0.42, 0.0, 0.42]) {
-        _fillDiamond(im, cx + headR * dx, headCy - headR * 1.15, headR * 0.24, hair);
-        img.drawCircle(im, x: (cx + headR * dx).round(), y: (headCy - headR * 1.15).round(), radius: (headR * 0.22).round(), color: hair, antialias: true);
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.2).round(), radius: (headR * 0.95).round(), color: hair);
+      for (final o in [[-0.45, -0.7], [0.0, -0.9], [0.45, -0.7], [-0.55, -0.15], [0.55, -0.15]]) {
+        img.fillCircle(im, x: (cx + o[0] * headR).round(), y: (cy + o[1] * headR).round(), radius: (headR * 0.18).round(), color: hair);
       }
       break;
     case _HairStyle.headwrap:
-      final colors = spec.wrapColors ?? [spec.hair];
-      for (var i = 0; i < 3; i++) {
-        img.drawCircle(im, x: cx.round(), y: (headCy - headR * (0.95 - i * 0.28)).round(), radius: (headR * (1.05 - i * 0.06)).round(), color: _c(colors[i % colors.length]), antialias: true);
+      final wraps = spec.wrapColors ?? [0xFFD4AF37, 0xFFCE1021];
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.35).round(), radius: (headR * 1.1).round(), color: _c(wraps[0]));
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.55).round(), radius: (headR * 0.55).round(), color: _c(wraps[1 % wraps.length]));
+      break;
+    case _HairStyle.fadeShort:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.45).round(), radius: (headR * 0.85).round(), color: hair);
+      break;
+    case _HairStyle.twists:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.25).round(), radius: (headR * 1.0).round(), color: hair);
+      for (var i = -3; i <= 3; i++) {
+        img.fillCircle(im, x: (cx + i * headR * 0.2).round(), y: (cy - headR * 0.85).round(), radius: (headR * 0.14).round(), color: hair);
       }
-      img.drawCircle(im, x: cx.round(), y: (headCy + headR * 0.05).round(), radius: (headR * 0.98).round(), color: skin, antialias: true);
-      // Fold accent knot on the side.
-      _fillDiamond(im, cx + headR * 0.78, headCy - headR * 0.55, headR * 0.22, _c(colors.last));
+      break;
+    case _HairStyle.bald:
       break;
   }
+}
 
-  // Beard.
+img.Image _renderPortrait(_PortraitSpec spec) {
+  final im = img.Image(width: _kPortraitSize, height: _kPortraitSize);
+  _vGradient(im, spec.bg[0], spec.bg[1]);
+  final cx = _kPortraitSize / 2;
+  final cy = _kPortraitSize * 0.42;
+  final headR = _kPortraitSize * 0.28;
+  _drawHair(im, spec, cx, cy, headR);
+  img.fillCircle(im, x: cx.round(), y: cy.round(), radius: headR.round(), color: _c(spec.skin));
+  // Neck + shoulders
+  img.fillRect(
+    im,
+    x1: (cx - headR * 0.55).round(),
+    y1: (cy + headR * 0.7).round(),
+    x2: (cx + headR * 0.55).round(),
+    y2: (cy + headR * 1.35).round(),
+    color: _c(spec.skin),
+  );
+  img.fillCircle(im, x: cx.round(), y: (_kPortraitSize * 0.92).round(), radius: (_kPortraitSize * 0.42).round(), color: _c(0xFF1F2937));
+  // Eyes
+  final eyeY = cy - headR * 0.08;
+  img.fillCircle(im, x: (cx - headR * 0.32).round(), y: eyeY.round(), radius: (headR * 0.09).round(), color: _c(0xFF111111));
+  img.fillCircle(im, x: (cx + headR * 0.32).round(), y: eyeY.round(), radius: (headR * 0.09).round(), color: _c(0xFF111111));
+  img.fillCircle(im, x: (cx - headR * 0.28).round(), y: (eyeY - headR * 0.02).round(), radius: (headR * 0.03).round(), color: _c(0xFFFFFFFF));
+  img.fillCircle(im, x: (cx + headR * 0.36).round(), y: (eyeY - headR * 0.02).round(), radius: (headR * 0.03).round(), color: _c(0xFFFFFFFF));
+  // Smile
+  img.drawLine(
+    im,
+    x1: (cx - headR * 0.28).round(),
+    y1: (cy + headR * 0.38).round(),
+    x2: (cx + headR * 0.28).round(),
+    y2: (cy + headR * 0.38).round(),
+    color: _c(0xFF4A2E1C),
+    thickness: 2,
+  );
   if (spec.beard) {
-    img.fillPolygon(
-      im,
-      vertices: [
-        img.Point(cx - headR * 0.62, headCy + headR * 0.15),
-        img.Point(cx - headR * 0.4, headCy + headR * 0.85),
-        img.Point(cx, headCy + headR * 1.05),
-        img.Point(cx + headR * 0.4, headCy + headR * 0.85),
-        img.Point(cx + headR * 0.62, headCy + headR * 0.15),
-      ],
-      color: hair,
-    );
+    img.fillCircle(im, x: cx.round(), y: (cy + headR * 0.55).round(), radius: (headR * 0.42).round(), color: _c(spec.hair, 180));
   }
-
-  // Face — simple friendly features.
-  final eyeY = headCy - headR * 0.02;
-  for (final side in [-1, 1]) {
-    img.drawCircle(im, x: (cx + side * headR * 0.36).round(), y: eyeY.round(), radius: (headR * 0.075).round(), color: _c(0xFF1C1210), antialias: true);
-    img.drawCircle(im, x: (cx + side * headR * 0.36 - side * headR * 0.02).round(), y: (eyeY - headR * 0.02).round(), radius: (headR * 0.02).round(), color: _c(0xFFFFFFFF), antialias: true);
+  if (spec.earrings) {
+    _fillDiamond(im, cx - headR * 0.95, cy + headR * 0.15, headR * 0.08, _c(0xFFD4AF37));
+    _fillDiamond(im, cx + headR * 0.95, cy + headR * 0.15, headR * 0.08, _c(0xFFD4AF37));
   }
-  // Eyebrows.
-  for (final side in [-1, 1]) {
-    img.drawLine(im, x1: (cx + side * headR * 0.24).round(), y1: (eyeY - headR * 0.22).round(), x2: (cx + side * headR * 0.5).round(), y2: (eyeY - headR * 0.28).round(), color: hair, antialias: true, thickness: 2.6);
-  }
-  // Nose.
-  img.drawLine(im, x1: cx.round(), y1: (headCy + headR * 0.06).round(), x2: (cx - headR * 0.08).round(), y2: (headCy + headR * 0.3).round(), color: _c(spec.skin, 140), antialias: true, thickness: 1.6);
-  // Smile.
-  final smileY = headCy + headR * 0.5;
-  img.drawLine(im, x1: (cx - headR * 0.26).round(), y1: smileY.round(), x2: (cx + headR * 0.26).round(), y2: smileY.round(), color: _c(0xFF6B2F1A), antialias: true, thickness: 3.2);
-  for (final side in [-1, 1]) {
-    img.drawLine(im, x1: (cx + side * headR * 0.26).round(), y1: smileY.round(), x2: (cx + side * headR * 0.32).round(), y2: (smileY - headR * 0.05).round(), color: _c(0xFF6B2F1A), antialias: true, thickness: 2.4);
-  }
-
   return im;
 }

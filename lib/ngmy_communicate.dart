@@ -678,6 +678,17 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         }
       } catch (_) {}
     }
+    // Bundled African role portraits — used when admin has not uploaded a photo.
+    try {
+      final roleBytes = await ngmyAdvisorPortraitBytesAsync(
+        id: id,
+        gender: widget.profile.gender,
+        role: widget.profile.role,
+      );
+      if (roleBytes.isNotEmpty && mounted) {
+        setState(() => _bytes = roleBytes);
+      }
+    } catch (_) {}
     await _resolveNetwork();
     // The app also warms this same cache in the background at startup
     // (ngmyWarmCommunicateAvatarsFromConfig). If this widget mounted before
@@ -723,12 +734,15 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Widget _emojiFallback() =>
       Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
 
-  /// No uploaded photo yet (or it failed to load) — draw an illustrated
-  /// portrait locally instead of a plain emoji. Deterministic per advisor
-  /// id, fully offline, no network or bundled photo assets involved.
+  /// No uploaded photo yet (or it failed to load) — use a role-matched African
+  /// portrait (bundled photo, or illustrated offline fallback).
   Widget _illustratedFallback() {
     try {
-      final bytes = ngmyAdvisorPortraitBytes(id: widget.profile.id, gender: widget.profile.gender);
+      final bytes = ngmyAdvisorPortraitBytes(
+        id: widget.profile.id,
+        gender: widget.profile.gender,
+        role: widget.profile.role,
+      );
       return ClipOval(
         child: Image.memory(
           bytes,
@@ -804,6 +818,7 @@ Future<void> ngmyOpenCommunicateWorld(
   VoidCallback? onDataChanged,
   Future<bool> Function()? onPersistConfig,
 }) {
+  unawaited(ngmyWarmAdvisorPortraitAssets());
   return NgmyNavigator.push<void>(
     context,
     NgmyCommunicateWorldScreen(
