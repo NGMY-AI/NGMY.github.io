@@ -19,6 +19,10 @@ enum _ProtocolSimKind {
   hexHandshake,
   fluxStream,
   echoField,
+  liquidCore,
+  tidalPool,
+  mercuryDrag,
+  vortexFluid,
 }
 
 class _SimMeta {
@@ -80,34 +84,354 @@ const _kSims = <_SimMeta>[
     colors: [Color(0xFFF472B6), Color(0xFF818CF8)],
     icon: Icons.podcasts_rounded,
   ),
+  _SimMeta(
+    kind: _ProtocolSimKind.liquidCore,
+    title: 'LIQUID CORE',
+    blurb: 'Morph a living fluid mass',
+    colors: [Color(0xFF22D3EE), Color(0xFF34D399)],
+    icon: Icons.water_drop_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.tidalPool,
+    title: 'TIDAL POOL',
+    blurb: 'Stir liquid ripples on touch',
+    colors: [Color(0xFF38BDF8), Color(0xFF6366F1)],
+    icon: Icons.waterfall_chart_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.mercuryDrag,
+    title: 'MERCURY DRAG',
+    blurb: 'Pull liquid-metal ribbons',
+    colors: [Color(0xFFE2E8F0), Color(0xFF94A3B8)],
+    icon: Icons.blur_on_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.vortexFluid,
+    title: 'VORTEX FLUID',
+    blurb: 'Spin a liquid whirlpool',
+    colors: [Color(0xFF2DD4BF), Color(0xFF818CF8)],
+    icon: Icons.cyclone_rounded,
+  ),
 ];
 
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
+  /// Original CORE PROTOCOL boot loads first, then the sims hub.
+  bool _booting = true;
   _SimMeta? _active;
+
+  void _exitSim() => setState(() => _active = null);
 
   @override
   Widget build(BuildContext context) {
     final active = _active;
-    return Scaffold(
-      backgroundColor: const Color(0xFF030712),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _CoreBackdrop(),
-          if (active == null)
-            _SimPicker(
-              onPick: (s) => setState(() => _active = s),
-              onClose: () => Navigator.of(context).maybePop(),
-            )
-          else
-            _ProtocolSimCanvas(
-              meta: active,
-              onBack: () => setState(() => _active = null),
-            ),
-        ],
+    return PopScope(
+      canPop: !_booting && active == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (active != null) {
+          _exitSim();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF030712),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const _CoreBackdrop(),
+            if (_booting)
+              _CoreProtocolBootSplash(
+                onFinished: () {
+                  if (mounted) setState(() => _booting = false);
+                },
+              )
+            else if (active == null)
+              _SimPicker(
+                onPick: (s) => setState(() => _active = s),
+                onClose: () => Navigator.of(context).maybePop(),
+              )
+            else
+              _ProtocolSimCanvas(
+                meta: active,
+                onExit: _exitSim,
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Same boot / loading beat as the original CORE PROTOCOL pulse screen —
+/// runs fully before the simulation hub opens.
+class _CoreProtocolBootSplash extends StatefulWidget {
+  const _CoreProtocolBootSplash({required this.onFinished});
+
+  final VoidCallback onFinished;
+
+  @override
+  State<_CoreProtocolBootSplash> createState() => _CoreProtocolBootSplashState();
+}
+
+class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with TickerProviderStateMixin {
+  static const _coreColors = [Color(0xFF34D399), Color(0xFF06B6D4)];
+
+  late final AnimationController _boot;
+  late final AnimationController _spin;
+  late final AnimationController _wave;
+  bool _notified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _boot = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..forward();
+    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 4800))..repeat();
+    _wave = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+    _boot.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        Future<void>.delayed(const Duration(milliseconds: 900), () {
+          if (!mounted || _notified) return;
+          _notified = true;
+          widget.onFinished();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _boot.dispose();
+    _spin.dispose();
+    _wave.dispose();
+    super.dispose();
+  }
+
+  String _statusLine(double t) {
+    final step = (t * 4).floor() % 4;
+    return const [
+      'Booting core modules…',
+      'Loading protocol stack…',
+      'Integrity check OK.',
+      'Mainframe online.',
+    ][step];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_boot, _spin, _wave]),
+      builder: (context, _) {
+        final boot = Curves.easeOutCubic.transform(_boot.value.clamp(0.0, 1.0));
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: const Color(0xFF030712).withValues(alpha: 0.92 * boot)),
+            CustomPaint(
+              painter: _BootBackdropPainter(
+                colors: _coreColors,
+                spin: _spin.value,
+                wave: _wave.value,
+                boot: boot,
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'SYSTEM · MAINFRAME',
+                        style: TextStyle(
+                          color: _coreColors.first.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Transform.scale(
+                      scale: 0.7 + boot * 0.35,
+                      child: SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: CustomPaint(
+                          painter: _BootOrbPainter(
+                            colors: _coreColors,
+                            pulse: 0.4 + math.sin(_wave.value * math.pi * 2) * 0.5,
+                            orbit: _spin.value,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Opacity(
+                      opacity: boot,
+                      child: Column(
+                        children: [
+                          const Text(
+                            'CORE PROTOCOL',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.2,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _statusLine(_wave.value),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: SizedBox(
+                              height: 6,
+                              width: 180,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ColoredBox(color: Colors.white.withValues(alpha: 0.12)),
+                                  FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: boot.clamp(0.2, 1.0),
+                                    child: const DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(colors: _coreColors),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'LOADING SIMULATIONS…',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BootBackdropPainter extends CustomPainter {
+  _BootBackdropPainter({
+    required this.colors,
+    required this.spin,
+    required this.wave,
+    required this.boot,
+  });
+
+  final List<Color> colors;
+  final double spin;
+  final double wave;
+  final double boot;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height * 0.42);
+    for (var i = 1; i <= 5; i++) {
+      canvas.drawCircle(
+        c,
+        40.0 * i + wave * 20,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = colors.first.withValues(alpha: (0.12 / i) * boot),
+      );
+    }
+    final grid = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04 * boot)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 28) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (var y = 0.0; y < size.height; y += 28) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: 150),
+      spin * math.pi * 2,
+      1.4,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = colors.last.withValues(alpha: 0.45 * boot),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BootBackdropPainter old) =>
+      old.spin != spin || old.wave != wave || old.boot != boot;
+}
+
+class _BootOrbPainter extends CustomPainter {
+  _BootOrbPainter({required this.colors, required this.pulse, required this.orbit});
+
+  final List<Color> colors;
+  final double pulse;
+  final double orbit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide * 0.34 * (0.92 + pulse * 0.08);
+    for (var i = 3; i >= 1; i--) {
+      canvas.drawCircle(
+        c,
+        radius + i * 10,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = colors.first.withValues(alpha: 0.14 * i),
+      );
+    }
+    canvas.drawCircle(
+      c,
+      radius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.55),
+            colors.first.withValues(alpha: 0.9),
+            colors.last.withValues(alpha: 0.55),
+          ],
+        ).createShader(Rect.fromCircle(center: c, radius: radius)),
+    );
+    for (var i = 0; i < 8; i++) {
+      final a = orbit * math.pi * 2 + i * (math.pi / 4);
+      final p = Offset(c.dx + math.cos(a) * (radius + 18), c.dy + math.sin(a) * (radius + 18));
+      canvas.drawCircle(p, 3.2, Paint()..color = colors.last.withValues(alpha: 0.85));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BootOrbPainter old) => old.pulse != pulse || old.orbit != orbit;
 }
 
 class _CoreBackdrop extends StatelessWidget {
@@ -211,10 +535,15 @@ class _SimPicker extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView.separated(
+            child: GridView.builder(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.92,
+              ),
               itemCount: _kSims.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, i) {
                 final s = _kSims[i];
                 return _SimPickTile(meta: s, onTap: () => onPick(s));
@@ -239,15 +568,15 @@ class _SimPickTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                meta.colors.first.withValues(alpha: 0.18),
+                meta.colors.first.withValues(alpha: 0.2),
                 const Color(0xFF0B1220),
                 meta.colors.last.withValues(alpha: 0.12),
               ],
@@ -255,55 +584,54 @@ class _SimPickTile extends StatelessWidget {
             border: Border.all(color: meta.colors.first.withValues(alpha: 0.45)),
             boxShadow: [
               BoxShadow(
-                color: meta.colors.first.withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: meta.colors.first.withValues(alpha: 0.16),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(colors: meta.colors),
                     boxShadow: [
-                      BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 12),
+                      BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 10),
                     ],
                   ),
-                  child: Icon(meta.icon, color: Colors.white, size: 26),
+                  child: Icon(meta.icon, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        meta.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        meta.blurb,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.62),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                const Spacer(),
+                Text(
+                  meta.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    letterSpacing: 0.8,
+                    height: 1.15,
                   ),
                 ),
-                Icon(Icons.play_arrow_rounded, color: meta.colors.first, size: 28),
+                const SizedBox(height: 4),
+                Text(
+                  meta.blurb,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.58),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                ),
               ],
             ),
           ),
@@ -316,10 +644,11 @@ class _SimPickTile extends StatelessWidget {
 // ── Interactive canvas ──────────────────────────────────────────────────────
 
 class _ProtocolSimCanvas extends StatefulWidget {
-  const _ProtocolSimCanvas({required this.meta, required this.onBack});
+  const _ProtocolSimCanvas({required this.meta, required this.onExit});
 
   final _SimMeta meta;
-  final VoidCallback onBack;
+  /// Leave simulation with no on-screen chrome (device back / long-press).
+  final VoidCallback onExit;
 
   @override
   State<_ProtocolSimCanvas> createState() => _ProtocolSimCanvasState();
@@ -443,104 +772,33 @@ class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas> with SingleTicke
   Widget build(BuildContext context) {
     final t = _elapsed.inMilliseconds / 1000.0;
     final meta = widget.meta;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: (d) => _onDown(d.localPosition),
-          onPanUpdate: (d) => _onMove(d.localPosition),
-          onPanEnd: (_) => _onUp(),
-          onPanCancel: _onUp,
-          onTapDown: (d) => _onDown(d.localPosition),
-          child: CustomPaint(
-            painter: _ProtocolPainter(
-              kind: meta.kind,
-              colors: meta.colors,
-              time: t,
-              finger: _finger,
-              trail: List<_TrailPoint>.from(_trail),
-              bursts: List<_Burst>.from(_bursts),
-              nodes: List<_EnergizedNode>.from(_nodes),
-              orbitPull: _orbitPull,
-              orbitAim: _orbitAim,
-              hexLit: Set<int>.from(_hexLit),
-              fluxAngle: _fluxAngle,
-              echoCount: _echoCount,
-            ),
-            child: const SizedBox.expand(),
-          ),
+    // No visible buttons inside a simulation — long-press returns to the hub.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (d) => _onDown(d.localPosition),
+      onPanUpdate: (d) => _onMove(d.localPosition),
+      onPanEnd: (_) => _onUp(),
+      onPanCancel: _onUp,
+      onTapDown: (d) => _onDown(d.localPosition),
+      onLongPress: widget.onExit,
+      child: CustomPaint(
+        painter: _ProtocolPainter(
+          kind: meta.kind,
+          colors: meta.colors,
+          time: t,
+          finger: _finger,
+          trail: List<_TrailPoint>.from(_trail),
+          bursts: List<_Burst>.from(_bursts),
+          nodes: List<_EnergizedNode>.from(_nodes),
+          orbitPull: _orbitPull,
+          orbitAim: _orbitAim,
+          hexLit: Set<int>.from(_hexLit),
+          fluxAngle: _fluxAngle,
+          echoCount: _echoCount,
         ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: widget.onBack,
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        meta.title,
-                        style: TextStyle(
-                          color: meta.colors.first,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        'Drag anywhere · ${_statusHint(meta.kind)}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _trail.clear();
-                      _bursts.clear();
-                      _nodes.clear();
-                      _hexLit.clear();
-                      _orbitPull = 0;
-                      _echoCount = 0;
-                    });
-                  },
-                  child: Text('RESET', style: TextStyle(color: meta.colors.first, fontWeight: FontWeight.w800, fontSize: 12)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        child: const SizedBox.expand(),
+      ),
     );
-  }
-
-  String _statusHint(_ProtocolSimKind kind) {
-    switch (kind) {
-      case _ProtocolSimKind.pulseWeave:
-        return 'weave pulse paths';
-      case _ProtocolSimKind.signalLattice:
-        return 'route the lattice';
-      case _ProtocolSimKind.orbitHandler:
-        return 'pull orbit packets';
-      case _ProtocolSimKind.hexHandshake:
-        return 'wake hex cells';
-      case _ProtocolSimKind.fluxStream:
-        return 'bend the stream';
-      case _ProtocolSimKind.echoField:
-        return 'cast echo rings';
-    }
   }
 }
 
@@ -614,6 +872,18 @@ class _ProtocolPainter extends CustomPainter {
         break;
       case _ProtocolSimKind.echoField:
         _paintEchoField(canvas, size, c);
+        break;
+      case _ProtocolSimKind.liquidCore:
+        _paintLiquidCore(canvas, size, c);
+        break;
+      case _ProtocolSimKind.tidalPool:
+        _paintTidalPool(canvas, size, c);
+        break;
+      case _ProtocolSimKind.mercuryDrag:
+        _paintMercuryDrag(canvas, size, c);
+        break;
+      case _ProtocolSimKind.vortexFluid:
+        _paintVortexFluid(canvas, size, c);
         break;
     }
     _paintFingerGlow(canvas);
@@ -861,6 +1131,215 @@ class _ProtocolPainter extends CustomPainter {
         Paint()..color = colors.last.withValues(alpha: 0.7 * (1 - age)),
       );
     }
+  }
+
+  void _paintLiquidCore(Canvas canvas, Size size, Offset c) {
+    final target = finger ?? c;
+    final blob = Offset(
+      c.dx + (target.dx - c.dx) * 0.55,
+      c.dy + (target.dy - c.dy) * 0.55,
+    );
+    final baseR = size.shortestSide * 0.16;
+    for (var layer = 4; layer >= 1; layer--) {
+      final path = Path();
+      const steps = 36;
+      for (var i = 0; i <= steps; i++) {
+        final a = (i / steps) * math.pi * 2;
+        final wobble = 1 +
+            0.12 * math.sin(a * 3 + time * 2.4) +
+            0.08 * math.sin(a * 5 - time * 1.6) +
+            (finger != null ? 0.1 * math.cos(a - math.atan2(target.dy - blob.dy, target.dx - blob.dx)) : 0);
+        final r = (baseR + layer * 10) * wobble;
+        final p = Offset(blob.dx + math.cos(a) * r, blob.dy + math.sin(a) * r);
+        if (i == 0) {
+          path.moveTo(p.dx, p.dy);
+        } else {
+          path.lineTo(p.dx, p.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = Color.lerp(colors.first, colors.last, layer / 4)!.withValues(alpha: 0.18 + layer * 0.08)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, layer == 1 ? 2 : 8.0),
+      );
+      if (layer == 1) {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..shader = RadialGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.55),
+                colors.first.withValues(alpha: 0.75),
+                colors.last.withValues(alpha: 0.35),
+              ],
+            ).createShader(Rect.fromCircle(center: blob, radius: baseR * 1.3)),
+        );
+      }
+    }
+    for (final b in bursts) {
+      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        b.p,
+        8 + age * 40 * b.power,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4 * (1 - age)
+          ..color = colors.first.withValues(alpha: 0.55 * (1 - age)),
+      );
+    }
+  }
+
+  void _paintTidalPool(Canvas canvas, Size size, Offset c) {
+    // Soft water floor
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colors.last.withValues(alpha: 0.08),
+            colors.first.withValues(alpha: 0.14),
+            const Color(0xFF030712),
+          ],
+        ).createShader(Offset.zero & size),
+    );
+    for (var i = 0; i < 7; i++) {
+      final y = size.height * (0.2 + i * 0.1);
+      final path = Path()..moveTo(0, y);
+      for (var x = 0.0; x <= size.width; x += 8) {
+        path.lineTo(x, y + math.sin(time * 1.8 + x * 0.03 + i) * 6);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = colors.first.withValues(alpha: 0.2),
+      );
+    }
+    for (final b in bursts) {
+      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
+      for (var ring = 0; ring < 4; ring++) {
+        final phase = (age + ring * 0.12).clamp(0.0, 1.0);
+        canvas.drawCircle(
+          b.p,
+          10 + phase * 90 * b.power,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.6 * (1 - phase)
+            ..color = Color.lerp(colors.first, colors.last, phase)!.withValues(alpha: 0.65 * (1 - phase)),
+        );
+      }
+    }
+    if (finger != null) {
+      for (var ring = 0; ring < 3; ring++) {
+        final phase = (time * 1.5 + ring * 0.33) % 1.0;
+        canvas.drawCircle(
+          finger!,
+          16 + phase * 70,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 * (1 - phase)
+            ..color = colors.last.withValues(alpha: 0.5 * (1 - phase)),
+        );
+      }
+    }
+    _drawCore(canvas, c, 28, time);
+  }
+
+  void _paintMercuryDrag(Canvas canvas, Size size, Offset c) {
+    _drawCore(canvas, c, 32, time);
+    if (trail.isEmpty) return;
+    for (var i = 0; i < trail.length; i++) {
+      final p = trail[i];
+      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
+      final r = 6 + p.force * 14 * (1 - age) + math.sin(time * 6 + i) * 1.5;
+      canvas.drawCircle(
+        p.p,
+        r,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.9 * (1 - age)),
+              colors.first.withValues(alpha: 0.75 * (1 - age)),
+              colors.last.withValues(alpha: 0.2 * (1 - age)),
+            ],
+          ).createShader(Rect.fromCircle(center: p.p, radius: r)),
+      );
+      if (i > 0) {
+        final prev = trail[i - 1].p;
+        canvas.drawLine(
+          prev,
+          p.p,
+          Paint()
+            ..strokeWidth = (r * 0.85).clamp(2.0, 16.0)
+            ..strokeCap = StrokeCap.round
+            ..color = colors.first.withValues(alpha: 0.45 * (1 - age))
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        );
+      }
+    }
+    for (final b in bursts) {
+      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        b.p,
+        10 + (1 - age) * 18 * b.power,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.35 * (1 - age))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
+    }
+  }
+
+  void _paintVortexFluid(Canvas canvas, Size size, Offset c) {
+    final center = finger ?? c;
+    final arms = 7;
+    for (var arm = 0; arm < arms; arm++) {
+      final path = Path();
+      for (var s = 0; s < 48; s++) {
+        final t = s / 47;
+        final a = time * 2.2 + arm * (math.pi * 2 / arms) + t * 4.2;
+        final r = 18 + t * size.shortestSide * 0.42 * (0.85 + 0.15 * math.sin(time + arm));
+        final p = Offset(center.dx + math.cos(a) * r, center.dy + math.sin(a) * r);
+        if (s == 0) {
+          path.moveTo(p.dx, p.dy);
+        } else {
+          path.lineTo(p.dx, p.dy);
+        }
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..strokeCap = StrokeCap.round
+          ..color = Color.lerp(colors.first, colors.last, arm / arms)!.withValues(alpha: 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+      );
+    }
+    for (final p in trail) {
+      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        p.p,
+        3 + p.force * 4,
+        Paint()..color = colors.first.withValues(alpha: 0.65 * (1 - age)),
+      );
+    }
+    canvas.drawCircle(
+      center,
+      22 + math.sin(time * 5) * 3,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.7),
+            colors.first.withValues(alpha: 0.8),
+            colors.last.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: 40)),
+    );
   }
 
   int get _elapsedMs => (time * 1000).round();
