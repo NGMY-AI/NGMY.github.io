@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,11 +8,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_civic_registry_members.dart';
 
 const _promptKeyPrefix = 'ngmy_civic_id_photo_prompted_v1_';
+const _localPhotoKeyPrefix = 'ngmy_civic_id_photo_local_v1_';
+
+/// Short token stored on the member / home card — real bytes live in prefs.
+const kNgmyCivicIdPhotoLocalToken = 'local:civic';
+
+final Map<String, String> _localPhotoCache = {};
+
+String _emailKey(String email) => NgmyCivicRegistryMembers.emailKey(email);
+
+String _localPhotoKey(String email) => '$_localPhotoKeyPrefix${_emailKey(email)}';
 
 Future<bool> ngmyCivicIdPhotoPromptWasShown(String email) async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('$_promptKeyPrefix${NgmyCivicRegistryMembers.emailKey(email)}') == true;
+    return prefs.getBool('$_promptKeyPrefix${_emailKey(email)}') == true;
   } catch (_) {
     return false;
   }
@@ -20,15 +31,90 @@ Future<bool> ngmyCivicIdPhotoPromptWasShown(String email) async {
 Future<void> ngmyMarkCivicIdPhotoPromptShown(String email) async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('$_promptKeyPrefix${NgmyCivicRegistryMembers.emailKey(email)}', true);
+    await prefs.setBool('$_promptKeyPrefix${_emailKey(email)}', true);
   } catch (_) {}
 }
 
+/// Persists JPEG bytes on-device so the Civic ID photo works offline.
+Future<String> ngmySaveCivicIdPhotoLocal(String email, Uint8List bytes) async {
+  final b64 = base64Encode(bytes);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_localPhotoKey(email), b64);
+  final dataUrl = 'data:image/jpeg;base64,$b64';
+  _localPhotoCache[_emailKey(email)] = dataUrl;
+  return kNgmyCivicIdPhotoLocalToken;
+}
+
+/// Loads the on-device photo into the sync cache (call on app / home load).
+Future<String?> ngmyLoadCivicIdPhotoLocal(String email) async {
+  final cached = _localPhotoCache[_emailKey(email)];
+  if (cached != null && cached.isNotEmpty) return cached;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_localPhotoKey(email));
+    if (raw == null || raw.isEmpty) return null;
+    final dataUrl = raw.startsWith('data:') ? raw : 'data:image/jpeg;base64,$raw';
+    _localPhotoCache[_emailKey(email)] = dataUrl;
+    return dataUrl;
+  } catch (_) {
+    return null;
+  }
+}
+
+String? ngmyCachedCivicIdPhoto(String email) {
+  final v = _localPhotoCache[_emailKey(email)];
+  if (v == null || v.isEmpty) return null;
+  return v;
+}
+
+bool ngmyIsCivicIdPhotoLocalToken(String? path) {
+  final p = (path ?? '').trim();
+  return p == kNgmyCivicIdPhotoLocalToken || p.startsWith('local:civic');
+}
+
 Future<String?> ngmyPickCivicIdPhotoBytes() async {
-  final img = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 78, maxWidth: 900);
+  final img = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 62,
+    maxWidth: 640,
+  );
   if (img == null) return null;
   final bytes = await img.readAsBytes();
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+}
+
+/// Pick from gallery and save locally; returns the `local:civic` token.
+Future<String?> ngmyPickAndPersistCivicIdPhoto(String email) async {
+  final img = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 62,
+    maxWidth: 640,
+  );
+  if (img == null) return null;
+  final bytes = await img.readAsBytes();
+  return ngmySaveCivicIdPhotoLocal(email, bytes);
+}
+
+/// Migrates a data-URL photo into local storage; returns the token (or existing path).
+Future<String> ngmyEnsureCivicIdPhotoLocal(String email, String photoPath) async {
+  final src = photoPath.trim();
+  if (src.isEmpty) return '';
+  if (ngmyIsCivicIdPhotoLocalToken(src)) {
+    await ngmyLoadCivicIdPhotoLocal(email);
+    return kNgmyCivicIdPhotoLocalToken;
+  }
+  if (src.startsWith('data:image')) {
+    try {
+      final b64 = src.contains(',') ? src.split(',').last : src;
+      return ngmySaveCivicIdPhotoLocal(email, base64Decode(b64));
+    } catch (_) {
+      return src;
+    }
+  }
+  // Already a short path / URL — keep, but prefer local if we have one.
+  final local = await ngmyLoadCivicIdPhotoLocal(email);
+  if (local != null) return kNgmyCivicIdPhotoLocalToken;
+  return src;
 }
 
 void ngmySaveCivicIdPhotoOnMember(dynamic config, String email, String photoPath) {
@@ -37,11 +123,20 @@ void ngmySaveCivicIdPhotoOnMember(dynamic config, String email, String photoPath
   NgmyCivicRegistryMembers.upsert(config, {...member, 'idPhotoPath': photoPath.trim()});
 }
 
-String? ngmyCivicIdPhotoForRecord(Map<String, dynamic> record, {String? profilePicturePath}) {
+String? ngmyCivicIdPhotoForRecord(Map<String, dynamic> record, {String? profilePicturePath, String? emailHint}) {
   final civic = (record['idPhotoPath'] ?? '').toString().trim();
-  if (civic.isNotEmpty) return civic;
+  final email = (emailHint ?? record['email'] ?? '').toString().trim();
+  if (ngmyIsCivicIdPhotoLocalToken(civic) || civic.isEmpty) {
+    final cached = email.isEmpty ? null : ngmyCachedCivicIdPhoto(email);
+    if (cached != null && cached.isNotEmpty) return cached;
+  }
+  if (civic.isNotEmpty && !ngmyIsCivicIdPhotoLocalToken(civic)) return civic;
   final profile = (profilePicturePath ?? '').trim();
   if (profile.isNotEmpty) return profile;
+  if (email.isNotEmpty) {
+    final cached = ngmyCachedCivicIdPhoto(email);
+    if (cached != null && cached.isNotEmpty) return cached;
+  }
   return null;
 }
 
@@ -63,18 +158,21 @@ Future<void> showNgmyCivicIdPhotoSheet(
         builder: (ctx, setSheet) {
           Future<void> pickAndSave() async {
             setSheet(() => uploading = true);
-            final path = await ngmyPickCivicIdPhotoBytes();
-            if (path == null) {
+            final token = await ngmyPickAndPersistCivicIdPhoto(email);
+            if (token == null) {
               setSheet(() => uploading = false);
               return;
             }
-            ngmySaveCivicIdPhotoOnMember(config, email, path);
+            ngmySaveCivicIdPhotoOnMember(config, email, token);
             await ngmyMarkCivicIdPhotoPromptShown(email);
             await onSaved();
             if (ctx.mounted) Navigator.pop(ctx);
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('ID photo saved — it will appear on your registry card.'), backgroundColor: Color(0xFF059669)),
+                const SnackBar(
+                  content: Text('ID photo saved on this device — it stays available offline.'),
+                  backgroundColor: Color(0xFF059669),
+                ),
               );
             }
           }
@@ -101,8 +199,8 @@ Future<void> showNgmyCivicIdPhotoSheet(
                     const SizedBox(height: 8),
                     Text(
                       skippable
-                          ? 'Optional — upload a portrait for your Civic Registry ID or passport card. You can skip and add one later from the ID icon.'
-                          : 'Upload a portrait photo for your Civic Registry ID before adding it to Home.',
+                          ? 'Optional — upload a portrait for your Civic Registry ID. It is saved on this device so it stays when you are offline.'
+                          : 'Upload a portrait photo for your Civic Registry ID before adding it to Home. It is saved on this device.',
                       style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                     ),
                     const SizedBox(height: 16),

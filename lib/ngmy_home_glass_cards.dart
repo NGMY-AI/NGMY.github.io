@@ -250,8 +250,8 @@ class NgmyHomeLocalStore {
 
   static Future<void> saveSpending(String email, List<NgmySpendingEntry> items) async {
     final prefs = await SharedPreferences.getInstance();
-    // Strip huge data-URL photos from Civic ID cards so SharedPreferences quota
-    // is not blown (that was wiping / failing saves and making cards "disappear").
+    // Civic photos live in a dedicated local prefs key (`local:civic` token on the card).
+    // Strip only giant inline data-URLs so the spending list itself stays small.
     final lean = items.map((e) {
       if (!e.hasCivicId) return e;
       try {
@@ -259,8 +259,12 @@ class NgmyHomeLocalStore {
         if (map is! Map) return e;
         final next = Map<String, dynamic>.from(map);
         final photo = (next['idPhotoPath'] ?? '').toString();
+        if (ngmyIsCivicIdPhotoLocalToken(photo)) {
+          next['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+          return e.copyWith(civicIdJson: jsonEncode(next));
+        }
         if (photo.startsWith('data:') || photo.length > 800) {
-          next['idPhotoPath'] = '';
+          next['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
           return e.copyWith(civicIdJson: jsonEncode(next));
         }
       } catch (_) {}
@@ -1698,6 +1702,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
 
   Future<List<NgmySpendingEntry>> _hydrateCivicIdCards(List<NgmySpendingEntry> spending) async {
     final live = widget.civicIdRecord;
+    await ngmyLoadCivicIdPhotoLocal(widget.userEmail);
     var changed = false;
     final next = <NgmySpendingEntry>[];
     for (final e in spending) {
@@ -1714,32 +1719,41 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         var record = Map<String, dynamic>.from(map);
         final rid = (record['registryId'] ?? '').toString().trim();
         final liveRid = (live?['registryId'] ?? '').toString().trim();
-        if (live != null && (rid.isEmpty || rid == liveRid || NgmyCivicRegistryMembers.emailKey((record['email'] ?? '').toString()) == NgmyCivicRegistryMembers.emailKey(widget.userEmail))) {
+        if (live != null &&
+            (rid.isEmpty ||
+                rid == liveRid ||
+                NgmyCivicRegistryMembers.emailKey((record['email'] ?? '').toString()) ==
+                    NgmyCivicRegistryMembers.emailKey(widget.userEmail))) {
           record = {
             ...record,
             ...live,
-            // Keep card identity fields stable.
             'registryId': (live['registryId'] ?? record['registryId'] ?? '').toString(),
           };
         }
-        final resolved = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
-        if (resolved.isNotEmpty && !resolved.startsWith('data:')) {
-          record['idPhotoPath'] = resolved;
-        } else if ((record['idPhotoPath'] ?? '').toString().startsWith('data:')) {
-          // Do not persist giant data URLs into SharedPreferences.
-          record['idPhotoPath'] = '';
+        final rawPhoto = (record['idPhotoPath'] ?? '').toString().trim();
+        if (rawPhoto.startsWith('data:image')) {
+          await ngmyEnsureCivicIdPhotoLocal(widget.userEmail, rawPhoto);
+          record['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+          changed = true;
+        } else if (ngmyIsCivicIdPhotoLocalToken(rawPhoto)) {
+          record['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+        } else if (rawPhoto.isEmpty) {
+          final local = ngmyCachedCivicIdPhoto(widget.userEmail);
+          if (local != null) {
+            record['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+            changed = true;
+          }
         }
-        // For display we temporarily put a resolved photo (including data URL from live registry).
+        final resolved = (ngmyCivicIdPhotoForRecord(
+              record,
+              profilePicturePath: widget.profilePicturePath,
+              emailHint: widget.userEmail,
+            ) ??
+            '')
+            .trim();
         final display = Map<String, dynamic>.from(record);
         if (resolved.isNotEmpty) display['idPhotoPath'] = resolved;
-        final leanEncode = jsonEncode({
-          ...record,
-          'idPhotoPath': (record['idPhotoPath'] ?? '').toString().startsWith('data:') ? '' : (record['idPhotoPath'] ?? ''),
-        });
-        final displayEncode = jsonEncode(display);
-        if (leanEncode != e.civicIdJson) changed = true;
-        next.add(e.copyWith(civicIdJson: displayEncode));
-        // Persist lean version without bloating prefs ? swap after loop via save of lean copies.
+        next.add(e.copyWith(civicIdJson: jsonEncode(display)));
       } catch (_) {
         next.add(e);
       }
@@ -1752,7 +1766,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
           if (map is! Map) return e;
           final m = Map<String, dynamic>.from(map);
           final p = (m['idPhotoPath'] ?? '').toString();
-          if (p.startsWith('data:') || p.length > 800) m['idPhotoPath'] = '';
+          if (p.startsWith('data:') || p.length > 800 || ngmyIsCivicIdPhotoLocalToken(p)) {
+            m['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+          }
           return e.copyWith(civicIdJson: jsonEncode(m));
         } catch (_) {
           return e;
@@ -2309,11 +2325,12 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 ),
               ),
               cardBuilder: (ctx, entry, {required isFront, required revealDates}) {
+                final isCivic = entry.hasCivicId;
                 final card = NgmyFrostedCard(
                   dateLabel: ngmyHomeDateTabLabel(entry.date),
                   accent: entry.hasImage
                       ? const [Color(0xFF111827), Color(0xFF1F2937)]
-                      : entry.hasCivicId
+                      : isCivic
                           ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
                           : entry.hasBusinessCard
                               ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
@@ -2326,14 +2343,15 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                                           : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                   isFront: isFront,
                   showDateTab: revealDates,
-                  welcomeName: isFront ? name : null,
-                  onDelete: isFront ? () => _deleteSpending(entry.id) : null,
-                  onAdd: isFront ? _openAddSheet : null,
+                  // Civic Registry ID: only the middle "added" date tab ? no welcome / today / X / +.
+                  welcomeName: isFront && !isCivic ? name : null,
+                  onDelete: isFront && !isCivic ? () => _deleteSpending(entry.id) : null,
+                  onAdd: isFront && !isCivic ? _openAddSheet : null,
                   footer: isFront && !entry.hideModePill ? _modePill() : null,
                   fillBleed: entry.hasImage ||
                       entry.showsCreditFace ||
                       entry.hasBusinessCard ||
-                      entry.hasCivicId ||
+                      isCivic ||
                       (entry.hasPinnedEssentials && entry.amount <= 0),
                   child: _SpendingCardContent(
                     entry: entry,
@@ -2630,7 +2648,13 @@ class _CivicIdCardBody extends StatelessWidget {
         record = {...record, ...live, 'registryId': liveRid.isNotEmpty ? liveRid : rid};
       }
     }
-    final photo = (ngmyCivicIdPhotoForRecord(record!, profilePicturePath: profilePicturePath) ?? '').trim();
+    final photo = (ngmyCivicIdPhotoForRecord(
+          record!,
+          profilePicturePath: profilePicturePath,
+          emailHint: (record['email'] ?? '').toString(),
+        ) ??
+        '')
+        .trim();
     return LayoutBuilder(
       builder: (context, c) {
         const designW = 360.0;
@@ -2891,19 +2915,23 @@ class _CreditCardSpendBody extends StatelessWidget {
                   shadows: [Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: ink.withValues(alpha: 0.72),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  letterSpacing: 0.6,
-                ),
-              ),
               const Spacer(),
             ],
+          ),
+        ),
+        // TOTAL sits in the bottom corner (Welcome back stays top-left on the frost shell).
+        Positioned(
+          left: 14,
+          bottom: 16,
+          child: Text(
+            'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: ink.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              letterSpacing: 0.5,
+              shadows: [Shadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 6, offset: const Offset(0, 1))],
+            ),
           ),
         ),
       ],
@@ -3862,7 +3890,7 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
       return;
     }
     // Reuse Civic Registry ID photo or the account profile picture ? no second upload needed.
-    var photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
+    var photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath, emailHint: widget.userEmail) ?? '').trim();
     if (photo.isEmpty) {
       if (widget.config == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3892,7 +3920,8 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
         return;
       }
       record = Map<String, dynamic>.from(refreshed);
-      photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath) ?? '').trim();
+      await ngmyLoadCivicIdPhotoLocal(widget.userEmail);
+      photo = (ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.profilePicturePath, emailHint: widget.userEmail) ?? '').trim();
       if (photo.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Add an ID photo first, then you can pin your Civic Registry ID.')),
@@ -3900,15 +3929,13 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
         return;
       }
     }
-    // Persist a lean Civic ID snapshot (no huge data-URL photo) so the home card
-    // survives app restarts without blowing SharedPreferences quota.
+    // Persist a lean Civic ID snapshot; photo bytes live in on-device local storage.
     final lean = Map<String, dynamic>.from(record);
-    final storedPhoto = (lean['idPhotoPath'] ?? '').toString().trim();
-    if (storedPhoto.startsWith('data:') || storedPhoto.length > 800) {
-      lean['idPhotoPath'] = '';
-    }
-    if ((lean['idPhotoPath'] ?? '').toString().trim().isEmpty && photo.isNotEmpty && !photo.startsWith('data:') && photo.length <= 800) {
-      lean['idPhotoPath'] = photo;
+    if (photo.isNotEmpty) {
+      await ngmyEnsureCivicIdPhotoLocal(widget.userEmail, photo);
+      lean['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+    } else {
+      lean['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
     }
     final name = (lean['fullName'] ?? lean['registryId'] ?? 'Civic Registry ID').toString().trim();
     if (!mounted) return;

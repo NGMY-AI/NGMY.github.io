@@ -32720,9 +32720,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  void _showCivicIdCardForRecord(Map<String, dynamic> record, {bool allowPhotoChange = false}) {
+  Future<void> _showCivicIdCardForRecord(Map<String, dynamic> record, {bool allowPhotoChange = false}) async {
     final email = NgmyCivicRegistryMembers.emailKey((record['email'] ?? widget.user.email).toString());
-    final photoPath = ngmyCivicIdPhotoForRecord(record, profilePicturePath: widget.user.profilePicturePath);
+    await ngmyLoadCivicIdPhotoLocal(email);
+    if (!mounted) return;
+    final photoPath = ngmyCivicIdPhotoForRecord(
+      record,
+      profilePicturePath: widget.user.profilePicturePath,
+      emailHint: email,
+    );
     final photoImage = ngmyCachedProfileImage(photoPath);
     showNgmyCivicRegistryIdCardDialog(
       context,
