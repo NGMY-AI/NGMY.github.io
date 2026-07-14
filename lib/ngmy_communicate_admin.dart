@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_advisor_roster.dart';
 import 'ngmy_communicate.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_mshauri.dart';
@@ -17,6 +18,7 @@ Future<void> showNgmyCommunicateAdminSheet({
   required Future<bool> Function() onPersist,
   String apiKey = '',
 }) async {
+  ngmyNormalizeAdvisorRosterInConfig(config);
   var profiles = ngmyCommunicateProfilesFromConfig(config);
   final raw = (config as dynamic).communicateProfiles;
   if (raw is List) {

@@ -104,10 +104,14 @@ String? _personPortraitKey({required String name, required String id}) {
   }
 
   // First advisor is MARIAM in admin data; Miriam / Maryam are common spellings too.
-  if (hit('mariam') || hit('miriam') || hit('maryam')) return 'person_miriam';
+  if (hit('mariam') || hit('miriam') || hit('maryam') || hit('dusabe')) return 'person_miriam';
+  // New romantic advisor — check before generic "suzana".
+  if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
   // Spelling variants used in the app / by the user.
-  if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey')) return 'person_susie';
-  if (hit('mina')) return 'person_mina';
+  if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey') || hit('benet')) {
+    return 'person_susie';
+  }
+  if (hit('mina') || (hit('samuel') && hit('mina'))) return 'person_mina';
   return null;
 }
 
@@ -124,7 +128,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'bible_study_teacher_m', 'bible_study_teacher_f',
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
-    'person_miriam', 'person_susie', 'person_mina',
+    'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
   ];
   await Future.wait(keys.map((k) async {
     final path = 'assets/images/advisors/$k.jpg';

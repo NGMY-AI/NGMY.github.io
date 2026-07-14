@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_advisor_portraits.dart';
+import 'ngmy_advisor_roster.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
@@ -1193,6 +1194,9 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
 }
 
 List<NgmyCommunicateProfile> ngmyCommunicateProfilesFromConfig(dynamic config) {
+  if (ngmyNormalizeAdvisorRosterInConfig(config)) {
+    unawaited(NgmyCommunicateAvatarCache.persistConfigProfilesLocally(config));
+  }
   final raw = (config as dynamic).communicateProfiles;
   if (raw is! List) return [];
   return raw
@@ -1269,6 +1273,10 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     super.initState();
     _bgCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _floatCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat(reverse: true);
+    if (ngmyNormalizeAdvisorRosterInConfig(widget.config)) {
+      unawaited(NgmyCommunicateAvatarCache.persistConfigProfilesLocally(widget.config));
+      unawaited(widget.onPersistConfig?.call() ?? Future<bool>.value(false));
+    }
     unawaited(_prepAvatars());
     unawaited(_warmAiKey());
     final email = ((widget.user as dynamic).email as String?) ?? '';
