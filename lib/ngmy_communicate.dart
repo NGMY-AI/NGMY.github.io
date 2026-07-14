@@ -259,6 +259,14 @@ class NgmyCommunicateProfile {
   /// Every advisor wears a role label on their NGMY Advisors badge.
   String get roleBadgeLabel => ngmyCommunicateRoleLabel(role);
 
+  /// Classic corner chip (Teacher / Lawyer / Pastor…) — same rules as before:
+  /// shown for every role except plain Companion.
+  String? get cornerRoleBadgeLabel {
+    final r = ngmyCommunicateNormalizeRole(role);
+    if (r == 'companion') return null;
+    return ngmyCommunicateRoleLabel(r);
+  }
+
   String systemPrompt(
     List<Map<String, dynamic>> memory, {
     required String chatterEmail,
@@ -649,6 +657,28 @@ List<Color> _ngmyAdvisorBadgeColors(String roleLabel) {
     'Debater' => [const Color(0xFFB45309), const Color(0xFFDC2626)],
     _ => [const Color(0xFFE11D48), const Color(0xFFBE123C)],
   };
+}
+
+/// Classic role chip for the top corner (Teacher, Lawyer, Pastor…).
+Widget _classicCornerRoleBadge(String label, {bool small = true}) {
+  final colors = _ngmyAdvisorBadgeColors(label);
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: small ? 7 : 9, vertical: small ? 3 : 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      gradient: LinearGradient(colors: colors),
+      boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: 8)],
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: small ? 8 : 9,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
 }
 
 /// Compact worn badge on advisor cards / chat — tap for the full NGMY ID card.
@@ -1633,61 +1663,72 @@ class _Companion3DCard extends StatelessWidget {
             phase: index * 0.13,
             onTap: onTap,
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-            child: SizedBox(
-              width: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Center(
-                    child: NgmyCommunicateAvatar(
-                      key: ValueKey<String>('ngmy_avatar_${profile.id}'),
-                      profile: profile,
-                      size: 68,
-                      glow: true,
-                      // List card opens chat only — fullscreen photo is in-chat.
-                      openFullscreenOnTap: false,
-                    ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (profile.cornerRoleBadgeLabel != null)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: _classicCornerRoleBadge(profile.cornerRoleBadgeLabel!, small: true),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    profile.name,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: nameColor, fontWeight: FontWeight.w900, fontSize: 15),
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Center(
+                        child: NgmyCommunicateAvatar(
+                          key: ValueKey<String>('ngmy_avatar_${profile.id}'),
+                          profile: profile,
+                          size: 68,
+                          glow: true,
+                          // List card opens chat only — fullscreen photo is in-chat.
+                          openFullscreenOnTap: false,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        profile.name,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: nameColor, fontWeight: FontWeight.w900, fontSize: 15),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        profile.genderLabel,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: subColor, fontSize: 11),
+                      ),
+                      const SizedBox(height: 6),
+                      _roleBadgeForProfile(
+                        profile,
+                        small: true,
+                        onTap: () => showNgmyAdvisorBadgeCard(context, profile),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(colors: [Color(0xFFE11D48), Color(0xFFDB2777)]),
+                          boxShadow: [
+                            BoxShadow(color: const Color(0xFFE11D48).withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text('Say hi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                            SizedBox(width: 4),
+                            Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 11),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    profile.genderLabel,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: subColor, fontSize: 11),
-                  ),
-                  const SizedBox(height: 6),
-                  _roleBadgeForProfile(
-                    profile,
-                    small: true,
-                    onTap: () => showNgmyAdvisorBadgeCard(context, profile),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: const LinearGradient(colors: [Color(0xFFE11D48), Color(0xFFDB2777)]),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFFE11D48).withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 10),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text('Say hi', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
-                        SizedBox(width: 4),
-                        Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 11),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
         );
       },
@@ -2530,54 +2571,64 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   borderRadius: BorderRadius.circular(22),
                   fillAlpha: 0.06,
                   blur: 12,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    child: Row(
-                      children: [
-                        IconButton(icon: Icon(Icons.arrow_back_rounded, color: panelFgMuted, size: 22), onPressed: widget.onBack),
-                        NgmyCommunicateAvatar(
-                          profile: widget.profile,
-                          size: 44,
-                          glow: true,
-                          openFullscreenOnTap: true,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(widget.profile.name, style: TextStyle(color: panelFg, fontWeight: FontWeight.w900, fontSize: 16)),
-                              const SizedBox(height: 3),
-                              GestureDetector(
-                                onTap: () => showNgmyAdvisorBadgeCard(context, widget.profile),
-                                child: _roleBadgeForProfile(widget.profile, small: true),
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        child: Row(
+                          children: [
+                            IconButton(icon: Icon(Icons.arrow_back_rounded, color: panelFgMuted, size: 22), onPressed: widget.onBack),
+                            NgmyCommunicateAvatar(
+                              profile: widget.profile,
+                              size: 44,
+                              glow: true,
+                              openFullscreenOnTap: true,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(widget.profile.name, style: TextStyle(color: panelFg, fontWeight: FontWeight.w900, fontSize: 16)),
+                                  const SizedBox(height: 3),
+                                  GestureDetector(
+                                    onTap: () => showNgmyAdvisorBadgeCard(context, widget.profile),
+                                    child: _roleBadgeForProfile(widget.profile, small: true),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _isAdmin ? 'Unlimited chat' : passLabel,
+                                    style: TextStyle(color: panelFgMuted, fontSize: 10),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _isAdmin ? 'Unlimited chat' : passLabel,
-                                style: TextStyle(color: panelFgMuted, fontSize: 10),
+                            ),
+                            IconButton(
+                              tooltip: 'NGMY Advisors badge',
+                              onPressed: () => showNgmyAdvisorBadgeCard(context, widget.profile),
+                              icon: Icon(Icons.badge_rounded, color: const Color(0xFFE11D48), size: 22),
+                            ),
+                            if (_isTranslator)
+                              IconButton(
+                                tooltip: 'Change languages',
+                                onPressed: _pickTranslatorLanguages,
+                                icon: const Icon(Icons.translate_rounded, color: Color(0xFF14B8A6), size: 22),
+                              )
+                            else if (ngmyCommunicateRoleIsRomantic(widget.profile.role))
+                              const Padding(
+                                padding: EdgeInsets.only(right: 6),
+                                child: Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: 'NGMY Advisors badge',
-                          onPressed: () => showNgmyAdvisorBadgeCard(context, widget.profile),
-                          icon: Icon(Icons.badge_rounded, color: const Color(0xFFE11D48), size: 22),
+                      ),
+                      if (widget.profile.cornerRoleBadgeLabel != null)
+                        Positioned(
+                          top: 2,
+                          right: 4,
+                          child: _classicCornerRoleBadge(widget.profile.cornerRoleBadgeLabel!, small: true),
                         ),
-                        if (_isTranslator)
-                          IconButton(
-                            tooltip: 'Change languages',
-                            onPressed: _pickTranslatorLanguages,
-                            icon: const Icon(Icons.translate_rounded, color: Color(0xFF14B8A6), size: 22),
-                          )
-                        else if (ngmyCommunicateRoleIsRomantic(widget.profile.role))
-                          const Padding(
-                            padding: EdgeInsets.only(right: 6),
-                            child: Icon(Icons.favorite, color: Color(0xFFEC4899), size: 20),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
