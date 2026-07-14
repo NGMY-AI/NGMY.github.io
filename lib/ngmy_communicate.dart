@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_advisor_portraits.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
@@ -722,6 +723,28 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Widget _emojiFallback() =>
       Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
 
+  /// No uploaded photo yet (or it failed to load) — draw an illustrated
+  /// portrait locally instead of a plain emoji. Deterministic per advisor
+  /// id, fully offline, no network or bundled photo assets involved.
+  Widget _illustratedFallback() {
+    try {
+      final bytes = ngmyAdvisorPortraitBytes(id: widget.profile.id, gender: widget.profile.gender);
+      return ClipOval(
+        child: Image.memory(
+          bytes,
+          width: widget.size,
+          height: widget.size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => _emojiFallback(),
+        ),
+      );
+    } catch (_) {
+      return _emojiFallback();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget inner;
@@ -734,11 +757,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => _emojiFallback(),
+          errorBuilder: (_, __, ___) => _illustratedFallback(),
         ),
       );
     } else {
-      inner = _emojiFallback();
+      inner = _illustratedFallback();
     }
     return Container(
       width: widget.size,
