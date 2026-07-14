@@ -9477,18 +9477,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
         await ngmyHydrateDocSharePaymentsFromAllBackups(next);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
-        // Apply quietly while the user is in a stacked screen/dialog so a parent
-        // rebuild cannot feel like a hard kick back to Home.
-        void applyConfig() {
-          _config = next;
-          _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
-          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
-        }
-        if (ngmyShouldAllowGlobalInterrupt()) {
-          setState(applyConfig);
-        } else {
-          applyConfig();
-        }
+        // Never rebuild the app shell mid-session — that can feel like a kick to Home.
+        // Apply quietly; screens that need live config already refresh via their own listeners.
+        _config = next;
+        _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
+        _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('app_config', jsonEncode(_config.toJson()));
           prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
@@ -14296,7 +14289,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _idx = i;
       _visitedTabs.add(i);
     });
-    SharedPreferences.getInstance().then((p) => p.setInt('ngmy_main_tab_idx', i)).catchError((_) {});
     if (i == 0) {
       WidgetsBinding.instance.scheduleForcedFrame();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -14691,14 +14683,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
-    SharedPreferences.getInstance().then((p) {
-      final saved = p.getInt('ngmy_main_tab_idx');
-      if (!mounted || saved == null || saved == _idx || saved < 0) return;
-      setState(() {
-        _idx = saved;
-        _visitedTabs.add(saved);
-      });
-    }).catchError((_) {});
+    // Always land on Home for a fresh shell. Never restore a previous tab — that
+    // fought mid-session stability and is wrong for cold open (close → reopen).
+    _idx = 0;
+    try {
+      SharedPreferences.getInstance().then((p) => p.remove('ngmy_main_tab_idx')).catchError((_) {});
+    } catch (_) {}
     ngmyRegisterPageVisibleHandler(_onShellVisibleAgain);
     _warmTransactionCacheAfterFrame();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
