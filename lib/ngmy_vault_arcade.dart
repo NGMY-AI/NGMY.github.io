@@ -6,8 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
-import 'ngmy_vault_games_pack2.dart';
-import 'ngmy_vault_games_pack3.dart';
+import 'ngmy_vault_mind_games.dart';
 import 'ngmy_vault_new_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
@@ -96,66 +95,24 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
         return const NgmyVaultMazeDashGame();
       case 'memory_flip':
         return const NgmyVaultMemoryFlipGame();
-      case 'stack_tower':
-        return const NgmyVaultStackTowerGame();
-      case 'reflex_grid':
-        return const NgmyVaultReflexGridGame();
-      case 'lane_racer':
-        return NgmyVaultLaneRacerGame(game: game);
-      case 'drag_launch':
-        return NgmyVaultDragLaunchGame(game: game);
-      case 'perfect_park':
-        return NgmyVaultPerfectParkGame(game: game);
-      case 'wheelie_balance':
-        return NgmyVaultWheelieGame(game: game);
-      case 'jump_runner':
-        return NgmyVaultJumpRunnerGame(game: game);
-      case 'orb_collector':
-        return NgmyVaultCollectorGame(game: game);
-      case 'target_aim':
-        return NgmyVaultTargetAimGame(game: game);
-      case 'brick_breaker':
-        return NgmyVaultBrickBreakerGame(game: game);
-      case 'gravity_flap':
-        return NgmyVaultGravityFlapGame(game: game);
-      case 'traffic_weave':
-        return NgmyVaultTrafficWeaveGame(game: game);
-      case 'keep_up':
-        return NgmyVaultKeepUpGame(game: game);
-      case 'whack_pulse':
-        return NgmyVaultWhackPulseGame(game: game);
-      case 'slice_drift':
-        return NgmyVaultSliceDriftGame(game: game);
-      case 'darts_timing':
-        return NgmyVaultDartsTimingGame(game: game);
-      case 'ring_toss':
-        return NgmyVaultRingTossGame(game: game);
-      case 'pinball_bump':
-        return NgmyVaultPinballBumpGame(game: game);
-      case 'orbit_dock':
-        return NgmyVaultOrbitDockGame(game: game);
-      case 'laser_defense':
-        return NgmyVaultLaserDefenseGame(game: game);
-      case 'platform_hop':
-        return NgmyVaultPlatformHopGame(game: game);
-      case 'balance_beam':
-        return NgmyVaultBalanceBeamGame(game: game);
-      case 'curl_bowl':
-        return NgmyVaultCurlBowlGame(game: game);
-      case 'balloon_rush':
-        return NgmyVaultBalloonRushGame(game: game);
-      case 'spin_stop':
-        return NgmyVaultSpinStopGame(game: game);
-      case 'metro_flow':
-        return NgmyVaultMetroFlowGame(game: game);
-      case 'asteroid_drift':
-        return NgmyVaultAsteroidDriftGame(game: game);
-      case 'slingshot_score':
-        return NgmyVaultSlingshotScoreGame(game: game);
-      case 'juggle_tap':
-        return NgmyVaultJuggleTapGame(game: game);
-      case 'vortex_hold':
-        return NgmyVaultVortexHoldGame(game: game);
+      case 'merge_2048':
+        return NgmyVaultMerge2048Game(game: game);
+      case 'code_breaker':
+        return NgmyVaultCodeBreakerGame(game: game);
+      case 'connect_four':
+        return NgmyVaultConnectFourGame(game: game);
+      case 'slide_lock':
+        return NgmyVaultSlideLockGame(game: game);
+      case 'sudoku_six':
+        return NgmyVaultSudokuSixGame(game: game);
+      case 'cipher_five':
+        return NgmyVaultCipherFiveGame(game: game);
+      case 'reversi_duel':
+        return NgmyVaultReversiDuelGame(game: game);
+      case 'hanoi_spire':
+        return NgmyVaultHanoiSpireGame(game: game);
+      case 'make_twenty_four':
+        return NgmyVaultMakeTwentyFourGame(game: game);
       default:
         if (game.engine == VaultEngine.neonSerpent) {
           return NgmyVaultLeveledGameScreen(game: game);
