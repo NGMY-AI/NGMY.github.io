@@ -1,4 +1,4 @@
-/// Public-facing NGMY Advisors badge text (never raw AI personality prompts).
+/// Public-facing NGMY Advisors badge text — written in the advisor’s own voice.
 
 const String _kHub = 'NGMY Advisors';
 
@@ -23,15 +23,24 @@ NgmyAdvisorBadgeCopy ngmyAdvisorBadgeCopy({
   if (byName != null) return byName;
 
   final r = role.trim().toLowerCase().replaceAll(' ', '_');
-  return _byRole[r] ??
-      NgmyAdvisorBadgeCopy(
-        roleTitle: 'Certified Advisor',
-        about:
-            '${n.isEmpty ? 'This advisor' : n} is a verified member of $_kHub, '
-            'trusted to listen with care and guide with clarity.',
-        style:
-            'Polished, respectful, and professional — clear guidance with a warm human touch.',
-      );
+  final roleCopy = _byRole[r];
+  if (roleCopy != null) {
+    if (n.isEmpty) return roleCopy;
+    return NgmyAdvisorBadgeCopy(
+      roleTitle: roleCopy.roleTitle,
+      about: 'I am $n. ${roleCopy.about}',
+      style: roleCopy.style,
+    );
+  }
+  final who = n.isEmpty ? 'your advisor' : n;
+  return NgmyAdvisorBadgeCopy(
+    roleTitle: 'Certified Advisor',
+    about:
+        'I am $who, a verified member of $_kHub. '
+        'I listen with care, I speak with clarity, and I am here to guide you with respect.',
+    style:
+        'I keep myself polished, respectful, and professional — clear guidance with a warm human touch.',
+  );
 }
 
 /// Short chip label for worn badges.
@@ -42,77 +51,84 @@ const _byName = <String, NgmyAdvisorBadgeCopy>{
   'MARIAM DUSABE': NgmyAdvisorBadgeCopy(
     roleTitle: 'Relationship & Lifestyle Advisor',
     about:
-        'MARIAM DUSABE represents $_kHub with grace and confidence. '
-        'She offers thoughtful companionship, dating conversation, and everyday life support — '
-        'poised, selective, and fully present for meaningful talk.',
+        'I am MARIAM DUSABE, a Relationship & Lifestyle Advisor on $_kHub. '
+        'I bring grace and confidence to every chat — companionship, dating talk, and everyday life support. '
+        'I am poised, selective, and fully present when you need meaningful conversation.',
     style:
-        'Elegant and approachable. Warm when trust is earned; composed standards from the first hello.',
+        'I am elegant and approachable. I warm up when trust is earned, and I keep my standards from the first hello.',
   ),
   'SUZANA VANESSA': NgmyAdvisorBadgeCopy(
     roleTitle: 'Personal Connection Advisor',
     about:
-        'SUZANA VANESSA is a rising voice on $_kHub — charming, grounded, and open to real conversation. '
-        'Members may talk through dating, daily life, hopes, or simply good company. '
-        'She welcomes dialogue with professionalism and self-respect.',
+        'I am SUZANA VANESSA, a Personal Connection Advisor on $_kHub. '
+        'I am charming, grounded, and open to real conversation — dating, daily life, hopes, or simply good company. '
+        'I welcome you with professionalism and self-respect.',
     style:
-        'Refined connection: playful yet dignified, hard to rush, easy to talk to about anything.',
+        'I keep my connections refined: playful yet dignified. I am not easy to rush, but I am easy to talk to about anything.',
   ),
   'ANNA AMURI': NgmyAdvisorBadgeCopy(
     roleTitle: 'Lifestyle & Guidance Advisor',
     about:
-        'ANNA AMURI brings polished counsel to $_kHub members seeking balance, '
-        'clarity, and confident next steps in personal and social life.',
-    style: 'Calm, articulate, and encouraging — practical wisdom with modern elegance.',
+        'I am ANNA AMURI, a Lifestyle & Guidance Advisor on $_kHub. '
+        'I help you find balance, clarity, and confident next steps in your personal and social life.',
+    style:
+        'I speak calmly and clearly. I encourage you with practical wisdom and modern elegance.',
   ),
   'ALISA JOHN': NgmyAdvisorBadgeCopy(
     roleTitle: 'Conversation & Confidence Advisor',
     about:
-        'ALISA JOHN helps members speak with clarity and carry themselves with confidence — '
-        'from everyday chats to moments that matter.',
-    style: 'Bright, professional, and sincere — sharp insight delivered with kindness.',
+        'I am ALISA JOHN, a Conversation & Confidence Advisor on $_kHub. '
+        'I help you speak with clarity and carry yourself with confidence — from everyday chats to moments that matter.',
+    style:
+        'I am bright, professional, and sincere. I give sharp insight with kindness.',
   ),
   'SUZANA MBUTO': NgmyAdvisorBadgeCopy(
     roleTitle: 'Personal Growth Advisor',
     about:
-        'SUZANA MBUTO supports members navigating growth, relationships, and daily decisions '
-        'with steady judgment and a welcoming presence on $_kHub.',
-    style: 'Steady, warm, and clear — mentorship with sisterly care and professional poise.',
+        'I am SUZANA MBUTO, a Personal Growth Advisor on $_kHub. '
+        'I walk with you through growth, relationships, and daily decisions with steady judgment and a welcoming presence.',
+    style:
+        'I am steady, warm, and clear — sisterly care with professional poise.',
   ),
   'SUZY BENET': NgmyAdvisorBadgeCopy(
     roleTitle: 'Social & Lifestyle Advisor',
     about:
-        'SUZY BENET is a verified $_kHub advisor known for stylish conversation, '
-        'social confidence, and honest perspective.',
-    style: 'Chic, witty, and professional — good company with high standards.',
+        'I am SUZY BENET, a Social & Lifestyle Advisor on $_kHub. '
+        'I am known for stylish conversation, social confidence, and an honest perspective you can trust.',
+    style:
+        'I am chic, witty, and professional — good company with high standards.',
   ),
   'MINA SAMUEL': NgmyAdvisorBadgeCopy(
     roleTitle: 'Wellness & Presence Advisor',
     about:
-        'MINA SAMUEL guides members toward calmer days, healthier habits of mind, '
-        'and conversations that restore focus and peace.',
-    style: 'Gentle professionalism — soft tone, clear boundaries, lasting encouragement.',
+        'I am MINA SAMUEL, a Wellness & Presence Advisor on $_kHub. '
+        'I guide you toward calmer days, healthier habits of mind, and conversations that restore focus and peace.',
+    style:
+        'I keep a gentle professionalism — soft tone, clear boundaries, lasting encouragement.',
   ),
   'ALEX REMY': NgmyAdvisorBadgeCopy(
     roleTitle: 'Strategic Life Advisor',
     about:
-        'ALEX REMY provides sharp, respectful guidance for careers, decisions, and daily strategy '
-        'as a certified $_kHub professional.',
-    style: 'Direct, respectful, and composed — premium advice without the clutter.',
+        'I am ALEX REMY, a Strategic Life Advisor and certified professional on $_kHub. '
+        'I give sharp, respectful guidance for careers, decisions, and daily strategy.',
+    style:
+        'I am direct, respectful, and composed — premium advice without the clutter.',
   ),
   'JEREMIAH NESTO': NgmyAdvisorBadgeCopy(
     roleTitle: 'Ethics & Counsel Advisor',
     about:
-        'JEREMIAH NESTO offers principled counsel for members seeking direction, integrity, '
-        'and steady support through complex moments.',
-    style: 'Thoughtful, firm, and fair — wisdom spoken with quiet authority.',
+        'I am JEREMIAH NESTO, an Ethics & Counsel Advisor on $_kHub. '
+        'I offer principled counsel when you need direction, integrity, and steady support through complex moments.',
+    style:
+        'I am thoughtful, firm, and fair — wisdom spoken with quiet authority.',
   ),
   'MSHAURI AMANI': NgmyAdvisorBadgeCopy(
     roleTitle: 'Wisdom Advisor',
     about:
-        'MSHAURI AMANI is the elder voice of $_kHub — an older woman of experience '
-        'who offers community wisdom, patience, and time-tested guidance for life’s harder questions.',
+        'I am MSHAURI AMANI, the Wisdom Advisor of $_kHub. '
+        'I am an older woman of experience. I offer community wisdom, patience, and time-tested guidance for life’s harder questions.',
     style:
-        'Mature, gracious, and deeply listening — traditional wisdom delivered with modern respect.',
+        'I am mature and gracious. I listen deeply, and I share traditional wisdom with modern respect.',
   ),
 };
 
@@ -120,116 +136,123 @@ const _byRole = <String, NgmyAdvisorBadgeCopy>{
   'romantic': NgmyAdvisorBadgeCopy(
     roleTitle: 'Relationship Advisor',
     about:
-        'A verified Relationship Advisor on $_kHub — available for dating conversation, '
-        'companionship chat, and respectful romantic guidance.',
-    style: 'Warm, selective, and professional — chemistry with composure.',
+        'I am a verified Relationship Advisor on $_kHub. '
+        'I am here for dating conversation, companionship chat, and respectful romantic guidance.',
+    style: 'I am warm and selective, and I keep my professionalism — chemistry with composure.',
   ),
   'companion': NgmyAdvisorBadgeCopy(
     roleTitle: 'Personal Companion Advisor',
     about:
-        'A certified Companion Advisor offering thoughtful conversation and everyday support '
-        'for members of $_kHub.',
-    style: 'Friendly professionalism — natural chat with reliable presence.',
+        'I am a certified Companion Advisor on $_kHub. '
+        'I offer thoughtful conversation and everyday support whenever you need me.',
+    style: 'I keep friendly professionalism — natural chat with reliable presence.',
   ),
   'friend': NgmyAdvisorBadgeCopy(
     roleTitle: 'Trusted Friend Advisor',
-    about: 'A professional Friend Advisor for honest talk, encouragement, and everyday perspective.',
-    style: 'Open, loyal, and respectful — a steady friend with good judgment.',
+    about:
+        'I am a professional Friend Advisor. I show up for honest talk, encouragement, and everyday perspective.',
+    style: 'I am open, loyal, and respectful — a steady friend with good judgment.',
   ),
   'therapist': NgmyAdvisorBadgeCopy(
     roleTitle: 'Wellness Counsel Advisor',
     about:
-        'Provides structured, compassionate listening and coping guidance within $_kHub standards.',
-    style: 'Calm clinical professionalism — clear language, careful pacing.',
+        'I provide structured, compassionate listening and coping guidance within $_kHub standards.',
+    style: 'I keep calm clinical professionalism — clear language, careful pacing.',
   ),
   'counselor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Guidance Counselor',
-    about: 'Certified counseling support for clarity, stress, and personal decisions.',
-    style: 'Supportive and structured — practical steps with empathy.',
+    about: 'I offer certified counseling support for clarity, stress, and personal decisions.',
+    style: 'I am supportive and structured — practical steps with empathy.',
   ),
   'teacher': NgmyAdvisorBadgeCopy(
     roleTitle: 'Learning Advisor',
-    about: 'Academic and skills guidance with patient, professional instruction.',
-    style: 'Clear lessons, encouraging tone, and stepwise clarity.',
+    about: 'I guide academics and skills with patient, professional instruction.',
+    style: 'I teach with clear lessons, an encouraging tone, and stepwise clarity.',
   ),
   'lawyer': NgmyAdvisorBadgeCopy(
     roleTitle: 'Legal Awareness Advisor',
-    about: 'Explains legal concepts in plain language for informed decisions (not a substitute for licensed counsel).',
-    style: 'Precise, formal, and careful with facts.',
+    about:
+        'I explain legal concepts in plain language so you can make informed decisions '
+        '(I am not a substitute for licensed counsel).',
+    style: 'I am precise, formal, and careful with facts.',
   ),
   'financial_advisor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Financial Clarity Advisor',
-    about: 'Helps members organize money decisions with disciplined, ethical guidance.',
-    style: 'Numbers with patience — practical plans, no pressure.',
+    about: 'I help you organize money decisions with disciplined, ethical guidance.',
+    style: 'I teach numbers with patience — practical plans, no pressure.',
   ),
   'pastor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Faith & Pastoral Advisor',
-    about: 'Spiritual encouragement and pastoral conversation rooted in respect and scripture-minded care.',
-    style: 'Gentle authority — prayerful, hopeful, grounded.',
+    about:
+        'I offer spiritual encouragement and pastoral conversation rooted in respect and scripture-minded care.',
+    style: 'I speak with gentle authority — prayerful, hopeful, grounded.',
   ),
   'bible_study_teacher': NgmyAdvisorBadgeCopy(
     roleTitle: 'Scripture Study Advisor',
-    about: 'Guides thoughtful Bible study and faith conversations with teaching care.',
-    style: 'Instructive and humble — scripture first, pride last.',
+    about: 'I guide thoughtful Bible study and faith conversations with teaching care.',
+    style: 'I stay instructive and humble — scripture first, pride last.',
   ),
   'debater': NgmyAdvisorBadgeCopy(
     roleTitle: 'Argument Strategy Advisor',
-    about: 'Trains members to argue with logic, composure, and persuasive structure.',
-    style: 'Sharp minds, clean tone — win the point without losing dignity.',
+    about: 'I train you to argue with logic, composure, and persuasive structure.',
+    style: 'I keep a sharp mind and a clean tone — win the point without losing dignity.',
   ),
   'marriage_advisor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Marriage & Family Advisor',
-    about: 'Seasoned guidance for partnership, respect, and family harmony.',
-    style: 'Mature counsel — balanced, discreet, and fair to both sides.',
+    about: 'I give seasoned guidance for partnership, respect, and family harmony.',
+    style: 'I offer mature counsel — balanced, discreet, and fair to both sides.',
   ),
   'doctor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Health Literacy Advisor',
-    about: 'Explains health topics clearly for better questions and informed choices (not emergency care).',
-    style: 'Clinical calm — accurate, careful, easy to follow.',
+    about:
+        'I explain health topics clearly so you can ask better questions and make informed choices '
+        '(I am not emergency care).',
+    style: 'I keep clinical calm — accurate, careful, easy to follow.',
   ),
   'mentor': NgmyAdvisorBadgeCopy(
     roleTitle: 'Life Mentor',
-    about: 'Long-view mentorship for growth, discipline, and purpose.',
-    style: 'Seasoned encouragement — high standards, kind delivery.',
+    about: 'I provide long-view mentorship for growth, discipline, and purpose.',
+    style: 'I encourage with seasoned care — high standards, kind delivery.',
   ),
   'career_coach': NgmyAdvisorBadgeCopy(
     roleTitle: 'Career Strategy Advisor',
-    about: 'Professional coaching for careers, interviews, and advancement plans.',
-    style: 'Executive clarity — actionable, confident, concise.',
+    about: 'I coach careers, interviews, and advancement plans with professional focus.',
+    style: 'I bring executive clarity — actionable, confident, concise.',
   ),
   'fitness_coach': NgmyAdvisorBadgeCopy(
     roleTitle: 'Fitness Performance Advisor',
-    about: 'Training mindset and habit support for stronger, sustainable routines.',
-    style: 'Energetic professionalism — goals first, excuses last.',
+    about: 'I support training mindset and habits for stronger, sustainable routines.',
+    style: 'I keep energetic professionalism — goals first, excuses last.',
   ),
   'life_coach': NgmyAdvisorBadgeCopy(
     roleTitle: 'Life Strategy Advisor',
-    about: 'Holistic coaching for habits, goals, and personal direction.',
-    style: 'Vision with structure — motivating and accountable.',
+    about: 'I offer holistic coaching for habits, goals, and personal direction.',
+    style: 'I pair vision with structure — motivating and accountable.',
   ),
   'translator': NgmyAdvisorBadgeCopy(
     roleTitle: 'Language Practice Advisor',
-    about: 'Language practice and cultural bridge-building with patient professionalism.',
-    style: 'Clear, slow when needed, celebratory when you improve.',
+    about: 'I help with language practice and cultural bridge-building with patient professionalism.',
+    style: 'I stay clear, slow when you need it, and celebratory when you improve.',
   ),
   'mshauri': NgmyAdvisorBadgeCopy(
     roleTitle: 'Wisdom Advisor',
-    about: 'Community wisdom and elder guidance for members seeking cultural grounding and life direction.',
-    style: 'Elder grace — patient listening, time-tested advice.',
+    about:
+        'I am a Wisdom Advisor. I share community wisdom and elder guidance when you need cultural grounding and life direction.',
+    style: 'I carry elder grace — patient listening, time-tested advice.',
   ),
   'pickup_line': NgmyAdvisorBadgeCopy(
     roleTitle: 'Charm Strategy Advisor',
-    about: 'Helps members craft confident, respectful openers and better social presence.',
-    style: 'Clever without crude — charm with class.',
+    about: 'I help you craft confident, respectful openers and a stronger social presence.',
+    style: 'I stay clever without crude — charm with class.',
   ),
   'smart_mouth': NgmyAdvisorBadgeCopy(
     roleTitle: 'Wit & Banter Advisor',
-    about: 'Sharpens comebacks and conversation timing with stylish restraint.',
-    style: 'Quick wit, professional filter — funny without disrespect.',
+    about: 'I sharpen your comebacks and conversation timing with stylish restraint.',
+    style: 'I use quick wit with a professional filter — funny without disrespect.',
   ),
   'text_coach': NgmyAdvisorBadgeCopy(
     roleTitle: 'Messaging Strategy Advisor',
-    about: 'Coaches texting, timing, and tone for stronger digital conversations.',
-    style: 'Strategic, modern, and respectful — every reply with intention.',
+    about: 'I coach texting, timing, and tone for stronger digital conversations.',
+    style: 'I stay strategic, modern, and respectful — every reply with intention.',
   ),
 };
