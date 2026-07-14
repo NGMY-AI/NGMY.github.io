@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_core_protocol_sims.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_vault_arcade.dart';
 
@@ -47,6 +48,20 @@ class _NgmyHomeTechFramesPanelState extends State<NgmyHomeTechFramesPanel> with 
           pageBuilder: (_, anim, secondary) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
             child: const NgmyVaultArcadeScreen(),
+          ),
+        ),
+      );
+      return;
+    }
+    if (spec.kind == _TechKind.core) {
+      await Navigator.of(context).push(
+        PageRouteBuilder(
+          opaque: true,
+          transitionDuration: const Duration(milliseconds: 420),
+          reverseTransitionDuration: const Duration(milliseconds: 320),
+          pageBuilder: (_, anim, secondary) => FadeTransition(
+            opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+            child: const NgmyCoreProtocolSimsScreen(),
           ),
         ),
       );
@@ -180,7 +195,7 @@ class _TechFrameSpec {
   static const core = _TechFrameSpec(
     kind: _TechKind.core,
     title: 'CORE PROTOCOL',
-    subtitle: 'Tap to boot the system sequence',
+    subtitle: 'Drag sims · pulse · lattice · orbit',
     badge: 'MAINFRAME',
     colors: [Color(0xFF34D399), Color(0xFF06B6D4), Color(0xFF818CF8)],
     icon: Icons.memory_rounded,

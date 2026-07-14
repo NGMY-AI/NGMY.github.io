@@ -1,0 +1,925 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+
+/// Full-screen Core Protocol simulations — drag finger for protocol effects.
+class NgmyCoreProtocolSimsScreen extends StatefulWidget {
+  const NgmyCoreProtocolSimsScreen({super.key});
+
+  @override
+  State<NgmyCoreProtocolSimsScreen> createState() => _NgmyCoreProtocolSimsScreenState();
+}
+
+enum _ProtocolSimKind {
+  pulseWeave,
+  signalLattice,
+  orbitHandler,
+  hexHandshake,
+  fluxStream,
+  echoField,
+}
+
+class _SimMeta {
+  const _SimMeta({
+    required this.kind,
+    required this.title,
+    required this.blurb,
+    required this.colors,
+    required this.icon,
+  });
+
+  final _ProtocolSimKind kind;
+  final String title;
+  final String blurb;
+  final List<Color> colors;
+  final IconData icon;
+}
+
+const _kSims = <_SimMeta>[
+  _SimMeta(
+    kind: _ProtocolSimKind.pulseWeave,
+    title: 'PULSE WEAVE',
+    blurb: 'Drag trails of live protocol pulses',
+    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
+    icon: Icons.graphic_eq_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.signalLattice,
+    title: 'SIGNAL LATTICE',
+    blurb: 'Energize nodes as your finger routes',
+    colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
+    icon: Icons.grid_on_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.orbitHandler,
+    title: 'ORBIT HANDLER',
+    blurb: 'Pull orbital packets around the core',
+    colors: [Color(0xFFA78BFA), Color(0xFFEC4899)],
+    icon: Icons.blur_circular_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.hexHandshake,
+    title: 'HEX HANDSHAKE',
+    blurb: 'Wake hexagonal handshake cells',
+    colors: [Color(0xFFFBBF24), Color(0xFF34D399)],
+    icon: Icons.hexagon_outlined,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.fluxStream,
+    title: 'FLUX STREAM',
+    blurb: 'Bend flowing protocol current',
+    colors: [Color(0xFF06B6D4), Color(0xFF6366F1)],
+    icon: Icons.waves_rounded,
+  ),
+  _SimMeta(
+    kind: _ProtocolSimKind.echoField,
+    title: 'ECHO FIELD',
+    blurb: 'Cast expanding echo rings',
+    colors: [Color(0xFFF472B6), Color(0xFF818CF8)],
+    icon: Icons.podcasts_rounded,
+  ),
+];
+
+class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
+  _SimMeta? _active;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _active;
+    return Scaffold(
+      backgroundColor: const Color(0xFF030712),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _CoreBackdrop(),
+          if (active == null)
+            _SimPicker(
+              onPick: (s) => setState(() => _active = s),
+              onClose: () => Navigator.of(context).maybePop(),
+            )
+          else
+            _ProtocolSimCanvas(
+              meta: active,
+              onBack: () => setState(() => _active = null),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoreBackdrop extends StatelessWidget {
+  const _CoreBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _CoreBackdropPainter(),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _CoreBackdropPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF030712), Color(0xFF0B1220), Color(0xFF020617)],
+        ).createShader(rect),
+    );
+    final glow = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0, -0.2),
+        radius: 0.85,
+        colors: [
+          const Color(0xFF34D399).withValues(alpha: 0.16),
+          const Color(0xFF06B6D4).withValues(alpha: 0.06),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, glow);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SimPicker extends StatelessWidget {
+  const _SimPicker({required this.onPick, required this.onClose});
+
+  final ValueChanged<_SimMeta> onPick;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SYSTEM · MAINFRAME',
+                        style: TextStyle(
+                          color: const Color(0xFF34D399).withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'CORE PROTOCOL',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.8,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pick a simulation — drag your finger to run it',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onClose,
+                  icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.75)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              itemCount: _kSims.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final s = _kSims[i];
+                return _SimPickTile(meta: s, onTap: () => onPick(s));
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SimPickTile extends StatelessWidget {
+  const _SimPickTile({required this.meta, required this.onTap});
+
+  final _SimMeta meta;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                meta.colors.first.withValues(alpha: 0.18),
+                const Color(0xFF0B1220),
+                meta.colors.last.withValues(alpha: 0.12),
+              ],
+            ),
+            border: Border.all(color: meta.colors.first.withValues(alpha: 0.45)),
+            boxShadow: [
+              BoxShadow(
+                color: meta.colors.first.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: meta.colors),
+                    boxShadow: [
+                      BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 12),
+                    ],
+                  ),
+                  child: Icon(meta.icon, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        meta.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        meta.blurb,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.play_arrow_rounded, color: meta.colors.first, size: 28),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Interactive canvas ──────────────────────────────────────────────────────
+
+class _ProtocolSimCanvas extends StatefulWidget {
+  const _ProtocolSimCanvas({required this.meta, required this.onBack});
+
+  final _SimMeta meta;
+  final VoidCallback onBack;
+
+  @override
+  State<_ProtocolSimCanvas> createState() => _ProtocolSimCanvasState();
+}
+
+class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas> with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  Duration _elapsed = Duration.zero;
+  Offset? _finger;
+  final List<_TrailPoint> _trail = [];
+  final List<_Burst> _bursts = [];
+  final List<_EnergizedNode> _nodes = [];
+  double _orbitPull = 0;
+  Offset _orbitAim = Offset.zero;
+  final Set<int> _hexLit = {};
+  double _fluxAngle = 0;
+  int _echoCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((d) {
+      _elapsed = d;
+      _decayTrail();
+      if (mounted) setState(() {});
+    })
+      ..start();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  void _decayTrail() {
+    final now = _elapsed.inMilliseconds;
+    _trail.removeWhere((p) => now - p.bornMs > 1400);
+    _bursts.removeWhere((b) => now - b.bornMs > 1800);
+    _nodes.removeWhere((n) => now - n.bornMs > 2200);
+  }
+
+  void _onDown(Offset p) {
+    _finger = p;
+    _pushTrail(p, force: 1);
+    _spawnBurst(p);
+    _energizeNear(p);
+    _lightHex(p);
+    _echoCount++;
+  }
+
+  void _onMove(Offset p) {
+    final prev = _finger;
+    _finger = p;
+    final force = prev == null ? 0.6 : (p - prev).distance.clamp(0.5, 28) / 28;
+    _pushTrail(p, force: force);
+    if (force > 0.35) _spawnBurst(p, small: true);
+    _energizeNear(p);
+    _lightHex(p);
+    if (prev != null) {
+      final d = p - prev;
+      _fluxAngle = math.atan2(d.dy, d.dx);
+    }
+    final size = MediaQuery.sizeOf(context);
+    final c = Offset(size.width / 2, size.height * 0.48);
+    _orbitAim = p - c;
+    _orbitPull = (_orbitAim.distance / (size.shortestSide * 0.42)).clamp(0.0, 1.0);
+  }
+
+  void _onUp() {
+    if (_finger != null) _spawnBurst(_finger!);
+    _finger = null;
+  }
+
+  void _pushTrail(Offset p, {required double force}) {
+    _trail.add(_TrailPoint(p, _elapsed.inMilliseconds, force));
+    if (_trail.length > 120) _trail.removeRange(0, _trail.length - 120);
+  }
+
+  void _spawnBurst(Offset p, {bool small = false}) {
+    _bursts.add(_Burst(p, _elapsed.inMilliseconds, small ? 0.55 : 1.0));
+    if (_bursts.length > 24) _bursts.removeAt(0);
+  }
+
+  void _energizeNear(Offset p) {
+    const cols = 8;
+    const rows = 12;
+    final size = MediaQuery.sizeOf(context);
+    final cellW = size.width / (cols + 1);
+    final cellH = size.height / (rows + 1);
+    for (var r = 1; r <= rows; r++) {
+      for (var c = 1; c <= cols; c++) {
+        final o = Offset(c * cellW, r * cellH);
+        if ((o - p).distance < 56) {
+          _nodes.add(_EnergizedNode(o, _elapsed.inMilliseconds));
+        }
+      }
+    }
+    if (_nodes.length > 80) _nodes.removeRange(0, _nodes.length - 80);
+  }
+
+  void _lightHex(Offset p) {
+    const n = 42;
+    final size = MediaQuery.sizeOf(context);
+    final cx = size.width / 2;
+    final cy = size.height * 0.48;
+    final R = size.shortestSide * 0.095;
+    for (var i = 0; i < n; i++) {
+      final ring = (i / 7).floor();
+      final slot = i % 7;
+      final a = slot * (math.pi * 2 / 7) + ring * 0.22;
+      final d = ring * R * 1.75;
+      final o = Offset(cx + math.cos(a) * d, cy + math.sin(a) * d);
+      if ((o - p).distance < R * 0.95) {
+        _hexLit.add(i);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _elapsed.inMilliseconds / 1000.0;
+    final meta = widget.meta;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: (d) => _onDown(d.localPosition),
+          onPanUpdate: (d) => _onMove(d.localPosition),
+          onPanEnd: (_) => _onUp(),
+          onPanCancel: _onUp,
+          onTapDown: (d) => _onDown(d.localPosition),
+          child: CustomPaint(
+            painter: _ProtocolPainter(
+              kind: meta.kind,
+              colors: meta.colors,
+              time: t,
+              finger: _finger,
+              trail: List<_TrailPoint>.from(_trail),
+              bursts: List<_Burst>.from(_bursts),
+              nodes: List<_EnergizedNode>.from(_nodes),
+              orbitPull: _orbitPull,
+              orbitAim: _orbitAim,
+              hexLit: Set<int>.from(_hexLit),
+              fluxAngle: _fluxAngle,
+              echoCount: _echoCount,
+            ),
+            child: const SizedBox.expand(),
+          ),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        meta.title,
+                        style: TextStyle(
+                          color: meta.colors.first,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Drag anywhere · ${_statusHint(meta.kind)}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _trail.clear();
+                      _bursts.clear();
+                      _nodes.clear();
+                      _hexLit.clear();
+                      _orbitPull = 0;
+                      _echoCount = 0;
+                    });
+                  },
+                  child: Text('RESET', style: TextStyle(color: meta.colors.first, fontWeight: FontWeight.w800, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _statusHint(_ProtocolSimKind kind) {
+    switch (kind) {
+      case _ProtocolSimKind.pulseWeave:
+        return 'weave pulse paths';
+      case _ProtocolSimKind.signalLattice:
+        return 'route the lattice';
+      case _ProtocolSimKind.orbitHandler:
+        return 'pull orbit packets';
+      case _ProtocolSimKind.hexHandshake:
+        return 'wake hex cells';
+      case _ProtocolSimKind.fluxStream:
+        return 'bend the stream';
+      case _ProtocolSimKind.echoField:
+        return 'cast echo rings';
+    }
+  }
+}
+
+class _TrailPoint {
+  _TrailPoint(this.p, this.bornMs, this.force);
+  final Offset p;
+  final int bornMs;
+  final double force;
+}
+
+class _Burst {
+  _Burst(this.p, this.bornMs, this.power);
+  final Offset p;
+  final int bornMs;
+  final double power;
+}
+
+class _EnergizedNode {
+  _EnergizedNode(this.p, this.bornMs);
+  final Offset p;
+  final int bornMs;
+}
+
+class _ProtocolPainter extends CustomPainter {
+  _ProtocolPainter({
+    required this.kind,
+    required this.colors,
+    required this.time,
+    required this.finger,
+    required this.trail,
+    required this.bursts,
+    required this.nodes,
+    required this.orbitPull,
+    required this.orbitAim,
+    required this.hexLit,
+    required this.fluxAngle,
+    required this.echoCount,
+  });
+
+  final _ProtocolSimKind kind;
+  final List<Color> colors;
+  final double time;
+  final Offset? finger;
+  final List<_TrailPoint> trail;
+  final List<_Burst> bursts;
+  final List<_EnergizedNode> nodes;
+  final double orbitPull;
+  final Offset orbitAim;
+  final Set<int> hexLit;
+  final double fluxAngle;
+  final int echoCount;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height * 0.48);
+    switch (kind) {
+      case _ProtocolSimKind.pulseWeave:
+        _paintPulseWeave(canvas, size, c);
+        break;
+      case _ProtocolSimKind.signalLattice:
+        _paintSignalLattice(canvas, size, c);
+        break;
+      case _ProtocolSimKind.orbitHandler:
+        _paintOrbitHandler(canvas, size, c);
+        break;
+      case _ProtocolSimKind.hexHandshake:
+        _paintHexHandshake(canvas, size, c);
+        break;
+      case _ProtocolSimKind.fluxStream:
+        _paintFluxStream(canvas, size, c);
+        break;
+      case _ProtocolSimKind.echoField:
+        _paintEchoField(canvas, size, c);
+        break;
+    }
+    _paintFingerGlow(canvas);
+  }
+
+  void _paintFingerGlow(Canvas canvas) {
+    final f = finger;
+    if (f == null) return;
+    canvas.drawCircle(
+      f,
+      18 + math.sin(time * 8) * 3,
+      Paint()
+        ..color = colors.first.withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+    );
+    canvas.drawCircle(f, 5, Paint()..color = Colors.white.withValues(alpha: 0.9));
+  }
+
+  void _paintPulseWeave(Canvas canvas, Size size, Offset c) {
+    _drawCore(canvas, c, 46, time);
+    if (trail.length >= 2) {
+      final path = Path()..moveTo(trail.first.p.dx, trail.first.p.dy);
+      for (var i = 1; i < trail.length; i++) {
+        path.lineTo(trail[i].p.dx, trail[i].p.dy);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..shader = ui.Gradient.linear(
+            trail.first.p,
+            trail.last.p,
+            [colors.first, colors.last, Colors.white],
+            const [0, 0.55, 1],
+          )
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+    }
+    for (final p in trail) {
+      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
+      final r = 4 + p.force * 10 * (1 - age);
+      canvas.drawCircle(
+        p.p,
+        r,
+        Paint()..color = Color.lerp(colors.first, colors.last, p.force)!.withValues(alpha: 0.75 * (1 - age)),
+      );
+    }
+    for (final b in bursts) {
+      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
+      final r = 12 + age * 70 * b.power;
+      canvas.drawCircle(
+        b.p,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2 * (1 - age)
+          ..color = colors.first.withValues(alpha: 0.7 * (1 - age)),
+      );
+    }
+  }
+
+  void _paintSignalLattice(Canvas canvas, Size size, Offset c) {
+    const cols = 8;
+    const rows = 12;
+    final cellW = size.width / (cols + 1);
+    final cellH = size.height / (rows + 1);
+    final pts = <Offset>[];
+    for (var r = 1; r <= rows; r++) {
+      for (var col = 1; col <= cols; col++) {
+        pts.add(Offset(col * cellW, r * cellH));
+      }
+    }
+    final line = Paint()
+      ..color = colors.first.withValues(alpha: 0.18)
+      ..strokeWidth = 1;
+    for (var r = 0; r < rows; r++) {
+      for (var col = 0; col < cols; col++) {
+        final i = r * cols + col;
+        if (col < cols - 1) canvas.drawLine(pts[i], pts[i + 1], line);
+        if (r < rows - 1) canvas.drawLine(pts[i], pts[i + cols], line);
+      }
+    }
+    for (final n in nodes) {
+      final age = ((_elapsedMs - n.bornMs) / 2200).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        n.p,
+        5 + (1 - age) * 6,
+        Paint()
+          ..color = colors.last.withValues(alpha: 0.85 * (1 - age))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      canvas.drawCircle(n.p, 3, Paint()..color = Colors.white.withValues(alpha: 0.9 * (1 - age)));
+    }
+    for (final p in pts) {
+      canvas.drawCircle(p, 2.2, Paint()..color = colors.first.withValues(alpha: 0.35));
+    }
+    if (finger != null && trail.length >= 2) {
+      final path = Path()..moveTo(trail.first.p.dx, trail.first.p.dy);
+      for (var i = 1; i < trail.length; i++) {
+        path.lineTo(trail[i].p.dx, trail[i].p.dy);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..color = colors.last.withValues(alpha: 0.7),
+      );
+    }
+    _drawCore(canvas, c, 36, time);
+  }
+
+  void _paintOrbitHandler(Canvas canvas, Size size, Offset c) {
+    final aim = orbitAim == Offset.zero ? Offset(1, 0) : orbitAim;
+    final pull = orbitPull;
+    final baseR = size.shortestSide * 0.12;
+    for (var ring = 1; ring <= 4; ring++) {
+      final rr = baseR * ring * (1 + pull * 0.35);
+      canvas.drawCircle(
+        c,
+        rr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = colors.first.withValues(alpha: 0.22 + pull * 0.2),
+      );
+      for (var i = 0; i < 6 + ring * 2; i++) {
+        final a = time * (0.6 + ring * 0.25) + i * (math.pi * 2 / (6 + ring * 2)) + pull;
+        final o = Offset(c.dx + math.cos(a) * rr, c.dy + math.sin(a) * rr);
+        final toward = Offset(o.dx + aim.dx * 0.04 * pull, o.dy + aim.dy * 0.04 * pull);
+        canvas.drawCircle(
+          toward,
+          2.5 + pull * 2,
+          Paint()..color = Color.lerp(colors.first, colors.last, i / 8)!,
+        );
+      }
+    }
+    if (finger != null) {
+      canvas.drawLine(
+        c,
+        finger!,
+        Paint()
+          ..color = colors.last.withValues(alpha: 0.45)
+          ..strokeWidth = 1.6,
+      );
+    }
+    _drawCore(canvas, c, 42 + pull * 10, time);
+  }
+
+  void _paintHexHandshake(Canvas canvas, Size size, Offset c) {
+    const n = 42;
+    final R = size.shortestSide * 0.095;
+    for (var i = 0; i < n; i++) {
+      final ring = (i / 7).floor();
+      final slot = i % 7;
+      final a = slot * (math.pi * 2 / 7) + ring * 0.22;
+      final d = ring * R * 1.75;
+      final o = ring == 0 ? c : Offset(c.dx + math.cos(a) * d, c.dy + math.sin(a) * d);
+      final lit = hexLit.contains(i) || ring == 0;
+      _drawHex(
+        canvas,
+        o,
+        R * 0.72,
+        fill: lit ? colors.first.withValues(alpha: 0.35) : colors.first.withValues(alpha: 0.06),
+        stroke: lit ? colors.last : colors.first.withValues(alpha: 0.35),
+        pulse: lit ? 0.5 + 0.5 * math.sin(time * 6 + i) : 0,
+      );
+    }
+    if (trail.length >= 2) {
+      for (var i = 1; i < trail.length; i++) {
+        canvas.drawLine(
+          trail[i - 1].p,
+          trail[i].p,
+          Paint()
+            ..color = colors.last.withValues(alpha: 0.45)
+            ..strokeWidth = 2,
+        );
+      }
+    }
+  }
+
+  void _paintFluxStream(Canvas canvas, Size size, Offset c) {
+    final bands = 9;
+    for (var b = 0; b < bands; b++) {
+      final path = Path();
+      final y0 = size.height * (0.18 + b * 0.075);
+      path.moveTo(0, y0);
+      for (var x = 0.0; x <= size.width; x += 10) {
+        final phase = time * 2.2 + b * 0.55 + x * 0.02;
+        var y = y0 + math.sin(phase) * (10 + b * 1.5);
+        if (finger != null) {
+          final dx = (x - finger!.dx).abs();
+          final influence = math.exp(-dx / 90);
+          y += math.sin(fluxAngle) * 28 * influence;
+          y += math.cos(phase + fluxAngle) * 8 * influence;
+        }
+        path.lineTo(x, y);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.1
+          ..color = Color.lerp(colors.first, colors.last, b / bands)!.withValues(alpha: 0.55),
+      );
+    }
+    for (final p in trail) {
+      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        p.p,
+        3 + p.force * 5,
+        Paint()..color = Colors.white.withValues(alpha: 0.55 * (1 - age)),
+      );
+    }
+    _drawCore(canvas, c, 34, time);
+  }
+
+  void _paintEchoField(Canvas canvas, Size size, Offset c) {
+    _drawCore(canvas, c, 40, time);
+    final origins = <Offset>[c, ...bursts.map((b) => b.p)];
+    if (finger != null) origins.add(finger!);
+    for (var oi = 0; oi < origins.length; oi++) {
+      final o = origins[oi];
+      for (var ring = 0; ring < 5; ring++) {
+        final phase = (time * 1.4 + ring * 0.35 + oi * 0.2 + echoCount * 0.05) % 1.0;
+        final r = 20 + phase * size.shortestSide * 0.55;
+        canvas.drawCircle(
+          o,
+          r,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 * (1 - phase)
+            ..color = Color.lerp(colors.first, colors.last, phase)!.withValues(alpha: 0.55 * (1 - phase)),
+        );
+      }
+    }
+    for (final p in trail) {
+      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        p.p,
+        2.5,
+        Paint()..color = colors.last.withValues(alpha: 0.7 * (1 - age)),
+      );
+    }
+  }
+
+  int get _elapsedMs => (time * 1000).round();
+
+  void _drawCore(Canvas canvas, Offset c, double radius, double t) {
+    for (var i = 3; i >= 1; i--) {
+      canvas.drawCircle(
+        c,
+        radius + i * 8 + math.sin(t * 3) * 2,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = colors.first.withValues(alpha: 0.12 * i),
+      );
+    }
+    canvas.drawCircle(
+      c,
+      radius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.55),
+            colors.first.withValues(alpha: 0.85),
+            colors.last.withValues(alpha: 0.5),
+          ],
+        ).createShader(Rect.fromCircle(center: c, radius: radius)),
+    );
+    canvas.drawCircle(
+      c,
+      radius + 2,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withValues(alpha: 0.55),
+    );
+  }
+
+  void _drawHex(Canvas canvas, Offset c, double r, {required Color fill, required Color stroke, required double pulse}) {
+    final path = Path();
+    for (var i = 0; i < 6; i++) {
+      final a = -math.pi / 2 + i * math.pi / 3;
+      final p = Offset(c.dx + math.cos(a) * (r + pulse * 2), c.dy + math.sin(a) * (r + pulse * 2));
+      if (i == 0) {
+        path.moveTo(p.dx, p.dy);
+      } else {
+        path.lineTo(p.dx, p.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = fill);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = stroke.withValues(alpha: 0.85),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProtocolPainter old) => true;
+}
