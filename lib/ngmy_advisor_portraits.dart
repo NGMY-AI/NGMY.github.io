@@ -72,7 +72,12 @@ const _kRolePhotoAlias = <String, String>{
 String ngmyAdvisorPortraitAssetPath({
   required String gender,
   required String role,
+  String name = '',
+  String id = '',
 }) {
+  final personKey = _personPortraitKey(name: name, id: id);
+  if (personKey != null) return 'assets/images/advisors/$personKey.jpg';
+
   final g = gender.trim().toLowerCase() == 'male' ? 'm' : 'f';
   var r = role.trim().toLowerCase();
   if (r.isEmpty) r = 'companion';
@@ -86,6 +91,17 @@ String ngmyAdvisorPortraitAssetPath({
   return 'assets/images/advisors/${r}_$g.jpg';
 }
 
+/// Named advisors get unique faces so two girls in the same role never share a photo.
+String? _personPortraitKey({required String name, required String id}) {
+  final n = name.trim().toLowerCase();
+  final i = id.trim().toLowerCase();
+  bool hit(String key) => n == key || n.startsWith('$key ') || i.contains(key);
+  if (hit('miriam')) return 'person_miriam';
+  if (hit('susie') || hit('suzie') || hit('suzi')) return 'person_susie';
+  if (hit('mina')) return 'person_mina';
+  return null;
+}
+
 Future<void> ngmyWarmAdvisorPortraitAssets() async {
   if (_assetsWarmed) return;
   _assetsWarmed = true;
@@ -95,6 +111,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'bible_study_teacher_m', 'bible_study_teacher_f',
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
+    'person_miriam', 'person_susie', 'person_mina',
   ];
   await Future.wait(keys.map((k) async {
     final path = 'assets/images/advisors/$k.jpg';
@@ -105,13 +122,14 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
   }));
 }
 
-/// Prefer photoreal asset bytes for [role]+[gender]; otherwise illustrated PNG.
+/// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
 Uint8List ngmyAdvisorPortraitBytes({
   required String id,
   required String gender,
   String role = '',
+  String name = '',
 }) {
-  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role);
+  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role, name: name, id: id);
   final fromAsset = _assetCache[path];
   if (fromAsset != null && fromAsset.isNotEmpty) return fromAsset;
 
@@ -119,7 +137,8 @@ Uint8List ngmyAdvisorPortraitBytes({
   final specs = isMale ? _maleSpecs : _femaleSpecs;
   final hash = id.trim().isEmpty ? 0 : id.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
   final roleHash = role.codeUnits.fold<int>(0, (a, c) => (a * 17 + c) & 0x7fffffff);
-  final idx = (hash + roleHash) % specs.length;
+  final nameHash = name.codeUnits.fold<int>(0, (a, c) => (a * 13 + c) & 0x7fffffff);
+  final idx = (hash + roleHash + nameHash) % specs.length;
   final key = 'ill_${isMale ? 'm' : 'f'}_$idx';
   final cached = _portraitCache[key];
   if (cached != null) return cached;
@@ -132,24 +151,26 @@ Future<Uint8List> ngmyAdvisorPortraitBytesAsync({
   required String id,
   required String gender,
   String role = '',
+  String name = '',
 }) async {
   await ngmyWarmAdvisorPortraitAssets();
-  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role);
+  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role, name: name, id: id);
   if (!_assetCache.containsKey(path)) {
     try {
       final data = await rootBundle.load(path);
       _assetCache[path] = data.buffer.asUint8List();
     } catch (_) {}
   }
-  return ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role);
+  return ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role, name: name);
 }
 
 String ngmyAdvisorPortraitDataUrl({
   required String id,
   required String gender,
   String role = '',
+  String name = '',
 }) {
-  final bytes = ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role);
+  final bytes = ngmyAdvisorPortraitBytes(id: id, gender: gender, role: role, name: name);
   final mime = bytes.length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 ? 'image/jpeg' : 'image/png';
   return 'data:$mime;base64,${base64Encode(bytes)}';
 }

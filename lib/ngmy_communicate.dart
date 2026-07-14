@@ -684,6 +684,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         id: id,
         gender: widget.profile.gender,
         role: widget.profile.role,
+        name: widget.profile.name,
       );
       if (roleBytes.isNotEmpty && mounted) {
         setState(() => _bytes = roleBytes);
@@ -742,6 +743,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         id: widget.profile.id,
         gender: widget.profile.gender,
         role: widget.profile.role,
+        name: widget.profile.name,
       );
       return ClipOval(
         child: Image.memory(
