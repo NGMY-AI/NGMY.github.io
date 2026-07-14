@@ -1843,6 +1843,25 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     }
   }
 
+  bool _registerTripleTapFast(String id) {
+    final now = DateTime.now();
+    // Each successive tap must land within half a second of the previous one.
+    if (_lastTapId != id || _lastTapAt == null || now.difference(_lastTapAt!) > const Duration(milliseconds: 500)) {
+      _tapCount = 1;
+    } else {
+      _tapCount += 1;
+    }
+    _lastTapAt = now;
+    _lastTapId = id;
+    if (_tapCount >= 3) {
+      _tapCount = 0;
+      _lastTapAt = null;
+      _lastTapId = null;
+      return true;
+    }
+    return false;
+  }
+
   bool _registerDoubleTap(String id) {
     final now = DateTime.now();
     if (_lastTapId != id || _lastTapAt == null || now.difference(_lastTapAt!) > const Duration(milliseconds: 450)) {
@@ -2326,7 +2345,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 if (!isFront || !entry.showsCreditFace) return card;
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: () => _editSpendingAmount(entry),
+                  onTap: () {
+                    if (_registerTripleTapFast(entry.id)) _editSpendingAmount(entry);
+                  },
                   child: card,
                 );
               },
@@ -2835,7 +2856,6 @@ class _CreditCardSpendBody extends StatelessWidget {
     final colors = tpl.colors;
     final amount = '-\$${entry.amount.toStringAsFixed(2)}';
     final ink = _luxeInkFor(tpl);
-    final muted = ink.withValues(alpha: 0.62);
 
     return Stack(
       fit: StackFit.expand,
@@ -2870,12 +2890,6 @@ class _CreditCardSpendBody extends StatelessWidget {
                   height: 1.05,
                   shadows: [Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap for receipt',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.3),
               ),
               const Spacer(),
             ],
@@ -5058,18 +5072,14 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFFBF2),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 14)),
                       ],
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(height: 10, width: double.infinity, child: CustomPaint(painter: _ReceiptEdgePainter(top: true))),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                    clipBehavior: Clip.antiAlias,
+                    child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                             child: DefaultTextStyle(
                               style: const TextStyle(
                                 color: ink,
@@ -5178,7 +5188,7 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
                                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                             filled: true,
                                             fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                           ),
                                         ),
                                       ),
@@ -5196,7 +5206,7 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
                                             contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                             filled: true,
                                             fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                           ),
                                         ),
                                       ),
@@ -5213,7 +5223,7 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
                                             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                             filled: true,
                                             fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                                           ),
                                         ),
                                       ),
@@ -5226,20 +5236,23 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
                                       foregroundColor: ink,
                                       side: const BorderSide(color: Color(0xFFCBD5E1)),
                                       minimumSize: const Size(0, 36),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
                                     child: const Text('+ ADD LINE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8)),
                                   ),
-                                  const SizedBox(height: 8),
-                                  const Text('THANK YOU', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
+                                  const SizedBox(height: 10),
+                                  GestureDetector(
+                                    onTap: () => Navigator.pop(context),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 8),
+                                      child: Text('THANK YOU', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: 10, width: double.infinity, child: CustomPaint(painter: _ReceiptEdgePainter(top: false))),
-                      ],
-                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -5274,36 +5287,4 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
       ),
     );
   }
-}
-
-class _ReceiptEdgePainter extends CustomPainter {
-  _ReceiptEdgePainter({required this.top});
-  final bool top;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path();
-    const step = 8.0;
-    if (top) {
-      path.moveTo(0, size.height);
-      for (var x = 0.0; x <= size.width; x += step) {
-        path.lineTo(x + step / 2, 0);
-        path.lineTo(x + step, size.height);
-      }
-      path.lineTo(size.width, size.height);
-      path.close();
-    } else {
-      path.moveTo(0, 0);
-      for (var x = 0.0; x <= size.width; x += step) {
-        path.lineTo(x + step / 2, size.height);
-        path.lineTo(x + step, 0);
-      }
-      path.lineTo(size.width, 0);
-      path.close();
-    }
-    canvas.drawPath(path, Paint()..color = const Color(0xFFFFFBF2));
-  }
-
-  @override
-  bool shouldRepaint(covariant _ReceiptEdgePainter old) => old.top != top;
 }
