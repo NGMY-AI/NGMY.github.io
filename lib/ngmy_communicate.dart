@@ -669,7 +669,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     final id = widget.profile.id.trim();
     final name = widget.profile.name.trim();
 
-    // Named overrides (Miriam / Suzy / Mina) always win over old cached role photos.
+    // Named overrides (Mariam / Suzy / Mina) always win over old cached role photos.
     if (ngmyAdvisorHasNamedPortrait(name: name, id: id)) {
       try {
         final namedBytes = await ngmyAdvisorPortraitBytesAsync(
@@ -1389,7 +1389,8 @@ class _Companion3DCard extends StatelessWidget {
                           profile: profile,
                           size: 72,
                           glow: true,
-                          openFullscreenOnTap: true,
+                          // List card opens chat only — fullscreen photo is in-chat.
+                          openFullscreenOnTap: false,
                         ),
                       ),
                       const SizedBox(height: 12),

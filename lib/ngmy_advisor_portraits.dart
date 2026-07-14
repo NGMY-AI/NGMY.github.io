@@ -103,7 +103,8 @@ String? _personPortraitKey({required String name, required String id}) {
     return false;
   }
 
-  if (hit('miriam')) return 'person_miriam';
+  // First advisor is MARIAM in admin data; Miriam / Maryam are common spellings too.
+  if (hit('mariam') || hit('miriam') || hit('maryam')) return 'person_miriam';
   // Spelling variants used in the app / by the user.
   if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey')) return 'person_susie';
   if (hit('mina')) return 'person_mina';
