@@ -134,6 +134,7 @@ import 'ngmy_admin_menu_badges.dart';
 import 'ngmy_civic_state_switches.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_civic_registry_admin.dart';
+import 'ngmy_civic_state_transfer_ui.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_enrollment.dart';
@@ -21380,6 +21381,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF6200EE)),
+                title: const Text('Transfer Member to Another State', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Move full civic record — profile, helps, claims, passport'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final candidates = NgmyCivicRegistryMembers.listFrom(widget.config)
+                      .map(NgmyCivicTransferCandidate.fromMember)
+                      .toList()
+                    ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+                  showNgmyTransferCivicMemberStateSheet(
+                    context,
+                    isDark: isDark,
+                    usStates: const [
+                      'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
+                      'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
+                      'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
+                      'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina',
+                      'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
+                    ],
+                    members: candidates,
+                    onTransfer: ({required member, required fromState, required toState}) async {
+                      return _adminTransferCivicMemberState(
+                        email: member.email,
+                        registryId: member.registryId,
+                        toState: toState,
+                      );
+                    },
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.restart_alt_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Reset State Change Limit', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Search users — grant 3 more state changes'),
@@ -21415,6 +21448,82 @@ class _AdminDashboardState extends State<AdminDashboard> {
         );
       },
     );
+  }
+
+  /// Admin / Civic Registry Admin only — move enrolled member to another state.
+  Future<bool> _adminTransferCivicMemberState({
+    required String email,
+    required String registryId,
+    required String toState,
+  }) async {
+    if (!(widget.user.isAdmin || widget.user.isCivicRegistryAdmin)) return false;
+    final target = toState.trim();
+    if (target.isEmpty) return false;
+    final updated = NgmyCivicRegistryMembers.transferToState(
+      widget.config,
+      toState: target,
+      email: email,
+      registryId: registryId,
+    );
+    if (updated == null) return false;
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    void applyLinked(UserData u) {
+      u.state = target;
+      u.city = '';
+      u.room = '';
+      if (u.civicRegistryAnchorState.trim().isNotEmpty) {
+        u.civicRegistryAnchorState = target;
+      }
+    }
+
+    for (final u in widget.allUsers) {
+      final sameEmail = emailKey.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == emailKey;
+      final sameId = rid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == rid;
+      if (sameEmail || sameId) applyLinked(u);
+    }
+    final selfEmail = NgmyCivicRegistryMembers.emailKey(widget.user.email);
+    final selfId = (widget.user.registryId ?? '').trim().toUpperCase();
+    if ((emailKey.isNotEmpty && selfEmail == emailKey) || (rid.isNotEmpty && selfId == rid)) {
+      applyLinked(widget.user);
+    }
+
+    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    final cloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      if (emailKey.isNotEmpty && selfEmail == emailKey) {
+        await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
+      }
+    } catch (_) {}
+
+    if (await ngmyCanReachCloud() && emailKey.isNotEmpty) {
+      final idx = widget.allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey);
+      if (idx >= 0) {
+        try {
+          await Supabase.instance.client
+              .from('users')
+              .upsert(
+                {
+                  'email': widget.allUsers[idx].email.trim().toLowerCase(),
+                  'state': target,
+                  'city': '',
+                  'room': '',
+                  'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
+                },
+                onConflict: 'email',
+              )
+              .timeout(kNgmyCloudWriteTimeout);
+        } catch (_) {}
+      }
+    }
+
+    widget.onDataChanged();
+    return cloudOk;
   }
 
   Future<void> _openNgmyAiAdmin(bool isDark) async {
@@ -29077,6 +29186,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _canManageCivicRegistry() => _hasRegistrarAccess();
 
+  /// Full admin or Civic Registry Admin may transfer enrolled members between states.
+  bool _canAdminTransferCivicState() => widget.user.isAdmin || widget.user.isCivicRegistryAdmin;
+
   String _registrarHomeState() => NgmyCivicRegistryStats.registrarStateForUser(
         email: widget.user.email,
         userState: widget.user.state,
@@ -29958,6 +30070,116 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       debugPrint('Registry member local save failed: $e');
     }
     return membersCloudOk && userCloudOk;
+  }
+
+  Future<void> _transferCivicMemberFromProfile(UserData member) async {
+    if (!_canAdminTransferCivicState()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only an admin can transfer members between states.')),
+      );
+      return;
+    }
+    final fromState = member.state.trim().isEmpty ? _selectedState : member.state.trim();
+    final picked = await showNgmyStatePickerSheet(
+      context,
+      states: _usStates,
+      selected: fromState,
+      title: 'Transfer to state',
+      searchHint: 'Search destination state…',
+    );
+    if (picked == null || !mounted) return;
+    if (picked.trim().toLowerCase() == fromState.toLowerCase()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.fullName ?? member.username} is already in $picked.')),
+      );
+      return;
+    }
+    final ok = await showNgmyLightConfirm(
+      context,
+      title: 'Transfer to $picked?',
+      message:
+          'Move ${member.fullName ?? member.username} from $fromState to $picked with their full civic registry record '
+          '(profile, helps, missed, passport, nicknames, photo, claims, and contributions). '
+          'City and room will be cleared for reassignment in $picked.',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Transfer',
+      icon: Icons.swap_horiz_rounded,
+    );
+    if (ok != true || !mounted) return;
+
+    final updated = NgmyCivicRegistryMembers.transferToState(
+      widget.config,
+      toState: picked,
+      email: member.email,
+      registryId: member.registryId ?? '',
+    );
+    if (updated == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transfer failed — member record not found.'), backgroundColor: Color(0xFFDC2626)),
+      );
+      return;
+    }
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
+    final rid = (member.registryId ?? '').trim().toUpperCase();
+    void applyLinked(UserData u) {
+      u.state = picked;
+      u.city = '';
+      u.room = '';
+      if (u.civicRegistryAnchorState.trim().isNotEmpty) {
+        u.civicRegistryAnchorState = picked;
+      }
+    }
+    for (final u in widget.allUsers) {
+      final sameEmail = emailKey.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == emailKey;
+      final sameId = rid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == rid;
+      if (sameEmail || sameId) applyLinked(u);
+    }
+    member.state = picked;
+    member.city = '';
+    member.room = '';
+
+    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    final cloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+    if (await ngmyCanReachCloud() && emailKey.isNotEmpty) {
+      final idx = widget.allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey);
+      if (idx >= 0) {
+        try {
+          await Supabase.instance.client
+              .from('users')
+              .upsert(
+                {
+                  'email': widget.allUsers[idx].email.trim().toLowerCase(),
+                  'state': picked,
+                  'city': '',
+                  'room': '',
+                  'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
+                },
+                onConflict: 'email',
+              )
+              .timeout(kNgmyCloudWriteTimeout);
+        } catch (_) {}
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {});
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cloudOk
+              ? '${member.fullName ?? member.username} transferred to $picked.'
+              : '${member.fullName ?? member.username} moved locally to $picked. Cloud sync may still be catching up.',
+        ),
+        backgroundColor: cloudOk ? const Color(0xFF059669) : const Color(0xFFD97706),
+      ),
+    );
   }
 
   Future<bool> _removeRegistryMember(UserData member) async {
@@ -31908,6 +32130,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     const SizedBox(height: 12),
                   ],
                   if (_canManageCivicRegistry()) _passportAdminPanel(u, isDark),
+                  if (_canAdminTransferCivicState()) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          unawaited(_transferCivicMemberFromProfile(u));
+                        },
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Transfer to Another State'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF6200EE),
+                          side: const BorderSide(color: Color(0xFF6200EE)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   Row(
                     children: [
                       Expanded(

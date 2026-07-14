@@ -223,6 +223,53 @@ class NgmyCivicRegistryMembers {
     return next;
   }
 
+  /// Move an enrolled member to another state, keeping the same registry record,
+  /// helps/missed, passport, nicknames, photo, and all other fields.
+  /// City/room are cleared because they belong to the old state's map.
+  /// Prefer [registryId] when both are provided (shared emails possible).
+  static Map<String, dynamic>? transferToState(
+    dynamic config, {
+    required String toState,
+    String email = '',
+    String registryId = '',
+    bool clearCityRoom = true,
+  }) {
+    final target = toState.trim();
+    if (target.isEmpty) return null;
+    final members = listFrom(config);
+    final rid = registryId.trim().toUpperCase();
+    final fromEmail = emailKey(email);
+    var idx = -1;
+    if (rid.isNotEmpty) {
+      idx = members.indexWhere(
+        (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
+      );
+    }
+    if (idx < 0 && fromEmail.isNotEmpty) {
+      idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == fromEmail);
+    }
+    if (idx < 0) return null;
+
+    final keep = Map<String, dynamic>.from(members[idx]);
+    final fromState = (keep['state'] ?? '').toString().trim();
+    if (fromState.toLowerCase() == target.toLowerCase()) {
+      return keep; // already there
+    }
+
+    final next = Map<String, dynamic>.from(keep);
+    next['state'] = target;
+    if (clearCityRoom) {
+      next['city'] = '';
+      next['room'] = '';
+    }
+    next['previousState'] = fromState;
+    next['transferredAt'] = DateTime.now().toUtc().toIso8601String();
+    next['updatedAt'] = next['transferredAt'];
+    members[idx] = next;
+    setList(config, members);
+    return next;
+  }
+
   static List<String> nicknamesOf(Map<String, dynamic> member) {
     final raw = member['nicknames'];
     if (raw is! List) return const [];
