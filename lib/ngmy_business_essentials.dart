@@ -6,12 +6,9 @@ import 'ngmy_business_tasks.dart';
 import 'ngmy_essentials_transfer.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
-import 'ngmy_paper_trace.dart';
-import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_color_buckets.dart';
-import 'ngmy_live_capture.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
@@ -27,8 +24,6 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessNotesCount(userEmail: userEmail),
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
-    ngmyPaperTraceCount(userEmail: userEmail),
-    ngmyLiveCaptureCount(userEmail: userEmail),
     ngmyColorBucketsCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
@@ -80,8 +75,6 @@ const _categoryArt = <String, _CategoryArt>{
   'Notes': _CategoryArt(icon: Icons.note_alt_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
   'Quick Tasks': _CategoryArt(icon: Icons.task_alt_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
   'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
-  'Paper Trace': _CategoryArt(icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
-  'Live Capture': _CategoryArt(icon: Icons.fiber_manual_record_rounded, accent: Color(0xFFEF4444), gradient: [Color(0xFFDC2626), Color(0xFF06B6D4)]),
   'Paint Mix': _CategoryArt(icon: Icons.palette_outlined, accent: Color(0xFFD6A800), gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)]),
 };
 
@@ -93,8 +86,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _notes = 0;
   int _tasks = 0;
   int _reminders = 0;
-  int _traces = 0;
-  int _liveCaptures = 0;
   int _colorBuckets = 0;
   bool _loading = true;
 
@@ -113,8 +104,6 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessNotesCount(userEmail: widget.userEmail),
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
-      ngmyPaperTraceCount(userEmail: widget.userEmail),
-      ngmyLiveCaptureCount(userEmail: widget.userEmail),
       ngmyColorBucketsCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
@@ -126,9 +115,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _notes = results[4];
       _tasks = results[5];
       _reminders = results[6];
-      _traces = results[7];
-      _liveCaptures = results[8];
-      _colorBuckets = results[9];
+      _colorBuckets = results[7];
       _loading = false;
     });
   }
@@ -274,30 +261,12 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           onTap: () => _openCategory((ctx) => showNgmyQuickSupportDialog(ctx, userEmail: widget.userEmail)),
                         ),
                         _CompactCategoryCard(
-                          title: 'Live Capture',
-                          count: _liveCaptures,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.48,
-                          onTap: () => _openCategory((ctx) => showNgmyLiveCaptureDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Paper Trace',
-                          count: _traces,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.54,
-                          onTap: () => _openCategory((ctx) => showNgmyPaperTraceDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
                           title: 'Paint Mix',
                           count: _colorBuckets,
                           pulse: pulse,
                           scan: scan,
                           orbit: orbit,
-                          phase: 0.6,
+                          phase: 0.48,
                           onTap: () => _openCategory((ctx) => showNgmyColorBucketsDialog(ctx, userEmail: widget.userEmail)),
                         ),
                       ],

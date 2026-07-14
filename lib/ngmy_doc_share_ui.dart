@@ -29,8 +29,6 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
-import 'ngmy_transfer.dart';
-import 'ngmy_transfer_ui.dart';
 
 ({Color bg, Color card, Color fg, Color muted, Color border}) _docShareColors(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -604,76 +602,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _uploadFolder() async => _beginUploadFolderFromUserGesture();
 
-  void _beginTransferSendFromUserGesture() {
-    if (kIsWeb) {
-      ngmyWebPickFilesFromUserGesture(
-        directory: false,
-        onResult: (picked) {
-          unawaited(_startTransferSendWithPicked(picked));
-        },
-      );
-      return;
-    }
-    unawaited(_openNgmyTransferSendPickedNative());
-  }
-
-  Future<void> _startTransferSendWithPicked(List<NgmyWebPickedFile> picked) async {
-    await _withWork(() async {
-      if (picked.isEmpty) {
-        _toast('Select file(s) or pick videos/documents to send.');
-        return;
-      }
-      final batch = await NgmyDocShareStore.addWebFolderFiles(
-        email: widget.email,
-        files: picked,
-        note: 'NGMY Transfer',
-      );
-      await _refresh();
-      if (batch.isEmpty) {
-        _toast('Could not read selected file(s). Try again.');
-        return;
-      }
-      if (!mounted) return;
-      await openNgmyTransferSend(context, email: widget.email, items: batch);
-    }, label: 'Preparing transfer…');
-  }
-
-  Future<void> _openNgmyTransferSendPickedNative() async {
-    await _withWork(() async {
-      List<NgmyDocShareItem> batch = [];
-      if (_selected.isNotEmpty) {
-        batch = _items.where((e) => _selected.contains(e.id)).toList();
-      } else {
-        try {
-          final result = await FilePicker.platform.pickFiles(
-            allowMultiple: true,
-            withData: false,
-            type: FileType.any,
-          );
-          if (result == null || result.files.isEmpty) return;
-          for (final f in result.files) {
-            final saved = await NgmyDocShareStore.addFromPlatformFile(
-              email: widget.email,
-              file: f,
-              note: 'NGMY Transfer',
-            );
-            if (saved != null) batch.add(saved);
-          }
-        } catch (e) {
-          debugPrint('[doc share transfer pick] $e');
-          _toast('Could not open file picker. Try again.');
-          return;
-        }
-      }
-      if (batch.isEmpty) {
-        _toast('Select file(s) or pick videos/documents to send.');
-        return;
-      }
-      if (!mounted) return;
-      await openNgmyTransferSend(context, email: widget.email, items: batch);
-    }, label: 'Preparing transfer…');
-  }
-
   void _selectAll() {
     setState(() {
       if (_selected.length == _items.length) {
@@ -858,31 +786,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
 
   Future<void> _showQrForOne(NgmyDocShareItem item) => _showQrForItems([item]);
 
-  Future<void> _openNgmyTransferSend(NgmyDocShareItem item) async {
-    await openNgmyTransferSend(context, email: widget.email, items: [item]);
-  }
-
-  Future<void> _openNgmyTransferSendPicked() async {
-    if (_selected.isNotEmpty) {
-      final batch = _items.where((e) => _selected.contains(e.id)).toList();
-      if (batch.isEmpty) {
-        _toast('Select file(s) or pick videos/documents to send.');
-        return;
-      }
-      await openNgmyTransferSend(context, email: widget.email, items: batch);
-      return;
-    }
-    _beginTransferSendFromUserGesture();
-  }
-
-  Future<void> _openNgmyTransferReceive() async {
-    await openNgmyTransferReceive(
-      context,
-      email: widget.email,
-      onReceived: () => unawaited(_refresh()),
-    );
-  }
-
   Future<void> _showItemMenu(NgmyDocShareItem item) async {
     final c = _docShareColors(context);
     final action = await showModalBottomSheet<String>(
@@ -942,14 +845,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'send_my_code'),
                   ),
                   _DocShareMenuTile(
-                    icon: Icons.north_east_rounded,
-                    label: 'NGMY Transfer · Send',
-                    subtitle: '6-digit number code · big files & videos',
-                    accent: true,
-                    colors: c,
-                    onTap: () => Navigator.pop(ctx, 'transfer_send'),
-                  ),
-                  _DocShareMenuTile(
                     icon: Icons.download_rounded,
                     label: 'Download / save',
                     colors: c,
@@ -978,8 +873,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_showQrForOne(item));
       case 'send_my_code':
         unawaited(_openSendToMyCode(items: [item]));
-      case 'transfer_send':
-        unawaited(_openNgmyTransferSend(item));
       case 'save':
         unawaited(_saveItem(item));
       case 'delete':
@@ -1096,7 +989,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
 
     if (RegExp(r'^\d{6}$').hasMatch(scan.trim())) {
-      await _receiveNgmyTransferCode(scan.trim());
+      _toast('NGMY Transfer is no longer available. Use My Code or Share via QR.');
       return;
     }
 
@@ -1172,25 +1065,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final videos = imported.where((e) => e.isVideo).length;
       _toast(videos > 0 ? 'Received $videos video(s).' : 'Restored ${imported.length} file(s).');
     }, label: 'Receiving…');
-  }
-
-  Future<void> _receiveNgmyTransferCode(String code) async {
-    await _withWork(() async {
-      final imported = await NgmyTransfer.receiveByCode(
-        recipientEmail: widget.email,
-        code: code,
-        onProgress: (r, t) {
-          if (mounted) setState(() => _status = 'Receiving $r of $t…');
-        },
-      );
-      if (!mounted) return;
-      if (imported.isEmpty) {
-        _toast('NGMY Transfer failed. Same Wi‑Fi or hotspot, and sender must keep Send screen open.');
-        return;
-      }
-      await _refresh();
-      _toast('Received ${imported.length} file(s) via NGMY Transfer.');
-    }, label: 'NGMY Transfer…');
   }
 
   Future<void> _scanQr() async {
@@ -1291,25 +1165,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     },
                   ),
                   _DocShareMenuTile(
-                    icon: Icons.north_east_rounded,
-                    label: 'NGMY Transfer · Send',
-                    subtitle: 'Any file type · any size · 6-digit code',
-                    accent: true,
-                    colors: c,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _beginTransferSendFromUserGesture();
-                    },
-                  ),
-                  _DocShareMenuTile(
-                    icon: Icons.south_west_rounded,
-                    label: 'NGMY Transfer · Receive',
-                    subtitle: 'Enter sender\'s 6-digit number code',
-                    accent: true,
-                    colors: c,
-                    onTap: () => Navigator.pop(ctx, 'transfer_receive'),
-                  ),
-                  _DocShareMenuTile(
                     icon: Icons.upload_file_rounded,
                     label: 'Import backup',
                     subtitle: '.ngmydoc file from another device',
@@ -1327,8 +1182,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     switch (action) {
       case 'my_code':
         unawaited(_openMyCode());
-      case 'transfer_receive':
-        unawaited(_openNgmyTransferReceive());
       case 'import':
         unawaited(_importBackupFile());
     }

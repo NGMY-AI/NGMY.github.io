@@ -397,7 +397,7 @@ class _DocShareGatePageState extends State<_DocShareGatePage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Photos, documents, long videos — QR transfer to any phone.',
+                      'Photos, documents, long videos — share with My Code or QR.',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14, height: 1.45),
                     ),
                   ],

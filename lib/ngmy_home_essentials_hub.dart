@@ -12,8 +12,6 @@ import 'ngmy_local_bio_storage.dart';
 import 'ngmy_local_menu_storage.dart';
 import 'ngmy_local_studio.dart';
 import 'ngmy_medicine_organizer.dart';
-import 'ngmy_paper_trace.dart';
-import 'ngmy_paper_trace_storage.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
@@ -54,7 +52,6 @@ const _kHomeEssentialsCats = <_HubCat>[
   _HubCat(id: 'notes', title: 'Notes', icon: Icons.note_alt_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
   _HubCat(id: 'tasks', title: 'Quick Tasks', icon: Icons.task_alt_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
   _HubCat(id: 'where', title: 'Where I Put It', icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
-  _HubCat(id: 'paper', title: 'Paper Trace', icon: Icons.draw_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFF97316)]),
   _HubCat(id: 'alarms', title: 'Alarms', icon: Icons.alarm_rounded, accent: Color(0xFFF97316), gradient: [Color(0xFFEA580C), Color(0xFFFBBF24)]),
   _HubCat(id: 'menu', title: 'Local Menu', icon: Icons.restaurant_menu_rounded, accent: Color(0xFF0EA5E9), gradient: [Color(0xFF0284C7), Color(0xFF0EA5E9)]),
   _HubCat(id: 'bio', title: 'Local Bio', icon: Icons.link_rounded, accent: Color(0xFF6366F1), gradient: [Color(0xFF4F46E5), Color(0xFF6366F1)]),
@@ -129,7 +126,6 @@ class _NgmyHomeRoboticEssentialsHubState extends State<_NgmyHomeRoboticEssential
       ngmyBusinessNotesCount(userEmail: widget.userEmail),
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
-      ngmyPaperTraceCount(userEmail: widget.userEmail),
       NgmyHelperAlarmMemoryStore.load(widget.userEmail).then((e) => e.length),
       ngmyLocalMenuCount(userEmail: widget.userEmail),
       ngmyLocalBioCount(userEmail: widget.userEmail),
@@ -144,10 +140,9 @@ class _NgmyHomeRoboticEssentialsHubState extends State<_NgmyHomeRoboticEssential
         ..['notes'] = results[4]
         ..['tasks'] = results[5]
         ..['where'] = results[6]
-        ..['paper'] = results[7]
-        ..['alarms'] = results[8]
-        ..['menu'] = results[9]
-        ..['bio'] = results[10];
+        ..['alarms'] = results[7]
+        ..['menu'] = results[8]
+        ..['bio'] = results[9];
       _loading = false;
     });
   }
@@ -174,9 +169,6 @@ class _NgmyHomeRoboticEssentialsHubState extends State<_NgmyHomeRoboticEssential
         break;
       case 'where':
         await showNgmyItemReminderDialog(context, userEmail: widget.userEmail);
-        break;
-      case 'paper':
-        await showNgmyPaperTraceDialog(context, userEmail: widget.userEmail);
         break;
       case 'menu':
         await showNgmyLocalMenuStudioDialog(context, userEmail: widget.userEmail);
@@ -266,14 +258,6 @@ class _NgmyHomeRoboticEssentialsHubState extends State<_NgmyHomeRoboticEssential
                     if (r.locationNote.trim().isNotEmpty) r.locationNote.trim(),
                     'Remind: ${r.remindAt}',
                   ].join('\n'),
-                ))
-            .toList();
-      case 'paper':
-        final list = await loadNgmyPaperTraceSessions(userEmail: widget.userEmail);
-        return list
-            .map((p) => _PinRow(
-                  title: p.title.trim().isEmpty ? 'Paper trace' : p.title.trim(),
-                  body: 'Saved ${p.createdAt}',
                 ))
             .toList();
       case 'alarms':
