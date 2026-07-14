@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
+import 'ngmy_vault_games_pack2.dart';
+import 'ngmy_vault_games_pack3.dart';
 import 'ngmy_vault_new_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
@@ -80,26 +82,91 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
 
   int get _cleared => _progress.values.fold(0, (a, b) => a + b.level.clamp(0, 10));
 
+  Widget _pageFor(VaultGameDef game) {
+    switch (game.id) {
+      case 'vault_sync':
+        return const NgmyVaultSyncScreen();
+      case 'word_match':
+        return const NgmyVaultWordMatchScreen();
+      case 'color_sprint':
+        return const NgmyVaultColorSprintGame();
+      case 'beat_bounce':
+        return const NgmyVaultBeatBounceGame();
+      case 'maze_dash':
+        return const NgmyVaultMazeDashGame();
+      case 'memory_flip':
+        return const NgmyVaultMemoryFlipGame();
+      case 'stack_tower':
+        return const NgmyVaultStackTowerGame();
+      case 'reflex_grid':
+        return const NgmyVaultReflexGridGame();
+      case 'lane_racer':
+        return NgmyVaultLaneRacerGame(game: game);
+      case 'drag_launch':
+        return NgmyVaultDragLaunchGame(game: game);
+      case 'perfect_park':
+        return NgmyVaultPerfectParkGame(game: game);
+      case 'wheelie_balance':
+        return NgmyVaultWheelieGame(game: game);
+      case 'jump_runner':
+        return NgmyVaultJumpRunnerGame(game: game);
+      case 'orb_collector':
+        return NgmyVaultCollectorGame(game: game);
+      case 'target_aim':
+        return NgmyVaultTargetAimGame(game: game);
+      case 'brick_breaker':
+        return NgmyVaultBrickBreakerGame(game: game);
+      case 'gravity_flap':
+        return NgmyVaultGravityFlapGame(game: game);
+      case 'traffic_weave':
+        return NgmyVaultTrafficWeaveGame(game: game);
+      case 'keep_up':
+        return NgmyVaultKeepUpGame(game: game);
+      case 'whack_pulse':
+        return NgmyVaultWhackPulseGame(game: game);
+      case 'slice_drift':
+        return NgmyVaultSliceDriftGame(game: game);
+      case 'darts_timing':
+        return NgmyVaultDartsTimingGame(game: game);
+      case 'ring_toss':
+        return NgmyVaultRingTossGame(game: game);
+      case 'pinball_bump':
+        return NgmyVaultPinballBumpGame(game: game);
+      case 'orbit_dock':
+        return NgmyVaultOrbitDockGame(game: game);
+      case 'laser_defense':
+        return NgmyVaultLaserDefenseGame(game: game);
+      case 'platform_hop':
+        return NgmyVaultPlatformHopGame(game: game);
+      case 'balance_beam':
+        return NgmyVaultBalanceBeamGame(game: game);
+      case 'curl_bowl':
+        return NgmyVaultCurlBowlGame(game: game);
+      case 'balloon_rush':
+        return NgmyVaultBalloonRushGame(game: game);
+      case 'spin_stop':
+        return NgmyVaultSpinStopGame(game: game);
+      case 'metro_flow':
+        return NgmyVaultMetroFlowGame(game: game);
+      case 'asteroid_drift':
+        return NgmyVaultAsteroidDriftGame(game: game);
+      case 'slingshot_score':
+        return NgmyVaultSlingshotScoreGame(game: game);
+      case 'juggle_tap':
+        return NgmyVaultJuggleTapGame(game: game);
+      case 'vortex_hold':
+        return NgmyVaultVortexHoldGame(game: game);
+      default:
+        if (game.engine == VaultEngine.neonSerpent) {
+          return NgmyVaultLeveledGameScreen(game: game);
+        }
+        return NgmyVaultArcadePlayScreen(game: game);
+    }
+  }
+
   Future<void> _openGame(VaultGameDef game) async {
     HapticFeedback.selectionClick();
-    final Widget page;
-    if (game.id == 'vault_sync') {
-      page = const NgmyVaultSyncScreen();
-    } else if (game.id == 'word_match') {
-      page = const NgmyVaultWordMatchScreen();
-    } else if (game.id == 'color_sprint') {
-      page = const NgmyVaultColorSprintGame();
-    } else if (game.id == 'beat_bounce') {
-      page = const NgmyVaultBeatBounceGame();
-    } else if (game.id == 'maze_dash') {
-      page = const NgmyVaultMazeDashGame();
-    } else if (game.id == 'memory_flip') {
-      page = const NgmyVaultMemoryFlipGame();
-    } else if (game.engine == VaultEngine.neonSerpent) {
-      page = NgmyVaultLeveledGameScreen(game: game);
-    } else {
-      page = NgmyVaultArcadePlayScreen(game: game);
-    }
+    final page = _pageFor(game);
     final result = await Navigator.of(context).push<Object?>(
       PageRouteBuilder(
         opaque: true,
