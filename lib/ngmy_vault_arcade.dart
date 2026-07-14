@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
+import 'ngmy_vault_games_pack2.dart';
 import 'ngmy_vault_new_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
@@ -99,6 +100,24 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
       page = const NgmyVaultReflexGridGame();
     } else if (game.id == 'memory_flip') {
       page = const NgmyVaultMemoryFlipGame();
+    } else if (const {'highway_rush', 'moto_lane', 'truck_route', 'night_racer', 'desert_rally'}.contains(game.id)) {
+      page = NgmyVaultLaneRacerGame(game: game);
+    } else if (const {'drag_strip', 'turbo_launch', 'nitro_sprint'}.contains(game.id)) {
+      page = NgmyVaultDragLaunchGame(game: game);
+    } else if (const {'valet_rush', 'tight_squeeze', 'city_parking'}.contains(game.id)) {
+      page = NgmyVaultPerfectParkGame(game: game);
+    } else if (const {'wheelie_king', 'stunt_bike', 'backflip_run'}.contains(game.id)) {
+      page = NgmyVaultWheelieGame(game: game);
+    } else if (const {'moto_jump', 'bmx_hop', 'dirt_jumper', 'rooftop_runner'}.contains(game.id)) {
+      page = NgmyVaultJumpRunnerGame(game: game);
+    } else if (const {'fuel_frenzy', 'coin_rally', 'gem_grab'}.contains(game.id)) {
+      page = NgmyVaultCollectorGame(game: game);
+    } else if (const {'bullseye_rush', 'sniper_focus', 'trick_shot'}.contains(game.id)) {
+      page = NgmyVaultTargetAimGame(game: game);
+    } else if (const {'math_racer', 'number_rush', 'speed_sums'}.contains(game.id)) {
+      page = NgmyVaultQuickMathGame(game: game);
+    } else if (const {'sequence_rally', 'circuit_memory', 'signal_chain'}.contains(game.id)) {
+      page = NgmyVaultPatternGame(game: game);
     } else if (game.engine == VaultEngine.neonSerpent) {
       page = NgmyVaultLeveledGameScreen(game: game);
     } else {

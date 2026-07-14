@@ -133,6 +133,45 @@ const kVaultGames = <VaultGameDef>[
     colors: [Color(0xFF2DD4BF), Color(0xFF22D3EE)],
     icon: Icons.style_rounded,
   ),
+  // Row 4 — Lane Racer: steer across lanes, dodge oncoming traffic
+  VaultGameDef(id: 'highway_rush', title: 'Highway Rush', shortTitle: 'Highway Rush', tagline: 'Weave through traffic on the open highway.', techLabel: 'RACE', engine: VaultEngine.pulseForge, colors: [Color(0xFFEF4444), Color(0xFFF97316)], icon: Icons.directions_car_rounded),
+  VaultGameDef(id: 'moto_lane', title: 'Moto Lane', shortTitle: 'Moto Lane', tagline: 'Lane-split your bike through the rush.', techLabel: 'RACE', engine: VaultEngine.pulseForge, colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)], icon: Icons.two_wheeler_rounded),
+  VaultGameDef(id: 'truck_route', title: 'Truck Route', shortTitle: 'Truck Route', tagline: 'Haul cargo through a busy route.', techLabel: 'RACE', engine: VaultEngine.pulseForge, colors: [Color(0xFF34D399), Color(0xFF059669)], icon: Icons.local_shipping_rounded),
+  VaultGameDef(id: 'night_racer', title: 'Night Racer', shortTitle: 'Night Racer', tagline: 'Neon streets, tighter reflexes.', techLabel: 'RACE', engine: VaultEngine.pulseForge, colors: [Color(0xFFA78BFA), Color(0xFF6D28D9)], icon: Icons.directions_car_filled_rounded),
+  VaultGameDef(id: 'desert_rally', title: 'Desert Rally', shortTitle: 'Desert Rally', tagline: 'Dodge rally wreckage across the dunes.', techLabel: 'RACE', engine: VaultEngine.pulseForge, colors: [Color(0xFFFBBF24), Color(0xFFD97706)], icon: Icons.airport_shuttle_rounded),
+  // Row 5 — Drag Launch: tap the needle in the launch zone
+  VaultGameDef(id: 'drag_strip', title: 'Drag Strip', shortTitle: 'Drag Strip', tagline: 'Perfect launches down the strip.', techLabel: 'DRAG', engine: VaultEngine.laserLane, colors: [Color(0xFFEF4444), Color(0xFFF59E0B)], icon: Icons.speed_rounded),
+  VaultGameDef(id: 'turbo_launch', title: 'Turbo Launch', shortTitle: 'Turbo Launch', tagline: 'Hit the boost window every time.', techLabel: 'DRAG', engine: VaultEngine.laserLane, colors: [Color(0xFFF97316), Color(0xFFEA580C)], icon: Icons.rocket_launch_rounded),
+  VaultGameDef(id: 'nitro_sprint', title: 'Nitro Sprint', shortTitle: 'Nitro Sprint', tagline: 'Chain nitro launches for combo score.', techLabel: 'DRAG', engine: VaultEngine.laserLane, colors: [Color(0xFF22D3EE), Color(0xFF3B82F6)], icon: Icons.bolt_rounded),
+  // Row 6 — Perfect Park: stop the sliding car in the target zone
+  VaultGameDef(id: 'valet_rush', title: 'Valet Rush', shortTitle: 'Valet Rush', tagline: 'Park it perfectly, every time.', techLabel: 'PARK', engine: VaultEngine.orbPop, colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)], icon: Icons.local_parking_rounded),
+  VaultGameDef(id: 'tight_squeeze', title: 'Tight Squeeze', shortTitle: 'Tight Squeeze', tagline: 'The parking zone shrinks every round.', techLabel: 'PARK', engine: VaultEngine.orbPop, colors: [Color(0xFFFBBF24), Color(0xFFF97316)], icon: Icons.directions_car_rounded),
+  VaultGameDef(id: 'city_parking', title: 'City Parking', shortTitle: 'City Parking', tagline: 'Squeeze into the garage under pressure.', techLabel: 'PARK', engine: VaultEngine.orbPop, colors: [Color(0xFF60A5FA), Color(0xFF818CF8)], icon: Icons.garage_rounded),
+  // Row 7 — Wheelie Balance: hold to keep the balance meter in the green
+  VaultGameDef(id: 'wheelie_king', title: 'Wheelie King', shortTitle: 'Wheelie King', tagline: 'Hold the wheelie as long as you can.', techLabel: 'STUNT', engine: VaultEngine.helixHold, colors: [Color(0xFFA3E635), Color(0xFF14B8A6)], icon: Icons.two_wheeler_rounded),
+  VaultGameDef(id: 'stunt_bike', title: 'Stunt Bike', shortTitle: 'Stunt Bike', tagline: 'Balance through the whole stunt run.', techLabel: 'STUNT', engine: VaultEngine.helixHold, colors: [Color(0xFFF472B6), Color(0xFFA855F7)], icon: Icons.moped_rounded),
+  VaultGameDef(id: 'backflip_run', title: 'Backflip Run', shortTitle: 'Backflip Run', tagline: 'Stay balanced through big air.', techLabel: 'STUNT', engine: VaultEngine.helixHold, colors: [Color(0xFFF97316), Color(0xFFEF4444)], icon: Icons.sports_motorsports_rounded),
+  // Row 8 — Jump Runner: endless run, tap to jump obstacles
+  VaultGameDef(id: 'moto_jump', title: 'Moto Jump', shortTitle: 'Moto Jump', tagline: 'Auto-ride and jump every obstacle.', techLabel: 'RUN', engine: VaultEngine.nodeDash, colors: [Color(0xFFEF4444), Color(0xFFFBBF24)], icon: Icons.two_wheeler_rounded),
+  VaultGameDef(id: 'bmx_hop', title: 'BMX Hop', shortTitle: 'BMX Hop', tagline: 'Hop the ramps without missing a beat.', techLabel: 'RUN', engine: VaultEngine.nodeDash, colors: [Color(0xFF84CC16), Color(0xFF22C55E)], icon: Icons.pedal_bike_rounded),
+  VaultGameDef(id: 'dirt_jumper', title: 'Dirt Jumper', shortTitle: 'Dirt Jumper', tagline: 'Off-road hops through the dirt track.', techLabel: 'RUN', engine: VaultEngine.nodeDash, colors: [Color(0xFFD97706), Color(0xFF92400E)], icon: Icons.directions_bike_rounded),
+  VaultGameDef(id: 'rooftop_runner', title: 'Rooftop Runner', shortTitle: 'Rooftop Runner', tagline: 'Sprint and jump across the rooftops.', techLabel: 'RUN', engine: VaultEngine.nodeDash, colors: [Color(0xFF22D3EE), Color(0xFF3B82F6)], icon: Icons.directions_run_rounded),
+  // Row 9 — Item Collector: steer across lanes, grab good items, dodge bad ones
+  VaultGameDef(id: 'fuel_frenzy', title: 'Fuel Frenzy', shortTitle: 'Fuel Frenzy', tagline: 'Grab fuel cans, dodge the hazards.', techLabel: 'COLLECT', engine: VaultEngine.gravityHook, colors: [Color(0xFFF97316), Color(0xFFEF4444)], icon: Icons.local_gas_station_rounded),
+  VaultGameDef(id: 'coin_rally', title: 'Coin Rally', shortTitle: 'Coin Rally', tagline: 'Rally down the road scooping coins.', techLabel: 'COLLECT', engine: VaultEngine.gravityHook, colors: [Color(0xFFFBBF24), Color(0xFFD97706)], icon: Icons.directions_car_rounded),
+  VaultGameDef(id: 'gem_grab', title: 'Gem Grab', shortTitle: 'Gem Grab', tagline: 'Collect gems, dodge everything else.', techLabel: 'COLLECT', engine: VaultEngine.gravityHook, colors: [Color(0xFFA855F7), Color(0xFFEC4899)], icon: Icons.diamond_rounded),
+  // Row 10 — Target Aim: tap the target the instant it appears
+  VaultGameDef(id: 'bullseye_rush', title: 'Bullseye Rush', shortTitle: 'Bullseye Rush', tagline: 'Hit the bullseye before it vanishes.', techLabel: 'AIM', engine: VaultEngine.wordMatch, colors: [Color(0xFFEF4444), Color(0xFFF97316)], icon: Icons.track_changes_rounded),
+  VaultGameDef(id: 'sniper_focus', title: 'Sniper Focus', shortTitle: 'Sniper Focus', tagline: 'Precision taps, no wasted shots.', techLabel: 'AIM', engine: VaultEngine.wordMatch, colors: [Color(0xFF34D399), Color(0xFF0D9488)], icon: Icons.center_focus_strong_rounded),
+  VaultGameDef(id: 'trick_shot', title: 'Trick Shot', shortTitle: 'Trick Shot', tagline: 'Fast eyes, faster fingers.', techLabel: 'AIM', engine: VaultEngine.wordMatch, colors: [Color(0xFF60A5FA), Color(0xFFA78BFA)], icon: Icons.adjust_rounded),
+  // Row 11 — Quick Math: solve simple arithmetic fast
+  VaultGameDef(id: 'math_racer', title: 'Math Racer', shortTitle: 'Math Racer', tagline: 'Race the clock with quick arithmetic.', techLabel: 'MATH', engine: VaultEngine.neonSerpent, colors: [Color(0xFF38BDF8), Color(0xFF6366F1)], icon: Icons.calculate_rounded),
+  VaultGameDef(id: 'number_rush', title: 'Number Rush', shortTitle: 'Number Rush', tagline: 'Quick sums, quicker taps.', techLabel: 'MATH', engine: VaultEngine.neonSerpent, colors: [Color(0xFFA78BFA), Color(0xFFEC4899)], icon: Icons.functions_rounded),
+  VaultGameDef(id: 'speed_sums', title: 'Speed Sums', shortTitle: 'Speed Sums', tagline: 'How many can you solve in time?', techLabel: 'MATH', engine: VaultEngine.neonSerpent, colors: [Color(0xFF84CC16), Color(0xFF22C55E)], icon: Icons.add_rounded),
+  // Row 12 — Pattern Sequence: Simon-says style memory
+  VaultGameDef(id: 'sequence_rally', title: 'Sequence Rally', shortTitle: 'Sequence Rally', tagline: 'Watch, remember, repeat — faster each round.', techLabel: 'MEMORY', engine: VaultEngine.wordMatch, colors: [Color(0xFFF472B6), Color(0xFF60A5FA)], icon: Icons.grid_view_rounded),
+  VaultGameDef(id: 'circuit_memory', title: 'Circuit Memory', shortTitle: 'Circuit Memory', tagline: 'Trace the growing circuit pattern.', techLabel: 'MEMORY', engine: VaultEngine.wordMatch, colors: [Color(0xFF2DD4BF), Color(0xFF06B6D4)], icon: Icons.memory_rounded),
+  VaultGameDef(id: 'signal_chain', title: 'Signal Chain', shortTitle: 'Signal Chain', tagline: 'Chain the signal without a slip.', techLabel: 'MEMORY', engine: VaultEngine.wordMatch, colors: [Color(0xFFA855F7), Color(0xFFEC4899)], icon: Icons.link_rounded),
 ];
 
 // Large offline banks for Type Rush
