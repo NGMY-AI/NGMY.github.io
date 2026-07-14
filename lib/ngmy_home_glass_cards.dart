@@ -2891,6 +2891,17 @@ class _CreditCardSpendBody extends StatelessWidget {
                   shadows: [Shadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
               ),
+              const SizedBox(height: 10),
+              Text(
+                'TOTAL  -\$${totalSpent.toStringAsFixed(2)}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: ink.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  letterSpacing: 0.6,
+                ),
+              ),
               const Spacer(),
             ],
           ),

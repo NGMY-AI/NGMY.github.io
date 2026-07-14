@@ -94,7 +94,7 @@ img.Image _cleanPaper(int top, int bottom, int frame) {
       255,
     );
   }
-  _border(im, 22, 28, _w - 44, _h - 56, frame, 1.6);
-  _border(im, 28, 34, _w - 56, _h - 68, frame, 0.7);
+  // Soft single frame — avoid heavy dark double borders in previews and print.
+  _border(im, 24, 30, _w - 48, _h - 60, frame, 1.1);
   return im;
 }
