@@ -88,6 +88,12 @@ void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
 
 
 
+void _markSessionBusy(bool busy) {
+  try {
+    html.document.body?.classes.toggle('ngmy-session-busy', busy);
+  } catch (_) {}
+}
+
 void onNavigatorDidPush() {
 
   if (_stackDepth >= 24) return;
@@ -95,6 +101,7 @@ void onNavigatorDidPush() {
   _stackDepth++;
 
   html.window.history.pushState(<String, dynamic>{'ngmy': _stackDepth}, '', html.window.location.href);
+  _markSessionBusy(true);
 
 }
 
@@ -105,7 +112,7 @@ void onNavigatorDidPop() {
   if (_popFromBrowser) {
 
     _popFromBrowser = false;
-
+    _markSessionBusy(_stackDepth > 0);
     return;
 
   }
@@ -115,6 +122,7 @@ void onNavigatorDidPop() {
     _stackDepth--;
 
   }
+  _markSessionBusy(_stackDepth > 0);
 
 }
 

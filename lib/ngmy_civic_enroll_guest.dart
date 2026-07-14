@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import 'ngmy_civic_enroll_link.dart';
+import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_light_notice_dialog.dart';
@@ -249,7 +250,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   String _generateRegistryId(String state) {
-    final prefix = state.length >= 2 ? state.substring(0, 2).toUpperCase() : 'ST';
+    final prefix = NgmyCivicRegistryIdCard.stateCode(state);
     final existing = _members
         .map((m) => (m['registryId'] ?? '').toString().trim().toUpperCase())
         .where((id) => id.isNotEmpty)

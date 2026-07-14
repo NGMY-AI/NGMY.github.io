@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'ngmy_civic_registry_id_card.dart';
 
 /// Civic Registry members — isolated from general app user profiles.
 class NgmyCivicRegistryMembers {
@@ -226,6 +229,19 @@ class NgmyCivicRegistryMembers {
   /// Move an enrolled member to another state, keeping the same registry record,
   /// helps/missed, passport, nicknames, photo, and all other fields.
   /// City/room are cleared because they belong to the old state's map.
+  static String mintRegistryId(dynamic config, String state, {Iterable<String> extraExisting = const []}) {
+    final prefix = NgmyCivicRegistryIdCard.stateCode(state);
+    final existing = <String>{
+      ...listFrom(config).map((m) => (m['registryId'] ?? '').toString().trim()).where((id) => id.isNotEmpty),
+      ...extraExisting.map((e) => e.trim()).where((id) => id.isNotEmpty),
+    };
+    for (var i = 0; i < 5000; i++) {
+      final candidate = '$prefix${math.Random().nextInt(8999999) + 1000000}';
+      if (!existing.contains(candidate)) return candidate;
+    }
+    return '$prefix${DateTime.now().microsecondsSinceEpoch}';
+  }
+
   /// Prefer [registryId] when both are provided (shared emails possible).
   static Map<String, dynamic>? transferToState(
     dynamic config, {
@@ -233,6 +249,7 @@ class NgmyCivicRegistryMembers {
     String email = '',
     String registryId = '',
     bool clearCityRoom = true,
+    bool remintRegistryId = true,
   }) {
     final target = toState.trim();
     if (target.isEmpty) return null;
@@ -265,6 +282,25 @@ class NgmyCivicRegistryMembers {
     next['previousState'] = fromState;
     next['transferredAt'] = DateTime.now().toUtc().toIso8601String();
     next['updatedAt'] = next['transferredAt'];
+    if (remintRegistryId) {
+      final oldId = (next['registryId'] ?? '').toString().trim();
+      final targetPrefix = NgmyCivicRegistryIdCard.stateCode(target);
+      if (oldId.isEmpty || !oldId.toUpperCase().startsWith(targetPrefix)) {
+        final digits = oldId.replaceAll(RegExp(r'[^0-9]'), '');
+        final rewritten = digits.isNotEmpty ? '$targetPrefix$digits' : '';
+        final taken = members
+            .asMap()
+            .entries
+            .where((e) => e.key != idx)
+            .map((e) => (e.value['registryId'] ?? '').toString().trim())
+            .where((id) => id.isNotEmpty)
+            .toSet();
+        next['previousRegistryId'] = oldId;
+        next['registryId'] = (rewritten.isNotEmpty && !taken.contains(rewritten))
+            ? rewritten
+            : mintRegistryId(config, target, extraExisting: [oldId]);
+      }
+    }
     members[idx] = next;
     setList(config, members);
     return next;

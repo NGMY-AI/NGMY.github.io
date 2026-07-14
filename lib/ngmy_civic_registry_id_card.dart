@@ -41,8 +41,14 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
 
   static String stateCode(String state) {
     final s = state.trim();
-    if (s.length == 2) return s.toUpperCase();
-    return _stateCodes[s] ?? (s.length >= 2 ? s.substring(0, 2).toUpperCase() : 'ST');
+    if (s.length == 2 && RegExp(r'^[A-Za-z]{2}$').hasMatch(s)) return s.toUpperCase();
+    final direct = _stateCodes[s];
+    if (direct != null) return direct;
+    final lower = s.toLowerCase();
+    for (final e in _stateCodes.entries) {
+      if (e.key.toLowerCase() == lower) return e.value;
+    }
+    return s.length >= 2 ? s.substring(0, 2).toUpperCase() : 'ST';
   }
 
   static String _docTitle(String idType) {

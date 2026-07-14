@@ -9477,11 +9477,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
         await ngmyHydrateDocSharePaymentsFromAllBackups(next);
         if (_appConfigSig(_config) == _appConfigSig(next)) return;
-        setState(() {
+        // Apply quietly while the user is in a stacked screen/dialog so a parent
+        // rebuild cannot feel like a hard kick back to Home.
+        void applyConfig() {
           _config = next;
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
           _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
-        });
+        }
+        if (ngmyShouldAllowGlobalInterrupt()) {
+          setState(applyConfig);
+        } else {
+          applyConfig();
+        }
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('app_config', jsonEncode(_config.toJson()));
           prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
@@ -14289,6 +14296,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _idx = i;
       _visitedTabs.add(i);
     });
+    SharedPreferences.getInstance().then((p) => p.setInt('ngmy_main_tab_idx', i)).catchError((_) {});
     if (i == 0) {
       WidgetsBinding.instance.scheduleForcedFrame();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -14683,6 +14691,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
+    SharedPreferences.getInstance().then((p) {
+      final saved = p.getInt('ngmy_main_tab_idx');
+      if (!mounted || saved == null || saved == _idx || saved < 0) return;
+      setState(() {
+        _idx = saved;
+        _visitedTabs.add(saved);
+      });
+    }).catchError((_) {});
     ngmyRegisterPageVisibleHandler(_onShellVisibleAgain);
     _warmTransactionCacheAfterFrame();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
@@ -21468,11 +21484,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (updated == null) return false;
 
     final emailKey = NgmyCivicRegistryMembers.emailKey(email);
-    final rid = registryId.trim().toUpperCase();
+    final oldRid = registryId.trim().toUpperCase();
+    final newRid = (updated['registryId'] ?? '').toString().trim();
     void applyLinked(UserData u) {
       u.state = target;
       u.city = '';
       u.room = '';
+      if (newRid.isNotEmpty) u.registryId = newRid;
       if (u.civicRegistryAnchorState.trim().isNotEmpty) {
         u.civicRegistryAnchorState = target;
       }
@@ -21480,12 +21498,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     for (final u in widget.allUsers) {
       final sameEmail = emailKey.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == emailKey;
-      final sameId = rid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == rid;
+      final sameId = oldRid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == oldRid;
       if (sameEmail || sameId) applyLinked(u);
     }
     final selfEmail = NgmyCivicRegistryMembers.emailKey(widget.user.email);
     final selfId = (widget.user.registryId ?? '').trim().toUpperCase();
-    if ((emailKey.isNotEmpty && selfEmail == emailKey) || (rid.isNotEmpty && selfId == rid)) {
+    if ((emailKey.isNotEmpty && selfEmail == emailKey) || (oldRid.isNotEmpty && selfId == oldRid)) {
       applyLinked(widget.user);
     }
 
@@ -21513,6 +21531,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   'state': target,
                   'city': '',
                   'room': '',
+                  'registryId': widget.allUsers[idx].registryId,
                   'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
                 },
                 onConflict: 'email',
@@ -29617,19 +29636,48 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _ensureUniqueRegistryIds() {
     final seen = <String>{};
+    var changed = false;
     for (final m in NgmyCivicRegistryMembers.listFrom(widget.config)) {
       var id = (m['registryId'] ?? '').toString().trim();
       final state = (m['state'] ?? _selectedState).toString();
-      if (id.isEmpty || seen.contains(id)) {
-        id = _generateUniqueRegistryId(state);
+      final prefix = NgmyCivicRegistryIdCard.stateCode(state);
+      final upper = id.toUpperCase();
+      final wrongPrefix = id.isNotEmpty && !upper.startsWith(prefix);
+      if (id.isEmpty || seen.contains(id) || wrongPrefix) {
+        if (wrongPrefix && id.isNotEmpty && !seen.contains(id)) {
+          final digits = id.replaceAll(RegExp(r'[^0-9]'), '');
+          final rewritten = digits.isNotEmpty ? '$prefix$digits' : '';
+          id = (rewritten.isNotEmpty && !seen.contains(rewritten))
+              ? rewritten
+              : _generateUniqueRegistryId(state);
+        } else {
+          id = _generateUniqueRegistryId(state);
+        }
         NgmyCivicRegistryMembers.upsert(widget.config, {...m, 'registryId': id});
+        final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
+        if (email.isNotEmpty) {
+          for (final u in widget.allUsers) {
+            if (NgmyCivicRegistryMembers.emailKey(u.email) == email) {
+              u.registryId = id;
+            }
+          }
+          if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == email) {
+            widget.user.registryId = id;
+          }
+        }
+        changed = true;
       }
       seen.add(id);
+    }
+    if (changed) {
+      unawaited(NgmyCivicRegistryMembers.saveLocalBackup(widget.config));
+      unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+      widget.onDataChanged();
     }
   }
 
   String _generateUniqueRegistryId(String state) {
-    final prefix = state.length >= 2 ? state.substring(0, 2).toUpperCase() : 'ST';
+    final prefix = NgmyCivicRegistryIdCard.stateCode(state);
     final existing = <String>{
       ...widget.allUsers.map((u) => (u.registryId ?? '').trim()).where((id) => id.isNotEmpty),
       ...NgmyCivicRegistryMembers.listFrom(widget.config)
@@ -30121,23 +30169,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
 
     final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
-    final rid = (member.registryId ?? '').trim().toUpperCase();
+    final oldRid = (member.registryId ?? '').trim().toUpperCase();
+    final newRid = (updated['registryId'] ?? '').toString().trim();
     void applyLinked(UserData u) {
       u.state = picked;
       u.city = '';
       u.room = '';
+      if (newRid.isNotEmpty) u.registryId = newRid;
       if (u.civicRegistryAnchorState.trim().isNotEmpty) {
         u.civicRegistryAnchorState = picked;
       }
     }
     for (final u in widget.allUsers) {
       final sameEmail = emailKey.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == emailKey;
-      final sameId = rid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == rid;
+      final sameId = oldRid.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == oldRid;
       if (sameEmail || sameId) applyLinked(u);
     }
     member.state = picked;
     member.city = '';
     member.room = '';
+    if (newRid.isNotEmpty) member.registryId = newRid;
 
     await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
     final cloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
@@ -30158,6 +30209,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   'state': picked,
                   'city': '',
                   'room': '',
+                  'registryId': widget.allUsers[idx].registryId,
                   'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
                 },
                 onConflict: 'email',
