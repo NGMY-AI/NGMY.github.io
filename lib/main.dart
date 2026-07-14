@@ -28948,6 +28948,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   final _cityC = TextEditingController();
   final _roomC = TextEditingController();
   final _familyMembersC = TextEditingController();
+  final _familyMalesC = TextEditingController();
+  final _familyFemalesC = TextEditingController();
   /// When set, Enroll tab is updating this member's registry email key.
   String? _editingMemberOriginalEmail;
   String? _editingMemberRegistryId;
@@ -29025,6 +29027,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _cityC.dispose();
     _roomC.dispose();
     _familyMembersC.dispose();
+    _familyMalesC.dispose();
+    _familyFemalesC.dispose();
     super.dispose();
   }
 
@@ -29709,6 +29713,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _cityC.clear();
     _roomC.clear();
     _familyMembersC.clear();
+    _familyMalesC.clear();
+    _familyFemalesC.clear();
     if (clearEditing) {
       _editingMemberOriginalEmail = null;
       _editingMemberRegistryId = null;
@@ -29724,6 +29730,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final idType = (raw?['idType'] ?? u.idType ?? '').toString().trim();
     final familyRaw = raw?['familyMembers'];
     final familyStr = familyRaw is num ? '${familyRaw.toInt()}' : (familyRaw?.toString() ?? '').trim();
+    final malesRaw = raw?['familyMales'];
+    final femalesRaw = raw?['familyFemales'];
+    final malesStr = malesRaw is num ? '${malesRaw.toInt()}' : (malesRaw?.toString() ?? '').trim();
+    final femalesStr = femalesRaw is num ? '${femalesRaw.toInt()}' : (femalesRaw?.toString() ?? '').trim();
     final state = (raw?['state'] ?? u.state).toString().trim();
     final phoneDigits = (raw?['phone'] ?? u.phone).toString().replaceAll(RegExp(r'\D'), '');
     final registryId = (raw?['registryId'] ?? u.registryId ?? '').toString().trim();
@@ -29744,6 +29754,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _cityC.text = (raw?['city'] ?? u.city ?? '').toString();
       _roomC.text = (raw?['room'] ?? u.room ?? '').toString();
       _familyMembersC.text = familyStr;
+      _familyMalesC.text = malesStr;
+      _familyFemalesC.text = femalesStr;
       _activeTab = 1;
     });
     if (!mounted) return;
@@ -29780,8 +29792,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final isRegistrarManual = targetUser == null;
 
     final hasTwoNames = RegExp(r'^\S+\s+\S+').hasMatch(fullName);
-    if (!hasTwoNames) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain at least first and last name.')));
+    if (fullName.isEmpty || !hasTwoNames) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full name is required (first and last name).')));
       return;
     }
     if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
@@ -29797,11 +29809,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     if (address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Home Address is required.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Home address is required.')));
       return;
     }
-    if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must contain numbers only (7-15 digits).')));
+    if (phone.isEmpty || !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number is required (7–15 digits).')));
       return;
     }
     if (email.isNotEmpty && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
@@ -29825,8 +29837,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final familyMembers = int.tryParse(_familyMembersC.text.trim()) ?? 0;
+    final familyMales = int.tryParse(_familyMalesC.text.trim()) ?? -1;
+    final familyFemales = int.tryParse(_familyFemalesC.text.trim()) ?? -1;
     if (familyMembers < 1 || familyMembers > 99) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many family members (1–99).')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Family size is required (1–99).')));
+      return;
+    }
+    if (familyMales < 0 || familyFemales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many males and females are in the family.')));
+      return;
+    }
+    if (familyMales + familyFemales != familyMembers) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Males + females must equal family size ($familyMembers).')),
+      );
       return;
     }
 
@@ -29880,6 +29904,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
       registryId: registryId,
       familyMembers: familyMembers,
+      familyMales: familyMales,
+      familyFemales: familyFemales,
     );
 
     setState(() {
@@ -29972,27 +29998,55 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         : (existingFamily is num
             ? existingFamily.toInt()
             : int.tryParse('${existingFamily ?? ''}') ?? 1);
+    final malesRawForm = _familyMalesC.text.trim();
+    final femalesRawForm = _familyFemalesC.text.trim();
+    final existingMales = existing['familyMales'];
+    final existingFemales = existing['familyFemales'];
+    final familyMales = malesRawForm.isNotEmpty
+        ? (int.tryParse(malesRawForm) ?? -1)
+        : (existingMales is num
+            ? existingMales.toInt()
+            : int.tryParse('${existingMales ?? ''}') ?? -1);
+    final familyFemales = femalesRawForm.isNotEmpty
+        ? (int.tryParse(femalesRawForm) ?? -1)
+        : (existingFemales is num
+            ? existingFemales.toInt()
+            : int.tryParse('${existingFemales ?? ''}') ?? -1);
     final registryId = (existing['registryId'] ?? editingRegistryId).toString().trim();
     final originalEmail = NgmyCivicRegistryMembers.emailKey((existing['email'] ?? editingEmail).toString());
 
-    if (fullName.isNotEmpty && !RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full Name must contain at least first and last name.')));
+    if (fullName.isEmpty || !RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Full name is required (first and last name).')));
+      return;
+    }
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Home address is required.')));
+      return;
+    }
+    if (phone.isEmpty || !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number is required (7–15 digits).')));
       return;
     }
     if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date of Birth must be in MM/DD/YYYY format.')));
       return;
     }
-    if (phone.isNotEmpty && !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone must contain numbers only (7-15 digits).')));
-      return;
-    }
     if (email.isNotEmpty && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid email address.')));
       return;
     }
-    if (familyRaw.isNotEmpty && (familyMembers < 1 || familyMembers > 99)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Family members must be 1–99 when provided.')));
+    if (familyMembers < 1 || familyMembers > 99) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Family size is required (1–99).')));
+      return;
+    }
+    if (familyMales < 0 || familyFemales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many males and females are in the family.')));
+      return;
+    }
+    if (familyMales + familyFemales != familyMembers) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Males + females must equal family size ($familyMembers).')),
+      );
       return;
     }
 
@@ -30028,6 +30082,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'room': roomFinal,
         'state': _selectedState,
         'familyMembers': familyMembers < 1 ? 1 : familyMembers,
+        'familyMales': familyMales < 0 ? 0 : familyMales,
+        'familyFemales': familyFemales < 0 ? 0 : familyFemales,
       },
     );
     if (updated == null) {
@@ -33792,7 +33848,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ],
               const SizedBox(height: 25),
 
-              const Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _fullNameC,
@@ -33820,9 +33876,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              _enrollField('Home Address', _addressC, 'Street address, Apt...'),
+              _enrollField('Home Address *', _addressC, 'Street address, Apt...'),
 
-              const Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneC,
@@ -33865,19 +33921,67 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Family Members', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('Family Size *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               TextField(
                 controller: _familyMembersC,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  hintText: 'How many people in this family?',
+                  hintText: 'Total people in this family',
                   hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                   filled: true,
                   fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Males *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _familyMalesC,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(
+                            hintText: '0',
+                            hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                            filled: true,
+                            fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Females *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _familyFemalesC,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(
+                            hintText: '0',
+                            hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                            filled: true,
+                            fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 30),
 

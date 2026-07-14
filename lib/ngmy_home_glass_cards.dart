@@ -2113,6 +2113,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                 autoPlay: _autoPlay,
                 slideStyle: _slideStyle,
                 civicIdRecord: widget.civicIdRecord,
+                hasCivicIdOnHome: _spending.any((e) => e.hasCivicId),
                 profilePicturePath: widget.profilePicturePath,
                 config: widget.config,
                 onCivicIdPhotoSaved: widget.onCivicIdPhotoSaved,
@@ -2124,6 +2125,18 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       );
       if (result == null) return;
       final kind = result['kind'] ?? 'spending';
+      if (kind == 'remove_civic_id') {
+        final civicIds = _spending.where((e) => e.hasCivicId).map((e) => e.id).toList();
+        if (civicIds.isEmpty) return;
+        final ok = await showNgmyRoboticDeleteConfirm(context, title: 'Remove Civic Registry ID from home?');
+        if (!ok || !mounted) return;
+        setState(() => _spending = _spending.where((e) => !e.hasCivicId).toList());
+        await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+        if (civicIds.contains(_frontSpendingId)) {
+          await _setDeckPrefs(frontSpendingId: _spending.isNotEmpty ? _spending.first.id : '');
+        }
+        return;
+      }
       if (kind == 'photo') {
         final b64 = result['imageBase64'] ?? '';
         if (b64.isEmpty) return;
@@ -2157,6 +2170,11 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       if (kind == 'civic_id') {
         final json = result['civicIdJson'] ?? '';
         if (json.isEmpty) return;
+        // Keep at most one Civic Registry ID card on home.
+        if (_spending.any((e) => e.hasCivicId)) {
+          setState(() => _spending = _spending.where((e) => !e.hasCivicId).toList());
+          await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+        }
         await _addSpendingEntry(
           NgmySpendingEntry(
             id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -2343,10 +2361,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                                           : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                   isFront: isFront,
                   showDateTab: revealDates,
-                  // Civic Registry ID: only the middle "added" date tab ? no welcome / today / X / +.
+                  // Civic Registry ID: middle date tab only (no welcome / today / X), but + still opens add/remove sheet.
                   welcomeName: isFront && !isCivic ? name : null,
                   onDelete: isFront && !isCivic ? () => _deleteSpending(entry.id) : null,
-                  onAdd: isFront && !isCivic ? _openAddSheet : null,
+                  onAdd: isFront ? _openAddSheet : null,
                   footer: isFront && !entry.hideModePill ? _modePill() : null,
                   fillBleed: entry.hasImage ||
                       entry.showsCreditFace ||
@@ -3784,6 +3802,7 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
     required this.slideStyle,
     required this.onDeckSettingsChanged,
     this.civicIdRecord,
+    this.hasCivicIdOnHome = false,
     this.profilePicturePath,
     this.config,
     this.onCivicIdPhotoSaved,
@@ -3794,6 +3813,7 @@ class _NgmyAddSpendingSheet extends StatefulWidget {
   final NgmyHomeCardSlideStyle slideStyle;
   final Future<void> Function(bool autoPlay, NgmyHomeCardSlideStyle style) onDeckSettingsChanged;
   final Map<String, dynamic>? civicIdRecord;
+  final bool hasCivicIdOnHome;
   final String? profilePicturePath;
   final dynamic config;
   final Future<void> Function()? onCivicIdPhotoSaved;
@@ -3882,6 +3902,11 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
   }
 
   Future<void> _pickCivicId() async {
+    if (widget.hasCivicIdOnHome) {
+      if (!mounted) return;
+      Navigator.pop(context, {'kind': 'remove_civic_id'});
+      return;
+    }
     var record = widget.civicIdRecord == null ? null : Map<String, dynamic>.from(widget.civicIdRecord!);
     if (record == null || record.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -4315,12 +4340,16 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                             ),
                             const SizedBox(height: 10),
                             _hudAction(
-                              icon: Icons.badge_outlined,
-                              label: 'Add Civic Registry ID to home',
+                              icon: widget.hasCivicIdOnHome ? Icons.remove_circle_outline_rounded : Icons.badge_outlined,
+                              label: widget.hasCivicIdOnHome
+                                  ? 'Remove Civic Registry ID from home'
+                                  : 'Add Civic Registry ID to home',
                               onTap: _pickCivicId,
                               t: t,
                               phase: 3,
-                              accent: const [Color(0xFF0EA5E9), Color(0xFF1D4ED8)],
+                              accent: widget.hasCivicIdOnHome
+                                  ? const [Color(0xFFF87171), Color(0xFFDC2626)]
+                                  : const [Color(0xFF0EA5E9), Color(0xFF1D4ED8)],
                             ),
                             const SizedBox(height: 16),
                             Text('CATEGORY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: muted)),
