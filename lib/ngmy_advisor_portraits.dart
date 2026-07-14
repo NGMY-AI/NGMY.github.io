@@ -95,12 +95,24 @@ String ngmyAdvisorPortraitAssetPath({
 String? _personPortraitKey({required String name, required String id}) {
   final n = name.trim().toLowerCase();
   final i = id.trim().toLowerCase();
-  bool hit(String key) => n == key || n.startsWith('$key ') || i.contains(key);
+  final blob = '$n $i';
+  bool hit(String key) {
+    if (n == key || i == key) return true;
+    if (n.startsWith('$key ') || n.endsWith(' $key') || n.contains(' $key ')) return true;
+    if (RegExp('\\b$key\\b').hasMatch(blob)) return true;
+    return false;
+  }
+
   if (hit('miriam')) return 'person_miriam';
-  if (hit('susie') || hit('suzie') || hit('suzi')) return 'person_susie';
+  // Spelling variants used in the app / by the user.
+  if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey')) return 'person_susie';
   if (hit('mina')) return 'person_mina';
   return null;
 }
+
+/// True when this advisor has a dedicated bundled photoreal portrait.
+bool ngmyAdvisorHasNamedPortrait({String name = '', String id = ''}) =>
+    _personPortraitKey(name: name, id: id) != null;
 
 Future<void> ngmyWarmAdvisorPortraitAssets() async {
   if (_assetsWarmed) return;

@@ -634,8 +634,16 @@ class NgmyCommunicateAvatar extends StatefulWidget {
   final NgmyCommunicateProfile profile;
   final double size;
   final bool glow;
+  /// When true, tapping the face opens the full portrait fullscreen.
+  final bool openFullscreenOnTap;
 
-  const NgmyCommunicateAvatar({super.key, required this.profile, this.size = 44, this.glow = false});
+  const NgmyCommunicateAvatar({
+    super.key,
+    required this.profile,
+    this.size = 44,
+    this.glow = false,
+    this.openFullscreenOnTap = false,
+  });
 
   @override
   State<NgmyCommunicateAvatar> createState() => _NgmyCommunicateAvatarState();
@@ -659,6 +667,26 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
 
   Future<void> _bootstrapBytes() async {
     final id = widget.profile.id.trim();
+    final name = widget.profile.name.trim();
+
+    // Named overrides (Miriam / Suzy / Mina) always win over old cached role photos.
+    if (ngmyAdvisorHasNamedPortrait(name: name, id: id)) {
+      try {
+        final namedBytes = await ngmyAdvisorPortraitBytesAsync(
+          id: id,
+          gender: widget.profile.gender,
+          role: widget.profile.role,
+          name: name,
+        );
+        if (namedBytes.isNotEmpty) {
+          // Keep disk/cache in sync so lists stop showing the old shared face.
+          await NgmyCommunicateAvatarCache.saveBytes(id, namedBytes);
+          if (mounted) setState(() => _bytes = namedBytes);
+          return;
+        }
+      } catch (_) {}
+    }
+
     var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
     bytes ??= await NgmyCommunicateAvatarCache.loadBytes(id);
     if (bytes != null && bytes.isNotEmpty) {
@@ -684,17 +712,13 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         id: id,
         gender: widget.profile.gender,
         role: widget.profile.role,
-        name: widget.profile.name,
+        name: name,
       );
       if (roleBytes.isNotEmpty && mounted) {
         setState(() => _bytes = roleBytes);
       }
     } catch (_) {}
     await _resolveNetwork();
-    // The app also warms this same cache in the background at startup
-    // (ngmyWarmCommunicateAvatarsFromConfig). If this widget mounted before
-    // that finished, it would fall back to the emoji forever with no way to
-    // know bytes showed up later — so give it one more look shortly after.
     if (mounted && (_bytes == null || _bytes!.isEmpty)) {
       _retryTimer = Timer(const Duration(seconds: 4), () {
         if (mounted && (_bytes == null || _bytes!.isEmpty)) {
@@ -707,13 +731,10 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   @override
   void didUpdateWidget(covariant NgmyCommunicateAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profile.id != widget.profile.id) {
-      _bytes = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id);
-      unawaited(_bootstrapBytes());
-      return;
-    }
-    if (oldWidget.profile.avatarUrl != widget.profile.avatarUrl &&
-        (_bytes == null || _bytes!.isEmpty)) {
+    if (oldWidget.profile.id != widget.profile.id ||
+        oldWidget.profile.name != widget.profile.name ||
+        oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
+      _bytes = null;
       unawaited(_bootstrapBytes());
     }
   }
@@ -723,6 +744,8 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     final url = widget.profile.avatarUrl.trim();
     final previous = _bytes;
     if (!url.startsWith('http')) return;
+    // Don't let a remote URL overwrite a dedicated named portrait.
+    if (ngmyAdvisorHasNamedPortrait(name: widget.profile.name, id: id)) return;
     await NgmyCommunicateAvatarCache.ensureCached(id, url);
     final bytes = await NgmyCommunicateAvatarCache.loadBytes(id);
     if (mounted) {
@@ -761,6 +784,16 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     }
   }
 
+  void _openFullscreen() {
+    final bytes = _bytes;
+    if (bytes == null || bytes.isEmpty) return;
+    unawaited(showNgmyAdvisorPortraitFullscreen(
+      context,
+      bytes: bytes,
+      name: widget.profile.name,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget inner;
@@ -779,7 +812,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     } else {
       inner = _illustratedFallback();
     }
-    return Container(
+    final face = Container(
       width: widget.size,
       height: widget.size,
       decoration: BoxDecoration(
@@ -797,7 +830,78 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         child: inner,
       ),
     );
+    if (!widget.openFullscreenOnTap || _bytes == null || _bytes!.isEmpty) return face;
+    return GestureDetector(
+      onTap: _openFullscreen,
+      behavior: HitTestBehavior.opaque,
+      child: face,
+    );
   }
+}
+
+Future<void> showNgmyAdvisorPortraitFullscreen(
+  BuildContext context, {
+  required Uint8List bytes,
+  required String name,
+}) {
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close photo',
+    barrierColor: Colors.black.withValues(alpha: 0.92),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (ctx, anim, secondary) {
+      return SafeArea(
+        child: Material(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                left: 12,
+                right: 12,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name.trim().isEmpty ? 'Photo' : name.trim(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (ctx, anim, secondary, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 List<NgmyCommunicateProfile> ngmyCommunicateProfilesFromConfig(dynamic config) {
@@ -2161,7 +2265,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                         child: Row(
                           children: [
                             IconButton(icon: Icon(Icons.arrow_back_rounded, color: panelFgMuted, size: 22), onPressed: widget.onBack),
-                            NgmyCommunicateAvatar(profile: widget.profile, size: 44, glow: true),
+                            NgmyCommunicateAvatar(
+                              profile: widget.profile,
+                              size: 44,
+                              glow: true,
+                              openFullscreenOnTap: true,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
