@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260714050025';
+      var embedded = '20260714051419';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -71,18 +71,25 @@
       fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (v) {
-          if (v && v.build_number) forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+          // Never hard-reload while the user is actively in the app — queue until they leave.
+          if (v && v.build_number) forceRefreshForBuild(v.build_number, { deferIfVisible: true });
         })
         .catch(function () {});
 
-      // Apply a deferred deploy only after the user backgrounds / closes the tab.
+      // Apply a deferred deploy only after the user backgrounds / closes the tab,
+      // and only if they are not mid-session in a nested route (Flutter signals via body class).
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'hidden') return;
         var pending = null;
         try { pending = localStorage.getItem('ngmy_pending_deploy'); } catch (e) {}
-        if (pending && pending !== embedded) {
-          forceRefreshForBuild(pending, { deferIfVisible: false });
-        }
+        if (!pending || pending === embedded) return;
+        // If Flutter marks an active dialog/route, keep deferring.
+        try {
+          if (document.body && document.body.classList && document.body.classList.contains('ngmy-session-busy')) {
+            return;
+          }
+        } catch (e2) {}
+        forceRefreshForBuild(pending, { deferIfVisible: false });
       });
     })();
   </script>
@@ -616,7 +623,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260714050025";
+      var CURRENT = "20260714051419";
 
       function showError(msg) {
 
@@ -668,7 +675,7 @@
 
   <script>
     (function () {
-      var deployId = '20260714050025';
+      var deployId = '20260714051419';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
