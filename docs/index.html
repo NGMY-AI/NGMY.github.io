@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260714055954';
+      var embedded = '20260714061649';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -37,14 +37,10 @@
         var onceKey = 'ngmy_force_reload_' + serverBuild;
         if (sessionStorage.getItem(onceKey)) return;
 
-        // While the app is open and visible, queue reload until the user leaves
-        // (prevents mid-session refreshes that kick people back to Home).
+        // Mid-session callers always pass deferIfVisible=true and must ONLY queue —
+        // never reload while someone is using the app (backgrounding counts as using).
         var defer = opts && opts.deferIfVisible;
-        var visible = true;
-        try {
-          visible = document.visibilityState !== 'hidden';
-        } catch (e) {}
-        if (defer && visible) {
+        if (defer) {
           try { localStorage.setItem('ngmy_pending_deploy', serverBuild); } catch (e2) {}
           return;
         }
@@ -68,29 +64,19 @@
         }
       }
       window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
+      // Cold open / fresh document only: if the server has a newer build, reload once.
+      // Never auto-reload later while the user is mid-session (that dumps them on Home).
       fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (v) {
-          // Never hard-reload while the user is actively in the app — queue until they leave.
-          if (v && v.build_number) forceRefreshForBuild(v.build_number, { deferIfVisible: true });
-        })
-        .catch(function () {});
-
-      // Apply a deferred deploy only after the user backgrounds / closes the tab,
-      // and only if they are not mid-session in a nested route (Flutter signals via body class).
-      document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState !== 'hidden') return;
-        var pending = null;
-        try { pending = localStorage.getItem('ngmy_pending_deploy'); } catch (e) {}
-        if (!pending || pending === embedded) return;
-        // If Flutter marks an active dialog/route, keep deferring.
-        try {
-          if (document.body && document.body.classList && document.body.classList.contains('ngmy-session-busy')) {
+          if (!v || !v.build_number) return;
+          if (v.build_number === embedded) {
+            try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
             return;
           }
-        } catch (e2) {}
-        forceRefreshForBuild(pending, { deferIfVisible: false });
-      });
+          forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+        })
+        .catch(function () {});
     })();
   </script>
 
@@ -623,7 +609,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260714055954";
+      var CURRENT = "20260714061649";
 
       function showError(msg) {
 
@@ -675,7 +661,7 @@
 
   <script>
     (function () {
-      var deployId = '20260714055954';
+      var deployId = '20260714061649';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
