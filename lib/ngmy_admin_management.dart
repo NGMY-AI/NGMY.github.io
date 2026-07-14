@@ -890,6 +890,13 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(AppConfig config, Lis
     }
   }
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
+  final before = NgmyCivicRegistryMembers.listFrom(config).length;
+  final removed = NgmyCivicRegistryMembers.normalizeRegistryIdsInPlace(config);
+  final after = NgmyCivicRegistryMembers.listFrom(config).length;
+  if (removed > 0 || after < before) {
+    // Push cleaned roster so other devices stop re-merging the clones.
+    await ngmyPersistCivicRegistryMembers(config);
+  }
 }
 
 Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {

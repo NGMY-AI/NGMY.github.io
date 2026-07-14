@@ -242,6 +242,224 @@ class NgmyCivicRegistryMembers {
     return '$prefix${DateTime.now().microsecondsSinceEpoch}';
   }
 
+  static String _digitsOfRegistryId(String registryId) =>
+      registryId.replaceAll(RegExp(r'[^0-9]'), '');
+
+  /// Prefer the row that already has the correct state postal prefix and richer civic data.
+  static Map<String, dynamic> _preferCanonicalMember(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final stateA = (a['state'] ?? '').toString();
+    final stateB = (b['state'] ?? '').toString();
+    final prefixA = NgmyCivicRegistryIdCard.stateCode(stateA);
+    final prefixB = NgmyCivicRegistryIdCard.stateCode(stateB);
+    final idA = (a['registryId'] ?? '').toString().trim().toUpperCase();
+    final idB = (b['registryId'] ?? '').toString().trim().toUpperCase();
+    final aOk = idA.startsWith(prefixA);
+    final bOk = idB.startsWith(prefixB);
+    if (aOk != bOk) return aOk ? a : b;
+
+    int score(Map<String, dynamic> m) {
+      var s = 0;
+      if ((m['idPhotoPath'] ?? '').toString().trim().isNotEmpty) s += 8;
+      if (m['passportGranted'] == true) s += 6;
+      s += ((m['helps'] as num?)?.toInt() ?? 0).clamp(0, 50);
+      s += ((m['missed'] as num?)?.toInt() ?? 0).clamp(0, 20);
+      if ((m['nicknames'] is List) && (m['nicknames'] as List).isNotEmpty) s += 3;
+      if ((m['previousRegistryId'] ?? '').toString().trim().isNotEmpty) s += 1;
+      return s;
+    }
+
+    final sa = score(a);
+    final sb = score(b);
+    if (sa != sb) return sa >= sb ? a : b;
+    // Prefer the older original enrollment when scores tie (newer row is often the accidental clone).
+    final ea = DateTime.tryParse((a['enrolledAt'] ?? '').toString());
+    final eb = DateTime.tryParse((b['enrolledAt'] ?? '').toString());
+    if (ea != null && eb != null && ea != eb) return ea.isBefore(eb) ? a : b;
+    return _preferNewerMember(a, b);
+  }
+
+  static Map<String, dynamic> _mergeMemberFields(Map<String, dynamic> keep, Map<String, dynamic> other) {
+    final next = Map<String, dynamic>.from(keep);
+    void keepIfEmpty(String key) {
+      if ((next[key] ?? '').toString().trim().isEmpty && (other[key] ?? '').toString().trim().isNotEmpty) {
+        next[key] = other[key];
+      }
+    }
+
+    for (final key in [
+      'fullName',
+      'dob',
+      'idType',
+      'homeAddress',
+      'phone',
+      'city',
+      'room',
+      'linkedAppEmail',
+      'idPhotoPath',
+      'passportGrantedAt',
+      'enrolledAt',
+      'previousState',
+      'previousRegistryId',
+    ]) {
+      keepIfEmpty(key);
+    }
+    if (next['passportGranted'] != true && other['passportGranted'] == true) {
+      next['passportGranted'] = true;
+    }
+    final helps = ((next['helps'] as num?)?.toInt() ?? 0);
+    final otherHelps = ((other['helps'] as num?)?.toInt() ?? 0);
+    if (otherHelps > helps) next['helps'] = otherHelps;
+    final missed = ((next['missed'] as num?)?.toInt() ?? 0);
+    final otherMissed = ((other['missed'] as num?)?.toInt() ?? 0);
+    if (otherMissed > missed) next['missed'] = otherMissed;
+    if ((next['nicknames'] is! List || (next['nicknames'] as List).isEmpty) && other['nicknames'] is List) {
+      next['nicknames'] = other['nicknames'];
+    }
+    if (!next.containsKey('showNicknames') && other.containsKey('showNicknames')) {
+      next['showNicknames'] = other['showNicknames'];
+    }
+    final oldId = (other['registryId'] ?? '').toString().trim();
+    final keepId = (next['registryId'] ?? '').toString().trim();
+    if (oldId.isNotEmpty && oldId.toUpperCase() != keepId.toUpperCase()) {
+      final prev = (next['previousRegistryId'] ?? '').toString().trim();
+      if (prev.isEmpty) next['previousRegistryId'] = oldId;
+    }
+    next['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    return next;
+  }
+
+  /// Collapse duplicate rows created by rewriting GE→GA (etc.) via upsert/merge-by-id.
+  /// Same email, or same numeric ID digits, count as one person — never mint a second profile.
+  static int dedupeMembers(dynamic config) {
+    final members = listFrom(config);
+    if (members.length < 2) return 0;
+
+    String groupKey(Map<String, dynamic> m) {
+      final email = emailKey((m['email'] ?? '').toString());
+      if (email.isNotEmpty) return 'em:$email';
+      final digits = _digitsOfRegistryId((m['registryId'] ?? '').toString());
+      final name = (m['fullName'] ?? '').toString().trim().toLowerCase();
+      if (digits.isNotEmpty) return 'dig:$digits|${name.isNotEmpty ? name : 'x'}';
+      final phone = _phoneKey((m['phone'] ?? '').toString());
+      if (phone.length >= 7) return 'ph:$phone';
+      if (name.isNotEmpty) return 'nm:$name|${(m['dob'] ?? '').toString()}';
+      return '';
+    }
+
+    final groups = <String, List<Map<String, dynamic>>>{};
+    final orphans = <Map<String, dynamic>>[];
+    for (final m in members) {
+      final key = groupKey(m);
+      if (key.isEmpty) {
+        orphans.add(Map<String, dynamic>.from(m));
+        continue;
+      }
+      (groups[key] ??= []).add(Map<String, dynamic>.from(m));
+    }
+
+    final out = <Map<String, dynamic>>[];
+    var removed = 0;
+    for (final group in groups.values) {
+      if (group.length == 1) {
+        out.add(group.first);
+        continue;
+      }
+      // Also collapse digit-equivalent twins even if keys differed somehow.
+      Map<String, dynamic> winner = group.first;
+      for (var i = 1; i < group.length; i++) {
+        winner = _preferCanonicalMember(winner, group[i]);
+      }
+      for (final m in group) {
+        if (!identical(m, winner) &&
+            (m['registryId'] ?? '').toString().trim().toUpperCase() !=
+                (winner['registryId'] ?? '').toString().trim().toUpperCase()) {
+          winner = _mergeMemberFields(winner, m);
+          removed++;
+        } else if (!identical(m, winner)) {
+          winner = _mergeMemberFields(winner, m);
+          removed++;
+        }
+      }
+
+      final state = (winner['state'] ?? '').toString();
+      final prefix = NgmyCivicRegistryIdCard.stateCode(state);
+      final id = (winner['registryId'] ?? '').toString().trim();
+      final digits = _digitsOfRegistryId(id);
+      if (digits.isNotEmpty && !id.toUpperCase().startsWith(prefix)) {
+        winner['previousRegistryId'] = id;
+        winner['registryId'] = '$prefix$digits';
+      }
+      out.add(winner);
+    }
+    out.addAll(orphans);
+
+    // Second pass: same numeric ID with different letter prefixes (GE123 vs GA123).
+    final byDigits = <String, List<int>>{};
+    for (var i = 0; i < out.length; i++) {
+      final digits = _digitsOfRegistryId((out[i]['registryId'] ?? '').toString());
+      if (digits.length < 5) continue;
+      (byDigits[digits] ??= []).add(i);
+    }
+    final drop = <int>{};
+    for (final idxs in byDigits.values) {
+      if (idxs.length < 2) continue;
+      var winnerIdx = idxs.first;
+      for (final i in idxs.skip(1)) {
+        final pick = _preferCanonicalMember(out[winnerIdx], out[i]);
+        final pickIsFirst = (pick['registryId'] ?? '').toString().trim().toUpperCase() ==
+            (out[winnerIdx]['registryId'] ?? '').toString().trim().toUpperCase();
+        final loser = pickIsFirst ? i : winnerIdx;
+        winnerIdx = pickIsFirst ? winnerIdx : i;
+        out[winnerIdx] = _mergeMemberFields(out[winnerIdx], out[loser]);
+        drop.add(loser);
+        removed++;
+      }
+    }
+    final cleaned = <Map<String, dynamic>>[];
+    for (var i = 0; i < out.length; i++) {
+      if (drop.contains(i)) continue;
+      cleaned.add(out[i]);
+    }
+
+    if (removed > 0 || cleaned.length != members.length) {
+      setList(config, cleaned);
+      return members.length - cleaned.length;
+    }
+    return 0;
+  }
+
+  /// Rewrite only the letter prefix of existing IDs (Georgia GE… → GA…). Never adds rows.
+  static int rewriteWrongStatePrefixes(dynamic config) {
+    final members = listFrom(config);
+    var changed = 0;
+    for (var i = 0; i < members.length; i++) {
+      final m = Map<String, dynamic>.from(members[i]);
+      final state = (m['state'] ?? '').toString();
+      if (state.trim().isEmpty) continue;
+      final prefix = NgmyCivicRegistryIdCard.stateCode(state);
+      final id = (m['registryId'] ?? '').toString().trim();
+      if (id.isEmpty) continue;
+      if (id.toUpperCase().startsWith(prefix)) continue;
+      final digits = _digitsOfRegistryId(id);
+      if (digits.isEmpty) continue;
+      m['previousRegistryId'] = id;
+      m['registryId'] = '$prefix$digits';
+      m['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      members[i] = m;
+      changed++;
+    }
+    if (changed > 0) setList(config, members);
+    return changed;
+  }
+
+  /// Dedupe twins + fix postal prefixes in place. Returns how many rows were removed.
+  static int normalizeRegistryIdsInPlace(dynamic config) {
+    final removed = dedupeMembers(config);
+    rewriteWrongStatePrefixes(config);
+    // Prefix rewrite can create digit collisions — dedupe again.
+    return removed + dedupeMembers(config);
+  }
+
   /// Prefer [registryId] when both are provided (shared emails possible).
   static Map<String, dynamic>? transferToState(
     dynamic config, {
@@ -286,19 +504,12 @@ class NgmyCivicRegistryMembers {
       final oldId = (next['registryId'] ?? '').toString().trim();
       final targetPrefix = NgmyCivicRegistryIdCard.stateCode(target);
       if (oldId.isEmpty || !oldId.toUpperCase().startsWith(targetPrefix)) {
-        final digits = oldId.replaceAll(RegExp(r'[^0-9]'), '');
-        final rewritten = digits.isNotEmpty ? '$targetPrefix$digits' : '';
-        final taken = members
-            .asMap()
-            .entries
-            .where((e) => e.key != idx)
-            .map((e) => (e.value['registryId'] ?? '').toString().trim())
-            .where((id) => id.isNotEmpty)
-            .toSet();
-        next['previousRegistryId'] = oldId;
-        next['registryId'] = (rewritten.isNotEmpty && !taken.contains(rewritten))
-            ? rewritten
-            : mintRegistryId(config, target, extraExisting: [oldId]);
+        final digits = _digitsOfRegistryId(oldId);
+        if (digits.isNotEmpty) {
+          next['previousRegistryId'] = oldId;
+          next['registryId'] = '$targetPrefix$digits';
+        }
+        // Never mint a brand-new random ID on transfer — that created duplicate people.
       }
     }
     members[idx] = next;
@@ -913,6 +1124,8 @@ class NgmyCivicRegistryMembers {
     }
 
     setList(config, merged.values.toList());
+    // Collapse GE… / GA… twins (and any same-email clones) created by id-key merges.
+    normalizeRegistryIdsInPlace(config);
   }
 
   static Future<void> saveLocalBackup(dynamic config) async {

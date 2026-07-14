@@ -29635,44 +29635,52 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _ensureUniqueRegistryIds() {
+    // Only rewrite prefixes / collapse accidental clones — never mint a second profile.
+    final before = NgmyCivicRegistryMembers.listFrom(widget.config).length;
+    final removed = NgmyCivicRegistryMembers.normalizeRegistryIdsInPlace(widget.config);
+    final after = NgmyCivicRegistryMembers.listFrom(widget.config);
+
+    // Keep app profile IDs in lockstep with the single civic row for that email.
+    var syncedUsers = false;
+    for (final m in after) {
+      final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
+      final id = (m['registryId'] ?? '').toString().trim();
+      if (email.isEmpty || id.isEmpty) continue;
+      for (final u in widget.allUsers) {
+        if (NgmyCivicRegistryMembers.emailKey(u.email) != email) continue;
+        if ((u.registryId ?? '').trim() != id) {
+          u.registryId = id;
+          syncedUsers = true;
+        }
+      }
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == email &&
+          (widget.user.registryId ?? '').trim() != id) {
+        widget.user.registryId = id;
+        syncedUsers = true;
+      }
+    }
+
+    // Fill blank IDs only (still in place — no new rows).
     final seen = <String>{};
-    var changed = false;
-    for (final m in NgmyCivicRegistryMembers.listFrom(widget.config)) {
-      var id = (m['registryId'] ?? '').toString().trim();
-      final state = (m['state'] ?? _selectedState).toString();
-      final prefix = NgmyCivicRegistryIdCard.stateCode(state);
-      final upper = id.toUpperCase();
-      final wrongPrefix = id.isNotEmpty && !upper.startsWith(prefix);
-      if (id.isEmpty || seen.contains(id) || wrongPrefix) {
-        if (wrongPrefix && id.isNotEmpty && !seen.contains(id)) {
-          final digits = id.replaceAll(RegExp(r'[^0-9]'), '');
-          final rewritten = digits.isNotEmpty ? '$prefix$digits' : '';
-          id = (rewritten.isNotEmpty && !seen.contains(rewritten))
-              ? rewritten
-              : _generateUniqueRegistryId(state);
-        } else {
-          id = _generateUniqueRegistryId(state);
-        }
-        NgmyCivicRegistryMembers.upsert(widget.config, {...m, 'registryId': id});
-        final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
-        if (email.isNotEmpty) {
-          for (final u in widget.allUsers) {
-            if (NgmyCivicRegistryMembers.emailKey(u.email) == email) {
-              u.registryId = id;
-            }
-          }
-          if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == email) {
-            widget.user.registryId = id;
-          }
-        }
-        changed = true;
+    var mintedBlank = false;
+    final members = NgmyCivicRegistryMembers.listFrom(widget.config);
+    for (var i = 0; i < members.length; i++) {
+      var id = (members[i]['registryId'] ?? '').toString().trim();
+      final state = (members[i]['state'] ?? _selectedState).toString();
+      if (id.isEmpty) {
+        id = _generateUniqueRegistryId(state);
+        members[i] = Map<String, dynamic>.from(members[i])..['registryId'] = id;
+        mintedBlank = true;
       }
       seen.add(id);
     }
-    if (changed) {
+    if (mintedBlank) NgmyCivicRegistryMembers.setList(widget.config, members);
+
+    if (removed > 0 || syncedUsers || mintedBlank || before != after.length) {
       unawaited(NgmyCivicRegistryMembers.saveLocalBackup(widget.config));
       unawaited(ngmyPersistCivicRegistryMembers(widget.config));
       widget.onDataChanged();
+      if (mounted) setState(() {});
     }
   }
 
