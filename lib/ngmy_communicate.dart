@@ -259,12 +259,19 @@ class NgmyCommunicateProfile {
   /// Every advisor wears a role label on their NGMY Advisors badge.
   String get roleBadgeLabel => ngmyCommunicateRoleLabel(role);
 
-  /// Classic corner chip (Teacher / Lawyer / Pastor…) — same rules as before:
-  /// shown for every role except plain Companion.
-  String? get cornerRoleBadgeLabel {
+  /// Classic top-corner role chip visibility:
+  /// - Users: only Lawyer + Bible Study Teacher
+  /// - Admin: those plus Debater + Text & Rizz Coach
+  /// - Never: Romantic, Teacher, Mshauri / Community Advisor, Companion, etc.
+  String? cornerRoleBadgeLabel({bool isAdmin = false}) {
     final r = ngmyCommunicateNormalizeRole(role);
-    if (r == 'companion') return null;
-    return ngmyCommunicateRoleLabel(r);
+    if (r == 'lawyer' || r == 'bible_study_teacher') {
+      return ngmyCommunicateRoleLabel(r);
+    }
+    if (isAdmin && (r == 'debater' || r == 'text_coach')) {
+      return ngmyCommunicateRoleLabel(r);
+    }
+    return null;
   }
 
   String systemPrompt(
@@ -1603,6 +1610,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
             index: i,
             floatCtrl: _floatCtrl,
             isDark: isDark,
+            isAdmin: _isAdmin,
             pulse: pulse,
             scan: scan,
             orbit: orbit,
@@ -1627,6 +1635,7 @@ class _Companion3DCard extends StatelessWidget {
   final int index;
   final AnimationController floatCtrl;
   final bool isDark;
+  final bool isAdmin;
   final double pulse;
   final double scan;
   final double orbit;
@@ -1637,6 +1646,7 @@ class _Companion3DCard extends StatelessWidget {
     required this.index,
     required this.floatCtrl,
     required this.isDark,
+    required this.isAdmin,
     required this.pulse,
     required this.scan,
     required this.orbit,
@@ -1647,6 +1657,7 @@ class _Companion3DCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final nameColor = NgmyHudInk.title(context);
     final subColor = NgmyHudInk.subtitle(context);
+    final corner = profile.cornerRoleBadgeLabel(isAdmin: isAdmin);
     final colors = <Color>[
       kNgmyAdvisorsHubAccent,
       kNgmyAdvisorsHubAccent2,
@@ -1666,11 +1677,11 @@ class _Companion3DCard extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                if (profile.cornerRoleBadgeLabel != null)
+                if (corner != null)
                   Positioned(
                     top: -2,
                     right: -2,
-                    child: _classicCornerRoleBadge(profile.cornerRoleBadgeLabel!, small: true),
+                    child: _classicCornerRoleBadge(corner, small: true),
                   ),
                 SizedBox(
                   width: double.infinity,
@@ -2622,11 +2633,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ],
                         ),
                       ),
-                      if (widget.profile.cornerRoleBadgeLabel != null)
+                      if (widget.profile.cornerRoleBadgeLabel(isAdmin: _isAdmin) != null)
                         Positioned(
                           top: 2,
                           right: 4,
-                          child: _classicCornerRoleBadge(widget.profile.cornerRoleBadgeLabel!, small: true),
+                          child: _classicCornerRoleBadge(
+                            widget.profile.cornerRoleBadgeLabel(isAdmin: _isAdmin)!,
+                            small: true,
+                          ),
                         ),
                     ],
                   ),
