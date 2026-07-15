@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_portraits.dart';
+import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
@@ -23,6 +24,7 @@ import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_mshauri.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
+import 'ngmy_push_notifications.dart';
 import 'ngmy_voice_input.dart';
 
 /// All admin-selectable companion roles.
@@ -2261,6 +2263,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _debateToolbarExpanded = true;
   Timer? _romanticNudgeTimer;
   int _romanticNudgeGen = 0;
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   Future<void> _saveDebateSession() async {
     if (!_isDebater) return;
@@ -2477,6 +2480,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _flushSessionTime();
     } else if (state == AppLifecycleState.resumed) {
@@ -2515,16 +2519,32 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     _romanticNudgeGen++;
   }
 
+  /// After the advisor's last reply: 1st follow-up at 3 minutes, 2nd at +2 minutes if still silent.
   void _scheduleRomanticNudgeIfNeeded() {
     _cancelRomanticNudge();
     if (!_isRomanticAdvisor || !_recentChatIsIntimate()) return;
     final gen = _romanticNudgeGen;
-    _romanticNudgeTimer = Timer(const Duration(seconds: 55), () {
-      unawaited(_fireRomanticNudge(gen));
+    // Ask once so silence follow-ups can alert outside the chat.
+    unawaited(ngmyPushRequestPermission());
+    _romanticNudgeTimer = Timer(const Duration(minutes: 3), () {
+      unawaited(_fireRomanticNudge(gen, step: 1));
     });
   }
 
-  Future<void> _fireRomanticNudge(int gen) async {
+  Future<void> _notifyAdvisorMessage(String text) async {
+    final preview = text.trim();
+    if (preview.isEmpty) return;
+    // User has not replied — always notify so they see the waiting message
+    // (especially when the app is closed / backgrounded).
+    final _ = _lifecycle;
+    await ngmyAdvisorMessagePush(
+      advisorName: widget.profile.name,
+      message: preview,
+      profileId: widget.profile.id,
+    );
+  }
+
+  Future<void> _fireRomanticNudge(int gen, {required int step}) async {
     if (!mounted || gen != _romanticNudgeGen || _busy || !_loaded) return;
     if (_messages.isEmpty || _messages.last['role'] != 'ai') return;
     if (!_recentChatIsIntimate()) return;
@@ -2540,39 +2560,40 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
       final girl = widget.profile.gender != 'male';
+      final waitHint = step == 1
+          ? 'They went quiet for about 3 minutes after your last message.'
+          : 'They are STILL silent — about 5 minutes total with no reply after your last check-in.';
       final desireHint = girl
-          ? 'You are turned on waiting for him. Send TWO short separate follow-up texts: '
-              'what you want HIM to do TO YOU (verbatim body words), romantic and filthy. '
-              'Line 1 = needy check-in + desire. Line 2 = more specific what you want him to do to you.'
-          : 'You are turned on waiting for her. Send TWO short separate follow-up texts: '
-              'what YOU will do TO HER (verbatim body words), romantic and filthy. '
-              'Line 1 = hungry check-in + promise. Line 2 = more specific what you will do to her.';
+          ? (step == 1
+              ? 'Send ONE short needy follow-up text — freaky/romantic: what you want HIM to do TO YOU '
+                  '(verbatim body words). Sound like a real girlfriend waiting on him.'
+              : 'Send ONE more short follow-up — hungrier, still freaky, not spammy. '
+                  'What you want him to do to you tonight. Still one real text only.')
+          : (step == 1
+              ? 'Send ONE short hungry follow-up — what YOU will do TO HER (verbatim body words).'
+              : 'Send ONE more short follow-up — hungrier, still freaky, what you will do to her. One text only.');
       final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
           '${transcript.isNotEmpty ? '$transcript\n' : ''}'
-          'They went quiet for about a minute after your last message. You are still turned on.\n'
+          '$waitHint You are still turned on.\n'
           '$desireHint\n'
-          'OUTPUT RULES: Reply with EXACTLY two lines of text separated by the token ||| — no numbering, no quotes, no labels. '
-          'Each line is one short human text message. Stay as ${widget.profile.name}.';
+          'OUTPUT RULES: Reply with EXACTLY one short human text message. No asterisks, no little stars. '
+          'No numbering, no quotes, no labels. Stay as ${widget.profile.name}.';
       final result = await ngmyAiGenerateWithRetry(creds, prompt);
       if (!mounted || gen != _romanticNudgeGen) return;
       if (_messages.isNotEmpty && _messages.last['role'] == 'user') return; // they replied mid-flight
-      final raw = ngmySanitizeAdvisorChatReply((result.text ?? '').trim());
-      if (raw.isEmpty) return;
-      var parts = raw.split('|||').map((e) => ngmySanitizeAdvisorChatReply(e.trim())).where((e) => e.isNotEmpty).toList();
-      if (parts.isEmpty) return;
-      if (parts.length == 1) {
-        // fallback: split on newlines if model ignored |||
-        final lines = raw.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-        if (lines.length >= 2) parts = lines.take(2).toList();
-      }
-      parts = parts.take(2).toList();
-      for (final line in parts) {
-        if (!mounted || gen != _romanticNudgeGen) return;
-        if (_messages.isNotEmpty && _messages.last['role'] == 'user') return;
-        setState(() => _messages.add({'role': 'ai', 'text': line}));
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: line);
-        _scrollBottom();
-        if (parts.length > 1) await Future<void>.delayed(const Duration(milliseconds: 900));
+      final line = ngmySanitizeAdvisorChatReply((result.text ?? '').trim().split(RegExp(r'\n+')).first.trim());
+      if (line.isEmpty) return;
+      setState(() => _messages.add({'role': 'ai', 'text': line}));
+      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: line);
+      _scrollBottom();
+      unawaited(_notifyAdvisorMessage(line));
+
+      // Second follow-up only if still silent — 2 minutes after the first.
+      if (step == 1 && mounted && gen == _romanticNudgeGen) {
+        _romanticNudgeTimer?.cancel();
+        _romanticNudgeTimer = Timer(const Duration(minutes: 2), () {
+          unawaited(_fireRomanticNudge(gen, step: 2));
+        });
       }
     } catch (e) {
       debugPrint('[communicate] romantic nudge: $e');
