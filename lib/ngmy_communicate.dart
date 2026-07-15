@@ -278,6 +278,91 @@ String ngmyAdvisorFirstName(String fullName) {
   return parts.first;
 }
 
+/// Metro-Atlanta cities (Georgia, USA) — advisors live here; Atlanta-heavy distribution.
+const kNgmyAdvisorGeorgiaCities = <String>[
+  'Atlanta',
+  'Atlanta',
+  'Atlanta',
+  'Atlanta',
+  'Lawrenceville',
+  'Clarkston',
+  'Stone Mountain',
+  'Decatur',
+  'Marietta',
+  'Duluth',
+  'Lithonia',
+];
+
+({String city, String state}) ngmyAdvisorGeorgiaHome({
+  required String id,
+  required String name,
+  String storedCity = '',
+}) {
+  final stored = storedCity.trim();
+  if (stored.isNotEmpty) {
+    return (city: stored, state: 'Georgia');
+  }
+  final blob = '${id.trim().toLowerCase()}|${name.trim().toLowerCase()}';
+  final hash = blob.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+  final city = kNgmyAdvisorGeorgiaCities[hash % kNgmyAdvisorGeorgiaCities.length];
+  return (city: city, state: 'Georgia');
+}
+
+/// Current local clock for advisors (Eastern Time — Georgia).
+String ngmyAdvisorNowContextBlock({String cityLabel = 'Atlanta, Georgia'}) {
+  final now = DateTime.now().toLocal();
+  final weekday = const [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ][now.weekday - 1];
+  final month = const [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ][now.month - 1];
+  final h24 = now.hour;
+  final h12 = h24 == 0 ? 12 : (h24 > 12 ? h24 - 12 : h24);
+  final ampm = h24 >= 12 ? 'PM' : 'AM';
+  final mm = now.minute.toString().padLeft(2, '0');
+  final partOfDay = h24 < 5
+      ? 'late night'
+      : h24 < 12
+          ? 'morning'
+          : h24 < 17
+              ? 'afternoon'
+              : h24 < 21
+                  ? 'evening'
+                  : 'night';
+  return 'CLOCK (your local time in Georgia, USA — Eastern): '
+      '$weekday, $month ${now.day}, ${now.year} — $h12:$mm $ampm ($partOfDay). '
+      'You live in $cityLabel. Know what time of day it is before you talk about "today".\n';
+}
+
+String ngmyAdvisorAtlantaKnowledgeBlock({required String city}) {
+  return 'HOME BASE: You live in $city, Georgia — metro Atlanta area, United States. '
+      'You know Atlanta like a local tour guide: Downtown, Midtown, Buckhead, Little Five Points, '
+      'Centennial Olympic Park, Georgia Aquarium, World of Coke, Mercedes-Benz Stadium, State Farm Arena, '
+      'Piedmont Park, BeltLine, CNN Center, Marta, Hartsfield-Jackson airport (ATL), '
+      'Stone Mountain Park, Downtown Lawrenceville, Clarkston\'s international food scene, '
+      'and everyday life (traffic on I-285 / I-85, weather, food, neighborhoods). '
+      'If someone visiting or out of state asks about Atlanta / Georgia, guide them warmly and specifically — '
+      'restaurants, areas to stay, what to see, how to get around. Sound like you actually live here.\n';
+}
+
 class NgmyCommunicateProfile {
   final String id;
   final String name;
@@ -402,14 +487,41 @@ class NgmyCommunicateProfile {
             : 'ONGOING CHAT — history matters. React based on everything below.\n';
 
     var gapNote = '';
-    if (replyGap != null && ngmyCommunicateRoleIsRomantic(role) && userMsgs >= 4) {
-      if (isMyPartner && replyGap.inHours >= 24) {
-        gapNote = 'They ghosted ${replyGap.inDays >= 1 ? '${replyGap.inDays}d' : '${replyGap.inHours}h'}. '
-            'You can be mad, hurt, or call it out — real partners need attention. Break up if it feels disrespectful.\n';
-      } else if (isMyPartner && replyGap.inMinutes >= 90) {
-        gapNote = 'They took a while to reply. Ask where they were — curious, playful, or bothered like a real partner.\n';
+    if (replyGap != null && userMsgs >= 2) {
+      final mins = replyGap.inMinutes;
+      final hours = replyGap.inHours;
+      if (mins < 180) {
+        // Still the same hangout — never restart with a fresh "what are you doing today?"
+        final ago = mins < 2
+            ? 'just now'
+            : mins < 60
+                ? '$mins minutes ago'
+                : hours <= 1
+                    ? 'about an hour ago'
+                    : '$hours hours ago';
+        gapNote =
+            'SAME THREAD: You two were already talking $ago. Continue naturally from the last topic. '
+            'Do NOT ask fresh-day openers like "what are you up to today?", "how\'s your day?", '
+            '"what are you doing today?", or "what\'s new?" — you already know them and just talked. '
+            'Skip repetitive check-ins you already asked recently.\n';
+      } else if (ngmyCommunicateRoleIsRomantic(role) && userMsgs >= 4) {
+        if (isMyPartner && hours >= 24) {
+          gapNote = 'They ghosted ${replyGap.inDays >= 1 ? '${replyGap.inDays}d' : '${hours}h'}. '
+              'You can be mad, hurt, or call it out — real partners need attention. Break up if it feels disrespectful.\n';
+        } else if (isMyPartner && mins >= 90) {
+          gapNote = 'They took a while to reply. Ask where they were — curious, playful, or bothered like a real partner. '
+              'Do not treat this like meeting for the first time today.\n';
+        }
       }
     }
+
+    final home = ngmyAdvisorGeorgiaHome(
+      id: id,
+      name: name,
+      storedCity: '',
+    );
+    final nowBlock = ngmyAdvisorNowContextBlock(cityLabel: '${home.city}, ${home.state}');
+    final atlantaBlock = ngmyAdvisorAtlantaKnowledgeBlock(city: home.city);
 
     var romanceBlock = '';
     if (ngmyCommunicateRoleIsRomantic(role)) {
@@ -463,6 +575,8 @@ class NgmyCommunicateProfile {
         '$bossBlock'
         'Personality: $vibe\n'
         '${bio.trim().isNotEmpty ? 'About you: ${bio.trim()}\n' : ''}'
+        '$nowBlock'
+        '$atlantaBlock'
         '$pacing'
         '$gapNote'
         '$romanceBlock'
@@ -471,10 +585,11 @@ class NgmyCommunicateProfile {
         'RULES:\n'
         '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
-        '- Remember every message in the history below.\n'
+        '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
         '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n'
+        '- TIME AWARENESS: Use the clock above. If you just talked (minutes or a few hours ago), do not restart the day with "what are you up to today?"\n'
         '- REMINDERS: Track things they said they would do (times, errands, goals). Remind them when it helps. '
-        'If they message after that time, ask how their day went and whether they did what they said — natural, caring, not spammy.\n';
+        'Only ask "how did X go?" when enough time has clearly passed for that plan — never spam the same check-in.\n';
   }
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
@@ -605,11 +720,12 @@ class NgmyCommunicateProfile {
           'When they ask for a picture, the app generates and sends the photo for you — NEVER just describe the body '
           'instead of sending. Never offer or send photos to people you are not dating.\n'
           'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
-          'and later ask if they did it / how the day went. Be a real caring partner — not a nagging bot.\n',
+          'and later ask if they did it / how it went — only when enough time has passed. '
+          'Never re-ask "what are you up to today?" if you already asked recently or you just talked.\n',
         'friend' =>
           'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n'
           'REMINDERS: If they mention plans, times, or things they will do, remember them. Remind them when useful, '
-          'and later ask how it went / whether they did it. Be a real friend who remembers.\n',
+          'and later ask how it went — only once the time has passed. Do not restart with fresh "how\'s your day?" if you just talked.\n',
         'pickup_line' =>
           'ROLE: Pickup Line Coach — you help users flirt and open conversations with confidence.\n'
           'You give smooth, contextual lines — openers AND follow-ups when they are already texting someone.\n'

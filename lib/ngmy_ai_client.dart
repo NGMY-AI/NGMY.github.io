@@ -589,6 +589,24 @@ bool ngmyIsOfflineOrNetworkError(String err) {
       e.contains('handshake');
 }
 
+/// Soft chat copy when AI fails — never leak HTTP codes, Gemini, or stack traces.
+const String kNgmySoftAiRetryMessage =
+    "One sec — that glitched on my side. Send your message again and I'll catch it 💕";
+
+const String kNgmySoftHelperRetryMessage =
+    "That reply glitched. Tap send again in a moment and we'll continue.";
+
+bool ngmyIsTransientAiHttpError(String err) {
+  final e = err.toLowerCase();
+  return RegExp(r'\b(429|500|502|503|504)\b').hasMatch(e) ||
+      e.contains('unavailable') ||
+      e.contains('internal error') ||
+      e.contains('overloaded') ||
+      e.contains('resource exhausted') ||
+      e.contains('deadline') ||
+      e.contains('timeout');
+}
+
 /// Friendly, on-brand copy for when the device has no internet — never a
 /// raw exception message or URL.
 const String kNgmyOfflineAiMessage =
@@ -603,7 +621,6 @@ String ngmyAiHelperFailureMessage({
   if (creds.apiKey.isEmpty) {
     return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Menus → NGMY AI → Save AI Settings, then reload the app.';
   }
-  final provider = ngmyAiProviderLabel(creds.provider);
   final err = (lastError ?? '').trim();
   if (ngmyIsOfflineOrNetworkError(err)) {
     return kNgmyOfflineAiMessage;
@@ -611,10 +628,46 @@ String ngmyAiHelperFailureMessage({
   if (err.contains('proxy not deployed') || err.contains('404')) {
     return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the $kNgmySupabaseAiFunction Edge Function, then try again.';
   }
-  if (err.isNotEmpty) {
-    return 'NGMY Helper could not reach $provider: $err';
+  // Never show "could not reach Google Gemini: HTTP 500" to users.
+  if (err.isEmpty || ngmyIsTransientAiHttpError(err) || err.toLowerCase().contains('http ')) {
+    return kNgmySoftHelperRetryMessage;
   }
-  return 'NGMY Helper could not reach $provider. Check the key in Management Menus → NGMY AI and reload the app.';
+  return kNgmySoftHelperRetryMessage;
+}
+
+/// Advisor chat errors — never blame the user for having internet, and
+/// never surface a raw exception message, HTTP code, or Gemini branding.
+String ngmyCommunicateAiFailureMessage({required String apiKey, String? lastError}) {
+  final err = (lastError ?? '').trim();
+  if (apiKey.trim().isEmpty) {
+    return 'Hang tight — I\'m still waking up. Send again in a few seconds 💕';
+  }
+  if (ngmyIsOfflineOrNetworkError(err)) {
+    return kNgmyOfflineAiMessage.replaceAll('NGMY AI', 'I');
+  }
+  return kNgmySoftAiRetryMessage;
+}
+
+Future<({String? text, String? error})> ngmyAiGenerateWithRetry(
+  NgmyAiCredentials creds,
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+  int attempts = 4,
+}) async {
+  ({String? text, String? error}) result = (text: null, error: null);
+  for (var i = 0; i < attempts; i++) {
+    if (i > 0) await Future<void>.delayed(Duration(milliseconds: 450 * i));
+    result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
+    if (result.text != null && result.text!.trim().isNotEmpty) return result;
+    final err = (result.error ?? '').toLowerCase();
+    final retryable = ngmyIsOfflineOrNetworkError(err) ||
+        ngmyIsTransientAiHttpError(err) ||
+        err.contains('socket') ||
+        err.contains('network') ||
+        err.contains('connection');
+    if (!retryable) break;
+  }
+  return result;
 }
 
 const _kNgmyConfigRowId = '1';
@@ -685,44 +738,6 @@ Future<String> ngmyResolveGeminiApiKey({
     } catch (_) {}
   }
   return key;
-}
-
-/// Advisor chat errors — never blame the user for having internet, and
-/// never surface a raw exception message or URL.
-String ngmyCommunicateAiFailureMessage({required String apiKey, String? lastError}) {
-  final err = (lastError ?? '').trim();
-  if (apiKey.trim().isEmpty) {
-    return 'NGMY AI is still loading — wait a few seconds and send again. If this keeps happening, ask an admin to verify AI settings.';
-  }
-  if (ngmyIsOfflineOrNetworkError(err)) {
-    return kNgmyOfflineAiMessage;
-  }
-  final base = ngmyAiHelperFailureMessage(apiKey: apiKey, lastError: lastError);
-  return base.replaceAll('NGMY Helper', 'Your advisor');
-}
-
-Future<({String? text, String? error})> ngmyAiGenerateWithRetry(
-  NgmyAiCredentials creds,
-  String prompt, {
-  List<NgmyAiImagePart> images = const [],
-  int attempts = 2,
-}) async {
-  ({String? text, String? error}) result = (text: null, error: null);
-  for (var i = 0; i < attempts; i++) {
-    if (i > 0) await Future<void>.delayed(Duration(milliseconds: 500 * i));
-    result = await ngmyAiGenerateWithCredentials(creds, prompt, images: images);
-    if (result.text != null && result.text!.trim().isNotEmpty) return result;
-    final err = (result.error ?? '').toLowerCase();
-    final retryable = err.contains('timeout') ||
-        err.contains('socket') ||
-        err.contains('network') ||
-        err.contains('connection') ||
-        err.contains('503') ||
-        err.contains('502') ||
-        err.contains('429');
-    if (!retryable) break;
-  }
-  return result;
 }
 
 /// Free image fallback — works without an API key (romantic chat selfies, etc.).

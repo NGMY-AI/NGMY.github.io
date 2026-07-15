@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_worksheet_helpers.dart';
 
 const _kStorageKey = 'ngmy_business_notes_v1';
 
@@ -807,12 +808,14 @@ class NgmyBusinessNote {
     this.titleFontSize = 28,
     this.leadFontSize = 16,
     List<NgmyNoteTextAnim>? textAnims,
+    List<String>? images,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
-        textAnims = textAnims ?? [];
+        textAnims = textAnims ?? [],
+        images = images ?? [];
 
   final String id;
   String title;
@@ -827,6 +830,8 @@ class NgmyBusinessNote {
   double titleFontSize;
   double leadFontSize;
   List<NgmyNoteTextAnim> textAnims;
+  /// Data-URL photos attached to the note (iPhone Notes-style).
+  List<String> images;
   final DateTime createdAt;
   DateTime updatedAt;
 
@@ -865,6 +870,7 @@ class NgmyBusinessNote {
         'titleFontSize': titleFontSize,
         'leadFontSize': leadFontSize,
         'textAnims': textAnims.map((a) => a.toJson()).toList(),
+        'images': images,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
@@ -887,6 +893,8 @@ class NgmyBusinessNote {
                 .map((e) => NgmyNoteTextAnim.fromJson(Map<String, dynamic>.from(e)))
                 .toList() ??
             [],
+        images: (json['images'] as List?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
+            const <String>[],
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
       );
@@ -1534,6 +1542,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late final FocusNode _bodyFocus;
   late final String _initialBody;
   late final String _initialTitle;
+  late final int _initialImageCount;
   Timer? _autosave;
   bool _dirty = false;
   bool _previewMode = false;
@@ -1554,6 +1563,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _storedBody = _note.body;
     _initialBody = _storedBody;
     _initialTitle = _note.title;
+    _initialImageCount = _note.images.length;
     _title = TextEditingController(text: _note.title);
     _body = TextEditingController(text: _storedBody);
     _bodyFocus = FocusNode();
@@ -1760,14 +1770,100 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 
   bool _hasTypedContentChange() {
-    return _title.text.trim() != _initialTitle.trim() || _storedBody.trim() != _initialBody.trim();
+    return _title.text.trim() != _initialTitle.trim() ||
+        _storedBody.trim() != _initialBody.trim() ||
+        _note.images.length != _initialImageCount;
   }
 
   bool _hasSaveableContent() {
     if (widget.isNew) {
-      return _title.text.trim().isNotEmpty || _storedBody.trim().isNotEmpty;
+      return _title.text.trim().isNotEmpty || _storedBody.trim().isNotEmpty || _note.images.isNotEmpty;
     }
     return true;
+  }
+
+  Future<void> _attachPhoto() async {
+    if (_note.images.length >= 12) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This note already has 12 photos.')),
+      );
+      return;
+    }
+    final ref = await ngmyPickImageBase64(imageQuality: 72, maxWidth: 1400);
+    if (ref == null || ref.trim().isEmpty) return;
+    setState(() {
+      _note.images = [..._note.images, ref];
+    });
+    _markDirty();
+  }
+
+  void _removePhoto(int index) {
+    if (index < 0 || index >= _note.images.length) return;
+    setState(() {
+      final next = List<String>.from(_note.images)..removeAt(index);
+      _note.images = next;
+    });
+    _markDirty();
+  }
+
+  Widget _notePhotosSection({required bool dark, required bool editable}) {
+    if (_note.images.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (var i = 0; i < _note.images.length; i++)
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    final provider = ngmyImageFromRef(_note.images[i]);
+                    if (provider == null) return;
+                    showDialog<void>(
+                      context: context,
+                      builder: (ctx) => Dialog(
+                        backgroundColor: Colors.black,
+                        insetPadding: const EdgeInsets.all(12),
+                        child: InteractiveViewer(
+                          child: Image(image: provider, fit: BoxFit.contain),
+                        ),
+                      ),
+                    );
+                  },
+                  child: ngmyImageOrPlaceholder(
+                    imageRef: _note.images[i],
+                    width: 104,
+                    height: 104,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                if (editable)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Material(
+                      color: dark ? const Color(0xFF1F2937) : Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 2,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => _removePhoto(i),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
   }
 
   void _markDirty() {
@@ -2498,6 +2594,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             },
                           ),
                           _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
+                          _tool(Icons.image_outlined, 'Photo', () => unawaited(_attachPhoto()), fg),
                           _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
                           _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
                           _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
@@ -2516,6 +2613,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                                 child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                               ),
+                              _notePhotosSection(dark: dark, editable: false),
                               Expanded(
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -2532,21 +2630,29 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                               ),
                             ],
                           )
-                        : Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                            child: TextField(
-                              controller: _body,
-                              focusNode: _bodyFocus,
-                              style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
-                              decoration: InputDecoration(
-                                hintText: 'Start writing…',
-                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                border: InputBorder.none,
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _notePhotosSection(dark: dark, editable: true),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                                  child: TextField(
+                                    controller: _body,
+                                    focusNode: _bodyFocus,
+                                    style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
+                                    decoration: InputDecoration(
+                                      hintText: 'Start writing…',
+                                      hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+                                      border: InputBorder.none,
+                                    ),
+                                    maxLines: null,
+                                    expands: true,
+                                    textAlignVertical: TextAlignVertical.top,
+                                  ),
+                                ),
                               ),
-                              maxLines: null,
-                              expands: true,
-                              textAlignVertical: TextAlignVertical.top,
-                            ),
+                            ],
                           ),
                   ),
                   if (_dirty && !_previewMode)

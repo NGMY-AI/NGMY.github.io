@@ -176,15 +176,35 @@ class NgmyCommunicateMemoryStore {
   static String transcriptForPrompt(List<Map<String, dynamic>> memory, {int maxMessages = 40}) {
     if (memory.isEmpty) return '';
     final slice = memory.length <= maxMessages ? memory : memory.sublist(memory.length - maxMessages);
-    final buf = StringBuffer('Your conversation history with this person (remember everything):\n');
+    final now = DateTime.now();
+    final buf = StringBuffer('Your conversation history with this person (remember everything — times matter):\n');
     for (final m in slice) {
       final who = m['role'] == 'user' ? 'Them' : 'You';
       final text = (m['text'] ?? '').toString().trim();
       final img = (m['imageB64'] ?? '').toString().trim();
+      final at = DateTime.tryParse((m['at'] ?? '').toString());
+      var when = '';
+      if (at != null) {
+        final local = at.toLocal();
+        final gap = now.difference(local);
+        final ago = gap.inMinutes < 1
+            ? 'just now'
+            : gap.inMinutes < 60
+                ? '${gap.inMinutes}m ago'
+                : gap.inHours < 36
+                    ? '${gap.inHours}h ago'
+                    : '${gap.inDays}d ago';
+        final hh = local.hour > 12
+            ? local.hour - 12
+            : (local.hour == 0 ? 12 : local.hour);
+        final ampm = local.hour >= 12 ? 'PM' : 'AM';
+        final mm = local.minute.toString().padLeft(2, '0');
+        when = ' [$ago · $hh:$mm $ampm]';
+      }
       if (img.isNotEmpty && who == 'Them') {
-        buf.writeln('$who: ${text.isEmpty ? '[sent homework photo]' : '$text [+ homework photo]'}');
+        buf.writeln('$who$when: ${text.isEmpty ? '[sent homework photo]' : '$text [+ homework photo]'}');
       } else {
-        buf.writeln('$who: $text');
+        buf.writeln('$who$when: $text');
       }
     }
     return buf.toString();
@@ -589,7 +609,8 @@ class NgmyCommunicateRelationshipStore {
     if (lastAt == null) return memory;
 
     final gap = DateTime.now().difference(lastAt);
-    if (gap.inMinutes < 45) return memory;
+    // Under 3 hours is still the same hangout — no canned "how's your day?" miss-you spam.
+    if (gap.inMinutes < 180) return memory;
 
     final prefs = await SharedPreferences.getInstance();
     final flagKey = 'ngmy_missyou_${profileId.trim()}_${email}_$lastAt';
@@ -614,25 +635,20 @@ class NgmyCommunicateRelationshipStore {
     } else if (hours >= 8) {
       lines.add(
         girl
-            ? 'Hey you… been a while 😌 Miss hearing from you. How’s your day?'
-            : 'Checking in on you. Missed you today.',
+            ? 'Hey you… been a while 😌 Missed you. You good?'
+            : 'Checking in on you. Missed you.',
       );
       lines.add(
         girl
             ? 'Don’t leave me hanging too long baby 💕'
             : 'Don’t ghost me like that 😤',
       );
-    } else if (hours >= 2) {
-      lines.add(
-        girl
-            ? 'Just thinking about you 💭 You disappeared on me… everything alright?'
-            : 'You went quiet. Everything good?',
-      );
     } else {
+      // 3–8 hours — miss them without a fresh "how was your day" if they may still be mid-day.
       lines.add(
         girl
-            ? 'Hey… where’d you go? 😊 Miss your texts.'
-            : 'Yo where you at? Miss talking to you.',
+            ? 'Just thinking about you 💭 You went quiet… everything alright?'
+            : 'You went quiet. Everything good?',
       );
     }
 
