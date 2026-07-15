@@ -26367,39 +26367,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _row(IconData i, String l, String v, {String? copyText}) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: NgmyHudInk.panelBorder(context)),
-      color: NgmyHudInk.panel(context),
-    ),
-    child: Row(
-      children: [
-        Icon(i, size: 18, color: NgmyHudInk.muted(context)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l, style: TextStyle(fontSize: 10, color: NgmyHudInk.muted(context))),
-              CopyOnHoldText(v, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: NgmyHudInk.title(context)), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ],
+  Widget _row(
+    IconData i,
+    String l,
+    String v, {
+    String? copyText,
+    bool requiredField = false,
+    bool missing = false,
+    VoidCallback? onTap,
+  }) =>
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: missing
+                    ? const Color(0xFFEF4444).withValues(alpha: 0.65)
+                    : NgmyHudInk.panelBorder(context),
+                width: missing ? 1.4 : 1,
+              ),
+              color: missing
+                  ? const Color(0xFFEF4444).withValues(alpha: NgmyHudInk.isDark(context) ? 0.12 : 0.06)
+                  : NgmyHudInk.panel(context),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  i,
+                  size: 18,
+                  color: missing ? const Color(0xFFEF4444) : NgmyHudInk.muted(context),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            requiredField ? '$l *' : l,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: requiredField ? FontWeight.w800 : FontWeight.w500,
+                              color: missing ? const Color(0xFFEF4444) : NgmyHudInk.muted(context),
+                            ),
+                          ),
+                          if (requiredField && missing) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                              child: const Text(
+                                'REQUIRED',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.4,
+                                  color: Color(0xFFEF4444),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      CopyOnHoldText(
+                        v,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: missing
+                              ? (NgmyHudInk.isDark(context) ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
+                              : NgmyHudInk.title(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (missing)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Add your phone number — tap to edit',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.25,
+                              color: NgmyHudInk.isDark(context) ? const Color(0xFFFECACA) : const Color(0xFF991B1B),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (copyText != null && copyText.trim().isNotEmpty)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    tooltip: 'Copy $l',
+                    icon: Icon(Icons.copy_rounded, size: 18, color: NgmyHudInk.muted(context)),
+                    onPressed: () => _copyProfileField(l, copyText),
+                  )
+                else if (missing)
+                  Icon(Icons.edit_rounded, size: 16, color: const Color(0xFFEF4444).withValues(alpha: 0.85)),
+              ],
+            ),
           ),
         ),
-        if (copyText != null && copyText.trim().isNotEmpty)
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            tooltip: 'Copy $l',
-            icon: Icon(Icons.copy_rounded, size: 18, color: NgmyHudInk.muted(context)),
-            onPressed: () => _copyProfileField(l, copyText),
-          ),
-      ],
-    ),
-  );
+      );
 
   Widget _profileContactSection(
     BuildContext context, {
@@ -26468,7 +26550,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 10),
                 _row(Icons.email_outlined, 'Email', widget.user.email, copyText: widget.user.email),
                 const SizedBox(height: 10),
-                _row(Icons.phone_android_outlined, 'Phone', widget.user.phone.isEmpty ? 'Not set' : widget.user.phone, copyText: widget.user.phone.isEmpty ? null : widget.user.phone),
+                _row(
+                  Icons.phone_android_outlined,
+                  'Phone',
+                  ngmyUserPhoneOnFile(widget.user.phone)
+                      ? ngmyFormatPhoneDisplay(widget.user.phone)
+                      : 'Phone number required',
+                  copyText: ngmyUserPhoneOnFile(widget.user.phone) ? widget.user.phone : null,
+                  requiredField: true,
+                  missing: !ngmyUserPhoneOnFile(widget.user.phone),
+                  onTap: !ngmyUserPhoneOnFile(widget.user.phone) ? () => _editMe(context) : null,
+                ),
               ],
             ),
           ),

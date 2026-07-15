@@ -31,14 +31,15 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
 
-({Color bg, Color card, Color fg, Color muted, Color border}) _docShareColors(BuildContext context) {
+({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) _docShareColors(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return (
-    bg: isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB),
-    card: isDark ? const Color(0xFF151B28) : Colors.white,
-    fg: isDark ? Colors.white : const Color(0xFF0F172A),
-    muted: isDark ? Colors.white60 : const Color(0xFF64748B),
-    border: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
+    bg: isDark ? const Color(0xFF081018) : const Color(0xFFF3F7FB),
+    card: isDark ? const Color(0xFF121A26) : Colors.white,
+    fg: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+    muted: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+    border: isDark ? const Color(0xFF243041) : const Color(0xFFE2E8F0),
+    wash: isDark ? const Color(0xFF0D9488) : const Color(0xFF14B8A6),
   );
 }
 
@@ -778,15 +779,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'send_my_code'),
                   ),
                   _DocShareMenuTile(
-                    icon: Icons.ios_share_rounded,
-                    label: 'Share outside NGMY',
-                    subtitle: kIsWeb
-                        ? 'Device share sheet / download'
-                        : 'AirDrop, Bluetooth, Nearby Share, Messages…',
-                    colors: c,
-                    onTap: () => Navigator.pop(ctx, 'share_outside'),
-                  ),
-                  _DocShareMenuTile(
                     icon: Icons.download_rounded,
                     label: 'Download / save',
                     colors: c,
@@ -815,8 +807,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_showQrForOne(item));
       case 'send_my_code':
         unawaited(_openSendToMyCode(items: [item]));
-      case 'share_outside':
-        unawaited(_shareItemOutside(item));
       case 'save':
         unawaited(_saveItem(item));
       case 'delete':
@@ -1036,24 +1026,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }, label: 'Saving…');
   }
 
-  Future<void> _shareItemOutside(NgmyDocShareItem item) async {
-    await _withWork(() async {
-      final bytes = await NgmyDocShareStore.readBytes(widget.email, item);
-      if (bytes == null || bytes.isEmpty) {
-        _toast('Could not read "${item.name}" to share. Try re-uploading.');
-        return;
-      }
-      final msg = await shareNgmyBytes(
-        bytes,
-        item.name,
-        mimeType: item.mime.isEmpty ? 'application/octet-stream' : item.mime,
-        title: item.name,
-        text: 'Shared from NGMY Doc Share',
-      );
-      _toast(msg);
-    }, label: 'Sharing…');
-  }
-
   Future<void> _deleteItem(NgmyDocShareItem item) async {
     final c = _docShareColors(context);
     final ok = await showModalBottomSheet<bool>(
@@ -1247,6 +1219,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         backgroundColor: c.bg,
         foregroundColor: c.fg,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: NgmyHudMotion(
           builder: (context, pulse, scan, orbit) {
             const colors = [Color(0xFF0D9488), Color(0xFF7C3AED)];
@@ -1296,141 +1269,380 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         ],
       ),
       floatingActionButton: null,
-      body: Column(
+      body: Stack(
         children: [
-          if (_status != null)
-            LinearProgressIndicator(
-              minHeight: 3,
-              backgroundColor: c.border,
-              color: kNgmyStudioHubAccent,
+          Positioned(
+            top: -80,
+            right: -60,
+            child: IgnorePointer(
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      c.wash.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.18 : 0.12),
+                      c.wash.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          if (_items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: _working ? null : _showQrForSelection,
-                      icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-                      label: Text(_selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})'),
+          ),
+          Positioned(
+            bottom: 40,
+            left: -70,
+            child: IgnorePointer(
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      kNgmyStudioHubAccent.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.12 : 0.08),
+                      kNgmyStudioHubAccent.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              if (_status != null)
+                LinearProgressIndicator(
+                  minHeight: 2.5,
+                  backgroundColor: c.border.withValues(alpha: 0.5),
+                  color: kNgmyStudioHubAccent,
+                ),
+              if (_items.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 420),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, t, child) => Opacity(
+                      opacity: t,
+                      child: Transform.translate(offset: Offset(0, (1 - t) * 10), child: child),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _DocShareActionPill(
+                            icon: Icons.qr_code_2_rounded,
+                            label: _selected.isEmpty ? 'Share QR' : 'QR (${_selected.length})',
+                            filled: true,
+                            colors: c,
+                            onPressed: _working ? null : _showQrForSelection,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DocShareActionPill(
+                            icon: Icons.ios_share_rounded,
+                            label: 'Export',
+                            filled: false,
+                            colors: c,
+                            onPressed: _working ? null : _exportBundle,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _working ? null : _exportBundle,
-                      icon: const Icon(Icons.ios_share_rounded, size: 18),
-                      label: const Text('Export'),
+                ),
+              Expanded(
+                child: _items.isEmpty
+                    ? _DocShareEmptyState(colors: c, onAdd: _working ? null : _pickUpload)
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                        itemCount: _items.length,
+                        itemBuilder: (_, i) {
+                          final item = _items[i];
+                          final checked = _selected.contains(item.id);
+                          return _DocShareListRow(
+                            index: i,
+                            item: item,
+                            checked: checked,
+                            colors: c,
+                            working: _working,
+                            icon: _iconFor(item),
+                            onOpen: () => unawaited(_openItem(item)),
+                            onToggle: () => setState(() {
+                              if (checked) {
+                                _selected.remove(item.id);
+                              } else {
+                                _selected.add(item.id);
+                              }
+                            }),
+                            onCopyCode: () => unawaited(_copyShortCode(item)),
+                            onMenu: () => unawaited(_showItemMenu(item)),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocShareActionPill extends StatelessWidget {
+  const _DocShareActionPill({
+    required this.icon,
+    required this.label,
+    required this.filled,
+    required this.colors,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool filled;
+  final ({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) colors;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(16);
+    if (filled) {
+      return FilledButton.icon(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: kNgmyStudioHubAccent,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          elevation: 0,
+        ),
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colors.fg,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        side: BorderSide(color: colors.border),
+        shape: RoundedRectangleBorder(borderRadius: radius),
+        backgroundColor: colors.card.withValues(alpha: 0.7),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+class _DocShareEmptyState extends StatelessWidget {
+  const _DocShareEmptyState({required this.colors, required this.onAdd});
+
+  final ({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) colors;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.translate(offset: Offset(0, (1 - t) * 18), child: child),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.86, end: 1),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) {
+                  return Transform.scale(scale: scale, child: child);
+                },
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colors.wash.withValues(alpha: 0.22),
+                        kNgmyStudioHubAccent.withValues(alpha: 0.16),
+                      ],
                     ),
+                    border: Border.all(color: colors.wash.withValues(alpha: 0.35)),
+                  ),
+                  child: Icon(Icons.cloud_upload_rounded, size: 36, color: colors.wash),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Your Doc Share is empty',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.fg, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: -0.2),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Add photos, videos, or documents — then share with a QR or Send to My Code.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.muted, height: 1.5, fontSize: 14),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                onPressed: onAdd,
+                style: FilledButton.styleFrom(
+                  backgroundColor: kNgmyStudioHubAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add files', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DocShareListRow extends StatelessWidget {
+  const _DocShareListRow({
+    required this.index,
+    required this.item,
+    required this.checked,
+    required this.colors,
+    required this.working,
+    required this.icon,
+    required this.onOpen,
+    required this.onToggle,
+    required this.onCopyCode,
+    required this.onMenu,
+  });
+
+  final int index;
+  final NgmyDocShareItem item;
+  final bool checked;
+  final ({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) colors;
+  final bool working;
+  final IconData icon;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+  final VoidCallback onCopyCode;
+  final VoidCallback onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final code = (item.shortCode ?? '').trim().toUpperCase();
+    final delayMs = (index * 45).clamp(0, 360);
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('docshare_row_${item.id}'),
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 380 + delayMs),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, (1 - t) * 14), child: child),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          color: colors.card,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: checked ? kNgmyStudioHubAccent.withValues(alpha: 0.85) : colors.border,
+              width: checked ? 1.5 : 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: onOpen,
+            onLongPress: onToggle,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: item.isVideo
+                            ? const [Color(0xFF5B21B6), Color(0xFF7C3AED)]
+                            : item.isImage
+                                ? [const Color(0xFF0F766E), kNgmyStudioHubAccent]
+                                : [kNgmyStudioHubAccent2.withValues(alpha: 0.85), kNgmyStudioHubAccent.withValues(alpha: 0.7)],
+                      ),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: TextStyle(color: colors.fg, fontWeight: FontWeight.w800, fontSize: 14),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          [
+                            item.sizeLabel,
+                            if (code.isNotEmpty) 'Code $code',
+                            if (item.isVideo) 'Tap to play',
+                            if (item.fromSender != null) 'from ${item.fromSender}',
+                          ].join(' · '),
+                          style: TextStyle(color: colors.muted, fontSize: 11.5, height: 1.25),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (code.isNotEmpty)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Copy QR share code',
+                      icon: Icon(Icons.copy_rounded, size: 17, color: colors.muted),
+                      onPressed: onCopyCode,
+                    ),
+                  if (!item.isVideo)
+                    Checkbox(
+                      value: checked,
+                      activeColor: kNgmyStudioHubAccent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                      onChanged: (_) => onToggle(),
+                    ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Options',
+                    icon: Icon(Icons.more_horiz_rounded, color: colors.muted),
+                    onPressed: working ? null : onMenu,
                   ),
                 ],
               ),
             ),
-          Expanded(
-            child: _items.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Text(
-                        'No files yet.\nTap + at the top to add videos, photos, or documents.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: c.muted, height: 1.5),
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-                    itemCount: _items.length,
-                    itemBuilder: (_, i) {
-                      final item = _items[i];
-                      final checked = _selected.contains(item.id);
-                      return Card(
-                        color: c.card,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: checked ? kNgmyStudioHubAccent : c.border),
-                        ),
-                        child: ListTile(
-                          onTap: () => unawaited(_openItem(item)),
-                          onLongPress: () => setState(() {
-                            if (checked) {
-                              _selected.remove(item.id);
-                            } else {
-                              _selected.add(item.id);
-                            }
-                          }),
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: item.isVideo
-                                    ? [const Color(0xFF6D28D9), const Color(0xFF9333EA)]
-                                    : [kNgmyStudioHubAccent2.withValues(alpha: 0.8), kNgmyStudioHubAccent.withValues(alpha: 0.6)],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(_iconFor(item), color: Colors.white, size: 22),
-                          ),
-                          title: Text(
-                            item.name,
-                            style: TextStyle(color: c.fg, fontWeight: FontWeight.w700, fontSize: 14),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${item.sizeLabel}${(item.shortCode ?? '').trim().isNotEmpty ? ' · QR ${item.shortCode!.trim().toUpperCase()}' : ''}${item.isVideo ? ' · Tap to play' : ''}${item.fromSender != null ? ' · from ${item.fromSender}' : ''}',
-                                  style: TextStyle(color: c.muted, fontSize: 11),
-                                ),
-                              ),
-                              if ((item.shortCode ?? '').trim().isNotEmpty)
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                  tooltip: 'Copy QR share code',
-                                  icon: Icon(Icons.copy_rounded, size: 16, color: c.muted),
-                                  onPressed: () => unawaited(_copyShortCode(item)),
-                                ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!item.isVideo)
-                                Checkbox(
-                                  value: checked,
-                                  activeColor: kNgmyStudioHubAccent,
-                                  onChanged: (v) => setState(() {
-                                    if (v == true) {
-                                      _selected.add(item.id);
-                                    } else {
-                                      _selected.remove(item.id);
-                                    }
-                                  }),
-                                ),
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                tooltip: 'Options',
-                                icon: Icon(Icons.more_horiz_rounded, color: c.muted),
-                                onPressed: _working ? null : () => unawaited(_showItemMenu(item)),
-                              ),
-                            ],
-                          ),
-                          isThreeLine: item.fromSender != null || item.isVideo,
-                        ),
-                      );
-                    },
-                  ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2550,7 +2762,7 @@ class _DocShareMenuTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String? subtitle;
-  final ({Color bg, Color card, Color fg, Color muted, Color border}) colors;
+  final ({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) colors;
   final VoidCallback onTap;
   final bool accent;
   final bool destructive;
