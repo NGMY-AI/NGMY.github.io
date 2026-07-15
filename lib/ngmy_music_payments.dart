@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_local_growth_income.dart';
 import 'ngmy_wallet_payment_ui.dart';
 
 /// NGMY Music Studio wallet pricing (stored on [AppConfig] in main.dart).
@@ -23,6 +24,7 @@ class NgmyMusicPayments {
     NgmyWalletPaymentTheme theme = NgmyWalletPaymentTheme.standard,
   }) async {
     if (amount <= 0) return true;
+    await NgmyLocalGrowthIncomeStore.reconcileIntoLiveUser(user);
     final balance = ((user as dynamic).accountBalance as num).toDouble();
     if (balance + 0.001 < amount) {
       if (context.mounted) {

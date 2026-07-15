@@ -255,6 +255,27 @@ class NgmyLocalGrowthIncomeStore {
     }
   }
 
+  /// Pulls this device's local Growth Income balance onto [liveUser] if it's
+  /// higher than what's already there. The mirroring in [applyTransaction]
+  /// only fires while the Growth Income screen is open and running — a user
+  /// who earned money there, then went straight to a payment screen (Store,
+  /// Advisors, Family Tree, Music, ...) without reopening Growth Income this
+  /// session would otherwise see a stale/zero balance. Call this before
+  /// showing any "pay with your balance" screen anywhere in the app.
+  static Future<void> reconcileIntoLiveUser(dynamic liveUser) async {
+    final user = liveUser as UserData;
+    final realEmail = user.email.trim();
+    if (realEmail.isEmpty) return;
+    try {
+      final loaded = await load(realEmail, user);
+      final localBalance = loaded.user.accountBalance;
+      if (localBalance > user.accountBalance + 0.009) {
+        user.accountBalance = localBalance;
+        ngmySeedLiveBalance(user.email, localBalance, allowIncrease: true);
+      }
+    } catch (_) {}
+  }
+
   // --- Local equivalents of main.dart's library-private clock-in helpers ---
   // (Dart privacy is file-scoped, so `_ngmyIsWeekend` etc. in main.dart can't
   // be imported here — these are small, deliberate re-implementations.)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
+import 'ngmy_local_growth_income.dart';
 import 'ngmy_wallet_payment_ui.dart';
 
 enum NgmyCommunicatePassTier { twoWeek, monthly, yearly }
@@ -155,6 +156,10 @@ class NgmyCommunicatePayments {
     final options = enabledPassOptions(config);
     if (options.isEmpty) return true;
 
+    // Pull in any Growth Income balance earned before this screen was
+    // opened this session — otherwise a user with money in Growth Income
+    // can see a stale $0 here.
+    await NgmyLocalGrowthIncomeStore.reconcileIntoLiveUser(user);
     final balance = ((user as dynamic).accountBalance as num).toDouble();
     final picked = await _pickPassOption(context, options, balance: balance);
     if (picked == null) return false;
@@ -497,6 +502,7 @@ class NgmyFamilyTreeStyleCharge {
     required Future<bool> Function(double amount, String description) onCharge,
   }) async {
     if (amount <= 0) return true;
+    await NgmyLocalGrowthIncomeStore.reconcileIntoLiveUser(user);
     final balance = ((user as dynamic).accountBalance as num).toDouble();
     if (balance + 0.001 < amount) {
       if (context.mounted) {
