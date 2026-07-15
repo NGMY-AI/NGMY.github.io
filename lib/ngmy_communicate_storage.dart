@@ -539,7 +539,9 @@ class NgmyCommunicateRelationshipStore {
       r'\b(break up|broke up|we.?re done|i.?m done with you|leave me alone|it.?s over|not together anymore)\b',
     ).hasMatch(all);
     final official = RegExp(
-      r'\b(you.?re my (boy|girl)friend|we.?re official|we.?re together|be my (boy|girl)friend|will you be mine|i.?m yours|only yours|exclusive)\b',
+      r'\b(you.?re my (boy|girl)friend|we.?re official|we.?re together|we.?re dating|be my (boy|girl)friend|'
+      r'will you be mine|i.?m yours|only yours|exclusive|date me|dating you|you.?re my girl|you.?re my man|'
+      r'i want you to be (my|mine)|let.?s be exclusive)\b',
     ).hasMatch(all);
 
     final existing = await loadPartner(profileId);
@@ -668,5 +670,100 @@ class NgmyTranslatorLanguageStore {
       _key(email, profileId),
       jsonEncode({'native': native.trim(), 'learning': learning.trim()}),
     );
+  }
+}
+
+/// Tracks things the user said they would do so advisors can remind / follow up.
+class NgmyCommunicatePromiseStore {
+  static String _key(String email, String profileId) =>
+      'ngmy_comm_promises_${email.toLowerCase().trim()}_${profileId.trim()}';
+
+  static Future<List<Map<String, dynamic>>> load(String email, String profileId) async {
+    if (email.trim().isEmpty || profileId.trim().isEmpty) return [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(email, profileId));
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> _save(String email, String profileId, List<Map<String, dynamic>> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmed = list.length > 40 ? list.sublist(list.length - 40) : list;
+    await prefs.setString(_key(email, profileId), jsonEncode(trimmed));
+  }
+
+  static Future<void> syncFromUserText(String email, String profileId, String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    final lower = t.toLowerCase();
+    final hit = RegExp(
+      r"\b(remind me|i('?m| am) (gonna|going to|about to)|i will|i('?ll| ll)|i have to|i need to|"
+      r"i should|don'?t let me forget|i['’]m supposed to)\b",
+    ).hasMatch(lower);
+    if (!hit) return;
+
+    final when = _whenHint(lower);
+    final list = await load(email, profileId);
+    // Avoid near-duplicates.
+    final norm = lower.replaceAll(RegExp(r'\s+'), ' ');
+    if (list.any((e) => (e['text'] ?? '').toString().toLowerCase().replaceAll(RegExp(r'\s+'), ' ') == norm)) {
+      return;
+    }
+    list.add({
+      'text': t.length > 180 ? '${t.substring(0, 180)}…' : t,
+      'when': when,
+      'at': DateTime.now().toUtc().toIso8601String(),
+      'done': false,
+    });
+    await _save(email, profileId, list);
+  }
+
+  static String _whenHint(String lower) {
+    if (RegExp(r'\b(tomorrow morning|tmr morning|in the morning|this morning)\b').hasMatch(lower)) {
+      return 'morning';
+    }
+    if (RegExp(r'\b(tonight|this evening|this afternoon|this weekend|tomorrow)\b').hasMatch(lower)) {
+      final m = RegExp(r'\b(tonight|this evening|this afternoon|this weekend|tomorrow)\b').firstMatch(lower);
+      return m?.group(0) ?? 'later';
+    }
+    final clock = RegExp(r'\b([01]?\d|2[0-3])\s*(:\s*[0-5]\d)?\s*(am|pm)?\b').firstMatch(lower);
+    if (clock != null) return clock.group(0)!.replaceAll(' ', '');
+    return 'sometime';
+  }
+
+  /// Prompt block so the advisor remembers open plans.
+  static Future<String> promptBlock(String email, String profileId) async {
+    final list = await load(email, profileId);
+    final open = list.where((e) => e['done'] != true).toList();
+    if (open.isEmpty) return '';
+    final now = DateTime.now();
+    final buf = StringBuffer('THINGS THEY SAID THEY WOULD DO (remember + remind naturally):\n');
+    for (final p in open.take(8)) {
+      final text = (p['text'] ?? '').toString();
+      final when = (p['when'] ?? 'sometime').toString();
+      final at = DateTime.tryParse((p['at'] ?? '').toString());
+      var dueNote = '';
+      if (at != null) {
+        final ageH = now.difference(at.toLocal()).inHours;
+        if (when.contains('morning') && now.hour >= 12 && ageH >= 4) {
+          dueNote = ' — time likely passed; ask how their day went and if they did it';
+        } else if (when.contains('tonight') && (now.hour >= 22 || ageH >= 12)) {
+          dueNote = ' — follow up gently: did they do it?';
+        } else if (ageH >= 20) {
+          dueNote = ' — old enough to check in warmly';
+        }
+      }
+      buf.writeln('- ($when) "$text"$dueNote');
+    }
+    buf.writeln(
+      'Use these naturally — remind before/around the time, or after ask if they did it / how the day was. Do not dump the whole list every reply.\n',
+    );
+    return buf.toString();
   }
 }

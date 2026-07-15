@@ -116,14 +116,59 @@ bool ngmyUserRequestedChatImage(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
   return RegExp(
-    r'\b(pic|picture|photo|selfie|snap|image|portrait|draw|paint|generate|created?|make|send)\b',
-    caseSensitive: false,
-  ).hasMatch(t) ||
-      RegExp(r'\b(send|show|make|create)\s+(me\s+)?(a\s+)?(pic|photo|picture|selfie|image)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bcreate\s+(an?\s+)?image\b', caseSensitive: false).hasMatch(t);
+        r'\b(pic|picture|photo|selfie|snap|image|nudes?|portrait)\b',
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(
+        r'\b(send|show|make|create|generate|snap)\s+(me\s+)?(a\s+|an\s+|your\s+|another\s+)?(pic|photo|picture|selfie|image|nudes?)\b',
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(r'\b(pic|photo|selfie)\s+of\s+(you|yourself)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\blet me see (you|your)\b', caseSensitive: false).hasMatch(t);
 }
 
 bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
+
+bool ngmyCommunicateIsExclusivePartner(Map<String, String>? partner, String chatterEmail) {
+  final p = (partner?['email'] ?? '').toLowerCase().trim();
+  final e = chatterEmail.toLowerCase().trim();
+  return p.isNotEmpty && e.isNotEmpty && p == e;
+}
+
+/// Visual look cues so generated pics match the advisor's known face/vibe.
+String ngmyAdvisorVisualLookDescription({
+  required String name,
+  required String gender,
+  String bio = '',
+}) {
+  final n = name.trim().toUpperCase();
+  if (n.contains('MARIAM')) {
+    return 'beautiful young African Black woman in her late teens/early 20s, soft curly afro puff, glowing skin, dusty pink or mauve top, delicate gold necklace, radiant smile — exact same person every time';
+  }
+  if (n.contains('SUZANA VANESSA') || (n.contains('VANESSA') && n.contains('SUZANA'))) {
+    return 'beautiful young African Black woman about 21–22, soft natural curly/coily hair with volume, warm dark eyes, soft feminine blouse, elegant gold earrings — exact same person every time';
+  }
+  if (n.contains('SUZANA MBUTO') || n.contains('MBUTO')) {
+    return 'beautiful young African Black woman early 20s, warm natural smile, soft stylish hair, modern casual top — exact same person every time';
+  }
+  if (n.contains('SUZY') || n.contains('SUSIE')) {
+    return 'stylish young African Black woman early 20s, elegant natural hair with soft volume, chic casual top — exact same person every time';
+  }
+  if (n.contains('MINA')) {
+    return 'beautiful young African Black woman about 18–20, gentle youthful features, soft natural hair — exact same person every time';
+  }
+  if (n.contains('ANNA')) {
+    return 'beautiful young African Black woman early 20s, polished graceful look — exact same person every time';
+  }
+  if (n.contains('ALISA')) {
+    return 'beautiful young African Black woman early 20s, bright confident smile — exact same person every time';
+  }
+  if (bio.trim().isNotEmpty) {
+    return '${bio.trim()} — same person identity consistent across photos';
+  }
+  final g = gender.trim().toLowerCase() == 'male' ? 'African Black man' : 'African Black woman';
+  return 'photorealistic $g named $name — consistent face matching their profile photo every time';
+}
 
 /// Users can attach homework / worksheet photos for these roles.
 bool ngmyCommunicateRoleAllowsUserPhotoUpload(String role) {
@@ -405,7 +450,9 @@ class NgmyCommunicateProfile {
         '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below.\n'
-        '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n';
+        '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n'
+        '- REMINDERS: Track things they said they would do (times, errands, goals). Remind them when it helps. '
+        'If they message after that time, ask how their day went and whether they did what they said — natural, caring, not spammy.\n';
   }
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
@@ -531,8 +578,16 @@ class NgmyCommunicateProfile {
           'ROLE: Dating partner — a real ${gender == 'female' ? 'woman' : 'man'} who dates seriously. '
           'Exclusive: you only date ONE person at a time — never two. When you are taken, you are loyal. '
           'When you are with your person you are deeply romantic, affectionate, and emotionally present. '
-          'Sexual talk is open and verbatim — real body words, never shy euphemisms.\n',
-        'friend' => 'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n',
+          'Sexual talk is open and verbatim — real body words, never shy euphemisms.\n'
+          'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
+          'When they ask for a picture, send one that looks exactly like YOU and matches the conversation '
+          '(cute, casual, flirty, or hotter — whatever fits). Never offer or send photos to people you are not dating.\n'
+          'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
+          'and later ask if they did it / how the day went. Be a real caring partner — not a nagging bot.\n',
+        'friend' =>
+          'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n'
+          'REMINDERS: If they mention plans, times, or things they will do, remember them. Remind them when useful, '
+          'and later ask how it went / whether they did it. Be a real friend who remembers.\n',
         'pickup_line' =>
           'ROLE: Pickup Line Coach — you help users flirt and open conversations with confidence.\n'
           'You give smooth, contextual lines — openers AND follow-ups when they are already texting someone.\n'
@@ -1932,6 +1987,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
     final buf = StringBuffer();
+    final promiseBlock = await NgmyCommunicatePromiseStore.promptBlock(_email, widget.profile.id);
+    if (promiseBlock.trim().isNotEmpty) buf.writeln(promiseBlock);
     if (_isMshauri) {
       final userState = ((widget.user as dynamic).state ?? '').toString();
       final session = await ngmyMshauriRefreshSession(
@@ -2441,6 +2498,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     } else {
       await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
     }
+    unawaited(NgmyCommunicatePromiseStore.syncFromUserText(_email, widget.profile.id, text));
     _scrollBottom();
 
     final apiKey = await _resolveApiKey();
@@ -2460,10 +2518,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
-      final wantsImage = text.isNotEmpty &&
-          !_allowsPhotoUpload &&
-          ngmyUserRequestedChatImage(text) &&
-          (_isAdmin || ngmyCommunicateRoleAllowsChatImages(widget.profile.role));
+      final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
+      final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
+      final canSendRomanticImage = ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && isExclusivePartner;
+      final wantsImage = requestedImage && canSendRomanticImage && !_allowsPhotoUpload;
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
 
       if (userSentPhoto) {
@@ -2486,29 +2544,41 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+      } else if (requestedImage && ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && !isExclusivePartner) {
+        // Romantic advisors never send pics except to their exclusive partner.
+        final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+        final extraCtx = await _advisorExtraContext(text, mem);
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+            '$extraCtx'
+            '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+            'They asked for a picture/selfie. You are NOT in a relationship with this person (or not exclusive yet). '
+            'Do NOT send a photo. Reply naturally like a real person — teasing, firm, or flirty as your character, '
+            'but make clear pics are only for your boyfriend/girlfriend once you are officially together.\n'
+            'They just texted: $text\n'
+            '${_replyStyleSuffix()}';
+        final result = await ngmyAiGenerateWithRetry(creds, prompt);
+        final reply = (result.text != null && result.text!.trim().isNotEmpty)
+            ? result.text!.trim()
+            : 'I don\'t send pics like that unless we\'re official 😌';
+        if (!mounted) return;
+        setState(() => _messages.add({'role': 'ai', 'text': reply}));
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
       } else if (wantsImage) {
-        final look = widget.profile.bio.trim().isNotEmpty
-            ? widget.profile.bio.trim()
-            : (widget.profile.personality.trim().isNotEmpty
-                ? widget.profile.personality.trim()
-                : '${widget.profile.genderLabel}, ${widget.profile.name}');
-        final scene = text.length > 120 ? text.substring(0, 120) : text;
+        final look = ngmyAdvisorVisualLookDescription(
+          name: widget.profile.name,
+          gender: widget.profile.gender,
+          bio: widget.profile.bio,
+        );
+        final scene = text.length > 160 ? text.substring(0, 160) : text;
+        final recent = mem.reversed.take(6).map((m) => (m['text'] ?? '').toString()).where((t) => t.trim().isNotEmpty).join(' | ');
         final imgPrompt =
-            'Photorealistic portrait of $look, ${widget.profile.name}, $scene, warm natural lighting, dating app photo, high quality, no text, no watermark';
+            'Photorealistic photo of $look. Scene/request from their partner: $scene. '
+            'Keep the SAME face and identity as this person in every photo. Match the conversation mood '
+            '(${recent.isEmpty ? 'intimate dating selfie' : recent}). Natural lighting, high detail, no text, no watermark, square photo.';
         final imgResult = await ngmyGenerateRomanticChatImage(imgPrompt, creds: creds);
         if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
           final b64 = base64Encode(imgResult.bytes!);
-          final dataUrl = 'data:image/jpeg;base64,$b64';
-          await NgmyCommunicateAvatarCache.patchProfileAvatarInConfig(
-            widget.config,
-            widget.profile.id,
-            avatarUrl: dataUrl,
-            bytes: imgResult.bytes,
-          );
-          await NgmyCommunicateAvatarCache.persistConfigProfilesLocally(widget.config);
-          unawaited(widget.onPersistConfig?.call() ?? Future.value(false));
-          widget.onDataChanged?.call();
-          const reply = 'Here — just for you.';
+          const reply = 'Here — just for you 💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': reply, 'imageB64': b64}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply, imageB64: b64);
