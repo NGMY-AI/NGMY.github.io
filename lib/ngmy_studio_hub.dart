@@ -81,7 +81,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
     @override
     Widget build(BuildContext context) {
-      // Pinned order: Doc Share → Quote Calc → QR Generator → AI Outfit → Play Zone → Video Studio → Kiswahili School.
+      // Pinned order: Doc Share → Quote Calc → QR Generator → Play Zone → Kiswahili School → AI Outfit → rest.
       final tools = <_CreatorTool>[
         _CreatorTool(
           icon: Icons.folder_shared_rounded,
@@ -126,6 +126,22 @@ class NgmyCreatorHubTab extends StatelessWidget {
         },
       ),
       _CreatorTool(
+        icon: Icons.interests_rounded,
+        colors: const [Color(0xFF7C3AED), Color(0xFF06B6D4)],
+        title: 'Play Zone',
+        subtitle: 'Love match · riddles · daily fun',
+        onTap: () {
+          showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
+        },
+      ),
+      _CreatorTool(
+        icon: Icons.translate_rounded,
+        colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
+        title: 'Kiswahili School',
+        subtitle: 'Jifunze Kiingereza kwa picha na Mwalimu Amina',
+        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
+      ),
+      _CreatorTool(
         icon: Icons.style_rounded,
         colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
         title: 'AI Outfit',
@@ -138,27 +154,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         },
       ),
       _CreatorTool(
-        icon: Icons.interests_rounded,
-        colors: const [Color(0xFF7C3AED), Color(0xFF06B6D4)],
-        title: 'Play Zone',
-        subtitle: 'Love match · riddles · daily fun',
-        onTap: () {
-          showNgmyFunGamesDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
-        },
-      ),
-      _CreatorTool(
         icon: Icons.movie_creation_rounded,
         colors: const [Color(0xFF6D28D9), Color(0xFF9333EA)],
         title: 'Video Studio',
         subtitle: 'Templates, clips & export',
         onTap: () => showNgmyVideoStudio(context),
-      ),
-      _CreatorTool(
-        icon: Icons.translate_rounded,
-        colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
-        title: 'Kiswahili School',
-        subtitle: 'Jifunze Kiingereza kwa picha na Mwalimu Amina',
-        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
       ),
       _CreatorTool(
         icon: Icons.smartphone_rounded,
