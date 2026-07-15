@@ -278,9 +278,8 @@ String ngmyAdvisorFirstName(String fullName) {
   return parts.first;
 }
 
-/// Metro-Atlanta cities (Georgia, USA) — advisors live here; Atlanta-heavy distribution.
+/// Metro Georgia cities — most advisors; top two + Wisdom Advisor are pinned to Macon.
 const kNgmyAdvisorGeorgiaCities = <String>[
-  'Atlanta',
   'Atlanta',
   'Atlanta',
   'Atlanta',
@@ -293,6 +292,22 @@ const kNgmyAdvisorGeorgiaCities = <String>[
   'Lithonia',
 ];
 
+/// President of NGMY + top two advisors + Wisdom Advisor live in Macon, GA.
+bool ngmyAdvisorLivesInMacon({required String id, required String name}) {
+  final n = name.trim().toUpperCase();
+  final i = id.trim().toLowerCase();
+  if (n.contains('MARIAM') || n.contains('MIRIAM') || n.contains('MARYAM') || n.contains('DUSABE')) {
+    return true;
+  }
+  if (n.contains('VANESSA') || (n.contains('SUZANA') && n.contains('VANESSA')) || i.contains('suzana-vanessa')) {
+    return true;
+  }
+  if (n.contains('MSHAURI') || n.contains('AMANI') || i.contains('mshauri')) {
+    return true;
+  }
+  return false;
+}
+
 ({String city, String state}) ngmyAdvisorGeorgiaHome({
   required String id,
   required String name,
@@ -301,6 +316,9 @@ const kNgmyAdvisorGeorgiaCities = <String>[
   final stored = storedCity.trim();
   if (stored.isNotEmpty) {
     return (city: stored, state: 'Georgia');
+  }
+  if (ngmyAdvisorLivesInMacon(id: id, name: name)) {
+    return (city: 'Macon', state: 'Georgia');
   }
   final blob = '${id.trim().toLowerCase()}|${name.trim().toLowerCase()}';
   final hash = blob.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
@@ -353,13 +371,18 @@ String ngmyAdvisorNowContextBlock({String cityLabel = 'Atlanta, Georgia'}) {
 }
 
 String ngmyAdvisorAtlantaKnowledgeBlock({required String city}) {
-  return 'HOME BASE: You live in $city, Georgia — metro Atlanta area, United States. '
-      'You know Atlanta like a local tour guide: Downtown, Midtown, Buckhead, Little Five Points, '
+  final homeLine = city.trim().toLowerCase() == 'macon'
+      ? 'HOME BASE: You live in Macon, Georgia, USA — same city as the President of NGMY. '
+          'You know Macon life (Cherry Blossom Festival, downtown, restaurants, I-75, Ocmulgee) '
+          'and you also know metro Atlanta well enough to guide visitors statewide.\n'
+      : 'HOME BASE: You live in $city, Georgia — metro Atlanta area, United States.\n';
+  return '$homeLine'
+      'You know Georgia like a local tour guide: Atlanta neighborhoods (Downtown, Midtown, Buckhead, Little Five Points), '
       'Centennial Olympic Park, Georgia Aquarium, World of Coke, Mercedes-Benz Stadium, State Farm Arena, '
       'Piedmont Park, BeltLine, CNN Center, Marta, Hartsfield-Jackson airport (ATL), '
-      'Stone Mountain Park, Downtown Lawrenceville, Clarkston\'s international food scene, '
+      'Stone Mountain Park, Lawrenceville, Clarkston\'s international food scene, '
       'and everyday life (traffic on I-285 / I-85, weather, food, neighborhoods). '
-      'If someone visiting or out of state asks about Atlanta / Georgia, guide them warmly and specifically — '
+      'If someone visiting or out of state asks about Atlanta / Georgia / Macon, guide them warmly and specifically — '
       'restaurants, areas to stay, what to see, how to get around. Sound like you actually live here.\n';
 }
 
@@ -587,6 +610,11 @@ class NgmyCommunicateProfile {
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
         '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n'
+        '- NO PARROTING: Do NOT echo or restate what they just said back at them '
+        '(bad: "completely tired huh?", "so you\'re tired…", "oh you went to the store?"). '
+        'Reply with a real next thought, reaction, question, or offer — move the chat forward. '
+        'Only repeat their words rarely, when you are genuinely shocked/surprised by something big '
+        '(like unexpected news), the way a real human might once — never as your default style.\n'
         '- TIME AWARENESS: Use the clock above. If you just talked (minutes or a few hours ago), do not restart the day with "what are you up to today?"\n'
         '- REMINDERS: Track things they said they would do (times, errands, goals). Remind them when it helps. '
         'Only ask "how did X go?" when enough time has clearly passed for that plan — never spam the same check-in.\n';
