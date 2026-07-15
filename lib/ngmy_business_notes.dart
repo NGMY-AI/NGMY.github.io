@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_business_note_images.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -809,13 +810,15 @@ class NgmyBusinessNote {
     this.leadFontSize = 16,
     List<NgmyNoteTextAnim>? textAnims,
     List<String>? images,
+    List<String>? imageIds,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         textAnims = textAnims ?? [],
-        images = images ?? [];
+        images = images ?? [],
+        imageIds = imageIds ?? [];
 
   final String id;
   String title;
@@ -830,8 +833,10 @@ class NgmyBusinessNote {
   double titleFontSize;
   double leadFontSize;
   List<NgmyNoteTextAnim> textAnims;
-  /// Data-URL photos attached to the note (iPhone Notes-style).
+  /// In-memory data-URL photos for the editor UI.
   List<String> images;
+  /// Durable blob ids (photos live outside the notes JSON so they don't vanish).
+  List<String> imageIds;
   final DateTime createdAt;
   DateTime updatedAt;
 
@@ -856,7 +861,7 @@ class NgmyBusinessNote {
     return _noteBackgroundById(effectiveBackgroundId).darkText;
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool embedImagesForTransfer = false}) => {
         'id': id,
         'title': title,
         'body': body,
@@ -870,34 +875,109 @@ class NgmyBusinessNote {
         'titleFontSize': titleFontSize,
         'leadFontSize': leadFontSize,
         'textAnims': textAnims.map((a) => a.toJson()).toList(),
-        'images': images,
+        // Never slam huge base64 into SharedPreferences for day-to-day saves —
+        // photos live in the blob store keyed by imageIds.
+        'imageIds': imageIds,
+        if (embedImagesForTransfer && images.isNotEmpty) 'images': images,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
 
-  factory NgmyBusinessNote.fromJson(Map<String, dynamic> json) => NgmyBusinessNote(
-        id: (json['id'] ?? '').toString(),
-        title: (json['title'] ?? '').toString(),
-        body: (json['body'] ?? '').toString(),
-        folder: (json['folder'] ?? 'Personal').toString(),
-        colorIndex: (json['colorIndex'] as num?)?.toInt().clamp(0, _noteColors.length - 1) ?? 0,
-        backgroundId: (json['backgroundId'] ?? '').toString(),
-        customColor: (json['customColor'] as num?)?.toInt(),
-        pinned: json['pinned'] == true,
-        icon: (json['icon'] ?? '📝').toString(),
-        openInPreview: json['openInPreview'] == true,
-        titleFontSize: (json['titleFontSize'] as num?)?.toDouble().clamp(18, 44) ?? 28,
-        leadFontSize: (json['leadFontSize'] as num?)?.toDouble().clamp(12, 32) ?? 16,
-        textAnims: (json['textAnims'] as List?)
-                ?.whereType<Map>()
-                .map((e) => NgmyNoteTextAnim.fromJson(Map<String, dynamic>.from(e)))
-                .toList() ??
-            [],
-        images: (json['images'] as List?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
-            const <String>[],
-        createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
-        updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
+  factory NgmyBusinessNote.fromJson(Map<String, dynamic> json) {
+    final embedded = (json['images'] as List?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
+        <String>[];
+    final ids = (json['imageIds'] as List?)?.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList() ??
+        <String>[];
+    // Legacy notes may only have embedded data URLs with no imageIds yet.
+    final legacyIds = <String>[];
+    if (ids.isEmpty && embedded.isNotEmpty) {
+      for (var i = 0; i < embedded.length; i++) {
+        legacyIds.add('legacy_$i');
+      }
+    }
+    return NgmyBusinessNote(
+      id: (json['id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      body: (json['body'] ?? '').toString(),
+      folder: (json['folder'] ?? 'Personal').toString(),
+      colorIndex: (json['colorIndex'] as num?)?.toInt().clamp(0, _noteColors.length - 1) ?? 0,
+      backgroundId: (json['backgroundId'] ?? '').toString(),
+      customColor: (json['customColor'] as num?)?.toInt(),
+      pinned: json['pinned'] == true,
+      icon: (json['icon'] ?? '📝').toString(),
+      openInPreview: json['openInPreview'] == true,
+      titleFontSize: (json['titleFontSize'] as num?)?.toDouble().clamp(18, 44) ?? 28,
+      leadFontSize: (json['leadFontSize'] as num?)?.toDouble().clamp(12, 32) ?? 16,
+      textAnims: (json['textAnims'] as List?)
+              ?.whereType<Map>()
+              .map((e) => NgmyNoteTextAnim.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          [],
+      images: embedded,
+      imageIds: ids.isNotEmpty ? ids : legacyIds,
+      createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
+      updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
+    );
+  }
+
+  /// Load photo bytes from durable blob storage into [images].
+  Future<void> hydrateImages(String userEmail) async {
+    if (imageIds.isEmpty) return;
+    final next = <String>[];
+    for (var i = 0; i < imageIds.length; i++) {
+      final imageId = imageIds[i];
+      // Prefer already-in-memory data URL (same session / legacy).
+      if (i < images.length && images[i].startsWith('data:image')) {
+        next.add(images[i]);
+        continue;
+      }
+      final fromBlob = await ngmyBusinessNoteImageGet(
+        userEmail: userEmail,
+        noteId: id,
+        imageId: imageId,
       );
+      if (fromBlob != null && fromBlob.trim().isNotEmpty) {
+        next.add(fromBlob);
+      } else if (i < images.length && images[i].trim().isNotEmpty) {
+        next.add(images[i]);
+      }
+    }
+    images = next;
+    // Keep imageIds aligned with what we could actually load.
+    if (images.length < imageIds.length) {
+      imageIds = imageIds.take(images.length).toList();
+    }
+  }
+
+  /// Persist photo bytes to blob storage and keep only ids in the note JSON.
+  Future<bool> persistImages(String userEmail) async {
+    final nextIds = <String>[];
+    final nextImages = <String>[];
+    for (var i = 0; i < images.length; i++) {
+      final dataUrl = images[i].trim();
+      if (dataUrl.isEmpty) continue;
+      final imageId = (i < imageIds.length && imageIds[i].trim().isNotEmpty)
+          ? imageIds[i].trim()
+          : 'img_${DateTime.now().microsecondsSinceEpoch}_$i';
+      final ok = await ngmyBusinessNoteImagePut(
+        userEmail: userEmail,
+        noteId: id,
+        imageId: imageId,
+        dataUrl: dataUrl,
+      );
+      if (!ok) return false;
+      nextIds.add(imageId);
+      nextImages.add(dataUrl);
+    }
+    // Delete orphans no longer attached.
+    final removed = imageIds.where((id) => !nextIds.contains(id));
+    if (removed.isNotEmpty) {
+      await ngmyBusinessNoteImagesDeleteAll(userEmail: userEmail, noteId: id, imageIds: removed);
+    }
+    imageIds = nextIds;
+    images = nextImages;
+    return true;
+  }
 }
 
 Future<List<NgmyBusinessNote>> _loadNotes(String userEmail) async {
@@ -907,20 +987,38 @@ Future<List<NgmyBusinessNote>> _loadNotes(String userEmail) async {
     if (raw == null) return [];
     final list = jsonDecode(raw);
     if (list is! List) return [];
-    return list.whereType<Map>().map((e) => NgmyBusinessNote.fromJson(Map<String, dynamic>.from(e))).toList();
+    final notes = list.whereType<Map>().map((e) => NgmyBusinessNote.fromJson(Map<String, dynamic>.from(e))).toList();
+    for (final n in notes) {
+      await n.hydrateImages(userEmail);
+    }
+    return notes;
   } catch (_) {
     return [];
   }
 }
 
 Future<void> _saveNotes(String userEmail, List<NgmyBusinessNote> items) async {
+  for (final n in items) {
+    final ok = await n.persistImages(userEmail);
+    if (!ok) {
+      throw StateError('Could not save note photos for ${n.id}');
+    }
+  }
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_notesKey(userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
+  final encoded = jsonEncode(items.map((e) => e.toJson()).toList());
+  final ok = await prefs.setString(_notesKey(userEmail), encoded);
+  if (!ok) {
+    throw StateError('Could not save notes (storage full)');
+  }
 }
 
 Future<int> ngmyBusinessNotesCount({required String userEmail}) async => (await _loadNotes(userEmail)).length;
 
-Future<List<NgmyBusinessNote>> ngmyExportBusinessNotes({required String userEmail}) => _loadNotes(userEmail);
+Future<List<NgmyBusinessNote>> ngmyExportBusinessNotes({required String userEmail}) async {
+  final notes = await _loadNotes(userEmail);
+  // Transfer/QR may need embedded bytes — hydrate already filled images.
+  return notes;
+}
 
 Future<void> ngmyImportBusinessNotes({required String userEmail, required List<NgmyBusinessNote> items}) async {
   final existing = await _loadNotes(userEmail);
@@ -1064,7 +1162,15 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
 
   Future<void> _delete(NgmyBusinessNote note) async {
     final items = await _loadNotes(widget.userEmail);
+    final doomed = items.where((e) => e.id == note.id).toList();
     items.removeWhere((e) => e.id == note.id);
+    for (final n in doomed) {
+      await ngmyBusinessNoteImagesDeleteAll(
+        userEmail: widget.userEmail,
+        noteId: n.id,
+        imageIds: [...n.imageIds, for (var i = 0; i < n.images.length; i++) 'legacy_$i'],
+      );
+    }
     await _saveNotes(widget.userEmail, items);
     await _reload();
   }
@@ -1772,7 +1878,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   bool _hasTypedContentChange() {
     return _title.text.trim() != _initialTitle.trim() ||
         _storedBody.trim() != _initialBody.trim() ||
-        _note.images.length != _initialImageCount;
+        _note.images.length != _initialImageCount ||
+        _note.imageIds.length != _initialImageCount;
   }
 
   bool _hasSaveableContent() {
@@ -1790,21 +1897,37 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       );
       return;
     }
-    final ref = await ngmyPickImageBase64(imageQuality: 72, maxWidth: 1400);
+    final ref = await ngmyPickImageBase64(imageQuality: 62, maxWidth: 1200);
     if (ref == null || ref.trim().isEmpty) return;
+    final imageId = 'img_${DateTime.now().microsecondsSinceEpoch}';
     setState(() {
       _note.images = [..._note.images, ref];
+      _note.imageIds = [..._note.imageIds, imageId];
     });
-    _markDirty();
+    _autosave?.cancel();
+    _dirty = true;
+    // Save immediately so leaving the note can't cancel the photo write.
+    await _persist();
+    if (!mounted) return;
+    if (_dirty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo could not be saved. Try a smaller picture.')),
+      );
+    }
   }
 
   void _removePhoto(int index) {
     if (index < 0 || index >= _note.images.length) return;
     setState(() {
-      final next = List<String>.from(_note.images)..removeAt(index);
-      _note.images = next;
+      final nextImgs = List<String>.from(_note.images)..removeAt(index);
+      final nextIds = List<String>.from(_note.imageIds);
+      if (index < nextIds.length) nextIds.removeAt(index);
+      _note.images = nextImgs;
+      _note.imageIds = nextIds;
     });
-    _markDirty();
+    _autosave?.cancel();
+    _dirty = true;
+    unawaited(_persist());
   }
 
   Widget _notePhotosSection({required bool dark, required bool editable}) {
@@ -1881,6 +2004,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
     try {
       final items = await _loadNotes(widget.userEmail);
+      // Prefer our in-memory note (including newly added photos) over disk copy.
       final i = items.indexWhere((e) => e.id == _note.id);
       if (i >= 0) {
         if (contentChanged) {
@@ -1910,15 +2034,41 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
           }
         }
       }
+      // Make sure this note keeps the editor's current photos even if _loadNotes
+      // briefly hydrated an older empty list for the same id.
+      final idx = items.indexWhere((e) => e.id == _note.id);
+      if (idx >= 0) {
+        items[idx].images = List<String>.from(_note.images);
+        items[idx].imageIds = List<String>.from(_note.imageIds);
+        items[idx].title = _note.title;
+        items[idx].body = _note.body;
+        items[idx].folder = _note.folder;
+        items[idx].pinned = _note.pinned;
+        items[idx].icon = _note.icon;
+        items[idx].backgroundId = _note.backgroundId;
+        items[idx].customColor = _note.customColor;
+        items[idx].openInPreview = _note.openInPreview;
+        items[idx].titleFontSize = _note.titleFontSize;
+        items[idx].leadFontSize = _note.leadFontSize;
+        items[idx].textAnims = List<NgmyNoteTextAnim>.from(_note.textAnims);
+        items[idx].updatedAt = _note.updatedAt;
+      }
       await _saveNotes(widget.userEmail, items);
-    } catch (_) {}
-    _dirty = false;
+      _dirty = false;
+    } catch (e) {
+      debugPrint('[business notes] persist failed: $e');
+      // Keep _dirty true so we retry — never pretend photos were saved.
+    }
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _autosave?.cancel();
+    if (_dirty) {
+      // Last-chance flush so photos/text aren't lost when leaving fast.
+      unawaited(_persist());
+    }
     _title.dispose();
     _body.dispose();
     _bodyFocus.dispose();

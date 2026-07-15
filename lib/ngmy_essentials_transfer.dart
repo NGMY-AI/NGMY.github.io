@@ -37,7 +37,9 @@ Future<Map<String, dynamic>> ngmyEssentialsExportBundle(String userEmail, Set<Es
     bundle['medicines'] = (await ngmyExportMedicines(userEmail: userEmail)).map((e) => e.toJson()).toList();
   }
   if (all || cats.contains(EssentialsTransferCategory.notes)) {
-    bundle['notes'] = (await ngmyExportBusinessNotes(userEmail: userEmail)).map((e) => e.toJson()).toList();
+    bundle['notes'] = (await ngmyExportBusinessNotes(userEmail: userEmail))
+        .map((e) => e.toJson(embedImagesForTransfer: true))
+        .toList();
   }
   if (all || cats.contains(EssentialsTransferCategory.tasks)) {
     bundle['tasks'] = (await ngmyExportBusinessTasks(userEmail: userEmail)).map((e) => e.toJson()).toList();
