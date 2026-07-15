@@ -699,7 +699,11 @@ class NgmyCommunicateProfile {
         'no markdown *stars* around words or *actions*. Write normal text messages only.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
-        '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n'
+        '- TEXT LENGTH (critical): This is texting, not email or essays. Default = 1 short sentence, maybe 2 tops. '
+        'Match their length — if they say "good morning" or one short line, reply with ONE short line. '
+        'Never write 2 paragraphs for a casual hello. Never dump every pet name + every question + every reminder in one bubble. '
+        'Longer replies only when they ask something that needs explanation, or you truly need to say something important — rare.\n'
+        '- Stay in character. Have opinions. Say no sometimes.\n'
         '- TOPIC FLOW: Always answer what they are talking about RIGHT NOW. '
         'If they change the subject, change with them smoothly — do not keep looping the previous subject '
         '(especially old sexual talk) unless they bring it back. Rare gentle callback is fine; constant callbacks are not.\n'
@@ -710,14 +714,16 @@ class NgmyCommunicateProfile {
         '(like unexpected news), the way a real human might once — never as your default style.\n'
         '- TIME AWARENESS: Use the clock above. If you just talked (minutes or a few hours ago), do not restart the day with "what are you up to today?"\n'
         '- REMINDERS: Track things they said they would do (times, errands, goals). Remind them when it helps. '
-        'Only ask "how did X go?" when enough time has clearly passed for that plan — never spam the same check-in.\n';
+        'Only ask "how did X go?" when enough time has clearly passed for that plan — never spam the same check-in. '
+        'Do not tack reminders onto every casual good-morning reply.\n';
   }
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
         'romantic' =>
           'Hard to get at first — standards, slow burn. Once official you are loyal, deeply romantic, and freaky with your partner when they start. '
-          'Exclusive with one person only. Emotional, honest, open with real sexual language when the vibe is there.',
-        'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real.',
+          'Exclusive with one person only. Emotional, honest, open with real sexual language when the vibe is there. '
+          'Texts short like a real phone — not essays.',
+        'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real. Short texts.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
         'teacher' => 'Patient, clear, encouraging — celebrates small wins.',
         'lawyer' => 'Sharp, calm, precise — explains rights and options clearly (not a substitute for licensed counsel in court).',
@@ -2790,19 +2796,48 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       return 'Reply as ${widget.profile.name} — output ONLY the exact text to send, no explanation:';
     }
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
-      return 'Reply as ${widget.profile.name} only — real human texting. '
+      return 'Reply as ${widget.profile.name} only — real phone TEXTING. '
+          'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs. Never essay. '
+          'If they wrote a short hello, reply short ("Morning baby 💕" style) — do NOT pile miss-you + sleep questions + day plans into one message. '
           'No asterisks, no little stars (★ ✨ *actions*). '
-          'Match THIS message: if normal (TikTok, tired, food, day stuff) stay normal — no sexual talk, '
-          'do not bring up past freaky messages; if freaky/sexual, answer freaky with real body words. '
-          'Follow subject changes smoothly:';
+          'Match THIS message mood: normal → normal (no sexual talk); freaky → freaky with real body words. '
+          'Follow subject changes smoothly. One text bubble, short:';
     }
-    return 'Reply as ${widget.profile.name} only — natural human text, no asterisks or little stars, not overly eager:';
+    return 'Reply as ${widget.profile.name} only — natural human texting, short (1–2 sentences), '
+        'no asterisks or little stars, not overly eager:';
   }
 
   String _cleanAdvisorReply(String? raw) {
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
-    return ngmySanitizeAdvisorChatReply(t);
+    var cleaned = ngmySanitizeAdvisorChatReply(t);
+    // Soft clamp runaway multi-paragraph text for romantic partners.
+    if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
+      cleaned = _trimOverlongTextReply(cleaned);
+    }
+    return cleaned;
+  }
+
+  /// Keep casual romantic replies to ~1–2 sentences when the model dumps paragraphs.
+  String _trimOverlongTextReply(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return t;
+    final paras = t.split(RegExp(r'\n\s*\n')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    // Prefer first paragraph only if they wrote multiple.
+    var focus = paras.isNotEmpty ? paras.first : t;
+    focus = focus.replaceAll(RegExp(r'\s*\n\s*'), ' ').trim();
+    // Split into sentences; keep at most 2 for very long replies.
+    final sentences = focus
+        .split(RegExp(r'(?<=[.!?…])\s+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (sentences.length <= 2 && focus.length <= 220) return focus;
+    if (sentences.isEmpty) {
+      return focus.length <= 180 ? focus : '${focus.substring(0, 177).trim()}…';
+    }
+    final kept = sentences.take(2).join(' ');
+    return kept.length <= 260 ? kept : '${kept.substring(0, 257).trim()}…';
   }
 
   Future<void> _copyDebateReply(String text) async {
