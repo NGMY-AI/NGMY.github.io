@@ -3200,7 +3200,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
         : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 96;
-    final bottomPad = MediaQuery.paddingOf(context).bottom + (_isDebater ? 200 : 88);
+    // Leave room above the glass typing bar so the latest message isn’t covered.
+    final bottomClearance = MediaQuery.paddingOf(context).bottom + (_isDebater ? 220 : 118);
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final panelFg = isDark ? Colors.white : const Color(0xFF111827);
     final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
@@ -3226,15 +3227,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             child: ListView.builder(
               controller: _scroll,
               reverse: true,
-              // reverse: true flips the axis after padding — bottom clears the header,
-              // top clears the composer so the latest message sits above the input.
-              padding: EdgeInsets.fromLTRB(16, bottomPad, 16, topPad),
-              itemCount: _messages.length + (_busy ? 1 : 0),
+              // Top padding clears the header overlay. Bottom spacer (index 0) clears
+              // the typing bar — messages can still scroll up behind both glass bars.
+              padding: EdgeInsets.fromLTRB(16, topPad, 16, 8),
+              itemCount: _messages.length + (_busy ? 1 : 0) + 1,
               itemBuilder: (context, i) {
-                // reverse: true → index 0 is the visual bottom (latest).
-                if (_busy && i == 0) {
+                // reverse: true → index 0 is the visual bottom.
+                if (i == 0) {
+                  return SizedBox(height: bottomClearance);
+                }
+                final slot = i - 1;
+                if (_busy && slot == 0) {
                   return Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                     child: Row(
                       children: [
                         Text('${ngmyAdvisorFirstName(widget.profile.name)} is typing', style: TextStyle(color: mutedText, fontStyle: FontStyle.italic, fontSize: 12)),
@@ -3244,7 +3249,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     ),
                   );
                 }
-                final msgIndex = _messages.length - 1 - (_busy ? i - 1 : i);
+                final msgIndex = _messages.length - 1 - (_busy ? slot - 1 : slot);
                 if (msgIndex < 0 || msgIndex >= _messages.length) {
                   return const SizedBox.shrink();
                 }
