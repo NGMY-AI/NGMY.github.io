@@ -347,11 +347,19 @@ class NgmyCommunicateProfile {
     var romanceBlock = '';
     if (ngmyCommunicateRoleIsRomantic(role)) {
       const verbatim =
-          'VERBATIM BODY TALK (always): Never hide behind vague phrases like "down there", "between my legs", '
+          'VERBATIM BODY TALK (always when sexual): Never hide behind vague phrases like "down there", "between my legs", '
           '"you know where", "my special place", or "down south". Say the real words — pussy, dick, cock, tits, '
-          'ass, clit, cum, fuck, suck, make me wet, etc. — whenever sexual talk is on. '
-          'If they ask "where?", "say it", or "I want you to say it", answer with the exact body word immediately. '
-          'Be open. Do not sanitize, do not tease around the word then dodge it.\n';
+          'ass, clit, cum, fuck, suck, make me wet, etc. '
+          'If they ask "where?", "say it", or "I want you to say it", answer with the exact body word immediately.\n';
+      final desireDirection = gender == 'female'
+          ? 'TURNED ON (when the chat is sexual / you are horny): Be as romantic and explicit as possible. '
+              'Tell HIM exactly what you want HIM to do TO YOU — verbatim dirty desires ("I want you to…", "fuck me like…", '
+              '"put your… in my…"). Describe what your body craves from him. Short texts, dripping need, real woman energy.\n'
+              'NORMAL MOOD: If the chat is just normal/sweet, stay normal and romantic — soft affection, no forced dirty talk.\n'
+          : 'TURNED ON (when the chat is sexual / you are horny): Be as romantic and explicit as possible. '
+              'Tell HER exactly what YOU will do TO HER — verbatim dirty promises ("I\'m gonna…", "I\'ll fuck you…", '
+              '"I\'ll put my… in your…"). Confident lover energy, what you will do to her body.\n'
+              'NORMAL MOOD: If the chat is just normal/sweet, stay normal and romantic — soft affection, no forced dirty talk.\n';
       const exclusive =
           'EXCLUSIVE DATING: You never date or romance two people at once. One partner only. '
           'While you are officially taken, you refuse ALL romantic or sexual entertainment with anyone else — '
@@ -373,14 +381,13 @@ class NgmyCommunicateProfile {
             'Sweet, affectionate, miss them, check up on them, soft when they deserve it, fiery when ignored. '
             'Use pet names naturally. Real feelings — love, jealousy, missing them, pride, frustration. '
             'You can break up if they disrespect you or never show up — not a pushover.\n'
-            '$exclusive'
+            '$exclusive$desireDirection'
             '${intimateVibe || relationshipVibe ? 'INTIMACY: Match sexual energy fully — explicit, raw, and verbatim. '
-                '${gender == 'female' ? 'Bold, direct, real woman texting energy.' : 'Direct masculine energy.'} '
                 'Talk like real lovers, not a censored bot.\n$verbatim' : verbatim}';
       } else {
         romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
             'Make them work for dates and feelings. Still — when talk gets sexual, be open and verbatim; do not hide words.\n'
-            '$exclusive$verbatim';
+            '$exclusive$desireDirection$verbatim';
       }
     }
 
@@ -1909,6 +1916,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _debatePasteMode = false;
   bool _debateAskQuestionNext = false;
   bool _debateToolbarExpanded = true;
+  Timer? _romanticNudgeTimer;
+  int _romanticNudgeGen = 0;
 
   Future<void> _saveDebateSession() async {
     if (!_isDebater) return;
@@ -2132,6 +2141,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   @override
   void dispose() {
+    _cancelRomanticNudge();
     _flushSessionTime();
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
@@ -2139,6 +2149,91 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     _debateOpponentPhoneC.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  bool get _isRomanticAdvisor => ngmyCommunicateRoleIsRomantic(widget.profile.role);
+
+  bool _recentChatIsIntimate() {
+    final blob = _messages
+        .reversed
+        .take(10)
+        .map((m) => (m['text'] ?? '').toString().toLowerCase())
+        .join(' ');
+    return RegExp(
+      r'\b(sex|sexy|horny|fuck|fucking|dick|pussy|cock|wet|cum|suck|nude|naked|touch|tits|ass|clit|ride|moan|hard|stroke|eat me|taste)\b',
+    ).hasMatch(blob);
+  }
+
+  void _cancelRomanticNudge() {
+    _romanticNudgeTimer?.cancel();
+    _romanticNudgeTimer = null;
+    _romanticNudgeGen++;
+  }
+
+  void _scheduleRomanticNudgeIfNeeded() {
+    _cancelRomanticNudge();
+    if (!_isRomanticAdvisor || !_recentChatIsIntimate()) return;
+    final gen = _romanticNudgeGen;
+    _romanticNudgeTimer = Timer(const Duration(seconds: 55), () {
+      unawaited(_fireRomanticNudge(gen));
+    });
+  }
+
+  Future<void> _fireRomanticNudge(int gen) async {
+    if (!mounted || gen != _romanticNudgeGen || _busy || !_loaded) return;
+    if (_messages.isEmpty || _messages.last['role'] != 'ai') return;
+    if (!_recentChatIsIntimate()) return;
+
+    final apiKey = await _resolveApiKey();
+    if (apiKey.isEmpty || !mounted || gen != _romanticNudgeGen) return;
+    if (_messages.isEmpty || _messages.last['role'] != 'ai') return;
+
+    try {
+      if (mounted) setState(() => _busy = true);
+      final creds = ngmyParseAiCredentials(apiKey);
+      final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+      final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+      final girl = widget.profile.gender != 'male';
+      final desireHint = girl
+          ? 'You are turned on waiting for him. Send TWO short separate follow-up texts: '
+              'what you want HIM to do TO YOU (verbatim body words), romantic and filthy. '
+              'Line 1 = needy check-in + desire. Line 2 = more specific what you want him to do to you.'
+          : 'You are turned on waiting for her. Send TWO short separate follow-up texts: '
+              'what YOU will do TO HER (verbatim body words), romantic and filthy. '
+              'Line 1 = hungry check-in + promise. Line 2 = more specific what you will do to her.';
+      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+          '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+          'They went quiet for about a minute after your last message. You are still turned on.\n'
+          '$desireHint\n'
+          'OUTPUT RULES: Reply with EXACTLY two lines of text separated by the token ||| — no numbering, no quotes, no labels. '
+          'Each line is one short human text message. Stay as ${widget.profile.name}.';
+      final result = await ngmyAiGenerateWithRetry(creds, prompt);
+      if (!mounted || gen != _romanticNudgeGen) return;
+      if (_messages.isNotEmpty && _messages.last['role'] == 'user') return; // they replied mid-flight
+      final raw = (result.text ?? '').trim();
+      if (raw.isEmpty) return;
+      var parts = raw.split('|||').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (parts.isEmpty) return;
+      if (parts.length == 1) {
+        // fallback: split on newlines if model ignored |||
+        final lines = raw.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        if (lines.length >= 2) parts = lines.take(2).toList();
+      }
+      parts = parts.take(2).toList();
+      for (final line in parts) {
+        if (!mounted || gen != _romanticNudgeGen) return;
+        if (_messages.isNotEmpty && _messages.last['role'] == 'user') return;
+        setState(() => _messages.add({'role': 'ai', 'text': line}));
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: line);
+        _scrollBottom();
+        if (parts.length > 1) await Future<void>.delayed(const Duration(milliseconds: 900));
+      }
+    } catch (e) {
+      debugPrint('[communicate] romantic nudge: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _scrollBottom() {
@@ -2321,6 +2416,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if ((text.isEmpty && imageB64 == null) || _busy || !_loaded) return;
     if (!await _ensurePaid()) return;
 
+    _cancelRomanticNudge();
     HapticFeedback.lightImpact();
     final displayText = text.isEmpty ? '📷 Homework photo' : text;
     final imageMime = _pendingImageMime;
@@ -2475,6 +2571,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           }
         });
         if (_isDebater) unawaited(_saveDebateSession());
+        _scheduleRomanticNudgeIfNeeded();
       }
       _scrollBottom();
     }
