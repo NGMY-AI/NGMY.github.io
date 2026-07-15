@@ -536,20 +536,29 @@ class NgmyCommunicateRelationshipStore {
     final email = chatterEmail.toLowerCase().trim();
 
     final brokeUp = RegExp(
-      r'\b(break up|broke up|we.?re done|i.?m done with you|leave me alone|it.?s over|not together anymore)\b',
+      r'\b(break up|broke up|we.?re done|i.?m done with you|leave me alone|it.?s over|not together anymore|'
+      r'we.?re not together|i.?m single now)\b',
     ).hasMatch(all);
     final official = RegExp(
       r'\b(you.?re my (boy|girl)friend|we.?re official|we.?re together|we.?re dating|be my (boy|girl)friend|'
       r'will you be mine|i.?m yours|only yours|exclusive|date me|dating you|you.?re my girl|you.?re my man|'
       r'i want you to be (my|mine)|let.?s be exclusive)\b',
     ).hasMatch(all);
+    final softDating = RegExp(
+      r'\b(my love|babe|baby|papi|i love you|love you|suck your|your dick|my pussy|fuck me|'
+      r'make me cum|i.?m your girl|i.?m your man)\b',
+    ).hasMatch(all);
+    final userCount = memory.where((m) => (m['role'] ?? '').toString() == 'user').length;
 
     final existing = await loadPartner(profileId);
     if (brokeUp && existing != null && existing['email'] == email) {
       await clearPartner(profileId);
       return;
     }
-    if (official) {
+    // Someone else already has this advisor — don't steal the relationship.
+    if (existing != null && existing['email'] != email) return;
+
+    if (official || (softDating && userCount >= 2)) {
       await setPartner(profileId, email: email, status: 'exclusive');
     }
   }

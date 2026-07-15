@@ -120,11 +120,30 @@ bool ngmyUserRequestedChatImage(String text) {
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(
-        r'\b(send|show|make|create|generate|snap)\s+(me\s+)?(a\s+|an\s+|your\s+|another\s+)?(pic|photo|picture|selfie|image|nudes?)\b',
+        r'\b(send|show|make|create|generate|snap)\s+(me\s+)?(a\s+|an\s+|your\s+|another\s+|the\s+)?(pic|photo|picture|selfie|image|nudes?)\b',
         caseSensitive: false,
       ).hasMatch(t) ||
-      RegExp(r'\b(pic|photo|selfie)\s+of\s+(you|yourself)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\blet me see (you|your)\b', caseSensitive: false).hasMatch(t);
+      RegExp(r'\b(pic|photo|selfie|picture)\s+of\s+(you|yourself|it|that)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\blet me see\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\bshow me\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\bsend (it|that|one)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\bi want (to see|a pic|a photo|the pic|the picture)\b', caseSensitive: false).hasMatch(t);
+}
+
+/// Strong dating / girlfriend-boyfriend energy already in the thread (not a cold hello).
+bool ngmyCommunicateMemoryLooksLikeDating(List<Map<String, dynamic>> memory) {
+  if (memory.isEmpty) return false;
+  final all = memory.map((m) => (m['text'] ?? '').toString().toLowerCase()).join(' ');
+  final userCount = memory.where((m) => m['role'] == 'user').length;
+  if (userCount < 2) return false;
+  final romanceWords = RegExp(
+    r'\b(my love|babe|baby|papi|boyfriend|girlfriend|my man|my girl|i love you|love you|'
+    r'we.?re together|we.?re dating|official|exclusive|only yours|i.?m yours)\b',
+  ).hasMatch(all);
+  final intimateWords = RegExp(
+    r'\b(sex|sexy|horny|fuck|dick|pussy|cock|wet|cum|suck|nude|naked|tits|ass|clit|moan)\b',
+  ).hasMatch(all);
+  return romanceWords || (intimateWords && userCount >= 3);
 }
 
 bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
@@ -580,8 +599,8 @@ class NgmyCommunicateProfile {
           'When you are with your person you are deeply romantic, affectionate, and emotionally present. '
           'Sexual talk is open and verbatim — real body words, never shy euphemisms.\n'
           'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
-          'When they ask for a picture, send one that looks exactly like YOU and matches the conversation '
-          '(cute, casual, flirty, or hotter — whatever fits). Never offer or send photos to people you are not dating.\n'
+          'When they ask for a picture, the app generates and sends the photo for you — NEVER just describe the body '
+          'instead of sending. Never offer or send photos to people you are not dating.\n'
           'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
           'and later ask if they did it / how the day went. Be a real caring partner — not a nagging bot.\n',
         'friend' =>
@@ -2517,6 +2536,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
+      // Romantic chats that already feel like dating must unlock pics for that boyfriend/girlfriend.
+      if (ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && ngmyCommunicateMemoryLooksLikeDating(mem)) {
+        final existing = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+        final takenByOther = existing != null &&
+            (existing['email'] ?? '').toLowerCase().trim().isNotEmpty &&
+            (existing['email'] ?? '').toLowerCase().trim() != _email.toLowerCase().trim();
+        if (!takenByOther) {
+          await NgmyCommunicateRelationshipStore.setPartner(
+            widget.profile.id,
+            email: _email,
+            status: 'exclusive',
+          );
+        }
+      }
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
@@ -2569,30 +2602,39 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           gender: widget.profile.gender,
           bio: widget.profile.bio,
         );
-        final scene = text.length > 160 ? text.substring(0, 160) : text;
-        final recent = mem.reversed.take(6).map((m) => (m['text'] ?? '').toString()).where((t) => t.trim().isNotEmpty).join(' | ');
+        final scene = text.trim();
+        final recent = mem.reversed
+            .take(8)
+            .map((m) => (m['text'] ?? '').toString())
+            .where((t) => t.trim().isNotEmpty)
+            .join(' | ');
         final imgPrompt =
-            'Photorealistic photo of $look. Scene/request from their partner: $scene. '
-            'Keep the SAME face and identity as this person in every photo. Match the conversation mood '
-            '(${recent.isEmpty ? 'intimate dating selfie' : recent}). Natural lighting, high detail, no text, no watermark, square photo.';
+            'Photorealistic image of $look. Their boyfriend/girlfriend asked for THIS exact photo: "$scene". '
+            'Show what they asked for clearly and vividly — same face/body identity as this person every time. '
+            'Conversation context: ${recent.isEmpty ? scene : recent}. '
+            'Adult romantic photo, tasteful-to-explicit matching the request, natural lighting, high detail, '
+            'no text, no watermark, no cartoon, square photo.';
         final imgResult = await ngmyGenerateRomanticChatImage(imgPrompt, creds: creds);
         if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
           final b64 = base64Encode(imgResult.bytes!);
-          const reply = 'Here — just for you 💕';
+          // Send the picture only — no long description / excuses.
           if (!mounted) return;
-          setState(() => _messages.add({'role': 'ai', 'text': reply, 'imageB64': b64}));
-          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply, imageB64: b64);
+          setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64}));
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64);
         } else {
           final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
           final extraCtx = await _advisorExtraContext(text, mem);
           final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
               '$extraCtx'
               '${transcript.isNotEmpty ? '$transcript\n' : ''}'
-              'They asked for a picture but image generation failed (${imgResult.error ?? 'try again'}). Reply naturally in text only:';
+              'They asked for a picture and you MUST send one for your boyfriend/girlfriend. '
+              'Image generation failed (${imgResult.error ?? 'try again'}). Keep the reply VERY short — say you will send it when it works, do NOT describe the body instead of sending the photo.\n'
+              'They just texted: $text\n'
+              '${_replyStyleSuffix()}';
           final result = await ngmyAiGenerateWithRetry(creds, prompt);
           final reply = (result.text != null && result.text!.trim().isNotEmpty)
               ? result.text!.trim()
-              : 'I tried to send a pic but it glitched — ask me again in a sec.';
+              : 'One sec babe — pic glitched, ask me again 💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': reply}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
