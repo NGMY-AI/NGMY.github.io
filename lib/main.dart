@@ -29834,19 +29834,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final familyMembers = int.tryParse(_familyMembersC.text.trim()) ?? 0;
-    final familyMales = int.tryParse(_familyMalesC.text.trim()) ?? -1;
-    final familyFemales = int.tryParse(_familyFemalesC.text.trim()) ?? -1;
+    final malesRaw = _familyMalesC.text.trim();
+    final femalesRaw = _familyFemalesC.text.trim();
+    final familyMales = malesRaw.isEmpty ? 0 : (int.tryParse(malesRaw) ?? -1);
+    final familyFemales = femalesRaw.isEmpty ? 0 : (int.tryParse(femalesRaw) ?? -1);
     if (familyMembers < 1 || familyMembers > 99) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Family size is required (1–99).')));
       return;
     }
-    if (familyMales < 0 || familyFemales < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many males and females are in the family.')));
+    if (malesRaw.isNotEmpty && familyMales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Males must be a number (or leave blank).')));
       return;
     }
-    if (familyMales + familyFemales != familyMembers) {
+    if (femalesRaw.isNotEmpty && familyFemales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Females must be a number (or leave blank).')));
+      return;
+    }
+    // Male/female split is optional. Only enforce the sum when both are provided.
+    if (malesRaw.isNotEmpty && femalesRaw.isNotEmpty && familyMales + familyFemales != familyMembers) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Males + females must equal family size ($familyMembers).')),
+        SnackBar(content: Text('Males + females must equal family size ($familyMembers), or leave male/female blank.')),
       );
       return;
     }
@@ -30004,12 +30011,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ? (int.tryParse(malesRawForm) ?? -1)
         : (existingMales is num
             ? existingMales.toInt()
-            : int.tryParse('${existingMales ?? ''}') ?? -1);
+            : int.tryParse('${existingMales ?? ''}') ?? 0);
     final familyFemales = femalesRawForm.isNotEmpty
         ? (int.tryParse(femalesRawForm) ?? -1)
         : (existingFemales is num
             ? existingFemales.toInt()
-            : int.tryParse('${existingFemales ?? ''}') ?? -1);
+            : int.tryParse('${existingFemales ?? ''}') ?? 0);
     final registryId = (existing['registryId'] ?? editingRegistryId).toString().trim();
     final originalEmail = NgmyCivicRegistryMembers.emailKey((existing['email'] ?? editingEmail).toString());
 
@@ -30037,13 +30044,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Family size is required (1–99).')));
       return;
     }
-    if (familyMales < 0 || familyFemales < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter how many males and females are in the family.')));
+    if (malesRawForm.isNotEmpty && familyMales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Males must be a number (or leave blank).')));
       return;
     }
-    if (familyMales + familyFemales != familyMembers) {
+    if (femalesRawForm.isNotEmpty && familyFemales < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Females must be a number (or leave blank).')));
+      return;
+    }
+    if (malesRawForm.isNotEmpty && femalesRawForm.isNotEmpty && familyMales + familyFemales != familyMembers) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Males + females must equal family size ($familyMembers).')),
+        SnackBar(content: Text('Males + females must equal family size ($familyMembers), or leave male/female blank.')),
       );
       return;
     }
@@ -33932,7 +33943,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  hintText: 'Total people in this family',
+                  hintText: 'Total people in this family (required)',
                   hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                   filled: true,
                   fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
@@ -33940,20 +33951,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              Text(
+                'Male / female split is optional — leave blank if you prefer not to say.',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.3),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Males *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Text('Males (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _familyMalesC,
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: InputDecoration(
-                            hintText: '0',
+                            hintText: 'Optional',
                             hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
@@ -33968,14 +33984,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Females *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Text('Females (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _familyFemalesC,
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: InputDecoration(
-                            hintText: '0',
+                            hintText: 'Optional',
                             hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                             filled: true,
                             fillColor: isDark ? Colors.black26 : Colors.grey.shade50,

@@ -498,6 +498,12 @@ class NgmyDocShareStore {
     return f?.path;
   }
 
+  static String? webObjectUrlForItem(String itemId) => null;
+
+  static String? webObjectUrlFromBytes(Uint8List bytes, String mime) => null;
+
+  static void revokeWebObjectUrl(String? url) {}
+
   static Future<File?> localFileForItem(String email, NgmyDocShareItem item) async {
     final path = await filePath(email, item);
     if (path == null) return null;

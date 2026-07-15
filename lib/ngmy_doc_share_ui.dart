@@ -1055,16 +1055,98 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _deleteItem(NgmyDocShareItem item) async {
-    final ok = await showDialog<bool>(
+    final c = _docShareColors(context);
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete file?'),
-        content: Text('Remove "${item.name}" from this device and clear the shared cloud copy?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: const Color(0xFFEF4444).withValues(alpha: 0.35))),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 18),
+                      decoration: BoxDecoration(
+                        color: c.muted.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 26),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Delete this file?',
+                    style: TextStyle(color: c.fg, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.fg, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Removes it from this device and clears any shared cloud copy.',
+                    style: TextStyle(color: c.muted, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: c.fg,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(color: c.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Keep file', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
     if (ok != true) return;
     final token = (item.stashToken ?? '').trim();
@@ -1366,6 +1448,7 @@ class _DocShareImagePage extends StatefulWidget {
 
 class _DocShareImagePageState extends State<_DocShareImagePage> {
   Uint8List? _bytes;
+  String? _objectUrl;
   bool _loading = true;
   String? _error;
   var _decodeFailed = false;
@@ -1374,6 +1457,12 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
   void initState() {
     super.initState();
     unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    NgmyDocShareStore.revokeWebObjectUrl(_objectUrl);
+    super.dispose();
   }
 
   bool get _maybeHeic {
@@ -1386,15 +1475,27 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
     try {
       final bytes = await NgmyDocShareStore.readBytes(widget.email, widget.item);
       if (!mounted) return;
-      if (bytes == null || bytes.isEmpty) {
+
+      String? url;
+      if (bytes != null && bytes.isNotEmpty) {
+        url = NgmyDocShareStore.webObjectUrlFromBytes(
+          bytes,
+          widget.item.mime.isEmpty ? 'image/jpeg' : widget.item.mime,
+        );
+      }
+      url ??= NgmyDocShareStore.webObjectUrlForItem(widget.item.id);
+
+      if ((bytes == null || bytes.isEmpty) && (url == null || url.isEmpty)) {
         setState(() {
           _loading = false;
           _error = 'Could not load image. Re-upload it with + and try again.';
         });
         return;
       }
+
       setState(() {
         _bytes = bytes;
+        _objectUrl = url;
         _loading = false;
         _decodeFailed = false;
         _error = null;
@@ -1409,8 +1510,15 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
   }
 
   Future<void> _shareOrSave() async {
-    final bytes = _bytes;
-    if (bytes == null || bytes.isEmpty) return;
+    var bytes = _bytes;
+    bytes ??= await NgmyDocShareStore.readBytes(widget.email, widget.item);
+    if (bytes == null || bytes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read this image to share.')),
+      );
+      return;
+    }
     final msg = await shareNgmyBytes(
       bytes,
       widget.item.name,
@@ -1419,6 +1527,56 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Widget _imageViewer() {
+    final url = _objectUrl;
+    final bytes = _bytes;
+    Widget child;
+    if (url != null && url.isNotEmpty) {
+      child = Image.network(
+        url,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) {
+          if (bytes != null && bytes.isNotEmpty) {
+            return Image.memory(
+              bytes,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stackTrace) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted && !_decodeFailed) setState(() => _decodeFailed = true);
+                });
+                return const SizedBox.shrink();
+              },
+            );
+          }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_decodeFailed) setState(() => _decodeFailed = true);
+          });
+          return const SizedBox.shrink();
+        },
+      );
+    } else if (bytes != null && bytes.isNotEmpty) {
+      child = Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_decodeFailed) setState(() => _decodeFailed = true);
+          });
+          return const SizedBox.shrink();
+        },
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
+    return InteractiveViewer(minScale: 0.5, maxScale: 4, child: child);
   }
 
   @override
@@ -1432,7 +1590,7 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
         elevation: 0,
         title: Text(widget.item.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.fg)),
         actions: [
-          if (_bytes != null)
+          if (_bytes != null || _objectUrl != null)
             IconButton(
               tooltip: 'Share / save',
               onPressed: _shareOrSave,
@@ -1448,49 +1606,30 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
                     padding: const EdgeInsets.all(24),
                     child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)),
                   )
-                : _bytes != null
-                    ? (_decodeFailed
-                        ? Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _maybeHeic
-                                      ? 'This HEIC/HEIF photo cannot be previewed here. Use Share to open it in Photos or AirDrop it.'
-                                      : 'Could not display this image in-app. Use Share to open or save it on your device.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: c.muted, height: 1.4),
-                                ),
-                                const SizedBox(height: 16),
-                                FilledButton.icon(
-                                  onPressed: _shareOrSave,
-                                  style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
-                                  icon: const Icon(Icons.ios_share_rounded),
-                                  label: const Text('Share / save'),
-                                ),
-                              ],
+                : _decodeFailed
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _maybeHeic
+                                  ? 'This HEIC/HEIF photo cannot be previewed here. Use Share to open it in Photos or AirDrop it.'
+                                  : 'Could not display this image in-app. Use Share to open or save it on your device.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: c.muted, height: 1.4),
                             ),
-                          )
-                        : InteractiveViewer(
-                            minScale: 0.5,
-                            maxScale: 4,
-                            child: Image.memory(
-                              _bytes!,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                              gaplessPlayback: true,
-                              errorBuilder: (context, error, stackTrace) {
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  if (mounted && !_decodeFailed) {
-                                    setState(() => _decodeFailed = true);
-                                  }
-                                });
-                                return const SizedBox.shrink();
-                              },
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _shareOrSave,
+                              style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
+                              icon: const Icon(Icons.ios_share_rounded),
+                              label: const Text('Share / save'),
                             ),
-                          ))
-                    : const SizedBox.shrink(),
+                          ],
+                        ),
+                      )
+                    : _imageViewer(),
       ),
     );
   }

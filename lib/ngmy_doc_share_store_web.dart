@@ -150,21 +150,35 @@ Future<Uint8List?> _loadBlob(String key) async {
   }
 }
 
-Future<Uint8List?> _readHtmlBlobSlice(html.Blob slice) async {
+Future<Uint8List?> _bytesFromFileReaderResult(Object? result) {
+  if (result == null) return Future.value(null);
+  if (result is ByteBuffer) {
+    return Future.value(Uint8List.fromList(Uint8List.view(result)));
+  }
+  if (result is Uint8List) {
+    return Future.value(Uint8List.fromList(result));
+  }
+  if (result is TypedData) {
+    return Future.value(Uint8List.fromList(Uint8List.sublistView(result)));
+  }
+  if (result is List<int>) {
+    return Future.value(Uint8List.fromList(result));
+  }
+  return Future.value(null);
+}
+
+Future<Uint8List?> _readHtmlBlobBytes(html.Blob blob) async {
   final reader = html.FileReader();
   final done = Completer<Uint8List?>();
   reader.onLoadEnd.listen((_) {
-    final result = reader.result;
-    if (result is ByteBuffer) {
-      done.complete(Uint8List.view(result));
-    } else {
-      done.complete(null);
-    }
+    unawaited(_bytesFromFileReaderResult(reader.result).then(done.complete));
   });
   reader.onError.listen((_) => done.complete(null));
-  reader.readAsArrayBuffer(slice);
+  reader.readAsArrayBuffer(blob);
   return done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
 }
+
+Future<Uint8List?> _readHtmlBlobSlice(html.Blob slice) => _readHtmlBlobBytes(slice);
 
 Future<void> _persistHtmlFileChunked(String email, String id, html.File file) async {
   final baseKey = _bytesPrefsKey(email, id);
@@ -189,11 +203,7 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
     }
     if (partKeys.isEmpty) return;
     await _persistChunkManifest(baseKey, partKeys, size);
-    if (await _durableBlobReadable(baseKey, minBytes: 1)) {
-      _webFiles.remove(id);
-    } else {
-      debugPrint('[doc share web persist chunked] verify failed for $id — keeping live file ref');
-    }
+    // Keep live file ref for reliable in-session previews (do not remove _webFiles).
   } catch (e) {
     debugPrint('[doc share web persist chunked] $e');
   }
@@ -206,24 +216,16 @@ Future<void> _persistHtmlFile(String email, String id, html.File file) async {
   }
   final key = _bytesPrefsKey(email, id);
   try {
-    final reader = html.FileReader();
-    final done = Completer<ByteBuffer?>();
-    reader.onLoadEnd.listen((_) {
-      final result = reader.result;
-      done.complete(result is ByteBuffer ? result : null);
-    });
-    reader.onError.listen((_) => done.complete(null));
-    reader.readAsArrayBuffer(file);
-    final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
-    if (buf == null) return;
-    final bytes = Uint8List.fromList(Uint8List.view(buf));
+    final bytes = await _readHtmlBlobBytes(file);
+    if (bytes == null || bytes.isEmpty) {
+      debugPrint('[doc share web persist] empty read for $id — keeping live file ref');
+      return;
+    }
+    _memoryBlobs[key] = bytes;
+    _transferReadCache[key] = bytes;
     final ok = await _persistBlob(key, bytes);
-    if (ok && await _durableBlobReadable(key, minBytes: 1)) {
-      _webFiles.remove(id);
-    } else {
-      // Keep live file + memory so preview/transfer still work this session.
-      _memoryBlobs[key] = bytes;
-      debugPrint('[doc share web persist] durable verify failed for $id — keeping live file ref');
+    if (!ok) {
+      debugPrint('[doc share web persist] durable write failed for $id — kept memory + live file');
     }
   } catch (e) {
     debugPrint('[doc share web persist] $e');
@@ -295,7 +297,16 @@ class NgmyDocShareStore {
         shortCode: NgmyDocShareShortCode.generateLocalCode(),
       );
       _webFiles[id] = entry.file;
-      await _persistHtmlFile(email, id, entry.file);
+      // Warm memory cache immediately so View Image works even if IDB is slow/blocked.
+      final key = _bytesPrefsKey(email, id);
+      final eager = await _readHtmlBlobBytes(entry.file);
+      if (eager != null && eager.isNotEmpty) {
+        _memoryBlobs[key] = eager;
+        _transferReadCache[key] = eager;
+        unawaited(_persistBlob(key, eager));
+      } else {
+        await _persistHtmlFile(email, id, entry.file);
+      }
       items.add(item);
       created.add(item);
     }
@@ -389,19 +400,7 @@ class NgmyDocShareStore {
     final webFile = _webFiles[item.id];
     if (webFile != null) {
       final slice = webFile.slice(start, end);
-      final reader = html.FileReader();
-      final done = Completer<Uint8List?>();
-      reader.onLoadEnd.listen((_) {
-        final result = reader.result;
-        if (result is ByteBuffer) {
-          done.complete(Uint8List.view(result));
-        } else {
-          done.complete(null);
-        }
-      });
-      reader.onError.listen((_) => done.complete(null));
-      reader.readAsArrayBuffer(slice);
-      return done.future.timeout(const Duration(minutes: 30), onTimeout: () => null);
+      return _readHtmlBlobBytes(slice);
     }
     final cacheKey = _bytesPrefsKey(email, item.id);
     final manifest = await _loadChunkManifest(cacheKey);
@@ -516,6 +515,21 @@ class NgmyDocShareStore {
     final cached = _transferReadCache[key] ?? _memoryBlobs[key];
     if (cached != null && cached.isNotEmpty) return cached;
 
+    final webFile = _webFiles[item.id];
+    if (webFile != null) {
+      try {
+        final bytes = await _readHtmlBlobBytes(webFile);
+        if (bytes != null && bytes.isNotEmpty) {
+          _memoryBlobs[key] = bytes;
+          _transferReadCache[key] = bytes;
+          unawaited(_persistBlob(key, bytes));
+          return bytes;
+        }
+      } catch (e) {
+        debugPrint('[doc share readBytes webFile] ${item.name}: $e');
+      }
+    }
+
     final manifest = await _loadChunkManifest(key);
     if (manifest != null && manifest.partKeys.isNotEmpty) {
       final out = BytesBuilder(copy: false);
@@ -529,7 +543,6 @@ class NgmyDocShareStore {
         _transferReadCache[key] = bytes;
         return bytes;
       }
-      // Incomplete/corrupt manifest — fall through to other sources.
       debugPrint('[doc share readBytes] incomplete chunks for ${item.name}');
     }
 
@@ -539,30 +552,7 @@ class NgmyDocShareStore {
       return stored;
     }
 
-    final webFile = _webFiles[item.id];
     if (webFile != null) {
-      try {
-        final reader = html.FileReader();
-        final done = Completer<ByteBuffer?>();
-        reader.onLoadEnd.listen((_) {
-          final result = reader.result;
-          done.complete(result is ByteBuffer ? result : null);
-        });
-        reader.onError.listen((_) => done.complete(null));
-        reader.readAsArrayBuffer(webFile);
-        final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
-        if (buf != null) {
-          final bytes = Uint8List.fromList(Uint8List.view(buf));
-          if (bytes.isNotEmpty) {
-            _memoryBlobs[key] = bytes;
-            _transferReadCache[key] = bytes;
-            unawaited(_persistBlob(key, bytes));
-            return bytes;
-          }
-        }
-      } catch (e) {
-        debugPrint('[doc share readBytes webFile] ${item.name}: $e');
-      }
       final range = await readByteRange(email, item, 0, webFile.size);
       if (range != null && range.isNotEmpty) {
         final copy = Uint8List.fromList(range);
@@ -573,6 +563,34 @@ class NgmyDocShareStore {
       }
     }
     return null;
+  }
+
+  /// Blob URL for in-browser image/video preview without re-reading full bytes.
+  static String? webObjectUrlForItem(String itemId) {
+    final file = _webFiles[itemId];
+    if (file == null) return null;
+    try {
+      return html.Url.createObjectUrlFromBlob(file);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String? webObjectUrlFromBytes(Uint8List bytes, String mime) {
+    if (bytes.isEmpty) return null;
+    try {
+      final blob = html.Blob([bytes], mime.isEmpty ? 'application/octet-stream' : mime);
+      return html.Url.createObjectUrlFromBlob(blob);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static void revokeWebObjectUrl(String? url) {
+    if (url == null || url.isEmpty) return;
+    try {
+      html.Url.revokeObjectUrl(url);
+    } catch (_) {}
   }
 
   static Future<String?> filePath(String email, NgmyDocShareItem item) => Future.value(null);
@@ -591,17 +609,9 @@ class NgmyDocShareStore {
       Uint8List bytes;
       if (wf != null) {
         onProgress?.call(0, wf.size);
-        final reader = html.FileReader();
-        final done = Completer<ByteBuffer?>();
-        reader.onLoadEnd.listen((_) {
-          final result = reader.result;
-          done.complete(result is ByteBuffer ? result : null);
-        });
-        reader.onError.listen((_) => done.complete(null));
-        reader.readAsArrayBuffer(wf);
-        final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
-        if (buf == null) return false;
-        bytes = Uint8List.view(buf);
+        final loaded = await _readHtmlBlobBytes(wf);
+        if (loaded == null || loaded.isEmpty) return false;
+        bytes = loaded;
       } else {
         final mem = await readBytes(ownerEmail, item);
         if (mem == null || mem.isEmpty) return false;
