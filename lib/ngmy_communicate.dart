@@ -274,6 +274,19 @@ String ngmyBibleStudyModeHint(String userText) {
 
 bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
 
+/// User asked for more detail / a longer answer (paragraph OK).
+bool ngmyUserWantsLongerAdvisorReply(String text) {
+  final t = text.toLowerCase().trim();
+  if (t.isEmpty) return false;
+  return RegExp(
+        r'\b(tell me more|say more|more about|go on|keep going|elaborate|explain( it| more| that| this)?|'
+        r'write (me )?(a |an )?(paragraph|few paragraphs|longer|more)|'
+        r'i wanna hear more|i want to hear more|want to hear more|hear more|'
+        r'details?|in detail|full story|open up|how (do|did|are|was)|why (do|did|are)|what happened)\b',
+      ).hasMatch(t) ||
+      RegExp(r'\b(can you|could you|please)\b.{0,40}\b(more|explain|tell|detail|paragraph)\b').hasMatch(t);
+}
+
 /// Strip RP asterisks / decorative stars advisors sometimes sprinkle into texts.
 String ngmySanitizeAdvisorChatReply(String text) {
   var t = text.trim();
@@ -694,15 +707,21 @@ class NgmyCommunicateProfile {
         '${_professionalBoundaryBlock()}'
         '${_languageBlock()}'
         'RULES:\n'
-        '- 100% human texting — slang, typos sometimes, light emojis when natural (❤️ ok). '
+        '- 100% human texting — slang, typos sometimes. '
         'NEVER put little stars in your texts — no asterisks (*like this*), no ★ ☆ ✦, no ✨ ⭐ sparkle stars, '
         'no markdown *stars* around words or *actions*. Write normal text messages only.\n'
+        '- EMOJIS: Do NOT put emojis on every message. '
+        'Normal everyday chat → usually no emoji. '
+        'Funny moment → maybe a laugh/smile emoji (😂 🙂). '
+        'Love / miss-you / romantic / freaky affection → love emojis are good (❤️ 💕 🥰) when they fit. '
+        'Never spam 3–5 emojis in one short text.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
-        '- TEXT LENGTH (critical): This is texting, not email or essays. Default = 1 short sentence, maybe 2 tops. '
-        'Match their length — if they say "good morning" or one short line, reply with ONE short line. '
-        'Never write 2 paragraphs for a casual hello. Never dump every pet name + every question + every reminder in one bubble. '
-        'Longer replies only when they ask something that needs explanation, or you truly need to say something important — rare.\n'
+        '- TEXT LENGTH: Default = short phone text (1 short sentence, maybe 2). '
+        'Match their length for casual hellos — never 2 paragraphs for "good morning." '
+        'EXCEPTION — LONGER OK: If they ask to hear more, tell you more, explain, write a paragraph, '
+        'give details, or clearly want a fuller answer, THEN write a real paragraph (or more) and open up. '
+        'Know when they need more from you vs when a short text is enough.\n'
         '- Stay in character. Have opinions. Say no sometimes.\n'
         '- TOPIC FLOW: Always answer what they are talking about RIGHT NOW. '
         'If they change the subject, change with them smoothly — do not keep looping the previous subject '
@@ -2795,25 +2814,49 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isTextCoach) {
       return 'Reply as ${widget.profile.name} — output ONLY the exact text to send, no explanation:';
     }
+    final lastUser = _messages.reversed
+        .where((m) => m['role'] == 'user')
+        .map((m) => (m['text'] ?? '').toString())
+        .cast<String>()
+        .firstWhere((t) => t.trim().isNotEmpty, orElse: () => '');
+    final wantsLong = ngmyUserWantsLongerAdvisorReply(lastUser);
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
+      if (wantsLong) {
+        return 'Reply as ${widget.profile.name} only — they asked for MORE / detail / a fuller answer. '
+            'Write a real paragraph (or two if needed) that opens up and explains / expresses / tells the story. '
+            'Emojis: light — love emojis only if the moment is affectionate; otherwise few or none. '
+            'No asterisks, no little stars. Match mood (normal vs freaky). Go long because they asked:';
+      }
       return 'Reply as ${widget.profile.name} only — real phone TEXTING. '
-          'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs. Never essay. '
-          'If they wrote a short hello, reply short ("Morning baby 💕" style) — do NOT pile miss-you + sleep questions + day plans into one message. '
-          'No asterisks, no little stars (★ ✨ *actions*). '
+          'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs for a casual hello. '
+          'If they wrote a short hello, reply short — do NOT pile miss-you + sleep questions + day plans into one message. '
+          'EMOJIS: mostly none on normal chat; love emojis ❤️💕 on love/miss-you/romantic lines; laugh/smile only if funny. '
+          'No emoji spam. No asterisks, no little stars (★ ✨ *actions*). '
           'Match THIS message mood: normal → normal (no sexual talk); freaky → freaky with real body words. '
-          'Follow subject changes smoothly. One text bubble, short:';
+          'Follow subject changes smoothly. One short text bubble:';
+    }
+    if (wantsLong) {
+      return 'Reply as ${widget.profile.name} — they want more detail. Give a clear fuller answer (a paragraph is fine). '
+          'Emojis sparingly. No asterisks or little stars:';
     }
     return 'Reply as ${widget.profile.name} only — natural human texting, short (1–2 sentences), '
-        'no asterisks or little stars, not overly eager:';
+        'emojis only when they fit the moment (usually none), no asterisks or little stars, not overly eager:';
   }
 
   String _cleanAdvisorReply(String? raw) {
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
     var cleaned = ngmySanitizeAdvisorChatReply(t);
-    // Soft clamp runaway multi-paragraph text for romantic partners.
+    // Soft clamp runaway multi-paragraph text for romantic partners — unless they asked for more.
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
-      cleaned = _trimOverlongTextReply(cleaned);
+      final lastUser = _messages.reversed
+          .where((m) => m['role'] == 'user')
+          .map((m) => (m['text'] ?? '').toString())
+          .cast<String>()
+          .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
+      if (!ngmyUserWantsLongerAdvisorReply(lastUser)) {
+        cleaned = _trimOverlongTextReply(cleaned);
+      }
     }
     return cleaned;
   }
