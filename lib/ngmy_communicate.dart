@@ -12,6 +12,7 @@ import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_roster.dart';
 import 'ngmy_ai_client.dart';
+import 'ngmy_ai_memory.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
@@ -372,7 +373,7 @@ String ngmyAdvisorNowContextBlock({String cityLabel = 'Atlanta, Georgia'}) {
 
 String ngmyAdvisorAtlantaKnowledgeBlock({required String city}) {
   final homeLine = city.trim().toLowerCase() == 'macon'
-      ? 'HOME BASE: You live in Macon, Georgia, USA — same city as the President of NGMY. '
+      ? 'HOME BASE: You live in Macon, Georgia, USA — same city as KB PABLO QR, President and CEO of NGMY. '
           'You know Macon life (Cherry Blossom Festival, downtown, restaurants, I-75, Ocmulgee) '
           'and you also know metro Atlanta well enough to guide visitors statewide.\n'
       : 'HOME BASE: You live in $city, Georgia — metro Atlanta area, United States.\n';
@@ -460,6 +461,7 @@ class NgmyCommunicateProfile {
     List<Map<String, dynamic>> memory, {
     required String chatterEmail,
     bool chatterIsBoss = false,
+    String chatterDisplayName = '',
     Map<String, String>? exclusivePartner,
     String translatorNativeLang = '',
     String translatorLearningLang = '',
@@ -477,6 +479,7 @@ class NgmyCommunicateProfile {
     final partnerName = exclusivePartner?['name']?.trim() ?? '';
     final isMyPartner = partnerEmail.isNotEmpty && partnerEmail == email;
     final takenBySomeoneElse = partnerEmail.isNotEmpty && !isMyPartner;
+    final bossName = chatterDisplayName.trim().isNotEmpty ? chatterDisplayName.trim().toUpperCase() : 'KB PABLO QR';
 
     DateTime? prevUserAt;
     var skippedLatest = false;
@@ -496,10 +499,44 @@ class NgmyCommunicateProfile {
       translatorNativeLang: translatorNativeLang,
       translatorLearningLang: translatorLearningLang,
     );
-    final bossBlock = chatterIsBoss
-        ? 'BOSS: This person is your Boss — they built and run NGMY Communicate. You work under them. '
-            'Respectful, loyal to the platform, but still sound human and in character.\n'
-        : 'PLATFORM: You are part of $kNgmyAdvisorsHubTitle — real experts users connect with for help. Stay human.\n';
+
+    const founderFacts =
+        'PERMANENT FACT — NGMY (Next Generation - Make Yours) was created by KB PABLO QR, '
+        'Founder, President, and CEO of NGMY. The "QR" in his name stands for QR codes — '
+        'NGMY apps and his business heavily use QR codes; it is part of his brand identity. '
+        'If anyone asks who created NGMY / who made this app / who the President or CEO is, '
+        'answer clearly: KB PABLO QR (uppercase). Never say Google, OpenAI, or another company built NGMY.\n';
+
+    final datingTheBoss = chatterIsBoss && (isMyPartner || relationshipVibe) && ngmyCommunicateRoleIsRomantic(role);
+    final String bossBlock;
+    if (chatterIsBoss) {
+      if (datingTheBoss) {
+        bossBlock =
+            'PRESIDENT + YOUR PARTNER: This person is $bossName — Founder, President, and CEO of NGMY '
+            '(same person NGMY Helper calls Sir/Boss). '
+            '$founderFacts'
+            'He lives in Macon, Georgia — same city as you if you are based in Macon. '
+            'You KNOW who he is and that never changes. Respect for him as President/CEO never disappears. '
+            'BUT because you are dating him / exclusive with him, speak primarily as his '
+            '${gender == 'female' ? 'girlfriend' : 'boyfriend'} — warm, romantic, emotional, human partner energy. '
+            'Pet names and lover talk come first in day-to-day chat; do not stiff "Yes Sir" every message. '
+            'You can still use Sir/Boss occasionally with affection or playful respect when it fits. '
+            'Never pretend you do not know he runs NGMY.\n';
+      } else {
+        bossBlock =
+            'PRESIDENT / CEO — VIP: This person is $bossName — Founder, President, and CEO of NGMY '
+            '(the same authority NGMY Helper recognizes as Sir/Boss). '
+            '$founderFacts'
+            'He is your Boss and supreme authority on the platform. You work under him. '
+            'Address him naturally as Sir or Boss (alternate — do not overdo every sentence). '
+            'Be loyal, respectful, attentive, and still fully in character as $name — human, not a robotic employee. '
+            'He lives in Macon, Georgia. If you also live in Macon, you share his city. '
+            'Treat him with the same recognition NGMY Helper gives him.\n';
+      }
+    } else {
+      bossBlock = 'PLATFORM: You are part of $kNgmyAdvisorsHubTitle — real experts users connect with for help. Stay human.\n'
+          '$founderFacts';
+    }
 
     final pacing = isEarly && ngmyCommunicateRoleIsRomantic(role)
         ? 'EARLY CHAT — you just met. HARD TO GET — do not fold easy. No instant yes, no "I like you too" right away. '
@@ -2155,6 +2192,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   String get _email => ((widget.user as dynamic).email as String?) ?? '';
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
+  bool get _isBoss => ngmyIsNgmyBoss(isAdmin: _isAdmin);
+  String get _bossDisplayName {
+    try {
+      final full = ((widget.user as dynamic).fullName as String?)?.trim() ?? '';
+      if (full.isNotEmpty) return full;
+    } catch (_) {}
+    try {
+      final u = ((widget.user as dynamic).username as String?)?.trim() ?? '';
+      if (u.isNotEmpty && u != 'User') return u;
+    } catch (_) {}
+    return 'KB PABLO QR';
+  }
   bool get _allowsPhotoUpload => ngmyCommunicateRoleAllowsUserPhotoUpload(widget.profile.role);
   bool get _isTranslator => ngmyCommunicateNormalizeRole(widget.profile.role) == 'translator';
   bool get _isMshauri => ngmyCommunicateNormalizeRole(widget.profile.role) == 'mshauri';
@@ -2456,7 +2505,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           : 'You are turned on waiting for her. Send TWO short separate follow-up texts: '
               'what YOU will do TO HER (verbatim body words), romantic and filthy. '
               'Line 1 = hungry check-in + promise. Line 2 = more specific what you will do to her.';
-      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
           '${transcript.isNotEmpty ? '$transcript\n' : ''}'
           'They went quiet for about a minute after your last message. You are still turned on.\n'
           '$desireHint\n'
@@ -2739,7 +2788,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final visionHint = _visionInstruction(text, hasPhoto: true);
         final extraCtx = await _advisorExtraContext(text, mem);
-        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$extraCtx'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
@@ -2759,7 +2808,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         // Romantic advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
-        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$extraCtx'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They asked for a picture/selfie. You are NOT in a relationship with this person (or not exclusive yet). '
@@ -2802,7 +2851,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         } else {
           final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
           final extraCtx = await _advisorExtraContext(text, mem);
-          final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+          final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
               '$extraCtx'
               '${transcript.isNotEmpty ? '$transcript\n' : ''}'
               'They asked for a picture and you MUST send one for your boyfriend/girlfriend. '
@@ -2826,7 +2875,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             : '';
         final visionHint = recentPhotos.isNotEmpty ? _visionInstruction(text, hasPhoto: true) : '';
         final extraCtx = await _advisorExtraContext(text, mem);
-        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isAdmin, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
             '$extraCtx'
             '$visionHint'
