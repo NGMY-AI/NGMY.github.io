@@ -2524,7 +2524,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isTranslator && _translatorNativeLang.isEmpty && mounted) {
       await _pickTranslatorLanguages(required: true);
     }
-    _scrollBottom();
+    _scrollBottom(instant: true);
   }
 
   Future<void> _pickTranslatorLanguages({bool required = false}) async {
@@ -2715,11 +2715,32 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
   }
 
-  void _scrollBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
-    });
+  /// Keeps the latest message pinned to the bottom (list uses [reverse: true]).
+  void _scrollBottom({bool instant = false}) {
+    void go([int attempt = 0]) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!_scroll.hasClients) {
+          if (attempt < 12) go(attempt + 1);
+          return;
+        }
+        // reverse: true → offset 0 is the newest messages (visual bottom).
+        final target = _scroll.position.minScrollExtent;
+        if (instant || attempt == 0) {
+          _scroll.jumpTo(target);
+        } else {
+          _scroll.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+        }
+        // Retry a few frames — images / bubbles can change extent after first paint.
+        if (attempt < 6) {
+          final remaining = (_scroll.position.pixels - target).abs();
+          if (remaining > 2) go(attempt + 1);
+          else if (attempt < 3) go(attempt + 1); // one/two more frames for late layout
+        }
+      });
+    }
+
+    go();
   }
 
   Widget _chatImageBubble(String b64) {
@@ -3204,10 +3225,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           Positioned.fill(
             child: ListView.builder(
               controller: _scroll,
-              padding: EdgeInsets.fromLTRB(16, topPad, 16, bottomPad),
+              reverse: true,
+              // reverse: true flips the axis after padding — bottom clears the header,
+              // top clears the composer so the latest message sits above the input.
+              padding: EdgeInsets.fromLTRB(16, bottomPad, 16, topPad),
               itemCount: _messages.length + (_busy ? 1 : 0),
               itemBuilder: (context, i) {
-                if (_busy && i == _messages.length) {
+                // reverse: true → index 0 is the visual bottom (latest).
+                if (_busy && i == 0) {
                   return Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -3219,12 +3244,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     ),
                   );
                 }
-                final m = _messages[i];
+                final msgIndex = _messages.length - 1 - (_busy ? i - 1 : i);
+                if (msgIndex < 0 || msgIndex >= _messages.length) {
+                  return const SizedBox.shrink();
+                }
+                final m = _messages[msgIndex];
                 final user = m['role'] == 'user';
                 return Align(
                   alignment: user ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(top: 12),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
                     decoration: BoxDecoration(
