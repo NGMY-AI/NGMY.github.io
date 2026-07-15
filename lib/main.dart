@@ -114,7 +114,6 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_share_image.dart';
 import 'ngmy_local_growth_income_ui.dart';
 import 'ngmy_local_deposit_qr.dart';
-import 'ngmy_cloud_growth_wallet.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
@@ -15764,19 +15763,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _openLocalGrowthFromHome() async {
     if (widget.disableLocalGrowthIncomeEntry) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are already in Growth Income.')),
+        const SnackBar(content: Text('You are already in Local Growth — use the back arrow to return to the main app.')),
       );
       return;
     }
-    // Local Growth Income is disconnected for now — cloud wallet + admin proofs instead.
-    await showNgmyCloudGrowthWalletPage(
-      context,
-      user: widget.user,
-      allTransactions: widget.allTransactions,
-      config: widget.config,
-      onAdd: widget.onAddTransaction,
-      onDataChanged: widget.onDataChanged,
-    );
+    await showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans);
   }
 
   @override Widget build(BuildContext context) {
@@ -15825,7 +15816,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                 ),
                             Expanded(child: Center(child: NgmyHomeBrandBadge(onTap: widget.onOpenAdminDashboard))),
-                            _roundGlassButton(icon: Icons.account_balance_wallet_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome),
+                            _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
                           ],
                         ),
                         if (widget.user.isOnFreeTrial) ...[
@@ -16001,7 +15992,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
         ),
         const SizedBox(width: 10),
-        _roundGlassButton(icon: Icons.account_balance_wallet_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome),
+        _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
       ],
     );
   }
