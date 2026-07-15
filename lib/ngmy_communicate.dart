@@ -1276,13 +1276,24 @@ class NgmyCommunicateAvatar extends StatefulWidget {
 
 class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Uint8List? _bytes;
+  ImageProvider? _memoryProvider;
   Timer? _retryTimer;
+  /// Stick to bundled asset faces once chosen — swapping to Image.memory causes blink.
+  bool _useBundledAsset = false;
 
   @override
   void initState() {
     super.initState();
-    // First paint must already be a real photo (or asset path) — never the cartoon generator.
-    _bytes = _syncPortraitBytes();
+    // Prefer the asset path for named/role portraits — no late swap flicker.
+    final pathReady = ngmyAdvisorPortraitAssetPath(
+      gender: widget.profile.gender,
+      role: widget.profile.role,
+      name: widget.profile.name,
+      id: widget.profile.id,
+    );
+    _useBundledAsset = pathReady.isNotEmpty;
+    _applyBytes(_syncPortraitBytes(), rebuild: false);
+    // Warm RAM cache in the background without forcing a re-paint when asset is already showing.
     unawaited(_bootstrapBytes());
   }
 
@@ -1290,6 +1301,34 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   void dispose() {
     _retryTimer?.cancel();
     super.dispose();
+  }
+
+  void _applyBytes(Uint8List? bytes, {bool rebuild = true}) {
+    if (bytes == null || bytes.isEmpty) return;
+    if (_bytes != null && _bytes!.length == bytes.length) {
+      var same = true;
+      // Fast path: same pointer or identical length + first/last samples.
+      if (!identical(_bytes, bytes)) {
+        for (var i = 0; i < 8 && i < bytes.length; i++) {
+          if (_bytes![i] != bytes[i]) {
+            same = false;
+            break;
+          }
+        }
+        if (same && _bytes!.length > 16) {
+          for (var i = 1; i <= 8; i++) {
+            if (_bytes![_bytes!.length - i] != bytes[bytes.length - i]) {
+              same = false;
+              break;
+            }
+          }
+        }
+      }
+      if (same) return;
+    }
+    _bytes = bytes;
+    _memoryProvider = MemoryImage(bytes);
+    if (rebuild && mounted) setState(() {});
   }
 
   /// Instant photoreal face from RAM / warmed assets (no async, no cartoons).
@@ -1327,9 +1366,10 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           name: name,
         );
         if (namedBytes.isNotEmpty) {
-          // Keep disk/cache in sync so lists stop showing the old shared face.
           await NgmyCommunicateAvatarCache.saveBytes(id, namedBytes);
-          if (mounted) setState(() => _bytes = namedBytes);
+          // Asset face is already correct — keep painting the asset (no blink).
+          if (_useBundledAsset) return;
+          if (mounted) _applyBytes(namedBytes);
           return;
         }
       } catch (_) {}
@@ -1338,9 +1378,8 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
     bytes ??= await NgmyCommunicateAvatarCache.loadBytes(id);
     if (bytes != null && bytes.isNotEmpty) {
-      if (mounted && _bytes != bytes) {
-        setState(() => _bytes = bytes);
-      }
+      if (_useBundledAsset) return;
+      if (mounted) _applyBytes(bytes);
       return;
     }
     final url = widget.profile.avatarUrl.trim();
@@ -1349,12 +1388,11 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         bytes = base64Decode(url.split(',').last);
         if (bytes.isNotEmpty) {
           await NgmyCommunicateAvatarCache.saveBytes(id, bytes);
-          if (mounted) setState(() => _bytes = bytes);
+          if (mounted) _applyBytes(bytes);
           return;
         }
       } catch (_) {}
     }
-    // Bundled photoreal role portraits only (skip cartoon illustrated PNG in UI).
     try {
       await ngmyWarmAdvisorPortraitAssets();
       final roleBytes = ngmyAdvisorPhotorealBytesSync(
@@ -1363,13 +1401,14 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         role: widget.profile.role,
         name: name,
       );
-      if (roleBytes != null && roleBytes.isNotEmpty && mounted) {
-        setState(() => _bytes = roleBytes);
+      if (roleBytes != null && roleBytes.isNotEmpty) {
+        if (_useBundledAsset) return;
+        if (mounted) _applyBytes(roleBytes);
         return;
       }
     } catch (_) {}
     await _resolveNetwork();
-    if (mounted && (_bytes == null || _bytes!.isEmpty)) {
+    if (mounted && (_bytes == null || _bytes!.isEmpty) && !_useBundledAsset) {
       _retryTimer = Timer(const Duration(seconds: 4), () {
         if (mounted && (_bytes == null || _bytes!.isEmpty)) {
           unawaited(_resolveNetwork());
@@ -1382,9 +1421,17 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   void didUpdateWidget(covariant NgmyCommunicateAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.id != widget.profile.id ||
-        oldWidget.profile.name != widget.profile.name ||
-        oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
-      _bytes = _syncPortraitBytes();
+        oldWidget.profile.name != widget.profile.name) {
+      _useBundledAsset = true;
+      _applyBytes(_syncPortraitBytes(), rebuild: false);
+      unawaited(_bootstrapBytes());
+      if (mounted) setState(() {});
+      return;
+    }
+    // avatarUrl churn from hydrate must NOT reset a stable face (that blinks).
+    if (oldWidget.profile.avatarUrl != widget.profile.avatarUrl &&
+        !_useBundledAsset &&
+        !ngmyAdvisorHasNamedPortrait(name: widget.profile.name, id: widget.profile.id)) {
       unawaited(_bootstrapBytes());
     }
   }
@@ -1392,23 +1439,17 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Future<void> _resolveNetwork() async {
     final id = widget.profile.id.trim();
     final url = widget.profile.avatarUrl.trim();
-    final previous = _bytes;
     if (!url.startsWith('http')) return;
-    // Don't let a remote URL overwrite a dedicated named portrait.
     if (ngmyAdvisorHasNamedPortrait(name: widget.profile.name, id: id)) return;
+    if (_useBundledAsset && _bytes != null) return;
     await NgmyCommunicateAvatarCache.ensureCached(id, url);
     final bytes = await NgmyCommunicateAvatarCache.loadBytes(id);
-    if (mounted) {
-      setState(() {
-        _bytes = (bytes != null && bytes.isNotEmpty) ? bytes : previous;
-      });
+    if (mounted && bytes != null && bytes.isNotEmpty) {
+      _useBundledAsset = false;
+      _applyBytes(bytes);
     }
   }
 
-  Widget _emojiFallback() =>
-      Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
-
-  /// Soft neutral circle — never the cartoon face generator (that caused the flash).
   Widget _quietPlaceholder() {
     return ColoredBox(
       color: const Color(0xFFEC4899).withValues(alpha: 0.22),
@@ -1416,7 +1457,6 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     );
   }
 
-  /// Bundled JPG via Flutter assets — real photo on first paint without waiting for bytes.
   Widget _bundledAssetFace() {
     final path = ngmyAdvisorPortraitAssetPath(
       gender: widget.profile.gender,
@@ -1427,19 +1467,30 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     return ClipOval(
       child: Image.asset(
         path,
+        key: ValueKey<String>('asset_$path'),
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => _quietPlaceholder(),
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) {
+          if (_memoryProvider != null) {
+            return Image(
+              image: _memoryProvider!,
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+            );
+          }
+          return _quietPlaceholder();
+        },
       ),
     );
   }
 
   void _openFullscreen() {
     unawaited(() async {
-      // Always prefer the full bundled portrait bytes (uncropped whole photo).
       Uint8List bytes;
       try {
         bytes = await ngmyAdvisorPortraitBytesAsync(
@@ -1464,39 +1515,41 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   @override
   Widget build(BuildContext context) {
     Widget inner;
-    if (_bytes != null && _bytes!.isNotEmpty) {
-      // Circle crops for the list/chat header only — fullscreen uses full photo.
+    if (_useBundledAsset) {
+      inner = _bundledAssetFace();
+    } else if (_memoryProvider != null) {
       inner = ClipOval(
-        child: Image.memory(
-          _bytes!,
+        child: Image(
+          image: _memoryProvider!,
           width: widget.size,
           height: widget.size,
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          filterQuality: FilterQuality.high,
+          filterQuality: FilterQuality.medium,
           errorBuilder: (_, __, ___) => _bundledAssetFace(),
         ),
       );
     } else {
-      // Real bundled photo path — never flash the illustrated cartoon placeholders.
       inner = _bundledAssetFace();
     }
-    final face = Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: widget.glow
-            ? [
-                BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.55), blurRadius: 18, spreadRadius: 2),
-                BoxShadow(color: const Color(0xFFF472B6).withValues(alpha: 0.35), blurRadius: 28, spreadRadius: 4),
-              ]
-            : null,
-      ),
-      child: CircleAvatar(
-        radius: widget.size / 2,
-        backgroundColor: const Color(0xFFEC4899).withValues(alpha: 0.25),
-        child: inner,
+    final face = RepaintBoundary(
+      child: Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: widget.glow
+              ? [
+                  BoxShadow(color: const Color(0xFFEC4899).withValues(alpha: 0.55), blurRadius: 18, spreadRadius: 2),
+                  BoxShadow(color: const Color(0xFFF472B6).withValues(alpha: 0.35), blurRadius: 28, spreadRadius: 4),
+                ]
+              : null,
+        ),
+        child: CircleAvatar(
+          radius: widget.size / 2,
+          backgroundColor: const Color(0xFFEC4899).withValues(alpha: 0.25),
+          child: inner,
+        ),
       ),
     );
     if (!widget.openFullscreenOnTap) return face;
@@ -2031,7 +2084,18 @@ class _Companion3DCard extends StatelessWidget {
     ];
     return AnimatedBuilder(
       animation: floatCtrl,
-      builder: (context, _) {
+      child: Center(
+        child: RepaintBoundary(
+          child: NgmyCommunicateAvatar(
+            key: ValueKey<String>('ngmy_avatar_${profile.id}'),
+            profile: profile,
+            size: 68,
+            glow: true,
+            openFullscreenOnTap: false,
+          ),
+        ),
+      ),
+      builder: (context, avatarChild) {
         return NgmyHudTechFrame(
             colors: colors,
             pulse: pulse,
@@ -2055,16 +2119,7 @@ class _Companion3DCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Center(
-                        child: NgmyCommunicateAvatar(
-                          key: ValueKey<String>('ngmy_avatar_${profile.id}'),
-                          profile: profile,
-                          size: 68,
-                          glow: true,
-                          // List card opens chat only — fullscreen photo is in-chat.
-                          openFullscreenOnTap: false,
-                        ),
-                      ),
+                      avatarChild ?? const SizedBox.shrink(),
                       const SizedBox(height: 8),
                       Text(
                         profile.name,

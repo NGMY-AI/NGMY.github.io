@@ -105,6 +105,22 @@ ImageProvider? ngmyImageFromRef(String? ref) {
   return null;
 }
 
+/// Cache so rebuilds (autosave setState) don't recreate MemoryImage and blink.
+final Map<String, ImageProvider> _ngmyImageRefCache = {};
+
+ImageProvider? ngmyCachedImageFromRef(String? ref) {
+  final key = ref?.trim() ?? '';
+  if (key.isEmpty) return null;
+  final hit = _ngmyImageRefCache[key];
+  if (hit != null) return hit;
+  final created = ngmyImageFromRef(key);
+  if (created != null) {
+    if (_ngmyImageRefCache.length > 64) _ngmyImageRefCache.clear();
+    _ngmyImageRefCache[key] = created;
+  }
+  return created;
+}
+
 Widget ngmyImageOrPlaceholder({
   required String? imageRef,
   required double width,
@@ -114,12 +130,19 @@ Widget ngmyImageOrPlaceholder({
   Color? iconColor,
   BorderRadius? borderRadius,
 }) {
-  final provider = ngmyImageFromRef(imageRef);
+  final provider = ngmyCachedImageFromRef(imageRef);
   final radius = borderRadius ?? BorderRadius.circular(12);
   if (provider != null) {
     return ClipRRect(
       borderRadius: radius,
-      child: Image(image: provider, width: width, height: height, fit: fit),
+      child: Image(
+        image: provider,
+        width: width,
+        height: height,
+        fit: fit,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+      ),
     );
   }
   return Container(
