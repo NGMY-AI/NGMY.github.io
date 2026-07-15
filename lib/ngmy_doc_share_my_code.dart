@@ -244,7 +244,7 @@ class NgmyDocShareMyCode {
       onStatus?.call('Delivery failed. Try again.');
       return false;
     }
-    onStatus?.call('Sent ${items.length} file(s) to My Code $code.');
+    onStatus?.call('Sent ${items.length} file(s) to code $code.');
     return true;
   }
 
@@ -317,7 +317,7 @@ class NgmyDocShareMyCode {
       return false;
     }
 
-    onStatus?.call('Sent ${items.length} large file(s) to My Code $code.');
+    onStatus?.call('Sent ${items.length} large file(s) to code $code.');
     return true;
   }
 

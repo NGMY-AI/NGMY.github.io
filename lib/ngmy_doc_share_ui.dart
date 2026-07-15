@@ -773,8 +773,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                   ),
                   _DocShareMenuTile(
                     icon: Icons.forward_to_inbox_rounded,
-                    label: 'Send to My Code',
-                    subtitle: 'Send this file to someone\'s personal code',
+                    label: 'Send to their Code',
+                    subtitle: 'Enter someone else\'s personal code',
                     colors: c,
                     onTap: () => Navigator.pop(ctx, 'send_my_code'),
                   ),
@@ -1172,8 +1172,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                   ),
                   _DocShareMenuTile(
                     icon: Icons.forward_to_inbox_rounded,
-                    label: 'Send to My Code',
-                    subtitle: 'Enter someone\'s 5-digit code + letter',
+                    label: 'Send to their Code',
+                    subtitle: 'Enter someone else\'s 5-digit code + letter',
                     colors: c,
                     onTap: () {
                       Navigator.pop(ctx);
@@ -1493,7 +1493,7 @@ class _DocShareEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'Add photos, videos, or documents — then share with a QR or Send to My Code.',
+                'Add photos, videos, or documents — then share with a QR or Send to their Code.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: colors.muted, height: 1.5, fontSize: 14),
               ),
