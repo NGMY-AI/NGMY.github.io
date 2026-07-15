@@ -141,8 +141,8 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
   }));
 }
 
-/// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
-Uint8List ngmyAdvisorPortraitBytes({
+/// Photoreal JPG bytes already warmed into RAM — never invents the cartoon fallback.
+Uint8List? ngmyAdvisorPhotorealBytesSync({
   required String id,
   required String gender,
   String role = '',
@@ -151,6 +151,19 @@ Uint8List ngmyAdvisorPortraitBytes({
   final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role, name: name, id: id);
   final fromAsset = _assetCache[path];
   if (fromAsset != null && fromAsset.isNotEmpty) return fromAsset;
+  return null;
+}
+
+/// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
+/// Prefer [ngmyAdvisorPhotorealBytesSync] / [Image.asset] in UI — illustrated is offline-only.
+Uint8List ngmyAdvisorPortraitBytes({
+  required String id,
+  required String gender,
+  String role = '',
+  String name = '',
+}) {
+  final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
+  if (photoreal != null) return photoreal;
 
   final isMale = gender.trim().toLowerCase() == 'male';
   final specs = isMale ? _maleSpecs : _femaleSpecs;

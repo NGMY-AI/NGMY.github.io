@@ -107,7 +107,10 @@ String ngmyCommunicateRoleLabel(String role) => kNgmyCommunicateRoles[ngmyCommun
 
 /// Pre-cache companion avatars from config (call after settings hydrate).
 Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
-  await NgmyCommunicateAvatarCache.hydrateRamFromDisk();
+  await Future.wait([
+    NgmyCommunicateAvatarCache.hydrateRamFromDisk(),
+    ngmyWarmAdvisorPortraitAssets(),
+  ]);
   final raw = (config as dynamic).communicateProfiles;
   if (raw is List) await NgmyCommunicateAvatarCache.cacheAllProfiles(raw);
 }
@@ -1053,6 +1056,8 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   @override
   void initState() {
     super.initState();
+    // First paint must already be a real photo (or asset path) — never the cartoon generator.
+    _bytes = _syncPortraitBytes();
     unawaited(_bootstrapBytes());
   }
 
@@ -1060,6 +1065,27 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   void dispose() {
     _retryTimer?.cancel();
     super.dispose();
+  }
+
+  /// Instant photoreal face from RAM / warmed assets (no async, no cartoons).
+  Uint8List? _syncPortraitBytes() {
+    final id = widget.profile.id.trim();
+    final name = widget.profile.name.trim();
+    final ram = NgmyCommunicateAvatarCache.bytesInRam(id);
+    if (ram != null && ram.isNotEmpty) return ram;
+    final url = widget.profile.avatarUrl.trim();
+    if (url.startsWith('data:image')) {
+      try {
+        final decoded = base64Decode(url.split(',').last);
+        if (decoded.isNotEmpty) return decoded;
+      } catch (_) {}
+    }
+    return ngmyAdvisorPhotorealBytesSync(
+      id: id,
+      gender: widget.profile.gender,
+      role: widget.profile.role,
+      name: name,
+    );
   }
 
   Future<void> _bootstrapBytes() async {
@@ -1087,7 +1113,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
     bytes ??= await NgmyCommunicateAvatarCache.loadBytes(id);
     if (bytes != null && bytes.isNotEmpty) {
-      if (mounted) {
+      if (mounted && _bytes != bytes) {
         setState(() => _bytes = bytes);
       }
       return;
@@ -1103,16 +1129,18 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         }
       } catch (_) {}
     }
-    // Bundled African role portraits — used when admin has not uploaded a photo.
+    // Bundled photoreal role portraits only (skip cartoon illustrated PNG in UI).
     try {
-      final roleBytes = await ngmyAdvisorPortraitBytesAsync(
+      await ngmyWarmAdvisorPortraitAssets();
+      final roleBytes = ngmyAdvisorPhotorealBytesSync(
         id: id,
         gender: widget.profile.gender,
         role: widget.profile.role,
         name: name,
       );
-      if (roleBytes.isNotEmpty && mounted) {
+      if (roleBytes != null && roleBytes.isNotEmpty && mounted) {
         setState(() => _bytes = roleBytes);
+        return;
       }
     } catch (_) {}
     await _resolveNetwork();
@@ -1131,7 +1159,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     if (oldWidget.profile.id != widget.profile.id ||
         oldWidget.profile.name != widget.profile.name ||
         oldWidget.profile.avatarUrl != widget.profile.avatarUrl) {
-      _bytes = null;
+      _bytes = _syncPortraitBytes();
       unawaited(_bootstrapBytes());
     }
   }
@@ -1155,30 +1183,33 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
   Widget _emojiFallback() =>
       Center(child: Text(widget.profile.emoji, style: TextStyle(fontSize: widget.size * 0.5)));
 
-  /// No uploaded photo yet (or it failed to load) — use a role-matched African
-  /// portrait (bundled photo, or illustrated offline fallback).
-  Widget _illustratedFallback() {
-    try {
-      final bytes = ngmyAdvisorPortraitBytes(
-        id: widget.profile.id,
-        gender: widget.profile.gender,
-        role: widget.profile.role,
-        name: widget.profile.name,
-      );
-      return ClipOval(
-        child: Image.memory(
-          bytes,
-          width: widget.size,
-          height: widget.size,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => _emojiFallback(),
-        ),
-      );
-    } catch (_) {
-      return _emojiFallback();
-    }
+  /// Soft neutral circle — never the cartoon face generator (that caused the flash).
+  Widget _quietPlaceholder() {
+    return ColoredBox(
+      color: const Color(0xFFEC4899).withValues(alpha: 0.22),
+      child: SizedBox(width: widget.size, height: widget.size),
+    );
+  }
+
+  /// Bundled JPG via Flutter assets — real photo on first paint without waiting for bytes.
+  Widget _bundledAssetFace() {
+    final path = ngmyAdvisorPortraitAssetPath(
+      gender: widget.profile.gender,
+      role: widget.profile.role,
+      name: widget.profile.name,
+      id: widget.profile.id,
+    );
+    return ClipOval(
+      child: Image.asset(
+        path,
+        width: widget.size,
+        height: widget.size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => _quietPlaceholder(),
+      ),
+    );
   }
 
   void _openFullscreen() {
@@ -1218,11 +1249,12 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           fit: BoxFit.cover,
           gaplessPlayback: true,
           filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => _illustratedFallback(),
+          errorBuilder: (_, __, ___) => _bundledAssetFace(),
         ),
       );
     } else {
-      inner = _illustratedFallback();
+      // Real bundled photo path — never flash the illustrated cartoon placeholders.
+      inner = _bundledAssetFace();
     }
     final face = Container(
       width: widget.size,
@@ -1350,8 +1382,10 @@ Future<void> ngmyOpenCommunicateWorld(
   Future<bool> Function(double amount, String description)? onChargeWallet,
   VoidCallback? onDataChanged,
   Future<bool> Function()? onPersistConfig,
-}) {
-  unawaited(ngmyWarmAdvisorPortraitAssets());
+}) async {
+  // Load photoreal portraits into RAM before the hub paints (kills cartoon flash).
+  await ngmyWarmAdvisorPortraitAssets();
+  if (!context.mounted) return;
   return NgmyNavigator.push<void>(
     context,
     NgmyCommunicateWorldScreen(
