@@ -37,7 +37,8 @@ class NgmyCloudPolicy {
     'profilePicturePath',
   };
 
-  static const bool persistTransactionsToCloud = false;
+  /// Growth Income deposits/withdrawals sync to Supabase so admin can approve with proofs.
+  static const bool persistTransactionsToCloud = true;
   static const bool persistMediaPostsToCloud = false;
   static const bool persistAnnouncementsToCloud = false;
 

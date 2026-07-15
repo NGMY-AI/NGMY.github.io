@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_feature_sync_session.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
 
@@ -554,12 +555,15 @@ class NgmyLoanServicesScreen extends StatefulWidget {
   State<NgmyLoanServicesScreen> createState() => _NgmyLoanServicesScreenState();
 }
 
-class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with WidgetsBindingObserver {
+class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   bool _refreshing = false;
+  late final AnimationController _heroCtrl;
 
   @override
   void initState() {
     super.initState();
+    NgmyFeatureSyncSession.enterLoans();
+    _heroCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_refreshLoans());
   }
@@ -567,6 +571,8 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _heroCtrl.dispose();
+    NgmyFeatureSyncSession.leaveLoans();
     super.dispose();
   }
 
@@ -646,7 +652,12 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + kToolbarHeight + 8, 20, 20),
-          child: Column(
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: _heroCtrl, curve: Curves.easeOut),
+            child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
+                  .animate(CurvedAnimation(parent: _heroCtrl, curve: Curves.easeOutCubic)),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _headerCard(),
@@ -656,17 +667,24 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               ],
               const SizedBox(height: 18),
               Center(
-                child: ClipRRect(
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.92, end: 1).animate(
+                    CurvedAnimation(parent: _heroCtrl, curve: const Interval(0.35, 1, curve: Curves.easeOutBack)),
+                  ),
+                  child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () => _openApplication(context),
                       child: Ink(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
+                          boxShadow: [
+                            BoxShadow(color: _loanGreen.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8)),
+                          ],
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -678,6 +696,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                       ),
                     ),
                   ),
+                ),
                 ),
               ),
               if (pending.isNotEmpty) ...[
@@ -696,6 +715,8 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               const SizedBox(height: 40),
             ],
           ),
+            ),
+          ),
         ),
       ),
     );
@@ -705,15 +726,38 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00894B)]),
-          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF00B25A), Color(0xFF059669), Color(0xFF0F766E)],
+          ),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(color: _loanGreen.withValues(alpha: 0.28), blurRadius: 24, offset: const Offset(0, 12)),
+          ],
         ),
-        child: Column(
+        child: Stack(
+          children: [
+            Positioned(
+              right: -18,
+              top: -22,
+              child: IgnorePointer(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+              ),
+            ),
+            Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
-                Icon(Icons.attach_money_rounded, color: Colors.white, size: 28),
+                Icon(Icons.account_balance_rounded, color: Colors.white, size: 28),
                 SizedBox(width: 12),
                 Text('Loan Services', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
               ],
@@ -750,6 +794,8 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
               'Up to 2 loans under \$1,000 · 1 loan if \$1,000+.',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 11, fontWeight: FontWeight.w600),
             ),
+          ],
+        ),
           ],
         ),
       );
@@ -2442,6 +2488,28 @@ class _NgmyLoanAdminPanel extends StatefulWidget {
 }
 
 class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    NgmyFeatureSyncSession.enterLoans();
+    unawaited(widget.onRefreshLoans?.call());
+    _poll = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted) return;
+      unawaited(widget.onRefreshLoans?.call().then((_) {
+        if (mounted) setState(() {});
+      }));
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    NgmyFeatureSyncSession.leaveLoans();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final apps = List<Map<String, dynamic>>.from(widget.config.loanApplications.map((e) => Map<String, dynamic>.from(e)))

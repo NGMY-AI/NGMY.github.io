@@ -114,6 +114,8 @@ import 'ngmy_qr_generator.dart';
 import 'ngmy_share_image.dart';
 import 'ngmy_local_growth_income_ui.dart';
 import 'ngmy_local_deposit_qr.dart';
+import 'ngmy_cloud_growth_wallet.dart';
+import 'ngmy_feature_sync_session.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
 import 'ngmy_studio_hub.dart';
@@ -7889,14 +7891,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       return;
     }
     _subscribeToRealtime();
-    _startUserTransactionSync();
-    _startAdminPendingTransactionPoll();
+    // Wallet / Growth Income polls only while those screens are open (see NgmyFeatureSyncSession).
+    if (NgmyFeatureSyncSession.anyGrowthIncomeActive) {
+      _startUserTransactionSync();
+      _startAdminPendingTransactionPoll();
+    }
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
     _startCurrentUserPullLoop();
     unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
-    if (_ngmySessionIsAdmin(_currentUser)) {
+    if (_ngmySessionIsAdmin(_currentUser) && NgmyFeatureSyncSession.growthIncomeAdminActive) {
       unawaited(_refreshAdminDashboardFromCloud());
       unawaited(_refreshPendingTransactionsFromCloud());
     }
@@ -7936,8 +7941,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         );
         _applyWalletDecisionLedgerToTransactions();
       }
-      final pendingWallet = await _fetchAdminPendingWalletFromCloud();
-      _mergePendingWalletRequestsFromCloud(pendingWallet);
+      final pendingWallet = NgmyFeatureSyncSession.growthIncomeAdminActive
+          ? await _fetchAdminPendingWalletFromCloud()
+          : const <AppTransaction>[];
+      if (pendingWallet.isNotEmpty) {
+        _mergePendingWalletRequestsFromCloud(pendingWallet);
+      }
       _applyWalletDecisionLedgerToTransactions();
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
       if (!lightweight) {
@@ -8210,7 +8219,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       if (_ngmySessionIsAdmin(_currentUser)) {
         await _refreshAdminCloudSnapshot(lightweight: false);
-        await _refreshPendingTransactionsFromCloud();
+        if (NgmyFeatureSyncSession.growthIncomeAdminActive) {
+          await _refreshPendingTransactionsFromCloud();
+        }
         await _refreshAdminOperationalRequestsFromCloud();
         if (mounted) {
           setState(() {});
@@ -8260,10 +8271,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       return;
     }
     _subscribeToRealtime();
-    _startUserTransactionSync();
+    if (NgmyFeatureSyncSession.anyGrowthIncomeActive) {
+      _startUserTransactionSync();
+      _startAdminPendingTransactionPoll();
+    }
     _startConfigRefreshLoop();
     _startGameSettingsRefreshLoop();
-    _startAdminPendingTransactionPoll();
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
@@ -8285,15 +8298,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startConfigRefreshLoop();
     _startGameSettingsRefreshLoop();
     _startMediaDeliveryLoop();
-    _startAdminPendingTransactionPoll();
+    // Growth Income wallet polls start only when those screens are open.
+    if (NgmyFeatureSyncSession.anyGrowthIncomeActive) {
+      _startAdminPendingTransactionPoll();
+      _startUserTransactionSync();
+    }
     _startAdminOperationalRequestsPoll();
     _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
-    _startUserTransactionSync();
     _startCurrentUserPullLoop();
-    if (_ngmySessionIsAdmin(_currentUser)) {
+    if (_ngmySessionIsAdmin(_currentUser) && NgmyFeatureSyncSession.growthIncomeAdminActive) {
       unawaited(_refreshPendingTransactionsFromCloud());
       unawaited(_refreshAdminDashboardFromCloud());
+      unawaited(_maybeDomainRenewalReminder());
+    } else if (_ngmySessionIsAdmin(_currentUser)) {
       unawaited(_maybeDomainRenewalReminder());
     }
   }
@@ -8316,9 +8334,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startUserTransactionSync() {
     _userTxnSyncTimer?.cancel();
     if (_currentUser == null || !NgmyCloudPolicy.persistTransactionsToCloud) return;
+    if (!NgmyFeatureSyncSession.growthIncomeUserActive) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
-    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused) return;
+      if (!NgmyFeatureSyncSession.growthIncomeUserActive) {
+        _userTxnSyncTimer?.cancel();
+        return;
+      }
       unawaited(_refreshUserTransactionsFromCloud());
     });
   }
@@ -8576,6 +8599,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       );
     };
     NgmyNavigator.install();
+    NgmyFeatureSyncSession.onEnteredGrowthIncomeAdmin = () {
+      _startAdminPendingTransactionPoll();
+      unawaited(_refreshPendingTransactionsFromCloud());
+    };
+    NgmyFeatureSyncSession.onLeftGrowthIncomeAdmin = () {
+      _adminPendingTxnPoll?.cancel();
+      _adminPendingTxnPoll = null;
+    };
+    NgmyFeatureSyncSession.onEnteredGrowthIncomeUser = () {
+      _startUserTransactionSync();
+    };
+    NgmyFeatureSyncSession.onLeftGrowthIncomeUser = () {
+      _userTxnSyncTimer?.cancel();
+      _userTxnSyncTimer = null;
+    };
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     unawaited(_initLoggedOutGuard());
     _initLocalNotifications();
@@ -8697,11 +8735,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         unawaited(_catchUpCloudDataAfterConnect());
       });
       if (_ngmySessionIsAdmin(_currentUser)) {
-        unawaited(_refreshPendingTransactionsFromCloud());
+        if (NgmyFeatureSyncSession.growthIncomeAdminActive) {
+          unawaited(_refreshPendingTransactionsFromCloud());
+          unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: true));
+        }
         unawaited(_refreshAdminOperationalRequestsFromCloud());
         unawaited(_refreshAdminUsersFromCloud());
         unawaited(_refreshAdminCloudSnapshot(lightweight: true));
-        unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: true));
       }
       if (_allowConfigDiffNotifications) {
         unawaited(_notifyStoreMarketDayListings());
@@ -8711,7 +8751,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   /// Transactions first, then user row — avoids balance flashing stale cloud amounts.
   Future<void> _refreshSessionFromCloudOnResume() async {
-    await _refreshUserTransactionsFromCloud(force: true);
+    if (NgmyFeatureSyncSession.growthIncomeUserActive) {
+      await _refreshUserTransactionsFromCloud(force: true);
+    }
     await _refreshCurrentUserFromCloud();
     if (!mounted) return;
     setState(() {
@@ -9020,9 +9062,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminPendingTransactionPoll() {
     _adminPendingTxnPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
+    if (!NgmyFeatureSyncSession.growthIncomeAdminActive) return;
     unawaited(_refreshPendingTransactionsFromCloud());
-    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
+      if (!NgmyFeatureSyncSession.growthIncomeAdminActive) {
+        _adminPendingTxnPoll?.cancel();
+        return;
+      }
       unawaited(_refreshPendingTransactionsFromCloud());
     });
   }
@@ -14990,6 +15037,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       onRefreshAdminData: widget.onRefreshAdminData,
       onDeleteMedia: widget.onDeleteMedia,
       onPushUserToCloud: widget.onPushUserToCloud,
+      onSaveWalletPayments: widget.onSaveWalletPayments,
+      onUpsertInvestmentPlan: widget.onUpsertInvestmentPlan,
+      onRemoveInvestmentPlan: widget.onRemoveInvestmentPlan,
+      onRefreshInvestmentPlans: widget.onRefreshInvestmentPlans,
+      onArchiveWalletTransaction: widget.onArchiveWalletTransaction,
       onPersistManagementConfig: widget.onPersistManagementConfig,
       onRefreshManagementData: widget.onRefreshManagementData,
       onRefreshAdminMedia: widget.onRefreshAdminMedia,
@@ -15712,11 +15764,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _openLocalGrowthFromHome() async {
     if (widget.disableLocalGrowthIncomeEntry) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are already in Local Growth — use the back arrow to return to the main app.')),
+        const SnackBar(content: Text('You are already in Growth Income.')),
       );
       return;
     }
-    await showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans);
+    // Local Growth Income is disconnected for now — cloud wallet + admin proofs instead.
+    await showNgmyCloudGrowthWalletPage(
+      context,
+      user: widget.user,
+      allTransactions: widget.allTransactions,
+      config: widget.config,
+      onAdd: widget.onAddTransaction,
+      onDataChanged: widget.onDataChanged,
+    );
   }
 
   @override Widget build(BuildContext context) {
@@ -15765,7 +15825,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                 ),
                             Expanded(child: Center(child: NgmyHomeBrandBadge(onTap: widget.onOpenAdminDashboard))),
-                            _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+                            _roundGlassButton(icon: Icons.account_balance_wallet_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome),
                           ],
                         ),
                         if (widget.user.isOnFreeTrial) ...[
@@ -15941,7 +16001,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
         ),
         const SizedBox(width: 10),
-        _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Local Growth', onTap: _openLocalGrowthFromHome),
+        _roundGlassButton(icon: Icons.account_balance_wallet_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome),
       ],
     );
   }
@@ -20033,14 +20093,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final pages = [
-      _adminHome(isDark),
-      _adminUsers(isDark),
-      NgmyAdminDomainCalendarPanel(isDark: isDark),
-    ];
     return NgmyTabBackScope(
       activeTab: _idx,
-      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 2)),
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 3)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
       appBar: AppBar(
@@ -20054,14 +20109,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: _topNav(isDark),
         ),
       ),
-      body: pages[_idx],
+      body: _adminPageFor(_idx, isDark),
     ),
     );
+  }
+
+  Widget _adminPageFor(int i, bool isDark) {
+    switch (i) {
+      case 1:
+        return _adminUsers(isDark);
+      case 2:
+        return _adminGrowthIncome(isDark);
+      case 3:
+        return NgmyAdminDomainCalendarPanel(isDark: isDark);
+      case 0:
+      default:
+        return _adminHome(isDark);
+    }
   }
 
   Widget _topNav(bool isDark) {
     final frameBg = isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC);
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
+    final pendingDeposits = widget.allTransactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .length;
+    final pendingWithdrawals = widget.allTransactions
+        .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
+        .length;
     return Container(
       height: 72,
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
@@ -20075,7 +20150,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _navItem(0, Icons.home_outlined, 'Home', isDark, frameBg, frameBorder),
             _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
-            _navItem(2, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
+            _navItem(
+              2,
+              Icons.trending_up_rounded,
+              'Growth Income',
+              isDark,
+              frameBg,
+              frameBorder,
+              badgeCount: NgmyAdminMenuCounts.pendingWalletAdminCount(
+                pendingDeposits: pendingDeposits,
+                pendingWithdrawals: pendingWithdrawals,
+              ),
+            ),
+            _navItem(3, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
           ],
         ),
       ),
@@ -20112,7 +20199,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: InkWell(
           onTap: () {
             setState(() => _idx = i);
-            if (i == 1) unawaited(_pullAdminCloudData());
+            if (i == 1 || i == 2) unawaited(_pullAdminCloudData());
           },
           borderRadius: BorderRadius.circular(12),
           child: Stack(
@@ -20178,7 +20265,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _menuName() => ["DASHBOARD", "USERS", "CALENDAR"][_idx];
+  String _menuName() => const ["DASHBOARD", "USERS", "GROWTH INCOME", "CALENDAR"][_idx];
+
+  Widget _adminGrowthIncome(bool isDark) {
+    return NgmyAdminWalletTab(
+      isDark: isDark,
+      config: widget.config,
+      allTransactions: widget.allTransactions,
+      allUsers: widget.allUsers,
+      onProcess: widget.onProcess,
+      onDataChanged: widget.onDataChanged,
+      onRefresh: () async {
+        await widget.onRefreshAdminData?.call();
+        if (mounted) setState(() {});
+      },
+      onSavePayments: (cash, btc) async {
+        if (widget.onSaveWalletPayments != null) {
+          return widget.onSaveWalletPayments!(cash, btc);
+        }
+        widget.config.officialCashApp = cash;
+        widget.config.officialBitcoin = btc;
+        widget.onDataChanged();
+        return false;
+      },
+      onArchiveRemove: (t) async {
+        await widget.onArchiveWalletTransaction?.call(t);
+        if (mounted) setState(() {});
+      },
+    );
+  }
 
   Widget _adminRetiredPanel({
     required bool isDark,
@@ -20245,6 +20360,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 animDelayMs: 40,
               ),
               _menuFrame(
+                'Loans',
+                Icons.attach_money_rounded,
+                const Color(0xFF00B25A),
+                () => _openLoansAdmin(isDark),
+                isDark,
+                badgeCount: NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications),
+                animDelayMs: 80,
+              ),
+              _menuFrame(
                 'Payments',
                 Icons.payments_outlined,
                 const Color(0xFF0D9488),
@@ -20272,6 +20396,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const SizedBox(height: 28),
         ],
       ),
+    );
+  }
+
+  Future<void> _openLoansAdmin(bool isDark) async {
+    await _refreshManagementBeforeOpen();
+    if (!mounted) return;
+    showNgmyLoanAdminSheet(
+      context,
+      config: ngmyLoanConfigBridge(widget.config),
+      onDataChanged: () {
+        widget.onDataChanged();
+        if (mounted) setState(() {});
+      },
+      isDark: isDark,
+      onPersistNow: () => ngmyAdminPersistManagementConfig(widget.config),
+      onRefreshLoans: () async {
+        await widget.onRefreshManagementData?.call();
+        await NgmyLoanStatusCloud.fetchAndApply(widget.config.loanApplications);
+        await NgmyLoanPaymentsCloud.fetchAndApply(widget.config.loanApplications);
+      },
     );
   }
 
