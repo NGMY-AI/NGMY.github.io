@@ -67,6 +67,28 @@ class NgmyDocShareSync {
     final cloud = await _createCloudStashQr(ownerEmail: ownerEmail, items: items);
     if (cloud != null) return cloud;
 
+    // Large images / any files that won't fit in settings stash — same storage relay as videos.
+    final storageRelay = await NgmyDocShareVideoCloud.beginShare(
+      ownerEmail: ownerEmail,
+      items: items,
+      awaitUpload: true,
+      allowAnyFile: true,
+    );
+    if (storageRelay != null) {
+      final result = (
+        qrPayload: storageRelay.qrPayload,
+        fileCount: storageRelay.fileCount,
+        mode: NgmyDocShareQrMode.videoCloud,
+      );
+      unawaited(registerShortCodesForShare(
+        ownerEmail: ownerEmail,
+        items: items,
+        qrPayload: result.qrPayload,
+        mode: result.mode,
+      ));
+      return result;
+    }
+
     if (!kIsWeb) {
       final lan = await NgmyDocShareLocalServer.start(ownerEmail: ownerEmail, items: items);
       if (lan != null) {

@@ -16,7 +16,8 @@ import 'ngmy_supabase_multipart_relay.dart';
 const String kNgmyDocShareMyCodeQrPrefix = 'NGMYDOCRCV';
 
 /// Files larger than this use Supabase storage instead of settings bundle.
-const int kNgmyMyCodeStorageThresholdBytes = 8 * 1024 * 1024;
+/// Kept low so big photos/images always use multipart storage transfer.
+const int kNgmyMyCodeStorageThresholdBytes = 1024 * 1024;
 
 String _lookupKey(String code) => 'ngmy_doc_share_my_code_lookup_v1_${code.trim().toUpperCase()}';
 
@@ -205,10 +206,14 @@ class NgmyDocShareMyCode {
     }
 
     if (bundleJson.length > kNgmyDocShareCloudStashMaxBytes) {
-      onStatus?.call(
-        'File too large for My Code (${(bundleJson.length / (1024 * 1024)).toStringAsFixed(1)} MB). Use NGMY Transfer for big videos.',
+      onStatus?.call('Large file — switching to cloud storage…');
+      return _sendViaStorage(
+        senderEmail: senderEmail,
+        recipientEmail: recipientEmail,
+        code: code,
+        items: items,
+        onStatus: onStatus,
       );
-      return false;
     }
 
     final stash = await NgmyDocShareQrStash.createFromBundleJson(
@@ -278,7 +283,7 @@ class NgmyDocShareMyCode {
       }
 
       if (partCount <= 0) {
-        onStatus?.call('Could not read ${item.name}. Try NGMY Transfer.');
+        onStatus?.call('Could not read ${item.name}. Re-upload the file and try again.');
         await ngmySupabaseRemovePaths(storagePaths);
         return false;
       }

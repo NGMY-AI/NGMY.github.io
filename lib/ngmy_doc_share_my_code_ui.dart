@@ -6,8 +6,10 @@ import 'package:share_plus/share_plus.dart';
 
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_my_code.dart';
+import 'ngmy_doc_share_store.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_share_image.dart';
 import 'ngmy_studio_hub.dart';
 
 /// Shows the user's personal My Code + QR for receiving documents.
@@ -301,6 +303,37 @@ class _NgmyDocShareSendToMyCodePageState extends State<NgmyDocShareSendToMyCodeP
     }
   }
 
+  Future<void> _shareOutside() async {
+    if (_sending || widget.items.isEmpty) return;
+    setState(() {
+      _sending = true;
+      _status = 'Opening device share…';
+    });
+    try {
+      // Share first file via system sheet (AirDrop / Bluetooth / Nearby when the OS offers them).
+      final item = widget.items.first;
+      final bytes = await NgmyDocShareStore.readBytes(widget.senderEmail, item);
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) setState(() => _status = 'Could not read ${item.name}. Try re-uploading.');
+        return;
+      }
+      final msg = await shareNgmyBytes(
+        bytes,
+        item.name,
+        mimeType: item.mime.isEmpty ? 'application/octet-stream' : item.mime,
+        title: item.name,
+        text: widget.items.length > 1
+            ? 'NGMY Doc Share (${widget.items.length} files — sharing first)'
+            : 'Shared from NGMY Doc Share',
+      );
+      if (mounted) setState(() => _status = msg);
+    } catch (e) {
+      if (mounted) setState(() => _status = 'Could not open share sheet: $e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -365,6 +398,21 @@ class _NgmyDocShareSendToMyCodePageState extends State<NgmyDocShareSendToMyCodeP
               Text(_status!, style: TextStyle(color: fg.withValues(alpha: 0.75), fontSize: 13)),
             ],
             const Spacer(),
+            OutlinedButton.icon(
+              onPressed: _sending ? null : _shareOutside,
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
+              label: const Text(
+                'Share via AirDrop / Bluetooth / Nearby',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Uses your phone’s share sheet when available. In-app My Code send is below.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: fg.withValues(alpha: 0.5), fontSize: 11, height: 1.35),
+            ),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: _sending ? null : _send,
               style: FilledButton.styleFrom(

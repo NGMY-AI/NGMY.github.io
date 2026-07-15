@@ -12,6 +12,23 @@ Future<String> shareNgmyPngBytes(
   return shareNgmyBytes(bytes, filename, mimeType: 'image/png', title: title, text: text);
 }
 
+String _ensureFilename(String filename, String mimeType) {
+  final safeName = filename.replaceAll(RegExp(r'[^\w\-.]+'), '_');
+  if (safeName.contains('.')) return safeName;
+  final mime = mimeType.toLowerCase();
+  final ext = switch (mime) {
+    'image/jpeg' || 'image/jpg' => '.jpg',
+    'image/png' => '.png',
+    'image/gif' => '.gif',
+    'image/webp' => '.webp',
+    'image/heic' || 'image/heif' => '.heic',
+    'video/mp4' => '.mp4',
+    'application/pdf' => '.pdf',
+    _ => '',
+  };
+  return '$safeName$ext';
+}
+
 Future<String> shareNgmyBytes(
   Uint8List bytes,
   String filename, {
@@ -19,9 +36,7 @@ Future<String> shareNgmyBytes(
   String? title,
   String? text,
 }) async {
-  final safeName = filename.replaceAll(RegExp(r'[^\w\-.]+'), '_');
-  final ext = mimeType == 'image/gif' ? '.gif' : '.png';
-  final name = safeName.endsWith(ext) ? safeName : '$safeName$ext';
+  final name = _ensureFilename(filename, mimeType);
 
   try {
     final blob = html.Blob([bytes], mimeType);

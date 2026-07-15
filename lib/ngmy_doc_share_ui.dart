@@ -13,6 +13,7 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
+import 'ngmy_share_image.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_doc_share_org_settings.dart';
 import 'ngmy_doc_share_payments.dart';
@@ -545,24 +546,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     unawaited(_pickNativeUploadFiles());
   }
 
-  void _beginUploadFolderFromUserGesture() {
-    if (kIsWeb) {
-      ngmyWebPickFilesFromUserGesture(
-        directory: true,
-        onResult: (picked) {
-          unawaited(_ingestPickedWebFiles(
-            picked,
-            emptyMessage: 'No files found in that folder.',
-            successLabel: 'Added',
-            note: 'From folder',
-          ));
-        },
-      );
-      return;
-    }
-    unawaited(_pickNativeUploadFolder());
-  }
-
   Future<void> _pickNativeUploadFiles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -581,27 +564,6 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
     }
   }
 
-  Future<void> _pickNativeUploadFolder() async {
-    try {
-      final path = await FilePicker.platform.getDirectoryPath();
-      if (path == null || path.isEmpty) return;
-      await _withWork(() async {
-        if (!await _ensureCanCreate()) return;
-        final count = await NgmyDocShareStore.addFromDirectory(email: widget.email, dirPath: path);
-        await _refresh();
-        if (count > 0) await _recordCreationIfNeeded(count: count);
-        _toast(count == 0 ? 'No files found in that folder.' : 'Added $count file(s) from folder.');
-      }, label: 'Reading folder…');
-    } catch (e) {
-      debugPrint('[doc share upload folder] $e');
-      _toast('Could not open folder picker. Try again.');
-    }
-  }
-
-  Future<void> _uploadFiles() async => _beginUploadFilesFromUserGesture();
-
-  Future<void> _uploadFolder() async => _beginUploadFolderFromUserGesture();
-
   void _selectAll() {
     setState(() {
       if (_selected.length == _items.length) {
@@ -613,37 +575,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _pickUpload() async {
-    final c = _docShareColors(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: c.card,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.upload_file_rounded, color: c.fg),
-              title: Text('Upload files', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
-              subtitle: Text('Any type — photos, videos, documents', style: TextStyle(color: c.muted, fontSize: 12)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _beginUploadFilesFromUserGesture();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.folder_open_rounded, color: c.fg),
-              title: Text('Upload folder', style: TextStyle(color: c.fg, fontWeight: FontWeight.w700)),
-              subtitle: Text('Entire folder of pictures or videos', style: TextStyle(color: c.muted, fontSize: 12)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _beginUploadFolderFromUserGesture();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    // Direct file picker — folder upload removed.
+    _beginUploadFilesFromUserGesture();
   }
 
   Future<void> _importBackupFile() async {
@@ -845,6 +778,15 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
                     onTap: () => Navigator.pop(ctx, 'send_my_code'),
                   ),
                   _DocShareMenuTile(
+                    icon: Icons.ios_share_rounded,
+                    label: 'Share outside NGMY',
+                    subtitle: kIsWeb
+                        ? 'Device share sheet / download'
+                        : 'AirDrop, Bluetooth, Nearby Share, Messages…',
+                    colors: c,
+                    onTap: () => Navigator.pop(ctx, 'share_outside'),
+                  ),
+                  _DocShareMenuTile(
                     icon: Icons.download_rounded,
                     label: 'Download / save',
                     colors: c,
@@ -873,6 +815,8 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
         unawaited(_showQrForOne(item));
       case 'send_my_code':
         unawaited(_openSendToMyCode(items: [item]));
+      case 'share_outside':
+        unawaited(_shareItemOutside(item));
       case 'save':
         unawaited(_saveItem(item));
       case 'delete':
@@ -1090,6 +1034,24 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       final msg = await NgmyDocShareStore.saveToDevice(widget.email, item);
       _toast(msg);
     }, label: 'Saving…');
+  }
+
+  Future<void> _shareItemOutside(NgmyDocShareItem item) async {
+    await _withWork(() async {
+      final bytes = await NgmyDocShareStore.readBytes(widget.email, item);
+      if (bytes == null || bytes.isEmpty) {
+        _toast('Could not read "${item.name}" to share. Try re-uploading.');
+        return;
+      }
+      final msg = await shareNgmyBytes(
+        bytes,
+        item.name,
+        mimeType: item.mime.isEmpty ? 'application/octet-stream' : item.mime,
+        title: item.name,
+        text: 'Shared from NGMY Doc Share',
+      );
+      _toast(msg);
+    }, label: 'Sharing…');
   }
 
   Future<void> _deleteItem(NgmyDocShareItem item) async {
@@ -1406,11 +1368,18 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
   Uint8List? _bytes;
   bool _loading = true;
   String? _error;
+  var _decodeFailed = false;
 
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+  }
+
+  bool get _maybeHeic {
+    final mime = widget.item.mime.toLowerCase();
+    final name = widget.item.name.toLowerCase();
+    return mime.contains('heic') || mime.contains('heif') || name.endsWith('.heic') || name.endsWith('.heif');
   }
 
   Future<void> _load() async {
@@ -1420,13 +1389,15 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
       if (bytes == null || bytes.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'Could not load image.';
+          _error = 'Could not load image. Re-upload it with + and try again.';
         });
         return;
       }
       setState(() {
         _bytes = bytes;
         _loading = false;
+        _decodeFailed = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -1435,6 +1406,19 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
         _error = 'Could not load image: $e';
       });
     }
+  }
+
+  Future<void> _shareOrSave() async {
+    final bytes = _bytes;
+    if (bytes == null || bytes.isEmpty) return;
+    final msg = await shareNgmyBytes(
+      bytes,
+      widget.item.name,
+      mimeType: widget.item.mime.isEmpty ? 'image/jpeg' : widget.item.mime,
+      title: widget.item.name,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -1447,6 +1431,14 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
         foregroundColor: c.fg,
         elevation: 0,
         title: Text(widget.item.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.fg)),
+        actions: [
+          if (_bytes != null)
+            IconButton(
+              tooltip: 'Share / save',
+              onPressed: _shareOrSave,
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
+        ],
       ),
       body: Center(
         child: _loading
@@ -1457,11 +1449,47 @@ class _DocShareImagePageState extends State<_DocShareImagePage> {
                     child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)),
                   )
                 : _bytes != null
-                    ? InteractiveViewer(
-                        minScale: 0.5,
-                        maxScale: 4,
-                        child: Image.memory(_bytes!, fit: BoxFit.contain, filterQuality: FilterQuality.high),
-                      )
+                    ? (_decodeFailed
+                        ? Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _maybeHeic
+                                      ? 'This HEIC/HEIF photo cannot be previewed here. Use Share to open it in Photos or AirDrop it.'
+                                      : 'Could not display this image in-app. Use Share to open or save it on your device.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: c.muted, height: 1.4),
+                                ),
+                                const SizedBox(height: 16),
+                                FilledButton.icon(
+                                  onPressed: _shareOrSave,
+                                  style: FilledButton.styleFrom(backgroundColor: kNgmyStudioHubAccent),
+                                  icon: const Icon(Icons.ios_share_rounded),
+                                  label: const Text('Share / save'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : InteractiveViewer(
+                            minScale: 0.5,
+                            maxScale: 4,
+                            child: Image.memory(
+                              _bytes!,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              gaplessPlayback: true,
+                              errorBuilder: (context, error, stackTrace) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (mounted && !_decodeFailed) {
+                                    setState(() => _decodeFailed = true);
+                                  }
+                                });
+                                return const SizedBox.shrink();
+                              },
+                            ),
+                          ))
                     : const SizedBox.shrink(),
       ),
     );

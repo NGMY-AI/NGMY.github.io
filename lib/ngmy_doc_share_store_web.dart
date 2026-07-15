@@ -88,15 +88,19 @@ Future<_ChunkManifest?> _loadChunkManifest(String baseKey) async {
   }
 }
 
-Future<void> _persistBlob(String key, Uint8List bytes) async {
-  if (bytes.isEmpty) return;
-  _memoryBlobs[key] = bytes;
-  await ngmyDocShareIdbPut(key, bytes);
+Future<bool> _persistBlob(String key, Uint8List bytes) async {
+  if (bytes.isEmpty) return false;
+  final copy = Uint8List.fromList(bytes);
+  _memoryBlobs[key] = copy;
+  final ok = await ngmyDocShareIdbPut(key, copy);
+  if (!ok) {
+    debugPrint('[doc share persist] IndexedDB write failed for $key (${copy.length} bytes)');
+  }
+  return ok;
 }
 
-Future<bool> _blobIsReadable(String key, {int minBytes = 1}) async {
-  final mem = _memoryBlobs[key];
-  if (mem != null && mem.length >= minBytes) return true;
+/// Memory alone does not count — used before dropping live [html.File] refs.
+Future<bool> _durableBlobReadable(String key, {int minBytes = 1}) async {
   final idb = await ngmyDocShareIdbGet(key);
   if (idb != null && idb.length >= minBytes) {
     _memoryBlobs[key] = idb;
@@ -104,15 +108,23 @@ Future<bool> _blobIsReadable(String key, {int minBytes = 1}) async {
   }
   final manifest = await _loadChunkManifest(key);
   if (manifest != null && manifest.totalBytes >= minBytes && manifest.partKeys.isNotEmpty) {
+    var readable = 0;
     for (final partKey in manifest.partKeys) {
       final part = await ngmyDocShareIdbGet(partKey);
-      if (part != null && part.isNotEmpty) return true;
+      if (part != null && part.isNotEmpty) readable += part.length;
     }
+    if (readable >= minBytes) return true;
   }
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString(key);
   if (raw != null && raw.isNotEmpty) return true;
   return false;
+}
+
+Future<bool> _blobIsReadable(String key, {int minBytes = 1}) async {
+  final mem = _memoryBlobs[key];
+  if (mem != null && mem.length >= minBytes) return true;
+  return _durableBlobReadable(key, minBytes: minBytes);
 }
 
 Future<Uint8List?> _loadBlob(String key) async {
@@ -163,14 +175,21 @@ Future<void> _persistHtmlFileChunked(String email, String id, html.File file) as
     for (var start = 0; start < size; start += _streamChunkBytes) {
       final end = start + _streamChunkBytes < size ? start + _streamChunkBytes : size;
       final chunk = await _readHtmlBlobSlice(file.slice(start, end));
-      if (chunk == null || chunk.isEmpty) continue;
+      if (chunk == null || chunk.isEmpty) {
+        debugPrint('[doc share web persist chunked] empty slice $start-$end for $id');
+        continue;
+      }
       final partKey = '${baseKey}_part_${partKeys.length}';
-      await ngmyDocShareIdbPut(partKey, chunk);
+      final ok = await ngmyDocShareIdbPut(partKey, chunk);
+      if (!ok) {
+        debugPrint('[doc share web persist chunked] part write failed $partKey');
+        continue;
+      }
       partKeys.add(partKey);
     }
     if (partKeys.isEmpty) return;
     await _persistChunkManifest(baseKey, partKeys, size);
-    if (await _blobIsReadable(baseKey, minBytes: 1)) {
+    if (await _durableBlobReadable(baseKey, minBytes: 1)) {
       _webFiles.remove(id);
     } else {
       debugPrint('[doc share web persist chunked] verify failed for $id — keeping live file ref');
@@ -197,11 +216,14 @@ Future<void> _persistHtmlFile(String email, String id, html.File file) async {
     reader.readAsArrayBuffer(file);
     final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
     if (buf == null) return;
-    await _persistBlob(key, Uint8List.view(buf));
-    if (await _blobIsReadable(key, minBytes: 1)) {
+    final bytes = Uint8List.fromList(Uint8List.view(buf));
+    final ok = await _persistBlob(key, bytes);
+    if (ok && await _durableBlobReadable(key, minBytes: 1)) {
       _webFiles.remove(id);
     } else {
-      debugPrint('[doc share web persist] verify failed for $id — keeping live file ref');
+      // Keep live file + memory so preview/transfer still work this session.
+      _memoryBlobs[key] = bytes;
+      debugPrint('[doc share web persist] durable verify failed for $id — keeping live file ref');
     }
   } catch (e) {
     debugPrint('[doc share web persist] $e');
@@ -232,13 +254,16 @@ class NgmyDocShareStore {
       shortCode: NgmyDocShareShortCode.generateLocalCode(),
     );
     final key = _bytesPrefsKey(email, id);
-    await _persistBlob(key, bytes);
+    final durable = await _persistBlob(key, bytes);
     // Keep tiny legacy mirror for very old builds only.
     if (bytes.length <= _prefsMaxBytes) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(key, base64Encode(bytes));
       } catch (_) {}
+    }
+    if (!durable && bytes.length > _prefsMaxBytes) {
+      debugPrint('[doc share addBytes] durable storage failed for $name — kept in memory only');
     }
     final items = await _readIndex(email)..add(item);
     await _writeIndex(email, items);
@@ -259,7 +284,7 @@ class NgmyDocShareStore {
     for (final entry in files) {
       if (entry.file.size <= 0) continue;
       final id = _newId();
-      final mime = _guessMime(entry.name, null);
+      final mime = _guessMime(entry.name, null, fileMime: entry.file.type);
       final item = NgmyDocShareItem(
         id: id,
         name: entry.name,
@@ -412,12 +437,17 @@ class NgmyDocShareStore {
     return Uint8List.sublistView(all, start, safeEnd);
   }
 
-  static String _guessMime(String name, String? ext) {
+  static String _guessMime(String name, String? ext, {String? fileMime}) {
+    final browserMime = (fileMime ?? '').trim().toLowerCase();
+    if (browserMime.isNotEmpty && browserMime != 'application/octet-stream') {
+      return browserMime;
+    }
     final parts = name.split('.');
     final lower = (ext ?? (parts.length > 1 ? parts.last : '')).toLowerCase();
     switch (lower) {
       case 'jpg':
       case 'jpeg':
+      case 'jfif':
         return 'image/jpeg';
       case 'png':
         return 'image/png';
@@ -425,6 +455,11 @@ class NgmyDocShareStore {
         return 'image/gif';
       case 'webp':
         return 'image/webp';
+      case 'bmp':
+        return 'image/bmp';
+      case 'tif':
+      case 'tiff':
+        return 'image/tiff';
       case 'mp4':
       case 'm4v':
         return 'video/mp4';
@@ -469,6 +504,7 @@ class NgmyDocShareStore {
       case 'aac':
         return 'audio/aac';
       case 'heic':
+      case 'heif':
         return 'image/heic';
       default:
         return 'application/octet-stream';
@@ -477,22 +513,34 @@ class NgmyDocShareStore {
 
   static Future<Uint8List?> readBytes(String email, NgmyDocShareItem item) async {
     final key = _bytesPrefsKey(email, item.id);
+    final cached = _transferReadCache[key] ?? _memoryBlobs[key];
+    if (cached != null && cached.isNotEmpty) return cached;
+
     final manifest = await _loadChunkManifest(key);
-    if (manifest != null) {
+    if (manifest != null && manifest.partKeys.isNotEmpty) {
       final out = BytesBuilder(copy: false);
       for (final partKey in manifest.partKeys) {
         final part = await ngmyDocShareIdbGet(partKey);
         if (part != null && part.isNotEmpty) out.add(part);
       }
       final bytes = out.takeBytes();
-      return bytes.isEmpty ? null : bytes;
+      if (bytes.isNotEmpty) {
+        _memoryBlobs[key] = bytes;
+        _transferReadCache[key] = bytes;
+        return bytes;
+      }
+      // Incomplete/corrupt manifest — fall through to other sources.
+      debugPrint('[doc share readBytes] incomplete chunks for ${item.name}');
     }
+
     final stored = await _loadBlob(key);
-    if (stored != null && stored.isNotEmpty) return stored;
+    if (stored != null && stored.isNotEmpty) {
+      _transferReadCache[key] = stored;
+      return stored;
+    }
+
     final webFile = _webFiles[item.id];
     if (webFile != null) {
-      final cached = _transferReadCache[key];
-      if (cached != null && cached.isNotEmpty) return cached;
       try {
         final reader = html.FileReader();
         final done = Completer<ByteBuffer?>();
@@ -504,8 +552,9 @@ class NgmyDocShareStore {
         reader.readAsArrayBuffer(webFile);
         final buf = await done.future.timeout(const Duration(hours: 2), onTimeout: () => null);
         if (buf != null) {
-          final bytes = Uint8List.view(buf);
+          final bytes = Uint8List.fromList(Uint8List.view(buf));
           if (bytes.isNotEmpty) {
+            _memoryBlobs[key] = bytes;
             _transferReadCache[key] = bytes;
             unawaited(_persistBlob(key, bytes));
             return bytes;
@@ -516,10 +565,12 @@ class NgmyDocShareStore {
       }
       final range = await readByteRange(email, item, 0, webFile.size);
       if (range != null && range.isNotEmpty) {
-        _transferReadCache[key] = range;
-        unawaited(_persistBlob(key, range));
+        final copy = Uint8List.fromList(range);
+        _memoryBlobs[key] = copy;
+        _transferReadCache[key] = copy;
+        unawaited(_persistBlob(key, copy));
+        return copy;
       }
-      return range;
     }
     return null;
   }
@@ -794,8 +845,12 @@ class _WebDiskReceive {
   Future<void> flushPending() async {
     if (pending.length <= 0) return;
     final partKey = '${baseKey}_rx_$partIndex';
-    final bytes = pending.takeBytes();
-    await ngmyDocShareIdbPut(partKey, Uint8List.fromList(bytes));
+    final bytes = Uint8List.fromList(pending.takeBytes());
+    final ok = await ngmyDocShareIdbPut(partKey, bytes);
+    if (!ok) {
+      debugPrint('[doc share web recv] part write failed $partKey');
+      return;
+    }
     partKeys.add(partKey);
     totalBytes += bytes.length;
     partIndex++;

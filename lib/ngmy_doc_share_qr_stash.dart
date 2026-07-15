@@ -12,8 +12,8 @@ const String kNgmyDocShareQrPrefixCloud = 'NGMYDOCSYNC1';
 /// Unlimited rescans — stash stays until sender deletes the file.
 const int kNgmyDocShareQrMaxUses = 999999;
 
-/// Bundles larger than this cannot use cloud stash QR.
-const int kNgmyDocShareCloudStashMaxBytes = 12 * 1024 * 1024;
+/// Bundles larger than this cannot use cloud stash QR (fall back to storage relay).
+const int kNgmyDocShareCloudStashMaxBytes = 24 * 1024 * 1024;
 
 String _stashSettingsKey(String token) => 'ngmy_doc_share_stash_v2_${token.trim()}';
 

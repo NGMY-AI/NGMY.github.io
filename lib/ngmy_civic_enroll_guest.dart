@@ -377,6 +377,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         familyMembers: familyMembers,
         familyMales: males,
         familyFemales: females,
+        enrollmentSource: 'guest_self_enrollment',
       );
       remoteMembers.add(member);
 

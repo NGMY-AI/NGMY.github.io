@@ -79,10 +79,12 @@ class NgmyCivicRegistryMembers {
     int helps = 0,
     int missed = 0,
     String? enrolledAt,
+    String? enrollmentSource,
   }) {
     final total = familyMembers < 1 ? 1 : familyMembers;
     final males = familyMales < 0 ? 0 : familyMales;
     final females = familyFemales < 0 ? 0 : familyFemales;
+    final source = (enrollmentSource ?? '').trim();
     return {
       'email': emailKey(email),
       'fullName': fullName.trim(),
@@ -100,6 +102,7 @@ class NgmyCivicRegistryMembers {
       'helps': helps,
       'missed': missed,
       'enrolledAt': enrolledAt ?? DateTime.now().toUtc().toIso8601String(),
+      if (source.isNotEmpty) 'enrollmentSource': source,
     };
   }
 
@@ -151,6 +154,10 @@ class NgmyCivicRegistryMembers {
       if (!next.containsKey('showNicknames')) next['showNicknames'] = keep['showNicknames'] == true;
       if ((next['registryId'] ?? '').toString().trim().isEmpty) {
         next['registryId'] = keep['registryId'] ?? rid;
+      }
+      if ((next['enrollmentSource'] ?? '').toString().trim().isEmpty) {
+        next['enrollmentSource'] =
+            (keep['enrollmentSource'] ?? keep['source'] ?? '').toString();
       }
       next['updatedAt'] = now;
       members[idx] = next;
@@ -830,6 +837,11 @@ class NgmyCivicRegistryMembers {
     return 'Already enrolled — matching name, birthday, address, or phone was found (${parts.join(' · ')}). One person cannot be registered twice.';
   }
 
+  /// Updates an *existing* Civic Registry member only.
+  /// Never creates a new enrollment just because someone has an NGMY account /
+  /// updated their phone or profile. New members must come from:
+  /// - Authorized Registrar (state controller) enrollment, or
+  /// - Self-enrollment link (`?civic=enroll`).
   static void syncFromFields(
     dynamic config, {
     required String email,
@@ -848,12 +860,14 @@ class NgmyCivicRegistryMembers {
   }) {
     final existing = findByEmail(config, email) ??
         (registryId.trim().isEmpty ? null : findByRegistryId(config, registryId));
-    final existingFamily = existing?['familyMembers'];
+    if (existing == null) return;
+
+    final existingFamily = existing['familyMembers'];
     final family = familyMembers ??
         (existingFamily is num ? existingFamily.toInt() : int.tryParse('${existingFamily ?? ''}') ?? 1);
     final rid = registryId.trim().isNotEmpty
         ? registryId.trim()
-        : (existing?['registryId'] ?? '').toString().trim();
+        : (existing['registryId'] ?? '').toString().trim();
     if (emailKey(email).isEmpty && rid.isEmpty) return;
     upsert(
       config,
@@ -871,9 +885,25 @@ class NgmyCivicRegistryMembers {
         familyMembers: family,
         helps: helps,
         missed: missed,
-        enrolledAt: existing?['enrolledAt']?.toString(),
+        enrolledAt: existing['enrolledAt']?.toString(),
+        enrollmentSource: (existing['enrollmentSource'] ?? existing['source'] ?? '').toString(),
       ),
     );
+  }
+
+  /// Drop rows that were never real enrollments (e.g. profile sync leftovers with no Registry ID).
+  /// Registrar + self-enrollment always assign a [registryId].
+  static int pruneIncompleteEnrollments(dynamic config) {
+    final members = listFrom(config);
+    final before = members.length;
+    members.removeWhere((m) {
+      final rid = (m['registryId'] ?? '').toString().trim();
+      return rid.isEmpty;
+    });
+    if (members.length == before) return 0;
+    setList(config, members);
+    debugPrint('[civic] pruned ${before - members.length} incomplete registry row(s) without registryId');
+    return before - members.length;
   }
 
   static void migrateFromLegacyUsers(dynamic config, List<dynamic> allUsers) {

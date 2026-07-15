@@ -29,8 +29,10 @@ class NgmyDocShareVideoCloud {
     return '$kNgmyDocShareVideoCloudTokenPrefix${List.generate(10, (_) => chars[r.nextInt(chars.length)]).join()}';
   }
 
-  static String _safeName(String name) =>
-      name.replaceAll(RegExp(r'[^\w\-.]+'), '_').trim().isEmpty ? 'video.mp4' : name.replaceAll(RegExp(r'[^\w\-.]+'), '_');
+  static String _safeName(String name) {
+    final cleaned = name.replaceAll(RegExp(r'[^\w\-.]+'), '_').trim();
+    return cleaned.isEmpty ? 'file.bin' : cleaned;
+  }
 
   static Future<Map<String, dynamic>> _loadRelays() async {
     if (!await ngmyCanReachCloud()) return {};
@@ -83,17 +85,19 @@ class NgmyDocShareVideoCloud {
   }
 
   /// Starts cloud upload; when [awaitUpload] is true, QR is returned only after upload completes.
+  /// Set [allowAnyFile] to share large images/documents the same way as videos.
   static Future<NgmyDocShareVideoCloudQr?> beginShare({
     required String ownerEmail,
     required List<NgmyDocShareItem> items,
     bool awaitUpload = false,
+    bool allowAnyFile = false,
   }) async {
     if (items.isEmpty || !await ngmyCanReachCloud()) return null;
-    final videos = items.where((e) => e.isVideo).toList();
-    if (videos.isEmpty) return null;
+    final selected = allowAnyFile ? List<NgmyDocShareItem>.from(items) : items.where((e) => e.isVideo).toList();
+    if (selected.isEmpty) return null;
 
     final token = _generateToken();
-    final fileRows = videos
+    final fileRows = selected
         .map((e) => {
               'id': e.id,
               'name': e.name,
@@ -115,14 +119,14 @@ class NgmyDocShareVideoCloud {
     await _saveRelays(relays);
 
     if (awaitUpload) {
-      await _uploadAll(ownerEmail: ownerEmail, token: token, items: videos, fileRows: fileRows);
+      await _uploadAll(ownerEmail: ownerEmail, token: token, items: selected, fileRows: fileRows);
     } else {
-      unawaited(_uploadAll(ownerEmail: ownerEmail, token: token, items: videos, fileRows: fileRows));
+      unawaited(_uploadAll(ownerEmail: ownerEmail, token: token, items: selected, fileRows: fileRows));
     }
 
     return (
       qrPayload: '$kNgmyDocShareQrPrefixVideoCloud|$token',
-      fileCount: videos.length,
+      fileCount: selected.length,
       token: token,
     );
   }

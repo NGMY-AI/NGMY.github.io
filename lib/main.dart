@@ -2636,11 +2636,18 @@ UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> 
 }
 
 List<UserData> _civicRegistryMembersForDisplay(AppConfig config, List<UserData> allUsers) {
+  NgmyCivicRegistryMembers.pruneIncompleteEnrollments(config);
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
   return NgmyCivicRegistryMembers.listFrom(config).map((m) => _civicMemberRecordToDisplayUser(m, allUsers)).toList();
 }
 
 void _syncCivicMemberRecordFromUser(AppConfig config, UserData u) {
+  // Never enroll from account/profile edits — only update people already in the registry.
+  final already =
+      NgmyCivicRegistryMembers.findByEmail(config, u.email) != null ||
+      ((u.registryId ?? '').trim().isNotEmpty &&
+          NgmyCivicRegistryMembers.findByRegistryId(config, u.registryId!) != null);
+  if (!already) return;
   NgmyCivicRegistryMembers.syncFromFields(
     config,
     email: u.email,
@@ -29896,6 +29903,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       familyMembers: familyMembers,
       familyMales: familyMales,
       familyFemales: familyFemales,
+      enrollmentSource: 'registrar',
     );
 
     setState(() {

@@ -21,7 +21,9 @@ class NgmyDocShareItem {
   final String? shortCode;
   final String? stashToken;
 
-  bool get isImage => mime.startsWith('image/') || _extMatch(const ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp']);
+  bool get isImage =>
+      mime.startsWith('image/') ||
+      _extMatch(const ['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tif', 'tiff']);
 
   bool get isVideo =>
       mime.startsWith('video/') || _extMatch(const ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv', '3gp']);
