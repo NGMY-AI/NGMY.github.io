@@ -7,6 +7,8 @@ import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
+import 'ngmy_feature_sync_session.dart';
+import 'ngmy_game_session.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -29,20 +31,39 @@ Future<void> showNgmyLocalGrowthIncomePage(
   required UserData liveUser,
   required AppConfig config,
   required List<InvestmentPlan> plans,
+  void Function(AppTransaction transaction)? onCloudAddTransaction,
+  Future<void> Function(double balance)? onPersistBalanceToCloud,
 }) {
   return NgmyNavigator.push<void>(
     context,
-    NgmyLocalGrowthIncomeScreen(liveUser: liveUser, config: config, plans: plans),
+    NgmyLocalGrowthIncomeScreen(
+      liveUser: liveUser,
+      config: config,
+      plans: plans,
+      onCloudAddTransaction: onCloudAddTransaction,
+      onPersistBalanceToCloud: onPersistBalanceToCloud,
+    ),
     fullscreenDialog: true,
   );
 }
 
 class NgmyLocalGrowthIncomeScreen extends StatefulWidget {
-  const NgmyLocalGrowthIncomeScreen({super.key, required this.liveUser, required this.config, required this.plans});
+  const NgmyLocalGrowthIncomeScreen({
+    super.key,
+    required this.liveUser,
+    required this.config,
+    required this.plans,
+    this.onCloudAddTransaction,
+    this.onPersistBalanceToCloud,
+  });
 
   final UserData liveUser;
   final AppConfig config;
   final List<InvestmentPlan> plans;
+  /// Sends deposit/withdraw requests to the main app cloud so admin Growth Income can review them.
+  final void Function(AppTransaction transaction)? onCloudAddTransaction;
+  /// Saves spendable balance to the users row in the database.
+  final Future<void> Function(double balance)? onPersistBalanceToCloud;
 
   @override
   State<NgmyLocalGrowthIncomeScreen> createState() => _NgmyLocalGrowthIncomeScreenState();
@@ -59,12 +80,21 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   @override
   void initState() {
     super.initState();
+    NgmyFeatureSyncSession.enterGrowthIncomeUser();
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    NgmyFeatureSyncSession.leaveGrowthIncomeUser();
     super.dispose();
+  }
+
+  Future<void> _syncBalanceToCloud() async {
+    final user = _user;
+    if (user == null) return;
+    widget.liveUser.accountBalance = user.accountBalance;
+    await widget.onPersistBalanceToCloud?.call(user.accountBalance);
   }
 
   Future<void> _load() async {
@@ -72,6 +102,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
     var revision = loaded.walletStateRevision;
+    // Balance lives in the database — cloud/live account is the source of truth.
+    user.accountBalance = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    ngmySeedLiveBalance(user.email, user.accountBalance);
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
 
     // Admin "Send money now" credits — no QR scan required.
@@ -109,9 +142,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _loading = false;
     });
     unawaited(_persist(bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty));
+    if (payoutAdded || appliedCreditIds.isNotEmpty) {
+      unawaited(_syncBalanceToCloud());
+    }
   }
 
-  Future<void> _persist({bool bumpWalletRevision = false}) async {
+  Future<void> _persist({bool bumpWalletRevision = false, bool syncBalance = false}) async {
     final user = _user;
     if (user == null) return;
     await NgmyLocalGrowthIncomeStore.save(
@@ -123,19 +159,57 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     if (bumpWalletRevision) {
       _walletStateRevision++;
     }
+    if (syncBalance) {
+      unawaited(_syncBalanceToCloud());
+    }
   }
 
   void _onDataChanged() {
     setState(() {});
-    unawaited(_persist());
+    unawaited(_persist(syncBalance: true));
   }
 
-  void _onAddTransaction(AppTransaction t, {bool bumpWalletRevision = true}) {
+  void _onAddTransaction(AppTransaction t, {bool bumpWalletRevision = true, bool cloudRequest = false}) {
     final user = _user;
     if (user == null) return;
-    NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
+
+    if (cloudRequest) {
+      final forCloud = AppTransaction(
+        id: t.id,
+        userEmail: widget.liveUser.email,
+        amount: t.amount,
+        type: t.type,
+        method: t.method,
+        sourceDetails: t.sourceDetails,
+        screenshotPath: t.screenshotPath,
+        verificationCode: t.verificationCode,
+        status: t.status,
+        timestamp: t.timestamp,
+      );
+      widget.onCloudAddTransaction?.call(forCloud);
+    }
+
+    if (t.status == TransactionStatus.pending && t.type == TransactionType.deposit) {
+      // History only — balance credits when admin approves.
+    } else if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
+      // Prefer the cloud/live balance after the pending hold, with a local fallback hold.
+      final liveBal = widget.liveUser.accountBalance;
+      if (liveBal < user.accountBalance - 0.001) {
+        user.accountBalance = liveBal.clamp(0.0, double.infinity);
+      } else {
+        user.accountBalance = (user.accountBalance - t.amount).clamp(0.0, double.infinity);
+      }
+      ngmySeedLiveBalance(user.email, user.accountBalance);
+    } else {
+      NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
+    }
+
     setState(() => _transactions = [..._transactions, t]);
-    unawaited(_persist(bumpWalletRevision: bumpWalletRevision));
+    final shouldSyncBalance =
+        t.type == TransactionType.withdrawal ||
+        t.status == TransactionStatus.approved ||
+        cloudRequest;
+    unawaited(_persist(bumpWalletRevision: bumpWalletRevision, syncBalance: shouldSyncBalance));
   }
 
   void _onInvest(String name, double price, double roi, double cost) {
@@ -280,7 +354,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       ),
       bumpWalletRevision: false,
     );
-    _toast('Clock-in started. Keep Local Growth active for today.');
+    _toast('Clock-in started. Keep Growth Income open for today.');
   }
 
   @override
@@ -327,7 +401,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           user: _user!,
           realEmail: widget.liveUser.email,
           config: widget.config,
-          onAdd: _onAddTransaction,
+          onAdd: (t, {bool cloudRequest = false}) => _onAddTransaction(t, cloudRequest: cloudRequest),
           onBackup: _openBackup,
         ),
       ),
@@ -607,7 +681,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                   if (recent.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Text('No local activity yet. Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
+                      child: Text('No activity yet. Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
                     )
                   else
                     ...recent.map((t) => _activityRow(context, t, isDark: true)),
@@ -1093,9 +1167,9 @@ class _ClockInRingPainter extends CustomPainter {
       oldDelegate.glowStrength != glowStrength;
 }
 
-/// Mirrors WalletScreen's look (FloatingTitle, gradient header, Deposit /
-/// Withdraw / History 3-way switch, same presets/fee/minimum). Deposits use
-/// the same payment proof flow as the main wallet; admin credits via QR scan.
+/// Wallet tab for Growth Income (deposit / withdraw / history).
+/// History stays on-device; deposit & withdraw requests go to cloud for admin review.
+/// Balance is saved in the database.
 class _LocalWalletTab extends StatefulWidget {
   const _LocalWalletTab({
     super.key,
@@ -1109,7 +1183,7 @@ class _LocalWalletTab extends StatefulWidget {
   final UserData user;
   final String realEmail;
   final AppConfig config;
-  final void Function(AppTransaction) onAdd;
+  final void Function(AppTransaction t, {bool cloudRequest}) onAdd;
   final VoidCallback onBackup;
 
   @override
@@ -1149,10 +1223,12 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
-  void _submitLocalDeposit(AppTransaction transaction) {
-    widget.onAdd(transaction);
+  void _submitDeposit(AppTransaction transaction) {
+    // Keep a local history copy; send the pending request to cloud for admin review.
+    widget.onAdd(transaction, cloudRequest: true);
     unawaited(_notifyWhatsApp(transaction));
-    _toast('Deposit request sent. Share payment proof on WhatsApp — admin will send a one-time deposit QR.');
+    _toast('Deposit submitted. Admin will review your payment proof in Growth Income.');
+    setState(() {});
   }
 
   void _openDepositPaymentPage(double amount) {
@@ -1161,12 +1237,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
       SubmitPaymentPage(
         user: widget.user,
         amount: amount,
-        onAdd: _submitLocalDeposit,
+        onAdd: _submitDeposit,
         config: widget.config,
-        requestTitle: 'Submit Local Deposit',
+        requestTitle: 'Submit Deposit',
         successHint:
-            'After you pay on Cash App or Bitcoin, submit here then send the WhatsApp message. '
-            'Admin will verify and send a deposit QR to scan in Backup & Restore.',
+            'Your deposit is pending. Admin will verify your payment proof and credit your balance.',
       ),
     );
   }
@@ -1201,28 +1276,20 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     }
     final fee = a * 0.15;
     final receive = a - fee;
-    widget.onAdd(AppTransaction(
-      id: 'local_wd_${DateTime.now().microsecondsSinceEpoch}',
-      userEmail: widget.user.email,
-      amount: a,
-      type: TransactionType.withdrawal,
-      method: PaymentMethod.cashApp,
-      sourceDetails: 'Withdrawal to \$$tag — Fee: \$${formatCurrency(fee)} — You receive: \$${formatCurrency(receive)}',
-      status: TransactionStatus.approved,
-      timestamp: DateTime.now(),
-    ));
-    _toast('Withdrawal request sent on WhatsApp.');
-    unawaited(ngmyShareLocalWalletWhatsApp(
-      config: widget.config,
-      message: ngmyLocalWithdrawWhatsAppMessage(
-        user: widget.user,
-        realEmail: widget.realEmail,
+    widget.onAdd(
+      AppTransaction(
+        id: 'wd_${DateTime.now().microsecondsSinceEpoch}',
+        userEmail: widget.user.email,
         amount: a,
-        fee: fee,
-        receive: receive,
-        cashAppTag: tag,
+        type: TransactionType.withdrawal,
+        method: PaymentMethod.cashApp,
+        sourceDetails: 'Withdrawal to \$$tag — Fee: \$${formatCurrency(fee)} — You receive: \$${formatCurrency(receive)}',
+        status: TransactionStatus.pending,
+        timestamp: DateTime.now(),
       ),
-    ));
+      cloudRequest: true,
+    );
+    _toast('Withdrawal submitted — waiting for admin approval.');
     _amt.clear();
     _cashAppTag.clear();
     setState(() {});
@@ -1246,9 +1313,9 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             FloatingTitle(
-              title: 'LOCAL WALLET',
+              title: 'WALLET',
               leading: InkWell(
-                onTap: () => _toast('This wallet is separate from Growth Income. Add funds here to invest locally.'),
+                onTap: () => _toast('Deposit and withdraw here. Balance is saved to your account.'),
                 customBorder: const CircleBorder(),
                 child: Container(
                   width: 40,
@@ -1319,7 +1386,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                     child: const Icon(Icons.account_balance_rounded, color: Colors.white, size: 30),
                   ),
                   const SizedBox(height: 10),
-                  const Text('Local Balance', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                  const Text('Balance', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 5),
                   Text(
                     '\$${formatCurrency(widget.user.accountBalance)}',

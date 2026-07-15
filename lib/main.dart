@@ -12836,6 +12836,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onMarkAnnouncementsRead: (ids) => _markAnnouncementsReadForUser(ids),
                 onRefreshAdminData: _refreshAdminDashboardFromCloud,
                 onPushUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
+                onPushBalanceToCloud: (u, {bool allowDecrease = false}) => _pushUserBalanceToCloud(u, allowDecrease: allowDecrease),
                 onPersistUserToCloud: (u) => _pushUserToCloudFast(u, includeFreeTrial: true),
                 onRefreshLegalAndPlans: () => _refreshLegalAndPlansFromCloud(),
                 onPersistManagementConfig: _saveAdminManagementConfigNow,
@@ -14280,6 +14281,7 @@ class MainScreen extends StatefulWidget {
   final Future<void> Function(List<String> ids)? onMarkAnnouncementsRead;
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(UserData user)? onPushUserToCloud;
+  final Future<bool> Function(UserData user, {bool allowDecrease})? onPushBalanceToCloud;
   final Future<bool> Function(UserData user)? onPersistUserToCloud;
   final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
   final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
@@ -14293,7 +14295,7 @@ class MainScreen extends StatefulWidget {
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
   final Future<void> Function(String code)? onReferralLinked;
 
-  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onPersistUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onRefreshLegalAndPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onReferralLinked});
+  const MainScreen({super.key, required this.user, required this.allTransactions, required this.allUsers, required this.globalPlans, required this.allMedia, required this.allAnnouncements, required this.config, required this.onThemeChanged, required this.currentThemeMode, required this.onLogout, required this.onDataChanged, required this.onAddTransaction, required this.onProcessTransaction, required this.onAddPlan, required this.onPostMedia, this.onRefreshMediaFromCloud, this.onDeleteMedia, this.onPruneMedia, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onPromptNotifications, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onPushUserToCloud, this.onPushBalanceToCloud, this.onPersistUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onRefreshLegalAndPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onReferralLinked});
   @override State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -14942,6 +14944,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         onRefreshAdminData: widget.onRefreshAdminData,
         onDeleteMedia: widget.onDeleteMedia,
         onPushUserToCloud: widget.onPushUserToCloud,
+        onPushBalanceToCloud: widget.onPushBalanceToCloud,
         onPersistManagementConfig: widget.onPersistManagementConfig,
         onRefreshManagementData: widget.onRefreshManagementData,
         onRefreshAdminMedia: widget.onRefreshAdminMedia,
@@ -15452,6 +15455,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(MediaPost post)? onDeleteMedia;
   final Future<void> Function(UserData user)? onPushUserToCloud;
+  final Future<bool> Function(UserData user, {bool allowDecrease})? onPushBalanceToCloud;
   final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
   final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
@@ -15467,7 +15471,7 @@ class HomeScreen extends StatefulWidget {
   final bool disableLocalGrowthIncomeEntry;
   final bool isLocalGrowthIncome;
   final String? homeTitleOverride;
-  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
+  const HomeScreen({super.key, required this.user, required this.onClockIn, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onMarkAnnouncementsRead, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onPushBalanceToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia, this.onOpenInvest, this.onOpenAdminDashboard, this.homeLeadingOverride, this.disableLocalGrowthIncomeEntry = false, this.isLocalGrowthIncome = false, this.homeTitleOverride});
 
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -15767,7 +15771,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       );
       return;
     }
-    await showNgmyLocalGrowthIncomePage(context, liveUser: widget.user, config: widget.config, plans: widget.globalPlans);
+    await showNgmyLocalGrowthIncomePage(
+      context,
+      liveUser: widget.user,
+      config: widget.config,
+      plans: widget.globalPlans,
+      onCloudAddTransaction: widget.onAddTransaction,
+      onPersistBalanceToCloud: (balance) async {
+        widget.user.accountBalance = balance;
+        await widget.onPushBalanceToCloud?.call(widget.user, allowDecrease: true);
+        widget.onDataChanged();
+      },
+    );
   }
 
   @override Widget build(BuildContext context) {
@@ -19970,6 +19985,7 @@ class AdminDashboard extends StatefulWidget {
   final Future<void> Function()? onRefreshAdminData;
   final Future<void> Function(MediaPost post)? onDeleteMedia;
   final Future<void> Function(UserData user)? onPushUserToCloud;
+  final Future<bool> Function(UserData user, {bool allowDecrease})? onPushBalanceToCloud;
   final Future<bool> Function(String cashApp, String bitcoin)? onSaveWalletPayments;
   final Future<bool> Function(InvestmentPlan plan, {InvestmentPlan? replace})? onUpsertInvestmentPlan;
   final Future<bool> Function(InvestmentPlan plan)? onRemoveInvestmentPlan;
@@ -19979,7 +19995,7 @@ class AdminDashboard extends StatefulWidget {
   final Future<void> Function()? onRefreshManagementData;
   final Future<void> Function()? onRefreshAdminMedia;
   final Future<int> Function({bool verifyUrls})? onPurgeBrokenMedia;
-  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
+  const AdminDashboard({super.key, required this.user, required this.allTransactions, required this.onProcess, required this.allUsers, required this.globalPlans, required this.onAddPlan, required this.onAddTransaction, required this.onDataChanged, required this.config, required this.allMedia, required this.allAnnouncements, required this.onAddAnnouncement, required this.onDeleteAnnouncement, required this.onClearAllAnnouncements, this.onSaveLegalContent, this.onSavePopups, this.onUploadPopupVideo, this.onSyncAdminMediaPost, this.onSyncAdminUserMedia, this.onEnqueueMediaDelivery, this.onRefreshAdminData, this.onDeleteMedia, this.onPushUserToCloud, this.onPushBalanceToCloud, this.onSaveWalletPayments, this.onUpsertInvestmentPlan, this.onRemoveInvestmentPlan, this.onRefreshInvestmentPlans, this.onArchiveWalletTransaction, this.onPersistManagementConfig, this.onRefreshManagementData, this.onRefreshAdminMedia, this.onPurgeBrokenMedia});
   @override State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
