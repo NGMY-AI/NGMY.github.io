@@ -25749,7 +25749,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (widget.user.isAdmin)
               IconButton(
                 onPressed: () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
-                tooltip: 'Admin deposit QR',
+                tooltip: 'Local deposit',
                 icon: NgmyHudMiniOrb(
                   colors: const [Color(0xFF22C55E), Color(0xFF16A34A)],
                   pulse: pulse,

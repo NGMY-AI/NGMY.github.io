@@ -73,6 +73,34 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final transactions = List<AppTransaction>.from(loaded.transactions);
     var revision = loaded.walletStateRevision;
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
+
+    // Admin "Send money now" credits — no QR scan required.
+    final pendingAdminCredits = await NgmyLocalDepositQr.claimPendingCredits(widget.liveUser.email);
+    final appliedCreditIds = <String>[];
+    for (final credit in pendingAdminCredits) {
+      final txnId = 'local_admin_push_${credit.id}';
+      if (transactions.any((t) => t.id == txnId)) {
+        appliedCreditIds.add(credit.id);
+        continue;
+      }
+      final txn = AppTransaction(
+        id: txnId,
+        userEmail: user.email,
+        amount: credit.amount,
+        type: TransactionType.deposit,
+        method: PaymentMethod.system,
+        sourceDetails: 'Admin deposit (\$${formatCurrency(credit.amount)})',
+        status: TransactionStatus.approved,
+        timestamp: DateTime.now(),
+      );
+      NgmyLocalGrowthIncomeStore.applyTransaction(user, txn);
+      transactions.add(txn);
+      appliedCreditIds.add(credit.id);
+    }
+    if (appliedCreditIds.isNotEmpty) {
+      unawaited(NgmyLocalDepositQr.markCreditsClaimed(widget.liveUser.email, appliedCreditIds));
+    }
+
     if (!mounted) return;
     setState(() {
       _user = user;
@@ -80,7 +108,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _walletStateRevision = revision;
       _loading = false;
     });
-    unawaited(_persist(bumpWalletRevision: payoutAdded));
+    unawaited(_persist(bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty));
   }
 
   Future<void> _persist({bool bumpWalletRevision = false}) async {
