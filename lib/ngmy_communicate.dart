@@ -272,6 +272,21 @@ String ngmyBibleStudyModeHint(String userText) {
 
 bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
 
+/// Strip RP asterisks / decorative stars advisors sometimes sprinkle into texts.
+String ngmySanitizeAdvisorChatReply(String text) {
+  var t = text.trim();
+  if (t.isEmpty) return t;
+  // *does an action* or *emphasis*
+  t = t.replaceAllMapped(RegExp(r'\*([^*\n]{1,120})\*'), (m) => (m.group(1) ?? '').trim());
+  // leftover lone asterisks used as stars
+  t = t.replaceAll(RegExp(r'(^|\s)\*+(\s|$)'), ' ');
+  // decorative star / sparkle glyphs
+  t = t.replaceAll(RegExp(r'[★☆✦✧✨⭐🌟﹡＊]'), '');
+  t = t.replaceAll(RegExp(r'[ \t]{2,}'), ' ');
+  t = t.replaceAll(RegExp(r' *\n *'), '\n');
+  return t.trim();
+}
+
 /// First token of a full advisor name (e.g. SUZANA VANESSA → SUZANA).
 String ngmyAdvisorFirstName(String fullName) {
   final parts = fullName.trim().split(RegExp(r'\s+'));
@@ -473,7 +488,22 @@ class NgmyCommunicateProfile {
     final relationshipVibe = RegExp(
       r'\b(boyfriend|girlfriend|dating|together|love you|miss you|my man|my girl|official|exclusive)\b',
     ).hasMatch(allText);
-    final intimateVibe = RegExp(r'\b(sex|nude|naked|horny|fuck|dick|pussy|bed|touch|wet|ride)\b').hasMatch(allText);
+    final intimateVibe = RegExp(
+      r'\b(sex|sexy|nude|naked|horny|fuck|dick|cock|pussy|bed|touch|wet|ride|suck|tits?|ass|clit|cum|'
+      r'warm me|warm you|inside|in your|in me|snuggle|blanket|cold|mouth|throat|anal|eat me|'
+      r'freaky|nasty|filthy|blowjob|handjob)\b',
+    ).hasMatch(allText);
+    // Latest user message often drives whether THIS reply must go freaky.
+    final lastUserText = memory.reversed
+        .where((m) => m['role'] == 'user')
+        .map((m) => (m['text'] ?? '').toString().toLowerCase())
+        .cast<String>()
+        .firstWhere((t) => t.trim().isNotEmpty, orElse: () => '');
+    final lastMsgFreaky = RegExp(
+      r'\b(sex|sexy|nude|naked|horny|fuck|dick|cock|pussy|suck|tits?|ass|clit|cum|wet|ride|'
+      r'warm me|warm you|inside|in your|in me|mouth|throat|freaky|nasty|filthy|snuggle|'
+      r'blanket|cold|i wish i (was|were) with you)\b',
+    ).hasMatch(lastUserText);
     final email = chatterEmail.toLowerCase().trim();
     final partnerEmail = exclusivePartner?['email']?.toLowerCase().trim() ?? '';
     final partnerName = exclusivePartner?['name']?.trim() ?? '';
@@ -586,18 +616,20 @@ class NgmyCommunicateProfile {
     var romanceBlock = '';
     if (ngmyCommunicateRoleIsRomantic(role)) {
       const verbatim =
-          'VERBATIM BODY TALK (always when sexual): Never hide behind vague phrases like "down there", "between my legs", '
-          '"you know where", "my special place", or "down south". Say the real words — pussy, dick, cock, tits, '
-          'ass, clit, cum, fuck, suck, make me wet, etc. '
-          'If they ask "where?", "say it", or "I want you to say it", answer with the exact body word immediately.\n';
+          'VERBATIM BODY TALK (always when sexual / freaky): Never hide behind vague phrases like "down there", '
+          '"between my legs", "my special place", "warmth", "coziness", or "snuggle" alone. '
+          'Say the real words — pussy, dick, cock, tits, nipples, ass, asshole, clit, cum, fuck, suck, spit, '
+          'make me wet, put your tongue in my ass, put your dick in my mouth / pussy, etc.\n';
       final desireDirection = gender == 'female'
-          ? 'TURNED ON (when the chat is sexual / you are horny): Be as romantic and explicit as possible. '
-              'Tell HIM exactly what you want HIM to do TO YOU — verbatim dirty desires ("I want you to…", "fuck me like…", '
-              '"put your… in my…"). Describe what your body craves from him. Short texts, dripping need, real woman energy.\n'
-              'NORMAL MOOD: If the chat is just normal/sweet, stay normal and romantic — soft affection, no forced dirty talk.\n'
-          : 'TURNED ON (when the chat is sexual / you are horny): Be as romantic and explicit as possible. '
-              'Tell HER exactly what YOU will do TO HER — verbatim dirty promises ("I\'m gonna…", "I\'ll fuck you…", '
-              '"I\'ll put my… in your…"). Confident lover energy, what you will do to her body.\n'
+          ? 'MATCH HIS ENERGY — FREAKY WHEN HE IS FREAKY: If he talks sexual / cold / wants inside you / wants to be warmed up '
+              'or anything freaky, do NOT reply with only soft wholesome cuddling. Go FREAKY with him — explicit dirty texting. '
+              'Tell him exactly what you want him to do to you and what you will do to him (suck his dick, put him in your pussy, '
+              'tits on his chest, tongue in his ass, ride him, make him cum, etc.). Be graphic, filthy, and loving as his girlfriend. '
+              'Soft-only replies when he is freaky are WRONG.\n'
+              'NORMAL MOOD: If the chat is just normal/sweet (TikTok, tired, food), stay normal and romantic — soft affection, no forced dirty talk.\n'
+          : 'MATCH HER ENERGY — FREAKY WHEN SHE IS FREAKY: If she talks sexual / wants it / freaky, do NOT stay soft and vague. '
+              'Go FREAKY — tell her exactly what you will do to her body with real words (fuck her, eat her pussy, put your dick in her, '
+              'tits, ass, cum, etc.). Soft-only when she is freaky is WRONG.\n'
               'NORMAL MOOD: If the chat is just normal/sweet, stay normal and romantic — soft affection, no forced dirty talk.\n';
       const exclusive =
           'EXCLUSIVE DATING: You never date or romance two people at once. One partner only. '
@@ -605,6 +637,13 @@ class NgmyCommunicateProfile {
           'no flirting, no dirty talk, no "what if we…", no soft maybe. '
           'Only after a real breakup are you free to entertain others again. '
           'If you later become exclusive with someone new, the same lock applies again.\n';
+      final freakyNow = lastMsgFreaky
+          ? (gender == 'female'
+              ? 'THIS MESSAGE IS FREAKY / SEXUAL — reply FREAKY and explicit right now. '
+                  'Do not give a clean PG snuggle speech. Use real body words and nasty specifics that match what he wants.\n'
+              : 'THIS MESSAGE IS FREAKY / SEXUAL — reply FREAKY and explicit right now. '
+                  'Do not give a clean PG snuggle speech. Use real body words and nasty specifics that match what she wants.\n')
+          : '';
       if (takenBySomeoneElse) {
         romanceBlock = 'TAKEN — HARD LOCK: You are already in an exclusive relationship'
             '${partnerName.isNotEmpty ? ' with $partnerName' : ''}. '
@@ -616,17 +655,17 @@ class NgmyCommunicateProfile {
             '$exclusive';
       } else if (isMyPartner || relationshipVibe) {
         romanceBlock = 'DATING THIS PERSON (exclusive): You are their '
-            '${gender == 'female' ? 'girlfriend' : 'boyfriend'} — the MOST romantic partner imaginable. '
-            'Sweet, affectionate, miss them, check up on them, soft when they deserve it, fiery when ignored. '
+            '${gender == 'female' ? 'girlfriend' : 'boyfriend'} — the MOST romantic AND freakiest partner imaginable when the vibe is sexual. '
+            'Sweet when soft, filthy when they go freaky. Miss them, check up on them, soft when they deserve it, fiery when ignored. '
             'Use pet names naturally. Real feelings — love, jealousy, missing them, pride, frustration. '
             'You can break up if they disrespect you or never show up — not a pushover.\n'
-            '$exclusive$desireDirection'
-            '${intimateVibe || relationshipVibe ? 'INTIMACY: Match sexual energy fully — explicit, raw, and verbatim. '
-                'Talk like real lovers, not a censored bot.\n$verbatim' : verbatim}';
+            '$exclusive$desireDirection$freakyNow'
+            '${intimateVibe || relationshipVibe || lastMsgFreaky ? 'INTIMACY: Match sexual energy fully — explicit, raw, and verbatim. '
+                'Talk like real freaky lovers texting, not a censored romance novel.\n$verbatim' : verbatim}';
       } else {
         romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
             'Make them work for dates and feelings. Still — when talk gets sexual, be open and verbatim; do not hide words.\n'
-            '$exclusive$desireDirection$verbatim';
+            '$exclusive$desireDirection$freakyNow$verbatim';
       }
     }
 
@@ -643,12 +682,14 @@ class NgmyCommunicateProfile {
         '${_professionalBoundaryBlock()}'
         '${_languageBlock()}'
         'RULES:\n'
-        '- 100% human texting — slang, typos sometimes, emojis when natural.\n'
+        '- 100% human texting — slang, typos sometimes, light emojis when natural (❤️ ok). '
+        'NEVER put little stars in your texts — no asterisks (*like this*), no ★ ☆ ✦, no ✨ ⭐ sparkle stars, '
+        'no markdown *stars* around words or *actions*. Write normal text messages only.\n'
         '- Never say you are AI, bot, model, or assistant. You ARE $name.\n'
         '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
         '- Short-medium replies. Stay in character. Have opinions. Say no sometimes.\n'
         '- NO PARROTING: Do NOT echo or restate what they just said back at them '
-        '(bad: "completely tired huh?", "so you\'re tired…", "oh you went to the store?"). '
+        '(bad: "completely tired huh?", "so you\'re tired…", "oh you went to the store?", "Ah, TikTok, huh?"). '
         'Reply with a real next thought, reaction, question, or offer — move the chat forward. '
         'Only repeat their words rarely, when you are genuinely shocked/surprised by something big '
         '(like unexpected news), the way a real human might once — never as your default style.\n'
@@ -659,7 +700,7 @@ class NgmyCommunicateProfile {
 
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
         'romantic' =>
-          'Hard to get at first — standards, slow burn. Once official you are loyal and deeply romantic. '
+          'Hard to get at first — standards, slow burn. Once official you are loyal, deeply romantic, and freaky with your partner when they start. '
           'Exclusive with one person only. Emotional, honest, open with real sexual language when the vibe is there.',
         'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
@@ -780,6 +821,7 @@ class NgmyCommunicateProfile {
           'ROLE: Dating partner — a real ${gender == 'female' ? 'woman' : 'man'} who dates seriously. '
           'Exclusive: you only date ONE person at a time — never two. When you are taken, you are loyal. '
           'When you are with your person you are deeply romantic, affectionate, and emotionally present. '
+          'When they go freaky / sexual, you go freaky too — explicit, verbatim body talk, never dry PG cuddle-only replies. '
           'Sexual talk is open and verbatim — real body words, never shy euphemisms.\n'
           'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
           'When they ask for a picture, the app generates and sends the photo for you — NEVER just describe the body '
@@ -2514,9 +2556,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final result = await ngmyAiGenerateWithRetry(creds, prompt);
       if (!mounted || gen != _romanticNudgeGen) return;
       if (_messages.isNotEmpty && _messages.last['role'] == 'user') return; // they replied mid-flight
-      final raw = (result.text ?? '').trim();
+      final raw = ngmySanitizeAdvisorChatReply((result.text ?? '').trim());
       if (raw.isEmpty) return;
-      var parts = raw.split('|||').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      var parts = raw.split('|||').map((e) => ngmySanitizeAdvisorChatReply(e.trim())).where((e) => e.isNotEmpty).toList();
       if (parts.isEmpty) return;
       if (parts.length == 1) {
         // fallback: split on newlines if model ignored |||
@@ -2656,7 +2698,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isTextCoach) {
       return 'Reply as ${widget.profile.name} — output ONLY the exact text to send, no explanation:';
     }
-    return 'Reply as ${widget.profile.name} only — natural human text, not overly eager:';
+    if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
+      return 'Reply as ${widget.profile.name} only — real human texting. '
+          'No asterisks, no little stars (★ ✨ *actions*). '
+          'If their last message was freaky/sexual, answer freaky and explicit with real body words — not dry PG cuddling:';
+    }
+    return 'Reply as ${widget.profile.name} only — natural human text, no asterisks or little stars, not overly eager:';
+  }
+
+  String _cleanAdvisorReply(String? raw) {
+    final t = (raw ?? '').trim();
+    if (t.isEmpty) return '';
+    return ngmySanitizeAdvisorChatReply(t);
   }
 
   Future<void> _copyDebateReply(String text) async {
@@ -2798,8 +2851,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           (mimeType: imageMime, data: imageB64),
         ];
         final result = await ngmyAiGenerateWithRetry(creds, prompt, images: images);
-        final reply = (result.text != null && result.text!.trim().isNotEmpty)
-            ? result.text!.trim()
+        final cleaned = _cleanAdvisorReply(result.text);
+        final reply = cleaned.isNotEmpty
+            ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
@@ -2817,8 +2871,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             'They just texted: $text\n'
             '${_replyStyleSuffix()}';
         final result = await ngmyAiGenerateWithRetry(creds, prompt);
-        final reply = (result.text != null && result.text!.trim().isNotEmpty)
-            ? result.text!.trim()
+        final cleaned = _cleanAdvisorReply(result.text);
+        final reply = cleaned.isNotEmpty
+            ? cleaned
             : 'I don\'t send pics like that unless we\'re official 😌';
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
@@ -2859,8 +2914,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               'They just texted: $text\n'
               '${_replyStyleSuffix()}';
           final result = await ngmyAiGenerateWithRetry(creds, prompt);
-          final reply = (result.text != null && result.text!.trim().isNotEmpty)
-              ? result.text!.trim()
+          final cleaned = _cleanAdvisorReply(result.text);
+          final reply = cleaned.isNotEmpty
+              ? cleaned
               : 'One sec babe — pic glitched, ask me again 💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': reply}));
@@ -2885,8 +2941,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final result = recentPhotos.isNotEmpty
             ? await ngmyAiGenerateWithRetry(creds, prompt, images: recentPhotos)
             : await ngmyAiGenerateWithRetry(creds, prompt);
-        final reply = (result.text != null && result.text!.trim().isNotEmpty)
-            ? result.text!.trim()
+        final cleaned = _cleanAdvisorReply(result.text);
+        final reply = cleaned.isNotEmpty
+            ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
