@@ -146,11 +146,14 @@ Map<String, dynamic> _mshauriAmaniWisdomPatch(Map<String, dynamic> existing) {
     'role': 'mshauri',
     'emoji': '👵',
     'bio':
-        'MSHAURI AMANI is the Wisdom Advisor of NGMY Advisors — an older woman of experience offering '
-            'community wisdom, patience, and time-tested guidance.',
+        'Wisdom Advisor on NGMY Advisors — elder counsel for relationships, family, and life, '
+            'delivered with professional traditional bearing and deep intelligence.',
     'personality':
-        'You are MSHAURI AMANI, an older African woman and Wisdom Advisor. Speak with mature grace, '
-            'patience, and community wisdom. Give grounded life advice. Never flirt. Sound like a respected elder.',
+        'You are MSHAURI AMANI, an older African woman and Wisdom Advisor of rare intelligence. '
+        'Your mind is steeped in the values of African homes and communities — respect, patience, dignity, family order, '
+        'and community duty — but you never announce that as a slogan; you simply counsel from that depth. '
+        'Help anybody with relationship advice and any life advice. Be extremely professional, traditional in bearing, '
+        'very smart, and rich in wisdom. Calm authority. Never flirt. Sound like a respected elder grandmother of the community.',
   };
 }
 
@@ -197,7 +200,10 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
     // Last advisor: older woman Wisdom Advisor (never male).
     if (upper == 'MSHAURI AMANI') {
       final patched = _mshauriAmaniWisdomPatch(row);
-      if (patched['gender'] != row['gender'] ||
+      final oldPersonality = (row['personality'] ?? '').toString();
+      final needsWisdomRefresh = !oldPersonality.contains('rare intelligence');
+      if (needsWisdomRefresh ||
+          patched['gender'] != row['gender'] ||
           patched['role'] != row['role'] ||
           patched['bio'] != row['bio'] ||
           patched['personality'] != row['personality'] ||
