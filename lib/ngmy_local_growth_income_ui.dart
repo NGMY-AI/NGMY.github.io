@@ -80,6 +80,24 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   bool _loading = true;
   Timer? _balancePoll;
 
+  /// One shared spendable balance for Growth Income AND the whole app.
+  void _publishAppBalance(double balance, {required bool allowDecrease}) {
+    final bal = balance.clamp(0.0, double.infinity);
+    final user = _user;
+    if (user != null) user.accountBalance = bal;
+    widget.liveUser.accountBalance = bal;
+    // Seed both identities so GI UI and app-wide payments/games caches stay aligned.
+    if (user != null) {
+      ngmySeedLiveBalance(user.email, bal, allowIncrease: true);
+    }
+    ngmySeedLiveBalance(widget.liveUser.email, bal, allowIncrease: true);
+    ngmyNotifyBalanceChanged(
+      email: widget.liveUser.email,
+      balance: bal,
+      allowIncrease: true,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -109,21 +127,17 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   Future<void> _syncBalanceToCloud({required bool allowDecrease}) async {
     final user = _user;
     if (user == null) return;
-    // Never push a lower balance over a higher live/cloud balance (protects approved deposits).
+    // Growth Income shares the main account balance used by every payment in the app.
     if (!allowDecrease && user.accountBalance + 0.01 < widget.liveUser.accountBalance) {
-      user.accountBalance = widget.liveUser.accountBalance;
-      ngmySeedLiveBalance(user.email, user.accountBalance);
+      _publishAppBalance(widget.liveUser.accountBalance, allowDecrease: false);
       return;
     }
-    if (allowDecrease) {
-      widget.liveUser.accountBalance = user.accountBalance;
-    } else if (user.accountBalance > widget.liveUser.accountBalance) {
-      widget.liveUser.accountBalance = user.accountBalance;
-    }
+    _publishAppBalance(user.accountBalance, allowDecrease: allowDecrease);
     await widget.onPersistBalanceToCloud?.call(widget.liveUser.accountBalance, allowDecrease: allowDecrease);
   }
 
   /// Pull the saved account balance from the database so admin-approved deposits appear.
+  /// Authority order: cloud / live session balance — never reinflate from stale GI prefs.
   Future<void> _pullApprovedBalanceFromCloud() async {
     final user = _user;
     if (user == null) return;
@@ -140,13 +154,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       final cloud = row == null
           ? 0.0
           : ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
-      final best = math.max(math.max(cloud, widget.liveUser.accountBalance), user.accountBalance);
-      if (best > user.accountBalance + 0.009) {
-        setState(() {
-          user.accountBalance = best;
-          widget.liveUser.accountBalance = best;
-          ngmySeedLiveBalance(user.email, best);
-        });
+      // Do NOT max() with local prefs balance — that undoes Store/game spends.
+      final best = math.max(cloud, widget.liveUser.accountBalance);
+      if ((best - user.accountBalance).abs() > 0.009) {
+        setState(() => _publishAppBalance(best, allowDecrease: best < user.accountBalance));
       }
       // Always reconcile approved deposit history → balance (even if cloud still shows old amount).
       await _refreshDepositStatusesFromCloud();
@@ -181,9 +192,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
     if (!mounted) return;
     setState(() {
-      user.accountBalance = (user.accountBalance + gained).clamp(0.0, double.infinity);
-      widget.liveUser.accountBalance = math.max(widget.liveUser.accountBalance, user.accountBalance);
-      ngmySeedLiveBalance(user.email, user.accountBalance);
+      _publishAppBalance(user.accountBalance + gained, allowDecrease: false);
     });
     credited.addAll(newlyCredited);
     await prefs.setStringList(key, credited.toList());
@@ -245,9 +254,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
               // Refund held withdrawal.
               final user = _user;
               if (user != null) {
-                user.accountBalance = (user.accountBalance + _transactions[idx].amount).clamp(0.0, double.infinity);
-                widget.liveUser.accountBalance = user.accountBalance;
-                ngmySeedLiveBalance(user.email, user.accountBalance);
+                _publishAppBalance(user.accountBalance + _transactions[idx].amount, allowDecrease: false);
                 unawaited(_persist(syncBalance: true, allowDecrease: false));
               }
             }
@@ -272,12 +279,15 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
     var revision = loaded.walletStateRevision;
-    // Prefer the live/cloud balance so approved deposits are never lost on open.
-    final seedBal = math.max(widget.liveUser.accountBalance, user.accountBalance).clamp(0.0, double.infinity);
+    // App-wide spendable balance is the source of truth (never reinflate from GI prefs).
+    final seedBal = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
     user.accountBalance = seedBal;
-    widget.liveUser.accountBalance = seedBal;
-    ngmySeedLiveBalance(user.email, user.accountBalance);
+    _user = user;
+    _publishAppBalance(seedBal, allowDecrease: true);
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
+    if (payoutAdded) {
+      _publishAppBalance(user.accountBalance, allowDecrease: false);
+    }
 
     // Admin "Send money now" credits — no QR scan required.
     final pendingAdminCredits = await NgmyLocalDepositQr.claimPendingCredits(widget.liveUser.email);
@@ -305,6 +315,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
     if (appliedCreditIds.isNotEmpty) {
       unawaited(NgmyLocalDepositQr.markCreditsClaimed(widget.liveUser.email, appliedCreditIds));
+      _publishAppBalance(user.accountBalance, allowDecrease: false);
     }
 
     if (!mounted) return;
@@ -369,28 +380,27 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       // History only — balance credits when admin approves (pulled from cloud).
     } else if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
       allowDecrease = true;
-      final liveBal = widget.liveUser.accountBalance;
-      if (liveBal < user.accountBalance - 0.001) {
-        user.accountBalance = liveBal.clamp(0.0, double.infinity);
-      } else {
-        user.accountBalance = (user.accountBalance - t.amount).clamp(0.0, double.infinity);
-      }
-      ngmySeedLiveBalance(user.email, user.accountBalance);
+      final next = (math.min(user.accountBalance, widget.liveUser.accountBalance) - t.amount)
+          .clamp(0.0, double.infinity);
+      _publishAppBalance(next, allowDecrease: true);
     } else {
       NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
       if (t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove) {
         allowDecrease = true;
       }
+      // Mirror every GI earn/spend onto the app-wide account balance.
+      _publishAppBalance(user.accountBalance, allowDecrease: allowDecrease);
     }
 
     setState(() => _transactions = [..._transactions, t]);
     final shouldSyncBalance =
         t.type == TransactionType.withdrawal ||
         t.type == TransactionType.adminRemove ||
-        (t.status == TransactionStatus.approved && t.type != TransactionType.deposit);
+        t.status == TransactionStatus.approved ||
+        t.type == TransactionType.reimbursement;
     unawaited(_persist(
       bumpWalletRevision: bumpWalletRevision,
-      syncBalance: shouldSyncBalance || (t.status == TransactionStatus.approved),
+      syncBalance: shouldSyncBalance,
       allowDecrease: allowDecrease,
     ));
   }

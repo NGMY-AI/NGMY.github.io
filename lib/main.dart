@@ -15789,13 +15789,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       plans: widget.globalPlans,
       onCloudAddTransaction: widget.onAddTransaction,
       onPersistBalanceToCloud: (balance, {required bool allowDecrease}) async {
-        // Never overwrite a higher live balance with a stale lower one.
+        // Growth Income shares this same account balance with Store, fees, games, etc.
         if (!allowDecrease && balance + 0.01 < widget.user.accountBalance) {
           return;
         }
         widget.user.accountBalance = allowDecrease
-            ? balance
+            ? balance.clamp(0.0, double.infinity)
             : math.max(widget.user.accountBalance, balance);
+        ngmyNotifyBalanceChanged(
+          email: widget.user.email,
+          balance: widget.user.accountBalance,
+          allowIncrease: true,
+        );
         await widget.onPushBalanceToCloud?.call(widget.user, allowDecrease: allowDecrease);
         widget.onDataChanged();
       },

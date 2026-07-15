@@ -7,9 +7,10 @@ import 'main.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_local_snapshot_sync.dart';
 
-/// A second, fully local copy of a user's growth-income numbers (balance,
-/// investment, clock-in streak, wallet history). Never touches Supabase —
-/// the real Growth Income tabs and their database sync are untouched.
+/// Local history + investment/clock-in state for Growth Income.
+/// Spendable money is the same shared account balance used across the whole app
+/// (Store, fees, games, Doc Share, etc.) — prefs keep GI history/plans, while
+/// `accountBalance` is always mirrored to the real signed-in user.
 class NgmyLocalGrowthIncomeStore {
   /// v1 copied the main Growth Income wallet on first open; v2 starts fresh.
   static const int walletSchemaVersion = 2;
@@ -242,11 +243,16 @@ class NgmyLocalGrowthIncomeStore {
         .toList();
   }
 
-  /// Mirrors main.dart's ngmyApplyApprovedTransactionToBalance call site —
-  /// applies the transaction's balance effect if approved.
-  static void applyTransaction(UserData user, AppTransaction t) {
+  /// Applies a transaction to the GI history user and mirrors the resulting
+  /// balance onto [realEmail] so app-wide payments (Store, fees, games, etc.)
+  /// can spend Growth Income money everywhere.
+  static void applyTransaction(UserData user, AppTransaction t, {String? realEmail}) {
     ngmyApplyApprovedTransactionToBalance(user, t);
     ngmySeedLiveBalance(user.email, user.accountBalance);
+    final real = (realEmail ?? '').trim();
+    if (real.isNotEmpty) {
+      ngmyNotifyBalanceChanged(email: real, balance: user.accountBalance, allowIncrease: true);
+    }
   }
 
   // --- Local equivalents of main.dart's library-private clock-in helpers ---
