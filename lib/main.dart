@@ -12749,7 +12749,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   _markTransactionDirty(t.id);
                   if (syncedUser != null) {
                     _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(syncedUser!.email);
-                    unawaited(_pushUserBalanceToCloud(syncedUser!));
+                    // Always write approved deposit credits (and holds) to the database so money is not lost.
+                    unawaited(_pushUserBalanceToCloud(
+                      syncedUser!,
+                      allowDecrease: t.type == TransactionType.withdrawal || !approve,
+                    ));
                     ngmyNotifyBalanceChanged(
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
@@ -15777,9 +15781,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       config: widget.config,
       plans: widget.globalPlans,
       onCloudAddTransaction: widget.onAddTransaction,
-      onPersistBalanceToCloud: (balance) async {
-        widget.user.accountBalance = balance;
-        await widget.onPushBalanceToCloud?.call(widget.user, allowDecrease: true);
+      onPersistBalanceToCloud: (balance, {required bool allowDecrease}) async {
+        // Never overwrite a higher live balance with a stale lower one.
+        if (!allowDecrease && balance + 0.01 < widget.user.accountBalance) {
+          return;
+        }
+        widget.user.accountBalance = allowDecrease
+            ? balance
+            : math.max(widget.user.accountBalance, balance);
+        await widget.onPushBalanceToCloud?.call(widget.user, allowDecrease: allowDecrease);
         widget.onDataChanged();
       },
     );

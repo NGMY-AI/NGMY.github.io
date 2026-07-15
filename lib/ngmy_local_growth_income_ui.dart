@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
@@ -11,6 +12,7 @@ import 'ngmy_feature_sync_session.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 String _ngmyLocalProfileDisplayName(UserData live) {
@@ -32,7 +34,7 @@ Future<void> showNgmyLocalGrowthIncomePage(
   required AppConfig config,
   required List<InvestmentPlan> plans,
   void Function(AppTransaction transaction)? onCloudAddTransaction,
-  Future<void> Function(double balance)? onPersistBalanceToCloud,
+  Future<void> Function(double balance, {required bool allowDecrease})? onPersistBalanceToCloud,
 }) {
   return NgmyNavigator.push<void>(
     context,
@@ -60,41 +62,140 @@ class NgmyLocalGrowthIncomeScreen extends StatefulWidget {
   final UserData liveUser;
   final AppConfig config;
   final List<InvestmentPlan> plans;
-  /// Sends deposit/withdraw requests to the main app cloud so admin Growth Income can review them.
   final void Function(AppTransaction transaction)? onCloudAddTransaction;
-  /// Saves spendable balance to the users row in the database.
-  final Future<void> Function(double balance)? onPersistBalanceToCloud;
+  /// Persist balance to the users table. [allowDecrease] only for withdraw/invest spends.
+  final Future<void> Function(double balance, {required bool allowDecrease})? onPersistBalanceToCloud;
 
   @override
   State<NgmyLocalGrowthIncomeScreen> createState() => _NgmyLocalGrowthIncomeScreenState();
 }
 
-class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScreen> {
+class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScreen> with WidgetsBindingObserver {
   UserData? _user;
   List<AppTransaction> _transactions = [];
   int _walletStateRevision = 0;
   int _idx = 0;
   bool _investPurchaseInFlight = false;
   bool _loading = true;
+  Timer? _balancePoll;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
     unawaited(_load());
+    _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
+      unawaited(_pullApprovedBalanceFromCloud());
+    });
   }
 
   @override
   void dispose() {
+    _balancePoll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     NgmyFeatureSyncSession.leaveGrowthIncomeUser();
     super.dispose();
   }
 
-  Future<void> _syncBalanceToCloud() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_pullApprovedBalanceFromCloud());
+    }
+  }
+
+  Future<void> _syncBalanceToCloud({required bool allowDecrease}) async {
     final user = _user;
     if (user == null) return;
-    widget.liveUser.accountBalance = user.accountBalance;
-    await widget.onPersistBalanceToCloud?.call(user.accountBalance);
+    // Never push a lower balance over a higher live/cloud balance (protects approved deposits).
+    if (!allowDecrease && user.accountBalance + 0.01 < widget.liveUser.accountBalance) {
+      user.accountBalance = widget.liveUser.accountBalance;
+      ngmySeedLiveBalance(user.email, user.accountBalance);
+      return;
+    }
+    if (allowDecrease) {
+      widget.liveUser.accountBalance = user.accountBalance;
+    } else if (user.accountBalance > widget.liveUser.accountBalance) {
+      widget.liveUser.accountBalance = user.accountBalance;
+    }
+    await widget.onPersistBalanceToCloud?.call(widget.liveUser.accountBalance, allowDecrease: allowDecrease);
+  }
+
+  /// Pull the saved account balance from the database so admin-approved deposits appear.
+  Future<void> _pullApprovedBalanceFromCloud() async {
+    final user = _user;
+    if (user == null) return;
+    final email = ngmyNormalizeEmail(widget.liveUser.email);
+    if (email.isEmpty) return;
+    try {
+      final row = await Supabase.instance.client
+          .from('users')
+          .select('accountBalance')
+          .eq('email', email)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row == null || !mounted) return;
+      final cloud = ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
+      if (cloud <= user.accountBalance + 0.009 && cloud <= widget.liveUser.accountBalance + 0.009) {
+        // Still adopt liveUser if it was updated in-app by another path.
+        if (widget.liveUser.accountBalance > user.accountBalance + 0.009) {
+          setState(() {
+            user.accountBalance = widget.liveUser.accountBalance;
+            ngmySeedLiveBalance(user.email, user.accountBalance);
+          });
+          unawaited(_persist(syncBalance: false));
+        }
+        return;
+      }
+      final best = math.max(cloud, widget.liveUser.accountBalance);
+      if (!mounted) return;
+      setState(() {
+        user.accountBalance = best;
+        widget.liveUser.accountBalance = best;
+        ngmySeedLiveBalance(user.email, best);
+      });
+      // Flip local deposit history to approved when admin already credited the balance.
+      await _refreshDepositStatusesFromCloud();
+      unawaited(_persist(syncBalance: false));
+    } catch (e) {
+      debugPrint('[growth income] pull balance: $e');
+    }
+  }
+
+  Future<void> _refreshDepositStatusesFromCloud() async {
+    final pending = _transactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .toList();
+    if (pending.isEmpty) return;
+    try {
+      final ids = pending.map((t) => t.id).toList();
+      final rows = await Supabase.instance.client
+          .from('transactions')
+          .select('id,status')
+          .inFilter('id', ids)
+          .timeout(kNgmyCloudLoadTimeout);
+      if (!mounted) return;
+      var changed = false;
+      for (final row in (rows as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final id = (map['id'] ?? '').toString();
+        final statusIdx = (map['status'] as num?)?.toInt() ?? 0;
+        if (id.isEmpty) continue;
+        final idx = _transactions.indexWhere((t) => t.id == id);
+        if (idx < 0) continue;
+        final next = statusIdx == 1
+            ? TransactionStatus.approved
+            : (statusIdx == 2 ? TransactionStatus.rejected : TransactionStatus.pending);
+        if (_transactions[idx].status != next) {
+          _transactions[idx].status = next;
+          changed = true;
+        }
+      }
+      if (changed && mounted) setState(() {});
+    } catch (e) {
+      debugPrint('[growth income] refresh deposit status: $e');
+    }
   }
 
   Future<void> _load() async {
@@ -102,8 +203,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
     var revision = loaded.walletStateRevision;
-    // Balance lives in the database — cloud/live account is the source of truth.
-    user.accountBalance = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    // Prefer the live/cloud balance so approved deposits are never lost on open.
+    final seedBal = math.max(widget.liveUser.accountBalance, user.accountBalance).clamp(0.0, double.infinity);
+    user.accountBalance = seedBal;
+    widget.liveUser.accountBalance = seedBal;
     ngmySeedLiveBalance(user.email, user.accountBalance);
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
 
@@ -141,13 +244,15 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _walletStateRevision = revision;
       _loading = false;
     });
-    unawaited(_persist(bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty));
-    if (payoutAdded || appliedCreditIds.isNotEmpty) {
-      unawaited(_syncBalanceToCloud());
+    unawaited(_persist(bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty, syncBalance: false));
+    if (appliedCreditIds.isNotEmpty) {
+      // Raise cloud balance to include admin push credits — never lower it.
+      unawaited(_syncBalanceToCloud(allowDecrease: false));
     }
+    unawaited(_pullApprovedBalanceFromCloud());
   }
 
-  Future<void> _persist({bool bumpWalletRevision = false, bool syncBalance = false}) async {
+  Future<void> _persist({bool bumpWalletRevision = false, bool syncBalance = false, bool allowDecrease = false}) async {
     final user = _user;
     if (user == null) return;
     await NgmyLocalGrowthIncomeStore.save(
@@ -160,13 +265,13 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _walletStateRevision++;
     }
     if (syncBalance) {
-      unawaited(_syncBalanceToCloud());
+      unawaited(_syncBalanceToCloud(allowDecrease: allowDecrease));
     }
   }
 
   void _onDataChanged() {
     setState(() {});
-    unawaited(_persist(syncBalance: true));
+    unawaited(_persist(syncBalance: true, allowDecrease: false));
   }
 
   void _onAddTransaction(AppTransaction t, {bool bumpWalletRevision = true, bool cloudRequest = false}) {
@@ -189,10 +294,11 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       widget.onCloudAddTransaction?.call(forCloud);
     }
 
+    var allowDecrease = false;
     if (t.status == TransactionStatus.pending && t.type == TransactionType.deposit) {
-      // History only — balance credits when admin approves.
+      // History only — balance credits when admin approves (pulled from cloud).
     } else if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
-      // Prefer the cloud/live balance after the pending hold, with a local fallback hold.
+      allowDecrease = true;
       final liveBal = widget.liveUser.accountBalance;
       if (liveBal < user.accountBalance - 0.001) {
         user.accountBalance = liveBal.clamp(0.0, double.infinity);
@@ -202,14 +308,21 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       ngmySeedLiveBalance(user.email, user.accountBalance);
     } else {
       NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
+      if (t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove) {
+        allowDecrease = true;
+      }
     }
 
     setState(() => _transactions = [..._transactions, t]);
     final shouldSyncBalance =
         t.type == TransactionType.withdrawal ||
-        t.status == TransactionStatus.approved ||
-        cloudRequest;
-    unawaited(_persist(bumpWalletRevision: bumpWalletRevision, syncBalance: shouldSyncBalance));
+        t.type == TransactionType.adminRemove ||
+        (t.status == TransactionStatus.approved && t.type != TransactionType.deposit);
+    unawaited(_persist(
+      bumpWalletRevision: bumpWalletRevision,
+      syncBalance: shouldSyncBalance || (t.status == TransactionStatus.approved),
+      allowDecrease: allowDecrease,
+    ));
   }
 
   void _onInvest(String name, double price, double roi, double cost) {
@@ -401,8 +514,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           user: _user!,
           realEmail: widget.liveUser.email,
           config: widget.config,
+          transactions: List<AppTransaction>.from(_transactions),
           onAdd: (t, {bool cloudRequest = false}) => _onAddTransaction(t, cloudRequest: cloudRequest),
           onBackup: _openBackup,
+          onRefreshBalance: () => _pullApprovedBalanceFromCloud(),
         ),
       ),
     ];
@@ -1176,15 +1291,19 @@ class _LocalWalletTab extends StatefulWidget {
     required this.user,
     required this.realEmail,
     required this.config,
+    required this.transactions,
     required this.onAdd,
     required this.onBackup,
+    this.onRefreshBalance,
   });
 
   final UserData user;
   final String realEmail;
   final AppConfig config;
+  final List<AppTransaction> transactions;
   final void Function(AppTransaction t, {bool cloudRequest}) onAdd;
   final VoidCallback onBackup;
+  final Future<void> Function()? onRefreshBalance;
 
   @override
   State<_LocalWalletTab> createState() => _LocalWalletTabState();
@@ -1193,7 +1312,7 @@ class _LocalWalletTab extends StatefulWidget {
 class _LocalWalletTabState extends State<_LocalWalletTab> {
   final TextEditingController _amt = TextEditingController();
   final TextEditingController _cashAppTag = TextEditingController();
-  int _view = 0; // 0: Deposit, 1: Withdraw
+  int _view = 0; // 0 Deposit, 1 Withdraw, 2 History
 
   @override
   void dispose() {
@@ -1402,9 +1521,14 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 Expanded(child: _viewTab('Deposit', 0)),
                 const SizedBox(width: 8),
                 Expanded(child: _viewTab('Withdraw', 1)),
+                const SizedBox(width: 8),
+                Expanded(child: _viewTab('History', 2)),
               ],
             ),
             const SizedBox(height: 16),
+            if (_view == 2)
+              _historyPanel()
+            else
             Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -1501,11 +1625,109 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
+  Widget _historyPanel() {
+    final wallet = widget.transactions
+        .where((t) => t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Transaction history', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await widget.onRefreshBalance?.call();
+                  if (mounted) setState(() {});
+                  _toast('Balance refreshed.');
+                },
+                child: const Text('Refresh', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (wallet.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Text(
+                'No deposits or withdrawals yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700),
+              ),
+            )
+          else
+            ...wallet.take(40).map((t) {
+              final approved = t.status == TransactionStatus.approved;
+              final pending = t.status == TransactionStatus.pending;
+              final color = approved
+                  ? const Color(0xFF2EF6A3)
+                  : (pending ? Colors.orangeAccent : Colors.redAccent);
+              final sign = t.type == TransactionType.withdrawal ? '-' : '+';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.type == TransactionType.deposit ? 'Deposit' : 'Withdrawal',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            t.status.name.toUpperCase(),
+                            style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 11),
+                          ),
+                          if ((t.sourceDetails ?? '').trim().isNotEmpty)
+                            Text(
+                              t.sourceDetails!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '$sign\$${formatCurrency(t.amount)}',
+                      style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   Widget _viewTab(String label, int v) {
     final selected = _view == v;
     const glassGreen = Color(0xFF2EF6A3);
     return GestureDetector(
-      onTap: () => setState(() => _view = v),
+      onTap: () {
+        setState(() => _view = v);
+        if (v == 2) unawaited(widget.onRefreshBalance?.call() ?? Future.value());
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
@@ -1520,7 +1742,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w900, color: selected ? glassGreen : Colors.white60),
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: selected ? glassGreen : Colors.white60),
         ),
       ),
     );
