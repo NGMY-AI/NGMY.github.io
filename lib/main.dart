@@ -12729,10 +12729,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     syncedUser = targetUser;
                     if (!approve && t.type == TransactionType.withdrawal) {
                       ngmyReleasePendingWithdrawalHold(targetUser, t, _withdrawalHoldTxnIds);
+                    } else if (approve &&
+                        t.type == TransactionType.deposit &&
+                        !isInvestmentRequest &&
+                        previousStatus == TransactionStatus.pending) {
+                      // Explicit credit so approved deposits always arrive in the account.
+                      targetUser.accountBalance =
+                          (targetUser.accountBalance + t.amount).clamp(0.0, double.infinity);
+                    } else if (approve && t.type == TransactionType.withdrawal) {
+                      // Funds were already held when the withdrawal was submitted.
+                      _withdrawalHoldTxnIds.remove(t.id);
                     } else {
-                      if (approve && t.type == TransactionType.withdrawal) {
-                        _withdrawalHoldTxnIds.remove(t.id);
-                      }
                       ngmySyncUserBalanceAfterWalletDecision(
                         targetUser,
                         _allTransactions,

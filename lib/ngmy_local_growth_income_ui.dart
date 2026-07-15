@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'main.dart';
@@ -135,66 +136,134 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           .eq('email', email)
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
-      if (row == null || !mounted) return;
-      final cloud = ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
-      if (cloud <= user.accountBalance + 0.009 && cloud <= widget.liveUser.accountBalance + 0.009) {
-        // Still adopt liveUser if it was updated in-app by another path.
-        if (widget.liveUser.accountBalance > user.accountBalance + 0.009) {
-          setState(() {
-            user.accountBalance = widget.liveUser.accountBalance;
-            ngmySeedLiveBalance(user.email, user.accountBalance);
-          });
-          unawaited(_persist(syncBalance: false));
-        }
-        return;
-      }
-      final best = math.max(cloud, widget.liveUser.accountBalance);
       if (!mounted) return;
-      setState(() {
-        user.accountBalance = best;
-        widget.liveUser.accountBalance = best;
-        ngmySeedLiveBalance(user.email, best);
-      });
-      // Flip local deposit history to approved when admin already credited the balance.
+      final cloud = row == null
+          ? 0.0
+          : ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
+      final best = math.max(math.max(cloud, widget.liveUser.accountBalance), user.accountBalance);
+      if (best > user.accountBalance + 0.009) {
+        setState(() {
+          user.accountBalance = best;
+          widget.liveUser.accountBalance = best;
+          ngmySeedLiveBalance(user.email, best);
+        });
+      }
+      // Always reconcile approved deposit history → balance (even if cloud still shows old amount).
       await _refreshDepositStatusesFromCloud();
       unawaited(_persist(syncBalance: false));
     } catch (e) {
       debugPrint('[growth income] pull balance: $e');
+      await _refreshDepositStatusesFromCloud();
     }
+  }
+
+  /// Credits approved deposits that never hit the balance (tracked per txn id so we never double-pay).
+  Future<void> _applyMissingWalletCredits({Iterable<String>? onlyIds}) async {
+    final user = _user;
+    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_gi_credited_txn_ids_${ngmyNormalizeEmail(widget.liveUser.email)}';
+    final credited = (prefs.getStringList(key) ?? <String>[]).toSet();
+    var gained = 0.0;
+    final newlyCredited = <String>[];
+    final idFilter = onlyIds?.toSet();
+
+    for (final t in _transactions) {
+      if (credited.contains(t.id)) continue;
+      if (idFilter != null && !idFilter.contains(t.id)) continue;
+      if (t.type == TransactionType.deposit && t.status == TransactionStatus.approved && t.amount > 0) {
+        gained += t.amount;
+        newlyCredited.add(t.id);
+      }
+    }
+
+    if (gained < 0.01) return;
+
+    if (!mounted) return;
+    setState(() {
+      user.accountBalance = (user.accountBalance + gained).clamp(0.0, double.infinity);
+      widget.liveUser.accountBalance = math.max(widget.liveUser.accountBalance, user.accountBalance);
+      ngmySeedLiveBalance(user.email, user.accountBalance);
+    });
+    credited.addAll(newlyCredited);
+    await prefs.setStringList(key, credited.toList());
+    unawaited(_persist(syncBalance: true, allowDecrease: false));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Balance updated: +\$${formatCurrency(gained)} from approved deposits.')),
+      );
+    }
+  }
+
+  Future<void> _markTxnCredited(String txnId) async {
+    if (txnId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ngmy_gi_credited_txn_ids_${ngmyNormalizeEmail(widget.liveUser.email)}';
+    final credited = (prefs.getStringList(key) ?? <String>[]).toSet()..add(txnId);
+    await prefs.setStringList(key, credited.toList());
   }
 
   Future<void> _refreshDepositStatusesFromCloud() async {
     final pending = _transactions
-        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .where((t) =>
+            (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) &&
+            t.status == TransactionStatus.pending)
         .toList();
-    if (pending.isEmpty) return;
-    try {
-      final ids = pending.map((t) => t.id).toList();
-      final rows = await Supabase.instance.client
-          .from('transactions')
-          .select('id,status')
-          .inFilter('id', ids)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (!mounted) return;
-      var changed = false;
-      for (final row in (rows as List)) {
-        final map = Map<String, dynamic>.from(row as Map);
-        final id = (map['id'] ?? '').toString();
-        final statusIdx = (map['status'] as num?)?.toInt() ?? 0;
-        if (id.isEmpty) continue;
-        final idx = _transactions.indexWhere((t) => t.id == id);
-        if (idx < 0) continue;
-        final next = statusIdx == 1
-            ? TransactionStatus.approved
-            : (statusIdx == 2 ? TransactionStatus.rejected : TransactionStatus.pending);
-        if (_transactions[idx].status != next) {
-          _transactions[idx].status = next;
-          changed = true;
+    final justApproved = <String>[];
+    if (pending.isNotEmpty) {
+      try {
+        final ids = pending.map((t) => t.id).toList();
+        final rows = await Supabase.instance.client
+            .from('transactions')
+            .select('id,status')
+            .inFilter('id', ids)
+            .timeout(kNgmyCloudLoadTimeout);
+        if (!mounted) return;
+        var changed = false;
+        for (final row in (rows as List)) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final id = (map['id'] ?? '').toString();
+          final statusIdx = (map['status'] as num?)?.toInt() ?? 0;
+          if (id.isEmpty) continue;
+          final idx = _transactions.indexWhere((t) => t.id == id);
+          if (idx < 0) continue;
+          final was = _transactions[idx].status;
+          final next = statusIdx == 1
+              ? TransactionStatus.approved
+              : (statusIdx == 2 ? TransactionStatus.rejected : TransactionStatus.pending);
+          if (was != next) {
+            _transactions[idx].status = next;
+            changed = true;
+            if (was == TransactionStatus.pending &&
+                next == TransactionStatus.approved &&
+                _transactions[idx].type == TransactionType.deposit) {
+              justApproved.add(id);
+            }
+            if (was == TransactionStatus.pending &&
+                next == TransactionStatus.rejected &&
+                _transactions[idx].type == TransactionType.withdrawal) {
+              // Refund held withdrawal.
+              final user = _user;
+              if (user != null) {
+                user.accountBalance = (user.accountBalance + _transactions[idx].amount).clamp(0.0, double.infinity);
+                widget.liveUser.accountBalance = user.accountBalance;
+                ngmySeedLiveBalance(user.email, user.accountBalance);
+                unawaited(_persist(syncBalance: true, allowDecrease: false));
+              }
+            }
+          }
         }
+        if (changed && mounted) setState(() {});
+      } catch (e) {
+        debugPrint('[growth income] refresh deposit status: $e');
       }
-      if (changed && mounted) setState(() {});
-    } catch (e) {
-      debugPrint('[growth income] refresh deposit status: $e');
+    }
+
+    // Credit newly approved rows — and one repair pass for older approved rows never credited.
+    if (justApproved.isNotEmpty) {
+      await _applyMissingWalletCredits(onlyIds: justApproved);
+    } else {
+      await _applyMissingWalletCredits();
     }
   }
 
@@ -232,6 +301,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       NgmyLocalGrowthIncomeStore.applyTransaction(user, txn);
       transactions.add(txn);
       appliedCreditIds.add(credit.id);
+      unawaited(_markTxnCredited(txnId));
     }
     if (appliedCreditIds.isNotEmpty) {
       unawaited(NgmyLocalDepositQr.markCreditsClaimed(widget.liveUser.email, appliedCreditIds));
@@ -1326,27 +1396,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _notifyWhatsApp(AppTransaction transaction) async {
-    final message = ngmyLocalDepositWhatsAppMessage(
-      user: widget.user,
-      realEmail: widget.realEmail,
-      transaction: transaction,
-      config: widget.config,
-    );
-    await ngmyShareLocalWalletWhatsApp(
-      config: widget.config,
-      message: message,
-      screenshotDataUrl: transaction.screenshotPath,
-      realEmail: widget.realEmail,
-      transactionId: transaction.id,
-    );
-  }
-
   void _submitDeposit(AppTransaction transaction) {
     // Keep a local history copy; send the pending request to cloud for admin review.
+    // No WhatsApp popup — admin reviews the proof inside Growth Income.
     widget.onAdd(transaction, cloudRequest: true);
-    unawaited(_notifyWhatsApp(transaction));
-    _toast('Deposit submitted. Admin will review your payment proof in Growth Income.');
+    _toast('Deposit submitted. Admin will review your payment proof.');
     setState(() {});
   }
 
