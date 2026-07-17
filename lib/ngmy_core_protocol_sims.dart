@@ -9,7 +9,8 @@ class NgmyCoreProtocolSimsScreen extends StatefulWidget {
   const NgmyCoreProtocolSimsScreen({super.key});
 
   @override
-  State<NgmyCoreProtocolSimsScreen> createState() => _NgmyCoreProtocolSimsScreenState();
+  State<NgmyCoreProtocolSimsScreen> createState() =>
+      _NgmyCoreProtocolSimsScreenState();
 }
 
 enum _ProtocolSimKind {
@@ -142,7 +143,8 @@ const _kUnfoldSims = <_UnfoldMeta>[
   ),
 ];
 
-class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
+class _NgmyCoreProtocolSimsScreenState
+    extends State<NgmyCoreProtocolSimsScreen> {
   /// Original CORE PROTOCOL boot loads first, then the sims hub.
   bool _booting = true;
   _SimMeta? _active;
@@ -184,15 +186,9 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
                 onClose: () => Navigator.of(context).maybePop(),
               )
             else if (active != null)
-              _ProtocolSimCanvas(
-                meta: active,
-                onExit: _exitSim,
-              )
+              _ProtocolSimCanvas(meta: active, onExit: _exitSim)
             else
-              _UnfoldSimCanvas(
-                meta: activeUnfold!,
-                onExit: _exitUnfold,
-              ),
+              _UnfoldSimCanvas(meta: activeUnfold!, onExit: _exitUnfold),
           ],
         ),
       ),
@@ -208,10 +204,12 @@ class _CoreProtocolBootSplash extends StatefulWidget {
   final VoidCallback onFinished;
 
   @override
-  State<_CoreProtocolBootSplash> createState() => _CoreProtocolBootSplashState();
+  State<_CoreProtocolBootSplash> createState() =>
+      _CoreProtocolBootSplashState();
 }
 
-class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with TickerProviderStateMixin {
+class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash>
+    with TickerProviderStateMixin {
   static const _coreColors = [Color(0xFF34D399), Color(0xFF06B6D4)];
 
   late final AnimationController _boot;
@@ -222,9 +220,18 @@ class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with T
   @override
   void initState() {
     super.initState();
-    _boot = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..forward();
-    _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 4800))..repeat();
-    _wave = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+    _boot = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..forward();
+    _spin = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4800),
+    )..repeat();
+    _wave = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
     _boot.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         Future<void>.delayed(const Duration(milliseconds: 900), () {
@@ -263,7 +270,9 @@ class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with T
         return Stack(
           fit: StackFit.expand,
           children: [
-            Container(color: const Color(0xFF030712).withValues(alpha: 0.92 * boot)),
+            Container(
+              color: const Color(0xFF030712).withValues(alpha: 0.92 * boot),
+            ),
             CustomPaint(
               painter: _BootBackdropPainter(
                 colors: _coreColors,
@@ -298,7 +307,8 @@ class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with T
                         child: CustomPaint(
                           painter: _BootOrbPainter(
                             colors: _coreColors,
-                            pulse: 0.4 + math.sin(_wave.value * math.pi * 2) * 0.5,
+                            pulse:
+                                0.4 + math.sin(_wave.value * math.pi * 2) * 0.5,
                             orbit: _spin.value,
                           ),
                         ),
@@ -339,13 +349,17 @@ class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash> with T
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  ColoredBox(color: Colors.white.withValues(alpha: 0.12)),
+                                  ColoredBox(
+                                    color: Colors.white.withValues(alpha: 0.12),
+                                  ),
                                   FractionallySizedBox(
                                     alignment: Alignment.centerLeft,
                                     widthFactor: boot.clamp(0.2, 1.0),
                                     child: const DecoratedBox(
                                       decoration: BoxDecoration(
-                                        gradient: LinearGradient(colors: _coreColors),
+                                        gradient: LinearGradient(
+                                          colors: _coreColors,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -430,7 +444,11 @@ class _BootBackdropPainter extends CustomPainter {
 }
 
 class _BootOrbPainter extends CustomPainter {
-  _BootOrbPainter({required this.colors, required this.pulse, required this.orbit});
+  _BootOrbPainter({
+    required this.colors,
+    required this.pulse,
+    required this.orbit,
+  });
 
   final List<Color> colors;
   final double pulse;
@@ -464,13 +482,21 @@ class _BootOrbPainter extends CustomPainter {
     );
     for (var i = 0; i < 8; i++) {
       final a = orbit * math.pi * 2 + i * (math.pi / 4);
-      final p = Offset(c.dx + math.cos(a) * (radius + 18), c.dy + math.sin(a) * (radius + 18));
-      canvas.drawCircle(p, 3.2, Paint()..color = colors.last.withValues(alpha: 0.85));
+      final p = Offset(
+        c.dx + math.cos(a) * (radius + 18),
+        c.dy + math.sin(a) * (radius + 18),
+      );
+      canvas.drawCircle(
+        p,
+        3.2,
+        Paint()..color = colors.last.withValues(alpha: 0.85),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _BootOrbPainter old) => old.pulse != pulse || old.orbit != orbit;
+  bool shouldRepaint(covariant _BootOrbPainter old) =>
+      old.pulse != pulse || old.orbit != orbit;
 }
 
 class _CoreBackdrop extends StatelessWidget {
@@ -516,7 +542,11 @@ class _CoreBackdropPainter extends CustomPainter {
 }
 
 class _SimPicker extends StatelessWidget {
-  const _SimPicker({required this.onPick, required this.onPickUnfold, required this.onClose});
+  const _SimPicker({
+    required this.onPick,
+    required this.onPickUnfold,
+    required this.onClose,
+  });
 
   final ValueChanged<_SimMeta> onPick;
   final ValueChanged<_UnfoldMeta> onPickUnfold;
@@ -569,7 +599,10 @@ class _SimPicker extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: onClose,
-                  icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.75)),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
                 ),
               ],
             ),
@@ -600,12 +633,21 @@ class _SimPicker extends StatelessWidget {
                     children: [
                       const Text(
                         'UNFOLD SEQUENCES',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                          fontSize: 13,
+                        ),
                       ),
                       const Spacer(),
                       Text(
                         'Tap to watch · tap to exit',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.38), fontSize: 11, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.38),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -614,7 +656,13 @@ class _SimPicker extends StatelessWidget {
                 for (final s in _kUnfoldSims)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: SizedBox(height: 160, child: _UnfoldPickTile(meta: s, onTap: () => onPickUnfold(s))),
+                    child: SizedBox(
+                      height: 160,
+                      child: _UnfoldPickTile(
+                        meta: s,
+                        onTap: () => onPickUnfold(s),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -650,7 +698,9 @@ class _SimPickTile extends StatelessWidget {
                 meta.colors.last.withValues(alpha: 0.12),
               ],
             ),
-            border: Border.all(color: meta.colors.first.withValues(alpha: 0.45)),
+            border: Border.all(
+              color: meta.colors.first.withValues(alpha: 0.45),
+            ),
             boxShadow: [
               BoxShadow(
                 color: meta.colors.first.withValues(alpha: 0.16),
@@ -671,7 +721,10 @@ class _SimPickTile extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: LinearGradient(colors: meta.colors),
                     boxShadow: [
-                      BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 10),
+                      BoxShadow(
+                        color: meta.colors.first.withValues(alpha: 0.4),
+                        blurRadius: 10,
+                      ),
                     ],
                   ),
                   child: Icon(meta.icon, color: Colors.white, size: 22),
@@ -735,7 +788,9 @@ class _UnfoldPickTile extends StatelessWidget {
                 meta.colors.last.withValues(alpha: 0.12),
               ],
             ),
-            border: Border.all(color: meta.colors.first.withValues(alpha: 0.45)),
+            border: Border.all(
+              color: meta.colors.first.withValues(alpha: 0.45),
+            ),
             boxShadow: [
               BoxShadow(
                 color: meta.colors.first.withValues(alpha: 0.16),
@@ -762,11 +817,22 @@ class _UnfoldPickTile extends StatelessWidget {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(7),
                               gradient: LinearGradient(colors: meta.colors),
-                              boxShadow: [BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 8)],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: meta.colors.first.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
                             child: Transform.rotate(
                               angle: -0.7854,
-                              child: Icon(meta.icons[i], color: Colors.white, size: 13),
+                              child: Icon(
+                                meta.icons[i],
+                                color: Colors.white,
+                                size: 13,
+                              ),
                             ),
                           ),
                         ),
@@ -813,6 +879,7 @@ class _ProtocolSimCanvas extends StatefulWidget {
   const _ProtocolSimCanvas({required this.meta, required this.onExit});
 
   final _SimMeta meta;
+
   /// Leave simulation with no on-screen chrome (device back / long-press).
   final VoidCallback onExit;
 
@@ -820,7 +887,8 @@ class _ProtocolSimCanvas extends StatefulWidget {
   State<_ProtocolSimCanvas> createState() => _ProtocolSimCanvasState();
 }
 
-class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas> with SingleTickerProviderStateMixin {
+class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas>
+    with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
   Duration _elapsed = Duration.zero;
   Offset? _finger;
@@ -840,8 +908,7 @@ class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas> with SingleTicke
       _elapsed = d;
       _decayTrail();
       if (mounted) setState(() {});
-    })
-      ..start();
+    })..start();
   }
 
   @override
@@ -881,7 +948,10 @@ class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas> with SingleTicke
     final size = MediaQuery.sizeOf(context);
     final c = Offset(size.width / 2, size.height * 0.48);
     _orbitAim = p - c;
-    _orbitPull = (_orbitAim.distance / (size.shortestSide * 0.42)).clamp(0.0, 1.0);
+    _orbitPull = (_orbitAim.distance / (size.shortestSide * 0.42)).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   void _onUp() {
@@ -1065,7 +1135,11 @@ class _ProtocolPainter extends CustomPainter {
         ..color = colors.first.withValues(alpha: 0.35)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
     );
-    canvas.drawCircle(f, 5, Paint()..color = Colors.white.withValues(alpha: 0.9));
+    canvas.drawCircle(
+      f,
+      5,
+      Paint()..color = Colors.white.withValues(alpha: 0.9),
+    );
   }
 
   void _paintPulseWeave(Canvas canvas, Size size, Offset c) {
@@ -1097,7 +1171,12 @@ class _ProtocolPainter extends CustomPainter {
       canvas.drawCircle(
         p.p,
         r,
-        Paint()..color = Color.lerp(colors.first, colors.last, p.force)!.withValues(alpha: 0.75 * (1 - age)),
+        Paint()
+          ..color = Color.lerp(
+            colors.first,
+            colors.last,
+            p.force,
+          )!.withValues(alpha: 0.75 * (1 - age)),
       );
     }
     for (final b in bursts) {
@@ -1144,10 +1223,18 @@ class _ProtocolPainter extends CustomPainter {
           ..color = colors.last.withValues(alpha: 0.85 * (1 - age))
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
       );
-      canvas.drawCircle(n.p, 3, Paint()..color = Colors.white.withValues(alpha: 0.9 * (1 - age)));
+      canvas.drawCircle(
+        n.p,
+        3,
+        Paint()..color = Colors.white.withValues(alpha: 0.9 * (1 - age)),
+      );
     }
     for (final p in pts) {
-      canvas.drawCircle(p, 2.2, Paint()..color = colors.first.withValues(alpha: 0.35));
+      canvas.drawCircle(
+        p,
+        2.2,
+        Paint()..color = colors.first.withValues(alpha: 0.35),
+      );
     }
     if (finger != null && trail.length >= 2) {
       final path = Path()..moveTo(trail.first.p.dx, trail.first.p.dy);
@@ -1180,9 +1267,15 @@ class _ProtocolPainter extends CustomPainter {
           ..color = colors.first.withValues(alpha: 0.22 + pull * 0.2),
       );
       for (var i = 0; i < 6 + ring * 2; i++) {
-        final a = time * (0.6 + ring * 0.25) + i * (math.pi * 2 / (6 + ring * 2)) + pull;
+        final a =
+            time * (0.6 + ring * 0.25) +
+            i * (math.pi * 2 / (6 + ring * 2)) +
+            pull;
         final o = Offset(c.dx + math.cos(a) * rr, c.dy + math.sin(a) * rr);
-        final toward = Offset(o.dx + aim.dx * 0.04 * pull, o.dy + aim.dy * 0.04 * pull);
+        final toward = Offset(
+          o.dx + aim.dx * 0.04 * pull,
+          o.dy + aim.dy * 0.04 * pull,
+        );
         canvas.drawCircle(
           toward,
           2.5 + pull * 2,
@@ -1210,13 +1303,17 @@ class _ProtocolPainter extends CustomPainter {
       final slot = i % 7;
       final a = slot * (math.pi * 2 / 7) + ring * 0.22;
       final d = ring * R * 1.75;
-      final o = ring == 0 ? c : Offset(c.dx + math.cos(a) * d, c.dy + math.sin(a) * d);
+      final o = ring == 0
+          ? c
+          : Offset(c.dx + math.cos(a) * d, c.dy + math.sin(a) * d);
       final lit = hexLit.contains(i) || ring == 0;
       _drawHex(
         canvas,
         o,
         R * 0.72,
-        fill: lit ? colors.first.withValues(alpha: 0.35) : colors.first.withValues(alpha: 0.06),
+        fill: lit
+            ? colors.first.withValues(alpha: 0.35)
+            : colors.first.withValues(alpha: 0.06),
         stroke: lit ? colors.last : colors.first.withValues(alpha: 0.35),
         pulse: lit ? 0.5 + 0.5 * math.sin(time * 6 + i) : 0,
       );
@@ -1256,7 +1353,11 @@ class _ProtocolPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.1
-          ..color = Color.lerp(colors.first, colors.last, b / bands)!.withValues(alpha: 0.55),
+          ..color = Color.lerp(
+            colors.first,
+            colors.last,
+            b / bands,
+          )!.withValues(alpha: 0.55),
       );
     }
     for (final p in trail) {
@@ -1277,7 +1378,8 @@ class _ProtocolPainter extends CustomPainter {
     for (var oi = 0; oi < origins.length; oi++) {
       final o = origins[oi];
       for (var ring = 0; ring < 5; ring++) {
-        final phase = (time * 1.4 + ring * 0.35 + oi * 0.2 + echoCount * 0.05) % 1.0;
+        final phase =
+            (time * 1.4 + ring * 0.35 + oi * 0.2 + echoCount * 0.05) % 1.0;
         final r = 20 + phase * size.shortestSide * 0.55;
         canvas.drawCircle(
           o,
@@ -1285,7 +1387,11 @@ class _ProtocolPainter extends CustomPainter {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2 * (1 - phase)
-            ..color = Color.lerp(colors.first, colors.last, phase)!.withValues(alpha: 0.55 * (1 - phase)),
+            ..color = Color.lerp(
+              colors.first,
+              colors.last,
+              phase,
+            )!.withValues(alpha: 0.55 * (1 - phase)),
         );
       }
     }
@@ -1311,10 +1417,20 @@ class _ProtocolPainter extends CustomPainter {
       const steps = 36;
       for (var i = 0; i <= steps; i++) {
         final a = (i / steps) * math.pi * 2;
-        final wobble = 1 +
+        final wobble =
+            1 +
             0.12 * math.sin(a * 3 + time * 2.4) +
             0.08 * math.sin(a * 5 - time * 1.6) +
-            (finger != null ? 0.1 * math.cos(a - math.atan2(target.dy - blob.dy, target.dx - blob.dx)) : 0);
+            (finger != null
+                ? 0.1 *
+                      math.cos(
+                        a -
+                            math.atan2(
+                              target.dy - blob.dy,
+                              target.dx - blob.dx,
+                            ),
+                      )
+                : 0);
         final r = (baseR + layer * 10) * wobble;
         final p = Offset(blob.dx + math.cos(a) * r, blob.dy + math.sin(a) * r);
         if (i == 0) {
@@ -1327,8 +1443,15 @@ class _ProtocolPainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = Color.lerp(colors.first, colors.last, layer / 4)!.withValues(alpha: 0.18 + layer * 0.08)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, layer == 1 ? 2 : 8.0),
+          ..color = Color.lerp(
+            colors.first,
+            colors.last,
+            layer / 4,
+          )!.withValues(alpha: 0.18 + layer * 0.08)
+          ..maskFilter = MaskFilter.blur(
+            BlurStyle.normal,
+            layer == 1 ? 2 : 8.0,
+          ),
       );
       if (layer == 1) {
         canvas.drawPath(
@@ -1396,7 +1519,11 @@ class _ProtocolPainter extends CustomPainter {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.6 * (1 - phase)
-            ..color = Color.lerp(colors.first, colors.last, phase)!.withValues(alpha: 0.65 * (1 - phase)),
+            ..color = Color.lerp(
+              colors.first,
+              colors.last,
+              phase,
+            )!.withValues(alpha: 0.65 * (1 - phase)),
         );
       }
     }
@@ -1468,8 +1595,13 @@ class _ProtocolPainter extends CustomPainter {
       for (var s = 0; s < 48; s++) {
         final t = s / 47;
         final a = time * 2.2 + arm * (math.pi * 2 / arms) + t * 4.2;
-        final r = 18 + t * size.shortestSide * 0.42 * (0.85 + 0.15 * math.sin(time + arm));
-        final p = Offset(center.dx + math.cos(a) * r, center.dy + math.sin(a) * r);
+        final r =
+            18 +
+            t * size.shortestSide * 0.42 * (0.85 + 0.15 * math.sin(time + arm));
+        final p = Offset(
+          center.dx + math.cos(a) * r,
+          center.dy + math.sin(a) * r,
+        );
         if (s == 0) {
           path.moveTo(p.dx, p.dy);
         } else {
@@ -1482,7 +1614,11 @@ class _ProtocolPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.4
           ..strokeCap = StrokeCap.round
-          ..color = Color.lerp(colors.first, colors.last, arm / arms)!.withValues(alpha: 0.55)
+          ..color = Color.lerp(
+            colors.first,
+            colors.last,
+            arm / arms,
+          )!.withValues(alpha: 0.55)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
       );
     }
@@ -1543,11 +1679,21 @@ class _ProtocolPainter extends CustomPainter {
     );
   }
 
-  void _drawHex(Canvas canvas, Offset c, double r, {required Color fill, required Color stroke, required double pulse}) {
+  void _drawHex(
+    Canvas canvas,
+    Offset c,
+    double r, {
+    required Color fill,
+    required Color stroke,
+    required double pulse,
+  }) {
     final path = Path();
     for (var i = 0; i < 6; i++) {
       final a = -math.pi / 2 + i * math.pi / 3;
-      final p = Offset(c.dx + math.cos(a) * (r + pulse * 2), c.dy + math.sin(a) * (r + pulse * 2));
+      final p = Offset(
+        c.dx + math.cos(a) * (r + pulse * 2),
+        c.dy + math.sin(a) * (r + pulse * 2),
+      );
       if (i == 0) {
         path.moveTo(p.dx, p.dy);
       } else {
@@ -1584,24 +1730,36 @@ class _UnfoldSimCanvas extends StatefulWidget {
   State<_UnfoldSimCanvas> createState() => _UnfoldSimCanvasState();
 }
 
-class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderStateMixin {
+class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
+    with TickerProviderStateMixin {
   late final AnimationController _seq;
   late final AnimationController _pulse;
 
-  // Fixed slot centers within the stack area — panels travel between these,
-  // they never just pop into their final spot.
+  // The big ad box lives fixed at the bottom the whole time. Mail and SMS
+  // are "born" there — they spawn small, tucked behind it — then rise to
+  // their own slot up top, one at a time.
   static const double _topY = 0;
-  static const double _midY = 148;
-  static const double _botY = 296;
-  static const double _stackHeight = 296 + 110;
+  static const double _midY = 156;
+  static const double _botY = 300;
+  static const double _adWidth = 188.0;
+  static const double _boxWidth = 104.0;
+  static const double _adTotalH = _adWidth * 0.62 + _adWidth * 0.16;
+  static const double _stackHeight = _botY + _adTotalH;
+  static const double _stackWidth = 340;
 
   @override
   void initState() {
     super.initState();
     // Slow, deliberate pacing — this is meant to read like a polished ad,
     // not a quick UI transition.
-    _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 7200))..repeat();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat(reverse: true);
+    _seq = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 6600),
+    )..repeat();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -1611,28 +1769,27 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
     super.dispose();
   }
 
-  double _seg(double t, double start, double end) => ((t - start) / (end - start)).clamp(0.0, 1.0);
+  double _seg(double t, double start, double end) =>
+      ((t - start) / (end - start)).clamp(0.0, 1.0);
 
-  /// Returns (y, scale, opacity) for a panel that appears at the bottom slot
-  /// during [appearStart]-[appearEnd], then — unless [home] is the bottom
-  /// slot itself — rises to [home] during [riseStart]-[riseEnd].
-  (double, double, double) _panelState(
+  /// Returns (y, scale, riseProgress) for a box that's born (pops in small)
+  /// at the bottom slot during [bornStart]-[bornEnd], then rises to [home]
+  /// during [riseStart]-[riseEnd]. [riseProgress] also drives the trailing
+  /// link so the glow travels up in lockstep with the box itself.
+  (double, double, double) _riseState(
     double t, {
-    required double appearStart,
-    required double appearEnd,
-    double? riseStart,
-    double? riseEnd,
+    required double bornStart,
+    required double bornEnd,
+    required double riseStart,
+    required double riseEnd,
     required double home,
   }) {
-    if (t < appearStart) return (_botY, 0.0, 0.0);
-    final appear = Curves.easeOutBack.transform(_seg(t, appearStart, appearEnd));
-    if (riseStart == null || riseEnd == null || home == _botY) {
-      return (_botY, appear, appear.clamp(0.0, 1.0));
-    }
-    if (t < riseStart) return (_botY, 1.0, 1.0);
+    if (t < bornStart) return (_botY, 0.0, 0.0);
+    final born = Curves.easeOutBack.transform(_seg(t, bornStart, bornEnd));
+    if (t < riseStart) return (_botY, born.clamp(0.0, 1.0), 0.0);
     final rise = Curves.easeInOutCubic.transform(_seg(t, riseStart, riseEnd));
     final y = _botY + (home - _botY) * rise;
-    return (y, 1.0, 1.0);
+    return (y, 1.0, rise);
   }
 
   @override
@@ -1647,18 +1804,29 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
           builder: (context, _) {
             final t = _seq.value;
             final pulse = Curves.easeInOut.transform(_pulse.value);
-            // Hold everything from ~0.80–0.92, then fade out before the loop restarts.
-            final holdFade = t < 0.80 ? 1.0 : 1.0 - _seg(t, 0.80, 0.92);
-            final restartGap = t > 0.98 ? 0.0 : 1.0; // fully hidden briefly before replay
-
-            final (mailY, mailScale, mailOp) = _panelState(t, appearStart: 0.00, appearEnd: 0.06, riseStart: 0.07, riseEnd: 0.30, home: _topY);
-            final (smsY, smsScale, smsOp) = _panelState(t, appearStart: 0.34, appearEnd: 0.40, riseStart: 0.41, riseEnd: 0.62, home: _midY);
-            final (adY, adScale, adOp) = _panelState(t, appearStart: 0.68, appearEnd: 0.76, home: _botY);
-
-            final link1 = Curves.easeInOut.transform(_seg(t, 0.63, 0.68));
-            final link2 = Curves.easeInOut.transform(_seg(t, 0.77, 0.83));
-
+            // Hold everything from ~0.83–0.92, then fade out before the loop restarts.
+            final holdFade = t < 0.83 ? 1.0 : 1.0 - _seg(t, 0.83, 0.92);
+            final restartGap = t > 0.98
+                ? 0.0
+                : 1.0; // fully hidden briefly before replay
             final fade = holdFade * restartGap;
+
+            final (mailY, mailScale, mailRise) = _riseState(
+              t,
+              bornStart: 0.05,
+              bornEnd: 0.12,
+              riseStart: 0.12,
+              riseEnd: 0.40,
+              home: _topY,
+            );
+            final (smsY, smsScale, smsRise) = _riseState(
+              t,
+              bornStart: 0.46,
+              bornEnd: 0.53,
+              riseStart: 0.53,
+              riseEnd: 0.81,
+              home: _midY,
+            );
 
             return Stack(
               fit: StackFit.expand,
@@ -1667,43 +1835,78 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
                 _UnfoldGlowBackdrop(color: meta.glow, pulse: pulse),
                 Center(
                   child: SizedBox(
-                    width: 300,
+                    width: _stackWidth,
                     height: _stackHeight,
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        // Links drawn first so panels sit on top of them.
+                        // The big box — fixed, always present, everything else is born from it.
                         Positioned(
-                          top: _topY + 92,
+                          top: _botY,
                           left: 0,
                           right: 0,
-                          height: _midY - _topY - 92 + 18,
-                          child: _UnfoldLink(colors: meta.colors, progress: link1 * fade),
+                          child: Center(
+                            child: _UnfoldBox3D(
+                              icon: meta.icons[2],
+                              colors: meta.colors,
+                              width: _adWidth,
+                              opacity: fade,
+                              scale: 1,
+                              pulse: pulse,
+                              isFinal: true,
+                            ),
+                          ),
+                        ),
+                        // Trailing glow links — drawn in lockstep with each box's rise.
+                        Positioned(
+                          top: _topY,
+                          left: 0,
+                          right: 0,
+                          height: _botY - _topY,
+                          child: _UnfoldLink(
+                            colors: meta.colors,
+                            progress: mailRise * fade,
+                          ),
                         ),
                         Positioned(
-                          top: _midY + 92,
+                          top: _midY,
                           left: 0,
                           right: 0,
-                          height: _botY - _midY - 92 + 18,
-                          child: _UnfoldLink(colors: meta.colors, progress: link2 * fade),
+                          height: _botY - _midY,
+                          child: _UnfoldLink(
+                            colors: meta.colors,
+                            progress: smsRise * fade,
+                          ),
                         ),
                         Positioned(
                           top: mailY,
                           left: 0,
                           right: 0,
-                          child: _UnfoldPanel(icon: meta.icons[0], colors: meta.colors, scale: mailScale, opacity: mailOp * fade, pulse: pulse),
+                          child: Center(
+                            child: _UnfoldBox3D(
+                              icon: meta.icons[0],
+                              colors: meta.colors,
+                              width: _boxWidth,
+                              opacity: mailScale * fade,
+                              scale: mailScale,
+                              pulse: pulse,
+                            ),
+                          ),
                         ),
                         Positioned(
                           top: smsY,
                           left: 0,
                           right: 0,
-                          child: _UnfoldPanel(icon: meta.icons[1], colors: meta.colors, scale: smsScale, opacity: smsOp * fade, pulse: pulse),
-                        ),
-                        Positioned(
-                          top: adY,
-                          left: 0,
-                          right: 0,
-                          child: _UnfoldPanel(icon: meta.icons[2], colors: meta.colors, scale: adScale, opacity: adOp * fade, pulse: pulse, isFinal: true),
+                          child: Center(
+                            child: _UnfoldBox3D(
+                              icon: meta.icons[1],
+                              colors: meta.colors,
+                              width: _boxWidth,
+                              opacity: smsScale * fade,
+                              scale: smsScale,
+                              pulse: pulse,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1723,12 +1926,21 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
                           children: [
                             Text(
                               meta.title,
-                              style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 13),
+                              style: TextStyle(
+                                color: meta.glow,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.6,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Tap anywhere to exit',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.35),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -1752,7 +1964,9 @@ class _UnfoldGlowBackdrop extends StatelessWidget {
   final double pulse;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _UnfoldGlowPainter(color: color, pulse: pulse));
+  Widget build(BuildContext context) => CustomPaint(
+    painter: _UnfoldGlowPainter(color: color, pulse: pulse),
+  );
 }
 
 class _UnfoldGlowPainter extends CustomPainter {
@@ -1766,124 +1980,252 @@ class _UnfoldGlowPainter extends CustomPainter {
     final r = size.shortestSide * (0.42 + pulse * 0.05);
     final paint = Paint()
       ..shader = RadialGradient(
-        colors: [color.withValues(alpha: 0.16 + pulse * 0.06), Colors.transparent],
+        colors: [
+          color.withValues(alpha: 0.16 + pulse * 0.06),
+          Colors.transparent,
+        ],
       ).createShader(Rect.fromCircle(center: c, radius: r));
     canvas.drawCircle(c, r, paint);
   }
 
   @override
-  bool shouldRepaint(covariant _UnfoldGlowPainter old) => old.pulse != pulse || old.color != color;
+  bool shouldRepaint(covariant _UnfoldGlowPainter old) =>
+      old.pulse != pulse || old.color != color;
 }
 
-/// One 3D-printed-looking diamond-cut glass tile — the first two stages are
-/// clear frosted glass (like the reference), the final stage ([isFinal]) is
-/// the solid-color "ad" payload tile with a NEW ribbon, like real content
-/// sitting inside the glass. Idles with a gentle glow breathing driven by
-/// [pulse] once fully in.
-class _UnfoldPanel extends StatelessWidget {
-  const _UnfoldPanel({
+/// Rounds the corners of an arbitrary polygon by clipping [radius] in from
+/// each vertex along its adjacent edges and joining the cut with a quad
+/// curve — used to give the isometric box faces their soft "cut glass" edges.
+ui.Path _roundedPolygonPath(List<Offset> pts, double radius) {
+  final path = ui.Path();
+  final n = pts.length;
+  for (var i = 0; i < n; i++) {
+    final prev = pts[(i - 1 + n) % n];
+    final curr = pts[i];
+    final next = pts[(i + 1) % n];
+    final toPrev = prev - curr;
+    final toNext = next - curr;
+    final d1 = toPrev.distance, d2 = toNext.distance;
+    final r = math.min(radius, math.min(d1, d2) / 2);
+    final p1 = curr + toPrev * (d1 == 0 ? 0 : r / d1);
+    final p2 = curr + toNext * (d2 == 0 ? 0 : r / d2);
+    if (i == 0) {
+      path.moveTo(p1.dx, p1.dy);
+    } else {
+      path.lineTo(p1.dx, p1.dy);
+    }
+    path.quadraticBezierTo(curr.dx, curr.dy, p2.dx, p2.dy);
+  }
+  path.close();
+  return path;
+}
+
+/// A genuine isometric 3D box — a rounded diamond top face plus two shaded
+/// side faces extruded downward, like a real cut-glass block viewed at an
+/// angle (matching the reference ad mock). The first two stages are clear
+/// frosted glass, the final stage ([isFinal]) is the solid-color "ad"
+/// payload with a NEW ribbon, like real content sitting inside the glass.
+class _IsoBoxPainter extends CustomPainter {
+  _IsoBoxPainter({
+    required this.colors,
+    required this.depth,
+    required this.isFinal,
+    required this.glowAlpha,
+  });
+
+  final List<Color> colors;
+  final double depth;
+  final bool isFinal;
+  final double glowAlpha;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height - depth;
+    final cx = w / 2;
+    final topTip = Offset(cx, 0);
+    final rightTip = Offset(w, h / 2);
+    final botTip = Offset(cx, h);
+    final leftTip = Offset(0, h / 2);
+    Offset down(Offset o) => Offset(o.dx, o.dy + depth);
+
+    final rightFace = ui.Path()
+      ..moveTo(rightTip.dx, rightTip.dy)
+      ..lineTo(botTip.dx, botTip.dy)
+      ..lineTo(down(botTip).dx, down(botTip).dy)
+      ..lineTo(down(rightTip).dx, down(rightTip).dy)
+      ..close();
+    final leftFace = ui.Path()
+      ..moveTo(leftTip.dx, leftTip.dy)
+      ..lineTo(botTip.dx, botTip.dy)
+      ..lineTo(down(botTip).dx, down(botTip).dy)
+      ..lineTo(down(leftTip).dx, down(leftTip).dy)
+      ..close();
+
+    final base = colors.first;
+    final base2 = colors.last;
+
+    canvas.drawPath(
+      rightFace,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Color.lerp(base2, Colors.black, 0.42)!,
+            Color.lerp(base2, Colors.black, 0.6)!,
+          ],
+        ).createShader(rightFace.getBounds()),
+    );
+    canvas.drawPath(
+      leftFace,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Color.lerp(base, Colors.black, 0.56)!,
+            Color.lerp(base, Colors.black, 0.72)!,
+          ],
+        ).createShader(leftFace.getBounds()),
+    );
+    final edgeStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1
+      ..color = Colors.white.withValues(alpha: 0.10);
+    canvas.drawPath(rightFace, edgeStroke);
+    canvas.drawPath(leftFace, edgeStroke);
+
+    final topPath = _roundedPolygonPath([
+      topTip,
+      rightTip,
+      botTip,
+      leftTip,
+    ], h * 0.16);
+
+    canvas.drawPath(
+      topPath,
+      Paint()
+        ..color = base.withValues(alpha: glowAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26),
+    );
+    canvas.drawPath(
+      topPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isFinal
+              ? [base.withValues(alpha: 0.90), base2.withValues(alpha: 0.97)]
+              : [
+                  Colors.white.withValues(alpha: 0.28),
+                  Colors.white.withValues(alpha: 0.08),
+                  base.withValues(alpha: 0.16),
+                ],
+        ).createShader(Rect.fromLTWH(0, 0, w, h)),
+    );
+    canvas.drawPath(
+      topPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: isFinal ? 0.55 : 0.72),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _IsoBoxPainter old) =>
+      old.depth != depth ||
+      old.isFinal != isFinal ||
+      old.glowAlpha != glowAlpha ||
+      old.colors != colors;
+}
+
+class _UnfoldBox3D extends StatelessWidget {
+  const _UnfoldBox3D({
     required this.icon,
     required this.colors,
-    required this.scale,
+    required this.width,
     required this.opacity,
+    required this.scale,
     required this.pulse,
     this.isFinal = false,
   });
 
   final IconData icon;
   final List<Color> colors;
-  final double scale;
+  final double width;
   final double opacity;
+  final double scale;
   final double pulse;
   final bool isFinal;
 
   @override
   Widget build(BuildContext context) {
-    if (opacity <= 0.001) return const SizedBox(height: 96);
-    final glowAlpha = (0.32 + pulse * 0.22) * opacity;
-    const size = 92.0;
-    final fill = isFinal
-        ? LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [colors.first.withValues(alpha: 0.85), colors.last.withValues(alpha: 0.95)],
-          )
-        : LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.white.withValues(alpha: 0.20), Colors.white.withValues(alpha: 0.06), colors.first.withValues(alpha: 0.10)],
-          );
-
-    return SizedBox(
-      height: 96,
-      child: Center(
-        child: Transform.scale(
-          scale: 0.6 + scale * 0.4,
-          child: Opacity(
-            opacity: opacity.clamp(0.0, 1.0),
-            child: Transform.rotate(
-              angle: 0.7854, // 45° — diamond cut
-              child: SizedBox(
-                width: size,
-                height: size,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Extruded "thickness" edge — the 3D-printed bevel look.
-                    Positioned(
-                      left: 4,
-                      top: 4,
-                      child: Container(
-                        width: size,
-                        height: size,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          color: Color.lerp(colors.last, Colors.black, 0.45)!.withValues(alpha: 0.55 * opacity),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: size,
-                      height: size,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        gradient: fill,
-                        border: Border.all(color: Colors.white.withValues(alpha: isFinal ? 0.5 : 0.65), width: 1.6),
-                        boxShadow: [
-                          BoxShadow(color: colors.first.withValues(alpha: glowAlpha), blurRadius: 30, spreadRadius: 2),
-                          BoxShadow(color: colors.last.withValues(alpha: glowAlpha * 0.7), blurRadius: 50, spreadRadius: 6),
-                        ],
-                      ),
-                      child: Transform.rotate(
-                        angle: -0.7854,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Icon(icon, color: Colors.white.withValues(alpha: isFinal ? 1 : 0.92), size: 32),
-                            if (isFinal)
-                              Positioned(
-                                left: -30,
-                                top: -30,
-                                child: Transform.rotate(
-                                  angle: -0.7854,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF22C55E),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text('NEW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 0.4)),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+    final depth = width * 0.16;
+    final topH = width * 0.62;
+    final totalH = topH + depth;
+    if (opacity <= 0.001) return SizedBox(width: width, height: totalH);
+    final glowAlpha = (0.30 + pulse * 0.20) * opacity;
+    return Opacity(
+      opacity: opacity.clamp(0.0, 1.0),
+      child: Transform.scale(
+        scale: 0.55 + scale * 0.45,
+        child: SizedBox(
+          width: width,
+          height: totalH,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CustomPaint(
+                size: Size(width, totalH),
+                painter: _IsoBoxPainter(
+                  colors: colors,
+                  depth: depth,
+                  isFinal: isFinal,
+                  glowAlpha: glowAlpha,
                 ),
               ),
-            ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: topH,
+                child: Center(
+                  child: Icon(
+                    icon,
+                    color: Colors.white.withValues(alpha: isFinal ? 1 : 0.94),
+                    size: width * 0.30,
+                  ),
+                ),
+              ),
+              if (isFinal)
+                Positioned(
+                  left: width * 0.04,
+                  top: topH * 0.08,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E),
+                      borderRadius: BorderRadius.circular(5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.5),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'NEW',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 9,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -1904,7 +2246,9 @@ class _UnfoldLink extends StatelessWidget {
     return SizedBox(
       height: 34,
       width: double.infinity,
-      child: CustomPaint(painter: _UnfoldLinkPainter(colors: colors, progress: progress)),
+      child: CustomPaint(
+        painter: _UnfoldLinkPainter(colors: colors, progress: progress),
+      ),
     );
   }
 }
@@ -1918,9 +2262,18 @@ class _UnfoldLinkPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (progress <= 0.001) return;
     final cx = size.width / 2;
+    // Starts at the bottom (the big box) and reveals upward — the glow
+    // trails behind the box as it rises, growing in lockstep with it.
     final path = Path()
-      ..moveTo(cx, 0)
-      ..cubicTo(cx - 26, size.height * 0.35, cx + 26, size.height * 0.65, cx, size.height);
+      ..moveTo(cx, size.height)
+      ..cubicTo(
+        cx + 26,
+        size.height * 0.65,
+        cx - 26,
+        size.height * 0.35,
+        cx,
+        0,
+      );
     final metric = path.computeMetrics().first;
     final drawn = metric.extractPath(0, metric.length * progress);
 
@@ -1929,7 +2282,9 @@ class _UnfoldLinkPainter extends CustomPainter {
       ..strokeWidth = 7
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
-      ..shader = LinearGradient(colors: colors).createShader(Offset.zero & size);
+      ..shader = LinearGradient(
+        colors: colors,
+      ).createShader(Offset.zero & size);
     canvas.drawPath(drawn, glow);
 
     final core = Paint()
@@ -1941,5 +2296,6 @@ class _UnfoldLinkPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _UnfoldLinkPainter old) => old.progress != progress || old.colors != colors;
+  bool shouldRepaint(covariant _UnfoldLinkPainter old) =>
+      old.progress != progress || old.colors != colors;
 }
