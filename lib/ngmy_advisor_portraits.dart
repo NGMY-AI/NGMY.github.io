@@ -10,7 +10,7 @@ import 'package:image/image.dart' as img;
 
 const int _kPortraitSize = 220;
 
-enum _HairStyle { afro, braids, locs, bantuKnots, headwrap, fadeShort, twists, bald }
+enum _HairStyle { afro, braids, locs, bantuKnots, headwrap, fadeShort, twists, bald, straight, wavy, ponytail, bun }
 
 class _PortraitSpec {
   const _PortraitSpec({
@@ -38,6 +38,16 @@ const List<_PortraitSpec> _femaleSpecs = [
   _PortraitSpec(skin: 0xFFC9906A, hair: 0xFF241813, style: _HairStyle.bantuKnots, bg: [0xFF7C3AED, 0xFF5B21B6], earrings: true),
   _PortraitSpec(skin: 0xFF9C6B47, hair: 0xFF17110D, style: _HairStyle.bantuKnots, bg: [0xFFEA580C, 0xFFC2410C], earrings: true),
   _PortraitSpec(skin: 0xFF4A2E1C, hair: 0xFF0C0806, style: _HairStyle.locs, bg: [0xFF2563EB, 0xFF1D4ED8], earrings: true),
+];
+
+/// Fair-skinned variants — routed by name (see [_kWhiteWomenNames]) for
+/// advisors specifically described as white.
+const List<_PortraitSpec> _femaleWhiteSpecs = [
+  _PortraitSpec(skin: 0xFFF3D9BF, hair: 0xFFE8C77E, style: _HairStyle.wavy, bg: [0xFFEC4899, 0xFFBE185D], earrings: true),
+  _PortraitSpec(skin: 0xFFF7E1C6, hair: 0xFF3B2A20, style: _HairStyle.straight, bg: [0xFF2563EB, 0xFF1D4ED8], earrings: true),
+  _PortraitSpec(skin: 0xFFEACBA8, hair: 0xFFA0522D, style: _HairStyle.ponytail, bg: [0xFFF97316, 0xFFC2410C], earrings: true),
+  _PortraitSpec(skin: 0xFFF0D0AC, hair: 0xFF6B4226, style: _HairStyle.bun, bg: [0xFF0F766E, 0xFF134E4A], earrings: true),
+  _PortraitSpec(skin: 0xFFE8C4A0, hair: 0xFF1B1210, style: _HairStyle.wavy, bg: [0xFF7C3AED, 0xFF5B21B6], earrings: true),
 ];
 
 const List<_PortraitSpec> _maleSpecs = [
@@ -154,6 +164,19 @@ Uint8List? ngmyAdvisorPhotorealBytesSync({
   return null;
 }
 
+/// Advisors specifically written as white women — routed to the fair-skinned
+/// illustrated set regardless of role, since none of the bundled photoreal
+/// assets are white (see ngmy_advisor_roster.dart's kNgmyNewAdvisorBatch).
+const _kWhiteWomenNames = <String>{
+  'emma carson',
+  'grace anderson',
+  'sophie morgan',
+  'chloe mitchell',
+  'olivia bennett',
+};
+
+bool _isKnownWhiteWoman(String name) => _kWhiteWomenNames.contains(name.trim().toLowerCase());
+
 /// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
 /// Prefer [ngmyAdvisorPhotorealBytesSync] / [Image.asset] in UI — illustrated is offline-only.
 Uint8List ngmyAdvisorPortraitBytes({
@@ -162,16 +185,20 @@ Uint8List ngmyAdvisorPortraitBytes({
   String role = '',
   String name = '',
 }) {
-  final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
-  if (photoreal != null) return photoreal;
-
   final isMale = gender.trim().toLowerCase() == 'male';
-  final specs = isMale ? _maleSpecs : _femaleSpecs;
+  final forcedWhite = !isMale && _isKnownWhiteWoman(name);
+
+  if (!forcedWhite) {
+    final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
+    if (photoreal != null) return photoreal;
+  }
+
+  final specs = forcedWhite ? _femaleWhiteSpecs : (isMale ? _maleSpecs : _femaleSpecs);
   final hash = id.trim().isEmpty ? 0 : id.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
   final roleHash = role.codeUnits.fold<int>(0, (a, c) => (a * 17 + c) & 0x7fffffff);
   final nameHash = name.codeUnits.fold<int>(0, (a, c) => (a * 13 + c) & 0x7fffffff);
   final idx = (hash + roleHash + nameHash) % specs.length;
-  final key = 'ill_${isMale ? 'm' : 'f'}_$idx';
+  final key = 'ill_${forcedWhite ? 'fw' : (isMale ? 'm' : 'f')}_$idx';
   final cached = _portraitCache[key];
   if (cached != null) return cached;
   final bytes = Uint8List.fromList(img.encodePng(_renderPortrait(specs[idx])));
@@ -281,6 +308,45 @@ void _drawHair(img.Image im, _PortraitSpec spec, double cx, double cy, double he
       }
       break;
     case _HairStyle.bald:
+      break;
+    case _HairStyle.straight:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.1).round(), radius: (headR * 1.05).round(), color: hair);
+      img.fillRect(
+        im,
+        x1: (cx - headR * 0.95).round(),
+        y1: (cy - headR * 0.1).round(),
+        x2: (cx - headR * 0.55).round(),
+        y2: (cy + headR * 1.1).round(),
+        color: hair,
+      );
+      img.fillRect(
+        im,
+        x1: (cx + headR * 0.55).round(),
+        y1: (cy - headR * 0.1).round(),
+        x2: (cx + headR * 0.95).round(),
+        y2: (cy + headR * 1.1).round(),
+        color: hair,
+      );
+      break;
+    case _HairStyle.wavy:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.15).round(), radius: (headR * 1.15).round(), color: hair);
+      img.fillCircle(im, x: (cx - headR * 0.85).round(), y: (cy + headR * 0.5).round(), radius: (headR * 0.35).round(), color: hair);
+      img.fillCircle(im, x: (cx + headR * 0.85).round(), y: (cy + headR * 0.5).round(), radius: (headR * 0.35).round(), color: hair);
+      break;
+    case _HairStyle.ponytail:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.25).round(), radius: (headR * 0.95).round(), color: hair);
+      img.fillRect(
+        im,
+        x1: (cx + headR * 0.55).round(),
+        y1: (cy - headR * 0.3).round(),
+        x2: (cx + headR * 0.85).round(),
+        y2: (cy + headR * 1.3).round(),
+        color: hair,
+      );
+      break;
+    case _HairStyle.bun:
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 0.15).round(), radius: (headR * 0.95).round(), color: hair);
+      img.fillCircle(im, x: cx.round(), y: (cy - headR * 1.15).round(), radius: (headR * 0.32).round(), color: hair);
       break;
   }
 }
