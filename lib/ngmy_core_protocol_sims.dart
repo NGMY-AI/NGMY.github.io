@@ -1739,13 +1739,13 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
   // are "born" there — they spawn small, tucked behind it — then rise to
   // their own slot up top, one at a time.
   static const double _topY = 0;
-  static const double _midY = 156;
-  static const double _botY = 300;
-  static const double _adWidth = 188.0;
-  static const double _boxWidth = 104.0;
-  static const double _adTotalH = _adWidth * 0.62 + _adWidth * 0.16;
+  static const double _midY = 172;
+  static const double _botY = 344;
+  static const double _adWidth = 224.0;
+  static const double _boxWidth = 128.0;
+  static const double _adTotalH = _adWidth * 0.80 + _adWidth * 0.115;
   static const double _stackHeight = _botY + _adTotalH;
-  static const double _stackWidth = 340;
+  static const double _stackWidth = 380;
 
   @override
   void initState() {
@@ -2057,7 +2057,9 @@ class _IsoBoxPainter extends CustomPainter {
 
     // One continuous rounded outline for the *whole* silhouette (top face +
     // both extruded side faces) — this is what makes the glass edge curve
-    // smoothly into the side instead of stopping in a sharp corner.
+    // smoothly into the side instead of stopping in a sharp corner. Radius
+    // is kept small relative to the short depth edges on purpose — too big
+    // here and those edges collapse into a shapeless blob.
     final silhouette = _roundedPolygonPath([
       topTip,
       rightTip,
@@ -2065,14 +2067,14 @@ class _IsoBoxPainter extends CustomPainter {
       down(botTip),
       down(leftTip),
       leftTip,
-    ], w * 0.09);
+    ], math.min(w * 0.032, depth * 0.42));
 
     // Soft ambient glow behind the whole shape.
     canvas.drawPath(
       silhouette,
       Paint()
-        ..color = base.withValues(alpha: glowAlpha)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28),
+        ..color = base.withValues(alpha: glowAlpha * 0.75)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
     );
 
     // Fill each face, clipped to the rounded silhouette so every outer
@@ -2115,8 +2117,8 @@ class _IsoBoxPainter extends CustomPainter {
       Paint()
         ..shader = LinearGradient(
           colors: [
-            Color.lerp(base, Colors.black, 0.56)!,
-            Color.lerp(base, Colors.black, 0.72)!,
+            Color.lerp(base, Colors.black, 0.32)!,
+            Color.lerp(base, Colors.black, 0.5)!,
           ],
         ).createShader(leftFace.getBounds()),
     );
@@ -2212,8 +2214,8 @@ class _UnfoldBox3D extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final depth = width * 0.16;
-    final topH = width * 0.62;
+    final depth = width * 0.115;
+    final topH = width * 0.80;
     final totalH = topH + depth;
     if (opacity <= 0.001) return SizedBox(width: width, height: totalH);
     final glowAlpha = (0.30 + pulse * 0.20) * opacity;
