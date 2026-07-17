@@ -28,6 +28,8 @@ const _noteColors = [
 ];
 
 const _noteFolders = ['All', 'Personal', 'Work', 'Ideas', 'Meeting', 'Other'];
+const _kTrashFolder = 'Trash';
+const _kTrashRetention = Duration(hours: 24);
 
 enum _NoteBgPattern { none, rain, waves, grass, stars, grid, bokeh, snow, fireflies, petals, fish, aurora, lightning, clouds, leaves }
 
@@ -813,6 +815,7 @@ class NgmyBusinessNote {
     List<String>? imageIds,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.deletedAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -839,6 +842,12 @@ class NgmyBusinessNote {
   List<String> imageIds;
   final DateTime createdAt;
   DateTime updatedAt;
+  /// Null = active note. Set when moved to Trash — the note's [folder] is
+  /// left untouched so it can be restored to where it came from. Notes
+  /// stay in Trash for 24 hours before being purged automatically.
+  DateTime? deletedAt;
+
+  bool get isTrashed => deletedAt != null;
 
   String get preview {
     if (title.trim().isNotEmpty) return title.trim();
@@ -881,6 +890,7 @@ class NgmyBusinessNote {
         if (embedImagesForTransfer && images.isNotEmpty) 'images': images,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
+        if (deletedAt != null) 'deletedAt': deletedAt!.toUtc().toIso8601String(),
       };
 
   factory NgmyBusinessNote.fromJson(Map<String, dynamic> json) {
@@ -917,6 +927,7 @@ class NgmyBusinessNote {
       imageIds: ids.isNotEmpty ? ids : legacyIds,
       createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
       updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
+      deletedAt: DateTime.tryParse((json['deletedAt'] ?? '').toString()),
     );
   }
 
@@ -1012,7 +1023,60 @@ Future<void> _saveNotes(String userEmail, List<NgmyBusinessNote> items) async {
   }
 }
 
-Future<int> ngmyBusinessNotesCount({required String userEmail}) async => (await _loadNotes(userEmail)).length;
+Future<int> ngmyBusinessNotesCount({required String userEmail}) async =>
+    (await _loadNotes(userEmail)).where((n) => !n.isTrashed).length;
+
+/// Permanently removes any note that has sat in Trash past [_kTrashRetention].
+/// Called opportunistically whenever the notes screen loads — there's no
+/// background service, so this is how the 24-hour auto-purge is enforced.
+Future<List<NgmyBusinessNote>> _purgeExpiredTrash(String userEmail, List<NgmyBusinessNote> items) async {
+  final now = DateTime.now();
+  final expired = items.where((n) => n.isTrashed && now.difference(n.deletedAt!) >= _kTrashRetention).toList();
+  if (expired.isEmpty) return items;
+  final kept = items.where((n) => !expired.contains(n)).toList();
+  for (final n in expired) {
+    await ngmyBusinessNoteImagesDeleteAll(
+      userEmail: userEmail,
+      noteId: n.id,
+      imageIds: [...n.imageIds, for (var i = 0; i < n.images.length; i++) 'legacy_$i'],
+    );
+  }
+  await _saveNotes(userEmail, kept);
+  return kept;
+}
+
+/// Moves a note to Trash — its [folder] is left alone so restoring puts it
+/// right back where it came from.
+Future<void> _trashNote(String userEmail, String noteId) async {
+  final items = await _loadNotes(userEmail);
+  final i = items.indexWhere((e) => e.id == noteId);
+  if (i < 0) return;
+  items[i].deletedAt = DateTime.now();
+  await _saveNotes(userEmail, items);
+}
+
+Future<void> _restoreNote(String userEmail, String noteId) async {
+  final items = await _loadNotes(userEmail);
+  final i = items.indexWhere((e) => e.id == noteId);
+  if (i < 0) return;
+  items[i].deletedAt = null;
+  await _saveNotes(userEmail, items);
+}
+
+/// Immediately, permanently deletes a note (used from inside Trash).
+Future<void> _deleteForever(String userEmail, String noteId) async {
+  final items = await _loadNotes(userEmail);
+  final doomed = items.where((e) => e.id == noteId).toList();
+  items.removeWhere((e) => e.id == noteId);
+  for (final n in doomed) {
+    await ngmyBusinessNoteImagesDeleteAll(
+      userEmail: userEmail,
+      noteId: n.id,
+      imageIds: [...n.imageIds, for (var i = 0; i < n.images.length; i++) 'legacy_$i'],
+    );
+  }
+  await _saveNotes(userEmail, items);
+}
 
 Future<List<NgmyBusinessNote>> ngmyExportBusinessNotes({required String userEmail}) async {
   final notes = await _loadNotes(userEmail);
@@ -1065,7 +1129,8 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   }
 
   Future<void> _reload() async {
-    final list = await _loadNotes(widget.userEmail);
+    var list = await _loadNotes(widget.userEmail);
+    list = await _purgeExpiredTrash(widget.userEmail, list);
     if (!mounted) return;
     setState(() {
       _notes = list;
@@ -1074,12 +1139,22 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   }
 
   List<NgmyBusinessNote> get _visible {
+    final inTrash = _folder == _kTrashFolder;
     var list = _notes.where((n) {
-      if (_folder != 'All' && n.folder != _folder) return false;
+      if (inTrash) {
+        if (!n.isTrashed) return false;
+      } else {
+        if (n.isTrashed) return false;
+        if (_folder != 'All' && n.folder != _folder) return false;
+      }
       if (_query.trim().isEmpty) return true;
       final q = _query.toLowerCase();
       return n.title.toLowerCase().contains(q) || n.body.toLowerCase().contains(q);
     }).toList();
+    if (inTrash) {
+      list.sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+      return list;
+    }
     // Pinned stay on top as a group; within non-pinned (and within pinned),
     // most recently edited/updated notes rise to the top.
     list.sort((a, b) {
@@ -1089,6 +1164,15 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
       return b.createdAt.compareTo(a.createdAt);
     });
     return list;
+  }
+
+  String _trashExpiryLabel(DateTime deletedAt) {
+    final remaining = _kTrashRetention - DateTime.now().difference(deletedAt);
+    if (remaining.isNegative) return 'Deleting…';
+    final h = remaining.inHours;
+    final m = remaining.inMinutes % 60;
+    if (h > 0) return '${h}h left';
+    return '${m}m left';
   }
 
   Future<void> _pickTemplateAndCreate() async {
@@ -1161,17 +1245,16 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
   }
 
   Future<void> _delete(NgmyBusinessNote note) async {
-    final items = await _loadNotes(widget.userEmail);
-    final doomed = items.where((e) => e.id == note.id).toList();
-    items.removeWhere((e) => e.id == note.id);
-    for (final n in doomed) {
-      await ngmyBusinessNoteImagesDeleteAll(
-        userEmail: widget.userEmail,
-        noteId: n.id,
-        imageIds: [...n.imageIds, for (var i = 0; i < n.images.length; i++) 'legacy_$i'],
-      );
+    if (note.isTrashed) {
+      await _deleteForever(widget.userEmail, note.id);
+    } else {
+      await _trashNote(widget.userEmail, note.id);
     }
-    await _saveNotes(widget.userEmail, items);
+    await _reload();
+  }
+
+  Future<void> _restore(NgmyBusinessNote note) async {
+    await _restoreNote(widget.userEmail, note.id);
     await _reload();
   }
 
@@ -1256,9 +1339,36 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                itemCount: _noteFolders.length,
+                itemCount: _noteFolders.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
+                  if (i == _noteFolders.length) {
+                    final sel = _folder == _kTrashFolder;
+                    final trashCount = _notes.where((n) => n.isTrashed).length;
+                    return GestureDetector(
+                      onTap: () => setState(() => _folder = _kTrashFolder),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: sel ? const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFB91C1C)]) : null,
+                          color: sel ? null : hub.chipIdleBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: sel ? Colors.transparent : hub.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 14, color: sel ? Colors.white : (trashCount > 0 ? const Color(0xFFEF4444) : hub.chipOffLabel)),
+                            if (trashCount > 0) ...[
+                              const SizedBox(width: 4),
+                              Text('$trashCount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: sel ? Colors.white : const Color(0xFFEF4444))),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                   final f = _noteFolders[i];
                   final sel = _folder == f;
                   return GestureDetector(
@@ -1385,18 +1495,41 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                                 ),
                                                 const SizedBox(height: 8),
                                                 Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                      decoration: BoxDecoration(
-                                                        color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: Text(n.folder, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: dark ? Colors.white54 : const Color(0xFF94A3B8))),
-                                                    ),
-                                                    const Spacer(),
-                                                    Text(_formatDate(n.updatedAt), style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600)),
-                                                  ],
+                                                  children: n.isTrashed
+                                                      ? [
+                                                          GestureDetector(
+                                                            onTap: () => _restore(n),
+                                                            child: Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                                                borderRadius: BorderRadius.circular(8),
+                                                              ),
+                                                              child: const Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  Icon(Icons.restore_rounded, size: 12, color: Color(0xFF10B981)),
+                                                                  SizedBox(width: 3),
+                                                                  Text('Restore', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const Spacer(),
+                                                          Text(_trashExpiryLabel(n.deletedAt!), style: TextStyle(color: const Color(0xFFEF4444).withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w600)),
+                                                        ]
+                                                      : [
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                            decoration: BoxDecoration(
+                                                              color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                                                              borderRadius: BorderRadius.circular(8),
+                                                            ),
+                                                            child: Text(n.folder, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: dark ? Colors.white54 : const Color(0xFF94A3B8))),
+                                                          ),
+                                                          const Spacer(),
+                                                          Text(_formatDate(n.updatedAt), style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600)),
+                                                        ],
                                                 ),
                                               ],
                                             ),
@@ -2574,7 +2707,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     } else if (action.startsWith('folder:')) {
       setState(() => _note.folder = action.substring(7));
     } else if (action == 'delete') {
-      await _persist();
+      if (!widget.isNew) await _trashNote(widget.userEmail, _note.id);
       if (mounted) Navigator.pop(context, null);
     }
   }
