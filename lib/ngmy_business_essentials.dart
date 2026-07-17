@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_bible_dictionary.dart';
 import 'ngmy_business_contacts.dart';
 import 'ngmy_business_notes.dart';
 import 'ngmy_business_tasks.dart';
@@ -10,7 +11,6 @@ import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_color_buckets.dart';
 import 'ngmy_medicine_organizer.dart';
-import 'ngmy_promote_me.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
@@ -28,7 +28,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyColorBucketsCount(userEmail: userEmail),
-    ngmyPromoteMeCount(userEmail: userEmail),
+    ngmyBibleDictionaryCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -122,10 +122,10 @@ const _categoryArt = <String, _CategoryArt>{
     accent: Color(0xFFD6A800),
     gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)],
   ),
-  'Promote Me': _CategoryArt(
-    icon: Icons.campaign_rounded,
-    accent: Color(0xFF06B6D4),
-    gradient: [Color(0xFF6366F1), Color(0xFF06B6D4)],
+  'Bible Dictionary': _CategoryArt(
+    icon: Icons.auto_stories_rounded,
+    accent: Color(0xFF7C3AED),
+    gradient: [Color(0xFF7C3AED), Color(0xFFD4AF37)],
   ),
 };
 
@@ -138,7 +138,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _tasks = 0;
   int _reminders = 0;
   int _colorBuckets = 0;
-  int _promoteMe = 0;
+  int _bibleDictionary = 0;
   bool _loading = true;
 
   @override
@@ -157,7 +157,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyColorBucketsCount(userEmail: widget.userEmail),
-      ngmyPromoteMeCount(userEmail: widget.userEmail),
+      ngmyBibleDictionaryCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -169,7 +169,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _tasks = results[5];
       _reminders = results[6];
       _colorBuckets = results[7];
-      _promoteMe = results[8];
+      _bibleDictionary = results[8];
       _loading = false;
     });
   }
@@ -388,14 +388,14 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                               ),
                             ),
                             _CompactCategoryCard(
-                              title: 'Promote Me',
-                              count: _promoteMe,
+                              title: 'Bible Dictionary',
+                              count: _bibleDictionary,
                               pulse: pulse,
                               scan: scan,
                               orbit: orbit,
                               phase: 0.54,
                               onTap: () => _openCategory(
-                                (ctx) => showNgmyPromoteMeDialog(
+                                (ctx) => showNgmyBibleDictionaryDialog(
                                   ctx,
                                   userEmail: widget.userEmail,
                                 ),
