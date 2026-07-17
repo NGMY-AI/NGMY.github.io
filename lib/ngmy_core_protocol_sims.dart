@@ -114,22 +114,97 @@ const _kSims = <_SimMeta>[
   ),
 ];
 
+/// A three-stage glass-panel reveal — one tile unfolds, a glowing link
+/// draws down to the next, it unfolds, and so on. Auto-plays, no touch
+/// input needed (unlike the drag sims above).
+class _UnfoldMeta {
+  const _UnfoldMeta({
+    required this.title,
+    required this.blurb,
+    required this.colors,
+    required this.icons,
+  });
+
+  final String title;
+  final String blurb;
+  final List<Color> colors;
+  final List<IconData> icons; // exactly 3, top to bottom
+
+  Color get glow => Color.lerp(colors.first, colors.last, 0.5)!;
+}
+
+const _kUnfoldSims = <_UnfoldMeta>[
+  _UnfoldMeta(
+    title: 'MESSAGE FUNNEL',
+    blurb: 'Mail → SMS → Campaign, one glowing reveal',
+    colors: [Color(0xFF818CF8), Color(0xFF6366F1)],
+    icons: [Icons.mail_rounded, Icons.sms_rounded, Icons.campaign_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'GROWTH CHAIN',
+    blurb: 'Deposit → Growth → Payout unfolds in sequence',
+    colors: [Color(0xFFFBBF24), Color(0xFF34D399)],
+    icons: [Icons.savings_rounded, Icons.show_chart_rounded, Icons.emoji_events_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'SIGNAL RELAY',
+    blurb: 'Broadcast → Satellite → Hub link-up',
+    colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
+    icons: [Icons.wifi_tethering_rounded, Icons.satellite_alt_rounded, Icons.hub_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'TRUST CHAIN',
+    blurb: 'Verify → Protect → Certify, panel by panel',
+    colors: [Color(0xFF2DD4BF), Color(0xFF059669)],
+    icons: [Icons.verified_user_rounded, Icons.shield_rounded, Icons.workspace_premium_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'DATA PIPELINE',
+    blurb: 'Cloud → Server → Device, glowing handoff',
+    colors: [Color(0xFF60A5FA), Color(0xFF4338CA)],
+    icons: [Icons.cloud_rounded, Icons.dns_rounded, Icons.devices_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'ENERGY CORE',
+    blurb: 'Spark → Charge → Bolt, powering up',
+    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
+    icons: [Icons.bolt_rounded, Icons.battery_charging_full_rounded, Icons.flash_on_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'CONNECTION WEB',
+    blurb: 'Person → Link → World, the network unfolds',
+    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
+    icons: [Icons.person_rounded, Icons.link_rounded, Icons.public_rounded],
+  ),
+  _UnfoldMeta(
+    title: 'SECURE VAULT',
+    blurb: 'Lock → Key → Verified, sealed shut',
+    colors: [Color(0xFF94A3B8), Color(0xFF22D3EE)],
+    icons: [Icons.lock_rounded, Icons.key_rounded, Icons.verified_rounded],
+  ),
+];
+
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
   /// Original CORE PROTOCOL boot loads first, then the sims hub.
   bool _booting = true;
   _SimMeta? _active;
+  _UnfoldMeta? _activeUnfold;
 
   void _exitSim() => setState(() => _active = null);
+  void _exitUnfold() => setState(() => _activeUnfold = null);
 
   @override
   Widget build(BuildContext context) {
     final active = _active;
+    final activeUnfold = _activeUnfold;
     return PopScope(
-      canPop: !_booting && active == null,
+      canPop: !_booting && active == null && activeUnfold == null,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (active != null) {
           _exitSim();
+        } else if (activeUnfold != null) {
+          _exitUnfold();
         }
       },
       child: Scaffold(
@@ -144,15 +219,21 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
                   if (mounted) setState(() => _booting = false);
                 },
               )
-            else if (active == null)
+            else if (active == null && activeUnfold == null)
               _SimPicker(
                 onPick: (s) => setState(() => _active = s),
+                onPickUnfold: (s) => setState(() => _activeUnfold = s),
                 onClose: () => Navigator.of(context).maybePop(),
               )
-            else
+            else if (active != null)
               _ProtocolSimCanvas(
                 meta: active,
                 onExit: _exitSim,
+              )
+            else
+              _UnfoldSimCanvas(
+                meta: activeUnfold!,
+                onExit: _exitUnfold,
               ),
           ],
         ),
@@ -477,9 +558,10 @@ class _CoreBackdropPainter extends CustomPainter {
 }
 
 class _SimPicker extends StatelessWidget {
-  const _SimPicker({required this.onPick, required this.onClose});
+  const _SimPicker({required this.onPick, required this.onPickUnfold, required this.onClose});
 
   final ValueChanged<_SimMeta> onPick;
+  final ValueChanged<_UnfoldMeta> onPickUnfold;
   final VoidCallback onClose;
 
   @override
@@ -535,19 +617,58 @@ class _SimPicker extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: GridView.builder(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.92,
-              ),
-              itemCount: _kSims.length,
-              itemBuilder: (context, i) {
-                final s = _kSims[i];
-                return _SimPickTile(meta: s, onTap: () => onPick(s));
-              },
+              children: [
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.92,
+                  ),
+                  itemCount: _kSims.length,
+                  itemBuilder: (context, i) {
+                    final s = _kSims[i];
+                    return _SimPickTile(meta: s, onTap: () => onPick(s));
+                  },
+                ),
+                const SizedBox(height: 26),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 4),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'UNFOLD SEQUENCES',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 13),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Tap to watch · tap to exit',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.38), fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.92,
+                  ),
+                  itemCount: _kUnfoldSims.length,
+                  itemBuilder: (context, i) {
+                    final s = _kUnfoldSims[i];
+                    return _UnfoldPickTile(meta: s, onTap: () => onPickUnfold(s));
+                  },
+                ),
+              ],
             ),
           ),
         ],
@@ -606,6 +727,103 @@ class _SimPickTile extends StatelessWidget {
                     ],
                   ),
                   child: Icon(meta.icon, color: Colors.white, size: 22),
+                ),
+                const Spacer(),
+                Text(
+                  meta.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    letterSpacing: 0.8,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  meta.blurb,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.58),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UnfoldPickTile extends StatelessWidget {
+  const _UnfoldPickTile({required this.meta, required this.onTap});
+
+  final _UnfoldMeta meta;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                meta.colors.first.withValues(alpha: 0.2),
+                const Color(0xFF0B1220),
+                meta.colors.last.withValues(alpha: 0.12),
+              ],
+            ),
+            border: Border.all(color: meta.colors.first.withValues(alpha: 0.45)),
+            boxShadow: [
+              BoxShadow(
+                color: meta.colors.first.withValues(alpha: 0.16),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    for (var i = 0; i < meta.icons.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+                        child: Transform.rotate(
+                          angle: 0.7854, // 45°
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(7),
+                              gradient: LinearGradient(colors: meta.colors),
+                              boxShadow: [BoxShadow(color: meta.colors.first.withValues(alpha: 0.4), blurRadius: 8)],
+                            ),
+                            child: Transform.rotate(
+                              angle: -0.7854,
+                              child: Icon(meta.icons[i], color: Colors.white, size: 13),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const Spacer(),
                 Text(
@@ -1401,4 +1619,251 @@ class _ProtocolPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProtocolPainter old) => true;
+}
+
+// ── Unfold reveal canvas ─────────────────────────────────────────────────────
+
+/// Fullscreen auto-playing reveal: stage 1 unfolds, a glowing link draws
+/// down to stage 2, it unfolds, a link draws to stage 3, it unfolds — then
+/// a hold, a soft fade, and the loop repeats. Tap anywhere to exit.
+class _UnfoldSimCanvas extends StatefulWidget {
+  const _UnfoldSimCanvas({required this.meta, required this.onExit});
+
+  final _UnfoldMeta meta;
+  final VoidCallback onExit;
+
+  @override
+  State<_UnfoldSimCanvas> createState() => _UnfoldSimCanvasState();
+}
+
+class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderStateMixin {
+  late final AnimationController _seq;
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 4600))..repeat();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _seq.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  double _seg(double t, double start, double end) => ((t - start) / (end - start)).clamp(0.0, 1.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = widget.meta;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onExit,
+      child: SizedBox.expand(
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_seq, _pulse]),
+          builder: (context, _) {
+            final t = _seq.value;
+            // Reveal windows (top → bottom), each eased with a back-out pop.
+            final stage1 = Curves.easeOutBack.transform(_seg(t, 0.00, 0.12));
+            final link1 = Curves.easeInOut.transform(_seg(t, 0.14, 0.28));
+            final stage2 = Curves.easeOutBack.transform(_seg(t, 0.30, 0.42));
+            final link2 = Curves.easeInOut.transform(_seg(t, 0.44, 0.58));
+            final stage3 = Curves.easeOutBack.transform(_seg(t, 0.60, 0.72));
+            // Hold from ~0.74–0.90, then fade everything out before the loop restarts.
+            final holdFade = t < 0.90 ? 1.0 : 1.0 - _seg(t, 0.90, 1.0);
+            final pulse = Curves.easeInOut.transform(_pulse.value);
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(color: const Color(0xFF030712)),
+                _UnfoldGlowBackdrop(color: meta.glow, pulse: pulse),
+                Center(
+                  child: SizedBox(
+                    width: 300,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _UnfoldPanel(icon: meta.icons[0], colors: meta.colors, reveal: stage1 * holdFade, pulse: pulse),
+                        _UnfoldLink(colors: meta.colors, progress: link1 * (stage1 > 0.5 ? 1 : 0) * holdFade),
+                        _UnfoldPanel(icon: meta.icons[1], colors: meta.colors, reveal: stage2 * holdFade, pulse: pulse),
+                        _UnfoldLink(colors: meta.colors, progress: link2 * (stage2 > 0.5 ? 1 : 0) * holdFade),
+                        _UnfoldPanel(icon: meta.icons[2], colors: meta.colors, reveal: stage3 * holdFade, pulse: pulse),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      child: Opacity(
+                        opacity: 0.85,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              meta.title,
+                              style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tap anywhere to exit',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// A soft radial wash behind the stack, breathing with [pulse].
+class _UnfoldGlowBackdrop extends StatelessWidget {
+  const _UnfoldGlowBackdrop({required this.color, required this.pulse});
+  final Color color;
+  final double pulse;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(painter: _UnfoldGlowPainter(color: color, pulse: pulse));
+}
+
+class _UnfoldGlowPainter extends CustomPainter {
+  _UnfoldGlowPainter({required this.color, required this.pulse});
+  final Color color;
+  final double pulse;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height * 0.46);
+    final r = size.shortestSide * (0.42 + pulse * 0.05);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [color.withValues(alpha: 0.16 + pulse * 0.06), Colors.transparent],
+      ).createShader(Rect.fromCircle(center: c, radius: r));
+    canvas.drawCircle(c, r, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _UnfoldGlowPainter old) => old.pulse != pulse || old.color != color;
+}
+
+/// One glassy diamond-cut panel — scales/fades in as [reveal] goes 0→1, then
+/// idles with a gentle glow breathing driven by [pulse].
+class _UnfoldPanel extends StatelessWidget {
+  const _UnfoldPanel({required this.icon, required this.colors, required this.reveal, required this.pulse});
+
+  final IconData icon;
+  final List<Color> colors;
+  final double reveal;
+  final double pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reveal <= 0.001) return const SizedBox(height: 88);
+    final glowAlpha = (0.35 + pulse * 0.25) * reveal;
+    return SizedBox(
+      height: 88,
+      child: Center(
+        child: Transform.scale(
+          scale: 0.55 + reveal * 0.45,
+          child: Opacity(
+            opacity: reveal.clamp(0.0, 1.0),
+            child: Transform.rotate(
+              angle: 0.7854, // 45° — diamond cut
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.white.withValues(alpha: 0.16), colors.first.withValues(alpha: 0.22), colors.last.withValues(alpha: 0.30)],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.4),
+                  boxShadow: [
+                    BoxShadow(color: colors.first.withValues(alpha: glowAlpha), blurRadius: 26, spreadRadius: 2),
+                    BoxShadow(color: colors.last.withValues(alpha: glowAlpha * 0.7), blurRadius: 44, spreadRadius: 6),
+                  ],
+                ),
+                child: Transform.rotate(
+                  angle: -0.7854,
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Glowing curved loop connecting two panels, drawn progressively as
+/// [progress] goes 0→1 — the "energy flowing to the next stage" beat.
+class _UnfoldLink extends StatelessWidget {
+  const _UnfoldLink({required this.colors, required this.progress});
+
+  final List<Color> colors;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      width: double.infinity,
+      child: CustomPaint(painter: _UnfoldLinkPainter(colors: colors, progress: progress)),
+    );
+  }
+}
+
+class _UnfoldLinkPainter extends CustomPainter {
+  _UnfoldLinkPainter({required this.colors, required this.progress});
+  final List<Color> colors;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.001) return;
+    final cx = size.width / 2;
+    final path = Path()
+      ..moveTo(cx, 0)
+      ..cubicTo(cx - 26, size.height * 0.35, cx + 26, size.height * 0.65, cx, size.height);
+    final metric = path.computeMetrics().first;
+    final drawn = metric.extractPath(0, metric.length * progress);
+
+    final glow = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
+      ..shader = LinearGradient(colors: colors).createShader(Offset.zero & size);
+    canvas.drawPath(drawn, glow);
+
+    final core = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: 0.9);
+    canvas.drawPath(drawn, core);
+  }
+
+  @override
+  bool shouldRepaint(covariant _UnfoldLinkPainter old) => old.progress != progress || old.colors != colors;
 }
