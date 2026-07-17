@@ -136,51 +136,9 @@ class _UnfoldMeta {
 const _kUnfoldSims = <_UnfoldMeta>[
   _UnfoldMeta(
     title: 'MESSAGE FUNNEL',
-    blurb: 'Mail → SMS → Campaign, one glowing reveal',
+    blurb: 'Mail rises into place, then SMS, then the ad',
     colors: [Color(0xFF818CF8), Color(0xFF6366F1)],
     icons: [Icons.mail_rounded, Icons.sms_rounded, Icons.campaign_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'GROWTH CHAIN',
-    blurb: 'Deposit → Growth → Payout unfolds in sequence',
-    colors: [Color(0xFFFBBF24), Color(0xFF34D399)],
-    icons: [Icons.savings_rounded, Icons.show_chart_rounded, Icons.emoji_events_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'SIGNAL RELAY',
-    blurb: 'Broadcast → Satellite → Hub link-up',
-    colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
-    icons: [Icons.wifi_tethering_rounded, Icons.satellite_alt_rounded, Icons.hub_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'TRUST CHAIN',
-    blurb: 'Verify → Protect → Certify, panel by panel',
-    colors: [Color(0xFF2DD4BF), Color(0xFF059669)],
-    icons: [Icons.verified_user_rounded, Icons.shield_rounded, Icons.workspace_premium_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'DATA PIPELINE',
-    blurb: 'Cloud → Server → Device, glowing handoff',
-    colors: [Color(0xFF60A5FA), Color(0xFF4338CA)],
-    icons: [Icons.cloud_rounded, Icons.dns_rounded, Icons.devices_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'ENERGY CORE',
-    blurb: 'Spark → Charge → Bolt, powering up',
-    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
-    icons: [Icons.bolt_rounded, Icons.battery_charging_full_rounded, Icons.flash_on_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'CONNECTION WEB',
-    blurb: 'Person → Link → World, the network unfolds',
-    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
-    icons: [Icons.person_rounded, Icons.link_rounded, Icons.public_rounded],
-  ),
-  _UnfoldMeta(
-    title: 'SECURE VAULT',
-    blurb: 'Lock → Key → Verified, sealed shut',
-    colors: [Color(0xFF94A3B8), Color(0xFF22D3EE)],
-    icons: [Icons.lock_rounded, Icons.key_rounded, Icons.verified_rounded],
   ),
 ];
 
@@ -653,21 +611,11 @@ class _SimPicker extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.92,
+                for (final s in _kUnfoldSims)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: SizedBox(height: 160, child: _UnfoldPickTile(meta: s, onTap: () => onPickUnfold(s))),
                   ),
-                  itemCount: _kUnfoldSims.length,
-                  itemBuilder: (context, i) {
-                    final s = _kUnfoldSims[i];
-                    return _UnfoldPickTile(meta: s, onTap: () => onPickUnfold(s));
-                  },
-                ),
               ],
             ),
           ),
@@ -1640,10 +1588,19 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
   late final AnimationController _seq;
   late final AnimationController _pulse;
 
+  // Fixed slot centers within the stack area — panels travel between these,
+  // they never just pop into their final spot.
+  static const double _topY = 0;
+  static const double _midY = 148;
+  static const double _botY = 296;
+  static const double _stackHeight = 296 + 110;
+
   @override
   void initState() {
     super.initState();
-    _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 4600))..repeat();
+    // Slow, deliberate pacing — this is meant to read like a polished ad,
+    // not a quick UI transition.
+    _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 7200))..repeat();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900))..repeat(reverse: true);
   }
 
@@ -1656,6 +1613,28 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
 
   double _seg(double t, double start, double end) => ((t - start) / (end - start)).clamp(0.0, 1.0);
 
+  /// Returns (y, scale, opacity) for a panel that appears at the bottom slot
+  /// during [appearStart]-[appearEnd], then — unless [home] is the bottom
+  /// slot itself — rises to [home] during [riseStart]-[riseEnd].
+  (double, double, double) _panelState(
+    double t, {
+    required double appearStart,
+    required double appearEnd,
+    double? riseStart,
+    double? riseEnd,
+    required double home,
+  }) {
+    if (t < appearStart) return (_botY, 0.0, 0.0);
+    final appear = Curves.easeOutBack.transform(_seg(t, appearStart, appearEnd));
+    if (riseStart == null || riseEnd == null || home == _botY) {
+      return (_botY, appear, appear.clamp(0.0, 1.0));
+    }
+    if (t < riseStart) return (_botY, 1.0, 1.0);
+    final rise = Curves.easeInOutCubic.transform(_seg(t, riseStart, riseEnd));
+    final y = _botY + (home - _botY) * rise;
+    return (y, 1.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final meta = widget.meta;
@@ -1667,15 +1646,19 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
           animation: Listenable.merge([_seq, _pulse]),
           builder: (context, _) {
             final t = _seq.value;
-            // Reveal windows (top → bottom), each eased with a back-out pop.
-            final stage1 = Curves.easeOutBack.transform(_seg(t, 0.00, 0.12));
-            final link1 = Curves.easeInOut.transform(_seg(t, 0.14, 0.28));
-            final stage2 = Curves.easeOutBack.transform(_seg(t, 0.30, 0.42));
-            final link2 = Curves.easeInOut.transform(_seg(t, 0.44, 0.58));
-            final stage3 = Curves.easeOutBack.transform(_seg(t, 0.60, 0.72));
-            // Hold from ~0.74–0.90, then fade everything out before the loop restarts.
-            final holdFade = t < 0.90 ? 1.0 : 1.0 - _seg(t, 0.90, 1.0);
             final pulse = Curves.easeInOut.transform(_pulse.value);
+            // Hold everything from ~0.80–0.92, then fade out before the loop restarts.
+            final holdFade = t < 0.80 ? 1.0 : 1.0 - _seg(t, 0.80, 0.92);
+            final restartGap = t > 0.98 ? 0.0 : 1.0; // fully hidden briefly before replay
+
+            final (mailY, mailScale, mailOp) = _panelState(t, appearStart: 0.00, appearEnd: 0.06, riseStart: 0.07, riseEnd: 0.30, home: _topY);
+            final (smsY, smsScale, smsOp) = _panelState(t, appearStart: 0.34, appearEnd: 0.40, riseStart: 0.41, riseEnd: 0.62, home: _midY);
+            final (adY, adScale, adOp) = _panelState(t, appearStart: 0.68, appearEnd: 0.76, home: _botY);
+
+            final link1 = Curves.easeInOut.transform(_seg(t, 0.63, 0.68));
+            final link2 = Curves.easeInOut.transform(_seg(t, 0.77, 0.83));
+
+            final fade = holdFade * restartGap;
 
             return Stack(
               fit: StackFit.expand,
@@ -1685,14 +1668,43 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas> with TickerProviderS
                 Center(
                   child: SizedBox(
                     width: 300,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    height: _stackHeight,
+                    child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        _UnfoldPanel(icon: meta.icons[0], colors: meta.colors, reveal: stage1 * holdFade, pulse: pulse),
-                        _UnfoldLink(colors: meta.colors, progress: link1 * (stage1 > 0.5 ? 1 : 0) * holdFade),
-                        _UnfoldPanel(icon: meta.icons[1], colors: meta.colors, reveal: stage2 * holdFade, pulse: pulse),
-                        _UnfoldLink(colors: meta.colors, progress: link2 * (stage2 > 0.5 ? 1 : 0) * holdFade),
-                        _UnfoldPanel(icon: meta.icons[2], colors: meta.colors, reveal: stage3 * holdFade, pulse: pulse),
+                        // Links drawn first so panels sit on top of them.
+                        Positioned(
+                          top: _topY + 92,
+                          left: 0,
+                          right: 0,
+                          height: _midY - _topY - 92 + 18,
+                          child: _UnfoldLink(colors: meta.colors, progress: link1 * fade),
+                        ),
+                        Positioned(
+                          top: _midY + 92,
+                          left: 0,
+                          right: 0,
+                          height: _botY - _midY - 92 + 18,
+                          child: _UnfoldLink(colors: meta.colors, progress: link2 * fade),
+                        ),
+                        Positioned(
+                          top: mailY,
+                          left: 0,
+                          right: 0,
+                          child: _UnfoldPanel(icon: meta.icons[0], colors: meta.colors, scale: mailScale, opacity: mailOp * fade, pulse: pulse),
+                        ),
+                        Positioned(
+                          top: smsY,
+                          left: 0,
+                          right: 0,
+                          child: _UnfoldPanel(icon: meta.icons[1], colors: meta.colors, scale: smsScale, opacity: smsOp * fade, pulse: pulse),
+                        ),
+                        Positioned(
+                          top: adY,
+                          left: 0,
+                          right: 0,
+                          child: _UnfoldPanel(icon: meta.icons[2], colors: meta.colors, scale: adScale, opacity: adOp * fade, pulse: pulse, isFinal: true),
+                        ),
                       ],
                     ),
                   ),
@@ -1763,48 +1775,112 @@ class _UnfoldGlowPainter extends CustomPainter {
   bool shouldRepaint(covariant _UnfoldGlowPainter old) => old.pulse != pulse || old.color != color;
 }
 
-/// One glassy diamond-cut panel — scales/fades in as [reveal] goes 0→1, then
-/// idles with a gentle glow breathing driven by [pulse].
+/// One 3D-printed-looking diamond-cut glass tile — the first two stages are
+/// clear frosted glass (like the reference), the final stage ([isFinal]) is
+/// the solid-color "ad" payload tile with a NEW ribbon, like real content
+/// sitting inside the glass. Idles with a gentle glow breathing driven by
+/// [pulse] once fully in.
 class _UnfoldPanel extends StatelessWidget {
-  const _UnfoldPanel({required this.icon, required this.colors, required this.reveal, required this.pulse});
+  const _UnfoldPanel({
+    required this.icon,
+    required this.colors,
+    required this.scale,
+    required this.opacity,
+    required this.pulse,
+    this.isFinal = false,
+  });
 
   final IconData icon;
   final List<Color> colors;
-  final double reveal;
+  final double scale;
+  final double opacity;
   final double pulse;
+  final bool isFinal;
 
   @override
   Widget build(BuildContext context) {
-    if (reveal <= 0.001) return const SizedBox(height: 88);
-    final glowAlpha = (0.35 + pulse * 0.25) * reveal;
+    if (opacity <= 0.001) return const SizedBox(height: 96);
+    final glowAlpha = (0.32 + pulse * 0.22) * opacity;
+    const size = 92.0;
+    final fill = isFinal
+        ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [colors.first.withValues(alpha: 0.85), colors.last.withValues(alpha: 0.95)],
+          )
+        : LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white.withValues(alpha: 0.20), Colors.white.withValues(alpha: 0.06), colors.first.withValues(alpha: 0.10)],
+          );
+
     return SizedBox(
-      height: 88,
+      height: 96,
       child: Center(
         child: Transform.scale(
-          scale: 0.55 + reveal * 0.45,
+          scale: 0.6 + scale * 0.4,
           child: Opacity(
-            opacity: reveal.clamp(0.0, 1.0),
+            opacity: opacity.clamp(0.0, 1.0),
             child: Transform.rotate(
               angle: 0.7854, // 45° — diamond cut
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white.withValues(alpha: 0.16), colors.first.withValues(alpha: 0.22), colors.last.withValues(alpha: 0.30)],
-                  ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.4),
-                  boxShadow: [
-                    BoxShadow(color: colors.first.withValues(alpha: glowAlpha), blurRadius: 26, spreadRadius: 2),
-                    BoxShadow(color: colors.last.withValues(alpha: glowAlpha * 0.7), blurRadius: 44, spreadRadius: 6),
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Extruded "thickness" edge — the 3D-printed bevel look.
+                    Positioned(
+                      left: 4,
+                      top: 4,
+                      child: Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          color: Color.lerp(colors.last, Colors.black, 0.45)!.withValues(alpha: 0.55 * opacity),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: fill,
+                        border: Border.all(color: Colors.white.withValues(alpha: isFinal ? 0.5 : 0.65), width: 1.6),
+                        boxShadow: [
+                          BoxShadow(color: colors.first.withValues(alpha: glowAlpha), blurRadius: 30, spreadRadius: 2),
+                          BoxShadow(color: colors.last.withValues(alpha: glowAlpha * 0.7), blurRadius: 50, spreadRadius: 6),
+                        ],
+                      ),
+                      child: Transform.rotate(
+                        angle: -0.7854,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(icon, color: Colors.white.withValues(alpha: isFinal ? 1 : 0.92), size: 32),
+                            if (isFinal)
+                              Positioned(
+                                left: -30,
+                                top: -30,
+                                child: Transform.rotate(
+                                  angle: -0.7854,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF22C55E),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('NEW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 8, letterSpacing: 0.4)),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
-                ),
-                child: Transform.rotate(
-                  angle: -0.7854,
-                  child: Icon(icon, color: Colors.white, size: 28),
                 ),
               ),
             ),
