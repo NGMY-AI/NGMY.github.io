@@ -16,12 +16,15 @@ String _hashKey(String base, String userEmail) {
 }
 
 enum NgmyBibleLang {
-  en('en', 'English'),
-  sw('sw', 'Swahili');
+  en('en', 'English', '🇺🇸'),
+  sw('sw', 'Swahili', '🇹🇿');
 
-  const NgmyBibleLang(this.code, this.label);
+  const NgmyBibleLang(this.code, this.label, this.flag);
   final String code;
   final String label;
+  final String flag;
+
+  NgmyBibleLang get other => this == en ? sw : en;
 }
 
 Future<NgmyBibleLang> _loadLanguage(String userEmail) async {
@@ -35,12 +38,25 @@ Future<void> _saveLanguage(String userEmail, NgmyBibleLang lang) async {
   await prefs.setString(_hashKey(_kLangKey, userEmail), lang.code);
 }
 
+/// This is NGMY's own doctrinal stance for the dictionary, not a neutral
+/// survey of Christian views — every prompt below carries it so the AI
+/// never slides into presenting the Trinity as the default/correct view.
+const _kDoctrineNote =
+    'Doctrine you must follow: there is only ONE God — the Father. The Father has a Son, Jesus Christ, who is distinct from the Father '
+    '(not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit — the Spirit of God, also called the '
+    'Spirit of Christ — not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three '
+    'co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" '
+    'or "three gods." Anchor this in 1 Corinthians 8:6 — "yet for us there is one God, the Father... and one Lord, Jesus Christ" — whenever the '
+    'question concerns who God is or how the Father, Jesus, and the Spirit relate.';
+
 /// Matches this app's existing Bible Study Teacher advisor persona — warm,
 /// sharp, opens the text, leans on the original languages — so a lookup
 /// here reads like it came from that same teacher.
 String _buildEntryPrompt(String query, NgmyBibleLang lang) {
   return '''
 You are the Bible Study Teacher inside NGMY's Bible Dictionary tool: warm, sharp-minded, and clear. You explain Scripture plainly, invite real understanding rather than preaching, and reach for the original language when it actually helps.
+
+$_kDoctrineNote
 
 A user is looking up: "$query"
 
@@ -52,13 +68,15 @@ MEANING: a clear, accurate definition, 1-3 sentences
 IN CONTEXT: how the word or verse is actually used in that passage and what it means there, 2-4 sentences
 TEACHER'S NOTE: a short, warm teaching point or application in your own voice, 1-3 sentences
 
-Stay accurate to the original Biblical languages and mainstream Christian scholarship. If the question isn't Bible-related, gently connect it to a relevant Biblical word or theme instead of refusing.
+Stay accurate to the original Biblical languages. If the question isn't Bible-related, gently connect it to a relevant Biblical word or theme instead of refusing.
 ''';
 }
 
 String _buildFollowUpPrompt(NgmyBibleThread thread, String question, NgmyBibleLang lang) {
   final buf = StringBuffer()
     ..writeln('You are the Bible Study Teacher inside NGMY\'s Bible Dictionary tool: warm, sharp-minded, and clear. Answer entirely in ${lang.label}.')
+    ..writeln()
+    ..writeln(_kDoctrineNote)
     ..writeln()
     ..writeln('Earlier, the user looked up: "${thread.query}"')
     ..writeln('Here is what you told them then:')
@@ -76,7 +94,7 @@ String _buildFollowUpPrompt(NgmyBibleThread thread, String question, NgmyBibleLa
     ..writeln(
       'Answer directly and conversationally, 2-5 sentences, in ${lang.label} only — no field labels, no headers, just the answer. '
       'Reference the original Greek (or Hebrew for Old Testament words) when it clarifies the answer, transliterated. '
-      'Stay warm, clear, and doctrinally careful — if the question touches something historically debated among Christians, explain the mainstream historic understanding plainly rather than dodging it, while noting where thoughtful believers have studied deeply on the topic.',
+      'Stay warm and clear, and follow the doctrine note above exactly when the question touches who God is or how the Father, Jesus, and the Spirit relate.',
     );
   return buf.toString();
 }
@@ -221,6 +239,11 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     await _saveLanguage(widget.userEmail, lang);
   }
 
+  Future<void> _toggleLanguage() async {
+    HapticFeedback.selectionClick();
+    await _setLanguage(_lang.other);
+  }
+
   Future<void> _persist(List<NgmyBibleThread> next) async {
     await _saveHistory(widget.userEmail, next);
     if (!mounted) return;
@@ -346,8 +369,6 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
             children: [
               _header(hub),
               const SizedBox(height: 10),
-              _languageSelector(hub),
-              const SizedBox(height: 10),
               _searchBar(hub),
               if (_active == null) ...[
                 const SizedBox(height: 10),
@@ -398,6 +419,8 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
             ],
           ),
         ),
+        _languageFlag(hub),
+        const SizedBox(width: 8),
         IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Container(
@@ -410,33 +433,27 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     );
   }
 
-  Widget _languageSelector(NgmyHubTheme hub) {
-    Widget chip(NgmyBibleLang lang) {
-      final on = _lang == lang;
-      return GestureDetector(
-        onTap: () => _setLanguage(lang),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            gradient: on ? const LinearGradient(colors: [_accent1, _accent2]) : null,
-            color: on ? null : hub.chipOffBg,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: on ? Colors.transparent : hub.chipOffBorder),
+  /// Just the flag, tap to switch language — matches the Document Scanner's
+  /// language picker instead of showing a text label.
+  Widget _languageFlag(NgmyHubTheme hub) {
+    return Tooltip(
+      message: 'Tap to switch to ${_lang.other.label}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _toggleLanguage,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: hub.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: hub.border)),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: RotationTransition(turns: anim, child: child)),
+              child: Text(_lang.flag, key: ValueKey<String>(_lang.code), style: const TextStyle(fontSize: 18)),
+            ),
           ),
-          child: Text(lang.label, style: TextStyle(color: on ? Colors.white : hub.chipOffLabel, fontWeight: FontWeight.w800, fontSize: 12)),
         ),
-      );
-    }
-
-    return Row(
-      children: [
-        Icon(Icons.translate_rounded, size: 15, color: hub.muted),
-        const SizedBox(width: 6),
-        chip(NgmyBibleLang.en),
-        const SizedBox(width: 8),
-        chip(NgmyBibleLang.sw),
-      ],
+      ),
     );
   }
 
@@ -534,49 +551,69 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     final f = thread.fields;
     final word = f['WORD']?.trim();
     final hasStructured = word != null && word.isNotEmpty;
-    return GestureDetector(
-      onTap: () => _openThread(thread),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: hub.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: hub.border),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(hasStructured ? word : thread.query, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16)),
-                  if ((f['MEANING'] ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(f['MEANING']!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.35)),
+    return Dismissible(
+      key: ValueKey(thread.id),
+      direction: DismissDirection.horizontal,
+      // Swipe right to open, swipe left to delete.
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        decoration: BoxDecoration(color: _accent1.withValues(alpha: hub.isDark ? 0.22 : 0.14), borderRadius: BorderRadius.circular(18)),
+        child: const Icon(Icons.menu_book_rounded, color: _accent1),
+      ),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(18)),
+        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          _openThread(thread);
+          return false;
+        }
+        return true;
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) _delete(thread);
+      },
+      child: GestureDetector(
+        onTap: () => _openThread(thread),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: hub.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: hub.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(hasStructured ? word : thread.query, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16)),
+                    if ((f['MEANING'] ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(f['MEANING']!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.35)),
+                    ],
+                    if (thread.followUps.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text('${thread.followUps.length} follow-up${thread.followUps.length == 1 ? '' : 's'}', style: const TextStyle(color: _accent1, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ],
                   ],
-                  if (thread.followUps.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text('${thread.followUps.length} follow-up${thread.followUps.length == 1 ? '' : 's'}', style: const TextStyle(color: _accent1, fontSize: 11, fontWeight: FontWeight.w800)),
-                  ],
-                ],
+                ),
               ),
-            ),
-            if ((f['REFERENCE'] ?? '').trim().isNotEmpty && (f['REFERENCE'] ?? '').trim().toLowerCase() != 'general')
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                margin: const EdgeInsets.only(left: 8),
-                decoration: BoxDecoration(color: _accent1.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
-                child: Text(f['REFERENCE']!.trim(), style: const TextStyle(color: _accent1, fontWeight: FontWeight.w800, fontSize: 11)),
-              ),
-            GestureDetector(
-              onTap: () => _delete(thread),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.close_rounded, size: 16, color: hub.muted),
-              ),
-            ),
-          ],
+              if ((f['REFERENCE'] ?? '').trim().isNotEmpty && (f['REFERENCE'] ?? '').trim().toLowerCase() != 'general')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  margin: const EdgeInsets.only(left: 8),
+                  decoration: BoxDecoration(color: _accent1.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+                  child: Text(f['REFERENCE']!.trim(), style: const TextStyle(color: _accent1, fontWeight: FontWeight.w800, fontSize: 11)),
+                ),
+            ],
+          ),
         ),
       ),
     );
