@@ -10,12 +10,15 @@ import 'ngmy_item_reminder.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_color_buckets.dart';
 import 'ngmy_medicine_organizer.dart';
+import 'ngmy_promote_me.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
 
 const _kEssentialsHudColors = [Color(0xFF38BDF8), Color(0xFF0EA5E9)];
 
-Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async {
+Future<int> ngmyBusinessEssentialsTotalCount({
+  required String userEmail,
+}) async {
   final results = await Future.wait([
     ngmyBusinessContactCount(userEmail: userEmail),
     ngmySavedLocationCount(userEmail: userEmail),
@@ -25,11 +28,15 @@ Future<int> ngmyBusinessEssentialsTotalCount({required String userEmail}) async 
     ngmyBusinessTasksCount(userEmail: userEmail),
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyColorBucketsCount(userEmail: userEmail),
+    ngmyPromoteMeCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
 
-Future<void> showNgmyBusinessEssentialsHub(BuildContext context, {required String userEmail}) {
+Future<void> showNgmyBusinessEssentialsHub(
+  BuildContext context, {
+  required String userEmail,
+}) {
   final t = NgmyHubTheme.of(context);
   return showGeneralDialog<void>(
     context: context,
@@ -42,7 +49,10 @@ Future<void> showNgmyBusinessEssentialsHub(BuildContext context, {required Strin
       child: _BusinessEssentialsHub(userEmail: userEmail),
     ),
     transitionBuilder: (ctx, anim, _, child) {
-      final scale = Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
+      final scale = Tween<double>(
+        begin: 0.96,
+        end: 1,
+      ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
       return FadeTransition(
         opacity: anim,
         child: ScaleTransition(scale: scale, child: child),
@@ -61,21 +71,62 @@ class _BusinessEssentialsHub extends StatefulWidget {
 }
 
 class _CategoryArt {
-  const _CategoryArt({required this.icon, required this.accent, required this.gradient});
+  const _CategoryArt({
+    required this.icon,
+    required this.accent,
+    required this.gradient,
+  });
   final IconData icon;
   final Color accent;
   final List<Color> gradient;
 }
 
 const _categoryArt = <String, _CategoryArt>{
-  'Contacts': _CategoryArt(icon: Icons.groups_rounded, accent: Color(0xFF38BDF8), gradient: [Color(0xFF0EA5E9), Color(0xFF38BDF8)]),
-  'Site Map': _CategoryArt(icon: Icons.map_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF10B981), Color(0xFF34D399)]),
-  'Hotlines': _CategoryArt(icon: Icons.phone_in_talk_rounded, accent: Color(0xFFFBBF24), gradient: [Color(0xFFF59E0B), Color(0xFFFBBF24)]),
-  'Medicines': _CategoryArt(icon: Icons.medication_liquid_rounded, accent: Color(0xFFEC4899), gradient: [Color(0xFFDB2777), Color(0xFFEC4899)]),
-  'Notes': _CategoryArt(icon: Icons.note_alt_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)]),
-  'Quick Tasks': _CategoryArt(icon: Icons.task_alt_rounded, accent: Color(0xFF34D399), gradient: [Color(0xFF059669), Color(0xFF34D399)]),
-  'Where I Put It': _CategoryArt(icon: Icons.place_rounded, accent: Color(0xFFA78BFA), gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)]),
-  'Paint Mix': _CategoryArt(icon: Icons.palette_outlined, accent: Color(0xFFD6A800), gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)]),
+  'Contacts': _CategoryArt(
+    icon: Icons.groups_rounded,
+    accent: Color(0xFF38BDF8),
+    gradient: [Color(0xFF0EA5E9), Color(0xFF38BDF8)],
+  ),
+  'Site Map': _CategoryArt(
+    icon: Icons.map_rounded,
+    accent: Color(0xFF34D399),
+    gradient: [Color(0xFF10B981), Color(0xFF34D399)],
+  ),
+  'Hotlines': _CategoryArt(
+    icon: Icons.phone_in_talk_rounded,
+    accent: Color(0xFFFBBF24),
+    gradient: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+  ),
+  'Medicines': _CategoryArt(
+    icon: Icons.medication_liquid_rounded,
+    accent: Color(0xFFEC4899),
+    gradient: [Color(0xFFDB2777), Color(0xFFEC4899)],
+  ),
+  'Notes': _CategoryArt(
+    icon: Icons.note_alt_rounded,
+    accent: Color(0xFFA78BFA),
+    gradient: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
+  ),
+  'Quick Tasks': _CategoryArt(
+    icon: Icons.task_alt_rounded,
+    accent: Color(0xFF34D399),
+    gradient: [Color(0xFF059669), Color(0xFF34D399)],
+  ),
+  'Where I Put It': _CategoryArt(
+    icon: Icons.place_rounded,
+    accent: Color(0xFFA78BFA),
+    gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)],
+  ),
+  'Paint Mix': _CategoryArt(
+    icon: Icons.palette_outlined,
+    accent: Color(0xFFD6A800),
+    gradient: [Color(0xFF2A2A2A), Color(0xFFC59A1B)],
+  ),
+  'Promote Me': _CategoryArt(
+    icon: Icons.campaign_rounded,
+    accent: Color(0xFF06B6D4),
+    gradient: [Color(0xFF6366F1), Color(0xFF06B6D4)],
+  ),
 };
 
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
@@ -87,6 +138,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _tasks = 0;
   int _reminders = 0;
   int _colorBuckets = 0;
+  int _promoteMe = 0;
   bool _loading = true;
 
   @override
@@ -105,6 +157,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyBusinessTasksCount(userEmail: widget.userEmail),
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyColorBucketsCount(userEmail: widget.userEmail),
+      ngmyPromoteMeCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -116,6 +169,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _tasks = results[5];
       _reminders = results[6];
       _colorBuckets = results[7];
+      _promoteMe = results[8];
       _loading = false;
     });
   }
@@ -154,7 +208,11 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                     customBorder: const CircleBorder(),
                     onTap: () async {
                       final imported = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(builder: (_) => NgmyEssentialsTransferPage(userEmail: widget.userEmail)),
+                        MaterialPageRoute(
+                          builder: (_) => NgmyEssentialsTransferPage(
+                            userEmail: widget.userEmail,
+                          ),
+                        ),
                       );
                       if (imported == true) await _reload();
                     },
@@ -169,12 +227,26 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                             const Color(0xFF6366F1).withValues(alpha: 0.28),
                           ],
                         ),
-                        border: Border.all(color: NgmyHudInk.icon(context).withValues(alpha: 0.45), width: 1.4),
+                        border: Border.all(
+                          color: NgmyHudInk.icon(
+                            context,
+                          ).withValues(alpha: 0.45),
+                          width: 1.4,
+                        ),
                         boxShadow: [
-                          BoxShadow(color: const Color(0xFF38BDF8).withValues(alpha: 0.25), blurRadius: 10),
+                          BoxShadow(
+                            color: const Color(
+                              0xFF38BDF8,
+                            ).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                          ),
                         ],
                       ),
-                      child: Icon(Icons.sync_alt_rounded, color: NgmyHudInk.icon(context), size: 18),
+                      child: Icon(
+                        Icons.sync_alt_rounded,
+                        color: NgmyHudInk.icon(context),
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
@@ -184,92 +256,152 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_loading)
-                  const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))))
+                  const Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF38BDF8),
+                      ),
+                    ),
+                  )
                 else
                   Expanded(
                     child: Builder(
                       builder: (context) {
                         final topPad = MediaQuery.paddingOf(context).top + 92;
                         return GridView.count(
-                      crossAxisCount: 2,
-                      padding: EdgeInsets.fromLTRB(16, topPad, 16, 24),
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 1.35,
-                      children: [
-                        _CompactCategoryCard(
-                          title: 'Notes',
-                          count: _notes,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.05,
-                          onTap: () => _openCategory((ctx) => showNgmyBusinessNotesDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Where I Put It',
-                          count: _reminders,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.12,
-                          onTap: () => _openCategory((ctx) => showNgmyItemReminderDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Contacts',
-                          count: _contacts,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.18,
-                          onTap: () => _openCategory((ctx) => showNgmyBusinessContactsDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Medicines',
-                          count: _medicines,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.24,
-                          onTap: () => _openCategory((ctx) => showNgmyMedicineOrganizerDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Site Map',
-                          count: _locations,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.3,
-                          onTap: () => _openCategory((ctx) => showNgmySavedLocationsDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Quick Tasks',
-                          count: _tasks,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.36,
-                          onTap: () => _openCategory((ctx) => showNgmyBusinessTasksDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Hotlines',
-                          count: _support,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.42,
-                          onTap: () => _openCategory((ctx) => showNgmyQuickSupportDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                        _CompactCategoryCard(
-                          title: 'Paint Mix',
-                          count: _colorBuckets,
-                          pulse: pulse,
-                          scan: scan,
-                          orbit: orbit,
-                          phase: 0.48,
-                          onTap: () => _openCategory((ctx) => showNgmyColorBucketsDialog(ctx, userEmail: widget.userEmail)),
-                        ),
-                      ],
+                          crossAxisCount: 2,
+                          padding: EdgeInsets.fromLTRB(16, topPad, 16, 24),
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1.35,
+                          children: [
+                            _CompactCategoryCard(
+                              title: 'Notes',
+                              count: _notes,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.05,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyBusinessNotesDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Where I Put It',
+                              count: _reminders,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.12,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyItemReminderDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Contacts',
+                              count: _contacts,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.18,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyBusinessContactsDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Medicines',
+                              count: _medicines,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.24,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyMedicineOrganizerDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Site Map',
+                              count: _locations,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.3,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmySavedLocationsDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Quick Tasks',
+                              count: _tasks,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.36,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyBusinessTasksDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Hotlines',
+                              count: _support,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.42,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyQuickSupportDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Paint Mix',
+                              count: _colorBuckets,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.48,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyColorBucketsDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Promote Me',
+                              count: _promoteMe,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.54,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyPromoteMeDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -329,7 +461,12 @@ class _CompactCategoryCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: NgmyHudInk.title(context), fontWeight: FontWeight.w900, fontSize: 12.5, height: 1.15),
+            style: TextStyle(
+              color: NgmyHudInk.title(context),
+              fontWeight: FontWeight.w900,
+              fontSize: 12.5,
+              height: 1.15,
+            ),
           ),
           if (count > 0)
             Padding(
@@ -340,7 +477,14 @@ class _CompactCategoryCard extends StatelessWidget {
                   color: art.accent.withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text('$count', style: TextStyle(color: art.accent, fontWeight: FontWeight.w800, fontSize: 10)),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: art.accent,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                  ),
+                ),
               ),
             ),
         ],

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_hub_form_ui.dart';
+
 Future<void> showNgmyColorBucketsDialog(
   BuildContext context, {
   required String userEmail,
@@ -143,11 +145,6 @@ class NgmyColorBucketsScreen extends StatefulWidget {
 }
 
 class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
-  static const _ink = Color(0xFF1E1B2E);
-  static const _muted = Color(0xFF7C7290);
-  static const _card = Colors.white;
-  static const _line = Color(0xFFE9E3F7);
-
   _Pigment? _selected;
   final _a = _Bucket('1');
   final _b = _Bucket('2');
@@ -202,14 +199,28 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hub = NgmyHubTheme.of(context);
+    final isDark = hub.isDark;
+    final ink = hub.title;
+    final muted = hub.subtitle;
     final pad = MediaQuery.paddingOf(context);
     return Material(
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFFF7ED), Color(0xFFFDF2FF), Color(0xFFEFF6FF)],
+            colors: isDark
+                ? const [
+                    Color(0xFF120B1E),
+                    Color(0xFF1B1030),
+                    Color(0xFF0B1220),
+                  ]
+                : const [
+                    Color(0xFFFFF7ED),
+                    Color(0xFFFDF2FF),
+                    Color(0xFFEFF6FF),
+                  ],
           ),
         ),
         child: Padding(
@@ -241,14 +252,14 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Paint Mix',
                           style: TextStyle(
-                            color: _ink,
+                            color: ink,
                             fontWeight: FontWeight.w900,
                             fontSize: 22,
                           ),
@@ -256,7 +267,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                         Text(
                           'Pick a color, pour it in a bucket, then mix!',
                           style: TextStyle(
-                            color: _muted,
+                            color: muted,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -264,9 +275,14 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                       ],
                     ),
                   ),
-                  _roundIconButton(icon: Icons.refresh_rounded, onTap: _reset),
+                  _roundIconButton(
+                    hub: hub,
+                    icon: Icons.refresh_rounded,
+                    onTap: _reset,
+                  ),
                   const SizedBox(width: 8),
                   _roundIconButton(
+                    hub: hub,
                     icon: Icons.close_rounded,
                     onTap: () => Navigator.pop(context),
                   ),
@@ -327,7 +343,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: on ? _ink : _muted,
+                                  color: on ? ink : muted,
                                   fontSize: 10,
                                   fontWeight: on
                                       ? FontWeight.w800
@@ -346,9 +362,9 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    Expanded(child: _bucketCard(_a)),
+                    Expanded(child: _bucketCard(_a, hub)),
                     const SizedBox(width: 10),
-                    Expanded(child: _bucketCard(_b)),
+                    Expanded(child: _bucketCard(_b, hub)),
                   ],
                 ),
               ),
@@ -359,9 +375,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: (_a.volume == 0 && _b.volume == 0)
-                        ? const LinearGradient(
-                            colors: [Color(0xFFE2E8F0), Color(0xFFE2E8F0)],
-                          )
+                        ? LinearGradient(colors: [hub.chipOffBg, hub.chipOffBg])
                         : const LinearGradient(
                             colors: [
                               Color(0xFFF97316),
@@ -392,7 +406,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                           'Mix it up! 🎉',
                           style: TextStyle(
                             color: (_a.volume == 0 && _b.volume == 0)
-                                ? _muted
+                                ? muted
                                 : Colors.white,
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
@@ -404,7 +418,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              _resultBar(),
+              _resultBar(hub),
             ],
           ),
         ),
@@ -413,11 +427,12 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
   }
 
   Widget _roundIconButton({
+    required NgmyHubTheme hub,
     required IconData icon,
     required VoidCallback onTap,
   }) {
     return Material(
-      color: Colors.white,
+      color: hub.isDark ? hub.surfaceElevated : Colors.white,
       shape: const CircleBorder(),
       elevation: 2,
       shadowColor: Colors.black.withValues(alpha: 0.15),
@@ -426,24 +441,33 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(9),
-          child: Icon(icon, color: _ink, size: 18),
+          child: Icon(icon, color: hub.title, size: 18),
         ),
       ),
     );
   }
 
-  Widget _bucketCard(_Bucket bucket) {
+  Widget _bucketCard(_Bucket bucket, NgmyHubTheme hub) {
     final fill = bucket.volume == 0
         ? 0.0
         : (0.18 + (bucket.volume / 10).clamp(0.0, 0.68));
+    final labelBg = hub.isDark
+        ? const Color(0xFF8B5CF6).withValues(alpha: 0.22)
+        : const Color(0xFFF3E8FF);
+    final labelInk = hub.isDark
+        ? const Color(0xFFC4B5FD)
+        : const Color(0xFF7C3AED);
+    final clearBg = hub.isDark
+        ? const Color(0xFFEF4444).withValues(alpha: 0.2)
+        : const Color(0xFFFEE2E2);
     return Container(
       decoration: BoxDecoration(
-        color: _card,
+        color: hub.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _line, width: 1.4),
+        border: Border.all(color: hub.border, width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: hub.isDark ? 0.2 : 0.05),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -467,13 +491,13 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF3E8FF),
+                        color: labelBg,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '🪣 Bucket ${bucket.label}',
-                        style: const TextStyle(
-                          color: Color(0xFF7C3AED),
+                        style: TextStyle(
+                          color: labelInk,
                           fontWeight: FontWeight.w800,
                           fontSize: 12,
                         ),
@@ -486,7 +510,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFEE2E2),
+                            color: clearBg,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
@@ -505,6 +529,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                       color: bucket.mixed,
                       fill: fill,
                       empty: bucket.volume == 0,
+                      isDark: hub.isDark,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -515,8 +540,8 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                       ? 'Tap to pour a color!'
                       : '${bucket.volume} drop${bucket.volume == 1 ? '' : 's'} · ${_hexOf(bucket.mixed)}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: _muted,
+                  style: TextStyle(
+                    color: hub.subtitle,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -529,19 +554,19 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
     );
   }
 
-  Widget _resultBar() {
+  Widget _resultBar(NgmyHubTheme hub) {
     final has = _result != null;
     return Container(
       height: 104,
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _card,
+        color: hub.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _line, width: 1.4),
+        border: Border.all(color: hub.border, width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: hub.isDark ? 0.2 : 0.05),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -563,8 +588,11 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                   height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: has ? _result : const Color(0xFFF1F5F9),
-                    border: Border.all(color: Colors.white, width: 3),
+                    color: has ? _result : hub.surfaceElevated,
+                    border: Border.all(
+                      color: hub.isDark ? hub.border : Colors.white,
+                      width: 3,
+                    ),
                     boxShadow: has
                         ? [
                             BoxShadow(
@@ -601,7 +629,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                   ? (_note ?? _hexOf(_result!))
                   : 'Pour some colors in, then hit Mix it up! ✨',
               style: TextStyle(
-                color: has ? _ink : _muted,
+                color: has ? hub.title : hub.subtitle,
                 fontSize: 12.5,
                 height: 1.4,
                 fontWeight: FontWeight.w700,
@@ -691,15 +719,26 @@ class _BucketPainter extends CustomPainter {
     required this.color,
     required this.fill,
     required this.empty,
+    required this.isDark,
   });
   final Color color;
   final double fill;
   final bool empty;
+  final bool isDark;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
+    final handleColor = isDark
+        ? const Color(0xFF5B5470)
+        : const Color(0xFFB6BECC);
+    final bucketMaterial = isDark
+        ? const [Color(0xFF2A2438), Color(0xFF1B1626)]
+        : const [Color(0xFFFAFBFF), Color(0xFFE7EBF3)];
+    final outlineColor = isDark
+        ? const Color(0xFF453F5C)
+        : const Color(0xFFCBD5E1);
     // A friendly, slightly-tapered paint bucket with a swing handle — reads
     // as "paint" at a glance instead of a somber ceramic mixing bowl.
     final bucket = Path()
@@ -718,16 +757,16 @@ class _BucketPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.2
         ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFFB6BECC),
+        ..color = handleColor,
     );
 
     canvas.drawPath(
       bucket,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFAFBFF), Color(0xFFE7EBF3)],
+          colors: bucketMaterial,
         ).createShader(Offset.zero & size),
     );
 
@@ -765,19 +804,22 @@ class _BucketPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = const Color(0xFFCBD5E1),
+        ..color = outlineColor,
     );
     canvas.drawLine(
       Offset(w * 0.16, h * 0.30),
       Offset(w * 0.84, h * 0.30),
       Paint()
         ..strokeWidth = 3
-        ..color = const Color(0xFFB6BECC)
+        ..color = handleColor
         ..strokeCap = StrokeCap.round,
     );
   }
 
   @override
   bool shouldRepaint(covariant _BucketPainter old) =>
-      old.color != color || old.fill != fill || old.empty != empty;
+      old.color != color ||
+      old.fill != fill ||
+      old.empty != empty ||
+      old.isDark != isDark;
 }
