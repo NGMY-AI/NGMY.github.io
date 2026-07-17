@@ -1754,7 +1754,9 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
     // not a quick UI transition.
     _seq = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 6600),
+      // 10s loop: ~4.3s to build the stack, then a full 5s hold so people
+      // can actually read it before it fades and replays.
+      duration: const Duration(milliseconds: 10000),
     )..repeat();
     _pulse = AnimationController(
       vsync: this,
@@ -1804,27 +1806,28 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
           builder: (context, _) {
             final t = _seq.value;
             final pulse = Curves.easeInOut.transform(_pulse.value);
-            // Hold everything from ~0.83–0.92, then fade out before the loop restarts.
-            final holdFade = t < 0.83 ? 1.0 : 1.0 - _seg(t, 0.83, 0.92);
-            final restartGap = t > 0.98
+            // Everything is built by t≈0.43, then held fully visible for a
+            // solid ~5s (0.43–0.93 of a 10s loop) before fading for replay.
+            final holdFade = t < 0.93 ? 1.0 : 1.0 - _seg(t, 0.93, 0.99);
+            final restartGap = t > 0.995
                 ? 0.0
                 : 1.0; // fully hidden briefly before replay
             final fade = holdFade * restartGap;
 
             final (mailY, mailScale, mailRise) = _riseState(
               t,
-              bornStart: 0.05,
-              bornEnd: 0.12,
-              riseStart: 0.12,
-              riseEnd: 0.40,
+              bornStart: 0.03,
+              bornEnd: 0.07,
+              riseStart: 0.07,
+              riseEnd: 0.21,
               home: _topY,
             );
             final (smsY, smsScale, smsRise) = _riseState(
               t,
-              bornStart: 0.46,
-              bornEnd: 0.53,
-              riseStart: 0.53,
-              riseEnd: 0.81,
+              bornStart: 0.25,
+              bornEnd: 0.29,
+              riseStart: 0.29,
+              riseEnd: 0.43,
               home: _midY,
             );
 
@@ -2049,6 +2052,35 @@ class _IsoBoxPainter extends CustomPainter {
     final leftTip = Offset(0, h / 2);
     Offset down(Offset o) => Offset(o.dx, o.dy + depth);
 
+    final base = colors.first;
+    final base2 = colors.last;
+
+    // One continuous rounded outline for the *whole* silhouette (top face +
+    // both extruded side faces) — this is what makes the glass edge curve
+    // smoothly into the side instead of stopping in a sharp corner.
+    final silhouette = _roundedPolygonPath([
+      topTip,
+      rightTip,
+      down(rightTip),
+      down(botTip),
+      down(leftTip),
+      leftTip,
+    ], w * 0.09);
+
+    // Soft ambient glow behind the whole shape.
+    canvas.drawPath(
+      silhouette,
+      Paint()
+        ..color = base.withValues(alpha: glowAlpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28),
+    );
+
+    // Fill each face, clipped to the rounded silhouette so every outer
+    // corner — including where the top face wraps into a side face — comes
+    // out as a smooth curve rather than a hard point.
+    canvas.save();
+    canvas.clipPath(silhouette);
+
     final rightFace = ui.Path()
       ..moveTo(rightTip.dx, rightTip.dy)
       ..lineTo(botTip.dx, botTip.dy)
@@ -2061,9 +2093,12 @@ class _IsoBoxPainter extends CustomPainter {
       ..lineTo(down(botTip).dx, down(botTip).dy)
       ..lineTo(down(leftTip).dx, down(leftTip).dy)
       ..close();
-
-    final base = colors.first;
-    final base2 = colors.last;
+    final topFace = ui.Path()
+      ..moveTo(topTip.dx, topTip.dy)
+      ..lineTo(rightTip.dx, rightTip.dy)
+      ..lineTo(botTip.dx, botTip.dy)
+      ..lineTo(leftTip.dx, leftTip.dy)
+      ..close();
 
     canvas.drawPath(
       rightFace,
@@ -2085,28 +2120,8 @@ class _IsoBoxPainter extends CustomPainter {
           ],
         ).createShader(leftFace.getBounds()),
     );
-    final edgeStroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..color = Colors.white.withValues(alpha: 0.10);
-    canvas.drawPath(rightFace, edgeStroke);
-    canvas.drawPath(leftFace, edgeStroke);
-
-    final topPath = _roundedPolygonPath([
-      topTip,
-      rightTip,
-      botTip,
-      leftTip,
-    ], h * 0.16);
-
     canvas.drawPath(
-      topPath,
-      Paint()
-        ..color = base.withValues(alpha: glowAlpha)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26),
-    );
-    canvas.drawPath(
-      topPath,
+      topFace,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
@@ -2114,18 +2129,57 @@ class _IsoBoxPainter extends CustomPainter {
           colors: isFinal
               ? [base.withValues(alpha: 0.90), base2.withValues(alpha: 0.97)]
               : [
-                  Colors.white.withValues(alpha: 0.28),
-                  Colors.white.withValues(alpha: 0.08),
-                  base.withValues(alpha: 0.16),
+                  Colors.white.withValues(alpha: 0.30),
+                  Colors.white.withValues(alpha: 0.09),
+                  base.withValues(alpha: 0.18),
                 ],
         ).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
+    // A soft diagonal sheen across the glass top — the "you can see light
+    // passing through it" read.
+    if (!isFinal) {
+      canvas.drawPath(
+        topFace,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.32),
+              Colors.white.withValues(alpha: 0.0),
+              Colors.white.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.45, 1.0],
+          ).createShader(Rect.fromLTWH(0, 0, w, h)),
+      );
+    }
+
+    // Subtle interior fold seams where the top face wraps into each side.
+    final seamStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Colors.black.withValues(alpha: 0.18);
+    canvas.drawLine(rightTip, botTip, seamStroke);
+    canvas.drawLine(leftTip, botTip, seamStroke);
+
+    canvas.restore();
+
+    // The continuous glass rim — brighter where light would catch the top
+    // edge, dimmer down the sides — drawn as one unbroken stroke so it
+    // visibly wraps all the way around to the other side.
     canvas.drawPath(
-      topPath,
+      silhouette,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = Colors.white.withValues(alpha: isFinal ? 0.55 : 0.72),
+        ..strokeWidth = 1.7
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: isFinal ? 0.65 : 0.85),
+            Colors.white.withValues(alpha: isFinal ? 0.22 : 0.34),
+          ],
+        ).createShader(Rect.fromLTWH(0, 0, w, size.height)),
     );
   }
 
@@ -2168,60 +2222,115 @@ class _UnfoldBox3D extends StatelessWidget {
       child: Transform.scale(
         scale: 0.55 + scale * 0.45,
         child: SizedBox(
-          width: width,
-          height: totalH,
+          width: width * 1.12,
+          height: totalH + depth * 0.7,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              CustomPaint(
-                size: Size(width, totalH),
-                painter: _IsoBoxPainter(
-                  colors: colors,
-                  depth: depth,
-                  isFinal: isFinal,
-                  glowAlpha: glowAlpha,
+              // Grounding contact shadow — makes the box read as a real
+              // object sitting in space instead of a flat sticker.
+              Positioned(
+                left: width * 0.06,
+                top: totalH - depth * 0.35,
+                width: width,
+                height: depth * 1.3,
+                child: ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 7),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.38 * opacity),
+                      borderRadius: BorderRadius.circular(depth),
+                    ),
+                  ),
                 ),
               ),
               Positioned(
-                left: 0,
-                right: 0,
+                left: width * 0.06,
+                top: 0,
+                child: CustomPaint(
+                  size: Size(width, totalH),
+                  painter: _IsoBoxPainter(
+                    colors: colors,
+                    depth: depth,
+                    isFinal: isFinal,
+                    glowAlpha: glowAlpha,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: width * 0.06,
+                right: width * 0.06,
                 top: 0,
                 height: topH,
                 child: Center(
                   child: Icon(
                     icon,
                     color: Colors.white.withValues(alpha: isFinal ? 1 : 0.94),
-                    size: width * 0.30,
+                    size: width * 0.42,
                   ),
                 ),
               ),
               if (isFinal)
                 Positioned(
-                  left: width * 0.04,
-                  top: topH * 0.08,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
-                      borderRadius: BorderRadius.circular(5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF22C55E).withValues(alpha: 0.5),
-                          blurRadius: 8,
+                  left: -width * 0.02,
+                  top: topH * 0.02,
+                  child: Transform.rotate(
+                    angle: -0.5236,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Tucked fold shadow peeking from under the ribbon's near end.
+                        Positioned(
+                          left: 1,
+                          top: 12,
+                          child: Container(
+                            width: 12,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF14532D),
+                              borderRadius: BorderRadius.circular(1.5),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF4ADE80), Color(0xFF16A34A)],
+                            ),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.45),
+                              width: 0.6,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF22C55E,
+                                ).withValues(alpha: 0.55),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                    child: const Text(
-                      'NEW',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 9,
-                        letterSpacing: 0.5,
-                      ),
                     ),
                   ),
                 ),
