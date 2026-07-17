@@ -1898,15 +1898,18 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
 
   Future<void> _editSpendingAmount(NgmySpendingEntry entry) async {
     if (!entry.showsCreditFace) return;
-    final result = await showDialog<_SpendEditResult>(
+    final result = await showGeneralDialog<_SpendEditResult>(
       context: context,
       barrierDismissible: true,
+      barrierLabel: 'Receipt',
       barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (ctx) => Dialog(
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (ctx, a1, a2) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
         child: _SpendReceiptPopup(entry: entry),
       ),
+      transitionBuilder: (ctx, anim, a2, child) => FadeTransition(opacity: anim, child: child),
     );
     if (result == null || !mounted) return;
     final next = entry.copyWith(
@@ -5045,12 +5048,13 @@ class _SpendReceiptPopup extends StatefulWidget {
   State<_SpendReceiptPopup> createState() => _SpendReceiptPopupState();
 }
 
-class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
+class _SpendReceiptPopupState extends State<_SpendReceiptPopup> with SingleTickerProviderStateMixin {
   late final TextEditingController _merchant;
   late final TextEditingController _itemName;
   late final TextEditingController _itemPrice;
   late final TextEditingController _itemQty;
   late List<NgmyReceiptItem> _items;
+  late final AnimationController _reveal;
 
   @override
   void initState() {
@@ -5074,6 +5078,9 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
         ),
       ];
     }
+    // The receipt visually "prints out" from underneath the green tab —
+    // the tab pops in first, then the card unrolls downward from it.
+    _reveal = AnimationController(vsync: this, duration: const Duration(milliseconds: 640))..forward();
   }
 
   @override
@@ -5082,8 +5089,11 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
     _itemName.dispose();
     _itemPrice.dispose();
     _itemQty.dispose();
+    _reveal.dispose();
     super.dispose();
   }
+
+  static double _seg(double t, double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
 
   double get _total => _items.fold(0.0, (a, b) => a + b.lineTotal);
 
@@ -5117,8 +5127,10 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    const ink = Color(0xFF1A1A1A);
-    const muted = Color(0xFF6B7280);
+    const ink = Color(0xFF15181D);
+    const muted = Color(0xFF8B93A1);
+    const green1 = Color(0xFF16A34A);
+    const green2 = Color(0xFF22C55E);
     final when = DateTime.now();
     final stamp =
         '${when.year}-${when.month.toString().padLeft(2, '0')}-${when.day.toString().padLeft(2, '0')}  ${when.hour.toString().padLeft(2, '0')}:${when.minute.toString().padLeft(2, '0')}';
@@ -5128,230 +5140,302 @@ class _SpendReceiptPopupState extends State<_SpendReceiptPopup> {
       padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset * 0.35 : 0),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 340, maxHeight: 560),
+          constraints: const BoxConstraints(maxWidth: 340, maxHeight: 600),
           child: Material(
             color: Colors.transparent,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBF2),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 28, offset: const Offset(0, 14)),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-                            child: DefaultTextStyle(
-                              style: const TextStyle(
-                                color: ink,
-                                fontFamily: 'Courier',
-                                fontFamilyFallback: ['Courier New', 'monospace'],
-                                decoration: TextDecoration.none,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const Text('*** RECEIPT ***', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 12)),
-                                  const SizedBox(height: 6),
-                                  TextField(
-                                    controller: _merchant,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16, fontFamily: 'Courier', decoration: TextDecoration.none),
-                                    decoration: const InputDecoration(
-                                      isDense: true,
-                                      border: InputBorder.none,
-                                      hintText: 'STORE NAME',
-                                      hintStyle: TextStyle(color: muted, fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                  Text(stamp, textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 10)),
-                                  const SizedBox(height: 4),
-                                  const Text('--------------------------------', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 11)),
-                                  const SizedBox(height: 6),
-                                  const Row(
-                                    children: [
-                                      Expanded(child: Text('ITEM', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
-                                      SizedBox(width: 36, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
-                                      SizedBox(width: 64, child: Text('AMT', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10))),
-                                      SizedBox(width: 22),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (_items.isEmpty)
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 16),
-                                      child: Text('No items yet', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12)),
-                                    )
-                                  else
-                                    ..._items.asMap().entries.map((e) {
-                                      final i = e.key;
-                                      final item = e.value;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 6),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                item.name.toUpperCase(),
-                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, height: 1.2),
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 36,
-                                              child: Text('${item.qty}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                                            ),
-                                            SizedBox(
-                                              width: 64,
-                                              child: Text(
-                                                item.lineTotal.toStringAsFixed(2),
-                                                textAlign: TextAlign.right,
-                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 22,
-                                              child: InkWell(
-                                                onTap: () => setState(() => _items = [..._items]..removeAt(i)),
-                                                child: const Icon(Icons.close, size: 14, color: muted),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }),
-                                  const Text('--------------------------------', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 11)),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      const Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                                      const Spacer(),
-                                      Text(
-                                        '\$${_total.toStringAsFixed(2)}',
-                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Text('Add item', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: muted)),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 4,
-                                        child: TextField(
-                                          controller: _itemName,
-                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
-                                          decoration: InputDecoration(
-                                            isDense: true,
-                                            hintText: 'What did you buy?',
-                                            hintStyle: const TextStyle(color: muted, fontSize: 11),
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                            filled: true,
-                                            fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      SizedBox(
-                                        width: 42,
-                                        child: TextField(
-                                          controller: _itemQty,
-                                          keyboardType: TextInputType.number,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
-                                          decoration: InputDecoration(
-                                            isDense: true,
-                                            hintText: '#',
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                            filled: true,
-                                            fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      SizedBox(
-                                        width: 70,
-                                        child: TextField(
-                                          controller: _itemPrice,
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
-                                          decoration: InputDecoration(
-                                            isDense: true,
-                                            hintText: '0.00',
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                            filled: true,
-                                            fillColor: const Color(0xFFF3EFE6),
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  OutlinedButton(
-                                    onPressed: _addItem,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: ink,
-                                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                      minimumSize: const Size(0, 36),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    child: const Text('+ ADD LINE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8)),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  GestureDetector(
-                                    onTap: () => Navigator.pop(context),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8),
-                                      child: Text('THANK YOU', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+            child: AnimatedBuilder(
+              animation: _reveal,
+              builder: (context, _) {
+                final t = _reveal.value;
+                final tabIn = Curves.easeOutBack.transform(_seg(t, 0.0, 0.4));
+                final cardReveal = Curves.easeOutCubic.transform(_seg(t, 0.16, 1.0));
+                final cardFade = Curves.easeOut.transform(_seg(t, 0.2, 0.6));
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                    // The green tab the receipt "prints out of".
+                    Transform.scale(
+                      alignment: Alignment.topCenter,
+                      scale: 0.72 + tabIn.clamp(0.0, 1.0) * 0.28,
+                      child: Opacity(
+                        opacity: tabIn.clamp(0.0, 1.0),
+                        child: Container(
+                          height: 28,
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(colors: [green1, green2]),
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _items.isEmpty ? null : _save,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFFBBF24),
-                          foregroundColor: Colors.black,
-                          disabledBackgroundColor: Colors.white24,
-                          minimumSize: const Size(0, 44),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: cardReveal.clamp(0.03, 1.0),
+                        child: Opacity(
+                          opacity: cardFade.clamp(0.0, 1.0),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFEFB),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 30, offset: const Offset(0, 16)),
+                              ],
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Stack(
+                              children: [
+                                SingleChildScrollView(
+                                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      TextField(
+                                        controller: _merchant,
+                                        style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 25, letterSpacing: -0.3, height: 1.15),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.only(right: 26),
+                                          hintText: 'Store name',
+                                          hintStyle: TextStyle(color: muted, fontWeight: FontWeight.w800),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(stamp, style: const TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF5F4EF),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: DefaultTextStyle(
+                                          style: const TextStyle(color: ink, fontFamily: 'Courier', fontFamilyFallback: ['Courier New', 'monospace'], decoration: TextDecoration.none),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                                            children: [
+                                              const Row(
+                                                children: [
+                                                  Expanded(child: Text('ITEM', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.6))),
+                                                  SizedBox(width: 34, child: Text('QTY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.6))),
+                                                  SizedBox(width: 62, child: Text('AMT', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.6))),
+                                                  SizedBox(width: 20),
+                                                ],
+                                              ),
+                                              const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: _DottedRule()),
+                                              if (_items.isEmpty)
+                                                const Padding(
+                                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                                  child: Text('No items yet', textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12)),
+                                                )
+                                              else
+                                                ..._items.asMap().entries.map((e) {
+                                                  final i = e.key;
+                                                  final item = e.value;
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(bottom: 6),
+                                                    child: Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            item.name.toUpperCase(),
+                                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, height: 1.2),
+                                                          ),
+                                                        ),
+                                                        SizedBox(
+                                                          width: 34,
+                                                          child: Text('${item.qty}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                                        ),
+                                                        SizedBox(
+                                                          width: 62,
+                                                          child: Text(
+                                                            item.lineTotal.toStringAsFixed(2),
+                                                            textAlign: TextAlign.right,
+                                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                                                          ),
+                                                        ),
+                                                        SizedBox(
+                                                          width: 20,
+                                                          child: InkWell(
+                                                            onTap: () => setState(() => _items = [..._items]..removeAt(i)),
+                                                            child: const Icon(Icons.close, size: 14, color: muted),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }),
+                                              const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: _DottedRule()),
+                                              const SizedBox(height: 2),
+                                              Text('Add item', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: muted.withValues(alpha: 0.9))),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 4,
+                                                    child: TextField(
+                                                      controller: _itemName,
+                                                      style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        hintText: 'What did you buy?',
+                                                        hintStyle: const TextStyle(color: muted, fontSize: 11),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                        filled: true,
+                                                        fillColor: Colors.white,
+                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  SizedBox(
+                                                    width: 42,
+                                                    child: TextField(
+                                                      controller: _itemQty,
+                                                      keyboardType: TextInputType.number,
+                                                      textAlign: TextAlign.center,
+                                                      style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        hintText: '#',
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                                        filled: true,
+                                                        fillColor: Colors.white,
+                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  SizedBox(
+                                                    width: 70,
+                                                    child: TextField(
+                                                      controller: _itemPrice,
+                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                      style: const TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 12, fontFamily: 'Courier'),
+                                                      decoration: InputDecoration(
+                                                        isDense: true,
+                                                        hintText: '0.00',
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                        filled: true,
+                                                        fillColor: Colors.white,
+                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              OutlinedButton(
+                                                onPressed: _addItem,
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: ink,
+                                                  side: const BorderSide(color: Color(0xFFD8D5CC)),
+                                                  minimumSize: const Size(0, 34),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                ),
+                                                child: const Text('+ ADD LINE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          const Text('TOTAL', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.4)),
+                                          const Spacer(),
+                                          GestureDetector(
+                                            onTap: _items.isEmpty ? null : _save,
+                                            child: AnimatedOpacity(
+                                              opacity: _items.isEmpty ? 0.45 : 1,
+                                              duration: const Duration(milliseconds: 150),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(colors: [green1, green2]),
+                                                  borderRadius: BorderRadius.circular(22),
+                                                  boxShadow: [BoxShadow(color: green2.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 6))],
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text('SAVE \$${_total.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                                                    const SizedBox(width: 4),
+                                                    const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 15),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text('Every purchase, tracked automatically.', style: TextStyle(color: muted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () => Navigator.pop(context),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(color: const Color(0xFFF0EFE9), shape: BoxShape.circle),
+                                        child: const Icon(Icons.close_rounded, size: 16, color: muted),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                        child: Text('Save  \$${_total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900)),
                       ),
                     ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A row of small dots — the "torn ticket" separator look between receipt
+/// sections, instead of a plain solid divider line.
+class _DottedRule extends StatelessWidget {
+  const _DottedRule();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dotSize = 3.0;
+        const gap = 4.0;
+        final count = (constraints.maxWidth / (dotSize + gap)).floor().clamp(1, 999);
+        return SizedBox(
+          height: dotSize,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(
+              count,
+              (_) => Container(width: dotSize, height: dotSize, decoration: const BoxDecoration(color: Color(0xFFD8D5CC), shape: BoxShape.circle)),
+            ),
+          ),
+        );
+      },
     );
   }
 }
