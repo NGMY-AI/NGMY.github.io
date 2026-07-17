@@ -59,6 +59,53 @@ const List<_PortraitSpec> _maleSpecs = [
   _PortraitSpec(skin: 0xFF4A2E1C, hair: 0xFF0C0806, style: _HairStyle.fadeShort, bg: [0xFF4338CA, 0xFF3730A3], beard: true),
 ];
 
+// ── 20-advisor batch (ngmy_advisor_roster.dart's kNgmyNewAdvisorBatch) ──────
+// Every one of these 20 gets its own hand-assigned, never-repeated spec —
+// explicit name→spec lookup, not hashing, so there is zero chance two
+// advisors (new or pre-existing) end up sharing a picture.
+
+const List<String> _kNewBatchMaleNames = [
+  'david okonkwo',
+  'samuel kiran',
+  'marcus bellingham',
+  'joshua reed',
+  'gabriel moses',
+  'isaac brandt',
+  'elijah cross',
+  'nathan pierce',
+  'tyler james',
+  'lucas ferreira',
+];
+
+const List<_PortraitSpec> _kNewBatchMaleSpecs = [
+  _PortraitSpec(skin: 0xFF8A5A3B, hair: 0xFF150F0C, style: _HairStyle.fadeShort, bg: [0xFF2563EB, 0xFF1D4ED8]),
+  _PortraitSpec(skin: 0xFFB07A56, hair: 0xFF1B1210, style: _HairStyle.afro, bg: [0xFF059669, 0xFF047857]),
+  _PortraitSpec(skin: 0xFF6B4226, hair: 0xFF17110D, style: _HairStyle.locs, bg: [0xFFD97706, 0xFFB45309]),
+  _PortraitSpec(skin: 0xFFC9906A, hair: 0xFF241813, style: _HairStyle.twists, bg: [0xFF0EA5E9, 0xFF0284C7]),
+  _PortraitSpec(skin: 0xFF9C6B47, hair: 0xFF150F0C, style: _HairStyle.braids, bg: [0xFF7C3AED, 0xFF5B21B6]),
+  _PortraitSpec(skin: 0xFF4A2E1C, hair: 0xFF0C0806, style: _HairStyle.fadeShort, bg: [0xFFDC2626, 0xFF991B1B]),
+  _PortraitSpec(skin: 0xFFB07A56, hair: 0xFF1B1210, style: _HairStyle.twists, bg: [0xFF16A34A, 0xFF15803D], beard: true),
+  _PortraitSpec(skin: 0xFF8A5A3B, hair: 0xFF150F0C, style: _HairStyle.locs, bg: [0xFFDB2777, 0xFFBE185D]),
+  _PortraitSpec(skin: 0xFFC9906A, hair: 0xFF241813, style: _HairStyle.afro, bg: [0xFF0D9488, 0xFF0F766E]),
+  _PortraitSpec(skin: 0xFF6B4226, hair: 0xFF17110D, style: _HairStyle.braids, bg: [0xFFCA8A04, 0xFFA16207], beard: true),
+];
+
+const List<String> _kNewBatchAfricanFemaleNames = [
+  'anika weston',
+  'nia robertson',
+  'destiny okafor',
+  'jasmine cole',
+  'aaliyah grant',
+];
+
+const List<_PortraitSpec> _kNewBatchAfricanFemaleSpecs = [
+  _PortraitSpec(skin: 0xFFB07A56, hair: 0xFF1B1210, style: _HairStyle.twists, bg: [0xFFEC4899, 0xFFDB2777], earrings: true),
+  _PortraitSpec(skin: 0xFF8A5A3B, hair: 0xFF150F0C, style: _HairStyle.braids, bg: [0xFF06B6D4, 0xFF0891B2], earrings: true),
+  _PortraitSpec(skin: 0xFF6B4226, hair: 0xFF1A120D, style: _HairStyle.bantuKnots, bg: [0xFFF59E0B, 0xFFD97706], earrings: true),
+  _PortraitSpec(skin: 0xFFC9906A, hair: 0xFF241813, style: _HairStyle.afro, bg: [0xFF8B5CF6, 0xFF7C3AED], earrings: true),
+  _PortraitSpec(skin: 0xFF9C6B47, hair: 0xFF17110D, style: _HairStyle.locs, bg: [0xFF10B981, 0xFF059669], earrings: true),
+];
+
 final _portraitCache = <String, Uint8List>{};
 final _assetCache = <String, Uint8List>{};
 var _assetsWarmed = false;
@@ -167,15 +214,28 @@ Uint8List? ngmyAdvisorPhotorealBytesSync({
 /// Advisors specifically written as white women — routed to the fair-skinned
 /// illustrated set regardless of role, since none of the bundled photoreal
 /// assets are white (see ngmy_advisor_roster.dart's kNgmyNewAdvisorBatch).
-const _kWhiteWomenNames = <String>{
+const List<String> _kWhiteWomenNames = [
   'emma carson',
   'grace anderson',
   'sophie morgan',
   'chloe mitchell',
   'olivia bennett',
-};
+];
 
-bool _isKnownWhiteWoman(String name) => _kWhiteWomenNames.contains(name.trim().toLowerCase());
+/// Exact spec for one of the 20-advisor batch, by name — no hashing, so it
+/// is impossible for two of them (or one of them and a pre-existing
+/// advisor) to land on the same picture. Returns null for anyone else.
+_PortraitSpec? _newBatchSpecFor(String name, bool isMale) {
+  final n = name.trim().toLowerCase();
+  if (isMale) {
+    final i = _kNewBatchMaleNames.indexOf(n);
+    return i >= 0 ? _kNewBatchMaleSpecs[i] : null;
+  }
+  final wi = _kWhiteWomenNames.indexOf(n);
+  if (wi >= 0) return _femaleWhiteSpecs[wi];
+  final ai = _kNewBatchAfricanFemaleNames.indexOf(n);
+  return ai >= 0 ? _kNewBatchAfricanFemaleSpecs[ai] : null;
+}
 
 /// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
 /// Prefer [ngmyAdvisorPhotorealBytesSync] / [Image.asset] in UI — illustrated is offline-only.
@@ -186,19 +246,29 @@ Uint8List ngmyAdvisorPortraitBytes({
   String name = '',
 }) {
   final isMale = gender.trim().toLowerCase() == 'male';
-  final forcedWhite = !isMale && _isKnownWhiteWoman(name);
+  final normalizedName = name.trim().toLowerCase();
+  final batchSpec = _newBatchSpecFor(normalizedName, isMale);
 
-  if (!forcedWhite) {
+  if (batchSpec == null) {
     final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
     if (photoreal != null) return photoreal;
   }
 
-  final specs = forcedWhite ? _femaleWhiteSpecs : (isMale ? _maleSpecs : _femaleSpecs);
+  if (batchSpec != null) {
+    final key = 'ill_batch_$normalizedName';
+    final cached = _portraitCache[key];
+    if (cached != null) return cached;
+    final bytes = Uint8List.fromList(img.encodePng(_renderPortrait(batchSpec)));
+    _portraitCache[key] = bytes;
+    return bytes;
+  }
+
+  final specs = isMale ? _maleSpecs : _femaleSpecs;
   final hash = id.trim().isEmpty ? 0 : id.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
   final roleHash = role.codeUnits.fold<int>(0, (a, c) => (a * 17 + c) & 0x7fffffff);
   final nameHash = name.codeUnits.fold<int>(0, (a, c) => (a * 13 + c) & 0x7fffffff);
   final idx = (hash + roleHash + nameHash) % specs.length;
-  final key = 'ill_${forcedWhite ? 'fw' : (isMale ? 'm' : 'f')}_$idx';
+  final key = 'ill_${isMale ? 'm' : 'f'}_$idx';
   final cached = _portraitCache[key];
   if (cached != null) return cached;
   final bytes = Uint8List.fromList(img.encodePng(_renderPortrait(specs[idx])));
