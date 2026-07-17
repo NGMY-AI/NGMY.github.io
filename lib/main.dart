@@ -25688,37 +25688,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _convertPointsToCash() {
-    final dollars = (widget.user.points ~/ 100).toDouble();
-    if (dollars <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You need at least 100 points to convert.')));
-      return;
-    }
-    final convertedPoints = dollars.toInt() * 100;
-    final now = DateTime.now();
-    setState(() {
-      widget.user.points -= convertedPoints;
-    });
-    ngmyPlayIncomeSoundForAmount(
-      beneficiaryEmail: widget.user.email,
-      amount: dollars,
-    );
-    widget.onAddTransaction(
-      AppTransaction(
-        id: now.microsecondsSinceEpoch.toString(),
-        userEmail: widget.user.email,
-        amount: dollars,
-        type: TransactionType.reimbursement,
-        method: PaymentMethod.system,
-        sourceDetails: 'Points converted to cash (${convertedPoints} pts)',
-        status: TransactionStatus.approved,
-        timestamp: now,
-      ),
-    );
-    widget.onDataChanged();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Converted to \$${dollars.toStringAsFixed(2)}.')));
-  }
-
   List<UserData> _myInvitees() {
     return widget.allUsers.where((u) {
       if (u.email.toLowerCase().trim() == widget.user.email.toLowerCase().trim()) return false;
@@ -25886,9 +25855,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final panelBorder = isDark ? Colors.white.withValues(alpha: 0.16) : const Color(0xFFCBD5E1);
     final neutralAction = isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
     final neutralActionText = isDark ? Colors.white : const Color(0xFF0F172A);
-    final cashEarned = widget.user.totalProfit;
-    final cashInvested = widget.user.totalInvestmentAmount;
-    final pointsCash = widget.user.points / 100.0;
     const profileColors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
     const legalFrameColors = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
     return Scaffold(
@@ -26072,99 +26038,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         scan: scan,
         orbit: orbit,
       ),
-      const SizedBox(height: 15),
-      _box(context, 'My Prizes', [
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: panelBorder, width: 1.15),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('💰 Cash Earned', style: TextStyle(fontSize: 12, color: softText)),
-                  const SizedBox(height: 4),
-                  Text('\$${formatCurrency(cashEarned)}', style: const TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: Color(0xFF34D399))),
-                ]),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: panelBorder, width: 1.15),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('📊 Cash Invested', style: TextStyle(fontSize: 12, color: softText)),
-                  const SizedBox(height: 4),
-                  Text('\$${formatCurrency(cashInvested)}', style: TextStyle(fontSize: 26 * 0.7, fontWeight: FontWeight.w900, color: primaryText)),
-                ]),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: panelBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: panelBorder, width: 1.25),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('🎯 NGMY Points', style: TextStyle(fontWeight: FontWeight.w700, color: primaryText)),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _convertPointsToCash,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: neutralAction,
-                      foregroundColor: neutralActionText,
-                      minimumSize: const Size(96, 34),
-                    ),
-                    child: const Text('Convert'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${widget.user.points} pts',
-                style: TextStyle(
-                  fontSize: 36 * 0.7,
-                  fontWeight: FontWeight.w900,
-                  color: primaryText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text('Convert to Cash', style: TextStyle(fontWeight: FontWeight.w600, color: primaryText)),
-              const SizedBox(height: 3),
-              Text('Every 100 pts =', style: TextStyle(fontSize: 12, color: softText)),
-              Align(alignment: Alignment.centerRight, child: Text('\$1.00', style: TextStyle(fontWeight: FontWeight.w900, color: primaryText))),
-              Divider(color: panelBorder),
-              Row(
-                children: [
-                  Text('Available:', style: TextStyle(color: primaryText)),
-                  const Spacer(),
-                  Text(
-                    '\$${pointsCash.toStringAsFixed(2)}',
-                    style: TextStyle(fontWeight: FontWeight.w900, color: primaryText),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ], pulse: pulse, scan: scan, orbit: orbit, phase: 0.2, colors: legalFrameColors),
       const SizedBox(height: 15),
       _legalInformationSection(context, pulse: pulse, scan: scan, orbit: orbit),
       const SizedBox(height: 15),
