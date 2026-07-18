@@ -13,6 +13,7 @@ import 'ngmy_color_buckets.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
+import 'ngmy_topical_guide.dart';
 
 const _kEssentialsHudColors = [Color(0xFF38BDF8), Color(0xFF0EA5E9)];
 
@@ -29,6 +30,7 @@ Future<int> ngmyBusinessEssentialsTotalCount({
     ngmyItemReminderCount(userEmail: userEmail),
     ngmyColorBucketsCount(userEmail: userEmail),
     ngmyBibleDictionaryCount(userEmail: userEmail),
+    ngmyTopicalGuideCount(userEmail: userEmail),
   ]);
   return results.fold<int>(0, (a, b) => a + b);
 }
@@ -127,6 +129,11 @@ const _categoryArt = <String, _CategoryArt>{
     accent: Color(0xFF7C3AED),
     gradient: [Color(0xFF7C3AED), Color(0xFFD4AF37)],
   ),
+  'Topical Guide': _CategoryArt(
+    icon: Icons.explore_rounded,
+    accent: Color(0xFF7C3AED),
+    gradient: [Color(0xFF7C3AED), Color(0xFFD4AF37)],
+  ),
 };
 
 class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
@@ -139,6 +146,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   int _reminders = 0;
   int _colorBuckets = 0;
   int _bibleDictionary = 0;
+  int _topicalGuide = 0;
   bool _loading = true;
 
   @override
@@ -158,6 +166,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       ngmyItemReminderCount(userEmail: widget.userEmail),
       ngmyColorBucketsCount(userEmail: widget.userEmail),
       ngmyBibleDictionaryCount(userEmail: widget.userEmail),
+      ngmyTopicalGuideCount(userEmail: widget.userEmail),
     ]);
     if (!mounted) return;
     setState(() {
@@ -170,6 +179,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
       _reminders = results[6];
       _colorBuckets = results[7];
       _bibleDictionary = results[8];
+      _topicalGuide = results[9];
       _loading = false;
     });
   }
@@ -396,6 +406,20 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                               phase: 0.54,
                               onTap: () => _openCategory(
                                 (ctx) => showNgmyBibleDictionaryDialog(
+                                  ctx,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            ),
+                            _CompactCategoryCard(
+                              title: 'Topical Guide',
+                              count: _topicalGuide,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.6,
+                              onTap: () => _openCategory(
+                                (ctx) => showNgmyTopicalGuideDialog(
                                   ctx,
                                   userEmail: widget.userEmail,
                                 ),

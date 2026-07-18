@@ -5,26 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_bible_dictionary.dart' show NgmyBibleLang, kNgmyBibleDoctrineNote, kNgmyBibleMeaningFirstNote;
 import 'ngmy_hub_form_ui.dart';
 
-const _kStorageKey = 'ngmy_bible_dictionary_threads_v2';
-const _kLangKey = 'ngmy_bible_dictionary_lang_v1';
+const _kStorageKey = 'ngmy_topical_guide_threads_v1';
+const _kLangKey = 'ngmy_topical_guide_lang_v1';
 
 String _hashKey(String base, String userEmail) {
   final e = userEmail.toLowerCase().trim();
   return '${base}_${e.isEmpty ? 'guest' : e.hashCode.abs()}';
-}
-
-enum NgmyBibleLang {
-  en('en', 'English', '🇺🇸'),
-  sw('sw', 'Swahili', '🇹🇿');
-
-  const NgmyBibleLang(this.code, this.label, this.flag);
-  final String code;
-  final String label;
-  final String flag;
-
-  NgmyBibleLang get other => this == en ? sw : en;
 }
 
 Future<NgmyBibleLang> _loadLanguage(String userEmail) async {
@@ -38,67 +27,37 @@ Future<void> _saveLanguage(String userEmail, NgmyBibleLang lang) async {
   await prefs.setString(_hashKey(_kLangKey, userEmail), lang.code);
 }
 
-/// This is NGMY's own doctrinal stance for the dictionary (and anything
-/// else built on top of it, like the Topical Guide), not a neutral survey
-/// of Christian views — every prompt carries it so the AI never slides
-/// into presenting the Trinity as the default/correct view. Public so
-/// other Bible-adjacent tools in this app can reuse the exact same wording.
-const kNgmyBibleDoctrineNote =
-    'Doctrine you must follow: there is only ONE God — the Father. The Father has a Son, Jesus Christ, who is distinct from the Father '
-    '(not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit — the Spirit of God, also called the '
-    'Spirit of Christ — not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three '
-    'co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" '
-    'or "three gods." When the question concerns who God is or how the Father, Jesus, and the Spirit relate, support it with Scripture — but '
-    'draw from a MIX of verses across different questions instead of leaning on the same one every time. Rotate between passages like: '
-    '1 Corinthians 8:6; Mark 12:29 (quoting Deuteronomy 6:4, "the Lord our God, the Lord is one"); John 17:3 ("you, the only true God, and '
-    'Jesus Christ whom you have sent"); 1 Timothy 2:5 ("one God, and one mediator... the man Christ Jesus"); John 14:28 ("the Father is '
-    'greater than I"); John 20:17 ("my Father and your Father, my God and your God"); Ephesians 4:4-6 ("one God and Father of all"); '
-    '1 Corinthians 15:24-28 (the Son subjecting himself to God "that God may be all in all"); Malachi 2:10 ("have we not all one Father?"); '
-    'and Colossians 1:15 (Jesus as "the image of the invisible God, the firstborn of all creation"). Pick whichever fits the specific word, '
-    'verse, or topic at hand rather than defaulting to the same reference each time.';
-
-/// The user's core complaint: answers were leading with story/background
-/// instead of just stating what the word or verse means. This note is the
-/// fix — it goes in every prompt, entry and follow-up alike.
-const kNgmyBibleMeaningFirstNote =
-    'Give the meaning directly — never open with a story, anecdote, or roundabout build-up before saying what the word or verse actually means. '
-    'Every answer about a word must state its original Greek (or Hebrew for Old Testament words) term plus a direct definition. Every answer about '
-    'a verse must state, in one direct sentence, what that verse means before anything else. Explanation can follow, but the meaning always comes first.';
-
-/// Matches this app's existing Bible Study Teacher advisor persona — warm,
-/// sharp, opens the text, leans on the original languages — so a lookup
-/// here reads like it came from that same teacher.
-String _buildEntryPrompt(String query, NgmyBibleLang lang) {
+/// Same Bible Study Teacher persona and doctrine as the Bible Dictionary —
+/// this is its sibling tool: topic-first instead of word/verse-first.
+String _buildEntryPrompt(String topic, NgmyBibleLang lang) {
   return '''
-You are the Bible Study Teacher inside NGMY's Bible Dictionary tool: warm, sharp-minded, and clear. You explain Scripture plainly, invite real understanding rather than preaching, and reach for the original language when it actually helps.
+You are the Bible Study Teacher inside NGMY's Topical Guide tool: warm, sharp-minded, and clear. Given a topic or life situation, you point people to what Scripture actually says about it.
 
 $kNgmyBibleDoctrineNote
 
 $kNgmyBibleMeaningFirstNote
 
-A user is looking up: "$query"
+A user wants to know what the Bible says about: "$topic"
 
-Respond as a dictionary entry using EXACTLY this structure — one field per line, nothing before the first field and nothing after the last. Keep the field labels below exactly as written, in English, but write every field's content in ${lang.label}:
-WORD: the key word or phrase being defined
-REFERENCE: the Bible verse reference this centers on, or "General" if none was given
-ORIGINAL: the original Greek (or Hebrew for Old Testament words) term, its transliteration, a short pronunciation guide, and its literal meaning — e.g. "agapē (ah-gah-PAY) — literally 'selfless, sacrificial love'"
-MEANING: start with ONE direct sentence stating exactly what the word means in ${lang.label}. Then, if useful, add 1-2 more sentences of explanation — but the meaning must come first, not last.
-IN CONTEXT: start with ONE direct sentence stating exactly what the verse itself means in plain ${lang.label}. Then explain how the word functions there and name any other key original-language words in that verse, 2-3 more sentences.
-TEACHER'S NOTE: a short, warm teaching point or application in your own voice, 1-3 sentences
+Respond using EXACTLY this structure — one field per line, nothing before the first field and nothing after the last. Keep the field labels below exactly as written, in English, but write every field's content in ${lang.label}:
+TOPIC: the topic, cleaned up into a short phrase
+SUMMARY: ONE direct sentence stating what the Bible teaches about this topic. Explanation can follow in a second sentence, but the meaning must come first.
+VERSES: 3 to 5 lines, each formatted exactly as "Reference — one-sentence takeaway" (use an em dash), one verse per line, most relevant first
+TEACHER'S NOTE: a short, warm encouragement or application in your own voice, 1-3 sentences
 
-Stay accurate to the original Biblical languages. If the question isn't Bible-related, gently connect it to a relevant Biblical word or theme instead of refusing.
+Stay accurate to the original Biblical languages when a verse's original Greek or Hebrew wording actually clarifies something. If the topic isn't Bible-related, gently connect it to the closest relevant Biblical theme instead of refusing.
 ''';
 }
 
-String _buildFollowUpPrompt(NgmyBibleThread thread, String question, NgmyBibleLang lang) {
+String _buildFollowUpPrompt(NgmyTopicalThread thread, String question, NgmyBibleLang lang) {
   final buf = StringBuffer()
-    ..writeln('You are the Bible Study Teacher inside NGMY\'s Bible Dictionary tool: warm, sharp-minded, and clear. Answer entirely in ${lang.label}.')
+    ..writeln('You are the Bible Study Teacher inside NGMY\'s Topical Guide tool: warm, sharp-minded, and clear. Answer entirely in ${lang.label}.')
     ..writeln()
     ..writeln(kNgmyBibleDoctrineNote)
     ..writeln()
     ..writeln(kNgmyBibleMeaningFirstNote)
     ..writeln()
-    ..writeln('Earlier, the user looked up: "${thread.query}"')
+    ..writeln('Earlier, the user asked what the Bible says about: "${thread.query}"')
     ..writeln('Here is what you told them then:')
     ..writeln(thread.raw)
     ..writeln();
@@ -109,44 +68,44 @@ String _buildFollowUpPrompt(NgmyBibleThread thread, String question, NgmyBibleLa
       ..writeln();
   }
   buf
-    ..writeln('Now they are asking a follow-up question about that SAME verse/word: "$question"')
+    ..writeln('Now they are asking a follow-up question about that SAME topic: "$question"')
     ..writeln()
     ..writeln(
       'Answer in ${lang.label} only — no field labels, no headers, just the answer, 2-5 sentences. '
-      'If they are asking what a word or the verse means, your FIRST sentence must directly state that meaning (with the original Greek/Hebrew '
-      'term for any key word), before any explanation, story, or elaboration follows. '
+      'If they are asking what a verse or word means, your FIRST sentence must directly state that meaning (with the original Greek/Hebrew term '
+      'for any key word), before any explanation, story, or elaboration follows. '
       'Stay warm and clear, and follow the doctrine note above exactly when the question touches who God is or how the Father, Jesus, and the Spirit relate.',
     );
   return buf.toString();
 }
 
-class NgmyBibleFollowUp {
-  NgmyBibleFollowUp({required this.question, required this.answer, required this.timestamp});
+class NgmyTopicalFollowUp {
+  NgmyTopicalFollowUp({required this.question, required this.answer, required this.timestamp});
   final String question;
   final String answer;
   final DateTime timestamp;
 
   Map<String, dynamic> toJson() => {'question': question, 'answer': answer, 'timestamp': timestamp.toUtc().toIso8601String()};
 
-  factory NgmyBibleFollowUp.fromJson(Map<String, dynamic> j) => NgmyBibleFollowUp(
+  factory NgmyTopicalFollowUp.fromJson(Map<String, dynamic> j) => NgmyTopicalFollowUp(
         question: (j['question'] ?? '').toString(),
         answer: (j['answer'] ?? '').toString(),
         timestamp: DateTime.tryParse((j['timestamp'] ?? '').toString()) ?? DateTime.now(),
       );
 }
 
-class NgmyBibleThread {
-  NgmyBibleThread({required this.id, required this.query, required this.raw, required this.timestamp, List<NgmyBibleFollowUp>? followUps})
+class NgmyTopicalThread {
+  NgmyTopicalThread({required this.id, required this.query, required this.raw, required this.timestamp, List<NgmyTopicalFollowUp>? followUps})
       : followUps = followUps ?? [];
   final String id;
   final String query;
   final String raw;
   final DateTime timestamp;
-  final List<NgmyBibleFollowUp> followUps;
+  final List<NgmyTopicalFollowUp> followUps;
 
   Map<String, String> get fields {
     final result = <String, String>{};
-    final pattern = RegExp(r"^(WORD|REFERENCE|ORIGINAL|MEANING|IN CONTEXT|TEACHER'S NOTE):\s*", multiLine: true, caseSensitive: false);
+    final pattern = RegExp(r"^(TOPIC|SUMMARY|VERSES|TEACHER'S NOTE):\s*", multiLine: true, caseSensitive: false);
     final matches = pattern.allMatches(raw).toList();
     for (var i = 0; i < matches.length; i++) {
       final m = matches[i];
@@ -158,6 +117,8 @@ class NgmyBibleThread {
     return result;
   }
 
+  List<String> get verseLines => (fields['VERSES'] ?? '').split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'query': query,
@@ -166,44 +127,44 @@ class NgmyBibleThread {
         'followUps': followUps.map((e) => e.toJson()).toList(),
       };
 
-  factory NgmyBibleThread.fromJson(Map<String, dynamic> j) => NgmyBibleThread(
+  factory NgmyTopicalThread.fromJson(Map<String, dynamic> j) => NgmyTopicalThread(
         id: (j['id'] ?? '').toString(),
         query: (j['query'] ?? '').toString(),
         raw: (j['raw'] ?? '').toString(),
         timestamp: DateTime.tryParse((j['timestamp'] ?? '').toString()) ?? DateTime.now(),
-        followUps: ((j['followUps'] as List?) ?? []).map((e) => NgmyBibleFollowUp.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+        followUps: ((j['followUps'] as List?) ?? []).map((e) => NgmyTopicalFollowUp.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
       );
 }
 
-Future<List<NgmyBibleThread>> _loadHistory(String userEmail) async {
+Future<List<NgmyTopicalThread>> _loadHistory(String userEmail) async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString(_hashKey(_kStorageKey, userEmail));
   if (raw == null || raw.isEmpty) return [];
   try {
     final list = jsonDecode(raw) as List;
-    return list.map((e) => NgmyBibleThread.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    return list.map((e) => NgmyTopicalThread.fromJson(Map<String, dynamic>.from(e as Map))).toList();
   } catch (_) {
     return [];
   }
 }
 
-Future<void> _saveHistory(String userEmail, List<NgmyBibleThread> items) async {
+Future<void> _saveHistory(String userEmail, List<NgmyTopicalThread> items) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_hashKey(_kStorageKey, userEmail), jsonEncode(items.map((e) => e.toJson()).toList()));
 }
 
-Future<int> ngmyBibleDictionaryCount({required String userEmail}) async => (await _loadHistory(userEmail)).length;
+Future<int> ngmyTopicalGuideCount({required String userEmail}) async => (await _loadHistory(userEmail)).length;
 
-const _kExampleQueries = ['agape', 'John 3:16', 'grace in Ephesians 2:8', 'logos', 'shalom', 'Psalm 23'];
+const _kExampleTopics = ['Anxiety', 'Forgiveness', 'Grief', 'Patience', 'Marriage', 'Finances', 'Fear', 'Healing'];
 
-Future<void> showNgmyBibleDictionaryDialog(BuildContext context, {required String userEmail}) {
+Future<void> showNgmyTopicalGuideDialog(BuildContext context, {required String userEmail}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: false,
-    barrierLabel: 'Bible Dictionary',
+    barrierLabel: 'Topical Guide',
     barrierColor: NgmyHubTheme.of(context).barrier,
     transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (ctx, a1, a2) => _BibleDictionaryScreen(userEmail: userEmail),
+    pageBuilder: (ctx, a1, a2) => _TopicalGuideScreen(userEmail: userEmail),
     transitionBuilder: (ctx, anim, a2, child) => FadeTransition(
       opacity: anim,
       child: ScaleTransition(scale: Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: child),
@@ -211,21 +172,21 @@ Future<void> showNgmyBibleDictionaryDialog(BuildContext context, {required Strin
   );
 }
 
-class _BibleDictionaryScreen extends StatefulWidget {
-  const _BibleDictionaryScreen({required this.userEmail});
+class _TopicalGuideScreen extends StatefulWidget {
+  const _TopicalGuideScreen({required this.userEmail});
   final String userEmail;
 
   @override
-  State<_BibleDictionaryScreen> createState() => _BibleDictionaryScreenState();
+  State<_TopicalGuideScreen> createState() => _TopicalGuideScreenState();
 }
 
-class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
+class _TopicalGuideScreenState extends State<_TopicalGuideScreen> {
   static const _accent1 = Color(0xFF7C3AED);
   static const _accent2 = Color(0xFFD4AF37);
 
   final _query = TextEditingController();
-  List<NgmyBibleThread> _history = [];
-  NgmyBibleThread? _active;
+  List<NgmyTopicalThread> _history = [];
+  NgmyTopicalThread? _active;
   NgmyBibleLang _lang = NgmyBibleLang.en;
   bool _loading = true;
   bool _searching = false;
@@ -248,7 +209,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     final results = await Future.wait([_loadHistory(widget.userEmail), _loadLanguage(widget.userEmail)]);
     if (!mounted) return;
     setState(() {
-      _history = results[0] as List<NgmyBibleThread>;
+      _history = results[0] as List<NgmyTopicalThread>;
       _lang = results[1] as NgmyBibleLang;
       _loading = false;
     });
@@ -265,7 +226,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     await _setLanguage(_lang.other);
   }
 
-  Future<void> _persist(List<NgmyBibleThread> next) async {
+  Future<void> _persist(List<NgmyTopicalThread> next) async {
     await _saveHistory(widget.userEmail, next);
     if (!mounted) return;
     setState(() => _history = next);
@@ -281,7 +242,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     }
   }
 
-  Future<void> _startThread(String query) async {
+  Future<void> _startThread(String topic) async {
     setState(() {
       _searching = true;
       _error = null;
@@ -290,7 +251,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
 
     _apiKey ??= await ngmyResolveGeminiApiKey();
     final creds = ngmyParseAiCredentials(_apiKey ?? '');
-    final result = await ngmyAiGenerateWithRetry(creds, _buildEntryPrompt(query, _lang));
+    final result = await ngmyAiGenerateWithRetry(creds, _buildEntryPrompt(topic, _lang));
 
     if (!mounted) return;
     final text = result.text?.trim();
@@ -302,7 +263,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
       return;
     }
 
-    final thread = NgmyBibleThread(id: DateTime.now().microsecondsSinceEpoch.toString(), query: query, raw: text, timestamp: DateTime.now());
+    final thread = NgmyTopicalThread(id: DateTime.now().microsecondsSinceEpoch.toString(), query: topic, raw: text, timestamp: DateTime.now());
     await _persist([thread, ..._history]);
     if (!mounted) return;
     setState(() {
@@ -336,12 +297,12 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
       return;
     }
 
-    final updated = NgmyBibleThread(
+    final updated = NgmyTopicalThread(
       id: thread.id,
       query: thread.query,
       raw: thread.raw,
       timestamp: thread.timestamp,
-      followUps: [...thread.followUps, NgmyBibleFollowUp(question: question, answer: answer, timestamp: DateTime.now())],
+      followUps: [...thread.followUps, NgmyTopicalFollowUp(question: question, answer: answer, timestamp: DateTime.now())],
     );
     final next = _history.map((t) => t.id == updated.id ? updated : t).toList();
     await _persist(next);
@@ -362,14 +323,14 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     });
   }
 
-  void _openThread(NgmyBibleThread thread) {
+  void _openThread(NgmyTopicalThread thread) {
     setState(() {
       _active = thread;
       _error = null;
     });
   }
 
-  Future<void> _delete(NgmyBibleThread thread) async {
+  Future<void> _delete(NgmyTopicalThread thread) async {
     final next = _history.where((e) => e.id != thread.id).toList();
     await _persist(next);
     if (!mounted) return;
@@ -428,15 +389,15 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [BoxShadow(color: _accent1.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 5))],
           ),
-          child: const Center(child: Text('📖', style: TextStyle(fontSize: 20))),
+          child: const Center(child: Text('🧭', style: TextStyle(fontSize: 20))),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Bible Dictionary', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
-              Text('Word meanings, Greek & Hebrew roots, verse study', style: TextStyle(color: hub.subtitle, fontSize: 11.5, fontWeight: FontWeight.w600)),
+              Text('Topical Guide', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
+              Text('What the Bible says about any topic', style: TextStyle(color: hub.subtitle, fontSize: 11.5, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -454,8 +415,6 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     );
   }
 
-  /// Just the flag, tap to switch language — matches the Document Scanner's
-  /// language picker instead of showing a text label.
   Widget _languageFlag(NgmyHubTheme hub) {
     return Tooltip(
       message: 'Tap to switch to ${_lang.other.label}',
@@ -488,7 +447,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
             style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
             onSubmitted: (_) => _submit(),
             decoration: InputDecoration(
-              hintText: followUpMode ? 'Ask a follow-up about this verse…' : 'A word, a verse, or a question…',
+              hintText: followUpMode ? 'Ask a follow-up about this topic…' : 'A topic or life situation…',
               hintStyle: TextStyle(color: hub.muted),
               filled: true,
               fillColor: hub.inputFill,
@@ -514,7 +473,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
               ),
               child: _searching
                   ? const Padding(padding: EdgeInsets.all(13), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.4))
-                  : Icon(followUpMode ? Icons.send_rounded : Icons.auto_stories_rounded, color: Colors.white, size: 20),
+                  : Icon(followUpMode ? Icons.send_rounded : Icons.explore_rounded, color: Colors.white, size: 20),
             ),
           ),
         ),
@@ -527,10 +486,10 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
       height: 30,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: _kExampleQueries.length,
+        itemCount: _kExampleTopics.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final ex = _kExampleQueries[i];
+          final ex = _kExampleTopics[i];
           return GestureDetector(
             onTap: _searching ? null : () => _submit(ex),
             child: Container(
@@ -558,9 +517,9 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('📖', style: TextStyle(fontSize: 40, color: hub.muted)),
+          Text('🧭', style: TextStyle(fontSize: 40, color: hub.muted)),
           const SizedBox(height: 10),
-          Text('Look up a word or a verse', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 15)),
+          Text('Ask about a topic or a life situation', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 15)),
           const SizedBox(height: 4),
           Text('Try one of the examples above to get started', style: TextStyle(color: hub.subtitle, fontSize: 12)),
         ],
@@ -568,19 +527,18 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     );
   }
 
-  Widget _historyCard(NgmyHubTheme hub, NgmyBibleThread thread) {
+  Widget _historyCard(NgmyHubTheme hub, NgmyTopicalThread thread) {
     final f = thread.fields;
-    final word = f['WORD']?.trim();
-    final hasStructured = word != null && word.isNotEmpty;
+    final topic = f['TOPIC']?.trim();
+    final hasStructured = topic != null && topic.isNotEmpty;
     return Dismissible(
       key: ValueKey(thread.id),
       direction: DismissDirection.horizontal,
-      // Swipe right to open, swipe left to delete.
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 22),
         decoration: BoxDecoration(color: _accent1.withValues(alpha: hub.isDark ? 0.22 : 0.14), borderRadius: BorderRadius.circular(18)),
-        child: const Icon(Icons.menu_book_rounded, color: _accent1),
+        child: const Icon(Icons.explore_rounded, color: _accent1),
       ),
       secondaryBackground: Container(
         alignment: Alignment.centerRight,
@@ -607,32 +565,18 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: hub.border),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(hasStructured ? word : thread.query, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16)),
-                    if ((f['MEANING'] ?? '').trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(f['MEANING']!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.35)),
-                    ],
-                    if (thread.followUps.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text('${thread.followUps.length} follow-up${thread.followUps.length == 1 ? '' : 's'}', style: const TextStyle(color: _accent1, fontSize: 11, fontWeight: FontWeight.w800)),
-                    ],
-                  ],
-                ),
-              ),
-              if ((f['REFERENCE'] ?? '').trim().isNotEmpty && (f['REFERENCE'] ?? '').trim().toLowerCase() != 'general')
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  margin: const EdgeInsets.only(left: 8),
-                  decoration: BoxDecoration(color: _accent1.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
-                  child: Text(f['REFERENCE']!.trim(), style: const TextStyle(color: _accent1, fontWeight: FontWeight.w800, fontSize: 11)),
-                ),
+              Text(hasStructured ? topic : thread.query, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16)),
+              if ((f['SUMMARY'] ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(f['SUMMARY']!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.35)),
+              ],
+              if (thread.followUps.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('${thread.followUps.length} follow-up${thread.followUps.length == 1 ? '' : 's'}', style: const TextStyle(color: _accent1, fontSize: 11, fontWeight: FontWeight.w800)),
+              ],
             ],
           ),
         ),
@@ -640,10 +584,10 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     );
   }
 
-  Widget _activeThreadView(NgmyHubTheme hub, NgmyBibleThread thread) {
+  Widget _activeThreadView(NgmyHubTheme hub, NgmyTopicalThread thread) {
     final f = thread.fields;
-    final word = f['WORD']?.trim();
-    final hasStructured = word != null && word.isNotEmpty;
+    final topic = f['TOPIC']?.trim();
+    final hasStructured = topic != null && topic.isNotEmpty;
     return SingleChildScrollView(
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -660,17 +604,10 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    hasStructured ? word : thread.query,
+                    hasStructured ? topic : thread.query,
                     style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                 ),
-                if ((f['REFERENCE'] ?? '').trim().isNotEmpty && (f['REFERENCE'] ?? '').trim().toLowerCase() != 'general')
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    margin: const EdgeInsets.only(left: 8, top: 2),
-                    decoration: BoxDecoration(color: _accent1.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
-                    child: Text(f['REFERENCE']!.trim(), style: const TextStyle(color: _accent1, fontWeight: FontWeight.w800, fontSize: 11)),
-                  ),
                 GestureDetector(
                   onTap: _closeThread,
                   child: Container(
@@ -686,22 +623,30 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
               const SizedBox(height: 6),
               Text(thread.raw, style: TextStyle(color: hub.subtitle, fontSize: 13, height: 1.4)),
             ] else ...[
-              if ((f['ORIGINAL'] ?? '').trim().isNotEmpty) ...[
+              if ((f['SUMMARY'] ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(f['ORIGINAL']!.trim(), style: const TextStyle(color: _accent2, fontStyle: FontStyle.italic, fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(f['SUMMARY']!.trim(), style: TextStyle(color: hub.title, fontSize: 13, height: 1.42, fontWeight: FontWeight.w600)),
               ],
-              if ((f['MEANING'] ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(f['MEANING']!.trim(), style: TextStyle(color: hub.title, fontSize: 13, height: 1.42, fontWeight: FontWeight.w600)),
-              ],
-              if ((f['IN CONTEXT'] ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text('IN CONTEXT', style: TextStyle(color: hub.muted, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
-                const SizedBox(height: 2),
-                Text(f['IN CONTEXT']!.trim(), style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.4)),
+              if (thread.verseLines.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text('VERSES', style: TextStyle(color: hub.muted, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+                const SizedBox(height: 4),
+                ...thread.verseLines.map(
+                  (line) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(padding: EdgeInsets.only(top: 2), child: Icon(Icons.circle, size: 5, color: _accent1)),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(line, style: TextStyle(color: hub.subtitle, fontSize: 12.5, height: 1.4))),
+                      ],
+                    ),
+                  ),
+                ),
               ],
               if ((f["TEACHER'S NOTE"] ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
@@ -740,7 +685,7 @@ class _BibleDictionaryScreenState extends State<_BibleDictionaryScreen> {
     );
   }
 
-  Widget _followUpBubble(NgmyHubTheme hub, NgmyBibleFollowUp f) {
+  Widget _followUpBubble(NgmyHubTheme hub, NgmyTopicalFollowUp f) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
