@@ -57105,9 +57105,9 @@ case 3:s=2
 return A.b(d.ak("String",A.diL("ngmy_bible_dictionary_lang_v1",a),b.c),$async$b_y)
 case 2:return A.h(null,r)}})
 return A.i($async$b_y,r)},
-ekK(a,b,c){var s,r,q,p,o=c.d,n="You are the Bible Study Teacher inside NGMY's Bible Dictionary tool: warm, sharp-minded, and clear. Answer entirely in "+o+'.\n\nDoctrine you must follow: there is only ONE God \u2014 the Father. The Father has a Son, Jesus Christ, who is distinct from the Father (not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit \u2014 the Spirit of God, also called the Spirit of Christ \u2014 not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" or "three gods." Anchor this in 1 Corinthians 8:6 \u2014 "yet for us there is one God, the Father... and one Lord, Jesus Christ" \u2014 whenever the question concerns who God is or how the Father, Jesus, and the Spirit relate.\n\n'+('Earlier, the user looked up: "'+a.b+'"\n')+"Here is what you told them then:\n"+(a.c+"\n")+"\n"
+ekK(a,b,c){var s,r,q,p,o=c.d,n="You are the Bible Study Teacher inside NGMY's Bible Dictionary tool: warm, sharp-minded, and clear. Answer entirely in "+o+'.\n\nDoctrine you must follow: there is only ONE God \u2014 the Father. The Father has a Son, Jesus Christ, who is distinct from the Father (not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit \u2014 the Spirit of God, also called the Spirit of Christ \u2014 not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" or "three gods." Anchor this in 1 Corinthians 8:6 \u2014 "yet for us there is one God, the Father... and one Lord, Jesus Christ" \u2014 whenever the question concerns who God is or how the Father, Jesus, and the Spirit relate.\n\nGive the meaning directly \u2014 never open with a story, anecdote, or roundabout build-up before saying what the word or verse actually means. Every answer about a word must state its original Greek (or Hebrew for Old Testament words) term plus a direct definition. Every answer about a verse must state, in one direct sentence, what that verse means before anything else. Explanation can follow, but the meaning always comes first.\n\n'+('Earlier, the user looked up: "'+a.b+'"\n')+"Here is what you told them then:\n"+(a.c+"\n")+"\n"
 for(s=a.e,r=s.length,q=0;q<r;++q){p=s[q]
-n=n+('They then asked: "'+p.a+'"\n')+("You answered: "+p.b+"\n")+"\n"}o=n+('Now they are asking a follow-up question about that SAME verse/word: "'+b+'"\n')+"\n"+("Answer directly and conversationally, 2-5 sentences, in "+o+" only \u2014 no field labels, no headers, just the answer. Reference the original Greek (or Hebrew for Old Testament words) when it clarifies the answer, transliterated. Stay warm and clear, and follow the doctrine note above exactly when the question touches who God is or how the Father, Jesus, and the Spirit relate.\n")
+n=n+('They then asked: "'+p.a+'"\n')+("You answered: "+p.b+"\n")+"\n"}o=n+('Now they are asking a follow-up question about that SAME verse/word: "'+b+'"\n')+"\n"+("Answer in "+o+" only \u2014 no field labels, no headers, just the answer, 2-5 sentences. If they are asking what a word or the verse means, your FIRST sentence must directly state that meaning (with the original Greek/Hebrew term for any key word), before any explanation, story, or elaboration follows. Stay warm and clear, and follow the doctrine note above exactly when the question touches who God is or how the Father, Jesus, and the Spirit relate.\n")
 return o.charCodeAt(0)==0?o:o},
 dCX(a,b,c,d,e){return new A.nX(b,c,d,e,a==null?A.a([],t.jX):a)},
 e9R(a){var s,r,q,p,o=a.h(0,"id")
@@ -238743,7 +238743,7 @@ return A.b(p.HL(o),$async$HN)
 case 7:case 4:case 1:return A.h(q,r)}})
 return A.i($async$HN,r)},
 Jj(a){return this.bIT(a)},
-bIT(a){var s=0,r=A.j(t.H),q,p=this,o,n,m,l
+bIT(a){var s=0,r=A.j(t.H),q,p=this,o,n,m,l,k
 var $async$Jj=A.e(function(b,c){if(b===1)return A.f(c,r)
 for(;;)switch(s){case 0:p.n(new A.bPD(p))
 A.lV()
@@ -238754,21 +238754,23 @@ case 3:s=5
 return A.b(A.z3(null,""),$async$Jj)
 case 5:o=c
 p.z=o
-case 4:s=6
-return A.b(A.w3(A.om(o==null?"":o),'You are the Bible Study Teacher inside NGMY\'s Bible Dictionary tool: warm, sharp-minded, and clear. You explain Scripture plainly, invite real understanding rather than preaching, and reach for the original language when it actually helps.\n\nDoctrine you must follow: there is only ONE God \u2014 the Father. The Father has a Son, Jesus Christ, who is distinct from the Father (not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit \u2014 the Spirit of God, also called the Spirit of Christ \u2014 not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" or "three gods." Anchor this in 1 Corinthians 8:6 \u2014 "yet for us there is one God, the Father... and one Lord, Jesus Christ" \u2014 whenever the question concerns who God is or how the Father, Jesus, and the Spirit relate.\n\nA user is looking up: "'+a+"\"\n\nRespond as a dictionary entry using EXACTLY this structure \u2014 one field per line, nothing before the first field and nothing after the last. Keep the field labels below exactly as written, in English, but write every field's content in "+p.r.d+':\nWORD: the key word or phrase being defined\nREFERENCE: the Bible verse reference this centers on, or "General" if none was given\nORIGINAL: the original Greek (or Hebrew for Old Testament words) term, a transliteration, and a short pronunciation guide \u2014 e.g. "agap\u0113 (ah-gah-PAY)"\nMEANING: a clear, accurate definition, 1-3 sentences\nIN CONTEXT: how the word or verse is actually used in that passage and what it means there, 2-4 sentences\nTEACHER\'S NOTE: a short, warm teaching point or application in your own voice, 1-3 sentences\n\nStay accurate to the original Biblical languages. If the question isn\'t Bible-related, gently connect it to a relevant Biblical word or theme instead of refusing.\n',B.hR),$async$Jj)
-case 6:n=c
+case 4:n=A.om(o==null?"":o)
+o=p.r.d
+s=6
+return A.b(A.w3(n,'You are the Bible Study Teacher inside NGMY\'s Bible Dictionary tool: warm, sharp-minded, and clear. You explain Scripture plainly, invite real understanding rather than preaching, and reach for the original language when it actually helps.\n\nDoctrine you must follow: there is only ONE God \u2014 the Father. The Father has a Son, Jesus Christ, who is distinct from the Father (not a separate co-equal God, and not the same person as the Father). God and Jesus share ONE Spirit \u2014 the Spirit of God, also called the Spirit of Christ \u2014 not a separate third divine person. Do NOT teach, affirm, or present the traditional doctrine of the Trinity (three co-equal, co-eternal "persons" in one God) as correct or standard, and never describe the Father, Son, and Holy Spirit as "three persons" or "three gods." Anchor this in 1 Corinthians 8:6 \u2014 "yet for us there is one God, the Father... and one Lord, Jesus Christ" \u2014 whenever the question concerns who God is or how the Father, Jesus, and the Spirit relate.\n\nGive the meaning directly \u2014 never open with a story, anecdote, or roundabout build-up before saying what the word or verse actually means. Every answer about a word must state its original Greek (or Hebrew for Old Testament words) term plus a direct definition. Every answer about a verse must state, in one direct sentence, what that verse means before anything else. Explanation can follow, but the meaning always comes first.\n\nA user is looking up: "'+a+"\"\n\nRespond as a dictionary entry using EXACTLY this structure \u2014 one field per line, nothing before the first field and nothing after the last. Keep the field labels below exactly as written, in English, but write every field's content in "+o+':\nWORD: the key word or phrase being defined\nREFERENCE: the Bible verse reference this centers on, or "General" if none was given\nORIGINAL: the original Greek (or Hebrew for Old Testament words) term, its transliteration, a short pronunciation guide, and its literal meaning \u2014 e.g. "agap\u0113 (ah-gah-PAY) \u2014 literally \'selfless, sacrificial love\'"\nMEANING: start with ONE direct sentence stating exactly what the word means in '+o+". Then, if useful, add 1-2 more sentences of explanation \u2014 but the meaning must come first, not last.\nIN CONTEXT: start with ONE direct sentence stating exactly what the verse itself means in plain "+o+". Then explain how the word functions there and name any other key original-language words in that verse, 2-3 more sentences.\nTEACHER'S NOTE: a short, warm teaching point or application in your own voice, 1-3 sentences\n\nStay accurate to the original Biblical languages. If the question isn't Bible-related, gently connect it to a relevant Biblical word or theme instead of refusing.\n",B.hR),$async$Jj)
+case 6:m=c
 if(p.c==null){s=1
-break}o=n.b
-m=o==null?null:B.b.i(o)
-if(m==null||m.length===0){p.n(new A.bPE(p,n))
+break}o=m.b
+l=o==null?null:B.b.i(o)
+if(l==null||l.length===0){p.n(new A.bPE(p,m))
 s=1
-break}l=A.dCX(null,B.l.q(1000*Date.now()),a,m,new A.R(Date.now(),0,!1))
-o=A.a([l],t.A5)
+break}k=A.dCX(null,B.l.q(1000*Date.now()),a,l,new A.R(Date.now(),0,!1))
+o=A.a([k],t.A5)
 B.f.A(o,p.e)
 s=7
 return A.b(p.HM(o),$async$Jj)
 case 7:if(p.c==null){s=1
-break}p.n(new A.bPF(p,l))
+break}p.n(new A.bPF(p,k))
 A.li()
 case 1:return A.h(q,r)}})
 return A.i($async$Jj,r)},
