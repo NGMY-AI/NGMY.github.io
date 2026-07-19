@@ -52,7 +52,14 @@ void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
     e.w = maxW;
     return;
   }
-  e.w = (t.length * 0.0115 + 0.028).clamp(0.06, maxW);
+  // Per-character width must scale with the field's own font size — this
+  // was a flat 0.0115 tuned for Marriage Agreement's small blanks (~11.5pt).
+  // Applied unchanged to a much bigger field (e.g. Hati ya Kuhoweya's 30pt
+  // editable section header), it drastically underestimated the width
+  // needed, shrinking the box until the text had to wrap onto a second
+  // line even though there was room on the paper for it to stay on one.
+  final perChar = e.fontSize * 0.001;
+  e.w = (t.length * perChar + 0.028).clamp(0.06, maxW);
 }
 
 Future<void> launchNgmyMarriageAgreement({

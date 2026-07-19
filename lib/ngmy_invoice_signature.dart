@@ -80,45 +80,54 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
     );
   }
 
-  static const _minStroke = 1.4;
-  static const _maxStroke = 9.5;
+  static const _thicknessChoices = [2.2, 3.5, 5.2];
+  static const _minStroke = 1.0;
+  static const _maxStroke = 14.0;
+  bool _sliderOpen = false;
 
-  Widget _stepBtn(IconData icon, VoidCallback onTap) {
+  Widget _thicknessDot(double w) {
+    final selected = !_sliderOpen && w == _strokeWidth;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => setState(() {
+        _strokeWidth = w;
+        _sliderOpen = false;
+      }),
       child: Container(
-        width: 22,
-        height: 22,
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.12),
-          border: Border.all(color: Colors.white24),
+          color: selected ? Colors.white.withOpacity(0.14) : Colors.transparent,
+          border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.white24, width: selected ? 1.4 : 1),
         ),
-        child: Icon(icon, size: 13, color: Colors.white),
+        child: Container(
+          width: (w * 1.6).clamp(4.0, 11.0),
+          height: (w * 1.6).clamp(4.0, 11.0),
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        ),
       ),
     );
   }
 
-  /// A +/- stepper (two tappable dots) instead of fixed preset sizes, so
-  /// the user can dial the thickness in themselves rather than pick from
-  /// only 3 options.
-  Widget _thicknessStepper() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _stepBtn(Icons.remove_rounded, () => setState(() => _strokeWidth = (_strokeWidth - 0.7).clamp(_minStroke, _maxStroke))),
-        SizedBox(
-          width: 26,
-          child: Center(
-            child: Container(
-              width: (_strokeWidth * 1.5).clamp(4.0, 13.0),
-              height: (_strokeWidth * 1.5).clamp(4.0, 13.0),
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            ),
-          ),
+  /// The "+" opens an inline slider (below the header) for dialing in any
+  /// size beyond the 3 presets — dragging updates the live preview stroke
+  /// width in real time.
+  Widget _thicknessPlusBtn() {
+    return GestureDetector(
+      onTap: () => setState(() => _sliderOpen = !_sliderOpen),
+      child: Container(
+        width: 28,
+        height: 28,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _sliderOpen ? const Color(0xFF10B981).withOpacity(0.25) : Colors.white.withOpacity(0.1),
+          border: Border.all(color: _sliderOpen ? const Color(0xFF10B981) : Colors.white24),
         ),
-        _stepBtn(Icons.add_rounded, () => setState(() => _strokeWidth = (_strokeWidth + 0.7).clamp(_minStroke, _maxStroke))),
-      ],
+        child: Icon(Icons.add_rounded, size: 15, color: _sliderOpen ? const Color(0xFF10B981) : Colors.white),
+      ),
     );
   }
 
@@ -148,13 +157,45 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                     // title/"sign the document" text and Clear/Done.
                     ..._inkChoices.map(_inkSwatch),
                     const SizedBox(width: 10),
-                    _thicknessStepper(),
+                    ..._thicknessChoices.map(_thicknessDot),
+                    _thicknessPlusBtn(),
                     const Spacer(),
                     TextButton(onPressed: () => setState(_points.clear), child: const Text('Clear')),
                     FilledButton(onPressed: _done, child: const Text('Done')),
                   ],
                 ),
               ),
+              if (_sliderOpen)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.line_weight_rounded, color: Colors.white54, size: 16),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            activeTrackColor: const Color(0xFF10B981),
+                            inactiveTrackColor: Colors.white24,
+                            thumbColor: const Color(0xFF10B981),
+                            overlayColor: const Color(0xFF10B981).withOpacity(0.2),
+                          ),
+                          child: Slider(
+                            value: _strokeWidth,
+                            min: _minStroke,
+                            max: _maxStroke,
+                            onChanged: (v) => setState(() => _strokeWidth = v),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: (_strokeWidth * 1.3).clamp(4.0, 18.0),
+                        height: (_strokeWidth * 1.3).clamp(4.0, 18.0),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
