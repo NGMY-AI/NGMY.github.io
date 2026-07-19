@@ -140,7 +140,7 @@ NgmySlideElement _hBlank(
 }
 
 NgmySlideElement _hBlankUnderline(double x, double y, double w, {int color = _softLine}) {
-  return _hLockedShape(shape: NgmySlideShapeKind.line, x: x, y: y + 0.022, w: w, h: 0.002, strokeColor: color, strokeWidth: 0.8, tag: 'ul_${x}_$y');
+  return _hLockedShape(shape: NgmySlideShapeKind.line, x: x, y: y + 0.02, w: w, h: 0.002, strokeColor: color, strokeWidth: 0.8, tag: 'ul_${x}_$y');
 }
 
 double _htw(String s, double fontSize) => s.length * fontSize * 0.0027 + 0.006;
@@ -157,89 +157,108 @@ class HkSeg {
   final double blankW;
 }
 
-List<NgmySlideElement> _hRun(List<HkSeg> segs, double x, double y, {required int ink, double fontSize = 11.5}) {
+List<NgmySlideElement> _hRun(List<HkSeg> segs, double x, double y, {required int ink, double fontSize = 10.5}) {
   final out = <NgmySlideElement>[];
   var cx = x;
   for (final s in segs) {
     if (s.blankKey == null) {
       final w = _htw(s.text, fontSize);
-      out.add(_hLockedText(s.text, x: cx, y: y, w: w, h: 0.024, fontSize: fontSize, fontWeight: FontWeight.w500, color: ink, tag: 'run_${cx}_$y'));
+      out.add(_hLockedText(s.text, x: cx, y: y, w: w, h: 0.022, fontSize: fontSize, fontWeight: FontWeight.w500, color: ink, tag: 'run_${cx}_$y'));
       cx += w;
     } else {
       out.add(_hBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize));
       out.add(_hBlankUnderline(cx, y, s.blankW));
-      cx += s.blankW + 0.008;
+      cx += s.blankW + 0.007;
     }
   }
   return out;
 }
 
-/// A section-header ribbon (UTANGULIZI / NIMETOWE / MASHAHIDI / MWANDISHI).
+/// A section-header ribbon (UTANGULIZI / NIMETOWE / MASHAHIDI).
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill, required int textColor}) {
   return [
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.036, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
-    _hLockedText(text, x: x, y: y + 0.004, w: w, h: 0.028, fontSize: 14, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.034, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
+    _hLockedText(text, x: x, y: y + 0.004, w: w, h: 0.026, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
   ];
 }
 
-/// One NIMETOWE line item — a single wide editable blank with an underline
-/// (the certificate's "……" dotted line, drawn as a soft rule).
-List<NgmySlideElement> _hItemLine(String key, String hint, double x, double y, double w, {required int ink}) {
+/// Boxed TAREHE field, top-right corner — matches the reference paper's
+/// bordered date box next to the title.
+List<NgmySlideElement> _hTareheBox(double x, double y, double w, double h, {required int ink, required int accent}) {
   return [
-    _hBlank(key, x, y, w, ink: ink, fontSize: 11.5, startText: hint, align: TextAlign.left),
-    _hBlankUnderline(x, y + 0.014, w),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'tarehe_box'),
+    _hLockedText('TAREHE:', x: x, y: y + 0.006, w: w, h: 0.016, fontSize: 8, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
+    _hBlank('tarehe', x + 0.012, y + 0.026, w - 0.024, ink: ink, fontSize: 9),
+    _hBlankUnderline(x + 0.012, y + 0.042, w - 0.024),
+  ];
+}
+
+/// One NIMETOWE line item — numbered circle + a wide editable blank, echoing
+/// the reference paper's numbered MAHARI table (not a bare underline).
+List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
+  const circleD = 0.028;
+  final itemX = x + circleD + 0.016;
+  final itemW = x + w - itemX;
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y, w: circleD, h: circleD, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'nim_c_$n'),
+    _hLockedText('$n', x: x, y: y + 0.002, w: circleD, h: circleD - 0.004, fontSize: 9, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFFFFFFF, tag: 'nim_n_$n'),
+    _hBlank('mahari_$n', itemX, y + 0.003, itemW, ink: ink, fontSize: 10, startText: hint, align: TextAlign.left),
+    _hBlankUnderline(itemX, y + 0.018, itemW),
   ];
 }
 
 /// One MASHAHIDI witness line — name + Sahihi (signature), no date field.
+/// Sized to sit in one half of a two-column witness table.
 List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, double w, {required int ink, required int accent}) {
   final nameW = w * 0.46;
-  final sahihiLblX = x + nameW + 0.024;
-  final signX = sahihiLblX + 0.09;
+  final sahihiLblX = x + nameW + 0.02;
+  final signX = sahihiLblX + 0.078;
   final signW = x + w - signX;
   return [
-    _hLockedText('$n.', x: x, y: y, w: 0.03, h: 0.022, fontSize: 10.5, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
-    _hBlank('witness_${side}_${n}_name', x + 0.03, y, nameW - 0.03, ink: ink, fontSize: 10.5, startText: '[Jina la Shahidi]', align: TextAlign.left),
-    _hBlankUnderline(x + 0.03, y + 0.016, nameW - 0.03),
-    _hLockedText('Sahihi:', x: sahihiLblX, y: y + 0.001, w: 0.086, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
+    _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
+    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 9.5, startText: '[Jina la Shahidi]', align: TextAlign.left),
+    _hBlankUnderline(x + 0.026, y + 0.014, nameW - 0.026),
+    _hLockedText('Sahihi:', x: sahihiLblX, y: y + 0.001, w: 0.076, h: 0.018, fontSize: 8.5, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.shape,
       shape: NgmySlideShapeKind.rectangle,
       x: signX,
-      y: y - 0.004,
+      y: y - 0.003,
       w: signW,
-      h: 0.026,
+      h: 0.022,
       fillColor: 0x00000000,
       strokeColor: 0x00000000,
       fileName: '$kMarriageSignPrefix${side}_witness_$n',
     ),
-    _hBlankUnderline(signX, y + 0.016, signW),
+    _hBlankUnderline(signX, y + 0.014, signW),
   ];
 }
 
-/// MWANDISHI block — just Jina + Sahihi, no Tarehe, no extra notes, no seal.
-List<NgmySlideElement> _hMwandishi(double x, double y, double w, {required int ink}) {
-  final out = <NgmySlideElement>[];
-  out.add(_hLockedText('Jina:', x: x, y: y, w: 0.1, h: 0.022, fontSize: 11, fontWeight: FontWeight.w700, color: ink, tag: 'mw_jl'));
-  out.add(_hBlank('mwandishi_jina', x + 0.11, y - 0.002, w - 0.11, ink: ink, fontSize: 11, align: TextAlign.left));
-  out.add(_hBlankUnderline(x + 0.11, y + 0.016, w - 0.11));
-  final y2 = y + 0.05;
-  out.add(_hLockedText('Sahihi:', x: x, y: y2, w: 0.1, h: 0.022, fontSize: 11, fontWeight: FontWeight.w700, color: ink, tag: 'mw_sl'));
-  out.add(NgmySlideElement(
-    id: NgmySlidesTemplates.newId(),
-    type: NgmySlideElementType.shape,
-    shape: NgmySlideShapeKind.rectangle,
-    x: x + 0.11,
-    y: y2 - 0.006,
-    w: w - 0.11,
-    h: 0.032,
-    fillColor: 0x00000000,
-    strokeColor: 0x00000000,
-    fileName: '${kMarriageSignPrefix}mwandishi',
-  ));
-  out.add(_hBlankUnderline(x + 0.11, y2 + 0.02, w - 0.11));
-  return out;
+/// MWANDISHI — a single compact bordered bar (Jina + Sahihi inline), matching
+/// the reference paper's footer-bar treatment instead of a tall stacked block.
+List<NgmySlideElement> _hMwandishiBar(double x, double y, double w, {required int ink, required int accent}) {
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.085, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'mw_box'),
+    _hLockedText('MWANDISHI', x: x + 0.02, y: y + 0.012, w: w - 0.04, h: 0.018, fontSize: 9.5, fontWeight: FontWeight.w800, color: accent, tag: 'mw_hdr'),
+    _hLockedText('Jina:', x: x + 0.02, y: y + 0.04, w: 0.07, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w600, color: ink, tag: 'mw_jl'),
+    _hBlank('mwandishi_jina', x + 0.1, y + 0.038, w * 0.4, ink: ink, fontSize: 9.5, align: TextAlign.left),
+    _hBlankUnderline(x + 0.1, y + 0.054, w * 0.4),
+    _hLockedText('Sahihi:', x: x + w * 0.56, y: y + 0.04, w: 0.075, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w600, color: ink, tag: 'mw_sl'),
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.shape,
+      shape: NgmySlideShapeKind.rectangle,
+      x: x + w * 0.65,
+      y: y + 0.032,
+      w: x + w - (x + w * 0.65) - 0.02,
+      h: 0.026,
+      fillColor: 0x00000000,
+      strokeColor: 0x00000000,
+      fileName: '${kMarriageSignPrefix}mwandishi',
+    ),
+    _hBlankUnderline(x + w * 0.65, y + 0.054, x + w - (x + w * 0.65) - 0.02),
+  ];
 }
 
 // ── Template registry ──────────────────────────────────────────────────────
@@ -282,120 +301,93 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id) {
 }
 
 // ── Content builder — "Hati ya Kuhowa" ──────────────────────────────────────
-// Page 1: title, Tarehe, UTANGULIZI, NIMETOWE.
-// Page 2: MASHAHIDI (NGAMBO YA MKE then NGAMBO YA MUME, single-column,
-// one line per witness), MWANDISHI.
+// A single printable page: title + Tarehe, UTANGULIZI, NIMETOWE, MASHAHIDI
+// (NGAMBO YA MKE then NGAMBO YA MUME, two columns), MWANDISHI.
 
-List<NgmySlideElement> _buildPage1Content(NgmyHatiKuhowaTemplate tpl) {
+List<NgmySlideElement> _buildPageContent(NgmyHatiKuhowaTemplate tpl) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
-  return [_hBgImage(bgUrl), ..._layoutPage1(tpl)];
+  return [_hBgImage(bgUrl), ..._layoutSingle(tpl)];
 }
 
-List<NgmySlideElement> _buildPage2Content(NgmyHatiKuhowaTemplate tpl) {
-  final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
-  return [_hBgImage(bgUrl), ..._layoutPage2(tpl)];
-}
-
-List<NgmySlideElement> _layoutPage1(NgmyHatiKuhowaTemplate tpl) {
-  final ink = tpl.ink;
-  const cx = 0.09;
-  const cw = 0.82;
-  final out = <NgmySlideElement>[];
-
-  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.036, w: cw, h: 0.05, fontSize: 24, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
-
-  double y = 0.1;
-  out.add(_hLockedText('Tarehe:', x: cx, y: y, w: 0.12, h: 0.024, fontSize: 12, fontWeight: FontWeight.w700, color: ink, tag: 'tarehe_lbl'));
-  out.add(_hBlank('tarehe', cx + 0.12, y - 0.002, 0.34, ink: ink, fontSize: 11.5, align: TextAlign.left));
-  out.add(_hBlankUnderline(cx + 0.12, y + 0.016, 0.34));
-  y += 0.05;
-
-  out.addAll(_hBanner('UTANGULIZI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.05;
-
-  out.addAll(_hRun([
-    const HkSeg.text('Mimi '),
-    const HkSeg.blank('man_name1', 0.16),
-    const HkSeg.text(', wa Jamaa la '),
-    const HkSeg.blank('family1', 0.16),
-    const HkSeg.text(','),
-  ], cx, y, ink: ink));
-  y += 0.042;
-  out.addAll(_hRun([
-    const HkSeg.text('Nyumba ya '),
-    const HkSeg.blank('house1', 0.16),
-    const HkSeg.text(','),
-  ], cx, y, ink: ink));
-  y += 0.042;
-  out.addAll(_hRun([
-    const HkSeg.text('nimetowa mahali ya kuhoweya'),
-  ], cx, y, ink: ink));
-  y += 0.042;
-  out.addAll(_hRun([
-    const HkSeg.text('kijana wangu aitwaye '),
-    const HkSeg.blank('man_name2', 0.16),
-    const HkSeg.text(','),
-  ], cx, y, ink: ink));
-  y += 0.042;
-  out.addAll(_hRun([
-    const HkSeg.text('kwa '),
-    const HkSeg.blank('woman_name', 0.16),
-    const HkSeg.text(', binti wa '),
-    const HkSeg.blank('woman_father', 0.18),
-    const HkSeg.text(','),
-  ], cx, y, ink: ink));
-  y += 0.042;
-  out.addAll(_hRun([
-    const HkSeg.text('wa Jamaa la '),
-    const HkSeg.blank('family2', 0.16),
-    const HkSeg.text(', Nyumba ya '),
-    const HkSeg.blank('house2', 0.16),
-    const HkSeg.text('.'),
-  ], cx, y, ink: ink));
-  y += 0.05;
-
-  out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.05;
-  out.add(_hLockedText('Vitu vifuatavyo vitatolewa (unaweza kuongeza zaidi):', x: cx, y: y, w: cw, h: 0.022, fontSize: 10.5, fontWeight: FontWeight.w600, color: ink, tag: 'nimetowe_sub'));
-  y += 0.036;
-  for (var i = 1; i <= 6; i++) {
-    out.addAll(_hItemLine('mahari_$i', '[Kitu cha Mahari $i]', cx, y, cw, ink: ink));
-    y += 0.04;
-  }
-
-  return out;
-}
-
-List<NgmySlideElement> _layoutPage2(NgmyHatiKuhowaTemplate tpl) {
+List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   final ink = tpl.ink;
   final accent = tpl.accent;
   const cx = 0.09;
   const cw = 0.82;
   final out = <NgmySlideElement>[];
 
+  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.03, w: cw, h: 0.046, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.addAll(_hTareheBox(0.68, 0.026, 0.23, 0.048, ink: ink, accent: accent));
+
   double y = 0.09;
+  out.addAll(_hBanner('UTANGULIZI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
+  y += 0.046;
+
+  out.addAll(_hRun([
+    const HkSeg.text('Mimi '),
+    const HkSeg.blank('man_name1', 0.15),
+    const HkSeg.text(', wa Jamaa la '),
+    const HkSeg.blank('family1', 0.15),
+    const HkSeg.text(','),
+  ], cx, y, ink: ink));
+  y += 0.032;
+  out.addAll(_hRun([
+    const HkSeg.text('Nyumba ya '),
+    const HkSeg.blank('house1', 0.15),
+    const HkSeg.text(', nimetowa mahali ya kuhoweya'),
+  ], cx, y, ink: ink));
+  y += 0.032;
+  out.addAll(_hRun([
+    const HkSeg.text('kijana wangu aitwaye '),
+    const HkSeg.blank('man_name2', 0.15),
+    const HkSeg.text(', kwa '),
+    const HkSeg.blank('woman_name', 0.13),
+    const HkSeg.text(','),
+  ], cx, y, ink: ink));
+  y += 0.032;
+  out.addAll(_hRun([
+    const HkSeg.text('binti wa '),
+    const HkSeg.blank('woman_father', 0.17),
+    const HkSeg.text(', wa Jamaa la '),
+    const HkSeg.blank('family2', 0.15),
+    const HkSeg.text(','),
+  ], cx, y, ink: ink));
+  y += 0.032;
+  out.addAll(_hRun([
+    const HkSeg.text('Nyumba ya '),
+    const HkSeg.blank('house2', 0.15),
+    const HkSeg.text('.'),
+  ], cx, y, ink: ink));
+  y += 0.046;
+
+  out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
+  y += 0.044;
+  out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'nimetowe_sub'));
+  y += 0.026;
+  for (var i = 1; i <= 6; i++) {
+    out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
+    y += 0.03;
+  }
+  y += 0.016;
+
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.05;
-
-  out.add(_hLockedText('NGAMBO YA MKE', x: cx, y: y, w: cw, h: 0.024, fontSize: 11.5, fontWeight: FontWeight.w800, color: accent, tag: 'side_mke'));
-  y += 0.036;
+  y += 0.044;
+  final colW = (cw - 0.03) / 2;
+  out.addAll([
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y, w: colW, h: 0.022, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mke'),
+    _hLockedText('NGAMBO YA MKE', x: cx, y: y + 0.002, w: colW, h: 0.017, fontSize: 8.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mke_t'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW + 0.03, y: y, w: colW, h: 0.022, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mume'),
+    _hLockedText('NGAMBO YA MUME', x: cx + colW + 0.03, y: y + 0.002, w: colW, h: 0.017, fontSize: 8.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mume_t'),
+  ]);
+  y += 0.028;
   for (var n = 1; n <= 3; n++) {
-    out.addAll(_hWitnessLine('mke', n, cx, y, cw, ink: ink, accent: accent));
-    y += 0.056;
+    out.addAll(_hWitnessLine('mke', n, cx, y, colW, ink: ink, accent: accent));
+    out.addAll(_hWitnessLine('mume', n, cx + colW + 0.03, y, colW, ink: ink, accent: accent));
+    y += 0.042;
   }
-  y += 0.035;
+  y += 0.022;
 
-  out.add(_hLockedText('NGAMBO YA MUME', x: cx, y: y, w: cw, h: 0.024, fontSize: 11.5, fontWeight: FontWeight.w800, color: accent, tag: 'side_mume'));
-  y += 0.036;
-  for (var n = 1; n <= 3; n++) {
-    out.addAll(_hWitnessLine('mume', n, cx, y, cw, ink: ink, accent: accent));
-    y += 0.056;
-  }
-  y += 0.05;
-
-  out.addAll(_hBanner('MWANDISHI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.06;
-  out.addAll(_hMwandishi(cx, y, cw, ink: ink));
+  out.addAll(_hMwandishiBar(cx, y, cw, ink: ink, accent: accent));
 
   return out;
 }
@@ -407,7 +399,7 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
   final bg = Color(tpl.background);
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
-  Widget bar({double w = 1, double h = 6}) => Align(
+  Widget bar({double w = 1, double h = 5}) => Align(
         alignment: Alignment.centerLeft,
         child: FractionallySizedBox(
           widthFactor: w,
@@ -415,10 +407,10 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
         ),
       );
   Widget ribbon(String t) => Container(
-        height: 14,
+        height: 12,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3)),
-        child: Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7, letterSpacing: 0.4)),
+        child: Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 6.5, letterSpacing: 0.4)),
       );
   return ColoredBox(
     color: bg,
@@ -431,32 +423,40 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('HATI YA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-              Text('KUHOWA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-              const SizedBox(height: 10),
+              Text('HATI YA KUHOWA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+              const SizedBox(height: 8),
               ribbon('UTANGULIZI'),
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               bar(),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2.5),
               bar(w: 0.85),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2.5),
               bar(w: 0.9),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               ribbon('NIMETOWE'),
+              const SizedBox(height: 5),
+              ...List.generate(4, (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Row(children: [
+                      Container(width: 7, height: 7, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                      const SizedBox(width: 4),
+                      Expanded(child: bar(h: 4)),
+                    ]),
+                  )),
               const SizedBox(height: 6),
-              ...List.generate(4, (_) => Padding(padding: const EdgeInsets.only(bottom: 4), child: bar(h: 4))),
-              const Spacer(),
               ribbon('MASHAHIDI'),
-              const SizedBox(height: 8),
-              bar(h: 4),
-              const SizedBox(height: 4),
-              bar(h: 4),
-              const SizedBox(height: 6),
-              Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 9)),
+              const SizedBox(height: 5),
+              Row(children: [
+                Expanded(child: Container(height: 20, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))),
+                const SizedBox(width: 4),
+                Expanded(child: Container(height: 20, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))),
+              ]),
+              const Spacer(),
+              Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 8)),
             ],
           ),
         ),
@@ -465,24 +465,17 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
   );
 }
 
-/// Builds the two-page "Hati ya Kuhowa" deck from a paper template.
+/// Builds the single-page "Hati ya Kuhowa" deck from a paper template.
 NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
   ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
 
-  final page1 = NgmySlide(
+  final page = NgmySlide(
     id: NgmySlidesTemplates.newId(),
-    title: 'Hati ya Kuhowa — Uk. 1',
+    title: 'Hati ya Kuhowa',
     layout: NgmySlideLayout.blank,
     background: tpl.background,
-    elements: _buildPage1Content(tpl),
-  );
-  final page2 = NgmySlide(
-    id: NgmySlidesTemplates.newId(),
-    title: 'Hati ya Kuhowa — Uk. 2',
-    layout: NgmySlideLayout.blank,
-    background: tpl.background,
-    elements: _buildPage2Content(tpl),
+    elements: _buildPageContent(tpl),
   );
 
   return NgmySlideDeck(
@@ -491,7 +484,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
     themeId: 'hati_kuhowa_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhowaDeckKind,
-    slides: [page1, page2],
+    slides: [page],
   );
 }
 
