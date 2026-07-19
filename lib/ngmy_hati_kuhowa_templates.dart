@@ -225,7 +225,9 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
     // "TAREHE:" and the date drifting to different heights.
     _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: _hBlankH(20), fontSize: 20, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
     _hBlank('tarehe', valueX, y, valueW, ink: ink, fontSize: 21, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
-    _hBlankUnderline(valueX, y + _hBlankH(21), underlineW, color: accent),
+    // Nudged right and closer to the text — it was sitting left of and
+    // below where the date glyphs actually render.
+    _hBlankUnderline(valueX + 0.008, y + _hBlankH(21) * 0.55, underlineW, color: accent),
   ];
 }
 
@@ -380,15 +382,15 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   // A small double-rule flourish sitting right under the title, not far
   // below it — same tight spacing as the NIMETOWE item underlines.
   out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.098, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.104, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.09, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.096, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
   ]);
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
   // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
   // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
   // flush from the left edge to the right edge of the paper automatically.
-  double y = 0.111;
+  double y = 0.103;
   out.add(_hParagraphField(
     'utangulizi',
     cx,
@@ -424,7 +426,11 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   const innerPad = 0.016;
   const hdrH = 0.05;
   const rowH = 0.056;
-  final tableH = hdrH + 3 * rowH;
+  // Extra cushion below the last row — without it, the last signature box
+  // sat exactly on the table's bottom border with zero margin, so it read
+  // as overflowing/poking out of the frame.
+  const tableBottomPad = 0.016;
+  final tableH = hdrH + 3 * rowH + tableBottomPad;
   final tableTop = y;
   out.addAll([
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: tableTop, w: cw, h: tableH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.3, tag: 'wit_table_border'),

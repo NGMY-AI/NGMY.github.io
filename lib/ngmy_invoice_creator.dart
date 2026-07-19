@@ -700,7 +700,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
       ctx,
       title: title,
       points: target,
-      onSave: (saved, canvasSize) {
+      onSave: (saved, canvasSize, color, strokeWidth) {
         target
           ..clear()
           ..addAll(normalizeSignaturePoints(saved, canvasSize));

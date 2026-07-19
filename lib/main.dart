@@ -27910,7 +27910,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                 ctx,
                 title: title,
                 points: target,
-                onSave: (saved, canvasSize) {
+                onSave: (saved, canvasSize, color, strokeWidth) {
                   target
                     ..clear()
                     ..addAll(normalizeSignaturePoints(saved, canvasSize));

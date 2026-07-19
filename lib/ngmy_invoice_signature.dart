@@ -7,7 +7,7 @@ Future<void> showNgmyFullscreenSignature(
   BuildContext context, {
   required String title,
   required List<Offset?> points,
-  required void Function(List<Offset?> saved, Size canvasSize) onSave,
+  required void Function(List<Offset?> saved, Size canvasSize, Color color, double strokeWidth) onSave,
 }) async {
   await showDialog<void>(
     context: context,
@@ -23,7 +23,7 @@ Future<void> showNgmyFullscreenSignature(
 class _FullscreenSignatureDialog extends StatefulWidget {
   final String title;
   final List<Offset?> initialPoints;
-  final void Function(List<Offset?>, Size canvasSize) onSave;
+  final void Function(List<Offset?>, Size canvasSize, Color color, double strokeWidth) onSave;
 
   const _FullscreenSignatureDialog({
     required this.title,
@@ -38,6 +38,11 @@ class _FullscreenSignatureDialog extends StatefulWidget {
 class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> {
   late List<Offset?> _points;
   final GlobalKey _padKey = GlobalKey();
+
+  static const _inkChoices = [Color(0xFF111827), Color(0xFF1D4ED8), Color(0xFF7F1D1D), Color(0xFF14532D)];
+  static const _thicknessChoices = [2.2, 3.5, 5.2];
+  Color _inkColor = _inkChoices.first;
+  double _strokeWidth = _thicknessChoices[1];
 
   @override
   void initState() {
@@ -54,8 +59,49 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
   void _done() {
     final box = _padKey.currentContext?.findRenderObject() as RenderBox?;
     final size = box?.size ?? const Size(600, 300);
-    widget.onSave(List<Offset?>.from(_points), size);
+    widget.onSave(List<Offset?>.from(_points), size, _inkColor, _strokeWidth);
     Navigator.pop(context);
+  }
+
+  Widget _inkSwatch(Color c) {
+    final selected = c.toARGB32() == _inkColor.toARGB32();
+    return GestureDetector(
+      onTap: () => setState(() => _inkColor = c),
+      child: Container(
+        width: 22,
+        height: 22,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(
+          color: c,
+          shape: BoxShape.circle,
+          border: Border.all(color: selected ? Colors.white : Colors.white24, width: selected ? 2.2 : 1),
+          boxShadow: selected ? [const BoxShadow(color: Colors.black45, blurRadius: 4)] : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _thicknessDot(double w) {
+    final selected = w == _strokeWidth;
+    return GestureDetector(
+      onTap: () => setState(() => _strokeWidth = w),
+      child: Container(
+        width: 30,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: selected ? Colors.white.withOpacity(0.14) : Colors.transparent,
+          border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.white24, width: selected ? 1.4 : 1),
+        ),
+        child: Container(
+          width: (w * 1.6).clamp(4.0, 11.0),
+          height: (w * 1.6).clamp(4.0, 11.0),
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+        ),
+      ),
+    );
   }
 
   @override
@@ -92,6 +138,20 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                child: Row(
+                  children: [
+                    Text('Ink', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 6),
+                    ..._inkChoices.map(_inkSwatch),
+                    const SizedBox(width: 14),
+                    Text('Thickness', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 6),
+                    ..._thicknessChoices.map(_thicknessDot),
+                  ],
+                ),
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -100,6 +160,8 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                     points: _points,
                     onChanged: () => setState(() {}),
                     borderColor: const Color(0xFF10B981),
+                    inkColor: _inkColor,
+                    strokeWidthBase: _strokeWidth,
                   ),
                 ),
               ),
@@ -174,6 +236,8 @@ class _SignatureCanvas extends StatelessWidget {
   final VoidCallback onChanged;
   final double? height;
   final Color borderColor;
+  final Color inkColor;
+  final double strokeWidthBase;
 
   const _SignatureCanvas({
     super.key,
@@ -181,6 +245,8 @@ class _SignatureCanvas extends StatelessWidget {
     required this.onChanged,
     this.height,
     this.borderColor = const Color(0xFFCBD5E1),
+    this.inkColor = const Color(0xFF0F172A),
+    this.strokeWidthBase = 3.5,
   });
 
   @override
@@ -214,7 +280,7 @@ class _SignatureCanvas extends StatelessWidget {
                 onChanged();
               },
               child: CustomPaint(
-                painter: NgmySignaturePainter(points, canvasSize: Size(w, h), liveDraw: true),
+                painter: NgmySignaturePainter(points, canvasSize: Size(w, h), liveDraw: true, color: inkColor, strokeWidthBase: strokeWidthBase),
                 child: SizedBox(height: h, width: w),
               ),
             ),
@@ -241,15 +307,22 @@ class NgmySignaturePainter extends CustomPainter {
   // That's what read as "zooming out" while signing. Only use the
   // fit-to-box behavior for a static, already-finished preview.
   final bool liveDraw;
+  final double strokeWidthBase;
 
-  NgmySignaturePainter(this.points, {this.color = const Color(0xFF0F172A), required this.canvasSize, this.liveDraw = false});
+  NgmySignaturePainter(
+    this.points, {
+    this.color = const Color(0xFF0F172A),
+    required this.canvasSize,
+    this.liveDraw = false,
+    this.strokeWidthBase = 2.8,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final fitted = liveDraw
         ? points.map((p) => p == null ? null : Offset(p.dx * size.width, p.dy * size.height)).toList()
         : fitSignatureToSize(points, size);
-    final stroke = (2.8 * (size.shortestSide / 280)).clamp(2.0, 4.5);
+    final stroke = (strokeWidthBase * (size.shortestSide / 280)).clamp(2.0, 8.0);
     final paint = Paint()
       ..color = color
       ..strokeWidth = stroke
@@ -266,7 +339,10 @@ class NgmySignaturePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant NgmySignaturePainter oldDelegate) =>
-      oldDelegate.points != points || oldDelegate.canvasSize != canvasSize;
+      oldDelegate.points != points ||
+      oldDelegate.canvasSize != canvasSize ||
+      oldDelegate.color != color ||
+      oldDelegate.strokeWidthBase != strokeWidthBase;
 }
 
 bool signaturePointsLookNormalized(List<Offset?> points) {

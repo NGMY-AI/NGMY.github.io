@@ -81,7 +81,12 @@ Future<String?> ngmySlidesEnhanceImage(String dataUrl) async {
   }
 }
 
-Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize) async {
+Future<String?> ngmySlidesSignatureToImage(
+  List<Offset?> points,
+  Size canvasSize, {
+  Color color = const Color(0xFF111827),
+  double strokeWidth = 3.5,
+}) async {
   if (points.whereType<Offset>().isEmpty) return null;
   try {
     const w = 800;
@@ -91,8 +96,8 @@ Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize
     final canvas = Canvas(recorder);
     canvas.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()), Paint()..color = const Color(0xFFFFFFFF));
     final stroke = Paint()
-      ..color = const Color(0xFF111827)
-      ..strokeWidth = 3.5 * scale
+      ..color = color
+      ..strokeWidth = strokeWidth * scale
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     Offset? last;
@@ -127,19 +132,23 @@ Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize
 Future<String?> ngmySlidesCaptureSignature(BuildContext context) async {
   final points = <Offset?>[];
   Size? size;
+  var color = const Color(0xFF111827);
+  var strokeWidth = 3.5;
   await showNgmyFullscreenSignature(
     context,
     title: 'Sign document',
     points: points,
-    onSave: (saved, canvasSize) {
+    onSave: (saved, canvasSize, inkColor, inkStrokeWidth) {
       points
         ..clear()
         ..addAll(saved);
       size = canvasSize;
+      color = inkColor;
+      strokeWidth = inkStrokeWidth;
     },
   );
   if (points.whereType<Offset>().isEmpty || size == null) return null;
-  return ngmySlidesSignatureToImage(points, size!);
+  return ngmySlidesSignatureToImage(points, size!, color: color, strokeWidth: strokeWidth);
 }
 
 String ngmySlidesPrintHtml(NgmySlideDeck deck) {
