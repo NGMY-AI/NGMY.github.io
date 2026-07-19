@@ -1799,7 +1799,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                       title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                       subtitle: Text(
                         deck.isMarriageAgreement
-                            ? 'Marriage agreement • ${deck.marriageState ?? 'U.S.'}'
+                            ? 'Hati ya Kuhowesha • Updated ${_formatDate(deck.updatedAt)}'
                             : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                       ),

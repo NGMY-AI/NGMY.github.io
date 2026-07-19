@@ -3,18 +3,14 @@ import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
-/// Soft, calm paper backgrounds for Marriage Agreement templates (portrait 9:16).
+/// Backgrounds for the "Hati ya Kuhowesha" (Barua ya Uchumba) certificate
+/// templates (portrait 9:16) — a bold tribal-patterned frame for the
+/// "Heritage" family, and a slim double-line frame for the "Elegant" family.
 enum NgmyMarriagePaperStyle {
-  congoHeritage,
-  classicParchment,
-  officialCream,
-  ceremonialDiamond,
-  forestGold,
-  ivoryElegance,
-  crimsonTradition,
-  goldenFrame,
-  unityHands,
-  ngmyOfficial,
+  heritageGold,
+  heritageCrimson,
+  elegantNavy,
+  elegantGold,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -35,26 +31,14 @@ const int _h = 854;
 
 img.Image _renderPaper(NgmyMarriagePaperStyle style) {
   switch (style) {
-    case NgmyMarriagePaperStyle.congoHeritage:
-      return _cleanPaper(0xFFF7F3EA, 0xFFEDE6D8, 0xFF8B7355);
-    case NgmyMarriagePaperStyle.classicParchment:
-      return _cleanPaper(0xFFFFFCF5, 0xFFF6EFE3, 0xFFB8A58A);
-    case NgmyMarriagePaperStyle.officialCream:
-      return _cleanPaper(0xFFFFFFF9, 0xFFF8F5EE, 0xFF4A4A4A);
-    case NgmyMarriagePaperStyle.ceremonialDiamond:
-      return _cleanPaper(0xFFF9F6F1, 0xFFF0EBE3, 0xFF6B5E4E);
-    case NgmyMarriagePaperStyle.forestGold:
-      return _cleanPaper(0xFFF5F7F3, 0xFFE8EEE6, 0xFF5A6B55);
-    case NgmyMarriagePaperStyle.ivoryElegance:
-      return _cleanPaper(0xFFFFFDF8, 0xFFF8F1E8, 0xFFA0896B);
-    case NgmyMarriagePaperStyle.crimsonTradition:
-      return _cleanPaper(0xFFFBF7F6, 0xFFF3EBEA, 0xFF7A5555);
-    case NgmyMarriagePaperStyle.goldenFrame:
-      return _cleanPaper(0xFFFFFBF2, 0xFFF5ECD8, 0xFFA6843A);
-    case NgmyMarriagePaperStyle.unityHands:
-      return _cleanPaper(0xFFF8F5EF, 0xFFEDE7DB, 0xFF6E6254);
-    case NgmyMarriagePaperStyle.ngmyOfficial:
-      return _cleanPaper(0xFFFFFFFE, 0xFFF4F4F2, 0xFF2C2C2C);
+    case NgmyMarriagePaperStyle.heritageGold:
+      return _tribalPaper(0xFFF9F1DD, 0xFFEFE0BE, 0xFF5C3A1E, 0xFFD4AF37);
+    case NgmyMarriagePaperStyle.heritageCrimson:
+      return _tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458);
+    case NgmyMarriagePaperStyle.elegantNavy:
+      return _elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B);
+    case NgmyMarriagePaperStyle.elegantGold:
+      return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
   }
 }
 
@@ -69,6 +53,16 @@ void _vGradient(img.Image im, int top, int bottom) {
   }
 }
 
+void _grainNoise(img.Image im, int seed) {
+  final rng = math.Random(seed);
+  for (var i = 0; i < 900; i++) {
+    final x = rng.nextInt(im.width);
+    final y = rng.nextInt(im.height);
+    final p = im.getPixel(x, y);
+    im.setPixelRgba(x, y, (p.r.toInt() - 3).clamp(0, 255), (p.g.toInt() - 3).clamp(0, 255), (p.b.toInt() - 2).clamp(0, 255), 255);
+  }
+}
+
 void _border(img.Image im, int x, int y, int w, int h, int color, double t) {
   final c = _c(color);
   img.drawLine(im, x1: x, y1: y, x2: x + w, y2: y, color: c, antialias: true, thickness: t);
@@ -77,24 +71,51 @@ void _border(img.Image im, int x, int y, int w, int h, int color, double t) {
   img.drawLine(im, x1: x + w, y1: y, x2: x + w, y2: y + h, color: c, antialias: true, thickness: t);
 }
 
-img.Image _cleanPaper(int top, int bottom, int frame) {
-  final im = img.Image(width: _w, height: _h);
-  _vGradient(im, top, bottom);
-  final rng = math.Random(top ^ bottom);
-  for (var i = 0; i < 900; i++) {
-    final x = rng.nextInt(_w);
-    final y = rng.nextInt(_h);
-    final p = im.getPixel(x, y);
-    im.setPixelRgba(
-      x,
-      y,
-      (p.r.toInt() - 3).clamp(0, 255),
-      (p.g.toInt() - 3).clamp(0, 255),
-      (p.b.toInt() - 2).clamp(0, 255),
-      255,
-    );
+/// A strip of alternating triangle "teeth" — the tribal zigzag trim.
+void _zigzagTrim(img.Image im, {required bool horizontal, required int pos, required int length, required int amp, required int toothLen, required int color, required bool pointForward}) {
+  final c = _c(color);
+  var i = 0;
+  while (i < length) {
+    final p0 = i;
+    final p1 = (i + toothLen / 2).round();
+    final p2 = (i + toothLen).clamp(0, length);
+    if (horizontal) {
+      final baseY = pos;
+      final tipY = pointForward ? pos + amp : pos - amp;
+      img.fillPolygon(im, vertices: [img.Point(p0, baseY), img.Point(p1, tipY), img.Point(p2, baseY)], color: c);
+    } else {
+      final baseX = pos;
+      final tipX = pointForward ? pos + amp : pos - amp;
+      img.fillPolygon(im, vertices: [img.Point(baseX, p0), img.Point(tipX, p1), img.Point(baseX, p2)], color: c);
+    }
+    i += toothLen;
   }
-  // Soft single frame — avoid heavy dark double borders in previews and print.
-  _border(im, 24, 30, _w - 48, _h - 60, frame, 1.1);
+}
+
+/// Bold picture-frame band with an inward-facing zigzag trim — "Heritage".
+img.Image _tribalPaper(int paperTop, int paperBottom, int bandColor, int trimColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  const band = 28;
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(bandColor));
+  img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
+  img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(bandColor));
+  img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
+  _zigzagTrim(im, horizontal: true, pos: band, length: _w, amp: 9, toothLen: 18, color: trimColor, pointForward: true);
+  _zigzagTrim(im, horizontal: true, pos: _h - band, length: _w, amp: 9, toothLen: 18, color: trimColor, pointForward: false);
+  _zigzagTrim(im, horizontal: false, pos: band, length: _h, amp: 9, toothLen: 18, color: trimColor, pointForward: true);
+  _zigzagTrim(im, horizontal: false, pos: _w - band, length: _h, amp: 9, toothLen: 18, color: trimColor, pointForward: false);
+  _border(im, band + 7, band + 7, _w - (band + 7) * 2, _h - (band + 7) * 2, trimColor, 1.0);
+  return im;
+}
+
+/// Slim double-rule border, no band fill — "Elegant".
+img.Image _elegantPaper(int paperTop, int paperBottom, int lineColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  _border(im, 14, 16, _w - 28, _h - 32, lineColor, 1.6);
+  _border(im, 20, 22, _w - 40, _h - 44, lineColor, 0.8);
   return im;
 }
