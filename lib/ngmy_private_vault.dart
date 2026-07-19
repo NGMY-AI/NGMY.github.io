@@ -667,7 +667,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Private', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                const Text('My Vault', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                 Text(
                   _items.isEmpty ? 'Nothing saved yet' : '${_items.length} item${_items.length == 1 ? '' : 's'}',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11.5, fontWeight: FontWeight.w600),

@@ -3661,7 +3661,14 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: AspectRatio(aspectRatio: widget.deck.aspectValue, child: ClipRect(child: body))),
+            Center(
+              child: AspectRatio(
+                aspectRatio: widget.deck.aspectValue,
+                child: ClipRect(
+                  child: InteractiveViewer(minScale: 1, maxScale: 4, child: body),
+                ),
+              ),
+            ),
             Positioned(
               top: 12,
               left: 12,

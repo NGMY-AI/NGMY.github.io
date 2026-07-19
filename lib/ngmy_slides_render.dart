@@ -22,6 +22,7 @@ class NgmySlideElementView extends StatelessWidget {
     this.onTextChanged,
     this.onTap,
     this.onDoubleTap,
+    this.showEmptyHint = true,
   });
 
   final NgmySlideElement element;
@@ -34,6 +35,11 @@ class NgmySlideElementView extends StatelessWidget {
   final ValueChanged<String>? onTextChanged;
   final VoidCallback? onTap;
   final VoidCallback? onDoubleTap;
+
+  /// Editor/thumbnail affordance only — "Tap to select · Edit to type" and
+  /// the blank-signature icon have no place in Present mode, PDF export, or
+  /// print, where an empty field should just read as blank space.
+  final bool showEmptyHint;
 
   @override
   Widget build(BuildContext context) {
@@ -91,18 +97,18 @@ class NgmySlideElementView extends StatelessWidget {
         onChanged: onTextChanged,
       );
     } else {
-      final display = element.text.trim().isEmpty ? 'Tap to select · Edit to type' : element.text;
       final empty = element.text.trim().isEmpty ||
           element.text.trim().toLowerCase() == 'click to edit text' ||
           element.text.trim().toLowerCase() == 'tap to edit text';
+      final showHint = empty && showEmptyHint;
       child = GestureDetector(
         onTap: onTap,
         onDoubleTap: onDoubleTap,
         behavior: HitTestBehavior.opaque,
         child: Text(
-          empty ? 'Tap to select · Edit to type' : display,
+          showHint ? 'Tap to select · Edit to type' : (empty ? '' : element.text),
           key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
-          style: empty
+          style: showHint
               ? style.copyWith(color: Color(element.color).withValues(alpha: 0.45), fontStyle: FontStyle.italic)
               : style,
           strutStyle: strut,
@@ -134,6 +140,7 @@ class NgmySlideElementView extends StatelessWidget {
   Widget _imageView() {
     final ref = element.imageRef;
     if (ref == null || !ref.startsWith('data:image')) {
+      if (!showEmptyHint) return const SizedBox.shrink();
       return Center(child: Icon(element.type == NgmySlideElementType.signature ? Icons.draw_rounded : Icons.image_not_supported_outlined, color: Colors.white54, size: 32));
     }
     final img = _buildImageMemory(ref);
@@ -755,7 +762,7 @@ class NgmySlideAnimatedRender extends StatelessWidget {
                   element: e,
                   animate: animate,
                   staggerIndex: stagger,
-                  child: NgmySlideElementView(element: e, scale: w / 960),
+                  child: NgmySlideElementView(element: e, scale: w / 960, showEmptyHint: false),
                 ),
               );
             }).toList(),
