@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
@@ -174,7 +175,21 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
     setState(() => _digits = '');
   }
 
+  /// A real 10-digit number dials out for real — that's what keeps the
+  /// disguise honest. Anything shorter is treated as a vault code instead.
+  Future<void> _dialOut(String number) async {
+    final uri = Uri(scheme: 'tel', path: number);
+    try {
+      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (mounted) setState(() => _digits = '');
+  }
+
   Future<void> _submit() async {
+    if (_digits.length == 10) {
+      await _dialOut(_digits);
+      return;
+    }
     if (_digits.length < 4) {
       _shake();
       return;
@@ -230,6 +245,11 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
     if (!_ready) {
       return const Scaffold(backgroundColor: Colors.black, body: SizedBox.shrink());
     }
+    final screenW = MediaQuery.sizeOf(context).width;
+    final keyGap = 18.0;
+    final keySize = ((screenW - keyGap * 2) / 3 * 0.86).clamp(84.0, 116.0);
+    final keypadWidth = keySize * 3 + keyGap * 2;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -242,7 +262,7 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white38, size: 18),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 12),
             AnimatedBuilder(
               animation: _shakeCtrl,
               builder: (context, child) {
@@ -256,29 +276,32 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
                     height: 16,
                     child: Text(_hint, style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   SizedBox(
-                    height: 48,
-                    child: Text(
-                      _digits.isEmpty ? ' ' : _digits,
-                      style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w300, letterSpacing: 4),
+                    height: 64,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _digits.isEmpty ? ' ' : _digits,
+                        style: const TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w400),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+            const Spacer(flex: 2),
+            _keypad(keySize, keyGap),
+            const SizedBox(height: 22),
+            _callRow(keySize, keypadWidth),
             const Spacer(),
-            _keypad(),
-            const SizedBox(height: 18),
-            _callRow(),
-            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _keypad() {
+  Widget _keypad(double keySize, double keyGap) {
     final rows = <List<(String, String)>>[
       [('1', ''), ('2', 'ABC'), ('3', 'DEF')],
       [('4', 'GHI'), ('5', 'JKL'), ('6', 'MNO')],
@@ -290,10 +313,12 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
       children: rows
           .map(
             (row) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: EdgeInsets.symmetric(vertical: keyGap * 0.3),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: row.map((k) => Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: _key(k.$1, k.$2))).toList(),
+                children: row
+                    .map((k) => Padding(padding: EdgeInsets.symmetric(horizontal: keyGap / 2), child: _key(k.$1, k.$2, keySize)))
+                    .toList(),
               ),
             ),
           )
@@ -301,50 +326,54 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
     );
   }
 
-  Widget _key(String digit, String letters) {
+  Widget _key(String digit, String letters, double keySize) {
     return GestureDetector(
       onTap: () => _addDigit(digit),
       child: Container(
-        width: 72,
-        height: 72,
+        width: keySize,
+        height: keySize,
         decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF2C2C2E)),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(digit, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w400)),
+            Text(digit, style: TextStyle(color: Colors.white, fontSize: keySize * 0.42, fontWeight: FontWeight.w400)),
             if (letters.isNotEmpty)
-              Text(letters, style: const TextStyle(color: Colors.white54, fontSize: 9, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+              Text(
+                letters,
+                style: TextStyle(color: Colors.white54, fontSize: keySize * 0.115, letterSpacing: 1.5, fontWeight: FontWeight.w600),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _callRow() {
+  Widget _callRow(double keySize, double keypadWidth) {
     return SizedBox(
-      height: 72,
+      width: keypadWidth,
+      height: keySize,
       child: Stack(
         alignment: Alignment.center,
         children: [
           GestureDetector(
             onTap: _submit,
             child: Container(
-              width: 72,
-              height: 72,
+              width: keySize,
+              height: keySize,
               decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF34C759)),
-              child: const Icon(Icons.call_rounded, color: Colors.white, size: 30),
+              child: Icon(Icons.call_rounded, color: Colors.white, size: keySize * 0.42),
             ),
           ),
           if (_digits.isNotEmpty)
-            Positioned(
-              right: 24,
+            Align(
+              alignment: Alignment.centerRight,
               child: GestureDetector(
                 onTap: _backspace,
                 onLongPress: _clear,
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Icon(Icons.backspace_outlined, color: Colors.white54, size: 26),
+                child: SizedBox(
+                  width: keySize * 0.8,
+                  child: Icon(Icons.backspace_outlined, color: Colors.white54, size: keySize * 0.34),
                 ),
               ),
             ),
