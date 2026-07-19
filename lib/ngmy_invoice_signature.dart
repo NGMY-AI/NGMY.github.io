@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-/// Opens a full-screen landscape signature pad (YouTube-style wide canvas).
+/// Opens a full-screen signature pad, sized to the device's current
+/// orientation (no forced rotation — see _FullscreenSignatureDialogState).
 Future<void> showNgmyFullscreenSignature(
   BuildContext context, {
   required String title,
@@ -43,18 +43,12 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
   void initState() {
     super.initState();
     _points = List<Offset?>.from(widget.initialPoints);
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  }
-
-  @override
-  void dispose() {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    super.dispose();
+    // Forcing a landscape orientation lock here (via the browser's Screen
+    // Orientation API on web) only actually works inside true browser
+    // fullscreen, which this dialog isn't — the attempted lock could fail
+    // or half-apply, which is what made the canvas feel like it was
+    // "moving" under the user's finger while signing. Just draw in
+    // whatever orientation the device is already in.
   }
 
   void _done() {
@@ -81,7 +75,7 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('Landscape mode · sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
+                        Text('Sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
                       ],
                     ),
                   ),
