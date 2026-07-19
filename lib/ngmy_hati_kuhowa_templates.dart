@@ -227,14 +227,26 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 }
 
 /// One NIMETOWE line item — plain numbering (matches the witness rows) and a
-/// wide editable blank. No circle graphic.
+/// wide editable blank. No circle graphic. The underline gets an explicit
+/// `nim_ul_$n` tag (instead of the generic coordinate-based one) so the
+/// editor can reliably find and remove one whole row by number — used to
+/// let users hide the (optional) 4th item.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
   final itemW = x + w - itemX;
   return [
     _hLockedText('$n.', x: x, y: y, w: 0.038, h: 0.034, fontSize: 21, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
     _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 21, startText: hint, align: TextAlign.left),
-    _hBlankUnderline(itemX, y + 0.002 + _hBlankH(21), itemW),
+    _hLockedShape(
+      shape: NgmySlideShapeKind.line,
+      x: itemX,
+      y: y + 0.002 + _hBlankH(21) + 0.002,
+      w: itemW,
+      h: 0.002,
+      strokeColor: _softLine,
+      strokeWidth: 0.8,
+      tag: 'nim_ul_$n',
+    ),
   ];
 }
 
@@ -360,20 +372,20 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   // Tarehe gets its own row, pushed close to the paper's actual gold
   // border on the right (not just the content margin) — it used to share
   // a row with the title and could crowd/overlap it. No frame.
-  out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
-  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.072, w: cw, h: 0.072, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.addAll(_hTareheBox(0.7, 0.016, 0.25, ink: ink, accent: accent));
+  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.036, w: cw, h: 0.072, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   // A small double-rule flourish sitting right under the title, not far
   // below it — same tight spacing as the NIMETOWE item underlines.
   out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.148, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.154, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.112, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.118, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
   ]);
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
   // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
   // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
   // flush from the left edge to the right edge of the paper automatically.
-  double y = 0.161;
+  double y = 0.125;
   out.add(_hParagraphField(
     'utangulizi',
     cx,

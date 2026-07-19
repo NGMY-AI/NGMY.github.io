@@ -965,6 +965,31 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
+  /// Hides Hati ya Kuhowa's optional 4th NIMETOWE item and shifts every
+  /// element below it up to close the gap that would otherwise be left —
+  /// same spacing as if there had only ever been 3 items.
+  void _hideHatiNimetoweItem4() {
+    final slide = _currentSlide;
+    if (slide == null) return;
+    const rowGap = 0.043;
+    NgmySlideElement? anchor;
+    for (final e in slide.elements) {
+      if (e.fileName == '${kMarriageLocked}_nim_n_4') anchor = e;
+    }
+    if (anchor == null) return;
+    final cutoffY = anchor.y;
+    _mutate(() {
+      slide.elements.removeWhere((e) =>
+          e.fileName == '${kMarriageLocked}_nim_n_4' ||
+          e.fileName == '${kMarriageLocked}_nim_ul_4' ||
+          e.fileName.startsWith('${kMarriageFieldPrefix}mahari_4:'));
+      for (final e in slide.elements) {
+        if (e.y > cutoffY + 0.001) e.y -= rowGap;
+      }
+      _selectedElementId = null;
+    });
+  }
+
   bool _marriageElementMovable(NgmySlideElement e) {
     if (_activeDeck?.isLockedTemplateDoc != true) return true;
     if (ngmyMarriageElementIsLocked(e)) return false;
@@ -3090,6 +3115,25 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       child: const Icon(Icons.open_in_full_rounded, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              if (marriage && e.fileName == '${kMarriageLocked}_nim_n_4')
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: GestureDetector(
+                    onTap: _hideHatiNimetoweItem4,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9CA3AF),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.2),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4)],
+                      ),
+                      child: const Icon(Icons.close_rounded, size: 13, color: Colors.white),
                     ),
                   ),
                 ),
