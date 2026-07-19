@@ -190,7 +190,7 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
         case NgmySlideElementType.pdf:
           buf.write('<div class="pdf"><div>📄 ${_escapeHtml(e.fileName.isEmpty ? 'PDF document' : e.fileName)}</div></div>');
         case NgmySlideElementType.shape:
-          buf.write('<div style="width:100%;height:100%;background:#${e.fillColor.toRadixString(16).padLeft(8, '0').substring(2)};border:2px solid #${e.strokeColor.toRadixString(16).padLeft(8, '0').substring(2)}"></div>');
+          buf.write('<div style="width:100%;height:100%;background:${_cssColor(e.fillColor)};border:2px solid ${_cssColor(e.strokeColor)}"></div>');
       }
       buf.writeln('</div>');
     }
@@ -198,6 +198,20 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   }
   buf.writeln('</body></html>');
   return buf.toString();
+}
+
+/// Converts an ARGB int to a CSS rgba() string, preserving alpha. Naively
+/// slicing the hex string (dropping the first byte to "remove alpha") is
+/// what caused every intentionally transparent shape (0x00000000 — used
+/// throughout for invisible sign zones and unfilled bordered boxes) to
+/// print as solid black: for that specific value the remaining RRGGBB
+/// digits happen to spell out black, with no alpha info preserved at all.
+String _cssColor(int argb) {
+  final a = ((argb >> 24) & 0xFF) / 255.0;
+  final r = (argb >> 16) & 0xFF;
+  final g = (argb >> 8) & 0xFF;
+  final b = argb & 0xFF;
+  return 'rgba($r,$g,$b,${a.toStringAsFixed(3)})';
 }
 
 String _escapeHtml(String s) => s

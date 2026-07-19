@@ -424,13 +424,11 @@ List<NgmySlideElement> _layoutSingle(
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
   out.add(_hLockedText(title, x: cx, y: 0.036, w: cw, h: 0.06, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
-  // A small double-rule flourish sitting right under the title, not far
-  // below it — same tight spacing as the NIMETOWE item underlines. Wide
-  // enough to span close to the title's own width on each side.
-  out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.225, y: 0.09, w: cw * 0.55, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.34, y: 0.096, w: cw * 0.32, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
-  ]);
+  // A single rule sitting right under the title, not far below it — same
+  // tight spacing as the NIMETOWE item underlines. Wide enough to span
+  // close to the title's own width on each side. (There used to be a
+  // second, smaller line under this one — removed per request.)
+  out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.225, y: 0.09, w: cw * 0.55, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim. Word-wrap
   // keeps every line flush from the left edge to the right edge of the
