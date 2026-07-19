@@ -246,8 +246,8 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
       return const Scaffold(backgroundColor: Colors.black, body: SizedBox.shrink());
     }
     final screenW = MediaQuery.sizeOf(context).width;
-    final keyGap = 18.0;
-    final keySize = ((screenW - keyGap * 2) / 3 * 0.86).clamp(84.0, 116.0);
+    final keyGap = 16.0;
+    final keySize = ((screenW - keyGap * 2) / 3 * 0.7).clamp(66.0, 88.0);
     final keypadWidth = keySize * 3 + keyGap * 2;
 
     return Scaffold(
@@ -283,7 +283,7 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
                       fit: BoxFit.scaleDown,
                       child: Text(
                         _digits.isEmpty ? ' ' : _digits,
-                        style: const TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w400),
+                        style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w400),
                       ),
                     ),
                   ),
@@ -473,35 +473,69 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     );
   }
 
+  Widget _addOption(BuildContext ctx, {required String emoji, required String title, required String subtitle, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          Navigator.pop(ctx);
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_accent1, _accent2]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Text(emoji, style: const TextStyle(fontSize: 20)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11.5)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _showAddSheet() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1C1C1E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: const Color(0xFF16121F),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.photo_outlined, color: Colors.white),
-              title: const Text('Add photos', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _addPhotos();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.videocam_outlined, color: Colors.white),
-              title: const Text('Add a video', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _addVideo();
-              },
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            _addOption(ctx, emoji: '🖼️', title: 'Add photos', subtitle: 'Choose one or more from your gallery', onTap: _addPhotos),
+            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Choose a clip from your gallery', onTap: _addVideo),
+            const SizedBox(height: 12),
           ],
         ),
       ),
@@ -567,23 +601,34 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     _reload();
   }
 
+  static const _accent1 = Color(0xFF6366F1);
+  static const _accent2 = Color(0xFFEC4899);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _header(),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: Colors.white54))
-                  : _items.isEmpty
-                      ? _empty()
-                      : _grid(),
-            ),
-            if (_selectMode) _selectBar(),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0B0B14), Color(0xFF181229), Color(0xFF0B0F1C)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _header(),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator(color: _accent1))
+                    : _items.isEmpty
+                        ? _empty()
+                        : _grid(),
+              ),
+              if (_selectMode) _selectBar(),
+            ],
+          ),
         ),
       ),
     );
@@ -591,19 +636,60 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
 
   Widget _header() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(8, 10, 16, 10),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.of(context).maybePop(),
+              child: Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), shape: BoxShape.circle),
+                child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 16),
+              ),
+            ),
           ),
-          const Expanded(
-            child: Text('Private', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+          const SizedBox(width: 12),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [_accent1, _accent2]),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: _accent1.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 5))],
+            ),
+            child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
           ),
-          IconButton(
-            onPressed: _showAddSheet,
-            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Private', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                Text(
+                  _items.isEmpty ? 'Nothing saved yet' : '${_items.length} item${_items.length == 1 ? '' : 's'}',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _showAddSheet,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_accent1, _accent2]),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: _accent2.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+                ),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              ),
+            ),
           ),
         ],
       ),
@@ -615,11 +701,36 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.lock_outline_rounded, color: Colors.white24, size: 44),
-          const SizedBox(height: 12),
-          const Text('Nothing here yet', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700)),
+          Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: [_accent1.withValues(alpha: 0.18), _accent2.withValues(alpha: 0.14)]),
+            ),
+            child: const Icon(Icons.lock_outline_rounded, color: Colors.white38, size: 34),
+          ),
+          const SizedBox(height: 18),
+          const Text('Nothing here yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
           const SizedBox(height: 6),
-          TextButton(onPressed: _showAddSheet, child: const Text('Add photos or a video')),
+          Text('Photos and videos you add stay just for you', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12.5)),
+          const SizedBox(height: 20),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: _showAddSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [_accent1, _accent2]),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [BoxShadow(color: _accent2.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 6))],
+                ),
+                child: const Text('Add photos or a video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -627,8 +738,8 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
 
   Widget _grid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(10),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 6, crossAxisSpacing: 6),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 8, crossAxisSpacing: 8),
       itemCount: _items.length,
       itemBuilder: (context, i) {
         final item = _items[i];
@@ -638,24 +749,42 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
           onLongPress: () {
             if (!_selectMode) _enterSelect(item.id);
           },
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: item.kind == NgmyVaultKind.video ? _videoTile() : _photoTile(item),
-              ),
-              if (_selectMode)
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Icon(
-                    selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                    color: selected ? const Color(0xFF34C759) : Colors.white70,
-                    size: 20,
-                  ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: selected ? _accent1 : Colors.white.withValues(alpha: 0.06), width: selected ? 2 : 1),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: item.kind == NgmyVaultKind.video ? _videoTile() : _photoTile(item),
                 ),
-            ],
+                if (selected)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Container(color: _accent1.withValues(alpha: 0.22)),
+                  ),
+                if (_selectMode)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(1.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? null : Colors.black38,
+                        gradient: selected ? const LinearGradient(colors: [_accent1, _accent2]) : null,
+                        border: selected ? null : Border.all(color: Colors.white70, width: 1.4),
+                      ),
+                      child: Icon(selected ? Icons.check_rounded : null, color: Colors.white, size: 15),
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -667,7 +796,13 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
       future: NgmyVaultBlobStore.getBytes(item.id),
       builder: (context, snap) {
         final bytes = snap.data;
-        if (bytes == null) return Container(color: const Color(0xFF1C1C1E));
+        if (bytes == null) {
+          return Container(
+            color: Colors.white.withValues(alpha: 0.04),
+            alignment: Alignment.center,
+            child: const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.white24)),
+          );
+        }
         return Image.memory(bytes, fit: BoxFit.cover);
       },
     );
@@ -675,31 +810,61 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
 
   Widget _videoTile() {
     return Container(
-      color: const Color(0xFF1C1C1E),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF241B3A), Color(0xFF151024)]),
+      ),
       alignment: Alignment.center,
-      child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white54, size: 30),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle),
+        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+      ),
     );
   }
 
   Widget _selectBar() {
     return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: const Color(0xFF1C1C1E),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
       child: Row(
         children: [
-          Text('${_selected.length} selected', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          Text('${_selected.length} selected', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
           const Spacer(),
-          TextButton.icon(
-            onPressed: _selected.isEmpty ? null : _downloadSelected,
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('Download'),
-          ),
-          TextButton.icon(
-            onPressed: _selected.isEmpty ? null : _deleteSelected,
-            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-            label: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
-          ),
+          _pillAction(Icons.download_rounded, 'Download', _selected.isEmpty ? null : _downloadSelected, const [_accent1, _accent2]),
+          const SizedBox(width: 8),
+          _pillAction(Icons.delete_outline_rounded, 'Delete', _selected.isEmpty ? null : _deleteSelected, const [Color(0xFFEF4444), Color(0xFFB91C1C)]),
         ],
+      ),
+    );
+  }
+
+  Widget _pillAction(IconData icon, String label, VoidCallback? onTap, List<Color> colors) {
+    final enabled = onTap != null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.35,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(gradient: LinearGradient(colors: colors), borderRadius: BorderRadius.circular(16)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 15),
+                const SizedBox(width: 5),
+                Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
