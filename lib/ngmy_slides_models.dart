@@ -334,6 +334,12 @@ class NgmySlideDeck {
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
 
+  /// Any "locked template" document (Marriage Agreement, Hati ya Kuhowa,
+  /// and future document categories) — these share the tap-to-fill-only
+  /// editing behavior: everything except the blank fields and sign zones
+  /// is locked in place.
+  bool get isLockedTemplateDoc => deckKind == 'marriage_agreement' || deckKind == 'hati_kuhowa';
+
   double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
 
   NgmySlideDeck copy() => NgmySlideDeck(

@@ -8,6 +8,7 @@ import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
@@ -199,7 +200,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     if (el == null || el.text == value) return;
     el.text = value;
     var needsRebuild = false;
-    if (_activeDeck?.isMarriageAgreement == true) {
+    if (_activeDeck?.isLockedTemplateDoc == true) {
       ngmyMarriageAutoFitField(el, value);
       final slide = _currentSlide;
       if (slide != null) ngmyMarriagePackRow(slide, el.y + el.h * 0.5);
@@ -291,6 +292,67 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       openDraftEditor: _openMarriageDraft,
       openSavedDeck: _openDeck,
     );
+  }
+
+  void _launchHatiKuhowa() {
+    launchNgmyHatiKuhowa(
+      context: context,
+      savedDecks: _decks,
+      openDraftEditor: _openMarriageDraft,
+      openSavedDeck: _openDeck,
+    );
+  }
+
+  Future<void> _openDocumentCategoryPicker() async {
+    final category = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1C1917),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Hati (Documents)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 4),
+              Text('Chagua aina ya hati', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13)),
+              const SizedBox(height: 18),
+              _DocumentCategoryTile(
+                icon: Icons.workspace_premium_rounded,
+                colors: const [Color(0xFFE6C15C), Color(0xFFB8860B), Color(0xFF8B6914)],
+                title: 'Hati ya Kuhowesha',
+                subtitle: 'Barua ya uchumba',
+                onTap: () => Navigator.pop(ctx, 'marriage_agreement'),
+              ),
+              const SizedBox(height: 10),
+              _DocumentCategoryTile(
+                icon: Icons.description_rounded,
+                colors: const [Color(0xFF2E4270), Color(0xFF12213D), Color(0xFF0A1526)],
+                title: 'Hati ya Kuhowa',
+                subtitle: 'Hati ya mahari',
+                onTap: () => Navigator.pop(ctx, 'hati_kuhowa'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (category == 'marriage_agreement') {
+      _launchMarriageAgreement();
+    } else if (category == 'hati_kuhowa') {
+      _launchHatiKuhowa();
+    }
   }
 
   void _openDraftEditor({String? name, bool sample = false}) {
@@ -867,7 +929,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         w: 0.35,
         h: 0.22,
         imageRef: imageRef,
-        fileName: _activeDeck?.isMarriageAgreement == true ? '${kMarriageSignPrefix}placed' : 'Signature',
+        fileName: _activeDeck?.isLockedTemplateDoc == true ? '${kMarriageSignPrefix}placed' : 'Signature',
       );
       _currentSlide!.elements.add(el);
       _selectedElementId = el.id;
@@ -895,7 +957,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   bool _marriageElementMovable(NgmySlideElement e) {
-    if (_activeDeck?.isMarriageAgreement != true) return true;
+    if (_activeDeck?.isLockedTemplateDoc != true) return true;
     if (ngmyMarriageElementIsLocked(e)) return false;
     if (ngmyMarriageElementIsField(e)) return false;
     if (ngmyMarriageElementIsSignZone(e)) return false;
@@ -904,7 +966,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   bool _marriageElementSelectable(NgmySlideElement e) {
-    if (_activeDeck?.isMarriageAgreement != true) return true;
+    if (_activeDeck?.isLockedTemplateDoc != true) return true;
     if (ngmyMarriageElementIsLocked(e)) return false;
     if (ngmyMarriageElementIsSignZone(e)) return false;
     if (e.type == NgmySlideElementType.signature && e.fileName.startsWith(kMarriageSignPrefix)) return false;
@@ -1380,7 +1442,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                   await _persistDecks();
                 },
               ),
-              onTrailingTap: _launchMarriageAgreement,
+              onTrailingTap: _openDocumentCategoryPicker,
             ),
             const SizedBox(height: 18),
             Row(
@@ -1741,9 +1803,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Widget _deckTile(NgmySlideDeck deck, bool isDark, {int index = 0}) {
-    final accent = deck.isMarriageAgreement
-        ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
-        : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
+    final accent = deck.deckKind == 'hati_kuhowa'
+        ? const [Color(0xFF2E4270), Color(0xFF12213D)]
+        : deck.isLockedTemplateDoc
+            ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
+            : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {
@@ -1791,16 +1855,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                           gradient: LinearGradient(colors: accent),
                         ),
                         child: Icon(
-                          deck.isMarriageAgreement ? Icons.description_rounded : Icons.slideshow_rounded,
+                          deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
                           color: Colors.white,
                           size: 22,
                         ),
                       ),
                       title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                       subtitle: Text(
-                        deck.isMarriageAgreement
+                        deck.deckKind == 'marriage_agreement'
                             ? 'Hati ya Kuhowesha • Updated ${_formatDate(deck.updatedAt)}'
-                            : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
+                            : deck.deckKind == 'hati_kuhowa'
+                                ? 'Hati ya Kuhowa • Updated ${_formatDate(deck.updatedAt)}'
+                                : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                       ),
                       trailing: IconButton(
@@ -2887,7 +2953,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
-    final marriage = _activeDeck?.isMarriageAgreement == true;
+    final marriage = _activeDeck?.isLockedTemplateDoc == true;
     final signZone = marriage && ngmyMarriageElementIsSignZone(e);
     final selectable = !marriage || _marriageElementSelectable(e);
     final movable = !marriage || _marriageElementMovable(e);
@@ -3307,7 +3373,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           Transform.translate(
             offset: const Offset(0, -7),
             child: Tooltip(
-              message: 'Marriage agreement (Hati ya Kuhowesha)',
+              message: 'Documents (Hati)',
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -3437,6 +3503,63 @@ class _UndoSnapshot {
   final NgmySlideDeck deck;
   final int slideIndex;
   final String? selectedId;
+}
+
+class _DocumentCategoryTile extends StatelessWidget {
+  const _DocumentCategoryTile({
+    required this.icon,
+    required this.colors,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final List<Color> colors;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.4)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NgmySlideshowPage extends StatefulWidget {
