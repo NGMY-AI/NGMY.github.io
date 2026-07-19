@@ -179,8 +179,8 @@ NgmySlideElement _hParagraphField(
 /// the body text so headers read as clearly more prominent.
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill, required int textColor}) {
   return [
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.048, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
-    _hLockedText(text, x: x, y: y + 0.007, w: w, h: 0.036, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.052, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
+    _hLockedText(text, x: x, y: y + 0.008, w: w, h: 0.036, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
   ];
 }
 
@@ -327,14 +327,16 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   const cw = 0.82;
   final out = <NgmySlideElement>[];
 
-  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.026, w: cw, h: 0.06, fontSize: 32, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
-  out.addAll(_hTareheBox(0.64, 0.022, 0.27, 0.05, ink: ink, accent: accent));
+  // Tarehe gets its own row, pinned to the very top-right corner — it used
+  // to share a row with the title and could crowd/overlap it.
+  out.addAll(_hTareheBox(0.7, 0.016, 0.21, 0.04, ink: ink, accent: accent));
+  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.062, w: cw, h: 0.06, fontSize: 32, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
   // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
   // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
   // flush from the left edge to the right edge of the paper automatically.
-  double y = 0.1;
+  double y = 0.13;
   out.add(_hParagraphField(
     'utangulizi',
     cx,
@@ -351,31 +353,31 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   y += 0.15;
 
   out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.06;
+  y += 0.064;
   out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.022, fontSize: 13, fontWeight: FontWeight.w600, color: ink, tag: 'nimetowe_sub'));
   y += 0.036;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
-    y += 0.05;
+    y += 0.044;
   }
   y += 0.024;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.06;
+  y += 0.064;
   final colW = (cw - 0.03) / 2;
   out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y, w: colW, h: 0.028, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mke'),
-    _hLockedText('NGAMBO YA MKE', x: cx, y: y + 0.004, w: colW, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mke_t'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW + 0.03, y: y, w: colW, h: 0.028, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mume'),
-    _hLockedText('NGAMBO YA MUME', x: cx + colW + 0.03, y: y + 0.004, w: colW, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mume_t'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y, w: colW, h: 0.032, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mke'),
+    _hLockedText('NGAMBO YA MKE', x: cx, y: y + 0.005, w: colW, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mke_t'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW + 0.03, y: y, w: colW, h: 0.032, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mume'),
+    _hLockedText('NGAMBO YA MUME', x: cx + colW + 0.03, y: y + 0.005, w: colW, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mume_t'),
   ]);
-  y += 0.038;
+  y += 0.042;
   for (var n = 1; n <= 3; n++) {
     out.addAll(_hWitnessLine('mke', n, cx, y, colW, ink: ink, accent: accent));
     out.addAll(_hWitnessLine('mume', n, cx + colW + 0.03, y, colW, ink: ink, accent: accent));
-    y += 0.062;
+    y += 0.052;
   }
-  y += 0.022;
+  y += 0.016;
 
   out.addAll(_hMwandishiBar(cx, y, cw, ink: ink, accent: accent));
 

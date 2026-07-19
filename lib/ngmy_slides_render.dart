@@ -66,7 +66,13 @@ class NgmySlideElementView extends StatelessWidget {
       );
 
   Widget _textView() {
-    final pad = compactText ? const EdgeInsets.symmetric(horizontal: 2, vertical: 1) : const EdgeInsets.fromLTRB(6, 10, 6, 12);
+    // Padding must scale with the canvas — otherwise this fixed pixel
+    // padding (originally tuned for scale≈1 print/PDF sizing) can exceed a
+    // short label's whole box height on a small phone canvas, which pushes
+    // the text off-center instead of centering it in the box.
+    final pad = compactText
+        ? EdgeInsets.symmetric(horizontal: 2 * scale, vertical: 1 * scale)
+        : EdgeInsets.fromLTRB(6 * scale, 10 * scale, 6 * scale, 12 * scale);
     final style = _textStyle().copyWith(height: 1.35);
     final strut = StrutStyle(fontSize: element.fontSize * scale, height: 1.35, forceStrutHeight: true);
     final align = _alignToAlignment(element.align);
