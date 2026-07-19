@@ -155,13 +155,18 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   final aspect = deck.aspectValue;
   // The old fixed pixel size (up to 960px) had no relation to the actual
   // printed page — on real paper that's a small rectangle stranded in the
-  // middle with huge blank margins. `width: 100%` + `aspect-ratio` instead
-  // makes the slide fill the printable area edge to edge on whichever
-  // dimension binds first, same approach as the PDF export fix.
+  // middle with huge blank margins. A later fix used `width: 100%` +
+  // `aspect-ratio` on the default page (usually A4/Letter), but for a
+  // tall 9:16 deck that's still just a narrow column inside a much wider
+  // sheet — a blank gutter on both sides. `@page { size }` now shapes the
+  // physical page itself to the deck's aspect ratio, same approach as the
+  // PDF export fix, so the content is the page rather than an island on it.
+  final pageHmm = 297.0;
+  final pageWmm = pageHmm * aspect;
   final buf = StringBuffer('''
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>${_escapeHtml(deck.name)}</title>
 <style>
-  @page { margin: 10mm; }
+  @page { size: ${pageWmm.toStringAsFixed(1)}mm ${pageHmm.toStringAsFixed(1)}mm; margin: 10mm; }
   * { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; }
   h1 { font-size: 14px; margin: 6px 10mm; }

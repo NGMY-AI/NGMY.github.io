@@ -66,7 +66,12 @@ pw.Alignment _pdfAlignment(TextAlign align) {
 }
 
 pw.Widget _pdfText(NgmySlideElement e, double pageW) {
-  final fs = (e.fontSize * (pageW / 960)).clamp(8.0, 96.0);
+  // Floor used to be 8pt regardless of how small the page's own scale
+  // ratio was. Once the page shrank to real-world size (see below), that
+  // floor forced small design-time labels (e.g. a 9pt "Sahihi:" tag) to
+  // render nearly 2x bigger than their box was sized for, wrapping text
+  // that fit fine on screen. Only guard against near-zero/negative sizes.
+  final fs = (e.fontSize * (pageW / 960)).clamp(3.0, 96.0);
   return pw.Text(
     _pdfTextContent(e),
     style: pw.TextStyle(
@@ -80,7 +85,7 @@ pw.Widget _pdfText(NgmySlideElement e, double pageW) {
   );
 }
 
-pw.Widget _pdfShape(NgmySlideElement e) {
+pw.Widget _pdfShape(NgmySlideElement e, double pageW) {
   // Passing color: PdfColor(_, _, _, 0) for "no fill" relies on the pdf
   // package correctly emitting an alpha graphics state for a solid-fill
   // primitive, which isn't reliably honored by every PDF viewer — some
@@ -91,14 +96,22 @@ pw.Widget _pdfShape(NgmySlideElement e) {
   final strokeA = (e.strokeColor >> 24) & 0xFF;
   final fill = fillA == 0 ? null : _pdfColor(e.fillColor);
   final strokeColor = strokeA == 0 ? null : _pdfColor(e.strokeColor);
-  final border = strokeColor == null ? null : pw.Border.all(color: strokeColor, width: e.strokeWidth.clamp(0.5, 6.0));
+  // strokeWidth is authored against the 960-wide design canvas, same as
+  // fontSize. Text already scales by pageW/960 (see _pdfText); borders
+  // didn't, so once the page shrank to real-world size every border/line
+  // rendered roughly 2x thicker than intended relative to the page (the
+  // title rule looked fine because that one is a filled rect sized by
+  // fractional height, which scales automatically).
+  final strokeScale = pageW / 960;
+  final sw = (e.strokeWidth * strokeScale).clamp(0.35, 6.0);
+  final border = strokeColor == null ? null : pw.Border.all(color: strokeColor, width: sw);
   switch (e.shape) {
     case NgmySlideShapeKind.circle:
       return pw.Container(
         decoration: pw.BoxDecoration(shape: pw.BoxShape.circle, color: fill, border: border),
       );
     case NgmySlideShapeKind.line:
-      return strokeColor == null ? pw.SizedBox() : pw.Center(child: pw.Container(height: e.strokeWidth + 1, color: strokeColor));
+      return strokeColor == null ? pw.SizedBox() : pw.Center(child: pw.Container(height: sw + 0.4, color: strokeColor));
     default:
       return pw.Container(
         decoration: pw.BoxDecoration(color: fill, border: border, borderRadius: pw.BorderRadius.circular(4)),
@@ -137,7 +150,7 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
         ),
       );
     case NgmySlideElementType.shape:
-      child = _pdfShape(e);
+      child = _pdfShape(e, pageW);
   }
 
   return pw.Positioned(
@@ -188,39 +201,34 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 
 /// Builds a PDF that mirrors slide layout (backgrounds, positioned text, images).
 ///
-/// The page itself is a real, standard paper size (A4) — PdfPageFormat's
-/// width/height are in points (1/72in), and the old code passed 960 (the
-/// on-screen reference canvas's pixel width) straight in, producing a
-/// roughly 13x24in custom page. Printers/viewers then had to shrink that
-/// whole oversized page down to fit actual paper, leaving the content
-/// looking tiny and stranded in the middle. The slide content is now
-/// centered within the real page, scaled up to fill it edge to edge on
-/// whichever dimension binds first (full height for a tall 9:16 deck).
+/// PdfPageFormat's width/height are in points (1/72in). The old code
+/// passed 960 (the on-screen reference canvas's pixel width) straight in,
+/// producing a roughly 13x24in custom page that printers/viewers had to
+/// shrink to fit real paper. A later fix embedded the content inside a
+/// standard A4 sheet instead — an improvement, but A4 is much wider than
+/// this deck's tall 9:16 shape, so the content was still a narrow island
+/// with a wide blank gutter on either side ("frame smaller than the
+/// paper"). The page itself is now shaped to the deck's own aspect ratio
+/// (using A4's height as the real-world reference), so the content *is*
+/// the page — no letterboxing on any side.
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
-  const pageFormat = PdfPageFormat.a4;
-  const margin = 16.0;
-  final availW = pageFormat.width - margin * 2;
-  final availH = pageFormat.height - margin * 2;
+  const margin = 14.0;
   final aspect = deck.aspectValue; // width / height
-  var contentW = availW;
-  var contentH = contentW / aspect;
-  if (contentH > availH) {
-    contentH = availH;
-    contentW = contentH * aspect;
-  }
+  final pageH = PdfPageFormat.a4.height;
+  final pageW = pageH * aspect;
+  final pageFormat = PdfPageFormat(pageW, pageH, marginAll: margin);
+  final contentW = pageW - margin * 2;
+  final contentH = pageH - margin * 2;
 
   for (final slide in deck.slides) {
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
-        margin: const pw.EdgeInsets.all(margin),
-        build: (_) => pw.Center(
-          child: pw.SizedBox(
-            width: contentW,
-            height: contentH,
-            child: pw.ClipRect(child: _pdfSlidePage(slide, deck, contentW, contentH)),
-          ),
+        build: (_) => pw.SizedBox(
+          width: contentW,
+          height: contentH,
+          child: pw.ClipRect(child: _pdfSlidePage(slide, deck, contentW, contentH)),
         ),
       ),
     );
