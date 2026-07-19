@@ -12,7 +12,11 @@ PdfColor _pdfColor(int argb) {
   final r = ((argb >> 16) & 0xFF) / 255.0;
   final g = ((argb >> 8) & 0xFF) / 255.0;
   final b = (argb & 0xFF) / 255.0;
-  return PdfColor(r, g, b, a <= 0 ? 1 : a);
+  // Forcing alpha=0 up to fully opaque turned every intentionally
+  // transparent shape (0x00000000 — used everywhere for invisible sign
+  // zones and unfilled bordered boxes) into a solid black rectangle when
+  // printed/exported to PDF. Trust the alpha channel as given.
+  return PdfColor(r, g, b, a);
 }
 
 pw.MemoryImage? _pdfImageFromRef(String? ref) {
