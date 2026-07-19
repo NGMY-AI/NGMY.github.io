@@ -143,7 +143,12 @@ NgmySlideElement _hBlankUnderline(double x, double y, double w, {int color = _so
   return _hLockedShape(shape: NgmySlideShapeKind.line, x: x, y: y + 0.02, w: w, h: 0.002, strokeColor: color, strokeWidth: 0.8, tag: 'ul_${x}_$y');
 }
 
-double _htw(String s, double fontSize) => s.length * fontSize * 0.0027 + 0.006;
+// Approximates rendered text width against the 960px-wide reference canvas
+// (avg glyph width ≈ 0.52 * fontSize). The previous constant here was ~5x
+// too large, which pushed every blank far past where the visible text
+// actually ended — that's what caused the big gaps and text running off
+// the page edge.
+double _htw(String s, double fontSize) => s.length * fontSize * 0.00055 + 0.004;
 
 /// One run of text — plain segments and named blanks placed left to right on
 /// a single hand-authored line.
@@ -170,7 +175,7 @@ List<NgmySlideElement> _hRun(List<HkSeg> segs, double x, double y, {required int
     } else {
       out.add(_hBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize, startText: s.startText));
       out.add(_hBlankUnderline(cx, y, s.blankW));
-      cx += s.blankW + 0.007;
+      cx += s.blankW + 0.005;
     }
   }
   return out;
@@ -194,26 +199,24 @@ String ngmyHatiKuhowaTodayDate() {
 
 /// Boxed TAREHE field, top-right corner — matches the reference paper's
 /// bordered date box next to the title. Pre-filled with today's date.
+/// No extra underline inside the box — the border already frames it.
 List<NgmySlideElement> _hTareheBox(double x, double y, double w, double h, {required int ink, required int accent}) {
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'tarehe_box'),
     _hLockedText('TAREHE:', x: x, y: y + 0.006, w: w, h: 0.016, fontSize: 8, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
     _hBlank('tarehe', x + 0.012, y + 0.026, w - 0.024, ink: ink, fontSize: 9, startText: ngmyHatiKuhowaTodayDate()),
-    _hBlankUnderline(x + 0.012, y + 0.042, w - 0.024),
   ];
 }
 
-/// One NIMETOWE line item — numbered circle + a wide editable blank, echoing
-/// the reference paper's numbered MAHARI table (not a bare underline).
+/// One NIMETOWE line item — plain numbering (matches the witness rows) and a
+/// wide editable blank. No circle graphic.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
-  const circleD = 0.028;
-  final itemX = x + circleD + 0.016;
+  final itemX = x + 0.03;
   final itemW = x + w - itemX;
   return [
-    _hLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y, w: circleD, h: circleD, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'nim_c_$n'),
-    _hLockedText('$n', x: x, y: y + 0.002, w: circleD, h: circleD - 0.004, fontSize: 9, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFFFFFFF, tag: 'nim_n_$n'),
-    _hBlank('mahari_$n', itemX, y + 0.003, itemW, ink: ink, fontSize: 10, startText: hint, align: TextAlign.left),
-    _hBlankUnderline(itemX, y + 0.018, itemW),
+    _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.02, fontSize: 10, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
+    _hBlank('mahari_$n', itemX, y + 0.001, itemW, ink: ink, fontSize: 10, startText: hint, align: TextAlign.left),
+    _hBlankUnderline(itemX, y + 0.016, itemW),
   ];
 }
 
@@ -335,37 +338,37 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   double y = 0.098;
   out.addAll(_hRun([
     const HkSeg.text('Mimi '),
-    const HkSeg.blank('man_name1', 0.15, '[Jina la Mwanaume]'),
+    const HkSeg.blank('man_name1', 0.13, '[Jina la Mwanaume]'),
     const HkSeg.text(', wa Jamaa la '),
-    const HkSeg.blank('family1', 0.15, '[Jina la Jamaa]'),
+    const HkSeg.blank('family1', 0.115, '[Jina la Jamaa]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.038;
+  y += 0.036;
   out.addAll(_hRun([
     const HkSeg.text('Nyumba ya '),
-    const HkSeg.blank('house1', 0.15, '[Jina la Nyumba]'),
+    const HkSeg.blank('house1', 0.115, '[Jina la Nyumba]'),
     const HkSeg.text(', nimetowa mahali ya kuhoweya'),
   ], cx, y, ink: ink));
-  y += 0.038;
+  y += 0.036;
   out.addAll(_hRun([
     const HkSeg.text('kijana wangu aitwaye '),
-    const HkSeg.blank('man_name2', 0.15, '[Jina la Mwanaume]'),
+    const HkSeg.blank('man_name2', 0.13, '[Jina la Mwanaume]'),
     const HkSeg.text(', kwa '),
-    const HkSeg.blank('woman_name', 0.13, '[Jina la Mwanamke]'),
+    const HkSeg.blank('woman_name', 0.125, '[Jina la Mwanamke]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.038;
+  y += 0.036;
   out.addAll(_hRun([
     const HkSeg.text('binti wa '),
     const HkSeg.blank('woman_father', 0.17, '[Jina la Baba wa Mwanamke]'),
     const HkSeg.text(', wa Jamaa la '),
-    const HkSeg.blank('family2', 0.15, '[Jina la Jamaa]'),
+    const HkSeg.blank('family2', 0.115, '[Jina la Jamaa]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.038;
+  y += 0.036;
   out.addAll(_hRun([
     const HkSeg.text('Nyumba ya '),
-    const HkSeg.blank('house2', 0.15, '[Jina la Nyumba]'),
+    const HkSeg.blank('house2', 0.115, '[Jina la Nyumba]'),
     const HkSeg.text('.'),
   ], cx, y, ink: ink));
   y += 0.05;

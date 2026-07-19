@@ -412,7 +412,15 @@ class NgmySlidesTheme {
 }
 
 class NgmySlidesTemplates {
-  static String newId() => DateTime.now().microsecondsSinceEpoch.toString();
+  // Flutter Web's DateTime only ticks at millisecond resolution under the
+  // hood, so a synchronous loop building many elements (e.g. a locked
+  // template document) can call this dozens of times within the same
+  // millisecond and get identical "microsecond" timestamps. A counter
+  // suffix guarantees every id is unique regardless of how fast this is
+  // called — duplicate ids caused tapping one field to select every other
+  // element that happened to share its timestamp.
+  static int _idCounter = 0;
+  static String newId() => '${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
 
   static NgmySlide blankSlide() => NgmySlide(id: newId(), layout: NgmySlideLayout.blank);
 
