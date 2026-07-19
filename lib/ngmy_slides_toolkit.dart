@@ -96,12 +96,18 @@ Future<String?> ngmySlidesSignatureToImage(List<Offset?> points, Size canvasSize
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     Offset? last;
+    // `points` are normalized 0.0-1.0 fractions of the drawing canvas (see
+    // _addPoint in ngmy_invoice_signature.dart), not raw pixel coordinates
+    // in canvasSize's space. Multiplying by `scale` (a ratio meant for
+    // pixel values) collapsed every stroke into a sub-pixel cluster near
+    // the origin — that's why nothing visible ever showed up after
+    // signing. Map the 0-1 fraction directly onto the output image size.
     for (final p in points) {
       if (p == null) {
         last = null;
         continue;
       }
-      final scaled = Offset(p.dx * scale, p.dy * scale);
+      final scaled = Offset(p.dx * w, p.dy * h);
       if (last != null) canvas.drawLine(last, scaled, stroke);
       last = scaled;
     }

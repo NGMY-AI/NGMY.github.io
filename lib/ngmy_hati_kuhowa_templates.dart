@@ -185,14 +185,16 @@ NgmySlideElement _hParagraphField(
 }
 
 /// A section header (NIMETOWE / MASHAHIDI) — a small bordered frame sized
-/// just to fit the word, centered on the page. Not a full-width bar.
+/// to fit the word (not a fixed width shared by both, and not oversized —
+/// an oversized box was overlapping the table that follows it).
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill}) {
-  const boxW = 0.36;
-  const boxH = 0.05;
+  const fontSize = 30.0;
+  final boxW = (text.length * fontSize * 0.00058 + 0.08).clamp(0.2, 0.5);
+  const boxH = 0.062;
   final bx = x + (w - boxW) / 2;
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$text'),
-    _hLockedText(text, x: bx, y: y + 0.008, w: boxW, h: 0.036, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
+    _hLockedText(text, x: bx, y: y + 0.011, w: boxW, h: 0.044, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
   ];
 }
 
@@ -360,17 +362,18 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
   out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.072, w: cw, h: 0.072, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
-  // A small double-rule flourish under the title instead of a plain line.
+  // A small double-rule flourish sitting right under the title, not far
+  // below it — same tight spacing as the NIMETOWE item underlines.
   out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.156, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.163, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.148, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.154, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
   ]);
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
   // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
   // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
   // flush from the left edge to the right edge of the paper automatically.
-  double y = 0.176;
+  double y = 0.161;
   out.add(_hParagraphField(
     'utangulizi',
     cx,
@@ -384,20 +387,20 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
         '[Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba '
         'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].',
   ));
-  y += 0.122;
+  y += 0.116;
 
   out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill));
-  y += 0.054;
+  y += 0.072;
   out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
-    y += 0.042;
+    y += 0.043;
   }
   y += 0.016;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
-  y += 0.044;
+  y += 0.076;
 
   // MASHAHIDI as one bordered table: a single outer frame around both
   // columns with one vertical line dividing NGAMBO YA MKE from NGAMBO YA
@@ -405,7 +408,7 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   const colW = cw / 2;
   const innerPad = 0.016;
   const hdrH = 0.05;
-  const rowH = 0.06;
+  const rowH = 0.056;
   final tableH = hdrH + 3 * rowH;
   final tableTop = y;
   out.addAll([
