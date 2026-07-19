@@ -72335,8 +72335,8 @@ return A.ee(B.aX,!1,4279310375,B.a8,f.length===0?"marriage_locked":"marriage_loc
 dI5(a,b,c,d,e,f,g,h){var s=A.c1(),r=B.l.O(f*0.0017,0.02,0.06)
 return A.ee(e,!1,g,B.a8,"marriage_field_"+a+":"+B.l.a9(d,3),4280640491,f,B.cV,B.O,r,s,null,0,0,B.b0,4280172719,2,h,0,B.bG,B.cc,d,b,c)},
 b_3(a,b,c,d){return A.PB(0,0.002,B.e3,d,0.8,"ul_"+A.t(a)+"_"+A.t(b),c,a,b+0.002)},
-dXh(a,b,c,d,e){var s=c+(d-0.36)/2
-return A.a([A.PB(0,0.05,B.b0,e,1.4,"banner_box_"+a,0.36,s,b),A.yG(a,B.R,e,22,B.D,0.036,"banner_t_"+a,0.36,s,b+0.008)],t.pt)},
+dXh(a,b,c,d,e){var s=B.l.O(a.length*30*0.00058+0.08,0.2,0.5),r=c+(d-s)/2
+return A.a([A.PB(0,0.062,B.b0,e,1.4,"banner_box_"+a,s,r,b),A.yG(a,B.R,e,30,B.D,0.044,"banner_t_"+a,s,r,b+0.011)],t.pt)},
 e_P(){var s=new A.R(Date.now(),0,!1),r=new A.duH()
 return A.t(r.$1(A.cf(s)))+"/"+A.t(r.$1(A.bY(s)))+"/"+A.bX(s)},
 dXi(a,b,c,d,e,f,g){var s=4293056712,r=e*0.48,q=c+r+0.01,p=q+0.05,o=c+e-p,n=""+b,m=c+0.026,l=r-0.026
@@ -72347,13 +72347,13 @@ if(r.a===a)return r}return null},
 epD(b0){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a=null,a0=4280640491,a1=4280172719,a2="marriage_locked",a3=4293056712,a4=4279310375,a5="marriage_locked_",a6=b0.f,a7=b0.r,a8=t.pt,a9=A.a([],a8)
 B.f.A(a9,A.a([A.yG("TAREHE:",B.aX,a7,20,B.J,0.036,"tarehe_lbl",0.1,0.7,0.026),A.dI5("tarehe",0.8059999999999999,0.026,0.14400000000000002,B.aX,21,a6,A.e_P()),A.b_3(0.8059999999999999,0.026+B.l.O(0.035699999999999996,0.02,0.06),0.12,a7)],a8))
 a9.push(A.yG("HATI YA KUHOWA",B.R,a6,40,B.D,0.072,"title",0.82,0.09,0.072))
-B.f.A(a9,A.a([A.PB(a7,0.0026,B.b0,a7,0,"title_rule_1",0.29519999999999996,0.35239999999999994,0.156),A.PB(a7,0.0018,B.b0,a7,0,"title_rule_2",0.164,0.41800000000000004,0.163)],a8))
+B.f.A(a9,A.a([A.PB(a7,0.0026,B.b0,a7,0,"title_rule_1",0.29519999999999996,0.35239999999999994,0.148),A.PB(a7,0.0018,B.b0,a7,0,"title_rule_2",0.164,0.41800000000000004,0.154)],a8))
 s=A.c1()
-a9.push(A.ee(B.aX,!1,a6,B.a8,"marriage_field_utangulizi:"+B.l.a9(0.82,3),a0,19,B.be,B.c3,0.11,s,a,0,0,B.b0,a1,2,"Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba], nimetowa mahali ya kuhoweya kijana wangu aitwaye [Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].",0,B.bG,B.cc,0.82,0.09,0.176))
+a9.push(A.ee(B.aX,!1,a6,B.a8,"marriage_field_utangulizi:"+B.l.a9(0.82,3),a0,19,B.be,B.c3,0.11,s,a,0,0,B.b0,a1,2,"Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba], nimetowa mahali ya kuhoweya kijana wangu aitwaye [Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].",0,B.bG,B.cc,0.82,0.09,0.161))
 s=b0.w
-B.f.A(a9,A.dXh("NIMETOWE",0.298,0.09,0.82,s))
-a9.push(A.yG("Vitu vifuatavyo vitatolewa:",B.aX,a6,20,B.O,0.03,"nimetowe_sub",0.82,0.09,0.352))
-for(r=0.382,q=1;q<=4;++q){p=""+q
+B.f.A(a9,A.dXh("NIMETOWE",0.277,0.09,0.82,s))
+a9.push(A.yG("Vitu vifuatavyo vitatolewa:",B.aX,a6,20,B.O,0.03,"nimetowe_sub",0.82,0.09,0.34900000000000003))
+for(r=0.379,q=1;q<=4;++q){p=""+q
 o="nim_n_"+p
 n=Date.now()
 m=$.eV
@@ -72372,16 +72372,16 @@ d=$.eV
 $.eV=d+1
 f=f.length===0?a2:a5+f
 B.f.A(a9,A.a([new A.eU(""+1000*n+"_"+m,B.cc,0.09,r,0.038,0.034,p+".",21,B.J,B.be,B.a8,a7,B.aX,a,B.b0,a0,a1,2,0,!1,o,0,B.bG,0),new A.eU(""+1000*k+"_"+j,B.cc,0.132,l,0.7779999999999999,i,"[Kitu cha Mahari "+p+"]",21,B.O,B.cV,B.a8,a6,B.aX,a,B.b0,a0,a1,2,0,!1,"marriage_field_"+("mahari_"+p)+":"+h,0,B.bG,0),new A.eU(""+1000*e+"_"+d,B.em,0.132,g+0.002,0.7779999999999999,0.002,"",24,B.a_,B.be,B.a8,a4,B.aX,a,B.e3,0,a3,0.8,0,!1,f,0,B.bG,0)],a8))
-r+=0.042}r+=0.016
+r+=0.043}r+=0.016
 B.f.A(a9,A.dXh("MASHAHIDI",r,0.09,0.82,s))
-r+=0.044
+r+=0.076
 s=r+0.05
 p=r+0.012
-B.f.A(a9,A.a([A.PB(0,0.22999999999999998,B.b0,a7,1.3,"wit_table_border",0.82,0.09,r),A.PB(a7,0.22999999999999998,B.b0,a7,0,"wit_table_divider",0.0024,0.4988,r),A.PB(0,0.0022,B.e3,a7,1.1,"wit_table_hdrline",0.82,0.09,s),A.yG("NGAMBO YA MKE",B.R,a7,20,B.D,0.03,"wit_h_mke_t",0.41,0.09,p),A.yG("NGAMBO YA MUME",B.R,a7,20,B.D,0.03,"wit_h_mume_t",0.41,0.5,p)],a8))
+B.f.A(a9,A.a([A.PB(0,0.21800000000000003,B.b0,a7,1.3,"wit_table_border",0.82,0.09,r),A.PB(a7,0.21800000000000003,B.b0,a7,0,"wit_table_divider",0.0024,0.4988,r),A.PB(0,0.0022,B.e3,a7,1.1,"wit_table_hdrline",0.82,0.09,s),A.yG("NGAMBO YA MKE",B.R,a7,20,B.D,0.03,"wit_h_mke_t",0.41,0.09,p),A.yG("NGAMBO YA MUME",B.R,a7,20,B.D,0.03,"wit_h_mume_t",0.41,0.5,p)],a8))
 c=s+0.01
 for(b=1;b<=3;++b){B.f.A(a9,A.dXi("mke",b,0.106,c,0.378,a7,a6))
 B.f.A(a9,A.dXi("mume",b,0.516,c,0.378,a7,a6))
-c+=0.06}r=r+0.22999999999999998+0.012
+c+=0.056}r=r+0.21800000000000003+0.012
 s=r+0.056
 p=r+0.09
 o=p-0.002
@@ -86585,7 +86585,7 @@ j=a
 i=null
 for(b=a7.length,a0=0;a0<a7.length;a7.length===b||(0,A.X)(a7),++a0){h=a7[a0]
 if(h==null){i=null
-continue}g=new A.z(h.a*n,h.b*n)
+continue}g=new A.z(h.a*800,h.b*m)
 if(i!=null){a1=i
 a2=g
 a3=j.aJ()
