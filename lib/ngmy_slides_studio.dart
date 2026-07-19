@@ -202,8 +202,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     var needsRebuild = false;
     if (_activeDeck?.isLockedTemplateDoc == true) {
       ngmyMarriageAutoFitField(el, value);
-      final slide = _currentSlide;
-      if (slide != null) ngmyMarriagePackRow(slide, el.y + el.h * 0.5);
+      // Row-packing slides every element sharing this row's y-coordinate
+      // left to right — correct for Marriage Agreement's flowing inline
+      // sentences, but wrong for a fixed-column table (like Hati ya
+      // Kuhowa's two-column witness table): two unrelated columns can sit
+      // at the same y, and packing would drag one column's fields across
+      // into the other, off the page. Only run it where it was designed
+      // for: Marriage Agreement's own deck kind.
+      if (_activeDeck?.isMarriageAgreement == true) {
+        final slide = _currentSlide;
+        if (slide != null) ngmyMarriagePackRow(slide, el.y + el.h * 0.5);
+      }
       needsRebuild = true;
     }
     _commitDraftIfNeeded();
