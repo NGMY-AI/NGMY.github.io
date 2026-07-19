@@ -207,13 +207,16 @@ String ngmyHatiKuhowaTodayDate() {
 /// TAREHE field, hugging the very top-right corner of the paper — no frame,
 /// just the label and an underlined date, in alignment on one line.
 List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int ink, required int accent}) {
-  final labelW = w * 0.44;
-  final valueX = x + labelW + 0.01;
+  // A small fixed label width (just enough for "TAREHE:") instead of a
+  // ratio share of the box — that's what was leaving a big empty gap
+  // before the date value started.
+  const labelW = 0.1;
+  final valueX = x + labelW + 0.006;
   final valueW = x + w - valueX;
   return [
-    _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: 0.032, fontSize: 18, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
-    _hBlank('tarehe', valueX, y, valueW, ink: ink, fontSize: 19, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
-    _hBlankUnderline(valueX, y + _hBlankH(19), valueW, color: accent),
+    _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: 0.036, fontSize: 20, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
+    _hBlank('tarehe', valueX, y, valueW, ink: ink, fontSize: 21, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
+    _hBlankUnderline(valueX, y + _hBlankH(21), valueW, color: accent),
   ];
 }
 
@@ -233,28 +236,31 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
 /// Sized to sit in one column of the shared witness table. The signature
 /// zone is deliberately wide/tall so a full signature has room to appear.
 List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, double w, {required int ink, required int accent}) {
-  final nameW = w * 0.36;
-  final sahihiLblX = x + nameW + 0.018;
-  final signX = sahihiLblX + 0.086;
+  // The name field is a single line, never allowed to wrap — it needs to
+  // be wide enough for a real full name, so it gets most of the column;
+  // Sahihi/signature get a smaller, still-usable share.
+  final nameW = w * 0.56;
+  final sahihiLblX = x + nameW + 0.012;
+  final signX = sahihiLblX + 0.05;
   final signW = x + w - signX;
   return [
-    _hLockedText('$n.', x: x, y: y, w: 0.03, h: 0.028, fontSize: 16, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
-    _hBlank('witness_${side}_${n}_name', x + 0.03, y, nameW - 0.03, ink: ink, fontSize: 16, startText: '[Jina la Shahidi]', align: TextAlign.left),
-    _hBlankUnderline(x + 0.03, y + _hBlankH(16), nameW - 0.03),
-    _hLockedText('Sahihi:', x: sahihiLblX, y: y + 0.002, w: 0.086, h: 0.026, fontSize: 13, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
+    _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.024, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
+    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 13, startText: '[Jina la Shahidi]', align: TextAlign.left),
+    _hBlankUnderline(x + 0.026, y + _hBlankH(13), nameW - 0.026),
+    _hLockedText('Sahihi:', x: sahihiLblX, y: y + 0.002, w: 0.05, h: 0.022, fontSize: 10, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.shape,
       shape: NgmySlideShapeKind.rectangle,
       x: signX,
-      y: y - 0.006,
+      y: y - 0.004,
       w: signW,
-      h: 0.036,
+      h: 0.03,
       fillColor: 0x00000000,
       strokeColor: 0x00000000,
       fileName: '$kMarriageSignPrefix${side}_witness_$n',
     ),
-    _hBlankUnderline(signX, y + 0.03, signW),
+    _hBlankUnderline(signX, y + 0.024, signW),
   ];
 }
 
@@ -345,20 +351,20 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
 
   // Tarehe gets its own row, pinned to the very top-right corner — it used
   // to share a row with the title and could crowd/overlap it. No frame.
-  out.addAll(_hTareheBox(0.6, 0.016, 0.31, ink: ink, accent: accent));
-  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.064, w: cw, h: 0.062, fontSize: 34, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.addAll(_hTareheBox(0.55, 0.026, 0.36, ink: ink, accent: accent));
+  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.072, w: cw, h: 0.062, fontSize: 34, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
   // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
   // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
   // flush from the left edge to the right edge of the paper automatically.
-  double y = 0.128;
+  double y = 0.138;
   out.add(_hParagraphField(
     'utangulizi',
     cx,
     y,
     cw,
-    0.13,
+    0.115,
     ink: ink,
     fontSize: 19,
     startText: 'Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya '
@@ -366,20 +372,20 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
         '[Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba '
         'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].',
   ));
-  y += 0.146;
+  y += 0.127;
 
   out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill));
   y += 0.056;
   out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
-  y += 0.034;
+  y += 0.032;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
-    y += 0.046;
+    y += 0.044;
   }
-  y += 0.02;
+  y += 0.018;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
-  y += 0.054;
+  y += 0.052;
 
   // MASHAHIDI as one bordered table: a single outer frame around both
   // columns with one vertical line dividing NGAMBO YA MKE from NGAMBO YA

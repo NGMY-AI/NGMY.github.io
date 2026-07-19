@@ -151,6 +151,10 @@ class NgmySlideElementView extends StatelessWidget {
     }
     final img = _buildImageMemory(ref);
     if (element.type == NgmySlideElementType.signature) {
+      // Padding must scale with the canvas — a fixed 6px padding can eat
+      // most (or all) of a small signature box on a phone-sized canvas,
+      // squeezing the actual signature down to nothing while the white
+      // background still shows, which looked like "nothing appears".
       return Container(
         width: double.infinity,
         height: double.infinity,
@@ -160,7 +164,7 @@ class NgmySlideElementView extends StatelessWidget {
           border: Border.all(color: const Color(0xFFCBD5E1)),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))],
         ),
-        padding: const EdgeInsets.all(6),
+        padding: EdgeInsets.all(2 * scale),
         child: img,
       );
     }
