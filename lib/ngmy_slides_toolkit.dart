@@ -153,14 +153,19 @@ Future<String?> ngmySlidesCaptureSignature(BuildContext context) async {
 
 String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   final aspect = deck.aspectValue;
-  final maxW = aspect >= 1 ? 960 : 540;
-  final maxH = (maxW / aspect).round();
+  // The old fixed pixel size (up to 960px) had no relation to the actual
+  // printed page — on real paper that's a small rectangle stranded in the
+  // middle with huge blank margins. `width: 100%` + `aspect-ratio` instead
+  // makes the slide fill the printable area edge to edge on whichever
+  // dimension binds first, same approach as the PDF export fix.
   final buf = StringBuffer('''
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>${_escapeHtml(deck.name)}</title>
 <style>
-  @page { margin: 12mm; }
-  body { font-family: system-ui, sans-serif; background: #fff; color: #111; }
-  .slide { page-break-after: always; width: ${maxW}px; height: ${maxH}px; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }
+  @page { margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; }
+  h1 { font-size: 14px; margin: 6px 10mm; }
+  .slide { page-break-after: always; width: 100%; aspect-ratio: $aspect; max-height: 94vh; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }
   .el { position: absolute; overflow: hidden; }
   .txt { white-space: pre-wrap; word-break: break-word; }
   img { max-width: 100%; max-height: 100%; object-fit: contain; }

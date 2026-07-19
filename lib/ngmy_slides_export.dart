@@ -81,16 +81,24 @@ pw.Widget _pdfText(NgmySlideElement e, double pageW) {
 }
 
 pw.Widget _pdfShape(NgmySlideElement e) {
-  final fill = _pdfColor(e.fillColor);
-  final stroke = _pdfColor(e.strokeColor);
-  final border = pw.Border.all(color: stroke, width: e.strokeWidth.clamp(0.5, 6.0));
+  // Passing color: PdfColor(_, _, _, 0) for "no fill" relies on the pdf
+  // package correctly emitting an alpha graphics state for a solid-fill
+  // primitive, which isn't reliably honored by every PDF viewer — some
+  // just paint the RGB opaque and ignore alpha 0. Passing null for color
+  // (paint nothing at all) is unambiguous regardless of viewer, so that's
+  // used for anything with alpha 0 instead of trusting transparency.
+  final fillA = (e.fillColor >> 24) & 0xFF;
+  final strokeA = (e.strokeColor >> 24) & 0xFF;
+  final fill = fillA == 0 ? null : _pdfColor(e.fillColor);
+  final strokeColor = strokeA == 0 ? null : _pdfColor(e.strokeColor);
+  final border = strokeColor == null ? null : pw.Border.all(color: strokeColor, width: e.strokeWidth.clamp(0.5, 6.0));
   switch (e.shape) {
     case NgmySlideShapeKind.circle:
       return pw.Container(
         decoration: pw.BoxDecoration(shape: pw.BoxShape.circle, color: fill, border: border),
       );
     case NgmySlideShapeKind.line:
-      return pw.Center(child: pw.Container(height: e.strokeWidth + 1, color: stroke));
+      return strokeColor == null ? pw.SizedBox() : pw.Center(child: pw.Container(height: e.strokeWidth + 1, color: strokeColor));
     default:
       return pw.Container(
         decoration: pw.BoxDecoration(color: fill, border: border, borderRadius: pw.BorderRadius.circular(4)),
@@ -179,17 +187,41 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 }
 
 /// Builds a PDF that mirrors slide layout (backgrounds, positioned text, images).
+///
+/// The page itself is a real, standard paper size (A4) — PdfPageFormat's
+/// width/height are in points (1/72in), and the old code passed 960 (the
+/// on-screen reference canvas's pixel width) straight in, producing a
+/// roughly 13x24in custom page. Printers/viewers then had to shrink that
+/// whole oversized page down to fit actual paper, leaving the content
+/// looking tiny and stranded in the middle. The slide content is now
+/// centered within the real page, scaled up to fill it edge to edge on
+/// whichever dimension binds first (full height for a tall 9:16 deck).
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
-  const pageW = 960.0;
-  final pageH = pageW / deck.aspectValue;
-  final format = PdfPageFormat(pageW, pageH, marginAll: 0);
+  const pageFormat = PdfPageFormat.a4;
+  const margin = 16.0;
+  final availW = pageFormat.width - margin * 2;
+  final availH = pageFormat.height - margin * 2;
+  final aspect = deck.aspectValue; // width / height
+  var contentW = availW;
+  var contentH = contentW / aspect;
+  if (contentH > availH) {
+    contentH = availH;
+    contentW = contentH * aspect;
+  }
 
   for (final slide in deck.slides) {
     doc.addPage(
       pw.Page(
-        pageFormat: format,
-        build: (_) => _pdfSlidePage(slide, deck, pageW, pageH),
+        pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.all(margin),
+        build: (_) => pw.Center(
+          child: pw.SizedBox(
+            width: contentW,
+            height: contentH,
+            child: pw.ClipRect(child: _pdfSlidePage(slide, deck, contentW, contentH)),
+          ),
+        ),
       ),
     );
   }
