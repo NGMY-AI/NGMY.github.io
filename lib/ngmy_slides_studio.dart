@@ -3084,6 +3084,32 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     ),
                   ),
                 ),
+              if (marriage && e.fileName.startsWith('${kMarriageFieldPrefix}tarehe:'))
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        e.text = ngmyHatiKuhowaTodayDate();
+                      });
+                      _commitDraftIfNeeded();
+                      _syncDeckIntoList();
+                      _scheduleAutosave();
+                    },
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB8860B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.2),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4)],
+                      ),
+                      child: const Icon(Icons.today_rounded, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
               if (selected && e.type == NgmySlideElementType.text && _editingTextId != e.id && _isCompactLayout(context))
                 Positioned(
                   left: 0,

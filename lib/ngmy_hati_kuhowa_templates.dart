@@ -150,11 +150,13 @@ double _htw(String s, double fontSize) => s.length * fontSize * 0.0027 + 0.006;
 class HkSeg {
   const HkSeg.text(this.text)
       : blankKey = null,
-        blankW = 0;
-  const HkSeg.blank(this.blankKey, this.blankW) : text = '';
+        blankW = 0,
+        startText = '';
+  const HkSeg.blank(this.blankKey, this.blankW, [this.startText = '']) : text = '';
   final String text;
   final String? blankKey;
   final double blankW;
+  final String startText;
 }
 
 List<NgmySlideElement> _hRun(List<HkSeg> segs, double x, double y, {required int ink, double fontSize = 10.5}) {
@@ -166,7 +168,7 @@ List<NgmySlideElement> _hRun(List<HkSeg> segs, double x, double y, {required int
       out.add(_hLockedText(s.text, x: cx, y: y, w: w, h: 0.022, fontSize: fontSize, fontWeight: FontWeight.w500, color: ink, tag: 'run_${cx}_$y'));
       cx += w;
     } else {
-      out.add(_hBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize));
+      out.add(_hBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize, startText: s.startText));
       out.add(_hBlankUnderline(cx, y, s.blankW));
       cx += s.blankW + 0.007;
     }
@@ -182,13 +184,21 @@ List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {requ
   ];
 }
 
+/// Today's date as DD/MM/YYYY — used to auto-fill the Tarehe field so users
+/// don't have to type today's date by hand.
+String ngmyHatiKuhowaTodayDate() {
+  final now = DateTime.now();
+  String p2(int n) => n.toString().padLeft(2, '0');
+  return '${p2(now.day)}/${p2(now.month)}/${now.year}';
+}
+
 /// Boxed TAREHE field, top-right corner — matches the reference paper's
-/// bordered date box next to the title.
+/// bordered date box next to the title. Pre-filled with today's date.
 List<NgmySlideElement> _hTareheBox(double x, double y, double w, double h, {required int ink, required int accent}) {
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'tarehe_box'),
     _hLockedText('TAREHE:', x: x, y: y + 0.006, w: w, h: 0.016, fontSize: 8, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
-    _hBlank('tarehe', x + 0.012, y + 0.026, w - 0.024, ink: ink, fontSize: 9),
+    _hBlank('tarehe', x + 0.012, y + 0.026, w - 0.024, ink: ink, fontSize: 9, startText: ngmyHatiKuhowaTodayDate()),
     _hBlankUnderline(x + 0.012, y + 0.042, w - 0.024),
   ];
 }
@@ -319,56 +329,56 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.03, w: cw, h: 0.046, fontSize: 22, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   out.addAll(_hTareheBox(0.68, 0.026, 0.23, 0.048, ink: ink, accent: accent));
 
-  double y = 0.09;
-  out.addAll(_hBanner('UTANGULIZI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.046;
-
+  // UTANGULIZI — no banner/label, paragraph starts directly under the title,
+  // reproduced verbatim (including the repeated "[Jina la Mwanaume]" /
+  // "[Jina la Jamaa]" / "[Jina la Nyumba]" placeholders exactly as given).
+  double y = 0.098;
   out.addAll(_hRun([
     const HkSeg.text('Mimi '),
-    const HkSeg.blank('man_name1', 0.15),
+    const HkSeg.blank('man_name1', 0.15, '[Jina la Mwanaume]'),
     const HkSeg.text(', wa Jamaa la '),
-    const HkSeg.blank('family1', 0.15),
+    const HkSeg.blank('family1', 0.15, '[Jina la Jamaa]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.032;
+  y += 0.038;
   out.addAll(_hRun([
     const HkSeg.text('Nyumba ya '),
-    const HkSeg.blank('house1', 0.15),
+    const HkSeg.blank('house1', 0.15, '[Jina la Nyumba]'),
     const HkSeg.text(', nimetowa mahali ya kuhoweya'),
   ], cx, y, ink: ink));
-  y += 0.032;
+  y += 0.038;
   out.addAll(_hRun([
     const HkSeg.text('kijana wangu aitwaye '),
-    const HkSeg.blank('man_name2', 0.15),
+    const HkSeg.blank('man_name2', 0.15, '[Jina la Mwanaume]'),
     const HkSeg.text(', kwa '),
-    const HkSeg.blank('woman_name', 0.13),
+    const HkSeg.blank('woman_name', 0.13, '[Jina la Mwanamke]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.032;
+  y += 0.038;
   out.addAll(_hRun([
     const HkSeg.text('binti wa '),
-    const HkSeg.blank('woman_father', 0.17),
+    const HkSeg.blank('woman_father', 0.17, '[Jina la Baba wa Mwanamke]'),
     const HkSeg.text(', wa Jamaa la '),
-    const HkSeg.blank('family2', 0.15),
+    const HkSeg.blank('family2', 0.15, '[Jina la Jamaa]'),
     const HkSeg.text(','),
   ], cx, y, ink: ink));
-  y += 0.032;
+  y += 0.038;
   out.addAll(_hRun([
     const HkSeg.text('Nyumba ya '),
-    const HkSeg.blank('house2', 0.15),
+    const HkSeg.blank('house2', 0.15, '[Jina la Nyumba]'),
     const HkSeg.text('.'),
   ], cx, y, ink: ink));
-  y += 0.046;
+  y += 0.05;
 
   out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
   y += 0.044;
   out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'nimetowe_sub'));
   y += 0.026;
-  for (var i = 1; i <= 6; i++) {
+  for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
-    y += 0.03;
+    y += 0.04;
   }
-  y += 0.016;
+  y += 0.024;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
   y += 0.044;
@@ -379,11 +389,11 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW + 0.03, y: y, w: colW, h: 0.022, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mume'),
     _hLockedText('NGAMBO YA MUME', x: cx + colW + 0.03, y: y + 0.002, w: colW, h: 0.017, fontSize: 8.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mume_t'),
   ]);
-  y += 0.028;
+  y += 0.032;
   for (var n = 1; n <= 3; n++) {
     out.addAll(_hWitnessLine('mke', n, cx, y, colW, ink: ink, accent: accent));
     out.addAll(_hWitnessLine('mume', n, cx + colW + 0.03, y, colW, ink: ink, accent: accent));
-    y += 0.042;
+    y += 0.05;
   }
   y += 0.022;
 
