@@ -312,6 +312,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  void _launchHatiKuhowesha() {
+    launchNgmyHatiKuhowesha(
+      context: context,
+      savedDecks: _decks,
+      openDraftEditor: _openMarriageDraft,
+      openSavedDeck: _openDeck,
+    );
+  }
+
   Future<void> _openDocumentCategoryPicker() async {
     final category = await showModalBottomSheet<String>(
       context: context,
@@ -351,6 +360,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 subtitle: 'Hati ya mahari',
                 onTap: () => Navigator.pop(ctx, 'hati_kuhowa'),
               ),
+              const SizedBox(height: 10),
+              _DocumentCategoryTile(
+                icon: Icons.receipt_long_rounded,
+                colors: const [Color(0xFF3E7A4F), Color(0xFF14532D), Color(0xFF0A2E17)],
+                title: 'Hati ya Kuhoweya',
+                subtitle: 'Hati ya kupokea',
+                onTap: () => Navigator.pop(ctx, 'hati_kuhoweya'),
+              ),
             ],
           ),
         ),
@@ -361,6 +378,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _launchMarriageAgreement();
     } else if (category == 'hati_kuhowa') {
       _launchHatiKuhowa();
+    } else if (category == 'hati_kuhoweya') {
+      _launchHatiKuhowesha();
     }
   }
 
@@ -1839,9 +1858,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   Widget _deckTile(NgmySlideDeck deck, bool isDark, {int index = 0}) {
     final accent = deck.deckKind == 'hati_kuhowa'
         ? const [Color(0xFF2E4270), Color(0xFF12213D)]
-        : deck.isLockedTemplateDoc
-            ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
-            : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
+        : deck.deckKind == 'hati_kuhoweya'
+            ? const [Color(0xFF3E7A4F), Color(0xFF14532D)]
+            : deck.isLockedTemplateDoc
+                ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
+                : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {
@@ -1900,7 +1921,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                             ? 'Hati ya Kuhowesha • Updated ${_formatDate(deck.updatedAt)}'
                             : deck.deckKind == 'hati_kuhowa'
                                 ? 'Hati ya Kuhowa • Updated ${_formatDate(deck.updatedAt)}'
-                                : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
+                                : deck.deckKind == 'hati_kuhoweya'
+                                    ? 'Hati ya Kuhoweya • Updated ${_formatDate(deck.updatedAt)}'
+                                    : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                       ),
                       trailing: IconButton(

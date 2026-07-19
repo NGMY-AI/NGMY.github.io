@@ -338,7 +338,7 @@ class NgmySlideDeck {
   /// and future document categories) — these share the tap-to-fill-only
   /// editing behavior: everything except the blank fields and sign zones
   /// is locked in place.
-  bool get isLockedTemplateDoc => deckKind == 'marriage_agreement' || deckKind == 'hati_kuhowa';
+  bool get isLockedTemplateDoc => deckKind == 'marriage_agreement' || deckKind == 'hati_kuhowa' || deckKind == 'hati_kuhoweya';
 
   double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
 

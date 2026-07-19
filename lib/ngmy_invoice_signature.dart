@@ -40,9 +40,8 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
   final GlobalKey _padKey = GlobalKey();
 
   static const _inkChoices = [Color(0xFF111827), Color(0xFF1D4ED8), Color(0xFF7F1D1D), Color(0xFF14532D)];
-  static const _thicknessChoices = [2.2, 3.5, 5.2];
   Color _inkColor = _inkChoices.first;
-  double _strokeWidth = _thicknessChoices[1];
+  double _strokeWidth = 3.5;
 
   @override
   void initState() {
@@ -81,26 +80,45 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
     );
   }
 
-  Widget _thicknessDot(double w) {
-    final selected = w == _strokeWidth;
+  static const _minStroke = 1.4;
+  static const _maxStroke = 9.5;
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () => setState(() => _strokeWidth = w),
+      onTap: onTap,
       child: Container(
-        width: 30,
-        height: 30,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        alignment: Alignment.center,
+        width: 22,
+        height: 22,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: selected ? Colors.white.withOpacity(0.14) : Colors.transparent,
-          border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.white24, width: selected ? 1.4 : 1),
+          color: Colors.white.withOpacity(0.12),
+          border: Border.all(color: Colors.white24),
         ),
-        child: Container(
-          width: (w * 1.6).clamp(4.0, 11.0),
-          height: (w * 1.6).clamp(4.0, 11.0),
-          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-        ),
+        child: Icon(icon, size: 13, color: Colors.white),
       ),
+    );
+  }
+
+  /// A +/- stepper (two tappable dots) instead of fixed preset sizes, so
+  /// the user can dial the thickness in themselves rather than pick from
+  /// only 3 options.
+  Widget _thicknessStepper() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _stepBtn(Icons.remove_rounded, () => setState(() => _strokeWidth = (_strokeWidth - 0.7).clamp(_minStroke, _maxStroke))),
+        SizedBox(
+          width: 26,
+          child: Center(
+            child: Container(
+              width: (_strokeWidth * 1.5).clamp(4.0, 13.0),
+              height: (_strokeWidth * 1.5).clamp(4.0, 13.0),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            ),
+          ),
+        ),
+        _stepBtn(Icons.add_rounded, () => setState(() => _strokeWidth = (_strokeWidth + 0.7).clamp(_minStroke, _maxStroke))),
+      ],
     );
   }
 
@@ -124,31 +142,16 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
                 child: Row(
                   children: [
                     IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white70)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                          Text('Sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
-                        ],
-                      ),
-                    ),
+                    Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                    const SizedBox(width: 14),
+                    // Ink + thickness settings sit right here, between the
+                    // title/"sign the document" text and Clear/Done.
+                    ..._inkChoices.map(_inkSwatch),
+                    const SizedBox(width: 10),
+                    _thicknessStepper(),
+                    const Spacer(),
                     TextButton(onPressed: () => setState(_points.clear), child: const Text('Clear')),
                     FilledButton(onPressed: _done, child: const Text('Done')),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                child: Row(
-                  children: [
-                    Text('Ink', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w800)),
-                    const SizedBox(width: 6),
-                    ..._inkChoices.map(_inkSwatch),
-                    const SizedBox(width: 14),
-                    Text('Thickness', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.w800)),
-                    const SizedBox(width: 6),
-                    ..._thicknessChoices.map(_thicknessDot),
                   ],
                 ),
               ),

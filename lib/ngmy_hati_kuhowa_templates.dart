@@ -5,6 +5,7 @@ import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
 
 const String kNgmyHatiKuhowaDeckKind = 'hati_kuhowa';
+const String kNgmyHatiKuhoweshaDeckKind = 'hati_kuhoweya';
 
 /// Soft underlines — never dark/black (picker + print).
 const _softLine = 0xFFE2D8C8;
@@ -198,6 +199,34 @@ List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {requ
   ];
 }
 
+/// Same small-fit bordered frame as [_hBanner], but the word inside is a
+/// tap-to-edit field (not locked text) — used for Hati ya Kuhoweya's
+/// "NIMEPOKEYA CASH" header, which the user can rename.
+List<NgmySlideElement> _hBannerField(String key, String defaultText, double y, double x, double w, {required int fill}) {
+  const fontSize = 30.0;
+  final boxW = (defaultText.length * fontSize * 0.00058 + 0.08).clamp(0.2, 0.5);
+  const boxH = 0.062;
+  final bx = x + (w - boxW) / 2;
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$key'),
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.text,
+      x: bx,
+      y: y + 0.011,
+      w: boxW,
+      h: 0.044,
+      text: defaultText,
+      fontSize: fontSize,
+      fontWeight: FontWeight.w900,
+      fontStyle: FontStyle.normal,
+      color: fill,
+      align: TextAlign.center,
+      fileName: '$kMarriageFieldPrefix$key:${boxW.toStringAsFixed(3)}',
+    ),
+  ];
+}
+
 /// Today's date as DD/MM/YYYY — used to auto-fill the Tarehe field so users
 /// don't have to type today's date by hand.
 String ngmyHatiKuhowaTodayDate() {
@@ -226,8 +255,9 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
     _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: _hBlankH(20), fontSize: 20, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
     _hBlank('tarehe', valueX, y, valueW, ink: ink, fontSize: 21, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
     // Nudged right and closer to the text — it was sitting left of and
-    // below where the date glyphs actually render.
-    _hBlankUnderline(valueX + 0.008, y + _hBlankH(21) * 0.55, underlineW, color: accent),
+    // below where the date glyphs actually render. (Was tightened too far
+    // to *0.55 at one point — eased back out a little.)
+    _hBlankUnderline(valueX + 0.008, y + _hBlankH(21) * 0.8, underlineW, color: accent),
   ];
 }
 
@@ -362,12 +392,27 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id) {
 // A single printable page: title + Tarehe, UTANGULIZI, NIMETOWE, MASHAHIDI
 // (NGAMBO YA MKE then NGAMBO YA MUME, two columns), MWANDISHI.
 
-List<NgmySlideElement> _buildPageContent(NgmyHatiKuhowaTemplate tpl) {
+List<NgmySlideElement> _buildPageContent(
+  NgmyHatiKuhowaTemplate tpl, {
+  required String title,
+  required String introText,
+  required String sectionLabel,
+  required bool sectionLabelEditable,
+}) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
-  return [_hBgImage(bgUrl), ..._layoutSingle(tpl)];
+  return [
+    _hBgImage(bgUrl),
+    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable),
+  ];
 }
 
-List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
+List<NgmySlideElement> _layoutSingle(
+  NgmyHatiKuhowaTemplate tpl, {
+  required String title,
+  required String introText,
+  required String sectionLabel,
+  required bool sectionLabelEditable,
+}) {
   final ink = tpl.ink;
   final accent = tpl.accent;
   const cx = 0.09;
@@ -378,18 +423,18 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
   // border on the right (not just the content margin) — it used to share
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
-  out.add(_hLockedText('HATI YA KUHOWA', x: cx, y: 0.036, w: cw, h: 0.06, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.add(_hLockedText(title, x: cx, y: 0.036, w: cw, h: 0.06, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   // A small double-rule flourish sitting right under the title, not far
-  // below it — same tight spacing as the NIMETOWE item underlines.
+  // below it — same tight spacing as the NIMETOWE item underlines. Wide
+  // enough to span close to the title's own width on each side.
   out.addAll([
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.32, y: 0.09, w: cw * 0.36, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
-    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.4, y: 0.096, w: cw * 0.2, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.225, y: 0.09, w: cw * 0.55, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'),
+    _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.34, y: 0.096, w: cw * 0.32, h: 0.0018, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_2'),
   ]);
 
-  // UTANGULIZI — one wrapped paragraph field, reproduced verbatim (including
-  // the repeated "[Jina la Mwanaume]" / "[Jina la Jamaa]" / "[Jina la
-  // Nyumba]" placeholders exactly as given). Word-wrap keeps every line
-  // flush from the left edge to the right edge of the paper automatically.
+  // UTANGULIZI — one wrapped paragraph field, reproduced verbatim. Word-wrap
+  // keeps every line flush from the left edge to the right edge of the
+  // paper automatically.
   double y = 0.103;
   out.add(_hParagraphField(
     'utangulizi',
@@ -399,14 +444,15 @@ List<NgmySlideElement> _layoutSingle(NgmyHatiKuhowaTemplate tpl) {
     0.11,
     ink: ink,
     fontSize: 19,
-    startText: 'Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya '
-        '[Jina la Nyumba], nimetowa mahali ya kuhoweya kijana wangu aitwaye '
-        '[Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba '
-        'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].',
+    startText: introText,
   ));
   y += 0.116;
 
-  out.addAll(_hBanner('NIMETOWE', y, cx, cw, fill: tpl.bannerFill));
+  if (sectionLabelEditable) {
+    out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: tpl.bannerFill));
+  } else {
+    out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: tpl.bannerFill));
+  }
   y += 0.072;
   out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
@@ -528,6 +574,11 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
   );
 }
 
+const _kHatiKuhowaIntro = 'Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya '
+    '[Jina la Nyumba], nimetowa mahali ya kuhoweya kijana wangu aitwaye '
+    '[Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba '
+    'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].';
+
 /// Builds the single-page "Hati ya Kuhowa" deck from a paper template.
 NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
   ngmyClearMarriagePaperCache();
@@ -538,7 +589,13 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
     title: 'Hati ya Kuhowa',
     layout: NgmySlideLayout.blank,
     background: tpl.background,
-    elements: _buildPageContent(tpl),
+    elements: _buildPageContent(
+      tpl,
+      title: 'HATI YA KUHOWA',
+      introText: _kHatiKuhowaIntro,
+      sectionLabel: 'NIMETOWA',
+      sectionLabelEditable: false,
+    ),
   );
 
   return NgmySlideDeck(
@@ -551,17 +608,60 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
   );
 }
 
-Future<String?> showNgmyHatiKuhowaTemplatePicker(BuildContext context) async {
+const _kHatiKuhoweshaIntro = 'Mimi [Jina la Mwanamke], binti wa [Jina la Baba wa Mwanamke], wa '
+    'Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba], ninathibitisha '
+    'kwa hiari yangu kuwa nimemkubali [Jina la Mwanaume], mwana wa [Jina la '
+    'Baba wa Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la '
+    'Nyumba], kuwa mchumba wangu rasmi.';
+
+/// Builds the single-page "Hati ya Kuhoweya" deck — same paper, table,
+/// Mashahidi, and Mwandishi as Hati ya Kuhowa, but its own title (printed
+/// on the paper as "HATI YA KUHOWESHA" — same name as the older, separate
+/// Marriage Agreement document, per explicit request), its own intro
+/// paragraph, and an editable (not locked) section header defaulting to
+/// "NIMEPOKEYA CASH". The deck's own internal name stays "Hati ya Kuhoweya"
+/// so it reads as a distinct entry in the picker/deck list.
+NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId}) {
+  ngmyClearMarriagePaperCache();
+  final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
+
+  final page = NgmySlide(
+    id: NgmySlidesTemplates.newId(),
+    title: 'Hati ya Kuhoweya',
+    layout: NgmySlideLayout.blank,
+    background: tpl.background,
+    elements: _buildPageContent(
+      tpl,
+      title: 'HATI YA KUHOWESHA',
+      introText: _kHatiKuhoweshaIntro,
+      sectionLabel: 'NIMEPOKEYA CASH',
+      sectionLabelEditable: true,
+    ),
+  );
+
+  return NgmySlideDeck(
+    id: NgmySlidesTemplates.newId(),
+    name: 'Hati ya Kuhoweya — ${tpl.name}',
+    themeId: 'hati_kuhoweya_${tpl.id}',
+    aspectRatio: NgmySlideAspectRatio.portrait916,
+    deckKind: kNgmyHatiKuhoweshaDeckKind,
+    slides: [page],
+  );
+}
+
+Future<String?> showNgmyHatiKuhowaTemplatePicker(BuildContext context, {String docLabel = 'Hati ya Kuhowa'}) async {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => const _NgmyHatiKuhowaTemplatePickerSheet(),
+    builder: (ctx) => _NgmyHatiKuhowaTemplatePickerSheet(docLabel: docLabel),
   );
 }
 
 class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
-  const _NgmyHatiKuhowaTemplatePickerSheet();
+  const _NgmyHatiKuhowaTemplatePickerSheet({this.docLabel = 'Hati ya Kuhowa'});
+
+  final String docLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -609,7 +709,7 @@ class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
                           children: [
                             Text('Chagua muundo wa hati', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF12213D))),
                             const SizedBox(height: 2),
-                            const Text('Hati ya Kuhowa', style: TextStyle(fontSize: 11.5, color: Color(0xFFB8860B), fontWeight: FontWeight.w700)),
+                            Text(docLabel, style: const TextStyle(fontSize: 11.5, color: Color(0xFFB8860B), fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),
@@ -773,4 +873,81 @@ Future<void> launchNgmyHatiKuhowa({
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context);
   if (templateId == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiKuhowaDeck(templateId: templateId));
+}
+
+/// Launches the "Hati ya Kuhoweya" flow — same shape as [launchNgmyHatiKuhowa],
+/// but for the deck whose paper is titled "HATI YA KUHOWESHA".
+Future<void> launchNgmyHatiKuhowesha({
+  required BuildContext context,
+  required List<NgmySlideDeck> savedDecks,
+  required void Function(NgmySlideDeck deck) openDraftEditor,
+  required void Function(NgmySlideDeck deck) openSavedDeck,
+}) async {
+  final existing = savedDecks.where((d) => d.deckKind == kNgmyHatiKuhoweshaDeckKind).toList();
+
+  if (existing.isNotEmpty) {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF14192A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Hati ya Kuhoweya', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 8),
+              Text(
+                'Una hati ${existing.length} zilizohifadhiwa.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'continue'),
+                icon: const Icon(Icons.edit_document),
+                label: Text('Endelea na "${existing.first.name}"'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF12213D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'new'),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Hati mpya (chagua muundo)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (action == 'continue') {
+      openSavedDeck(existing.first.copy());
+      return;
+    }
+    if (action != 'new') return;
+  }
+
+  if (!context.mounted) return;
+  final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Hati ya Kuhoweya');
+  if (templateId == null || !context.mounted) return;
+  openDraftEditor(ngmyBuildHatiKuhoweshaDeck(templateId: templateId));
 }
