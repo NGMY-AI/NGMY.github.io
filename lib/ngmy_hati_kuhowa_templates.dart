@@ -220,7 +220,10 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
   // runs longer than the date itself.
   const underlineW = 0.12;
   return [
-    _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: 0.036, fontSize: 20, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
+    // Same height formula as the date value's own box (_hBlankH), so both
+    // are guaranteed to center on the exact same line — no more risk of
+    // "TAREHE:" and the date drifting to different heights.
+    _hLockedText('TAREHE:', x: x, y: y, w: labelW, h: _hBlankH(20), fontSize: 20, fontWeight: FontWeight.w800, align: TextAlign.left, color: accent, tag: 'tarehe_lbl'),
     _hBlank('tarehe', valueX, y, valueW, ink: ink, fontSize: 21, startText: ngmyHatiKuhowaTodayDate(), align: TextAlign.left),
     _hBlankUnderline(valueX, y + _hBlankH(21), underlineW, color: accent),
   ];

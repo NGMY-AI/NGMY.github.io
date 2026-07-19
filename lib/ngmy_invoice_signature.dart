@@ -60,42 +60,51 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
 
   @override
   Widget build(BuildContext context) {
+    // Sideways like a rotated video, without ever touching the OS/browser
+    // orientation APIs (those don't reliably apply here, which was the
+    // "screen moving" bug). RotatedBox just rotates the rendering — the
+    // page stays in its natural portrait orientation the whole time, so
+    // there's nothing for the browser to fight over, and Flutter transforms
+    // touch hit-testing through the rotation automatically.
     return Dialog.fullscreen(
       backgroundColor: const Color(0xFF0A0F1C),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white70)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                        Text('Sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
-                      ],
+      child: RotatedBox(
+        quarterTurns: 1,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white70)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                          Text('Sign with finger or stylus', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
+                        ],
+                      ),
                     ),
-                  ),
-                  TextButton(onPressed: () => setState(_points.clear), child: const Text('Clear')),
-                  FilledButton(onPressed: _done, child: const Text('Done')),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: _SignatureCanvas(
-                  key: _padKey,
-                  points: _points,
-                  onChanged: () => setState(() {}),
-                  borderColor: const Color(0xFF10B981),
+                    TextButton(onPressed: () => setState(_points.clear), child: const Text('Clear')),
+                    FilledButton(onPressed: _done, child: const Text('Done')),
+                  ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: _SignatureCanvas(
+                    key: _padKey,
+                    points: _points,
+                    onChanged: () => setState(() {}),
+                    borderColor: const Color(0xFF10B981),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -205,7 +214,7 @@ class _SignatureCanvas extends StatelessWidget {
                 onChanged();
               },
               child: CustomPaint(
-                painter: NgmySignaturePainter(points, canvasSize: Size(w, h)),
+                painter: NgmySignaturePainter(points, canvasSize: Size(w, h), liveDraw: true),
                 child: SizedBox(height: h, width: w),
               ),
             ),
@@ -225,12 +234,21 @@ class NgmySignaturePainter extends CustomPainter {
   final List<Offset?> points;
   final Color color;
   final Size canvasSize;
+  // While actively drawing, points must render at a fixed 1:1 scale against
+  // the canvas — fitSignatureToSize's "fit to content's bounding box,
+  // centered" logic recomputes on every repaint as the box grows with each
+  // new stroke, which rescales everything already drawn smaller and smaller.
+  // That's what read as "zooming out" while signing. Only use the
+  // fit-to-box behavior for a static, already-finished preview.
+  final bool liveDraw;
 
-  NgmySignaturePainter(this.points, {this.color = const Color(0xFF0F172A), required this.canvasSize});
+  NgmySignaturePainter(this.points, {this.color = const Color(0xFF0F172A), required this.canvasSize, this.liveDraw = false});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fitted = fitSignatureToSize(points, size);
+    final fitted = liveDraw
+        ? points.map((p) => p == null ? null : Offset(p.dx * size.width, p.dy * size.height)).toList()
+        : fitSignatureToSize(points, size);
     final stroke = (2.8 * (size.shortestSide / 280)).clamp(2.0, 4.5);
     final paint = Paint()
       ..color = color
