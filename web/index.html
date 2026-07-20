@@ -64,7 +64,28 @@
         }
       }
       window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
-      function checkForUpdate() {
+      var toastShown = false;
+      function showUpdateToast(build) {
+        if (toastShown || !document.body) return;
+        toastShown = true;
+        var el = document.createElement('div');
+        el.setAttribute('style', 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:999999;background:#1C1917;color:#fff;padding:10px 10px 10px 16px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;font-family:system-ui,sans-serif;font-size:13px;border:1px solid rgba(255,255,255,0.15);');
+        var msg = document.createElement('span');
+        msg.textContent = 'Toleo jipya liko tayari';
+        var btn = document.createElement('button');
+        btn.textContent = 'Sasisha';
+        btn.setAttribute('style', 'background:#B8860B;color:#fff;border:none;border-radius:10px;padding:7px 14px;font-weight:700;font-size:13px;');
+        btn.onclick = function () { forceRefreshForBuild(build, { deferIfVisible: false }); };
+        el.appendChild(msg);
+        el.appendChild(btn);
+        document.body.appendChild(el);
+      }
+      // silent:true is for the periodic check below — never auto-reloads
+      // (that would dump someone mid-edit), just queues the pending build
+      // and shows a small "update ready" toast the user can tap on their
+      // own terms.
+      function checkForUpdate(opts) {
+        var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (v) {
@@ -73,7 +94,12 @@
               try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
               return;
             }
-            forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+            if (silent) {
+              try { localStorage.setItem('ngmy_pending_deploy', v.build_number); } catch (e2) {}
+              showUpdateToast(v.build_number);
+            } else {
+              forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+            }
           })
           .catch(function () {});
       }
@@ -92,6 +118,15 @@
       window.addEventListener('pageshow', function (ev) {
         if (ev.persisted) checkForUpdate();
       });
+      // The gap this closes: if the tab/app just stays open and in the
+      // foreground the whole time (never backgrounded, never reloaded —
+      // exactly what happens during a long back-and-forth testing a fix),
+      // none of the checks above ever fire again, so a brand new deploy
+      // could go completely unnoticed no matter how many times it ships.
+      // This periodic, silent check is what actually surfaces it.
+      setInterval(function () {
+        if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
+      }, 45000);
     })();
   </script>
 
