@@ -69,7 +69,10 @@ void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
       e.fontSize = baseFontSize;
       e.w = naturalW.clamp(0.06, maxW);
     } else {
-      e.fontSize = ((maxW - 0.028) / (t.length * 0.001)).clamp(7.0, baseFontSize);
+      // 7pt read as "very very small" — 10pt is the floor now, even if a
+      // handful of pathologically long names end up sitting slightly
+      // tighter against the box edge than the math below targets.
+      e.fontSize = ((maxW - 0.028) / (t.length * 0.001)).clamp(10.0, baseFontSize);
       e.w = maxW;
     }
     return;

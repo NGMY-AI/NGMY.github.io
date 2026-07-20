@@ -302,7 +302,11 @@ List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, dou
   // BoxFit.contain is limited by whichever dimension is smallest, and a
   // too-short box was the reason nothing appeared even after the padding
   // fix.
-  final nameW = w * 0.48;
+  // Widened from 0.48 — the name field needs more room to keep a long name
+  // readable at close to its normal font size without wrapping onto a
+  // second line, borrowed from the signature zone's width (not its height,
+  // which is what actually matters for a usable signature).
+  final nameW = w * 0.58;
   final sahihiLblX = x + nameW + 0.01;
   final signX = sahihiLblX + 0.05;
   final signW = x + w - signX;
