@@ -506,13 +506,16 @@ List<NgmySlideElement> _layoutSingle(
   // MWANDISHI in its own small frame, never user-editable.
   final trimmedState = state.trim();
   if (trimmedState.isNotEmpty) {
-    const stateBoxH = 0.032;
-    const stateBoxW = 0.32;
+    // Tight fit on purpose: the remaining gap between MWANDISHI's bottom
+    // border and the paper's own outer frame is small, and the box was
+    // previously spilling past it.
+    const stateBoxH = 0.03;
+    const stateBoxW = 0.66;
     final stateBoxX = cx + (cw - stateBoxW) / 2;
-    final stateY = y + 0.016;
+    final stateY = y + 0.006;
     out.addAll([
       _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: stateBoxX, y: stateY, w: stateBoxW, h: stateBoxH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'state_box'),
-      _hLockedText(trimmedState, x: stateBoxX, y: stateY + 0.005, w: stateBoxW, h: stateBoxH - 0.01, fontSize: 13, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
+      _hLockedText("EMO 'YA M'MBONDO $trimmedState", x: stateBoxX, y: stateY + 0.003, w: stateBoxW, h: stateBoxH - 0.006, fontSize: 16, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
     ]);
   }
 
