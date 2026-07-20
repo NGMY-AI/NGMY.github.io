@@ -198,7 +198,15 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
         case NgmySlideElementType.image:
         case NgmySlideElementType.signature:
           if (e.imageRef != null && e.imageRef!.startsWith('data:image')) {
-            buf.write('<img src="${e.imageRef}" alt="" />');
+            // A full-slide background (the locked templates' paper texture,
+            // frame lines included) must stretch to cover its box like every
+            // other element does — the global `object-fit: contain` rule
+            // instead preserves its own aspect ratio, leaving it a smaller
+            // island once the page is stretched to fill real A4 while the
+            // text/table on top of it stretches to the full page.
+            final isFullBleedBg = e.type == NgmySlideElementType.image && e.x == 0 && e.y == 0 && e.w == 1 && e.h == 1;
+            final fitStyle = isFullBleedBg ? ' style="object-fit:fill"' : '';
+            buf.write('<img src="${e.imageRef}" alt=""$fitStyle />');
           }
         case NgmySlideElementType.pdf:
           buf.write('<div class="pdf"><div>📄 ${_escapeHtml(e.fileName.isEmpty ? 'PDF document' : e.fileName)}</div></div>');

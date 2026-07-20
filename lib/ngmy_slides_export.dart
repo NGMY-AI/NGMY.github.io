@@ -132,9 +132,21 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
     case NgmySlideElementType.image:
     case NgmySlideElementType.signature:
       final img = _pdfImageFromRef(e.imageRef);
+      // A full-bleed background (the locked templates' paper texture,
+      // including the decorative frame lines, is one full-slide image) is
+      // meant to cover its box edge to edge, same as every vector element
+      // on top of it — BoxFit.contain instead preserves the image's own
+      // aspect ratio and letterboxes it, so once the page got stretched to
+      // fill real A4 (non-uniformly, since the design's native shape is
+      // 9:16), the background stayed a smaller island while the text/
+      // table on top of it stretched to the full page, spilling past the
+      // frame lines baked into that now-undersized image. Only a true
+      // full-slide background should stretch to fill; a user's actual
+      // inserted photo (or a signature) should keep its own proportions.
+      final isFullBleedBg = e.type == NgmySlideElementType.image && e.x == 0 && e.y == 0 && e.w == 1 && e.h == 1;
       child = img == null
           ? pw.Center(child: pw.Text(e.fileName.isEmpty ? 'Image' : e.fileName, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)))
-          : pw.Image(img, fit: pw.BoxFit.contain);
+          : pw.Image(img, fit: isFullBleedBg ? pw.BoxFit.fill : pw.BoxFit.contain);
     case NgmySlideElementType.pdf:
       child = pw.Container(
         decoration: pw.BoxDecoration(
