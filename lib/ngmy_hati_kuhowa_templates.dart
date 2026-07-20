@@ -91,7 +91,7 @@ NgmySlideElement _hWatermark(int ink) {
     fontSize: 60,
     fontWeight: FontWeight.w900,
     align: TextAlign.center,
-    color: (0x15 << 24) | (ink & 0x00FFFFFF),
+    color: (0x0F << 24) | (ink & 0x00FFFFFF),
     rotation: -0.52,
     tag: 'watermark',
   );
