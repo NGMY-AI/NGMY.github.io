@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260720132729';
+      var embedded = '20260720134243';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -109,14 +109,20 @@
       // reloading it when reopened from the app switcher — this script would
       // otherwise never run again, leaving the app stuck on whatever build
       // was live at install time no matter how many times a new one ships.
-      // Re-check right when the app comes back to the foreground, same as a
-      // fresh open (the user hasn't started interacting with this session
-      // yet, so an immediate reload here is safe, not disruptive).
+      // Re-check right when the app comes back to the foreground so a stale
+      // install eventually notices a new deploy — but ALWAYS silent/deferred
+      // here, never the loud immediate reload. visibilitychange/pageshow
+      // fire on every brief backgrounding (switching apps for a second,
+      // screen auto-lock, a notification banner) while the user is very much
+      // mid-session, not just on a genuine close-and-reopen — a non-deferred
+      // reload here was yanking users back to Home while they were actively
+      // using the app. Only the toast-driven update (tap "Sasisha") or an
+      // actual fresh page load should ever reload.
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') checkForUpdate();
+        if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
       });
       window.addEventListener('pageshow', function (ev) {
-        if (ev.persisted) checkForUpdate();
+        if (ev.persisted) checkForUpdate({ silent: true });
       });
       // The gap this closes: if the tab/app just stays open and in the
       // foreground the whole time (never backgrounded, never reloaded —
@@ -659,7 +665,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260720132729";
+      var CURRENT = "20260720134243";
 
       function showError(msg) {
 
@@ -711,7 +717,7 @@
 
   <script>
     (function () {
-      var deployId = '20260720132729';
+      var deployId = '20260720134243';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
