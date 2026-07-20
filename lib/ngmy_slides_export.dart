@@ -245,7 +245,7 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   // a genuine zoom-in, not just less blank border. Scales the whole
   // composed page (frame image included) up around its center; whatever
   // spills past the page edge is cropped by the ClipRect below.
-  const zoom = 1.075;
+  const zoom = 1.0375;
   final contentW = pageFormat.width - margin * 2;
   final contentH = pageFormat.height - margin * 2;
 

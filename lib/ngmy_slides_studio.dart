@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -274,6 +275,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
+  static const _kMarriageHintSeenKey = 'ngmy_marriage_hint_seen';
+
   void _openMarriageDraft(NgmySlideDeck deck) {
     setState(() {
       _activeDeck = deck.copy();
@@ -286,6 +289,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _syncTextControllersForCurrentSlide();
       _ribbonTab = 'Home';
     });
+    unawaited(_maybeShowMarriageHint());
+  }
+
+  // Was showing every single time a locked-template document (Marriage
+  // Agreement, Hati ya Kuhowa/Kuhoweya) was opened — a one-time "how this
+  // works" hint doesn't need to repeat on every open. Now shown at most
+  // once ever per device.
+  Future<void> _maybeShowMarriageHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kMarriageHintSeenKey) == true) return;
+    await prefs.setBool(_kMarriageHintSeenKey, true);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Tap fields to edit names & amounts. Use Sign for signatures. Print from the View tab.'),
