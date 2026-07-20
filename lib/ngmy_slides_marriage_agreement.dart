@@ -69,10 +69,11 @@ void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
       e.fontSize = baseFontSize;
       e.w = naturalW.clamp(0.06, maxW);
     } else {
-      // 7pt read as "very very small" — 10pt is the floor now, even if a
-      // handful of pathologically long names end up sitting slightly
-      // tighter against the box edge than the math below targets.
-      e.fontSize = ((maxW - 0.028) / (t.length * 0.001)).clamp(10.0, baseFontSize);
+      // 10pt was still "kinda small" — 12pt is the floor now. For an
+      // unusually long two-word name this can sit a touch wider than
+      // maxW technically allows; that small a mismatch reads better than
+      // tiny text, which is what was explicitly asked for.
+      e.fontSize = ((maxW - 0.028) / (t.length * 0.001)).clamp(12.0, baseFontSize);
       e.w = maxW;
     }
     return;

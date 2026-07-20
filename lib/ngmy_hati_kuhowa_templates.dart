@@ -306,14 +306,14 @@ List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, dou
   // readable at close to its normal font size without wrapping onto a
   // second line, borrowed from the signature zone's width (not its height,
   // which is what actually matters for a usable signature).
-  final nameW = w * 0.58;
+  final nameW = w * 0.64;
   final sahihiLblX = x + nameW + 0.01;
   final signX = sahihiLblX + 0.05;
   final signW = x + w - signX;
   return [
     _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.024, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
-    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 13, startText: '[Jina la Shahidi]', align: TextAlign.left, autoShrinkFont: true),
-    _hBlankUnderline(x + 0.026, y + _hBlankH(13), nameW - 0.026),
+    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 16, startText: '[Jina la Shahidi]', align: TextAlign.left, autoShrinkFont: true),
+    _hBlankUnderline(x + 0.026, y + _hBlankH(16), nameW - 0.026),
     _hLockedText('Sahihi:', x: sahihiLblX, y: y, w: 0.046, h: 0.02, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
