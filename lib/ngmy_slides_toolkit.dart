@@ -177,8 +177,10 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   /* Requested after the margin was already trimmed to near zero: a real
      zoom-in on the whole slide (frame included), not just less border.
      `.slide` keeps overflow:hidden so whatever spills past the edge at
-     this scale gets cropped instead of pushing the page layout around. */
-  .zoom { position: absolute; inset: 0; transform: scale(1.0375); transform-origin: center center; }
+     this scale gets cropped instead of pushing the page layout around.
+     Width and height scale independently — a separate "wider on the
+     left and right only" request on top of the overall zoom. */
+  .zoom { position: absolute; inset: 0; transform: scaleX(1.0375) scaleY(1.01875); transform-origin: center center; }
   .el { position: absolute; overflow: hidden; }
   .txt { white-space: pre-wrap; word-break: break-word; }
   img { max-width: 100%; max-height: 100%; object-fit: contain; }

@@ -244,8 +244,11 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   // Requested after the print margin was already trimmed to near zero:
   // a genuine zoom-in, not just less blank border. Scales the whole
   // composed page (frame image included) up around its center; whatever
-  // spills past the page edge is cropped by the ClipRect below.
-  const zoom = 1.0375;
+  // spills past the page edge is cropped by the ClipRect below. Height
+  // and width are scaled independently — a separate "wider on the left
+  // and right only" request on top of the overall zoom.
+  const zoomY = 1.01875;
+  const zoomX = 1.0375;
   final contentW = pageFormat.width - margin * 2;
   final contentH = pageFormat.height - margin * 2;
 
@@ -258,8 +261,9 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
           width: contentW,
           height: contentH,
           child: pw.ClipRect(
-            child: pw.Transform.scale(
-              scale: zoom,
+            child: pw.Transform(
+              transform: Matrix4.diagonal3Values(zoomX, zoomY, 1),
+              alignment: pw.Alignment.center,
               child: _pdfSlidePage(slide, deck, contentW, contentH),
             ),
           ),
