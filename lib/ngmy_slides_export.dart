@@ -122,8 +122,16 @@ pw.Widget _pdfShape(NgmySlideElement e, double pageW) {
 pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
   final left = e.x * pageW;
   final top = e.y * pageH;
-  final width = (e.w * pageW).clamp(12.0, pageW);
-  final height = (e.h * pageH).clamp(12.0, pageH);
+  // A 12pt floor makes sense for text/image boxes (nothing legible should
+  // render smaller than that), but decorative bar shapes — the title's
+  // underline rule, the witness table's column divider — are authored a
+  // couple of points thick on purpose and fill their *entire* box. Forcing
+  // that box up to 12pt turned a ~1.5-2pt line into one 6-9x thicker than
+  // designed, which is exactly the "thick when I print" report: the
+  // on-screen editor never applies this floor, so it never showed there.
+  final minSize = e.type == NgmySlideElementType.shape ? 0.4 : 12.0;
+  final width = (e.w * pageW).clamp(minSize, pageW);
+  final height = (e.h * pageH).clamp(minSize, pageH);
 
   pw.Widget child;
   switch (e.type) {
@@ -232,7 +240,7 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
   const pageFormat = PdfPageFormat.a4;
-  const margin = 14.0;
+  const margin = 7.0;
   final contentW = pageFormat.width - margin * 2;
   final contentH = pageFormat.height - margin * 2;
 
