@@ -200,7 +200,14 @@ NgmySlideElement _hParagraphField(
 // MASHAHIDI were tall enough to crowd the rows around them.
 // Width/fontSize untouched; the text's own vertical offset scales down
 // with it so it stays centered in the shorter box.
-const _bannerBoxH = 0.05;
+// Shrunk further per request — the left/right border strokes (the box's
+// "poles") read as too tall relative to the word inside them.
+const _bannerBoxH = 0.036;
+// The text's own top padding and line-box height stay proportional to
+// _bannerBoxH via these ratios, so the word stays centered inside the box
+// no matter how tall/short _bannerBoxH is tuned to.
+const _bannerTextYRatio = 0.17;
+const _bannerTextHRatio = 0.70;
 
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill}) {
   const fontSize = 30.0;
@@ -209,7 +216,7 @@ List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {requ
   final bx = x + (w - boxW) / 2;
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$text'),
-    _hLockedText(text, x: bx, y: y + 0.0085, w: boxW, h: 0.035, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
+    _hLockedText(text, x: bx, y: y + boxH * _bannerTextYRatio, w: boxW, h: boxH * _bannerTextHRatio, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
   ];
 }
 
@@ -227,9 +234,9 @@ List<NgmySlideElement> _hBannerField(String key, String defaultText, double y, d
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.text,
       x: bx,
-      y: y + 0.0085,
+      y: y + boxH * _bannerTextYRatio,
       w: boxW,
-      h: 0.035,
+      h: boxH * _bannerTextHRatio,
       text: defaultText,
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
@@ -474,23 +481,32 @@ List<NgmySlideElement> _layoutSingle(
   // are trimmed slightly to give this back the room it needs without
   // pushing everything below off the bottom of the page.
   y += 0.165;
+  // Extra breathing room so the (now shorter) NIMETOWA/NIMEPOKEYA CASH
+  // frame sits lower under the intro paragraph, per request to bring it
+  // down.
+  y += 0.016;
 
   if (sectionLabelEditable) {
     out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: tpl.bannerFill));
   } else {
     out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: tpl.bannerFill));
   }
-  y += 0.062;
+  // Was 0.062 — trimmed to match the shrunk banner box height.
+  y += 0.048;
   out.add(_hLockedText('Vitu vifuatavyo vimetolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
     y += 0.04;
   }
-  y += 0.014;
+  // Was 0.014 — tightened so the MASHAHIDI frame moves up, per request.
+  y += 0.006;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
-  y += 0.067;
+  // Was 0.067 — shrunk banner box + tightened margin brings the witness
+  // table (and everything below it: MWANDISHI bar, state box) up too,
+  // since they're all positioned relative to this cumulative `y`.
+  y += 0.046;
 
   // MASHAHIDI as one bordered table: a single outer frame around both
   // columns with one vertical line dividing NGAMBO YA MKE from NGAMBO YA
