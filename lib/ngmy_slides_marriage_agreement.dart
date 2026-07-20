@@ -43,13 +43,35 @@ void ngmyMarriagePackRow(NgmySlide slide, double anchorY) {
 }
 
 /// Shrink editable field width when user types a short name.
+///
+/// Fields tagged with a third `:baseFontSize` segment (see _hBlank's
+/// autoShrinkFont param) additionally shrink their FONT SIZE instead of
+/// letting long text wrap onto a second line — a witness name that's too
+/// long to fit at the normal size otherwise wraps, throwing that one row
+/// out of alignment with every other name in the table (which stay on a
+/// single line). Fields without that third segment keep the old
+/// width-only behavior unchanged.
 void ngmyMarriageAutoFitField(NgmySlideElement e, String text) {
   if (!ngmyMarriageElementIsField(e)) return;
   final parts = e.fileName.split(':');
-  final maxW = parts.length > 1 ? (double.tryParse(parts.last) ?? e.w) : e.w;
+  final maxW = parts.length > 1 ? (double.tryParse(parts[1]) ?? e.w) : e.w;
+  final baseFontSize = parts.length > 2 ? double.tryParse(parts[2]) : null;
   final t = text.trim();
   if (t.isEmpty) {
     e.w = maxW;
+    if (baseFontSize != null) e.fontSize = baseFontSize;
+    return;
+  }
+  if (baseFontSize != null) {
+    final perCharAtBase = baseFontSize * 0.001;
+    final naturalW = t.length * perCharAtBase + 0.028;
+    if (naturalW <= maxW) {
+      e.fontSize = baseFontSize;
+      e.w = naturalW.clamp(0.06, maxW);
+    } else {
+      e.fontSize = ((maxW - 0.028) / (t.length * 0.001)).clamp(7.0, baseFontSize);
+      e.w = maxW;
+    }
     return;
   }
   // Per-character width must scale with the field's own font size — this

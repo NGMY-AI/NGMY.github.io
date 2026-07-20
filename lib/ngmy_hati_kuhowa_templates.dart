@@ -128,6 +128,11 @@ NgmySlideElement _hBlank(
   double fontSize = 8.5,
   String startText = '',
   TextAlign align = TextAlign.center,
+  // When true, a name too long to fit at `fontSize` shrinks the font
+  // instead of wrapping onto a second line — for fields like the
+  // witness table's names, where a wrapped row would sit visually out
+  // of alignment with every other single-line row around it.
+  bool autoShrinkFont = false,
 }) {
   return NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
@@ -142,7 +147,9 @@ NgmySlideElement _hBlank(
     fontStyle: FontStyle.italic,
     color: ink,
     align: align,
-    fileName: '$kMarriageFieldPrefix$key:${w.toStringAsFixed(3)}',
+    fileName: autoShrinkFont
+        ? '$kMarriageFieldPrefix$key:${w.toStringAsFixed(3)}:${fontSize.toStringAsFixed(1)}'
+        : '$kMarriageFieldPrefix$key:${w.toStringAsFixed(3)}',
   );
 }
 
@@ -301,7 +308,7 @@ List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, dou
   final signW = x + w - signX;
   return [
     _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.024, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
-    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 13, startText: '[Jina la Shahidi]', align: TextAlign.left),
+    _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 13, startText: '[Jina la Shahidi]', align: TextAlign.left, autoShrinkFont: true),
     _hBlankUnderline(x + 0.026, y + _hBlankH(13), nameW - 0.026),
     _hLockedText('Sahihi:', x: sahihiLblX, y: y, w: 0.046, h: 0.02, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
     NgmySlideElement(
@@ -331,7 +338,7 @@ List<NgmySlideElement> _hMwandishiBar(double x, double y, double w, {required in
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.11, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.2, tag: 'mw_box'),
     _hLockedText('MWANDISHI', x: x + 0.022, y: y + 0.016, w: w - 0.044, h: 0.026, fontSize: 15, fontWeight: FontWeight.w800, color: accent, tag: 'mw_hdr'),
     _hLockedText('Jina:', x: x + 0.022, y: y + 0.056, w: 0.09, h: 0.028, fontSize: 15, fontWeight: FontWeight.w600, color: ink, tag: 'mw_jl'),
-    _hBlank('mwandishi_jina', x + 0.125, y + 0.056, w * 0.38, ink: ink, fontSize: 15, align: TextAlign.left),
+    _hBlank('mwandishi_jina', x + 0.125, y + 0.056, w * 0.38, ink: ink, fontSize: 15, align: TextAlign.left, autoShrinkFont: true),
     _hBlankUnderline(x + 0.125, y + baselineOffset - 0.002, w * 0.38),
     _hLockedText('Sahihi:', x: x + w * 0.5, y: y + 0.056, w: 0.09, h: 0.028, fontSize: 15, fontWeight: FontWeight.w600, color: ink, tag: 'mw_sl'),
     NgmySlideElement(
