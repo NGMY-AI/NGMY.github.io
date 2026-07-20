@@ -72328,7 +72328,7 @@ dkl(a,b,c,d,e,f,g,h,i){var s=A.bZ(),r=B.l.O(g*0.0017,0.02,0.06),q="marriage_fiel
 return A.eb(e,!1,h,B.a8,f?q+B.l.a9(d,3)+":"+B.m.a9(g,1):q+B.l.a9(d,3),4280640491,g,B.cY,B.O,r,s,null,0,0,B.b0,4280172719,2,i,0,B.bG,B.cc,d,b,c)},
 b_6(a,b,c,d){return A.GS(0,0.002,B.e3,d,0.8,"ul_"+A.t(a)+"_"+A.t(b),c,a,b+0.002)},
 dXz(a,b,c,d,e){var s=B.l.O(a.length*30*0.00058+0.08,0.2,0.5),r=c+(d-s)/2
-return A.a([A.GS(0,0.05,B.b0,e,1.4,"banner_box_"+a,s,r,b),A.vV(a,B.P,e,30,B.D,0.035,"banner_t_"+a,s,r,b+0.0085)],t.pt)},
+return A.a([A.GS(0,0.036,B.b0,e,1.4,"banner_box_"+a,s,r,b),A.vV(a,B.P,e,30,B.D,0.025199999999999997,"banner_t_"+a,s,r,b+0.00612)],t.pt)},
 e04(){var s=new A.R(Date.now(),0,!1),r=new A.dv_()
 return A.t(r.$1(A.cf(s)))+"/"+A.t(r.$1(A.bY(s)))+"/"+A.bX(s)},
 dXA(a,b,c,d,e,f,g){var s=4293056712,r=e*0.64,q=c+r+0.01,p=q+0.05,o=c+e-p,n=""+b,m=c+0.026,l=r-0.026
@@ -72348,11 +72348,11 @@ b0.push(A.eb(B.aX,!1,a7,B.a8,"marriage_field_utangulizi:"+B.l.a9(0.82,3),a1,19,B
 s=b1.w
 if(b5){r=B.l.O(b4.length*30*0.00058+0.08,0.2,0.5)
 q=0.09+(0.82-r)/2
-p=A.GS(0,0.05,B.b0,s,1.4,"banner_box_nimetowe_label",r,q,0.268)
+p=A.GS(0,0.036,B.b0,s,1.4,"banner_box_nimetowe_label",r,q,0.28400000000000003)
 o=A.bZ()
-B.f.A(b0,A.a([p,A.eb(B.P,!1,s,B.a8,"marriage_field_nimetowe_label:"+B.l.a9(r,3),a1,30,B.be,B.D,0.035,o,a0,0,0,B.b0,a2,2,b4,0,B.bG,B.cc,r,q,0.2765)],a9))}else B.f.A(b0,A.dXz(b4,0.268,0.09,0.82,s))
-b0.push(A.vV("Vitu vifuatavyo vimetolewa:",B.aX,a7,20,B.O,0.03,"nimetowe_sub",0.82,0.09,0.33))
-for(n=0.36,m=1;m<=4;++m){p=b3[m-1]
+B.f.A(b0,A.a([p,A.eb(B.P,!1,s,B.a8,"marriage_field_nimetowe_label:"+B.l.a9(r,3),a1,30,B.be,B.D,0.025199999999999997,o,a0,0,0,B.b0,a2,2,b4,0,B.bG,B.cc,r,q,0.29012000000000004)],a9))}else B.f.A(b0,A.dXz(b4,0.28400000000000003,0.09,0.82,s))
+b0.push(A.vV("Vitu vifuatavyo vimetolewa:",B.aX,a7,20,B.O,0.03,"nimetowe_sub",0.82,0.09,0.332))
+for(n=0.362,m=1;m<=4;++m){p=b3[m-1]
 o=""+m
 l="nim_n_"+o
 k=Date.now()
@@ -72368,9 +72368,9 @@ e=$.f3
 $.f3=e+1
 g=g.length===0?a3:a6+g
 B.f.A(b0,A.a([new A.eX(""+1000*k+"_"+j,B.cc,0.09,n,0.038,0.034,o+".",21,B.J,B.be,B.a8,a8,B.aX,a0,B.b0,a1,a2,2,0,!1,l,0,B.bG,0),p,new A.eX(""+1000*f+"_"+e,B.ef,0.132,i+h+0.002,0.7779999999999999,0.002,"",24,B.a_,B.be,B.a8,a5,B.aX,a0,B.e3,0,a4,0.8,0,!1,g,0,B.bG,0)],a9))
-n+=0.04}n+=0.014
+n+=0.04}n+=0.006
 B.f.A(b0,A.dXz("MASHAHIDI",n,0.09,0.82,s))
-n+=0.067
+n+=0.046
 s=n+0.05
 p=n+0.012
 B.f.A(b0,A.a([A.GS(0,0.22900000000000004,B.b0,a8,1.3,"wit_table_border",0.82,0.09,n),A.GS(a8,0.22900000000000004,B.b0,a8,0,"wit_table_divider",0.0024,0.4988,n),A.GS(0,0.0022,B.e3,a8,1.1,"wit_table_hdrline",0.82,0.09,s),A.vV("NGAMBO YA MKE",B.P,a8,20,B.D,0.03,"wit_h_mke_t",0.41,0.09,p),A.vV("NGAMBO YA MUME",B.P,a8,20,B.D,0.03,"wit_h_mume_t",0.41,0.5,p)],a9))
