@@ -211,6 +211,13 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
                 border: pw.Border.all(color: PdfColors.grey400),
                 borderRadius: pw.BorderRadius.circular(4),
               ),
+              // pw.Image shrinks its own layout box to the fitted image
+              // size (unlike Flutter's Image, which fills the given box and
+              // centers internally) — without this, Container has no Align
+              // wrapper and the shrunk box sinks to a corner instead of
+              // staying centered, which is why signatures drifted to the
+              // bottom only in the printed/downloaded PDF.
+              alignment: pw.Alignment.center,
               child: child,
             )
           : child,
