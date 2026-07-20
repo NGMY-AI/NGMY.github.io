@@ -174,6 +174,11 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; }
   h1 { font-size: 14px; margin: 6px 10mm; }
   .slide { page-break-after: always; width: 100%; height: ${pageHmm - marginMm * 2}mm; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }
+  /* Requested after the margin was already trimmed to near zero: a real
+     zoom-in on the whole slide (frame included), not just less border.
+     `.slide` keeps overflow:hidden so whatever spills past the edge at
+     this scale gets cropped instead of pushing the page layout around. */
+  .zoom { position: absolute; inset: 0; transform: scale(1.15); transform-origin: center center; }
   .el { position: absolute; overflow: hidden; }
   .txt { white-space: pre-wrap; word-break: break-word; }
   img { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -185,6 +190,7 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
     final slide = deck.slides[i];
     final bg = slide.background.toRadixString(16).padLeft(8, '0').substring(2);
     buf.writeln('<div class="slide" style="background:#$bg">');
+    buf.writeln('<div class="zoom">');
     for (final e in slide.elements) {
       final left = (e.x * 100).toStringAsFixed(2);
       final top = (e.y * 100).toStringAsFixed(2);
@@ -215,7 +221,8 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
       }
       buf.writeln('</div>');
     }
-    buf.writeln('</div>');
+    buf.writeln('</div>'); // .zoom
+    buf.writeln('</div>'); // .slide
   }
   buf.writeln('</body></html>');
   return buf.toString();

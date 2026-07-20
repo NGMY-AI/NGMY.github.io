@@ -241,6 +241,11 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
   const pageFormat = PdfPageFormat.a4;
   const margin = 2.5;
+  // Requested after the print margin was already trimmed to near zero:
+  // a genuine zoom-in, not just less blank border. Scales the whole
+  // composed page (frame image included) up around its center; whatever
+  // spills past the page edge is cropped by the ClipRect below.
+  const zoom = 1.15;
   final contentW = pageFormat.width - margin * 2;
   final contentH = pageFormat.height - margin * 2;
 
@@ -252,7 +257,12 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
         build: (_) => pw.SizedBox(
           width: contentW,
           height: contentH,
-          child: pw.ClipRect(child: _pdfSlidePage(slide, deck, contentW, contentH)),
+          child: pw.ClipRect(
+            child: pw.Transform.scale(
+              scale: zoom,
+              child: _pdfSlidePage(slide, deck, contentW, contentH),
+            ),
+          ),
         ),
       ),
     );
