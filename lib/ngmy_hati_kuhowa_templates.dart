@@ -758,7 +758,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: 'Hati ya Kuhowa — ${tpl.name}',
+    name: 'Hati ya Kuhowa',
     themeId: 'hati_kuhowa_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhowaDeckKind,
@@ -813,7 +813,7 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: 'Hati ya Kuhoweya — ${tpl.name}',
+    name: 'Hati ya Kuhoweya',
     themeId: 'hati_kuhoweya_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhoweshaDeckKind,

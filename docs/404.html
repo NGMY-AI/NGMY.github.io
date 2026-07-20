@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260720134243';
+      var embedded = '20260720135558';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -64,26 +64,10 @@
         }
       }
       window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
-      var toastShown = false;
-      function showUpdateToast(build) {
-        if (toastShown || !document.body) return;
-        toastShown = true;
-        var el = document.createElement('div');
-        el.setAttribute('style', 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:999999;background:#1C1917;color:#fff;padding:10px 10px 10px 16px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;font-family:system-ui,sans-serif;font-size:13px;border:1px solid rgba(255,255,255,0.15);');
-        var msg = document.createElement('span');
-        msg.textContent = 'Toleo jipya liko tayari';
-        var btn = document.createElement('button');
-        btn.textContent = 'Sasisha';
-        btn.setAttribute('style', 'background:#B8860B;color:#fff;border:none;border-radius:10px;padding:7px 14px;font-weight:700;font-size:13px;');
-        btn.onclick = function () { forceRefreshForBuild(build, { deferIfVisible: false }); };
-        el.appendChild(msg);
-        el.appendChild(btn);
-        document.body.appendChild(el);
-      }
-      // silent:true is for the periodic check below — never auto-reloads
-      // (that would dump someone mid-edit), just queues the pending build
-      // and shows a small "update ready" toast the user can tap on their
-      // own terms.
+      // silent:true is for the periodic/visibility checks — never auto-reloads
+      // (that would dump someone mid-edit) and never shows a popup; it just
+      // queues the pending build so a genuine cold reopen (a real fresh page
+      // load, handled by the non-silent call below) picks it up right away.
       function checkForUpdate(opts) {
         var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -96,7 +80,6 @@
             }
             if (silent) {
               try { localStorage.setItem('ngmy_pending_deploy', v.build_number); } catch (e2) {}
-              showUpdateToast(v.build_number);
             } else {
               forceRefreshForBuild(v.build_number, { deferIfVisible: false });
             }
@@ -665,7 +648,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260720134243";
+      var CURRENT = "20260720135558";
 
       function showError(msg) {
 
@@ -717,7 +700,7 @@
 
   <script>
     (function () {
-      var deployId = '20260720134243';
+      var deployId = '20260720135558';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;

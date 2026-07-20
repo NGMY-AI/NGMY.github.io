@@ -579,7 +579,7 @@ NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: 'Hati ya Kuhowesha — ${tpl.name}',
+    name: 'Hati ya Kuhowesha',
     themeId: 'marriage_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: 'marriage_agreement',
