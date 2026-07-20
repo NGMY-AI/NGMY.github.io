@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260719222942';
+      var embedded = '20260720015835';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -64,19 +64,34 @@
         }
       }
       window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
-      // Cold open / fresh document only: if the server has a newer build, reload once.
-      // Never auto-reload later while the user is mid-session (that dumps them on Home).
-      fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (v) {
-          if (!v || !v.build_number) return;
-          if (v.build_number === embedded) {
-            try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
-            return;
-          }
-          forceRefreshForBuild(v.build_number, { deferIfVisible: false });
-        })
-        .catch(function () {});
+      function checkForUpdate() {
+        fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (v) {
+            if (!v || !v.build_number) return;
+            if (v.build_number === embedded) {
+              try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
+              return;
+            }
+            forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+          })
+          .catch(function () {});
+      }
+      // Cold open / fresh document: if the server has a newer build, reload once.
+      checkForUpdate();
+      // iOS home-screen PWAs typically *resume* a suspended page instead of
+      // reloading it when reopened from the app switcher — this script would
+      // otherwise never run again, leaving the app stuck on whatever build
+      // was live at install time no matter how many times a new one ships.
+      // Re-check right when the app comes back to the foreground, same as a
+      // fresh open (the user hasn't started interacting with this session
+      // yet, so an immediate reload here is safe, not disruptive).
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') checkForUpdate();
+      });
+      window.addEventListener('pageshow', function (ev) {
+        if (ev.persisted) checkForUpdate();
+      });
     })();
   </script>
 
@@ -609,7 +624,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260719222942";
+      var CURRENT = "20260720015835";
 
       function showError(msg) {
 
@@ -661,7 +676,7 @@
 
   <script>
     (function () {
-      var deployId = '20260719222942';
+      var deployId = '20260720015835';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
