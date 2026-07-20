@@ -196,14 +196,20 @@ NgmySlideElement _hParagraphField(
 /// A section header (NIMETOWE / MASHAHIDI) — a small bordered frame sized
 /// to fit the word (not a fixed width shared by both, and not oversized —
 /// an oversized box was overlapping the table that follows it).
+// Height only, per request — NIMETOWA/NIMEPOKEYA CASH and MASHAHIDI were
+// tall enough to crowd the rows around them. Width/fontSize untouched;
+// the text's own vertical offset is scaled down by the same ratio so it
+// stays centered in the shorter box instead of sitting off-center.
+const _bannerBoxH = 0.056;
+
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill}) {
   const fontSize = 30.0;
   final boxW = (text.length * fontSize * 0.00058 + 0.08).clamp(0.2, 0.5);
-  const boxH = 0.062;
+  const boxH = _bannerBoxH;
   final bx = x + (w - boxW) / 2;
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$text'),
-    _hLockedText(text, x: bx, y: y + 0.011, w: boxW, h: 0.044, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
+    _hLockedText(text, x: bx, y: y + 0.01, w: boxW, h: 0.04, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
   ];
 }
 
@@ -213,7 +219,7 @@ List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {requ
 List<NgmySlideElement> _hBannerField(String key, String defaultText, double y, double x, double w, {required int fill}) {
   const fontSize = 30.0;
   final boxW = (defaultText.length * fontSize * 0.00058 + 0.08).clamp(0.2, 0.5);
-  const boxH = 0.062;
+  const boxH = _bannerBoxH;
   final bx = x + (w - boxW) / 2;
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$key'),
@@ -221,9 +227,9 @@ List<NgmySlideElement> _hBannerField(String key, String defaultText, double y, d
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.text,
       x: bx,
-      y: y + 0.011,
+      y: y + 0.01,
       w: boxW,
-      h: 0.044,
+      h: 0.04,
       text: defaultText,
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
