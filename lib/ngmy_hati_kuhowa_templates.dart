@@ -196,11 +196,11 @@ NgmySlideElement _hParagraphField(
 /// A section header (NIMETOWE / MASHAHIDI) — a small bordered frame sized
 /// to fit the word (not a fixed width shared by both, and not oversized —
 /// an oversized box was overlapping the table that follows it).
-// Height only, per request — NIMETOWA/NIMEPOKEYA CASH and MASHAHIDI were
-// tall enough to crowd the rows around them. Width/fontSize untouched;
-// the text's own vertical offset is scaled down by the same ratio so it
-// stays centered in the shorter box instead of sitting off-center.
-const _bannerBoxH = 0.056;
+// Height only, per repeated request — NIMETOWA/NIMEPOKEYA CASH and
+// MASHAHIDI were tall enough to crowd the rows around them.
+// Width/fontSize untouched; the text's own vertical offset scales down
+// with it so it stays centered in the shorter box.
+const _bannerBoxH = 0.05;
 
 List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {required int fill}) {
   const fontSize = 30.0;
@@ -209,7 +209,7 @@ List<NgmySlideElement> _hBanner(String text, double y, double x, double w, {requ
   final bx = x + (w - boxW) / 2;
   return [
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: bx, y: y, w: boxW, h: boxH, fillColor: 0x00000000, strokeColor: fill, strokeWidth: 1.4, tag: 'banner_box_$text'),
-    _hLockedText(text, x: bx, y: y + 0.01, w: boxW, h: 0.04, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
+    _hLockedText(text, x: bx, y: y + 0.0085, w: boxW, h: 0.035, fontSize: fontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: fill, tag: 'banner_t_$text'),
   ];
 }
 
@@ -227,9 +227,9 @@ List<NgmySlideElement> _hBannerField(String key, String defaultText, double y, d
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.text,
       x: bx,
-      y: y + 0.01,
+      y: y + 0.0085,
       w: boxW,
-      h: 0.04,
+      h: 0.035,
       text: defaultText,
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
@@ -473,7 +473,7 @@ List<NgmySlideElement> _layoutSingle(
   // even though the box itself wasn't the problem. The next few gaps
   // are trimmed slightly to give this back the room it needs without
   // pushing everything below off the bottom of the page.
-  y += 0.16;
+  y += 0.165;
 
   if (sectionLabelEditable) {
     out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: tpl.bannerFill));
@@ -487,7 +487,7 @@ List<NgmySlideElement> _layoutSingle(
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
     y += 0.04;
   }
-  y += 0.011;
+  y += 0.014;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
   y += 0.067;
@@ -532,13 +532,14 @@ List<NgmySlideElement> _layoutSingle(
   // MWANDISHI in its own small frame, never user-editable.
   final trimmedState = state.trim();
   if (trimmedState.isNotEmpty) {
-    // Tight fit on purpose: the remaining gap between MWANDISHI's bottom
-    // border and the paper's own outer frame is small, and the box was
-    // previously spilling past it.
-    const stateBoxH = 0.04;
+    // The remaining gap between MWANDISHI's bottom border and the paper's
+    // own outer frame is small, and the box was spilling past it — a
+    // slightly bigger top gap plus a shorter box brings its bottom edge
+    // back up inside the frame.
+    const stateBoxH = 0.032;
     const stateBoxW = 0.7;
     final stateBoxX = cx + (cw - stateBoxW) / 2;
-    final stateY = y + 0.003;
+    final stateY = y + 0.006;
     out.addAll([
       _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: stateBoxX, y: stateY, w: stateBoxW, h: stateBoxH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'state_box'),
       _hLockedText("EMO 'YA M'MBONDO $trimmedState", x: stateBoxX, y: stateY + 0.003, w: stateBoxW, h: stateBoxH - 0.006, fontSize: 26, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
