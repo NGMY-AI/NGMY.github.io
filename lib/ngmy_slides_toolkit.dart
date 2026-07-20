@@ -165,7 +165,7 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
   // to the deck's own aspect ratio) is what actually fills real paper.
   const pageWmm = 210.0;
   const pageHmm = 297.0;
-  const marginMm = 5.0;
+  const marginMm = 1.7;
   final buf = StringBuffer('''
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>${_escapeHtml(deck.name)}</title>
 <style>

@@ -240,7 +240,7 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
   const pageFormat = PdfPageFormat.a4;
-  const margin = 7.0;
+  const margin = 2.5;
   final contentW = pageFormat.width - margin * 2;
   final contentH = pageFormat.height - margin * 2;
 
