@@ -145,9 +145,9 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
       // meant to cover its box edge to edge, same as every vector element
       // on top of it — BoxFit.contain instead preserves the image's own
       // aspect ratio and letterboxes it, so once the page got stretched to
-      // fill real A4 (non-uniformly, since the design's native shape is
-      // 9:16), the background stayed a smaller island while the text/
-      // table on top of it stretched to the full page, spilling past the
+      // fill the real printed page (non-uniformly, since the design's
+      // native shape is 9:16), the background stayed a smaller island
+      // while the text/table on top of it stretched to the full page, spilling past the
       // frame lines baked into that now-undersized image. Only a true
       // full-slide background should stretch to fill; a user's actual
       // inserted photo (or a signature) should keep its own proportions.
@@ -248,22 +248,24 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 /// PdfPageFormat's width/height are in points (1/72in). The old code
 /// passed 960 (the on-screen reference canvas's pixel width) straight in,
 /// producing a roughly 13x24in custom page that printers/viewers had to
-/// shrink to fit real paper. A later fix shaped the PDF's own page to the
-/// deck's tall 9:16 aspect ratio instead of A4 — that eliminated the
-/// gutter *inside the PDF*, but real printers only have standard paper
-/// (A4/Letter) loaded, so AirPrint/the OS print pipeline scaled that
-/// custom narrow page to fit the actual sheet by height (since it's
-/// narrower than A4's own aspect), which put the exact same blank gutter
-/// back on the sides — just introduced by the print driver instead of by
-/// this code. A standard page size sidesteps that: it's the same size as
-/// the paper actually being printed on, so nothing needs to be re-fit.
-/// The content is then stretched to fill that page's full width and
-/// height directly (not aspect-locked to the deck's 9:16 shape) — a
-/// certificate's text/table layout tolerates a modest non-uniform
-/// stretch far better than a permanent blank margin down both sides.
+/// shrink to fit real paper. A later fix shaped the PDF's own page to a
+/// standard size instead of that custom aspect ratio — matching the
+/// actual paper being printed on means nothing needs to be re-fit by the
+/// print driver, so no blank gutter gets reintroduced outside the PDF.
+/// That standard size has to be Letter, not A4: this app's documents are
+/// US-only (see the state picker baked into every certificate — "Alabama",
+/// "Arkansas", etc.), and a US printer has Letter loaded, not A4. An A4
+/// PDF sent to a Letter tray gets fit-to-page and centered by the OS
+/// print pipeline — since A4 and Letter aren't the same aspect ratio,
+/// that always leaves a margin on one axis, which is exactly the "frame
+/// doesn't fill the printed page" report. The content is then stretched
+/// to fill that page's full width and height directly (not aspect-locked
+/// to the deck's 9:16 shape) — a certificate's text/table layout
+/// tolerates a modest non-uniform stretch far better than a permanent
+/// blank margin down both sides.
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
-  const pageFormat = PdfPageFormat.a4;
+  const pageFormat = PdfPageFormat.letter;
   const margin = 2.5;
   // Requested after the print margin was already trimmed to near zero:
   // a genuine zoom-in, not just less blank border. Scales the whole
