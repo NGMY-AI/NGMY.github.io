@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_studio_html_video_stub.dart' if (dart.library.html) 'ngmy_studio_html_video.dart' as studio_html_video;
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
 import 'ngmy_vault_web_io.dart';
@@ -1076,6 +1078,11 @@ class _VaultVideoPageState extends State<_VaultVideoPage> {
   Widget build(BuildContext context) {
     final url = _blobUrl;
     if (url == null) return const Center(child: CircularProgressIndicator(color: Colors.white54));
-    return NgmyStudioSlotVideo(source: url);
+    // video_player's web backend (NgmyStudioSlotVideo) doesn't reliably load
+    // local blob: URLs — Video Studio hit the same thing and switched to a
+    // native <video> element (NgmyStudioHtmlVideo) for exactly this local-
+    // preview case. This app only ships as a web build, but keep the same
+    // kIsWeb split the rest of the codebase uses for parity.
+    return kIsWeb ? studio_html_video.NgmyStudioHtmlVideo(source: url) : NgmyStudioSlotVideo(source: url);
   }
 }
