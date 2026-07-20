@@ -361,14 +361,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               Text('Chagua aina ya hati', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13)),
               const SizedBox(height: 18),
               _DocumentCategoryTile(
-                icon: Icons.workspace_premium_rounded,
-                colors: const [Color(0xFFE6C15C), Color(0xFFB8860B), Color(0xFF8B6914)],
-                title: 'Hati ya Kuhowesha',
-                subtitle: 'Barua ya uchumba',
-                onTap: () => Navigator.pop(ctx, 'marriage_agreement'),
-              ),
-              const SizedBox(height: 10),
-              _DocumentCategoryTile(
                 icon: Icons.description_rounded,
                 colors: const [Color(0xFF2E4270), Color(0xFF12213D), Color(0xFF0A1526)],
                 title: 'Hati ya Kuhowa',

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_state_picker.dart';
 
 const String kNgmyHatiKuhowaDeckKind = 'hati_kuhowa';
 const String kNgmyHatiKuhoweshaDeckKind = 'hati_kuhoweya';
@@ -398,11 +399,12 @@ List<NgmySlideElement> _buildPageContent(
   required String introText,
   required String sectionLabel,
   required bool sectionLabelEditable,
+  String state = '',
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   return [
     _hBgImage(bgUrl),
-    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable),
+    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable, state: state),
   ];
 }
 
@@ -412,6 +414,7 @@ List<NgmySlideElement> _layoutSingle(
   required String introText,
   required String sectionLabel,
   required bool sectionLabelEditable,
+  String state = '',
 }) {
   final ink = tpl.ink;
   final accent = tpl.accent;
@@ -495,6 +498,23 @@ List<NgmySlideElement> _layoutSingle(
   y = tableTop + tableH + 0.012;
 
   out.addAll(_hMwandishiBar(cx, y, cw, ink: ink, accent: accent));
+  y += 0.11;
+
+  // State the document was created for — picked once up front (see
+  // launchNgmyHatiKuhowa/launchNgmyHatiKuhowesha) and baked in here as
+  // locked text, same as everything else on this paper: centered under
+  // MWANDISHI in its own small frame, never user-editable.
+  final trimmedState = state.trim();
+  if (trimmedState.isNotEmpty) {
+    const stateBoxH = 0.032;
+    const stateBoxW = 0.32;
+    final stateBoxX = cx + (cw - stateBoxW) / 2;
+    final stateY = y + 0.016;
+    out.addAll([
+      _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: stateBoxX, y: stateY, w: stateBoxW, h: stateBoxH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'state_box'),
+      _hLockedText(trimmedState, x: stateBoxX, y: stateY + 0.005, w: stateBoxW, h: stateBoxH - 0.01, fontSize: 13, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
+    ]);
+  }
 
   return out;
 }
@@ -578,7 +598,7 @@ const _kHatiKuhowaIntro = 'Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa],
     'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].';
 
 /// Builds the single-page "Hati ya Kuhowa" deck from a paper template.
-NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
+NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state = ''}) {
   ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
 
@@ -593,6 +613,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId}) {
       introText: _kHatiKuhowaIntro,
       sectionLabel: 'NIMETOWA',
       sectionLabelEditable: false,
+      state: state,
     ),
   );
 
@@ -619,7 +640,7 @@ const _kHatiKuhoweshaIntro = 'Mimi [Jina la Mwanamke], binti wa [Jina la Baba wa
 /// paragraph, and an editable (not locked) section header defaulting to
 /// "NIMEPOKEYA CASH". The deck's own internal name stays "Hati ya Kuhoweya"
 /// so it reads as a distinct entry in the picker/deck list.
-NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId}) {
+NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String state = ''}) {
   ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
 
@@ -634,6 +655,7 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId}) {
       introText: _kHatiKuhoweshaIntro,
       sectionLabel: 'NIMEPOKEYA CASH',
       sectionLabelEditable: true,
+      state: state,
     ),
   );
 
@@ -870,7 +892,21 @@ Future<void> launchNgmyHatiKuhowa({
   if (!context.mounted) return;
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context);
   if (templateId == null || !context.mounted) return;
-  openDraftEditor(ngmyBuildHatiKuhowaDeck(templateId: templateId));
+  final state = await _pickNgmyHatiState(context);
+  if (state == null || !context.mounted) return;
+  openDraftEditor(ngmyBuildHatiKuhowaDeck(templateId: templateId, state: state));
+}
+
+/// Asked once, before the document loads — baked into the paper as locked
+/// text (see _layoutSingle's state badge), not left as an editable field.
+Future<String?> _pickNgmyHatiState(BuildContext context) {
+  return showNgmyStatePickerSheet(
+    context,
+    states: kNgmyUsStates,
+    selected: '',
+    title: 'Chagua jimbo',
+    searchHint: 'Tafuta jimbo…',
+  );
 }
 
 /// Launches the "Hati ya Kuhoweya" flow — same shape as [launchNgmyHatiKuhowa],
@@ -947,5 +983,7 @@ Future<void> launchNgmyHatiKuhowesha({
   if (!context.mounted) return;
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Hati ya Kuhoweya');
   if (templateId == null || !context.mounted) return;
-  openDraftEditor(ngmyBuildHatiKuhoweshaDeck(templateId: templateId));
+  final state = await _pickNgmyHatiState(context);
+  if (state == null || !context.mounted) return;
+  openDraftEditor(ngmyBuildHatiKuhoweshaDeck(templateId: templateId, state: state));
 }
