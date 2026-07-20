@@ -338,19 +338,21 @@ List<NgmySlideElement> _hWitnessLine(String side, int n, double x, double y, dou
   // BoxFit.contain is limited by whichever dimension is smallest, and a
   // too-short box was the reason nothing appeared even after the padding
   // fix.
-  // Widened from 0.48 — the name field needs more room to keep a long name
-  // readable at close to its normal font size without wrapping onto a
-  // second line, borrowed from the signature zone's width (not its height,
-  // which is what actually matters for a usable signature).
-  final nameW = w * 0.64;
+  // Narrowed from 0.64 — freed up room for the "Sahihi:" label below to
+  // grow to match MWANDISHI's font size, while keeping the signature zone
+  // the same width it always was. The name field still has autoShrinkFont
+  // as a fallback for long names.
+  final nameW = w * 0.56;
   final sahihiLblX = x + nameW + 0.01;
-  final signX = sahihiLblX + 0.05;
+  final signX = sahihiLblX + 0.08;
   final signW = x + w - signX;
   return [
     _hLockedText('$n.', x: x, y: y, w: 0.026, h: 0.024, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'wln_${side}_$n'),
     _hBlank('witness_${side}_${n}_name', x + 0.026, y, nameW - 0.026, ink: ink, fontSize: 16, startText: '[Jina la Shahidi]', align: TextAlign.left, autoShrinkFont: true),
     _hBlankUnderline(x + 0.026, y + _hBlankH(16), nameW - 0.026),
-    _hLockedText('Sahihi:', x: sahihiLblX, y: y, w: 0.046, h: 0.02, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
+    // fontSize 15 to match MWANDISHI's own "Sahihi:" label — was 9, which
+    // read as noticeably smaller than the rest of the document.
+    _hLockedText('Sahihi:', x: sahihiLblX, y: y, w: 0.077, h: 0.028, fontSize: 15, fontWeight: FontWeight.w600, color: ink, tag: 'wls_${side}_$n'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.shape,

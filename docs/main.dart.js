@@ -72076,8 +72076,8 @@ dX6(a,b,c,d,e){var s=B.l.O(a.length*30*0.00058+0.08,0.2,0.5),r=c+(d-s)/2
 return A.a([A.GP(0,0.036,B.b0,e,1.4,"banner_box_"+a,s,r,b),A.u_(a,B.P,e,30,B.D,0.025199999999999997,0,"banner_t_"+a,s,r,b+0.00612)],t.pt)},
 e_B(){var s=new A.S(Date.now(),0,!1),r=new A.duy()
 return A.t(r.$1(A.cf(s)))+"/"+A.t(r.$1(A.bY(s)))+"/"+A.bX(s)},
-dX7(a,b,c,d,e,f,g){var s=4293056712,r=e*0.64,q=c+r+0.01,p=q+0.05,o=c+e-p,n=""+b,m=c+0.026,l=r-0.026
-return A.a([A.u_(n+".",B.aX,f,13,B.J,0.024,0,"wln_"+a+"_"+n,0.026,c,d),A.djW("witness_"+a+"_"+n+"_name",m,d,l,B.aX,!0,16,g,"[Jina la Shahidi]"),A.aZY(m,d+B.l.O(0.0272,0.02,0.06),l,s),A.u_("Sahihi:",B.aX,g,9,B.a_,0.02,0,"wls_"+a+"_"+n,0.046,q,d),A.eb(B.aX,!1,4279310375,B.a8,"marriage_sign_"+a+"_witness_"+n,0,24,B.be,B.a_,0.05,A.bZ(),null,0,0,B.b0,0,2,"",0,B.bG,B.ef,o,p,d-0.004),A.aZY(p,d+0.044,o,s)],t.pt)},
+dX7(a,b,c,d,e,f,g){var s=4293056712,r=e*0.56,q=c+r+0.01,p=q+0.08,o=c+e-p,n=""+b,m=c+0.026,l=r-0.026
+return A.a([A.u_(n+".",B.aX,f,13,B.J,0.024,0,"wln_"+a+"_"+n,0.026,c,d),A.djW("witness_"+a+"_"+n+"_name",m,d,l,B.aX,!0,16,g,"[Jina la Shahidi]"),A.aZY(m,d+B.l.O(0.0272,0.02,0.06),l,s),A.u_("Sahihi:",B.aX,g,15,B.a_,0.028,0,"wls_"+a+"_"+n,0.077,q,d),A.eb(B.aX,!1,4279310375,B.a8,"marriage_sign_"+a+"_witness_"+n,0,24,B.be,B.a_,0.05,A.bZ(),null,0,0,B.b0,0,2,"",0,B.bG,B.ef,o,p,d-0.004),A.aZY(p,d+0.044,o,s)],t.pt)},
 dJL(a){var s,r
 for(s=0;s<6;++s){r=B.xO[s]
 if(r.a===a)return r}return null},
