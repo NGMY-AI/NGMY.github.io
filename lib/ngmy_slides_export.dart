@@ -204,27 +204,31 @@ pw.Widget _pdfSlidePage(NgmySlide slide, NgmySlideDeck deck, double pageW, doubl
 /// PdfPageFormat's width/height are in points (1/72in). The old code
 /// passed 960 (the on-screen reference canvas's pixel width) straight in,
 /// producing a roughly 13x24in custom page that printers/viewers had to
-/// shrink to fit real paper. A later fix embedded the content inside a
-/// standard A4 sheet instead — an improvement, but A4 is much wider than
-/// this deck's tall 9:16 shape, so the content was still a narrow island
-/// with a wide blank gutter on either side ("frame smaller than the
-/// paper"). The page itself is now shaped to the deck's own aspect ratio
-/// (using A4's height as the real-world reference), so the content *is*
-/// the page — no letterboxing on any side.
+/// shrink to fit real paper. A later fix shaped the PDF's own page to the
+/// deck's tall 9:16 aspect ratio instead of A4 — that eliminated the
+/// gutter *inside the PDF*, but real printers only have standard paper
+/// (A4/Letter) loaded, so AirPrint/the OS print pipeline scaled that
+/// custom narrow page to fit the actual sheet by height (since it's
+/// narrower than A4's own aspect), which put the exact same blank gutter
+/// back on the sides — just introduced by the print driver instead of by
+/// this code. A standard page size sidesteps that: it's the same size as
+/// the paper actually being printed on, so nothing needs to be re-fit.
+/// The content is then stretched to fill that page's full width and
+/// height directly (not aspect-locked to the deck's 9:16 shape) — a
+/// certificate's text/table layout tolerates a modest non-uniform
+/// stretch far better than a permanent blank margin down both sides.
 Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
   final doc = pw.Document(title: deck.name, creator: 'NGMY Slides');
+  const pageFormat = PdfPageFormat.a4;
   const margin = 14.0;
-  final aspect = deck.aspectValue; // width / height
-  final pageH = PdfPageFormat.a4.height;
-  final pageW = pageH * aspect;
-  final pageFormat = PdfPageFormat(pageW, pageH, marginAll: margin);
-  final contentW = pageW - margin * 2;
-  final contentH = pageH - margin * 2;
+  final contentW = pageFormat.width - margin * 2;
+  final contentH = pageFormat.height - margin * 2;
 
   for (final slide in deck.slides) {
     doc.addPage(
       pw.Page(
         pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.all(margin),
         build: (_) => pw.SizedBox(
           width: contentW,
           height: contentH,
