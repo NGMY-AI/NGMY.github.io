@@ -410,12 +410,13 @@ List<NgmySlideElement> _buildPageContent(
   required String introText,
   required String sectionLabel,
   required bool sectionLabelEditable,
+  required List<String> mahariItems,
   String state = '',
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   return [
     _hBgImage(bgUrl),
-    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable, state: state),
+    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable, mahariItems: mahariItems, state: state),
   ];
 }
 
@@ -425,6 +426,7 @@ List<NgmySlideElement> _layoutSingle(
   required String introText,
   required String sectionLabel,
   required bool sectionLabelEditable,
+  required List<String> mahariItems,
   String state = '',
 }) {
   final ink = tpl.ink;
@@ -466,10 +468,10 @@ List<NgmySlideElement> _layoutSingle(
     out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: tpl.bannerFill));
   }
   y += 0.072;
-  out.add(_hLockedText('Vitu vifuatavyo vitatolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
+  out.add(_hLockedText('Vitu vifuatavyo vimetolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
-    out.addAll(_hNimetoweRow(i, '[Kitu cha Mahari $i]', cx, y, cw, ink: ink, accent: accent));
+    out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
     y += 0.043;
   }
   y += 0.016;
@@ -606,10 +608,21 @@ Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
   );
 }
 
-const _kHatiKuhowaIntro = 'Mimi [Jina la Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya '
-    '[Jina la Nyumba], nimetowa mahali ya kuhoweya kijana wangu aitwaye '
-    '[Jina la Mwanaume], kwa [Jina la Mwanamke], binti wa [Jina la Baba '
-    'wa Mwanamke], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba].';
+const _kHatiKuhowaIntro = 'Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyumba ya [Jina la '
+    'Nyumba], nimesimama rasmi kuthibitisha utoaji wa mahali ya kuhoweya '
+    'kijana wangu aitwaye [Jina la Kijana], pamoja na [Jina la Binti], '
+    'binti wa [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya '
+    'Binti], nyumba ya [Jina la Nyumba ya Binti]. Makubaliano haya '
+    'yanatekelezwa kwa kufuata desturi, taratibu, na mapokeo '
+    'yanayoheshimiwa na pande zote mbili za familia, kwa nia ya '
+    'kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.';
+
+const _kHatiKuhowaMahariItems = [
+  'Kichwa cha Mtu: Dollar elfu ishirini na tano (\$20,000)',
+  'Mbuzi Mbili',
+  'Ngyoka',
+  'Mmoko',
+];
 
 /// Builds the single-page "Hati ya Kuhowa" deck from a paper template.
 NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state = ''}) {
@@ -627,6 +640,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
       introText: _kHatiKuhowaIntro,
       sectionLabel: 'NIMETOWA',
       sectionLabelEditable: false,
+      mahariItems: _kHatiKuhowaMahariItems,
       state: state,
     ),
   );
@@ -641,11 +655,23 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
   );
 }
 
-const _kHatiKuhoweshaIntro = 'Mimi [Jina la Mwanamke], binti wa [Jina la Baba wa Mwanamke], wa '
-    'Jamaa la [Jina la Jamaa], Nyumba ya [Jina la Nyumba], ninathibitisha '
-    'kwa hiari yangu kuwa nimemkubali [Jina la Mwanaume], mwana wa [Jina la '
-    'Baba wa Mwanaume], wa Jamaa la [Jina la Jamaa], Nyumba ya [Jina la '
-    'Nyumba], kuwa mchumba wangu rasmi.';
+const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], nyumba ya [Jina la '
+    'Nyumba], kwa hiari yangu na kwa ridhaa ya familia yangu, '
+    'nimemuhowesha binti wangu [Jina la Binti] kwa [Jina la Mume], wa '
+    'jamaa la [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya '
+    'Mume], mwana wa [Jina la Baba wa Mume]. Uhoweshaji huu umefanyika '
+    'kwa makubaliano ya pande zote mbili, kwa kufuata mila na desturi za '
+    'wazee wetu, kwa lengo la kuunganisha familia zetu katika heshima, '
+    'upendo na mshikamano. Hivyo, ninathibitisha mbele ya mashahidi kuwa '
+    'makubaliano haya yamefanyika kwa amani na kwa ridhaa kamili ya '
+    'familia zote mbili.';
+
+const _kHatiKuhoweshaMahariItems = [
+  'Kichwa cha Mtu: Dollar elfu ishirini na tano (\$20,000)',
+  'Mbuzi Wawili',
+  'Ngyoka',
+  'Mmoko',
+];
 
 /// Builds the single-page "Hati ya Kuhoweya" deck — same paper, table,
 /// Mashahidi, and Mwandishi as Hati ya Kuhowa, but its own title (printed
@@ -669,6 +695,7 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
       introText: _kHatiKuhoweshaIntro,
       sectionLabel: 'NIMEPOKEYA CASH',
       sectionLabelEditable: true,
+      mahariItems: _kHatiKuhoweshaMahariItems,
       state: state,
     ),
   );
