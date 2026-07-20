@@ -509,13 +509,13 @@ List<NgmySlideElement> _layoutSingle(
     // Tight fit on purpose: the remaining gap between MWANDISHI's bottom
     // border and the paper's own outer frame is small, and the box was
     // previously spilling past it.
-    const stateBoxH = 0.034;
-    const stateBoxW = 0.58;
+    const stateBoxH = 0.04;
+    const stateBoxW = 0.7;
     final stateBoxX = cx + (cw - stateBoxW) / 2;
-    final stateY = y + 0.006;
+    final stateY = y + 0.003;
     out.addAll([
       _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: stateBoxX, y: stateY, w: stateBoxW, h: stateBoxH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'state_box'),
-      _hLockedText("EMO 'YA M'MBONDO $trimmedState", x: stateBoxX, y: stateY + 0.003, w: stateBoxW, h: stateBoxH - 0.006, fontSize: 20, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
+      _hLockedText("EMO 'YA M'MBONDO $trimmedState", x: stateBoxX, y: stateY + 0.003, w: stateBoxW, h: stateBoxH - 0.006, fontSize: 26, fontWeight: FontWeight.w700, align: TextAlign.center, color: ink, tag: 'state_text'),
     ]);
   }
 
