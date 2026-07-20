@@ -84,7 +84,7 @@ NgmySlideElement _hLockedText(
 NgmySlideElement _hWatermark(int ink) {
   return _hLockedText(
     'NGMY',
-    x: 0.02,
+    x: -0.06,
     y: 0.01,
     w: 0.44,
     h: 0.08,
@@ -92,7 +92,7 @@ NgmySlideElement _hWatermark(int ink) {
     fontWeight: FontWeight.w900,
     align: TextAlign.center,
     color: (0x15 << 24) | (ink & 0x00FFFFFF),
-    rotation: -0.36,
+    rotation: -0.52,
     tag: 'watermark',
   );
 }
@@ -561,10 +561,14 @@ List<NgmySlideElement> _layoutSingle(
   // down.
   y += 0.016;
 
+  // Gold (accent), not tpl.bannerFill — bannerFill is the template's dark
+  // ink color for most templates, which made this frame the one dark box
+  // on an otherwise all-gold page (title rule, item numbers, table border,
+  // table headers are all `accent`). Restored to match.
   if (sectionLabelEditable) {
-    out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: tpl.bannerFill));
+    out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: accent));
   } else {
-    out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: tpl.bannerFill));
+    out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: accent));
   }
   // Was 0.062 — trimmed to match the shrunk banner box height.
   y += 0.048;
@@ -577,7 +581,7 @@ List<NgmySlideElement> _layoutSingle(
   // Was 0.014 — tightened so the MASHAHIDI frame moves up, per request.
   y += 0.006;
 
-  out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
+  out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: accent));
   // Was 0.067 — shrunk banner box + tightened margin brings the witness
   // table (and everything below it: MWANDISHI bar, state box) up too,
   // since they're all positioned relative to this cumulative `y`.

@@ -173,6 +173,14 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
       child = _pdfShape(e, pageW);
   }
 
+  // The editor/live view rotates elements via Transform.rotate — the PDF
+  // path never mirrored that, so anything rotated on screen (the watermark)
+  // printed flat/horizontal instead, which read as far more prominent than
+  // the faint diagonal mark the user was previewing before export.
+  if (e.rotation != 0) {
+    child = pw.Transform.rotate(angle: e.rotation, child: child);
+  }
+
   return pw.Positioned(
     left: left,
     top: top,
