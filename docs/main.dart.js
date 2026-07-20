@@ -72386,8 +72386,8 @@ p=n+0.09
 o=p-0.002
 B.f.A(b3,A.a([A.GS(0,0.11,B.b0,b1,1.2,"mw_box",0.82,0.09,n),A.vV("MWANDISHI",B.aX,b1,15,B.J,0.026,"mw_hdr",0.7759999999999999,0.11199999999999999,n+0.016),A.vV("Jina:",B.aX,b0,15,B.a_,0.028,"mw_jl",0.09,0.11199999999999999,s),A.dIo("mwandishi_jina",0.215,s,0.3116,B.aX,15,b0,""),A.b_6(0.215,o,0.3116,a7),A.vV("Sahihi:",B.aX,b0,15,B.a_,0.028,"mw_sl",0.09,0.5,s),A.eb(B.aX,!1,a8,B.a8,"marriage_sign_mwandishi",0,24,B.be,B.a_,0.044,A.bZ(),a3,0,0,B.b0,0,2,"",0,B.bG,B.ef,0.3161999999999999,0.5738,p-0.044),A.b_6(0.5738,o,0.3161999999999999,a7)],b2))
 a1=B.b.i(b8)
-if(a1.length!==0){a2=n+0.11+0.006
-B.f.A(b3,A.a([A.GS(0,0.034,B.b0,b1,1,"state_box",0.58,0.21,a2),A.vV("EMO 'YA M'MBONDO "+a1,B.P,b0,20,B.O,0.028000000000000004,"state_text",0.58,0.21,a2+0.003)],b2))}return b3},
+if(a1.length!==0){a2=n+0.11+0.003
+B.f.A(b3,A.a([A.GS(0,0.04,B.b0,b1,1,"state_box",0.7,0.15,a2),A.vV("EMO 'YA M'MBONDO "+a1,B.P,b0,26,B.O,0.034,"state_text",0.7,0.15,a2+0.003)],b2))}return b3},
 exV(a){var s,r,q,p,o,n,m,l,k,j,i=null,h=A.dKd(a)
 if(h==null)h=B.f.gI(B.y_)
 s=A.bf(h.e)
