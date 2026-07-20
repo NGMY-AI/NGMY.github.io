@@ -1,4 +1,4 @@
-# Build NGMY for GitHub Pages and copy output into docs/
+﻿# Build NGMY for GitHub Pages and copy output into docs/
 # Run from project root:  .\publish-web.ps1
 #
 # Phone not updating? After push, on the phone: close all NGMY tabs,

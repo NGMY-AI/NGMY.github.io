@@ -11,6 +11,8 @@ enum NgmyMarriagePaperStyle {
   heritageCrimson,
   elegantNavy,
   elegantGold,
+  elegantEmerald,
+  elegantBurgundy,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -39,6 +41,10 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
       return _elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B);
     case NgmyMarriagePaperStyle.elegantGold:
       return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
+    case NgmyMarriagePaperStyle.elegantEmerald:
+      return _elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A);
+    case NgmyMarriagePaperStyle.elegantBurgundy:
+      return _elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34);
   }
 }
 

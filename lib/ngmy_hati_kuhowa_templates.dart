@@ -56,6 +56,7 @@ NgmySlideElement _hLockedText(
   TextAlign align = TextAlign.left,
   String tag = '',
   int color = 0xFF1A1208,
+  double rotation = 0,
 }) {
   return NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
@@ -70,7 +71,29 @@ NgmySlideElement _hLockedText(
     fontStyle: fontStyle,
     color: color,
     align: align,
+    rotation: rotation,
     fileName: tag.isEmpty ? kMarriageLocked : '${kMarriageLocked}_$tag',
+  );
+}
+
+/// A big, faint "NGMY" mark tucked into the top-left corner (opposite the
+/// TAREHE box, which sits top-right) — a watermark, not a readable label:
+/// low alpha so it never competes with real content, and rotated at a
+/// shallow diagonal (not a full 90°, per request — "sideways" rather than
+/// straight up) so it reads as background texture rather than a heading.
+NgmySlideElement _hWatermark(int ink) {
+  return _hLockedText(
+    'NGMY',
+    x: 0.02,
+    y: 0.01,
+    w: 0.44,
+    h: 0.08,
+    fontSize: 52,
+    fontWeight: FontWeight.w900,
+    align: TextAlign.center,
+    color: (0x15 << 24) | (ink & 0x00FFFFFF),
+    rotation: -0.36,
+    tag: 'watermark',
   );
 }
 
@@ -404,6 +427,54 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFFCF3), Color(0xFFA6843A), Color(0xFF6B4A12)],
   ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_heritage_gold',
+    name: 'Kuhowa — Hazina ya Dhahabu',
+    description: 'Mpaka mzito wa kikabila · dhahabu na hudhurungi.',
+    paperStyle: NgmyMarriagePaperStyle.heritageGold,
+    background: 0xFFF9F1DD,
+    ink: 0xFF5C3A1E,
+    accent: 0xFFD4AF37,
+    bannerFill: 0xFF5C3A1E,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFF9F1DD), Color(0xFF5C3A1E), Color(0xFFD4AF37)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_heritage_crimson',
+    name: 'Kuhowa — Hazina Nyekundu',
+    description: 'Mpaka mzito wa kikabila · nyekundu na dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.heritageCrimson,
+    background: 0xFFFAF0E6,
+    ink: 0xFF6B2A1E,
+    accent: 0xFFE0A458,
+    bannerFill: 0xFF6B2A1E,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFAF0E6), Color(0xFF6B2A1E), Color(0xFFE0A458)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_elegant_emerald',
+    name: 'Kuhowa — Zumaridi',
+    description: 'Mpaka mwembamba wa dhahabu · vichwa vya kijani ya zumaridi.',
+    paperStyle: NgmyMarriagePaperStyle.elegantEmerald,
+    background: 0xFFF6FBF8,
+    ink: 0xFF0E3B2E,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF0E3B2E,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFF6FBF8), Color(0xFF0E3B2E), Color(0xFFC9A227)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_elegant_burgundy',
+    name: 'Kuhowa — Mvinyo',
+    description: 'Mpaka mwembamba wa dhahabu · vichwa vya rangi ya mvinyo.',
+    paperStyle: NgmyMarriagePaperStyle.elegantBurgundy,
+    background: 0xFFFFF7F6,
+    ink: 0xFF4A0E1F,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF4A0E1F,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFF7F6), Color(0xFF4A0E1F), Color(0xFFC9A227)],
+  ),
 ];
 
 NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id) {
@@ -447,6 +518,10 @@ List<NgmySlideElement> _layoutSingle(
   const cx = 0.09;
   const cw = 0.82;
   final out = <NgmySlideElement>[];
+
+  // Watermark goes in first so every other element draws on top of it —
+  // top-left corner, opposite the TAREHE box below.
+  out.add(_hWatermark(ink));
 
   // Tarehe gets its own row, pushed close to the paper's actual gold
   // border on the right (not just the content margin) — it used to share
