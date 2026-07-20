@@ -173,12 +173,28 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
       child = _pdfShape(e, pageW);
   }
 
-  // The editor/live view rotates elements via Transform.rotate — the PDF
-  // path never mirrored that, so anything rotated on screen (the watermark)
-  // printed flat/horizontal instead, which read as far more prominent than
-  // the faint diagonal mark the user was previewing before export.
+  // The editor/live view rotates elements via Flutter's Transform.rotate.
+  // pdf's own pw.Transform.rotate takes the same angle but composes it in
+  // the PDF's native (y-up) canvas space rather than Flutter's y-down
+  // screen space, so the same signed angle spins the opposite way —
+  // negating it here is what makes the two actually match instead of
+  // mirroring each other (this is what read as "the watermark flips the
+  // other way in the PDF").
   if (e.rotation != 0) {
-    child = pw.Transform.rotate(angle: e.rotation, child: child);
+    child = pw.Transform.rotate(angle: -e.rotation, child: child);
+  }
+
+  // pdf's setFillColor only ever emits the RGB channels to the content
+  // stream — it silently drops alpha entirely, so a low-alpha text color
+  // (the faint watermark) painted fully opaque in the PDF regardless of
+  // what alpha we set. pw.Opacity is the only thing in this package that
+  // actually emits a graphics-state alpha, so it's the real fix, not a
+  // difference in *what* color we pass.
+  if (e.type == NgmySlideElementType.text) {
+    final textAlpha = (e.color >> 24) & 0xFF;
+    if (textAlpha < 255) {
+      child = pw.Opacity(opacity: textAlpha / 255, child: child);
+    }
   }
 
   return pw.Positioned(
