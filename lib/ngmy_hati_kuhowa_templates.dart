@@ -85,7 +85,7 @@ NgmySlideElement _hWatermark(int ink) {
   return _hLockedText(
     'NGMY',
     x: -0.13,
-    y: 0.005,
+    y: 0.045,
     w: 0.5,
     h: 0.09,
     fontSize: 60,
