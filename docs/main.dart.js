@@ -86700,7 +86700,7 @@ s=1
 break
 case 1:return A.h(q,r)}})
 return A.i($async$b1k,r)},
-ezv(a){var s,r,q,p,o,n,m,l,k,j,i,h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+A.dXe(a.b)+"</title>\n<style>\n  @page { size: 210mm 297mm; margin: 1.7mm; }\n  * { box-sizing: border-box; }\n  body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; }\n  h1 { font-size: 14px; margin: 6px 10mm; }\n  .slide { page-break-after: always; width: 100%; height: 293.6mm; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }\n  /* Requested after the margin was already trimmed to near zero: a real\n     zoom-in on the whole slide (frame included), not just less border.\n     `.slide` keeps overflow:hidden so whatever spills past the edge at\n     this scale gets cropped instead of pushing the page layout around. */\n  .zoom { position: absolute; inset: 0; transform: scale(1.15); transform-origin: center center; }\n  .el { position: absolute; overflow: hidden; }\n  .txt { white-space: pre-wrap; word-break: break-word; }\n  img { max-width: 100%; max-height: 100%; object-fit: contain; }\n  .pdf { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#f8fafc; }\n</style></head><body>\n<h1>"+A.dXe(a.b)+"</h1>\n"
+ezv(a){var s,r,q,p,o,n,m,l,k,j,i,h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+A.dXe(a.b)+"</title>\n<style>\n  @page { size: 210mm 297mm; margin: 1.7mm; }\n  * { box-sizing: border-box; }\n  body { font-family: system-ui, sans-serif; background: #fff; color: #111; margin: 0; }\n  h1 { font-size: 14px; margin: 6px 10mm; }\n  .slide { page-break-after: always; width: 100%; height: 293.6mm; border: 1px solid #ddd; position: relative; overflow: hidden; margin: 0 auto 24px; }\n  /* Requested after the margin was already trimmed to near zero: a real\n     zoom-in on the whole slide (frame included), not just less border.\n     `.slide` keeps overflow:hidden so whatever spills past the edge at\n     this scale gets cropped instead of pushing the page layout around. */\n  .zoom { position: absolute; inset: 0; transform: scale(1.075); transform-origin: center center; }\n  .el { position: absolute; overflow: hidden; }\n  .txt { white-space: pre-wrap; word-break: break-word; }\n  img { max-width: 100%; max-height: 100%; object-fit: contain; }\n  .pdf { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#f8fafc; }\n</style></head><body>\n<h1>"+A.dXe(a.b)+"</h1>\n"
 for(s=a.r,r=0;r<s.length;++r){q=s[r]
 h=h+('<div class="slide" style="background:#'+B.b.b5(B.b.bb(B.m.hk(q.e,16),8,"0"),2)+'">\n')+'<div class="zoom">\n'
 for(p=q.z,o=p.length,n=0;n<p.length;p.length===o||(0,A.X)(p),++n){m=p[n]
@@ -281504,7 +281504,7 @@ $1(a){return A.erb(a,this.a,this.b)},
 $S:1613}
 A.dxx.prototype={
 $1(a){var s=this,r=s.a,q=s.b,p=A.ere(s.c,s.d,r,q)
-return new A.tp(r,q,new A.att(new A.aH2(A.Ae(1.15,1.15,1),B.vr,p)))},
+return new A.tp(r,q,new A.att(new A.aH2(A.Ae(1.075,1.075,1),B.vr,p)))},
 $S:538}
 A.dvD.prototype={
 $2(a,b){return B.l.aS(a.c,b.c)},
