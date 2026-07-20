@@ -461,29 +461,36 @@ List<NgmySlideElement> _layoutSingle(
     cx,
     y,
     cw,
-    0.11,
+    0.15,
     ink: ink,
     fontSize: 19,
     startText: introText,
   ));
-  y += 0.116;
+  // The current intro paragraph wraps to about 6 lines (both documents'
+  // wording is longer than the old text this replaced) — the advance
+  // below has to clear all of them, or the tail end renders behind the
+  // banner that follows, which is what read as "the frame is too tall"
+  // even though the box itself wasn't the problem. The next few gaps
+  // are trimmed slightly to give this back the room it needs without
+  // pushing everything below off the bottom of the page.
+  y += 0.16;
 
   if (sectionLabelEditable) {
     out.addAll(_hBannerField('nimetowe_label', sectionLabel, y, cx, cw, fill: tpl.bannerFill));
   } else {
     out.addAll(_hBanner(sectionLabel, y, cx, cw, fill: tpl.bannerFill));
   }
-  y += 0.072;
+  y += 0.062;
   out.add(_hLockedText('Vitu vifuatavyo vimetolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
-    y += 0.043;
+    y += 0.04;
   }
-  y += 0.016;
+  y += 0.011;
 
   out.addAll(_hBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill));
-  y += 0.076;
+  y += 0.067;
 
   // MASHAHIDI as one bordered table: a single outer frame around both
   // columns with one vertical line dividing NGAMBO YA MKE from NGAMBO YA
@@ -495,7 +502,7 @@ List<NgmySlideElement> _layoutSingle(
   // Extra cushion below the last row — without it, the last signature box
   // sat exactly on the table's bottom border with zero margin, so it read
   // as overflowing/poking out of the frame.
-  const tableBottomPad = 0.016;
+  const tableBottomPad = 0.011;
   final tableH = hdrH + 3 * rowH + tableBottomPad;
   final tableTop = y;
   out.addAll([
