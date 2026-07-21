@@ -898,7 +898,7 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
       titleFontSize: 24,
       sectionSubtitle: 'Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):',
       sectionSubtitleFontSize: 18,
-      introAdvance: 0.18,
+      introAdvance: 0.21,
       witnessRows: 2,
       titleRuleWidthRatio: 0.85,
     ),
