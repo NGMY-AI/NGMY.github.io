@@ -197,24 +197,40 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
     }
   }
 
-  // Text boxes are sized at design time to fit their default content. The
-  // in-app font-size +/- control lets a user enlarge a field's text without
+  // Text boxes are sized at design time to fit their default content, with
+  // most boxes intentionally a bit taller than one line so pw.Align can
+  // center that line with breathing room (e.g. the title's box). The in-app
+  // font-size +/- control lets a user enlarge a field's text without
   // growing its box (see ngmy_slides_studio.dart's _selChip fontSize
   // steppers), and the live editor already renders that overflow visibly
   // (ngmy_slides_render.dart uses `overflow: TextOverflow.visible`) instead
-  // of clipping it. A fixed-height SizedBox here did the opposite — it
-  // clipped anything past the box's original (un-enlarged) height, so an
-  // enlarged paragraph silently lost its later lines in the exported PDF
-  // even though the editor showed it in full. Only constrain width for
-  // text (wrapping still has to match the box); let height grow to fit.
+  // of clipping it. A fixed-height SizedBox here clipped it instead, so an
+  // enlarged paragraph silently lost its later lines in the exported PDF.
+  // Dropping the height constraint entirely (first fix attempt) traded that
+  // bug for a new one: well-fitted single-line text (already smaller than
+  // its box) lost its centering and snapped to the box's top edge instead,
+  // which for e.g. the title moved it up into whatever sits just above it.
+  // minHeight (not a fixed height) gets both right — content that fits
+  // keeps its original box and centering, content that doesn't grows past
+  // it instead of clipping.
   final isText = e.type == NgmySlideElementType.text;
+  if (isText) {
+    return pw.Positioned(
+      left: left,
+      top: top,
+      child: pw.ConstrainedBox(
+        constraints: pw.BoxConstraints(minWidth: width, maxWidth: width, minHeight: height),
+        child: child,
+      ),
+    );
+  }
 
   return pw.Positioned(
     left: left,
     top: top,
     child: pw.SizedBox(
       width: width,
-      height: isText ? null : height,
+      height: height,
       child: e.type == NgmySlideElementType.signature
           ? pw.Container(
               padding: const pw.EdgeInsets.all(4),

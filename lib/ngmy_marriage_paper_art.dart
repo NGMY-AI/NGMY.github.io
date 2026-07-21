@@ -13,6 +13,10 @@ enum NgmyMarriagePaperStyle {
   elegantGold,
   elegantEmerald,
   elegantBurgundy,
+  beadedPearl,
+  artDeco,
+  rosetteCorners,
+  modernLedger,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -45,6 +49,14 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
       return _elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A);
     case NgmyMarriagePaperStyle.elegantBurgundy:
       return _elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34);
+    case NgmyMarriagePaperStyle.beadedPearl:
+      return _beadedPearlPaper(0xFFFFFDF6, 0xFFF3EAD8, 0xFF7A5C2E, 0xFFC9A227);
+    case NgmyMarriagePaperStyle.artDeco:
+      return _artDecoPaper(0xFFF7F5F2, 0xFFE9E3D9, 0xFF1F1B16, 0xFFB8860B);
+    case NgmyMarriagePaperStyle.rosetteCorners:
+      return _rosetteCornerPaper(0xFFFBF6EF, 0xFFEFE3D0, 0xFF6B3F2A, 0xFFC97B3D);
+    case NgmyMarriagePaperStyle.modernLedger:
+      return _modernLedgerPaper(0xFFFFFFFF, 0xFFF2F2F2, 0xFFD8D8D8, 0xFF12213D);
   }
 }
 
@@ -123,5 +135,108 @@ img.Image _elegantPaper(int paperTop, int paperBottom, int lineColor) {
   _grainNoise(im, paperTop);
   _border(im, 14, 16, _w - 28, _h - 32, lineColor, 1.6);
   _border(im, 20, 22, _w - 40, _h - 44, lineColor, 0.8);
+  return im;
+}
+
+/// A row of small filled "beads" tracing the perimeter, with a thin hairline
+/// just inside them — a pearl-strand trim, structurally unlike the solid
+/// band ("Heritage") or plain double-rule ("Elegant") frames.
+void _beadRow(img.Image im, int x1, int y1, int x2, int y2, int color, {int spacing = 20, int radius = 3}) {
+  final dx = (x2 - x1).toDouble();
+  final dy = (y2 - y1).toDouble();
+  final dist = math.sqrt(dx * dx + dy * dy);
+  final steps = math.max(1, (dist / spacing).round());
+  for (var i = 0; i <= steps; i++) {
+    final t = i / steps;
+    img.fillCircle(im, x: (x1 + dx * t).round(), y: (y1 + dy * t).round(), radius: radius, color: _c(color), antialias: true);
+  }
+}
+
+img.Image _beadedPearlPaper(int paperTop, int paperBottom, int lineColor, int beadColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  const inset = 24;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, lineColor, 1.0);
+  const beadInset = 12;
+  _beadRow(im, beadInset, beadInset, _w - beadInset, beadInset, beadColor);
+  _beadRow(im, beadInset, _h - beadInset, _w - beadInset, _h - beadInset, beadColor);
+  _beadRow(im, beadInset, beadInset, beadInset, _h - beadInset, beadColor);
+  _beadRow(im, _w - beadInset, beadInset, _w - beadInset, _h - beadInset, beadColor);
+  return im;
+}
+
+/// Thin outer rule with stepped, nested Art Deco corner brackets and a
+/// radiating fan at the top — a geometric structure with no counterpart in
+/// the band/zigzag or plain-rule families.
+void _stepCorner(img.Image im, int cx, int cy, int dx, int dy, int color) {
+  for (var i = 0; i < 3; i++) {
+    final off = 34 + i * 12;
+    final len = 26 - i * 6;
+    final x = cx + dx * off;
+    final y = cy + dy * off;
+    img.drawLine(im, x1: x, y1: y, x2: x + dx * len, y2: y, color: _c(color), antialias: true, thickness: 1.4);
+    img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * len, color: _c(color), antialias: true, thickness: 1.4);
+  }
+}
+
+img.Image _artDecoPaper(int paperTop, int paperBottom, int lineColor, int accentColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  const inset = 20;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, lineColor, 1.2);
+  _stepCorner(im, 0, 0, 1, 1, accentColor);
+  _stepCorner(im, _w, 0, -1, 1, accentColor);
+  _stepCorner(im, 0, _h, 1, -1, accentColor);
+  _stepCorner(im, _w, _h, -1, -1, accentColor);
+  const fanCx = _w / 2;
+  const fanCy = 60;
+  for (var i = -3; i <= 3; i++) {
+    final angle = -math.pi / 2 + i * 0.2;
+    final x2 = fanCx + 24 * math.cos(angle);
+    final y2 = fanCy + 24 * math.sin(angle);
+    img.drawLine(im, x1: fanCx.round(), y1: fanCy, x2: x2.round(), y2: y2.round(), color: _c(accentColor), antialias: true, thickness: 1.2);
+  }
+  return im;
+}
+
+/// A thin rule border with a circular "rosette" medallion (double ring +
+/// diamond center) at each corner instead of a continuous trim — a
+/// medallion-corner structure distinct from every other family here.
+void _rosette(img.Image im, int cx, int cy, int ringColor, int accentColor) {
+  img.drawCircle(im, x: cx, y: cy, radius: 13, color: _c(ringColor), antialias: true);
+  img.drawCircle(im, x: cx, y: cy, radius: 9, color: _c(ringColor), antialias: true);
+  img.fillPolygon(im, vertices: [
+    img.Point(cx.toDouble(), (cy - 4).toDouble()),
+    img.Point((cx + 4).toDouble(), cy.toDouble()),
+    img.Point(cx.toDouble(), (cy + 4).toDouble()),
+    img.Point((cx - 4).toDouble(), cy.toDouble()),
+  ], color: _c(accentColor));
+}
+
+img.Image _rosetteCornerPaper(int paperTop, int paperBottom, int lineColor, int accentColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  const inset = 28;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, lineColor, 1.0);
+  _rosette(im, inset, inset, lineColor, accentColor);
+  _rosette(im, _w - inset, inset, lineColor, accentColor);
+  _rosette(im, inset, _h - inset, lineColor, accentColor);
+  _rosette(im, _w - inset, _h - inset, lineColor, accentColor);
+  return im;
+}
+
+/// An asymmetric modern layout — a bold solid accent bar down the left
+/// edge (like a report cover) plus a thin hairline on the other three
+/// sides, instead of a symmetric all-around frame.
+img.Image _modernLedgerPaper(int paperTop, int paperBottom, int lineColor, int barColor) {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  const inset = 18;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, lineColor, 0.7);
+  img.fillRect(im, x1: 0, y1: 0, x2: 13, y2: _h - 1, color: _c(barColor));
   return im;
 }

@@ -480,8 +480,71 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
   ),
 ];
 
-NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id) {
-  for (final t in kNgmyHatiKuhowaTemplates) {
+/// Four extra templates for "Hati ya Makubaliano ya Malipo ya Awamu" only —
+/// each a genuinely different paper *structure* (see
+/// ngmy_marriage_paper_art.dart: beaded-pearl trim, stepped Art Deco
+/// corners, rosette medallion corners, an asymmetric modern accent bar),
+/// not just a recolor of the existing band/zigzag or double-rule frames.
+/// Appended after the shared six so they always sort to the bottom of this
+/// document's picker.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiMalipoAwamuExtraTemplates = [
+  NgmyHatiKuhowaTemplate(
+    id: 'malipo_beaded_pearl',
+    name: 'Malipo — Lulu',
+    description: 'Mpaka wa shanga za lulu kuzunguka pembeni · dhahabu na shaba.',
+    paperStyle: NgmyMarriagePaperStyle.beadedPearl,
+    background: 0xFFFFFDF6,
+    ink: 0xFF7A5C2E,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF7A5C2E,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFDF6), Color(0xFF7A5C2E), Color(0xFFC9A227)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'malipo_art_deco',
+    name: 'Malipo — Art Deco',
+    description: 'Pembe za ngazi za kisasa · mng\'ao wa dhahabu juu.',
+    paperStyle: NgmyMarriagePaperStyle.artDeco,
+    background: 0xFFF7F5F2,
+    ink: 0xFF1F1B16,
+    accent: 0xFFB8860B,
+    bannerFill: 0xFF1F1B16,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFF7F5F2), Color(0xFF1F1B16), Color(0xFFB8860B)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'malipo_rosette',
+    name: 'Malipo — Duara',
+    description: 'Medali ya duara kila pembe · shaba na mahogany.',
+    paperStyle: NgmyMarriagePaperStyle.rosetteCorners,
+    background: 0xFFFBF6EF,
+    ink: 0xFF6B3F2A,
+    accent: 0xFFC97B3D,
+    bannerFill: 0xFF6B3F2A,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFBF6EF), Color(0xFF6B3F2A), Color(0xFFC97B3D)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'malipo_modern_ledger',
+    name: 'Malipo — Kisasa',
+    description: 'Ukanda thabiti wa bluu upande wa kushoto · mstari mwembamba.',
+    paperStyle: NgmyMarriagePaperStyle.modernLedger,
+    background: 0xFFFFFFFF,
+    ink: 0xFF12213D,
+    accent: 0xFF12213D,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF12213D), Color(0xFF12213D)],
+  ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiMalipoAwamuTemplates = [
+  ...kNgmyHatiKuhowaTemplates,
+  ...kNgmyHatiMalipoAwamuExtraTemplates,
+];
+
+NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuhowaTemplate> templates = kNgmyHatiKuhowaTemplates}) {
+  for (final t in templates) {
     if (t.id == id) return t;
   }
   return null;
@@ -678,8 +741,7 @@ List<NgmySlideElement> _layoutSingle(
 
 /// Soft picker preview — one silhouette shared by both templates (same
 /// content), just recolored per template.
-Widget ngmyHatiKuhowaTemplateLivePreview(String templateId) {
-  final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
+Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
   final bg = Color(tpl.background);
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
@@ -883,7 +945,7 @@ const _kHatiMalipoAwamuMahariItems = [
 /// past the page's bottom border.
 NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String state = ''}) {
   ngmyClearMarriagePaperCache();
-  final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
+  final tpl = ngmyHatiKuhowaTemplateById(templateId, templates: kNgmyHatiMalipoAwamuTemplates) ?? kNgmyHatiMalipoAwamuTemplates.first;
 
   final page = NgmySlide(
     id: NgmySlidesTemplates.newId(),
@@ -918,19 +980,24 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
   );
 }
 
-Future<String?> showNgmyHatiKuhowaTemplatePicker(BuildContext context, {String docLabel = 'Hati ya Kuhowa'}) async {
+Future<String?> showNgmyHatiKuhowaTemplatePicker(
+  BuildContext context, {
+  String docLabel = 'Hati ya Kuhowa',
+  List<NgmyHatiKuhowaTemplate> templates = kNgmyHatiKuhowaTemplates,
+}) async {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _NgmyHatiKuhowaTemplatePickerSheet(docLabel: docLabel),
+    builder: (ctx) => _NgmyHatiKuhowaTemplatePickerSheet(docLabel: docLabel, templates: templates),
   );
 }
 
 class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
-  const _NgmyHatiKuhowaTemplatePickerSheet({this.docLabel = 'Hati ya Kuhowa'});
+  const _NgmyHatiKuhowaTemplatePickerSheet({this.docLabel = 'Hati ya Kuhowa', this.templates = kNgmyHatiKuhowaTemplates});
 
   final String docLabel;
+  final List<NgmyHatiKuhowaTemplate> templates;
 
   @override
   Widget build(BuildContext context) {
@@ -992,9 +1059,9 @@ class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
                 controller: scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 16, crossAxisSpacing: 14, childAspectRatio: 0.62),
-                itemCount: kNgmyHatiKuhowaTemplates.length,
+                itemCount: templates.length,
                 itemBuilder: (_, i) {
-                  final tpl = kNgmyHatiKuhowaTemplates[i];
+                  final tpl = templates[i];
                   return _HkTemplateCard(template: tpl, onTap: () => Navigator.pop(context, tpl.id));
                 },
               ),
@@ -1039,7 +1106,7 @@ class _HkTemplateCard extends StatelessWidget {
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 6, offset: const Offset(0, 2))],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: AspectRatio(aspectRatio: 9 / 16, child: ngmyHatiKuhowaTemplateLivePreview(template.id)),
+                  child: AspectRatio(aspectRatio: 9 / 16, child: ngmyHatiKuhowaTemplateLivePreview(template)),
                 ),
               ),
               Container(
@@ -1310,7 +1377,7 @@ Future<void> launchNgmyHatiMalipoAwamu({
   }
 
   if (!context.mounted) return;
-  final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Malipo ya Awamu ya Mahari');
+  final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Malipo ya Awamu ya Mahari', templates: kNgmyHatiMalipoAwamuTemplates);
   if (templateId == null || !context.mounted) return;
   final state = await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
