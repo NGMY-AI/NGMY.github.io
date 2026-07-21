@@ -729,7 +729,7 @@ const _kHatiKuhowaIntro = 'Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyu
     'kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.';
 
 const _kHatiKuhowaMahariItems = [
-  'Kichwa cha Mtu: Dollar elfu ishirini na tano (\$20,000)',
+  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
   'Mbuzi Mbili',
   'Ngyoka',
   'Mmoko',
@@ -778,7 +778,7 @@ const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], 
     'familia zote mbili.';
 
 const _kHatiKuhoweshaMahariItems = [
-  'Kichwa cha Mtu: Dollar elfu ishirini na tano (\$20,000)',
+  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
   'Mbuzi Wawili',
   'Ngyoka',
   'Mmoko',

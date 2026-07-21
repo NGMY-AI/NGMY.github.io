@@ -3,21 +3,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'ngmy_network_resilience.dart';
 
 /// Brief pause after both players enter so neither starts early.
 const int kNgmyMpLobbyAlignMs = 500;
 
 /// Shared countdown once both players are in the room.
 const int kNgmyMpCountdownSec = 4;
-
-/// Minimum interval between full cloud invite fetches (lobby + match sync).
-const Duration kNgmyInviteCloudRefreshMin = Duration(seconds: 12);
-
-List<Map<String, dynamic>> _inviteCloudCache = [];
-DateTime? _inviteCloudFetchedAt;
 
 /// Multiplayer-capable game ids.
 const Set<String> kNgmyMultiplayerGameIds = {
@@ -47,8 +38,6 @@ const Map<String, String> kNgmyProGameTitles = {
   'checkers_deluxe': 'Checkers Deluxe',
   'tic_tac_go': 'Tic Tac Go',
 };
-
-const String _kConfigRowId = '1';
 
 List<Map<String, dynamic>> parseGameInvites(dynamic raw) {
   if (raw is! List) return [];
@@ -297,32 +286,13 @@ Future<String> inviteOpponentDisplayNameResolved(Map<String, dynamic> invite, St
   return inviteOpponentDisplayName(invite, yourEmail, emailToUsername: map);
 }
 
-Future<List<Map<String, dynamic>>> _remoteInvitesCached({bool force = false}) async {
-  if (!force &&
-      _inviteCloudFetchedAt != null &&
-      DateTime.now().difference(_inviteCloudFetchedAt!) < kNgmyInviteCloudRefreshMin &&
-      _inviteCloudCache.isNotEmpty) {
-    return _inviteCloudCache;
-  }
-  final remote = await ngmyFetchGameInvitesFromCloud();
-  if (remote != null) {
-    _inviteCloudCache = remote;
-    _inviteCloudFetchedAt = DateTime.now();
-  }
-  return _inviteCloudCache;
-}
-
-/// Local + cached remote merge — avoids a cloud round-trip on every poll.
+/// Local-only invite lookup (multiplayer invites disabled).
 Future<Map<String, dynamic>?> ngmyFetchInviteByIdMerged(
   String inviteId,
   List<Map<String, dynamic>> localInvites, {
   bool forceRefresh = false,
 }) async {
-  final remote = await _remoteInvitesCached(force: forceRefresh);
-  final merged = mergeGameInvites(localInvites, remote);
-  final found = findInviteById(merged, inviteId);
-  if (found != null) upsertInviteInList(localInvites, found);
-  return found;
+  return findInviteById(localInvites, inviteId);
 }
 
 void respondInvite(List<Map<String, dynamic>> invites, String id, String status) {
@@ -470,36 +440,9 @@ void updateInviteSession(List<Map<String, dynamic>> invites, String id, Map<Stri
   }
 }
 
-Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud({bool force = false}) async {
-  if (!force &&
-      _inviteCloudFetchedAt != null &&
-      DateTime.now().difference(_inviteCloudFetchedAt!) < kNgmyInviteCloudRefreshMin &&
-      _inviteCloudCache.isNotEmpty) {
-    return _inviteCloudCache.map((e) => Map<String, dynamic>.from(e)).toList();
-  }
-  if (!await ngmyCanReachCloud()) return null;
-  try {
-    final row = await Supabase.instance.client
-        .from('config')
-        .select('gameInvites')
-        .eq('id', _kConfigRowId)
-        .maybeSingle();
-    if (row == null || row['gameInvites'] is! List) return [];
-    final parsed = parseGameInvites(row['gameInvites']);
-    _inviteCloudCache = parsed;
-    _inviteCloudFetchedAt = DateTime.now();
-    return parsed;
-  } catch (e) {
-    debugPrint('[gameInvites] fetch: $e');
-    return null;
-  }
-}
+Future<List<Map<String, dynamic>>?> ngmyFetchGameInvitesFromCloud({bool force = false}) async => const [];
 
-Future<Map<String, dynamic>?> ngmyFetchInviteById(String inviteId) async {
-  final remote = await ngmyFetchGameInvitesFromCloud();
-  if (remote == null) return null;
-  return findInviteById(remote, inviteId);
-}
+Future<Map<String, dynamic>?> ngmyFetchInviteById(String inviteId) async => null;
 
 Future<Map<String, dynamic>?> ngmyFetchInviteByIdMergedOnlyLocal(
   String inviteId,
@@ -509,62 +452,31 @@ Future<Map<String, dynamic>?> ngmyFetchInviteByIdMergedOnlyLocal(
       ngmyFetchInviteByIdMerged(inviteId, localInvites);
 }
 
-/// Pull remote invites, merge with local, optionally push merged list back.
+/// Local prune only — multiplayer invites are disabled.
 Future<List<Map<String, dynamic>>?> ngmySyncGameInvites(List<Map<String, dynamic>> localInvites, {bool push = false}) async {
-  final remote = await _remoteInvitesCached();
-  final merged = mergeGameInvites(localInvites, remote);
-  localInvites
-    ..clear()
-    ..addAll(merged);
-  if (push) {
-    await ngmyPublishGameInvites(localInvites);
-  }
-  return merged;
+  ngmyPruneStaleGameInvites(localInvites);
+  return List<Map<String, dynamic>>.from(localInvites.map((e) => Map<String, dynamic>.from(e)));
 }
 
 Future<bool> ngmyPublishGameInvites(
   List<Map<String, dynamic>> localInvites, {
   bool preferCachedRemote = false,
 }) async {
-  if (!await ngmyCanReachCloud()) return false;
-  try {
-    final client = Supabase.instance.client;
-    List<Map<String, dynamic>> remote;
-    if (preferCachedRemote && _inviteCloudCache.isNotEmpty) {
-      remote = _inviteCloudCache;
-    } else {
-      final row = await client.from('config').select('gameInvites').eq('id', _kConfigRowId).maybeSingle();
-      remote = row != null && row['gameInvites'] is List ? parseGameInvites(row['gameInvites']) : <Map<String, dynamic>>[];
-      _inviteCloudCache = remote;
-      _inviteCloudFetchedAt = DateTime.now();
-    }
-    final merged = mergeGameInvites(localInvites, remote);
-    await client.from('config').upsert({'id': _kConfigRowId, 'gameInvites': merged});
-    localInvites
-      ..clear()
-      ..addAll(merged);
-    _inviteCloudCache = merged;
-    _inviteCloudFetchedAt = DateTime.now();
-    return true;
-  } catch (e) {
-    debugPrint('[gameInvites] publish: $e');
-    return false;
-  }
+  ngmyPruneStaleGameInvites(localInvites);
+  return true;
 }
 
 Future<bool> ngmyPublishInviteSession(List<Map<String, dynamic>> localInvites, String inviteId, Map<String, dynamic> sessionState) async {
   updateInviteSession(localInvites, inviteId, sessionState);
-  return ngmyPublishGameInvites(localInvites);
+  return true;
 }
 
-/// Updates local session immediately; cloud publish runs without blocking UI.
 void ngmyPublishInviteSessionFast(
   List<Map<String, dynamic>> localInvites,
   String inviteId,
   Map<String, dynamic> sessionState,
 ) {
   updateInviteSession(localInvites, inviteId, sessionState);
-  unawaited(ngmyPublishGameInvites(localInvites, preferCachedRemote: true));
 }
 
 /// Solo vs NGMY system, or head-to-head when [inviteId] is set.
