@@ -72080,13 +72080,13 @@ return A.a([A.tZ(n+".",B.aX,f,13,B.J,0.024,0,"wln_"+a+"_"+n,0.026,c,d),A.djJ("wi
 dum(a){var s,r
 for(s=0;s<6;++s){r=B.ud[s]
 if(r.a===a)return r}return null},
-dHw(a,b,c,d,e,f,g,h,i,j,k,l,m){var s=A.dJM(a.d),r=A.a([A.eb(B.aX,!1,4279310375,B.a8,"marriage_locked_bg",4280640491,24,B.be,B.a_,1,A.bZ(),s,0,0,B.b0,4280172719,2,"",0,B.bH,B.oM,1,0,0)],t.pt)
-B.f.A(r,A.epb(a,b,c,d,e,f,g,h,i,j,k,l,m))
+dHw(a,b,c,d,e,f,g,h,i,j,k,l,m,n){var s=A.dJM(a.d),r=A.a([A.eb(B.aX,!1,4279310375,B.a8,"marriage_locked_bg",4280640491,24,B.be,B.a_,1,A.bZ(),s,0,0,B.b0,4280172719,2,"",0,B.bH,B.oM,1,0,0)],t.pt)
+B.f.A(r,A.epb(a,b,c,d,e,f,g,h,i,j,k,l,m,n))
 return r},
-epb(b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0=null,a1=4280640491,a2=4280172719,a3="marriage_locked",a4=4293056712,a5=4279310375,a6="marriage_locked_",a7=b1.f,a8=b1.r,a9=t.pt,b0=A.a([],a9)
+epb(b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0=null,a1=4280640491,a2=4280172719,a3="marriage_locked",a4=4293056712,a5=4279310375,a6="marriage_locked_",a7=b1.f,a8=b1.r,a9=t.pt,b0=A.a([],a9)
 b0.push(A.tZ("NGMY",B.P,a7&16777215|251658240,60,B.D,0.09,-0.52,"watermark",0.5,-0.11,0.025))
 B.f.A(b0,A.a([A.tZ("TAREHE:",B.aX,a8,20,B.J,B.l.O(0.033999999999999996,0.02,0.06),0,"tarehe_lbl",0.1,0.7,0.026),A.djJ("tarehe",0.8059999999999999,0.026,0.14400000000000002,B.aX,!1,21,a7,A.e_p()),A.aZX(0.814,0.026+B.l.O(0.035699999999999996,0.02,0.06)*0.8,0.12,a8)],a9))
-b0.push(A.tZ(c0,B.P,a7,c1,B.D,0.06,0,"title",0.82,0.09,0.036))
+b0.push(A.tZ(c0,B.P,a7,c1,B.D,0.06,0,"title",0.82,0.09,c3))
 b0.push(A.GO(a8,0.0026,B.b0,a8,0,"title_rule_1",0.82*c2,0.09+0.82*(1-c2)/2,0.09))
 s=A.bZ()
 b0.push(A.eb(B.aX,!1,a7,B.a8,"marriage_field_utangulizi:"+B.l.a9(0.82,3),a1,19,B.be,B.c3,0.15,s,a0,0,0,B.b0,a2,2,b3,0,B.bH,B.cc,0.82,0.09,0.103))
@@ -72118,12 +72118,12 @@ B.f.A(b0,A.a([new A.eX(""+1000*l+"_"+k,B.cc,0.09,r,0.038,0.034,o+".",21,B.J,B.be
 r+=0.04}r+=0.006
 B.f.A(b0,A.dWW("MASHAHIDI",r,0.09,0.82,a8))
 r+=0.046
-e=0.05+c3*0.056+0.011
+e=0.05+c4*0.056+0.011
 s=r+0.05
 o=r+0.012
 B.f.A(b0,A.a([A.GO(0,e,B.b0,a8,1.3,"wit_table_border",0.82,0.09,r),A.GO(a8,e,B.b0,a8,0,"wit_table_divider",0.0024,0.4988,r),A.GO(0,0.0022,B.e3,a8,1.1,"wit_table_hdrline",0.82,0.09,s),A.tZ("NGAMBO YA MKE",B.P,a8,20,B.D,0.03,0,"wit_h_mke_t",0.41,0.09,o),A.tZ("NGAMBO YA MUME",B.P,a8,20,B.D,0.03,0,"wit_h_mume_t",0.41,0.5,o)],a9))
 d=s+0.01
-for(c=1;c<=c3;++c){B.f.A(b0,A.dWX("mke",c,0.106,d,0.378,a8,a7))
+for(c=1;c<=c4;++c){B.f.A(b0,A.dWX("mke",c,0.106,d,0.378,a8,a7))
 B.f.A(b0,A.dWX("mume",c,0.516,d,0.378,a8,a7))
 d+=0.056}r=r+e+0.012
 s=r+0.056
@@ -72185,7 +72185,7 @@ break}$.b_j.a7(0)
 m=A.dum(o)
 if(m==null)m=B.f.gI(B.ud)
 k=A.bZ()
-l=A.o0(m.e,null,0,0,A.dHw(m,0.165,"Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyumba ya [Jina la Nyumba], nimesimama rasmi kuthibitisha utoaji wa mahali ya kuhoweya kijana wangu aitwaye [Jina la Kijana], pamoja na [Jina la Binti], binti wa [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya Binti], nyumba ya [Jina la Nyumba ya Binti]. Makubaliano haya yanatekelezwa kwa kufuata desturi, taratibu, na mapokeo yanayoheshimiwa na pande zote mbili za familia, kwa nia ya kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.",B.c0a,"NIMETOWA",!1,"Vitu vifuatavyo vimetolewa:",20,n,"HATI YA KUHOWA",40,0.55,3),k,B.ml,"","","Hati ya Kuhowa",B.cV)
+l=A.o0(m.e,null,0,0,A.dHw(m,0.165,"Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyumba ya [Jina la Nyumba], nimesimama rasmi kuthibitisha utoaji wa mahali ya kuhoweya kijana wangu aitwaye [Jina la Kijana], pamoja na [Jina la Binti], binti wa [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya Binti], nyumba ya [Jina la Nyumba ya Binti]. Makubaliano haya yanatekelezwa kwa kufuata desturi, taratibu, na mapokeo yanayoheshimiwa na pande zote mbili za familia, kwa nia ya kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.",B.c0a,"NIMETOWA",!1,"Vitu vifuatavyo vimetolewa:",20,n,"HATI YA KUHOWA",40,0.55,0.036,3),k,B.ml,"","","Hati ya Kuhowa",B.cV)
 b.$1(A.KW(B.oL,5,"hati_kuhowa",A.bZ(),null,"Hati ya Kuhowa",A.a([l],t.xU),"hati_kuhowa_"+m.a,null))
 case 1:return A.h(q,r)}})
 return A.i($async$aq8,r)},
@@ -72214,7 +72214,7 @@ break}$.b_j.a7(0)
 m=A.dum(o)
 if(m==null)m=B.f.gI(B.ud)
 k=A.bZ()
-l=A.o0(m.e,null,0,0,A.dHw(m,0.165,"Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], nyumba ya [Jina la Nyumba], kwa hiari yangu na kwa ridhaa ya familia yangu, nimemuhowesha binti wangu [Jina la Binti] kwa [Jina la Mume], wa jamaa la [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya Mume], mwana wa [Jina la Baba wa Mume]. Uhoweshaji huu umefanyika kwa makubaliano ya pande zote mbili, kwa kufuata mila na desturi za wazee wetu, kwa lengo la kuunganisha familia zetu katika heshima, upendo na mshikamano. Hivyo, ninathibitisha mbele ya mashahidi kuwa makubaliano haya yamefanyika kwa amani na kwa ridhaa kamili ya familia zote mbili.",B.bYT,"NIMEPOKEYA CASH",!0,"Vitu vifuatavyo vimetolewa:",20,n,"HATI YA KUHOWESHA",40,0.55,3),k,B.ml,"","","Hati ya Kuhoweya",B.cV)
+l=A.o0(m.e,null,0,0,A.dHw(m,0.165,"Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], nyumba ya [Jina la Nyumba], kwa hiari yangu na kwa ridhaa ya familia yangu, nimemuhowesha binti wangu [Jina la Binti] kwa [Jina la Mume], wa jamaa la [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya Mume], mwana wa [Jina la Baba wa Mume]. Uhoweshaji huu umefanyika kwa makubaliano ya pande zote mbili, kwa kufuata mila na desturi za wazee wetu, kwa lengo la kuunganisha familia zetu katika heshima, upendo na mshikamano. Hivyo, ninathibitisha mbele ya mashahidi kuwa makubaliano haya yamefanyika kwa amani na kwa ridhaa kamili ya familia zote mbili.",B.bYT,"NIMEPOKEYA CASH",!0,"Vitu vifuatavyo vimetolewa:",20,n,"HATI YA KUHOWESHA",40,0.55,0.036,3),k,B.ml,"","","Hati ya Kuhoweya",B.cV)
 b.$1(A.KW(B.oL,5,"hati_kuhoweya",A.bZ(),null,"Hati ya Kuhoweya",A.a([l],t.xU),"hati_kuhoweya_"+m.a,null))
 case 1:return A.h(q,r)}})
 return A.i($async$aq9,r)},
@@ -72243,7 +72243,7 @@ break}$.b_j.a7(0)
 m=A.dum(o)
 if(m==null)m=B.f.gI(B.ud)
 k=A.bZ()
-l=A.o0(m.e,null,0,0,A.dHw(m,0.21,"Mimi [Jina la Baba wa Mume], nikiwa kama baba na mkuu wa familia ya upande wa mume kutoka jamii ya [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya Mume], ninafanya makubaliano haya rasmi na familia ya [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya Binti], nyumba ya [Jina la Nyumba ya Binti]. Kwa kuwa malipo kamili ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, tumefikia makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha mahari kitakamilishwa kikamilifu na familia yetu ifikapo tarehe [Tarehe ya Kurudi Kulipa Mahari]. Siku hiyo, pande zote mbili zitakutana tena kwa ajili ya kukamilisha taratibu zote zilizosalia, kupokea baraka kamili za ndoa, na kukabidhiwa Cheti cha Ndoa ya Kimila. Makubaliano haya yanafanyika kwa hiari, kwa ridhaa ya familia zote mbili, na kwa kufuata misingi ya heshima, mila, desturi na maelewano mema kati ya familia zetu.",B.bVG,"MALIPO YALIYOSALIA",!1,"Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):",18,n,"HATI YA MAKUBALIANO YA MALIPO YA AWAMU YA MAHARI",24,0.85,2),k,B.ml,"","","Hati ya Makubaliano ya Malipo ya Awamu",B.cV)
+l=A.o0(m.e,null,0,0,A.dHw(m,0.21,"Mimi [Jina la Baba wa Mume], nikiwa kama baba na mkuu wa familia ya upande wa mume kutoka jamii ya [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya Mume], ninafanya makubaliano haya rasmi na familia ya [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya Binti], nyumba ya [Jina la Nyumba ya Binti]. Kwa kuwa malipo kamili ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, tumefikia makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha mahari kitakamilishwa kikamilifu na familia yetu ifikapo tarehe [Tarehe ya Kurudi Kulipa Mahari]. Siku hiyo, pande zote mbili zitakutana tena kwa ajili ya kukamilisha taratibu zote zilizosalia, kupokea baraka kamili za ndoa, na kukabidhiwa Cheti cha Ndoa ya Kimila. Makubaliano haya yanafanyika kwa hiari, kwa ridhaa ya familia zote mbili, na kwa kufuata misingi ya heshima, mila, desturi na maelewano mema kati ya familia zetu.",B.bVG,"MALIPO YALIYOSALIA",!1,"Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):",18,n,"HATI YA MAKUBALIANO YA MALIPO YA AWAMU YA MAHARI",24,0.85,0.048,2),k,B.ml,"","","Hati ya Makubaliano ya Malipo ya Awamu",B.cV)
 b.$1(A.KW(B.oL,5,"hati_malipo_awamu",A.bZ(),null,"Hati ya Makubaliano ya Malipo ya Awamu",A.a([l],t.xU),"hati_malipo_awamu_"+m.a,null))
 case 1:return A.h(q,r)}})
 return A.i($async$aqa,r)},

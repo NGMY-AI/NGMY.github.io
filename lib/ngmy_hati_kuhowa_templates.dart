@@ -505,6 +505,7 @@ List<NgmySlideElement> _buildPageContent(
   double introAdvance = 0.165,
   int witnessRows = 3,
   double titleRuleWidthRatio = 0.55,
+  double titleY = 0.036,
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   return [
@@ -523,6 +524,7 @@ List<NgmySlideElement> _buildPageContent(
       introAdvance: introAdvance,
       witnessRows: witnessRows,
       titleRuleWidthRatio: titleRuleWidthRatio,
+      titleY: titleY,
     ),
   ];
 }
@@ -541,6 +543,7 @@ List<NgmySlideElement> _layoutSingle(
   double introAdvance = 0.165,
   int witnessRows = 3,
   double titleRuleWidthRatio = 0.55,
+  double titleY = 0.036,
 }) {
   final ink = tpl.ink;
   final accent = tpl.accent;
@@ -556,7 +559,7 @@ List<NgmySlideElement> _layoutSingle(
   // border on the right (not just the content margin) — it used to share
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
-  out.add(_hLockedText(title, x: cx, y: 0.036, w: cw, h: 0.06, fontSize: titleFontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.add(_hLockedText(title, x: cx, y: titleY, w: cw, h: 0.06, fontSize: titleFontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   // A single rule sitting right under the title, not far below it — same
   // tight spacing as the NIMETOWE item underlines. Wide enough to span
   // close to the title's own width on each side. (There used to be a
@@ -901,6 +904,7 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
       introAdvance: 0.21,
       witnessRows: 2,
       titleRuleWidthRatio: 0.85,
+      titleY: 0.048,
     ),
   );
 
