@@ -336,6 +336,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  void _launchHatiMalipoAwamu() {
+    launchNgmyHatiMalipoAwamu(
+      context: context,
+      savedDecks: _decks,
+      openDraftEditor: _openMarriageDraft,
+      openSavedDeck: _openDeck,
+    );
+  }
+
   Future<void> _openDocumentCategoryPicker() async {
     final category = await showModalBottomSheet<String>(
       context: context,
@@ -375,6 +384,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 subtitle: 'Hati ya kupokea',
                 onTap: () => Navigator.pop(ctx, 'hati_kuhoweya'),
               ),
+              const SizedBox(height: 10),
+              _DocumentCategoryTile(
+                icon: Icons.payments_rounded,
+                colors: const [Color(0xFFB8860B), Color(0xFF6B4A12), Color(0xFF3A2708)],
+                title: 'Malipo ya Awamu ya Mahari',
+                subtitle: 'Makubaliano ya mahari iliyosalia',
+                onTap: () => Navigator.pop(ctx, 'hati_malipo_awamu'),
+              ),
             ],
           ),
         ),
@@ -387,6 +404,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _launchHatiKuhowa();
     } else if (category == 'hati_kuhoweya') {
       _launchHatiKuhowesha();
+    } else if (category == 'hati_malipo_awamu') {
+      _launchHatiMalipoAwamu();
     }
   }
 

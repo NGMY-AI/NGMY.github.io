@@ -7,6 +7,7 @@ import 'ngmy_state_picker.dart';
 
 const String kNgmyHatiKuhowaDeckKind = 'hati_kuhowa';
 const String kNgmyHatiKuhoweshaDeckKind = 'hati_kuhoweya';
+const String kNgmyHatiMalipoAwamuDeckKind = 'hati_malipo_awamu';
 
 /// Soft underlines — never dark/black (picker + print).
 const _softLine = 0xFFE2D8C8;
@@ -498,11 +499,29 @@ List<NgmySlideElement> _buildPageContent(
   required bool sectionLabelEditable,
   required List<String> mahariItems,
   String state = '',
+  double titleFontSize = 40,
+  String sectionSubtitle = 'Vitu vifuatavyo vimetolewa:',
+  double sectionSubtitleFontSize = 20,
+  double introAdvance = 0.165,
+  int witnessRows = 3,
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   return [
     _hBgImage(bgUrl),
-    ..._layoutSingle(tpl, title: title, introText: introText, sectionLabel: sectionLabel, sectionLabelEditable: sectionLabelEditable, mahariItems: mahariItems, state: state),
+    ..._layoutSingle(
+      tpl,
+      title: title,
+      introText: introText,
+      sectionLabel: sectionLabel,
+      sectionLabelEditable: sectionLabelEditable,
+      mahariItems: mahariItems,
+      state: state,
+      titleFontSize: titleFontSize,
+      sectionSubtitle: sectionSubtitle,
+      sectionSubtitleFontSize: sectionSubtitleFontSize,
+      introAdvance: introAdvance,
+      witnessRows: witnessRows,
+    ),
   ];
 }
 
@@ -514,6 +533,11 @@ List<NgmySlideElement> _layoutSingle(
   required bool sectionLabelEditable,
   required List<String> mahariItems,
   String state = '',
+  double titleFontSize = 40,
+  String sectionSubtitle = 'Vitu vifuatavyo vimetolewa:',
+  double sectionSubtitleFontSize = 20,
+  double introAdvance = 0.165,
+  int witnessRows = 3,
 }) {
   final ink = tpl.ink;
   final accent = tpl.accent;
@@ -529,7 +553,7 @@ List<NgmySlideElement> _layoutSingle(
   // border on the right (not just the content margin) — it used to share
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
-  out.add(_hLockedText(title, x: cx, y: 0.036, w: cw, h: 0.06, fontSize: 40, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.add(_hLockedText(title, x: cx, y: 0.036, w: cw, h: 0.06, fontSize: titleFontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   // A single rule sitting right under the title, not far below it — same
   // tight spacing as the NIMETOWE item underlines. Wide enough to span
   // close to the title's own width on each side. (There used to be a
@@ -557,7 +581,7 @@ List<NgmySlideElement> _layoutSingle(
   // even though the box itself wasn't the problem. The next few gaps
   // are trimmed slightly to give this back the room it needs without
   // pushing everything below off the bottom of the page.
-  y += 0.165;
+  y += introAdvance;
   // Extra breathing room so the (now shorter) NIMETOWA/NIMEPOKEYA CASH
   // frame sits lower under the intro paragraph, per request to bring it
   // down.
@@ -574,7 +598,7 @@ List<NgmySlideElement> _layoutSingle(
   }
   // Was 0.062 — trimmed to match the shrunk banner box height.
   y += 0.048;
-  out.add(_hLockedText('Vitu vifuatavyo vimetolewa:', x: cx, y: y, w: cw, h: 0.03, fontSize: 20, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
+  out.add(_hLockedText(sectionSubtitle, x: cx, y: y, w: cw, h: 0.03, fontSize: sectionSubtitleFontSize, fontWeight: FontWeight.w700, color: ink, tag: 'nimetowe_sub'));
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
@@ -600,7 +624,7 @@ List<NgmySlideElement> _layoutSingle(
   // sat exactly on the table's bottom border with zero margin, so it read
   // as overflowing/poking out of the frame.
   const tableBottomPad = 0.011;
-  final tableH = hdrH + 3 * rowH + tableBottomPad;
+  final tableH = hdrH + witnessRows * rowH + tableBottomPad;
   final tableTop = y;
   out.addAll([
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: tableTop, w: cw, h: tableH, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.3, tag: 'wit_table_border'),
@@ -613,7 +637,7 @@ List<NgmySlideElement> _layoutSingle(
     _hLockedText('NGAMBO YA MUME', x: cx + colW, y: tableTop + 0.012, w: colW, h: 0.03, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'wit_h_mume_t'),
   ]);
   y = tableTop + hdrH + 0.01;
-  for (var n = 1; n <= 3; n++) {
+  for (var n = 1; n <= witnessRows; n++) {
     out.addAll(_hWitnessLine('mke', n, cx + innerPad, y, colW - innerPad * 2, ink: ink, accent: accent));
     out.addAll(_hWitnessLine('mume', n, cx + colW + innerPad, y, colW - innerPad * 2, ink: ink, accent: accent));
     y += rowH;
@@ -817,6 +841,69 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
     themeId: 'hati_kuhoweya_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhoweshaDeckKind,
+    slides: [page],
+  );
+}
+
+const _kHatiMalipoAwamuIntro = 'Mimi [Jina la Baba wa Mume], nikiwa kama baba na mkuu wa familia ya '
+    'upande wa mume kutoka jamii ya Bashimkinji, Nyumba ya Locha Msambya, '
+    'ninafanya makubaliano haya rasmi na familia ya [Jina la Baba wa '
+    'Binti], wa jamii ya Bashimwenda, Nyumba ya Bashi Lwangya. Kwa kuwa '
+    'malipo kamili ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, '
+    'tumefikia makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha '
+    'mahari kitakamilishwa kikamilifu na familia yetu ifikapo tarehe '
+    '[Weka Tarehe ya Kurudi Kulipa]. Siku hiyo, pande zote mbili '
+    'zitakutana tena kwa ajili ya kukamilisha taratibu zote zilizosalia, '
+    'kupokea baraka kamili za ndoa, na kukabidhiwa cheti rasmi cha ndoa. '
+    'Makubaliano haya yanafanyika kwa hiari na kwa kufuata misingi ya '
+    'heshima, mapokeo, na maelewano mazuri kati ya familia zetu mbili.';
+
+const _kHatiMalipoAwamuMahariItems = [
+  'Kichwa cha Mtu: [Kiasi kilichosalia au thamani]',
+  'Mbuzi Mbili',
+  'Ngyoka',
+  'Mmoko',
+];
+
+/// Builds the single-page "Hati ya Makubaliano ya Malipo ya Awamu ya
+/// Mahari" deck — same paper, table, Mashahidi, and Mwandishi as Hati ya
+/// Kuhowa, but for a partial-mahari-payment agreement: its own (longer)
+/// title, its own intro paragraph, a "MALIPO YALIYOSALIA" section header
+/// over the remaining-items list, and only 2 witness rows per side (the
+/// paper text names exactly 2 mashahidi per side, not 3) — freeing up the
+/// extra vertical room the longer intro paragraph needs so nothing spills
+/// past the page's bottom border.
+NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String state = ''}) {
+  ngmyClearMarriagePaperCache();
+  final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
+
+  final page = NgmySlide(
+    id: NgmySlidesTemplates.newId(),
+    title: 'Hati ya Makubaliano ya Malipo ya Awamu',
+    layout: NgmySlideLayout.blank,
+    background: tpl.background,
+    elements: _buildPageContent(
+      tpl,
+      title: 'HATI YA MAKUBALIANO YA MALIPO YA AWAMU YA MAHARI',
+      introText: _kHatiMalipoAwamuIntro,
+      sectionLabel: 'MALIPO YALIYOSALIA',
+      sectionLabelEditable: false,
+      mahariItems: _kHatiMalipoAwamuMahariItems,
+      state: state,
+      titleFontSize: 24,
+      sectionSubtitle: 'Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):',
+      sectionSubtitleFontSize: 18,
+      introAdvance: 0.22,
+      witnessRows: 2,
+    ),
+  );
+
+  return NgmySlideDeck(
+    id: NgmySlidesTemplates.newId(),
+    name: 'Hati ya Makubaliano ya Malipo ya Awamu',
+    themeId: 'hati_malipo_awamu_${tpl.id}',
+    aspectRatio: NgmySlideAspectRatio.portrait916,
+    deckKind: kNgmyHatiMalipoAwamuDeckKind,
     slides: [page],
   );
 }
@@ -1138,4 +1225,84 @@ Future<void> launchNgmyHatiKuhowesha({
   final state = await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiKuhoweshaDeck(templateId: templateId, state: state));
+}
+
+/// Launches the "Hati ya Makubaliano ya Malipo ya Awamu ya Mahari" flow —
+/// same shape as [launchNgmyHatiKuhowa]/[launchNgmyHatiKuhowesha], but for
+/// the partial-mahari-payment agreement deck.
+Future<void> launchNgmyHatiMalipoAwamu({
+  required BuildContext context,
+  required List<NgmySlideDeck> savedDecks,
+  required void Function(NgmySlideDeck deck) openDraftEditor,
+  required void Function(NgmySlideDeck deck) openSavedDeck,
+}) async {
+  final existing = savedDecks.where((d) => d.deckKind == kNgmyHatiMalipoAwamuDeckKind).toList();
+
+  if (existing.isNotEmpty) {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF14192A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Malipo ya Awamu ya Mahari', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 8),
+              Text(
+                'Una hati ${existing.length} zilizohifadhiwa.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'continue'),
+                icon: const Icon(Icons.edit_document),
+                label: Text('Endelea na "${existing.first.name}"'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF12213D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'new'),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Hati mpya (chagua muundo)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (action == 'continue') {
+      openSavedDeck(existing.first.copy());
+      return;
+    }
+    if (action != 'new') return;
+  }
+
+  if (!context.mounted) return;
+  final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Malipo ya Awamu ya Mahari');
+  if (templateId == null || !context.mounted) return;
+  final state = await _pickNgmyHatiState(context);
+  if (state == null || !context.mounted) return;
+  openDraftEditor(ngmyBuildHatiMalipoAwamuDeck(templateId: templateId, state: state));
 }
