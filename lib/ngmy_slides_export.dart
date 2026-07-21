@@ -197,12 +197,24 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
     }
   }
 
+  // Text boxes are sized at design time to fit their default content. The
+  // in-app font-size +/- control lets a user enlarge a field's text without
+  // growing its box (see ngmy_slides_studio.dart's _selChip fontSize
+  // steppers), and the live editor already renders that overflow visibly
+  // (ngmy_slides_render.dart uses `overflow: TextOverflow.visible`) instead
+  // of clipping it. A fixed-height SizedBox here did the opposite — it
+  // clipped anything past the box's original (un-enlarged) height, so an
+  // enlarged paragraph silently lost its later lines in the exported PDF
+  // even though the editor showed it in full. Only constrain width for
+  // text (wrapping still has to match the box); let height grow to fit.
+  final isText = e.type == NgmySlideElementType.text;
+
   return pw.Positioned(
     left: left,
     top: top,
     child: pw.SizedBox(
       width: width,
-      height: height,
+      height: isText ? null : height,
       child: e.type == NgmySlideElementType.signature
           ? pw.Container(
               padding: const pw.EdgeInsets.all(4),
