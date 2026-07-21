@@ -504,6 +504,7 @@ List<NgmySlideElement> _buildPageContent(
   double sectionSubtitleFontSize = 20,
   double introAdvance = 0.165,
   int witnessRows = 3,
+  double titleRuleWidthRatio = 0.55,
 }) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
   return [
@@ -521,6 +522,7 @@ List<NgmySlideElement> _buildPageContent(
       sectionSubtitleFontSize: sectionSubtitleFontSize,
       introAdvance: introAdvance,
       witnessRows: witnessRows,
+      titleRuleWidthRatio: titleRuleWidthRatio,
     ),
   ];
 }
@@ -538,6 +540,7 @@ List<NgmySlideElement> _layoutSingle(
   double sectionSubtitleFontSize = 20,
   double introAdvance = 0.165,
   int witnessRows = 3,
+  double titleRuleWidthRatio = 0.55,
 }) {
   final ink = tpl.ink;
   final accent = tpl.accent;
@@ -558,7 +561,7 @@ List<NgmySlideElement> _layoutSingle(
   // tight spacing as the NIMETOWE item underlines. Wide enough to span
   // close to the title's own width on each side. (There used to be a
   // second, smaller line under this one — removed per request.)
-  out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.225, y: 0.09, w: cw * 0.55, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
+  out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * (1 - titleRuleWidthRatio) / 2, y: 0.09, w: cw * titleRuleWidthRatio, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
 
   // UTANGULIZI — one wrapped paragraph field, reproduced verbatim. Word-wrap
   // keeps every line flush from the left edge to the right edge of the
@@ -846,17 +849,19 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
 }
 
 const _kHatiMalipoAwamuIntro = 'Mimi [Jina la Baba wa Mume], nikiwa kama baba na mkuu wa familia ya '
-    'upande wa mume kutoka jamii ya Bashimkinji, Nyumba ya Locha Msambya, '
-    'ninafanya makubaliano haya rasmi na familia ya [Jina la Baba wa '
-    'Binti], wa jamii ya Bashimwenda, Nyumba ya Bashi Lwangya. Kwa kuwa '
-    'malipo kamili ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, '
-    'tumefikia makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha '
-    'mahari kitakamilishwa kikamilifu na familia yetu ifikapo tarehe '
-    '[Weka Tarehe ya Kurudi Kulipa]. Siku hiyo, pande zote mbili '
-    'zitakutana tena kwa ajili ya kukamilisha taratibu zote zilizosalia, '
-    'kupokea baraka kamili za ndoa, na kukabidhiwa cheti rasmi cha ndoa. '
-    'Makubaliano haya yanafanyika kwa hiari na kwa kufuata misingi ya '
-    'heshima, mapokeo, na maelewano mazuri kati ya familia zetu mbili.';
+    'upande wa mume kutoka jamii ya [Jina la Jamii ya Mume], nyumba ya '
+    '[Jina la Nyumba ya Mume], ninafanya makubaliano haya rasmi na '
+    'familia ya [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya '
+    'Binti], nyumba ya [Jina la Nyumba ya Binti]. Kwa kuwa malipo kamili '
+    'ya mahari ya mke wa mwanangu hayajakamilika kwa sasa, tumefikia '
+    'makubaliano ya kulipa kwa awamu. Kiasi kilichosalia cha mahari '
+    'kitakamilishwa kikamilifu na familia yetu ifikapo tarehe [Tarehe ya '
+    'Kurudi Kulipa Mahari]. Siku hiyo, pande zote mbili zitakutana tena '
+    'kwa ajili ya kukamilisha taratibu zote zilizosalia, kupokea baraka '
+    'kamili za ndoa, na kukabidhiwa Cheti cha Ndoa ya Kimila. Makubaliano '
+    'haya yanafanyika kwa hiari, kwa ridhaa ya familia zote mbili, na kwa '
+    'kufuata misingi ya heshima, mila, desturi na maelewano mema kati ya '
+    'familia zetu.';
 
 const _kHatiMalipoAwamuMahariItems = [
   'Kichwa cha Mtu: [Kiasi kilichosalia au thamani]',
@@ -893,8 +898,9 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
       titleFontSize: 24,
       sectionSubtitle: 'Mambo ya Cash na Mali (Yaliyosalia / Yatakayokamilishwa):',
       sectionSubtitleFontSize: 18,
-      introAdvance: 0.22,
+      introAdvance: 0.24,
       witnessRows: 2,
+      titleRuleWidthRatio: 0.85,
     ),
   );
 
