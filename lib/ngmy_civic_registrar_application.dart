@@ -117,12 +117,39 @@ class NgmyCivicRegistrarApplication {
     return kept;
   }
 
+  static DateTime? _rowTimestamp(Map<String, dynamic> a) {
+    final raw = (a['reviewedAt'] ?? a['updatedAt'] ?? a['revokedAt'] ?? a['createdAt'] ?? '').toString();
+    if (raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  /// Merges a device-local application backup into [list] for [email] —
+  /// but only if it's actually more recent than whatever's already
+  /// there. This backup is written once, on the applicant's own device,
+  /// when they submit an application — it is never updated there again
+  /// when an admin later approves/revokes/restores remotely, on a
+  /// different device. Every app bootstrap on the applicant's own phone
+  /// calls this to fold that backup back in, so blindly replacing an
+  /// existing row (e.g. one just correctly merged in from the cloud,
+  /// showing "revoked") with the stale local one (still "pending" from
+  /// however long ago they applied) silently undid every remote status
+  /// change on every single app load — the applicant's own device could
+  /// never see themselves as revoked no matter how long they waited.
   static List<Map<String, dynamic>> mergeLocalIntoList(
     List<Map<String, dynamic>> list,
     String email,
     Map<String, dynamic>? local,
   ) {
     if (local == null) return list.map((e) => Map<String, dynamic>.from(e)).toList();
+    final key = _emailKey(email);
+    final existingIdx = list.indexWhere((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == key);
+    if (existingIdx == -1) return upsertInList(list, local);
+    final existingTs = _rowTimestamp(list[existingIdx]);
+    final localTs = _rowTimestamp(local);
+    if (localTs == null) return list.map((e) => Map<String, dynamic>.from(e)).toList();
+    if (existingTs != null && !localTs.isAfter(existingTs)) {
+      return list.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
     return upsertInList(list, local);
   }
 
