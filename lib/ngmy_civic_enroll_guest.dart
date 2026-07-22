@@ -274,8 +274,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final phone = _phoneC.text.trim();
     final familyRaw = _familyMembersC.text.trim();
     final familyMembers = int.tryParse(familyRaw) ?? 0;
-    final males = int.tryParse(_familyMalesC.text.trim()) ?? -1;
-    final females = int.tryParse(_familyFemalesC.text.trim()) ?? -1;
+    final malesRaw = _familyMalesC.text.trim();
+    final femalesRaw = _familyFemalesC.text.trim();
+    final males = malesRaw.isEmpty ? 0 : (int.tryParse(malesRaw) ?? -1);
+    final females = femalesRaw.isEmpty ? 0 : (int.tryParse(femalesRaw) ?? -1);
     final state = _selectedState.trim();
 
     if (fullName.isEmpty) {
@@ -307,12 +309,17 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Andika ukubwa wa familia (1–99).');
       return;
     }
-    if (males < 0 || females < 0) {
-      _toast('Andika idadi ya wanaume na wanawake.');
+    if (malesRaw.isNotEmpty && males < 0) {
+      _toast('Wanaume lazima iwe nambari (au uache wazi).');
       return;
     }
-    if (males + females != familyMembers) {
-      _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
+    if (femalesRaw.isNotEmpty && females < 0) {
+      _toast('Wanawake lazima iwe nambari (au uache wazi).');
+      return;
+    }
+    // Male/female split is optional. Only enforce the sum when both are provided.
+    if (malesRaw.isNotEmpty && femalesRaw.isNotEmpty && males + females != familyMembers) {
+      _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers), au uache wazi.');
       return;
     }
     if (state.isEmpty) {
@@ -1011,14 +1018,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyMalesC,
-                                label: 'Wanaume (M)',
+                                label: 'Wanaume (M) — hiari',
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyFemalesC,
-                                label: 'Wanawake (F)',
+                                label: 'Wanawake (F) — hiari',
                               ),
                             ),
                           ],
