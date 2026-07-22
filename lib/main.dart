@@ -2517,6 +2517,41 @@ Future<void> _mergeCivicRegistryPinsIntoConfig(AppConfig config) async {
   );
 }
 
+/// Cities/rooms added by a registrar were disappearing intermittently:
+/// _persistCriticalConfigFields pushed config.civicCitiesByState/rooms
+/// straight from this device's local state with no fetch-merge step
+/// first — unlike civicRegistrarApplications and the registry pins just
+/// above, which both fetch remote and merge before writing. Two
+/// registrars (or a registrar and an admin) each adding a different city
+/// around the same time raced: whichever device's throttled push landed
+/// last silently overwrote the whole civicCitiesByState/rooms value with
+/// its own local copy, discarding whatever the other device had just
+/// added. Union-merging local with remote before every write closes
+/// that gap — an addition can never be lost to a later write from a
+/// device that didn't know about it yet.
+Future<void> _mergeCivicCitiesAndRoomsIntoConfig(AppConfig config) async {
+  try {
+    final row = await _fetchNgmyConfigRow(columns: 'civicCitiesByState,rooms');
+    if (row == null) return;
+    final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(row['civicCitiesByState']);
+    if (remoteByState.isNotEmpty) {
+      final merged = Map<String, List<String>>.from(config.civicCitiesByState);
+      for (final entry in remoteByState.entries) {
+        final local = merged[entry.key] ?? const <String>[];
+        merged[entry.key] = <String>{...local, ...entry.value}.toList();
+      }
+      config.civicCitiesByState = merged;
+      config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
+    }
+    final remoteRooms = row['rooms'];
+    if (remoteRooms is List && remoteRooms.isNotEmpty) {
+      config.rooms = <String>{...config.rooms, ...remoteRooms.map((e) => e.toString())}.toList();
+    }
+  } catch (e) {
+    debugPrint('[config] merge cities/rooms: $e');
+  }
+}
+
 Future<void> _persistCivicRegistryPins(
   AppConfig config, {
   required String state,
@@ -3476,6 +3511,7 @@ void _scheduleOperationalConfigCloudPersist(AppConfig config) {
 Future<void> _persistCriticalConfigFields(AppConfig config) async {
   if (!await ngmyCanReachCloud()) return;
   await _mergeCivicRegistryPinsIntoConfig(config);
+  await _mergeCivicCitiesAndRoomsIntoConfig(config);
   final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
   final localRegistrarBefore = config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   _mergeRegistrarApplicationsIntoConfig(config, remoteRegistrarApps);
@@ -3494,6 +3530,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'cities': config.cities,
+    'rooms': config.rooms,
     'civicRegistryMembers': config.civicRegistryMembers,
     if (shouldWriteRegistrarApps) 'civicRegistrarApplications': registrarApps,
   });
@@ -31572,9 +31609,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     // missed more than once.
     final alreadyMarked = <String>{};
     for (final m in members ?? _membersInCurrentHelpScope()) {
-      final key = m.email.toLowerCase().trim();
-      if (key.isEmpty || !alreadyMarked.add(key)) continue;
-      if (!contributors.contains(key)) {
+      // Registrars can enroll a member without an email (guest
+      // enrollment — registryId is the unique key in that case; see
+      // NgmyCivicRegistryMembers.upsert). Keying purely on email meant
+      // every such member had an empty key here and was silently
+      // `continue`d past — never marked missed, no matter what — which
+      // is exactly how one person out of a full state roster could
+      // vanish from the missed count while everyone else was handled
+      // correctly. Fall back to registryId (always present — rows
+      // without one get pruned on enrollment) so nobody with a real
+      // registry record gets skipped.
+      final emailKey = m.email.toLowerCase().trim();
+      final key = emailKey.isNotEmpty ? emailKey : 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
+      if (key == 'rid:' || !alreadyMarked.add(key)) continue;
+      if (!contributors.contains(emailKey)) {
         m.missed += 1;
         unawaited(_persistCivicMemberActivity(m));
       }
@@ -34866,6 +34914,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         children: [
           TextField(
             controller: _searchController,
+            // Live — no more "Search Registry" button to click. Results
+            // below update on every keystroke via onChanged.
+            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             decoration: InputDecoration(
               hintText: 'Search by name (typos OK), ID, city...',
               hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
@@ -34875,18 +34926,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               fillColor: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.shade50,
             ),
           ),
-          const SizedBox(height: 25),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _searchQuery = _searchController.text.toLowerCase();
-                if (_canManageCivicRegistry()) _activeTab = 2;
-              });
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6200EE), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 0),
-            child: const Text('Search Registry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-          if (!_canManageCivicRegistry() && _searchQuery.isNotEmpty) ...[
+          if (_searchQuery.isNotEmpty) ...[
             const SizedBox(height: 24),
             Align(
               alignment: Alignment.centerLeft,
@@ -34926,7 +34966,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _showPublicMemberProfile(u),
+        // _showMemberProfile dispatches to the full manager dialog
+        // (money/claim/delete actions) for registrars/King/Admin, or the
+        // read-only public profile otherwise — a manager searching live
+        // now gets the same capabilities they'd have had from the
+        // Members tab, without needing to switch to it first.
+        onTap: () => _showMemberProfile(u),
         borderRadius: BorderRadius.circular(22),
         child: _AliveSearchFrame(
           isDark: isDark,
