@@ -30053,8 +30053,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       try {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
         if (now.difference(startedAt).inDays >= 5) {
-          final campaignId = _activeHelpCampaignId();
-          _markMissedForNonContributorsInCampaign(campaignId, campaignStartedAt: startedAt);
+          final campaignId = _activeHelpCampaignId(state);
+          _markMissedForNonContributorsInCampaign(
+            campaignId,
+            members: _membersInCurrentHelpScope(forState: state),
+            campaignStartedAt: startedAt,
+          );
           widget.config.deactivateHelpCampaign(state);
           _markCampaignClosed(campaignId, now);
           changed = true;
@@ -31462,8 +31466,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   /// still can't see or touch that state's help mode campaign.
   String _helpModeState() => _isGlobalCivicRegistryAdmin() ? _selectedState : widget.user.state;
 
-  bool _memberMatchesHelpScope(UserData u) {
-    final state = _helpModeState();
+  bool _memberMatchesHelpScope(UserData u, {String? forState}) {
+    final state = forState ?? _helpModeState();
     if (!widget.config.helpActiveFor(state)) return false;
     final scopeType = widget.config.helpScopeTypeFor(state);
     final scopeValue = widget.config.helpScopeValueFor(state).trim();
@@ -31479,19 +31483,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return '${widget.config.helpPurposeFor(state)}|${widget.config.helpScopeTypeFor(state)}|${widget.config.helpScopeValueFor(state)}|$state';
   }
 
-  List<UserData> _membersInCurrentHelpScope() {
-    // Must filter by the campaign's own state (_helpModeState()), not
-    // widget.user.state. For a King/Admin managing a state that isn't
-    // their personal home state (e.g. deactivating Alabama's campaign
-    // while their own account state is something else), comparing
-    // against widget.user.state matched zero members — so nobody was
-    // ever marked missed, even though the campaign closed normally.
-    // Registrars deactivating their own state's campaign happened to
-    // work anyway, since _helpModeState() equals widget.user.state for
-    // them, which is exactly why this only showed up for Alabama here.
-    final campaignState = _helpModeState().trim().toLowerCase();
+  List<UserData> _membersInCurrentHelpScope({String? forState}) {
+    // Must filter by the campaign's own state, not widget.user.state. For
+    // a King/Admin managing a state that isn't their personal home state
+    // (e.g. deactivating Alabama's campaign while their own account state
+    // is something else), comparing against widget.user.state matched
+    // zero members — so nobody was ever marked missed, even though the
+    // campaign closed normally.
+    //
+    // Defaulting to _helpModeState() (which itself falls back to
+    // widget.user.state for non-King/Admin) still isn't enough on its
+    // own: widget.user.state is only ever set at initial PIN unlock or
+    // registrar approval and is never resynced when a registrar spends
+    // one of their 3 free state switches (_applyCivicStateChange updates
+    // _selectedState, not widget.user.state). A registrar deactivating
+    // *their own currently-selected state's* campaign needs that exact
+    // state, not whatever widget.user.state happens to still say — this
+    // is why the Deactivate button (which always operates on
+    // _selectedState) passes forState explicitly instead of relying on
+    // this default.
+    final campaignState = (forState ?? _helpModeState()).trim().toLowerCase();
     return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((m) {
-      if (!_memberMatchesHelpScope(m)) return false;
+      if (!_memberMatchesHelpScope(m, forState: forState)) return false;
       return m.state.trim().isEmpty || m.state.trim().toLowerCase() == campaignState;
     }).toList();
   }
@@ -32263,7 +32276,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     );
                                     return;
                                   }
-                                  final activeCampaignId = _activeHelpCampaignId();
+                                  // Pin everything to _selectedState explicitly — the
+                                  // state this button is actually deactivating — instead
+                                  // of letting _activeHelpCampaignId()/
+                                  // _membersInCurrentHelpScope() fall back to
+                                  // _helpModeState() (widget.user.state for a non-King/
+                                  // Admin viewer). widget.user.state can silently drift
+                                  // from _selectedState once a registrar has used a free
+                                  // state switch, which broke missed-marking for
+                                  // registrars specifically while King/Admin (who always
+                                  // resolve through _selectedState) looked unaffected.
+                                  final activeCampaignId = _activeHelpCampaignId(_selectedState);
                                   // Snapshot who was in scope *before* deactivating —
                                   // helpActiveFor(state) flips to false the instant
                                   // deactivateHelpCampaign runs below, and
@@ -32272,7 +32295,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   // scope list would come back empty and no one would
                                   // ever be marked missed for a manually-deactivated
                                   // campaign.
-                                  final membersInScope = _membersInCurrentHelpScope();
+                                  final membersInScope = _membersInCurrentHelpScope(forState: _selectedState);
                                   final startedAtRaw = widget.config.helpCampaignStartedAtFor(_selectedState).trim();
                                   DateTime? campaignStartedAt;
                                   if (startedAtRaw.isNotEmpty) {
@@ -33699,12 +33722,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showContributionDialog(UserData u) {
-    final state = _helpModeState();
+    // Anchor on _selectedState throughout, not _helpModeState() (which
+    // falls back to widget.user.state for a non-King/Admin viewer) — the
+    // Deactivate button always closes out _selectedState's campaign, so a
+    // contribution recorded here has to be tagged and scoped the same way
+    // or it can end up attached to a different campaign than the one that
+    // eventually gets deactivated.
+    final state = _selectedState;
     if (!widget.config.helpActiveFor(state)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;
     }
-    if (!_memberMatchesHelpScope(u)) {
+    if (!_memberMatchesHelpScope(u, forState: state)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This member is outside current help scope.')));
       return;
     }
@@ -33809,14 +33838,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 return;
                               }
                               final now = DateTime.now();
-                              final campaignId = _activeHelpCampaignId();
+                              final campaignId = _activeHelpCampaignId(state);
                               final payload = jsonEncode({
                                 'kind': 'contribution',
                                 'purpose': widget.config.helpPurposeFor(state),
                                 'note': noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim(),
                                 'scopeType': widget.config.helpScopeTypeFor(state),
                                 'scopeValue': widget.config.helpScopeValueFor(state),
-                                'state': widget.user.state,
+                                // The campaign's own state, not widget.user.state —
+                                // they used to diverge (widget.user.state is never
+                                // resynced after a registrar uses a free state
+                                // switch), tagging the receipt with the wrong state
+                                // and hiding it from the state it actually belongs to.
+                                'state': state,
                                 'campaignId': campaignId,
                               });
                               widget.onAddTransaction(
@@ -34516,7 +34550,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () => _showHelpCampaignSpendingLedger(
-                                    campaignId: _activeHelpCampaignId(),
+                                    campaignId: _activeHelpCampaignId(helpModeStateName),
                                     campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                   ),
                                   icon: const Icon(Icons.receipt_long_rounded, size: 16),
@@ -34534,7 +34568,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 Expanded(
                                   child: FilledButton.icon(
                                     onPressed: () => _recordHelpCampaignSpending(
-                                      campaignId: _activeHelpCampaignId(),
+                                      campaignId: _activeHelpCampaignId(helpModeStateName),
                                       campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                     ),
                                     icon: const Icon(Icons.folder_open_rounded, size: 16),
