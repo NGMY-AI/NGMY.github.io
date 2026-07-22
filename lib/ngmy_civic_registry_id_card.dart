@@ -758,7 +758,7 @@ String _civicIdDownloadFilename(Map<String, dynamic> record) {
   return 'ngmy_civic_id_$name';
 }
 
-Future<void> _showEnlargedCivicQrDialog(BuildContext context, String registryId) {
+Future<void> showNgmyEnlargedCivicQrDialog(BuildContext context, String registryId) {
   final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
   final size = MediaQuery.sizeOf(context).width.clamp(260.0, 320.0);
   return showDialog<void>(
@@ -871,7 +871,7 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
                                 photoPath: resolvedPhoto.isEmpty ? null : resolvedPhoto,
                                 photoImage: photoImage,
                                 scale: 1,
-                                onQrTap: () => _showEnlargedCivicQrDialog(context, registryId),
+                                onQrTap: () => showNgmyEnlargedCivicQrDialog(context, registryId),
                               ),
                               const SizedBox(height: 8),
                               Text(

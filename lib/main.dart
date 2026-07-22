@@ -32502,24 +32502,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showRegistrarMemberProfile(UserData u) {
-    final contributions = widget.allTransactions
-        .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final claims = widget.allTransactions
-        .where((t) => t.userEmail == u.email && t.type == TransactionType.claim)
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final openClaims = claims.where((c) => c.status == TransactionStatus.pending).toList();
-    final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
-
+    final emailKey = u.email.toLowerCase().trim();
     showDialog(
       context: context,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final statusLabel = _statusLabelForMissed(u.missed);
-        final statusColor = _statusColorForMissed(u.missed);
-        return Dialog(
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final statusLabel = _statusLabelForMissed(u.missed);
+            final statusColor = _statusColorForMissed(u.missed);
+            // Read the same merged local+cloud transaction set
+            // _showPublicMemberProfile uses (case-insensitive email match),
+            // not just widget.allTransactions with an exact-case compare —
+            // otherwise a claim/contribution recorded on the member's own
+            // device, or by a different registrar, never showed up here
+            // even though the member could already see it on their own
+            // profile. Rejected == deleted (see the trash button below) —
+            // excluded so a deleted claim actually disappears instead of
+            // lingering as "Resolved claim".
+            final contributions = _civicTransactionsForDisplay()
+                .where((t) =>
+                    t.userEmail.toLowerCase().trim() == emailKey &&
+                    t.type == TransactionType.contribution &&
+                    t.status == TransactionStatus.approved)
+                .toList()
+              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            final claims = _civicTransactionsForDisplay()
+                .where((t) =>
+                    t.userEmail.toLowerCase().trim() == emailKey &&
+                    t.type == TransactionType.claim &&
+                    t.status != TransactionStatus.rejected)
+                .toList()
+              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            final openClaims = claims.where((c) => c.status == TransactionStatus.pending).toList();
+            final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
+            void deleteClaim(AppTransaction t) {
+              setState(() => t.status = TransactionStatus.rejected);
+              widget.onDataChanged();
+              setDialogState(() {});
+            }
+
+            return Dialog(
           insetPadding: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: SelectionContainer.disabled(
@@ -32699,7 +32722,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ),
                         title: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Claim'),
                         subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
-                        trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            IconButton(
+                              tooltip: 'Delete claim',
+                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              padding: EdgeInsets.zero,
+                              onPressed: () => deleteClaim(t),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   const SizedBox(height: 20),
@@ -32765,6 +32801,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
           ),
+        );
+          },
         );
       },
     );
@@ -33439,8 +33477,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   timestamp: now,
                 ),
               );
-              setState(() => u.missed += 1);
-              unawaited(_persistCivicMemberActivity(u));
+              // A claim is not the same thing as missing a contribution —
+              // it shouldn't add to the member's missed count.
               widget.onDataChanged();
               Navigator.pop(ctx);
             },
@@ -33478,9 +33516,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   onPressed: () {
                     setState(() {
                       c.status = TransactionStatus.rejected;
-                      if (u.missed > 0) u.missed -= 1;
                     });
-                    unawaited(_persistCivicMemberActivity(u));
                     widget.onDataChanged();
                     Navigator.pop(ctx);
                   },
@@ -33556,15 +33592,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final email = NgmyCivicRegistryMembers.emailKey((record['email'] ?? widget.user.email).toString());
     await ngmyLoadCivicIdPhotoLocal(email);
     if (!mounted) return;
+    // The civic registry record's dob is only ever set at enrollment time —
+    // if a member added/updated their DOB on their app profile afterward
+    // (e.g. during ID verification), the registry record itself is never
+    // backfilled. Fall back to the live profile field (display-only, not
+    // persisted) so the printed card still shows a DOB whenever one exists
+    // anywhere for this person.
+    var displayRecord = record;
+    if ((record['dob'] ?? '').toString().trim().isEmpty) {
+      UserData? owner;
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == email) {
+        owner = widget.user;
+      } else {
+        for (final u in widget.allUsers) {
+          if (NgmyCivicRegistryMembers.emailKey(u.email) == email) {
+            owner = u;
+            break;
+          }
+        }
+      }
+      final ownerDob = (owner?.dob ?? '').toString().trim();
+      if (ownerDob.isNotEmpty) {
+        displayRecord = {...record, 'dob': ownerDob};
+      }
+    }
     final photoPath = ngmyCivicIdPhotoForRecord(
-      record,
+      displayRecord,
       profilePicturePath: widget.user.profilePicturePath,
       emailHint: email,
     );
     final photoImage = ngmyCachedProfileImage(photoPath);
     showNgmyCivicRegistryIdCardDialog(
       context,
-      record: record,
+      record: displayRecord,
       photoPath: photoPath,
       photoImage: photoImage,
       onChangePhoto: allowPhotoChange

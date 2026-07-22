@@ -2697,6 +2697,10 @@ class _CivicIdCardBody extends StatelessWidget {
                     record: record!,
                     photoPath: photo.isEmpty ? null : photo,
                     scale: 1,
+                    onQrTap: () => showNgmyEnlargedCivicQrDialog(
+                      context,
+                      (record!['registryId'] ?? '').toString().trim(),
+                    ),
                   ),
                 ),
               ),
