@@ -1538,7 +1538,9 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
       };
       for (var i = 0; i < 8; i++) {
         try {
-          await Supabase.instance.client.from('config').upsert(row);
+          // See _upsertNgmySettingSafe — no timeout here meant a stalled
+          // connection could block Deactivate Help Mode's await forever.
+          await Supabase.instance.client.from('config').upsert(row).timeout(kNgmyCloudWriteTimeout);
           cloudOk = true;
           break;
         } catch (e) {

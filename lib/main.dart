@@ -4769,7 +4769,13 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
   };
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key');
+      // Without a timeout, a stalled (not failed — a request that never
+      // resolves at all) connection blocks this await forever. That's
+      // fatal for a caller like the Deactivate Help Mode button, which
+      // awaits this before closing its dialog: no exception ever fires,
+      // so the retry/error handling below never runs either — the button
+      // just looks permanently stuck instead of failing visibly.
+      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       _rememberSupabasePersistError(e);
@@ -4791,7 +4797,7 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
 
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
   try {
-    final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle();
+    final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle().timeout(kNgmyCloudLoadTimeout);
     if (row == null) return null;
     final value = row['value'];
     if (value is Map) return Map<String, dynamic>.from(value);
@@ -31877,9 +31883,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       debugPrint('[help mode] mark campaign closed: $e');
                                     }
                                   });
-                                  await ngmyPersistCivicHelpModeSettings(widget.config);
+                                  // Close and reflect the deactivation immediately — the
+                                  // local data is already updated above. Waiting on this
+                                  // awaited cloud sync before closing meant a slow/stalled
+                                  // connection left the dialog sitting there looking stuck
+                                  // for as long as the network call took (now bounded by a
+                                  // timeout, but still not something a button press should
+                                  // block on). Sync in the background instead.
                                   widget.onDataChanged();
                                   if (ctx.mounted) Navigator.pop(ctx);
+                                  unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red.shade500,
@@ -31964,9 +31977,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     startNewCampaignId: shouldStartNewCampaign,
                                   );
                                 });
-                                await ngmyPersistCivicHelpModeSettings(widget.config);
+                                // Same reasoning as Deactivate below — don't block
+                                // closing the dialog on an awaited cloud sync.
                                 widget.onDataChanged();
                                 if (ctx.mounted) Navigator.pop(ctx);
+                                unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),
