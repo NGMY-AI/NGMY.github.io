@@ -29600,17 +29600,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  bool _canChangeCivicState() {
-    if (_hasRegistrarAccess() && !_isCivicRegistryKing(widget.user) && !widget.user.isAdmin) {
-      return false;
-    }
-    return NgmyCivicStateSwitches.canChangeState(
-      isAdmin: widget.user.isAdmin,
-      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
-      isCivicRegistryKing: widget.user.isCivicRegistryKing,
-      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-    );
-  }
+  // Everyone gets the same 3 free state switches (King/Admin/Civic
+  // Registry Admin bypass the limit entirely) — a plain Authorized
+  // Registrar used to be blocked from ever changing state at all here,
+  // before NgmyCivicStateSwitches.canChangeState below even got a
+  // chance to count their switches.
+  bool _canChangeCivicState() => NgmyCivicStateSwitches.canChangeState(
+        isAdmin: widget.user.isAdmin,
+        isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+        isCivicRegistryKing: widget.user.isCivicRegistryKing,
+        switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      );
 
   Future<bool> _applyCivicStateChange(String newState) async {
     final from = _selectedState;
@@ -32810,6 +32810,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            // Same glassy treatment for both the Contribution Records and
+            // Claim Records sections — one soft outer frame around the
+            // whole list, and each record gets its own smaller frame
+            // inside it. Same neutral tint for both sections (icon colors
+            // still tell contributions and claims apart); kept subtle —
+            // thin low-opacity border, no heavy lines.
+            Widget glassFrame({required Widget child}) => Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.05 : 0.03),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.10)),
+                  ),
+                  child: child,
+                );
+            Widget glassTile({required Widget child, bool last = false}) => Container(
+                  margin: EdgeInsets.only(bottom: last ? 0 : 8),
+                  decoration: BoxDecoration(
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.055 : 0.045),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.08)),
+                  ),
+                  child: child,
+                );
             final statusLabel = _statusLabelForMissed(u.missed);
             final statusColor = _statusColorForMissed(u.missed);
             // Read the same merged local+cloud transaction set
@@ -32999,51 +33023,63 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const SizedBox(height: 18),
                   const Text('Contribution Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-                  if (contributions.isEmpty)
-                    const Text('No contribution records yet.', style: TextStyle(color: Colors.grey))
-                  else
-                    ...contributions.take(8).map(
-                      (t) => ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                        title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(_txReadableDetails(t)),
-                        trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                      ),
-                    ),
+                  glassFrame(
+                    child: contributions.isEmpty
+                        ? const Text('No contribution records yet.', style: TextStyle(color: Colors.grey))
+                        : Column(
+                            children: contributions.take(8).toList().asMap().entries.map((entry) {
+                              final t = entry.value;
+                              return glassTile(
+                                last: entry.key == contributions.take(8).length - 1,
+                                child: ListTile(
+                                  dense: true,
+                                  leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                  title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(_txReadableDetails(t)),
+                                  trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                  ),
                   const SizedBox(height: 16),
                   const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-                  if (claims.isEmpty)
-                    const Text('No claim records yet.', style: TextStyle(color: Colors.grey))
-                  else
-                    ...claims.take(8).map(
-                      (t) => ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          t.status == TransactionStatus.pending ? Icons.warning_amber_rounded : Icons.verified,
-                          color: t.status == TransactionStatus.pending ? Colors.orange : Colors.green,
-                        ),
-                        title: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Claim'),
-                        subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            IconButton(
-                              tooltip: 'Delete claim',
-                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                              visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              padding: EdgeInsets.zero,
-                              onPressed: () => deleteClaim(t),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  glassFrame(
+                    child: claims.isEmpty
+                        ? const Text('No claim records yet.', style: TextStyle(color: Colors.grey))
+                        : Column(
+                            children: claims.take(8).toList().asMap().entries.map((entry) {
+                              final t = entry.value;
+                              return glassTile(
+                                last: entry.key == claims.take(8).length - 1,
+                                child: ListTile(
+                                  dense: true,
+                                  leading: Icon(
+                                    t.status == TransactionStatus.pending ? Icons.warning_amber_rounded : Icons.verified,
+                                    color: t.status == TransactionStatus.pending ? Colors.orange : Colors.green,
+                                  ),
+                                  title: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Claim'),
+                                  subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      IconButton(
+                                        tooltip: 'Delete claim',
+                                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                        visualDensity: VisualDensity.compact,
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () => deleteClaim(t),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                  ),
                   const SizedBox(height: 20),
                   if ((u.registryId ?? '').trim().isNotEmpty) ...[
                     SizedBox(
