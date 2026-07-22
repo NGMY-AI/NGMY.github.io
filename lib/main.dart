@@ -31291,7 +31291,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }).toList();
   }
 
-  void _markMissedForNonContributorsInCampaign(String campaignId) {
+  // [members] lets a caller snapshot the campaign's scope membership
+  // *before* deactivating: _membersInCurrentHelpScope() filters through
+  // _memberMatchesHelpScope(), whose first check is
+  // `widget.config.helpActiveFor(state)` — once the campaign has already
+  // been deactivated that's false for everyone, so calling this after
+  // deactivateHelpCampaign() with no snapshot silently checks zero
+  // members and nobody is ever marked missed. Defaults to a live lookup
+  // for callers (like the 5-day auto-expiry) that still run this before
+  // deactivating.
+  void _markMissedForNonContributorsInCampaign(String campaignId, {List<UserData>? members}) {
     final normalizedCampaignId = campaignId.trim();
     if (normalizedCampaignId.isEmpty) return;
     final contributors = widget.allTransactions
@@ -31307,7 +31316,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     // been marked so a single close-out never counts one person as
     // missed more than once.
     final alreadyMarked = <String>{};
-    for (final m in _membersInCurrentHelpScope()) {
+    for (final m in members ?? _membersInCurrentHelpScope()) {
       final key = m.email.toLowerCase().trim();
       if (key.isEmpty || !alreadyMarked.add(key)) continue;
       if (!contributors.contains(key)) {
@@ -31475,64 +31484,161 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       context: context,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          title: const Text('Record Spending', style: TextStyle(fontWeight: FontWeight.w900)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if ((campaignTitle ?? '').trim().isNotEmpty)
-                Text(campaignTitle!.trim(), style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
-              const SizedBox(height: 10),
-              TextField(
-                controller: amountC,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Amount spent (\$)'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: noteC,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'What was purchased / paid for?'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0.0;
-                final note = noteC.text.trim();
-                if (amount <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
-                  return;
-                }
-                if (note.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe what the money was used for.')));
-                  return;
-                }
-                final record = {
-                  'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
-                  'campaignId': cid,
-                  'amount': amount,
-                  'description': note,
-                  'recordedAt': DateTime.now().toUtc().toIso8601String(),
-                  'recordedByEmail': widget.user.email.toLowerCase().trim(),
-                  'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
-                  'state': widget.user.state.trim(),
-                };
-                setState(() {
-                  widget.config.helpCampaignSpendings = [
-                    ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
-                    record,
-                  ];
-                });
-                widget.onDataChanged();
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Spending recorded — members can view it live.')));
-              },
-              child: const Text('Save'),
+        final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
+        final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+        InputDecoration framedInput(String label) {
+          return InputDecoration(
+            labelText: label,
+            filled: true,
+            fillColor: inputBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+              borderSide: BorderSide(color: Color(0xFF059669), width: 1.6),
             ),
-          ],
+          );
+        }
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.42 : 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF047857)]),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.receipt_long_rounded, color: Colors.white),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Record Spending',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 19,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if ((campaignTitle ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 46),
+                    child: Text(
+                      campaignTitle!.trim(),
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                TextField(
+                  controller: amountC,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                  decoration: framedInput('Amount spent (\$)').copyWith(
+                    prefixIcon: const Icon(Icons.attach_money_rounded),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteC,
+                  maxLines: 3,
+                  minLines: 2,
+                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                  decoration: framedInput('What was purchased / paid for?'),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark ? Colors.white70 : Colors.black87,
+                          side: BorderSide(color: borderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0.0;
+                          final note = noteC.text.trim();
+                          if (amount <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
+                            return;
+                          }
+                          if (note.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Describe what the money was used for.')));
+                            return;
+                          }
+                          final record = {
+                            'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
+                            'campaignId': cid,
+                            'amount': amount,
+                            'description': note,
+                            'recordedAt': DateTime.now().toUtc().toIso8601String(),
+                            'recordedByEmail': widget.user.email.toLowerCase().trim(),
+                            'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+                            'state': widget.user.state.trim(),
+                          };
+                          setState(() {
+                            widget.config.helpCampaignSpendings = [
+                              ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+                              record,
+                            ];
+                          });
+                          widget.onDataChanged();
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Spending recorded — members can view it live.')));
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -31863,6 +31969,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     return;
                                   }
                                   final activeCampaignId = _activeHelpCampaignId();
+                                  // Snapshot who was in scope *before* deactivating —
+                                  // helpActiveFor(state) flips to false the instant
+                                  // deactivateHelpCampaign runs below, and
+                                  // _membersInCurrentHelpScope() (called fresh) checks
+                                  // exactly that flag first. Without this snapshot the
+                                  // scope list would come back empty and no one would
+                                  // ever be marked missed for a manually-deactivated
+                                  // campaign.
+                                  final membersInScope = _membersInCurrentHelpScope();
                                   setState(() {
                                     // Deactivating is the actual button the user pressed —
                                     // it must always happen and must go first. Bookkeeping
@@ -31873,7 +31988,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     // clicked Deactivate and nothing happened" report.
                                     widget.config.deactivateHelpCampaign(_selectedState);
                                     try {
-                                      _markMissedForNonContributorsInCampaign(activeCampaignId);
+                                      _markMissedForNonContributorsInCampaign(activeCampaignId, members: membersInScope);
                                     } catch (e) {
                                       debugPrint('[help mode] mark missed on deactivate: $e');
                                     }
