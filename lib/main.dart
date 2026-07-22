@@ -3790,7 +3790,16 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               app['status'] = 'rejected';
                                               app['reviewedAt'] = DateTime.now().toIso8601String();
                                               app['reviewedBy'] = reviewer.email;
-                                              config.civicRegistrarApplications = apps;
+                                              // Write the update back into the FULL config list, not
+                                              // `apps` — `apps` is scope-filtered to this reviewer's own
+                                              // state (see its construction above), so assigning it
+                                              // straight to config.civicRegistrarApplications silently
+                                              // dropped every other state's applications whenever a
+                                              // King (not Admin) reviewer actioned one of their own.
+                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+                                                app,
+                                              );
                                               await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
                                               await _persistCivicRegistrarApplications(config);
                                               if (userIndex != -1) {
@@ -3828,7 +3837,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               app['status'] = 'approved';
                                               app['reviewedAt'] = DateTime.now().toIso8601String();
                                               app['reviewedBy'] = reviewer.email;
-                                              config.civicRegistrarApplications = apps;
+                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+                                                app,
+                                              );
                                               if (userIndex != -1) {
                                                 allUsers[userIndex].isAuthorizedRegistrar = true;
                                                 allUsers[userIndex].state = appState.isNotEmpty ? appState : allUsers[userIndex].state;
@@ -3856,7 +3868,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                           app['status'] = 'revoked';
                                           app['revokedAt'] = DateTime.now().toUtc().toIso8601String();
                                           app['revokedBy'] = reviewer.email;
-                                          config.civicRegistrarApplications = apps;
+                                          config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+                                            config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+                                            app,
+                                          );
                                           if (userIndex != -1) {
                                             allUsers[userIndex].isAuthorizedRegistrar = false;
                                             await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
@@ -3879,6 +3894,106 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                         },
                                         child: const Text('Revoke Registrar Access'),
                                       ),
+                                    ),
+                                  ] else if ((status == 'revoked' || status == 'rejected') && _reviewerCanActOnRegistrarApp(reviewer, app, config)) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                                            onPressed: () async {
+                                              final appState = (app['state'] ?? '').toString().trim();
+                                              if (appState.isNotEmpty &&
+                                                  !NgmyCivicRegistryStats.canApproveRegistrarForState(
+                                                    state: appState,
+                                                    applications: apps,
+                                                    users: allUsers,
+                                                  )) {
+                                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars. Revoke one first.',
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
+                                              app['status'] = 'approved';
+                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedBy'] = reviewer.email;
+                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+                                                app,
+                                              );
+                                              if (userIndex != -1) {
+                                                allUsers[userIndex].isAuthorizedRegistrar = true;
+                                                allUsers[userIndex].state = appState.isNotEmpty ? appState : allUsers[userIndex].state;
+                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+                                              }
+                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
+                                              await _persistCivicRegistrarApplications(config);
+                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
+                                              onDataChanged();
+                                              onParentSetState?.call();
+                                              setST(() {});
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Registrar access restored.')),
+                                                );
+                                              }
+                                            },
+                                            child: const Text('Restore Access'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                            onPressed: () async {
+                                              final confirmed = await showDialog<bool>(
+                                                context: ctx,
+                                                builder: (dctx) => AlertDialog(
+                                                  title: const Text('Delete application?'),
+                                                  content: Text(
+                                                    'This removes ${(app['fullName'] ?? app['username'] ?? email).toString()}\'s registrar application history entirely, letting them submit a brand new application.',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('Cancel')),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(dctx, true),
+                                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirmed != true) return;
+                                              // Remove every record for this email from the FULL
+                                              // config list (not just this one status entry) — the
+                                              // applicant can have separate rows per status
+                                              // transition (see upsertInList), and any leftover row
+                                              // would keep _registrarApplicationStatusForEmail
+                                              // reporting revoked/rejected and blocking reapplication.
+                                              config.civicRegistrarApplications = config.civicRegistrarApplications
+                                                  .where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() != email)
+                                                  .map((e) => Map<String, dynamic>.from(e))
+                                                  .toList();
+                                              await NgmyCivicRegistrarApplication.clear(email);
+                                              await _persistCivicRegistrarApplications(config);
+                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
+                                              onDataChanged();
+                                              onParentSetState?.call();
+                                              setST(() {});
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Application deleted — they can reapply.')),
+                                                );
+                                              }
+                                            },
+                                            child: const Text('Delete Application'),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ],
@@ -29903,7 +30018,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
         if (now.difference(startedAt).inDays >= 5) {
           final campaignId = _activeHelpCampaignId();
-          _markMissedForNonContributorsInCampaign(campaignId);
+          _markMissedForNonContributorsInCampaign(campaignId, campaignStartedAt: startedAt);
           widget.config.deactivateHelpCampaign(state);
           _markCampaignClosed(campaignId, now);
           changed = true;
@@ -31354,17 +31469,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   // members and nobody is ever marked missed. Defaults to a live lookup
   // for callers (like the 5-day auto-expiry) that still run this before
   // deactivating.
-  void _markMissedForNonContributorsInCampaign(String campaignId, {List<UserData>? members}) {
+  void _markMissedForNonContributorsInCampaign(
+    String campaignId, {
+    List<UserData>? members,
+    DateTime? campaignStartedAt,
+  }) {
     final normalizedCampaignId = campaignId.trim();
-    if (normalizedCampaignId.isEmpty) return;
+    if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
     // _civicTransactionsForDisplay(), not widget.allTransactions alone —
     // a contribution recorded on another registrar's device/session only
     // shows up locally through the separately-fetched community list
     // until this device's own transactions catch up, and missing it here
     // would wrongly mark someone missed who actually did contribute.
+    //
+    // Prefer the campaignStartedAt time window over matching the stored
+    // campaignId string: the ID-scan deposit flow records contributions
+    // without ever stamping a campaignId, and a campaign that went
+    // through an activate/deactivate cycle (Alabama, repeatedly, while
+    // the deactivate-resurrects-itself bug was live) could end up with a
+    // stale or empty campaignId that no longer matches what contributions
+    // were actually tagged with — silently zeroing out the contributor
+    // set and marking everyone missed even though they'd contributed. A
+    // contribution timestamped anywhere in [campaignStartedAt, now] counts
+    // regardless of its campaignId; a state can only have one active
+    // campaign at a time, so there's no ambiguity about which campaign a
+    // contribution in that window belongs to.
     final contributors = _civicTransactionsForDisplay()
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .where((t) {
+          if (campaignStartedAt != null) return !t.timestamp.isBefore(campaignStartedAt);
           final meta = _decodeContributionMeta(t);
           return (meta['campaignId'] ?? '').toString() == normalizedCampaignId;
         })
@@ -32091,6 +32224,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   // ever be marked missed for a manually-deactivated
                                   // campaign.
                                   final membersInScope = _membersInCurrentHelpScope();
+                                  final startedAtRaw = widget.config.helpCampaignStartedAtFor(_selectedState).trim();
+                                  DateTime? campaignStartedAt;
+                                  if (startedAtRaw.isNotEmpty) {
+                                    try {
+                                      campaignStartedAt = DateTime.parse(startedAtRaw).toLocal();
+                                    } catch (_) {}
+                                  }
                                   setState(() {
                                     // Deactivating is the actual button the user pressed —
                                     // it must always happen and must go first. Bookkeeping
@@ -32101,7 +32241,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     // clicked Deactivate and nothing happened" report.
                                     widget.config.deactivateHelpCampaign(_selectedState);
                                     try {
-                                      _markMissedForNonContributorsInCampaign(activeCampaignId, members: membersInScope);
+                                      _markMissedForNonContributorsInCampaign(
+                                        activeCampaignId,
+                                        members: membersInScope,
+                                        campaignStartedAt: campaignStartedAt,
+                                      );
                                     } catch (e) {
                                       debugPrint('[help mode] mark missed on deactivate: $e');
                                     }
