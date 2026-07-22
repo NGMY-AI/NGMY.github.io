@@ -36,18 +36,20 @@ class NgmyCivicStateSwitches {
   static int remainingSwitches({
     required bool isAdmin,
     required bool isCivicRegistryAdmin,
+    bool isCivicRegistryKing = false,
     required int switchesUsed,
   }) {
-    if (isAdmin || isCivicRegistryAdmin) return maxSwitches;
+    if (isAdmin || isCivicRegistryAdmin || isCivicRegistryKing) return maxSwitches;
     return (maxSwitches - switchesUsed).clamp(0, maxSwitches);
   }
 
   static bool canChangeState({
     required bool isAdmin,
     required bool isCivicRegistryAdmin,
+    bool isCivicRegistryKing = false,
     required int switchesUsed,
   }) {
-    if (isAdmin || isCivicRegistryAdmin) return true;
+    if (isAdmin || isCivicRegistryAdmin || isCivicRegistryKing) return true;
     return switchesUsed < maxSwitches;
   }
 
@@ -69,6 +71,7 @@ class NgmyCivicStateSwitches {
   static bool tryConsumeSwitch({
     required bool isAdmin,
     required bool isCivicRegistryAdmin,
+    bool isCivicRegistryKing = false,
     required String fromState,
     required String toState,
     required String? anchorState,
@@ -77,7 +80,7 @@ class NgmyCivicStateSwitches {
     required void Function(int used) setSwitchesUsed,
   }) {
     if (fromState.trim().toLowerCase() == toState.trim().toLowerCase()) return true;
-    if (isAdmin || isCivicRegistryAdmin) return true;
+    if (isAdmin || isCivicRegistryAdmin || isCivicRegistryKing) return true;
 
     final anchor = (anchorState ?? '').trim();
     if (anchor.isEmpty) {

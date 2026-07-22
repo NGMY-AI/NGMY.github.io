@@ -29396,6 +29396,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return NgmyCivicStateSwitches.canChangeState(
       isAdmin: widget.user.isAdmin,
       isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      isCivicRegistryKing: widget.user.isCivicRegistryKing,
       switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
     );
   }
@@ -29406,6 +29407,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final ok = NgmyCivicStateSwitches.tryConsumeSwitch(
       isAdmin: widget.user.isAdmin,
       isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      isCivicRegistryKing: widget.user.isCivicRegistryKing,
       fromState: from,
       toState: newState,
       anchorState: widget.user.civicRegistryAnchorState,
@@ -31284,8 +31286,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         })
         .map((t) => t.userEmail.toLowerCase().trim())
         .toSet();
+    // A member can end up listed more than once for one campaign check
+    // (e.g. duplicate records from cloud merges) — track who's already
+    // been marked so a single close-out never counts one person as
+    // missed more than once.
+    final alreadyMarked = <String>{};
     for (final m in _membersInCurrentHelpScope()) {
       final key = m.email.toLowerCase().trim();
+      if (key.isEmpty || !alreadyMarked.add(key)) continue;
       if (!contributors.contains(key)) {
         m.missed += 1;
         unawaited(_persistCivicMemberActivity(m));
@@ -31840,9 +31848,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   }
                                   final activeCampaignId = _activeHelpCampaignId();
                                   setState(() {
-                                    _markMissedForNonContributorsInCampaign(activeCampaignId);
+                                    // Deactivating is the actual button the user pressed —
+                                    // it must always happen and must go first. Bookkeeping
+                                    // (missed counts, campaign-closed history) is best-effort;
+                                    // if either throws, State.setState never reaches
+                                    // markNeedsBuild and the whole deactivation silently
+                                    // fails to render or persist, which is exactly the "I
+                                    // clicked Deactivate and nothing happened" report.
                                     widget.config.deactivateHelpCampaign(_selectedState);
-                                    _markCampaignClosed(activeCampaignId, DateTime.now());
+                                    try {
+                                      _markMissedForNonContributorsInCampaign(activeCampaignId);
+                                    } catch (e) {
+                                      debugPrint('[help mode] mark missed on deactivate: $e');
+                                    }
+                                    try {
+                                      _markCampaignClosed(activeCampaignId, DateTime.now());
+                                    } catch (e) {
+                                      debugPrint('[help mode] mark campaign closed: $e');
+                                    }
                                   });
                                   await ngmyPersistCivicHelpModeSettings(widget.config);
                                   widget.onDataChanged();
@@ -31852,8 +31875,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   foregroundColor: Colors.red.shade500,
                                   side: BorderSide(color: Colors.red.shade300),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
                                 ),
-                                child: const Text('Deactivate'),
+                                child: const Text('Deactivate', maxLines: 1, softWrap: false, overflow: TextOverflow.visible, style: TextStyle(fontSize: 13)),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -34381,6 +34405,44 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ]);
   }
 
+  /// The "Clear Missed" pill above the member list had no onTap at all —
+  /// tapping it did nothing. Clears the missed count for every member
+  /// currently visible under the active city/room/search filters.
+  Future<void> _confirmClearMissed(List<UserData> visibleMembers) async {
+    final withMissed = visibleMembers.where((m) => m.missed > 0).toList();
+    if (withMissed.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No members here have a missed count to clear.')));
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Missed?'),
+        content: Text('Reset the missed count to 0 for ${withMissed.length} member(s) shown in $_selectedState right now?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() {
+      for (final m in withMissed) {
+        m.missed = 0;
+      }
+    });
+    for (final m in withMissed) {
+      unawaited(_persistCivicMemberActivity(m));
+    }
+    widget.onDataChanged();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cleared missed for ${withMissed.length} member(s).')));
+  }
+
   Widget _membersSection(bool isDark) {
     final q = _searchQuery.trim();
     final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((u) {
@@ -34485,7 +34547,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ],
 
         const SizedBox(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canManageCivicRegistry()) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.red)]))]),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canManageCivicRegistry()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
@@ -34927,7 +34989,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin) ...[
           const SizedBox(height: 8),
           Text(
-            'State changes left: ${NgmyCivicStateSwitches.remainingSwitches(isAdmin: widget.user.isAdmin, isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin, switchesUsed: widget.user.civicRegistryStateSwitchesUsed)}',
+            'State changes left: ${NgmyCivicStateSwitches.remainingSwitches(isAdmin: widget.user.isAdmin, isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin, isCivicRegistryKing: widget.user.isCivicRegistryKing, switchesUsed: widget.user.civicRegistryStateSwitchesUsed)}',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 10, color: muted),
           ),
