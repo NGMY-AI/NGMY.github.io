@@ -31329,9 +31329,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<UserData> _membersInCurrentHelpScope() {
+    // Must filter by the campaign's own state (_helpModeState()), not
+    // widget.user.state. For a King/Admin managing a state that isn't
+    // their personal home state (e.g. deactivating Alabama's campaign
+    // while their own account state is something else), comparing
+    // against widget.user.state matched zero members — so nobody was
+    // ever marked missed, even though the campaign closed normally.
+    // Registrars deactivating their own state's campaign happened to
+    // work anyway, since _helpModeState() equals widget.user.state for
+    // them, which is exactly why this only showed up for Alabama here.
+    final campaignState = _helpModeState().trim().toLowerCase();
     return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((m) {
       if (!_memberMatchesHelpScope(m)) return false;
-      return (m.state.trim().isEmpty || m.state == widget.user.state);
+      return m.state.trim().isEmpty || m.state.trim().toLowerCase() == campaignState;
     }).toList();
   }
 
@@ -31347,7 +31357,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void _markMissedForNonContributorsInCampaign(String campaignId, {List<UserData>? members}) {
     final normalizedCampaignId = campaignId.trim();
     if (normalizedCampaignId.isEmpty) return;
-    final contributors = widget.allTransactions
+    // _civicTransactionsForDisplay(), not widget.allTransactions alone —
+    // a contribution recorded on another registrar's device/session only
+    // shows up locally through the separately-fetched community list
+    // until this device's own transactions catch up, and missing it here
+    // would wrongly mark someone missed who actually did contribute.
+    final contributors = _civicTransactionsForDisplay()
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .where((t) {
           final meta = _decodeContributionMeta(t);
@@ -33468,74 +33483,157 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final noteC = TextEditingController(text: widget.config.helpPurposeFor(state).isNotEmpty ? widget.config.helpPurposeFor(state) : 'Community contribution');
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Contribution'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountC,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount'),
-            ),
-            TextField(
-              controller: noteC,
-              decoration: const InputDecoration(labelText: 'Details'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(amountC.text.trim()) ?? 0;
-              if (amount <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
-                return;
-              }
-              final now = DateTime.now();
-              final campaignId = _activeHelpCampaignId();
-              final payload = jsonEncode({
-                'kind': 'contribution',
-                'purpose': widget.config.helpPurposeFor(state),
-                'note': noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim(),
-                'scopeType': widget.config.helpScopeTypeFor(state),
-                'scopeValue': widget.config.helpScopeValueFor(state),
-                'state': widget.user.state,
-                'campaignId': campaignId,
-              });
-              widget.onAddTransaction(
-                AppTransaction(
-                  id: 'contrib_${u.email}_$now',
-                  userEmail: u.email,
-                  amount: amount,
-                  type: TransactionType.contribution,
-                  method: PaymentMethod.system,
-                  sourceDetails: payload,
-                  status: TransactionStatus.approved,
-                  timestamp: now,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
+        final sectionBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
+        final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+        final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+        InputDecoration framedInput(String label, {String? prefixText}) {
+          return InputDecoration(
+            labelText: label,
+            prefixText: prefixText,
+            filled: true,
+            fillColor: inputBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+            focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFF10B981), width: 1.6)),
+          );
+        }
+
+        return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 460),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: panelBg,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.14), blurRadius: 24, offset: const Offset(0, 12))],
                 ),
-              );
-              final alreadyContributedInCampaign = widget.allTransactions.any((t) {
-                if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
-                if (t.userEmail.toLowerCase().trim() != u.email.toLowerCase().trim()) return false;
-                final meta = _decodeContributionMeta(t);
-                return (meta['campaignId'] ?? '').toString() == campaignId;
-              });
-              setState(() {
-                u.helps += 1;
-                if (!alreadyContributedInCampaign && u.missed > 0) {
-                  u.missed -= 1;
-                }
-              });
-              unawaited(_persistCivicMemberActivity(u));
-              widget.onDataChanged();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Add Contribution', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                              Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: sectionBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: amountC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                            decoration: framedInput('Amount', prefixText: '\$ '),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: noteC,
+                            style: TextStyle(color: ink),
+                            decoration: framedInput('Details'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), foregroundColor: ink.withOpacity(0.7)),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final amount = double.tryParse(amountC.text.trim()) ?? 0;
+                              if (amount <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
+                                return;
+                              }
+                              final now = DateTime.now();
+                              final campaignId = _activeHelpCampaignId();
+                              final payload = jsonEncode({
+                                'kind': 'contribution',
+                                'purpose': widget.config.helpPurposeFor(state),
+                                'note': noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim(),
+                                'scopeType': widget.config.helpScopeTypeFor(state),
+                                'scopeValue': widget.config.helpScopeValueFor(state),
+                                'state': widget.user.state,
+                                'campaignId': campaignId,
+                              });
+                              widget.onAddTransaction(
+                                AppTransaction(
+                                  id: 'contrib_${u.email}_$now',
+                                  userEmail: u.email,
+                                  amount: amount,
+                                  type: TransactionType.contribution,
+                                  method: PaymentMethod.system,
+                                  sourceDetails: payload,
+                                  status: TransactionStatus.approved,
+                                  timestamp: now,
+                                ),
+                              );
+                              final alreadyContributedInCampaign = widget.allTransactions.any((t) {
+                                if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+                                if (t.userEmail.toLowerCase().trim() != u.email.toLowerCase().trim()) return false;
+                                final meta = _decodeContributionMeta(t);
+                                return (meta['campaignId'] ?? '').toString() == campaignId;
+                              });
+                              setState(() {
+                                u.helps += 1;
+                                if (!alreadyContributedInCampaign && u.missed > 0) {
+                                  u.missed -= 1;
+                                }
+                              });
+                              unawaited(_persistCivicMemberActivity(u));
+                              widget.onDataChanged();
+                              Navigator.pop(ctx);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+      },
     );
   }
 
@@ -33543,47 +33641,122 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final claimC = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Claim Record'),
-        content: TextField(
-          controller: claimC,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Claim details',
-            hintText: 'Describe what happened',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final text = claimC.text.trim();
-              if (text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Claim details are required.')));
-                return;
-              }
-              final now = DateTime.now();
-              widget.onAddTransaction(
-                AppTransaction(
-                  id: 'claim_${u.email}_$now',
-                  userEmail: u.email,
-                  amount: 0,
-                  type: TransactionType.claim,
-                  method: PaymentMethod.system,
-                  sourceDetails: text,
-                  status: TransactionStatus.pending,
-                  timestamp: now,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
+        final sectionBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
+        final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+        final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+        final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.14), blurRadius: 24, offset: const Offset(0, 12))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Add Claim Record', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                          Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              );
-              // A claim is not the same thing as missing a contribution —
-              // it shouldn't add to the member's missed count.
-              widget.onDataChanged();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add Claim'),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: sectionBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
+                  child: TextField(
+                    controller: claimC,
+                    maxLines: 3,
+                    style: TextStyle(color: ink),
+                    decoration: InputDecoration(
+                      labelText: 'Claim details',
+                      hintText: 'Describe what happened',
+                      filled: true,
+                      fillColor: inputBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
+                      focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: Color(0xFFF59E0B), width: 1.6)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), foregroundColor: ink.withOpacity(0.7)),
+                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final text = claimC.text.trim();
+                          if (text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Claim details are required.')));
+                            return;
+                          }
+                          final now = DateTime.now();
+                          widget.onAddTransaction(
+                            AppTransaction(
+                              id: 'claim_${u.email}_$now',
+                              userEmail: u.email,
+                              amount: 0,
+                              type: TransactionType.claim,
+                              method: PaymentMethod.system,
+                              sourceDetails: text,
+                              status: TransactionStatus.pending,
+                              timestamp: now,
+                            ),
+                          );
+                          // A claim is not the same thing as missing a contribution —
+                          // it shouldn't add to the member's missed count.
+                          widget.onDataChanged();
+                          Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Add Claim', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
