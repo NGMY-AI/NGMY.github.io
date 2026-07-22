@@ -2308,18 +2308,36 @@ int _registrarStatusRank(String status) {
   }
 }
 
+/// Recency decides which of two application records for the same person
+/// is "current" — NOT a fixed status rank. A fixed rank that put
+/// "revoked" permanently above "approved" meant a revoked applicant
+/// could never be shown as approved again: even a brand new Restore
+/// Access approval would still lose to the older revoked record every
+/// time it was picked, both for the live in-session status check and
+/// (worse) for _mergeCivicRegistrarApplications, which collapses a
+/// person's history down to a single kept record — so the "approved"
+/// row wouldn't just display wrong, it would get discarded outright on
+/// the next cloud merge.
 Map<String, dynamic> _pickRegistrarApplicationRow(
   Map<String, dynamic> a,
   Map<String, dynamic> b,
 ) {
-  final as = (a['status'] ?? 'pending').toString();
-  final bs = (b['status'] ?? 'pending').toString();
-  final ar = _registrarStatusRank(as);
-  final br = _registrarStatusRank(bs);
-  if (ar != br) return ar > br ? a : b;
-  final ac = (a['reviewedAt'] ?? a['updatedAt'] ?? a['createdAt'] ?? '').toString();
-  final bc = (b['reviewedAt'] ?? b['updatedAt'] ?? b['createdAt'] ?? '').toString();
-  return ac.compareTo(bc) >= 0 ? a : b;
+  DateTime? ts(Map<String, dynamic> m) {
+    final raw = (m['reviewedAt'] ?? m['updatedAt'] ?? m['revokedAt'] ?? m['createdAt'] ?? '').toString();
+    if (raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  final at = ts(a);
+  final bt = ts(b);
+  if (at != null && bt != null) return bt.isAfter(at) ? b : a;
+  if (at != null) return a;
+  if (bt != null) return b;
+  // Neither row has a usable timestamp — fall back to status rank as a
+  // last resort so a comparison never fails outright.
+  final ar = _registrarStatusRank((a['status'] ?? 'pending').toString());
+  final br = _registrarStatusRank((b['status'] ?? 'pending').toString());
+  return ar >= br ? a : b;
 }
 
 void _stampJobWorkerApplicationDecision(
@@ -3901,7 +3919,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                       children: [
                                         Expanded(
                                           child: OutlinedButton(
-                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.green,
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                                            ),
                                             onPressed: () async {
                                               final appState = (app['state'] ?? '').toString().trim();
                                               if (appState.isNotEmpty &&
@@ -3943,13 +3964,22 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                               }
                                             },
-                                            child: const Text('Restore Access'),
+                                            child: const Text(
+                                              'Restore Access',
+                                              maxLines: 1,
+                                              softWrap: false,
+                                              overflow: TextOverflow.visible,
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: OutlinedButton(
-                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: Colors.red,
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                                            ),
                                             onPressed: () async {
                                               final confirmed = await showDialog<bool>(
                                                 context: ctx,
@@ -3990,7 +4020,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                               }
                                             },
-                                            child: const Text('Delete Application'),
+                                            child: const Text(
+                                              'Delete Application',
+                                              maxLines: 1,
+                                              softWrap: false,
+                                              overflow: TextOverflow.visible,
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -25589,7 +25625,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               amount: amount,
               type: TransactionType.contribution,
               method: PaymentMethod.system,
-              sourceDetails: '{"kind":"contribution","note":"Registrar deposit via ID scan","registryId":"$registryId"}',
+              sourceDetails: '{"kind":"contribution","note":"Registrar deposit via ID scan","registryId":"$registryId","state":"${widget.user.state}"}',
               status: TransactionStatus.approved,
               timestamp: now,
             ),
@@ -31616,8 +31652,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final scopeType = (meta['scopeType'] ?? 'all').toString();
       final scopeValue = (meta['scopeValue'] ?? '').toString();
-      final targetState = (meta['state'] ?? '').toString();
-      if (targetState.isNotEmpty && targetState != widget.user.state && !_canManageCivicRegistry()) return false;
+      final targetState = (meta['state'] ?? '').toString().trim();
+      // A contribution receipt belongs to the state whose help-mode
+      // campaign it was recorded under and must stay visible only to
+      // that state — not the whole country. Two things broke that:
+      // `_canManageCivicRegistry()` is true for an Authorized Registrar
+      // in ANY state, so it bypassed the state check for every
+      // registrar, not just that state's own; and the ID-scan deposit
+      // flow never stamped a `state` at all, so `targetState.isEmpty`
+      // skipped the check entirely and showed to everyone. Only
+      // King/Admin (genuinely cross-state roles) bypass the match now,
+      // and a missing state tag hides the receipt rather than leaking it.
+      if (!_isGlobalCivicRegistryAdmin()) {
+        if (targetState.isEmpty) return false;
+        if (targetState.toLowerCase() != widget.user.state.trim().toLowerCase()) return false;
+      }
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
