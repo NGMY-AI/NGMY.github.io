@@ -1132,6 +1132,10 @@ enum PaymentMethod { cashApp, bitcoin, system }
 const int kNgmyWalletReceiptRetentionDays = 5;
 const int kNgmyWalletHistoryDisplayMax = 500;
 
+/// Civic Registry claims a registrar has resolved (rejected/deleted) stay
+/// visible as history for this long, then auto-disappear and get purged.
+const int kNgmyCivicClaimRetentionDays = 60;
+
 bool ngmyIsWalletReceiptTransaction(AppTransaction t) {
   if (t.status == TransactionStatus.pending) return false;
   return t.type == TransactionType.deposit ||
@@ -29156,10 +29160,28 @@ extension AppConfigHelpMode on AppConfig {
     helpModeByState = next;
   }
 
+  /// Deactivates by flipping `active: false` in place — it must NOT
+  /// remove the state's key from helpModeByState. `_campaignFor` calls
+  /// `migrateLegacyHelpModeIfNeeded` on every read, and that migration's
+  /// only guard against re-running is `helpModeByState.containsKey(key)`.
+  /// If a state's key were removed here, the very next `helpActiveFor`
+  /// call (e.g. the button rebuilding right after this runs) would see
+  /// the key missing, find the legacy flat `helpModeActive`/`helpState`
+  /// fields still pointing at this state (they're never cleared —
+  /// nothing else reads them), and silently recreate the campaign as
+  /// active again. That was the actual cause of "Deactivate does
+  /// nothing" — not a network/race issue, a deterministic resurrection
+  /// on the very next read, every single time.
   void deactivateHelpCampaign(String state) {
     final key = _stateKey(state);
     if (key.isEmpty) return;
-    final next = Map<String, dynamic>.from(helpModeByState)..remove(key);
+    final existingRaw = helpModeByState[key];
+    final existing = existingRaw is Map ? Map<String, dynamic>.from(existingRaw) : const <String, dynamic>{};
+    final next = Map<String, dynamic>.from(helpModeByState)
+      ..[key] = {
+        ...existing,
+        'active': false,
+      };
     helpModeByState = next;
   }
 
@@ -29291,6 +29313,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _communityContributions = results[0];
       _communityClaims = results[1];
     });
+    unawaited(_pruneExpiredResolvedClaims());
   }
 
   void _onCivicLiveRefresh() {
@@ -31386,6 +31409,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return true;
   }
 
+  /// A resolved (rejected/deleted) claim stays visible as history for
+  /// kNgmyCivicClaimRetentionDays, then must vanish everywhere — no view
+  /// should still be able to show "Resolved claim" past that point.
+  /// Open (pending) claims are never touched by this, no matter how old.
+  bool _isExpiredResolvedClaim(AppTransaction t) {
+    if (t.type != TransactionType.claim || t.status == TransactionStatus.pending) return false;
+    return DateTime.now().difference(t.timestamp) > const Duration(days: kNgmyCivicClaimRetentionDays);
+  }
+
   List<AppTransaction> _civicTransactionsForDisplay() {
     final byId = <String, AppTransaction>{};
     for (final t in widget.allTransactions) {
@@ -31397,7 +31429,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     for (final t in _communityClaims) {
       if (t.id.isNotEmpty) byId[t.id] = t;
     }
+    byId.removeWhere((_, t) => _isExpiredResolvedClaim(t));
     return byId.values.toList();
+  }
+
+  /// Actually deletes expired resolved claims (not just hides them) — from
+  /// the shared transaction list, the locally-cached community claims, and
+  /// Supabase. Runs once per Civic Registry screen visit; claims are
+  /// low-volume so this doesn't need its own background timer.
+  Future<void> _pruneExpiredResolvedClaims() async {
+    final expiredIds = <String>{};
+    for (final t in widget.allTransactions) {
+      if (_isExpiredResolvedClaim(t) && t.id.isNotEmpty) expiredIds.add(t.id);
+    }
+    for (final t in _communityClaims) {
+      if (_isExpiredResolvedClaim(t) && t.id.isNotEmpty) expiredIds.add(t.id);
+    }
+    if (expiredIds.isEmpty) return;
+    widget.allTransactions.removeWhere((t) => expiredIds.contains(t.id));
+    _communityClaims.removeWhere((t) => expiredIds.contains(t.id));
+    if (mounted) setState(() {});
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      const chunkSize = 50;
+      final ids = expiredIds.toList();
+      for (var i = 0; i < ids.length; i += chunkSize) {
+        final chunk = ids.sublist(i, math.min(i + chunkSize, ids.length));
+        await Supabase.instance.client.from('transactions').delete().inFilter('id', chunk).timeout(kNgmyCloudWriteTimeout);
+      }
+    } catch (e) {
+      debugPrint('[civic claims] prune expired: $e');
+    }
   }
 
   List<AppTransaction> _visibleContributionTx() {
