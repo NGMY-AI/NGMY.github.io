@@ -1433,6 +1433,13 @@ Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
       'helpState': config.helpState.trim(),
       'helpCampaignId': config.helpCampaignId.trim(),
       'helpCampaignStartedAt': config.helpCampaignStartedAt.trim(),
+      // Per-state campaigns (see AppConfigHelpMode) — the fields above are
+      // legacy and no longer written to, but kept for old-payload
+      // migration. This is the live data; without it here, the periodic
+      // help-mode poll (_refreshCivicHelpModeAndContributions) wouldn't
+      // pick up another device's per-state activate/deactivate until a
+      // full app config resync happened.
+      'helpModeByState': config.helpModeByState,
       'helpCampaignClosures': config.helpCampaignClosures,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
@@ -1469,6 +1476,9 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
   }
   if (payload.containsKey('helpCampaignStartedAt')) {
     config.helpCampaignStartedAt = (payload['helpCampaignStartedAt'] ?? '').toString().trim();
+  }
+  if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map) {
+    config.helpModeByState = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
   }
   if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List) {
     config.helpCampaignClosures = (payload['helpCampaignClosures'] as List)

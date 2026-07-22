@@ -1597,6 +1597,15 @@ class AppConfig {
   String helpState;
   String helpCampaignId;
   String helpCampaignStartedAt;
+  /// Per-state help mode campaigns — state name -> {active, purpose,
+  /// cashApp, zelle, phone, scopeType, scopeValue, campaignId,
+  /// campaignStartedAt}. The flat helpModeActive/helpPurpose/etc fields
+  /// above are legacy (one shared slot, not per-state) and are only kept
+  /// around for other unrelated readers (e.g. loanCompanyZelle's fallback)
+  /// and for migrating an already-active campaign into this map on first
+  /// load — new code should go through the per-state accessors instead
+  /// (see the AppConfigHelpMode extension).
+  Map<String, dynamic> helpModeByState;
   List<Map<String, dynamic>> helpCampaignClosures;
   List<Map<String, dynamic>> helpCampaignSpendings;
   List<String> openedContributionReceiptKeys;
@@ -1735,6 +1744,7 @@ class AppConfig {
     this.helpState = '',
     this.helpCampaignId = '',
     this.helpCampaignStartedAt = '',
+    Map<String, dynamic>? helpModeByState,
     this.helpCampaignClosures = const [],
     this.helpCampaignSpendings = const [],
     this.openedContributionReceiptKeys = const [],
@@ -1828,6 +1838,7 @@ class AppConfig {
           civicCitiesByState: civicCitiesByState ?? const {},
           legacyCities: cities,
         ),
+        helpModeByState = helpModeByState ?? const {},
         loanApplications = loanApplications ?? [],
         communicateProfiles = communicateProfiles ?? const [],
         mshauriSettingsByState = mshauriSettingsByState ?? const {},
@@ -1889,6 +1900,7 @@ class AppConfig {
     'helpState': helpState,
     'helpCampaignId': helpCampaignId,
     'helpCampaignStartedAt': helpCampaignStartedAt,
+    'helpModeByState': helpModeByState,
     'helpCampaignClosures': helpCampaignClosures,
     'helpCampaignSpendings': helpCampaignSpendings,
     'openedContributionReceiptKeys': openedContributionReceiptKeys,
@@ -2014,6 +2026,7 @@ class AppConfig {
     helpState: (json['helpState'] ?? '').toString(),
     helpCampaignId: json['helpCampaignId'] ?? '',
     helpCampaignStartedAt: json['helpCampaignStartedAt'] ?? '',
+    helpModeByState: json['helpModeByState'] is Map ? Map<String, dynamic>.from(json['helpModeByState'] as Map) : const {},
     helpCampaignClosures: List<Map<String, dynamic>>.from((json['helpCampaignClosures'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     helpCampaignSpendings: List<Map<String, dynamic>>.from((json['helpCampaignSpendings'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     openedContributionReceiptKeys: List<String>.from(json['openedContributionReceiptKeys'] ?? const []),
@@ -29039,6 +29052,110 @@ class _CivicBackupActionTileState extends State<_CivicBackupActionTile> with Sin
   }
 }
 
+/// Per-state help mode campaigns. Each US state activates/deactivates its
+/// own campaign independently — Georgia's Authorized Registrar turning
+/// help mode on must never show Alabama's registrar a "Deactivate Help
+/// Mode" button for Georgia's campaign, and vice versa. Storage lives in
+/// `AppConfig.helpModeByState` (state name -> campaign map); the older
+/// flat `helpModeActive`/`helpPurpose`/etc fields on AppConfig are legacy
+/// (a single shared slot) and are only read here once, to migrate
+/// whichever campaign was active under the old system into this map the
+/// first time it's touched — see `migrateLegacyHelpModeIfNeeded`.
+extension AppConfigHelpMode on AppConfig {
+  Map<String, dynamic> _campaignFor(String state) {
+    migrateLegacyHelpModeIfNeeded(state);
+    final key = state.trim();
+    final raw = helpModeByState[key];
+    return raw is Map ? Map<String, dynamic>.from(raw) : const {};
+  }
+
+  bool helpActiveFor(String state) => _campaignFor(state)['active'] == true;
+  String helpPurposeFor(String state) => (_campaignFor(state)['purpose'] ?? '').toString();
+  String helpCashAppFor(String state) => (_campaignFor(state)['cashApp'] ?? '').toString();
+  String helpZelleFor(String state) => (_campaignFor(state)['zelle'] ?? '').toString();
+  String helpPhoneFor(String state) => (_campaignFor(state)['phone'] ?? '').toString();
+  String helpScopeTypeFor(String state) {
+    final v = (_campaignFor(state)['scopeType'] ?? 'all').toString();
+    return v.isEmpty ? 'all' : v;
+  }
+
+  String helpScopeValueFor(String state) => (_campaignFor(state)['scopeValue'] ?? '').toString();
+  String helpCampaignIdFor(String state) => (_campaignFor(state)['campaignId'] ?? '').toString();
+  String helpCampaignStartedAtFor(String state) => (_campaignFor(state)['campaignStartedAt'] ?? '').toString();
+
+  /// Activates (or edits, if already active) the given state's campaign.
+  /// `startNewCampaignId` should be true when the purpose/scope actually
+  /// changed (or this is a fresh activation) — matches the old
+  /// shouldStartNewCampaign logic, just scoped to one state now.
+  void setHelpCampaign(
+    String state, {
+    required String purpose,
+    required String cashApp,
+    required String zelle,
+    required String phone,
+    required String scopeType,
+    required String scopeValue,
+    required bool startNewCampaignId,
+  }) {
+    final key = state.trim();
+    if (key.isEmpty) return;
+    // Read the raw existing entry directly (not via _campaignFor) — that
+    // triggers migration, and this is called *from* the migration path
+    // itself, which would otherwise recurse forever.
+    final existingRaw = helpModeByState[key];
+    final existing = existingRaw is Map ? Map<String, dynamic>.from(existingRaw) : const <String, dynamic>{};
+    final next = Map<String, dynamic>.from(helpModeByState)
+      ..[key] = {
+        'active': true,
+        'purpose': purpose,
+        'cashApp': cashApp,
+        'zelle': zelle,
+        'phone': phone,
+        'scopeType': scopeType,
+        'scopeValue': scopeValue,
+        'campaignId': startNewCampaignId ? 'help_${DateTime.now().microsecondsSinceEpoch}' : (existing['campaignId'] ?? ''),
+        'campaignStartedAt': startNewCampaignId ? DateTime.now().toUtc().toIso8601String() : (existing['campaignStartedAt'] ?? ''),
+      };
+    helpModeByState = next;
+  }
+
+  void deactivateHelpCampaign(String state) {
+    final key = state.trim();
+    if (key.isEmpty) return;
+    final next = Map<String, dynamic>.from(helpModeByState)..remove(key);
+    helpModeByState = next;
+  }
+
+  /// One-time migration: if this state has no entry in the new per-state
+  /// map yet, but the legacy single-slot fields say IT was the active
+  /// campaign, copy it in. No-op once migrated (the map entry then exists,
+  /// so this never runs again for that state).
+  void migrateLegacyHelpModeIfNeeded(String state) {
+    final key = state.trim();
+    if (key.isEmpty || helpModeByState.containsKey(key)) return;
+    if (!helpModeActive) return;
+    if (helpState.trim().isNotEmpty && helpState.trim() != key) return;
+    setHelpCampaign(
+      key,
+      purpose: helpPurpose,
+      cashApp: helpCashApp,
+      zelle: helpZelle,
+      phone: helpPhone,
+      scopeType: helpScopeType,
+      scopeValue: helpScopeValue,
+      startNewCampaignId: false,
+    );
+    if (helpCampaignId.trim().isNotEmpty || helpCampaignStartedAt.trim().isNotEmpty) {
+      final next = Map<String, dynamic>.from(helpModeByState);
+      final campaign = Map<String, dynamic>.from(next[key] as Map);
+      campaign['campaignId'] = helpCampaignId;
+      campaign['campaignStartedAt'] = helpCampaignStartedAt;
+      next[key] = campaign;
+      helpModeByState = next;
+    }
+  }
+}
+
 class CivicRegistryScreen extends StatefulWidget {
   final UserData user;
   final List<UserData> allUsers;
@@ -29706,21 +29823,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void _runHelpModeLifecycleMaintenance() {
     var changed = false;
     final now = DateTime.now();
+    final state = _helpModeState();
 
-    final startedAtRaw = widget.config.helpCampaignStartedAt.trim();
-    if (widget.config.helpModeActive && startedAtRaw.isEmpty) {
-      widget.config.helpCampaignStartedAt = now.toUtc().toIso8601String();
+    final startedAtRaw = widget.config.helpCampaignStartedAtFor(state).trim();
+    if (widget.config.helpActiveFor(state) && startedAtRaw.isEmpty) {
+      // Backfill only the missing timestamp — setHelpCampaign(startNewCampaignId:
+      // false) would just preserve this same empty value, not stamp "now".
+      final next = Map<String, dynamic>.from(widget.config.helpModeByState);
+      final campaign = Map<String, dynamic>.from(next[state] as Map? ?? const {});
+      campaign['campaignStartedAt'] = now.toUtc().toIso8601String();
+      next[state] = campaign;
+      widget.config.helpModeByState = next;
       changed = true;
     }
-    if (widget.config.helpModeActive && startedAtRaw.isNotEmpty) {
+    if (widget.config.helpActiveFor(state) && startedAtRaw.isNotEmpty) {
       try {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
         if (now.difference(startedAt).inDays >= 5) {
           final campaignId = _activeHelpCampaignId();
           _markMissedForNonContributorsInCampaign(campaignId);
-          widget.config.helpModeActive = false;
-          widget.config.helpCampaignId = '';
-          widget.config.helpCampaignStartedAt = '';
+          widget.config.deactivateHelpCampaign(state);
           _markCampaignClosed(campaignId, now);
           changed = true;
         }
@@ -31119,19 +31241,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }());
   }
 
+  /// The state whose help mode this viewer sees/controls — King/Admin
+  /// follow whatever state they've switched `_selectedState` to (they can
+  /// operate across states); everyone else is locked to their own home
+  /// state (`widget.user.state`) regardless of `_selectedState`, so a
+  /// registrar merely browsing another state (their 3 free switches)
+  /// still can't see or touch that state's help mode campaign.
+  String _helpModeState() => _isGlobalCivicRegistryAdmin() ? _selectedState : widget.user.state;
+
   bool _memberMatchesHelpScope(UserData u) {
-    if (!widget.config.helpModeActive) return false;
-    final scopeType = widget.config.helpScopeType;
-    final scopeValue = widget.config.helpScopeValue.trim();
+    final state = _helpModeState();
+    if (!widget.config.helpActiveFor(state)) return false;
+    final scopeType = widget.config.helpScopeTypeFor(state);
+    final scopeValue = widget.config.helpScopeValueFor(state).trim();
     if (scopeType == 'city') return scopeValue.isNotEmpty && (u.city ?? '') == scopeValue;
     if (scopeType == 'room') return scopeValue.isNotEmpty && (u.room ?? '') == scopeValue;
     return true;
   }
 
-  String _activeHelpCampaignId() {
-    final stored = widget.config.helpCampaignId.trim();
+  String _activeHelpCampaignId([String? forState]) {
+    final state = forState ?? _helpModeState();
+    final stored = widget.config.helpCampaignIdFor(state);
     if (stored.isNotEmpty) return stored;
-    return '${widget.config.helpPurpose}|${widget.config.helpScopeType}|${widget.config.helpScopeValue}|${widget.user.state}';
+    return '${widget.config.helpPurposeFor(state)}|${widget.config.helpScopeTypeFor(state)}|${widget.config.helpScopeValueFor(state)}|$state';
   }
 
   List<UserData> _membersInCurrentHelpScope() {
@@ -31170,14 +31302,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _isGlobalCivicRegistryAdmin() => widget.user.isCivicRegistryKing || widget.user.isCivicRegistryAdmin;
 
   bool _canCurrentUserSeeHelpMode() {
-    if (!widget.config.helpModeActive) return false;
-    final helpState = widget.config.helpState.trim();
-    if (helpState.isNotEmpty &&
-        widget.user.state.trim().isNotEmpty &&
-        widget.user.state.trim() != helpState &&
-        !_isGlobalCivicRegistryAdmin()) {
-      return false;
-    }
+    if (!widget.config.helpActiveFor(_helpModeState())) return false;
     if (_canManageCivicRegistry()) return true;
     return _memberMatchesHelpScope(widget.user);
   }
@@ -31504,17 +31629,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   String _helpScopeLabel() {
-    if (widget.config.helpScopeType == 'city') {
-      return 'City: ${widget.config.helpScopeValue}';
+    final state = _helpModeState();
+    if (widget.config.helpScopeTypeFor(state) == 'city') {
+      return 'City: ${widget.config.helpScopeValueFor(state)}';
     }
-    if (widget.config.helpScopeType == 'room') {
-      return 'Room: ${widget.config.helpScopeValue}';
+    if (widget.config.helpScopeTypeFor(state) == 'room') {
+      return 'Room: ${widget.config.helpScopeValueFor(state)}';
     }
     return 'All members';
   }
 
   Future<void> _openCashApp() async {
-    final raw = widget.config.helpCashApp.trim();
+    final raw = widget.config.helpCashAppFor(_helpModeState()).trim();
     if (raw.isEmpty) return;
     final handle = raw.startsWith(r'$') ? raw.substring(1) : raw;
     final uri = Uri.parse('https://cash.app/\$$handle');
@@ -31522,7 +31648,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _callHelpPhone() async {
-    final phone = widget.config.helpPhone.trim();
+    final phone = widget.config.helpPhoneFor(_helpModeState()).trim();
     if (phone.isEmpty) return;
     final uri = Uri.parse('tel:$phone');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -31540,24 +31666,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
     );
     final purposeC = TextEditingController(
-      text: widget.config.helpPurpose.trim().isNotEmpty
-          ? widget.config.helpPurpose
+      text: widget.config.helpPurposeFor(_selectedState).trim().isNotEmpty
+          ? widget.config.helpPurposeFor(_selectedState)
           : (savedDraft?.purpose ?? ''),
     );
     final cashC = TextEditingController(
-      text: widget.config.helpCashApp.trim().isNotEmpty ? widget.config.helpCashApp : (savedDraft?.cashApp ?? ''),
+      text: widget.config.helpCashAppFor(_selectedState).trim().isNotEmpty ? widget.config.helpCashAppFor(_selectedState) : (savedDraft?.cashApp ?? ''),
     );
     final zelleC = TextEditingController(
-      text: widget.config.helpZelle.trim().isNotEmpty ? widget.config.helpZelle : (savedDraft?.zelle ?? ''),
+      text: widget.config.helpZelleFor(_selectedState).trim().isNotEmpty ? widget.config.helpZelleFor(_selectedState) : (savedDraft?.zelle ?? ''),
     );
     final phoneC = TextEditingController(
-      text: widget.config.helpPhone.trim().isNotEmpty ? widget.config.helpPhone : (savedDraft?.phone ?? ''),
+      text: widget.config.helpPhoneFor(_selectedState).trim().isNotEmpty ? widget.config.helpPhoneFor(_selectedState) : (savedDraft?.phone ?? ''),
     );
-    String scopeType = widget.config.helpScopeType.trim().isNotEmpty
-        ? widget.config.helpScopeType
+    String scopeType = widget.config.helpScopeTypeFor(_selectedState).trim().isNotEmpty
+        ? widget.config.helpScopeTypeFor(_selectedState)
         : (savedDraft?.scopeType ?? 'all');
-    String scopeValue = widget.config.helpScopeValue.trim().isNotEmpty
-        ? widget.config.helpScopeValue
+    String scopeValue = widget.config.helpScopeValueFor(_selectedState).trim().isNotEmpty
+        ? widget.config.helpScopeValueFor(_selectedState)
         : (savedDraft?.scopeValue ?? '');
 
     showDialog(
@@ -31631,7 +31757,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            widget.config.helpModeActive ? 'Edit Help Mode' : 'Activate Help Mode',
+                            widget.config.helpActiveFor(_selectedState) ? 'Edit Help Mode' : 'Activate Help Mode',
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 19,
@@ -31696,27 +31822,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     SelectionContainer.disabled(
                       child: Row(
                         children: [
-                          if (widget.config.helpModeActive) ...[
+                          if (widget.config.helpActiveFor(_selectedState)) ...[
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () async {
-                                  // A regular registrar only manages their own state's
-                                  // campaign — don't let them end another state's active
-                                  // one (only King/Admin operate across states).
-                                  final activeForOtherState = widget.config.helpState.trim().isNotEmpty &&
-                                      widget.config.helpState.trim() != _selectedState;
-                                  if (activeForOtherState && !_isGlobalCivicRegistryAdmin()) {
+                                  // Each state's campaign is fully independent now
+                                  // (AppConfigHelpMode), so this can no longer collide
+                                  // with another state's — but a regular registrar
+                                  // still shouldn't be able to end a campaign for a
+                                  // state that isn't their own (only King/Admin
+                                  // operate across states).
+                                  if (_selectedState.trim().toLowerCase() != widget.user.state.trim().toLowerCase() && !_isGlobalCivicRegistryAdmin()) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('That campaign belongs to ${widget.config.helpState.trim()}, not $_selectedState.')),
+                                      SnackBar(content: Text('You can only manage help mode for ${widget.user.state}.')),
                                     );
                                     return;
                                   }
                                   final activeCampaignId = _activeHelpCampaignId();
                                   setState(() {
                                     _markMissedForNonContributorsInCampaign(activeCampaignId);
-                                    widget.config.helpModeActive = false;
-                                    widget.config.helpCampaignId = '';
-                                    widget.config.helpCampaignStartedAt = '';
+                                    widget.config.deactivateHelpCampaign(_selectedState);
                                     _markCampaignClosed(activeCampaignId, DateTime.now());
                                   });
                                   await ngmyPersistCivicHelpModeSettings(widget.config);
@@ -31759,24 +31884,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select scope value.')));
                                   return;
                                 }
-                                // Help mode is one shared slot (helpModeActive/helpPurpose/etc
-                                // aren't per-state), so without this guard a regular
-                                // registrar saving their own state's campaign would silently
-                                // stomp another state's still-running one. Only King/Admin —
-                                // who are meant to operate across every state — may do that.
-                                final activeForOtherState = widget.config.helpModeActive &&
-                                    widget.config.helpState.trim().isNotEmpty &&
-                                    widget.config.helpState.trim() != _selectedState;
-                                if (activeForOtherState && !_isGlobalCivicRegistryAdmin()) {
+                                // Each state's campaign is independent (AppConfigHelpMode) —
+                                // activating Georgia can no longer stomp Alabama's. A regular
+                                // registrar can still only manage their own state's campaign;
+                                // only King/Admin operate across every state.
+                                if (_selectedState.trim().toLowerCase() != widget.user.state.trim().toLowerCase() && !_isGlobalCivicRegistryAdmin()) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Help mode is already active for ${widget.config.helpState.trim()}. Wait for that campaign to end before starting one for $_selectedState.')),
+                                    SnackBar(content: Text('You can only manage help mode for ${widget.user.state}.')),
                                   );
                                   return;
                                 }
-                                final wasActive = widget.config.helpModeActive;
-                                final previousPurpose = widget.config.helpPurpose.trim();
-                                final previousScopeType = widget.config.helpScopeType.trim();
-                                final previousScopeValue = widget.config.helpScopeValue.trim();
+                                final wasActive = widget.config.helpActiveFor(_selectedState);
+                                final previousPurpose = widget.config.helpPurposeFor(_selectedState).trim();
+                                final previousScopeType = widget.config.helpScopeTypeFor(_selectedState).trim();
+                                final previousScopeValue = widget.config.helpScopeValueFor(_selectedState).trim();
                                 final nextPurpose = purposeC.text.trim();
                                 final nextScopeType = scopeType;
                                 final nextScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
@@ -31793,23 +31914,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   state: _selectedState,
                                   draft: draft,
                                 );
+                                final shouldStartNewCampaign = !wasActive ||
+                                    previousPurpose != nextPurpose ||
+                                    previousScopeType != nextScopeType ||
+                                    previousScopeValue != nextScopeValue;
                                 setState(() {
-                                  widget.config.helpModeActive = true;
-                                  widget.config.helpPurpose = nextPurpose;
-                                  widget.config.helpCashApp = cashC.text.trim();
-                                  widget.config.helpZelle = zelleC.text.trim();
-                                  widget.config.helpPhone = phoneC.text.trim();
-                                  widget.config.helpScopeType = nextScopeType;
-                                  widget.config.helpScopeValue = nextScopeValue;
-                                  widget.config.helpState = _selectedState;
-                                  final shouldStartNewCampaign = !wasActive ||
-                                      previousPurpose != nextPurpose ||
-                                      previousScopeType != nextScopeType ||
-                                      previousScopeValue != nextScopeValue;
-                                  if (shouldStartNewCampaign) {
-                                    widget.config.helpCampaignId = 'help_${DateTime.now().microsecondsSinceEpoch}';
-                                    widget.config.helpCampaignStartedAt = DateTime.now().toUtc().toIso8601String();
-                                  }
+                                  widget.config.setHelpCampaign(
+                                    _selectedState,
+                                    purpose: nextPurpose,
+                                    cashApp: cashC.text.trim(),
+                                    zelle: zelleC.text.trim(),
+                                    phone: phoneC.text.trim(),
+                                    scopeType: nextScopeType,
+                                    scopeValue: nextScopeValue,
+                                    startNewCampaignId: shouldStartNewCampaign,
+                                  );
                                 });
                                 await ngmyPersistCivicHelpModeSettings(widget.config);
                                 widget.onDataChanged();
@@ -31820,7 +31939,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
-                              child: Text(widget.config.helpModeActive ? 'Save' : 'Activate'),
+                              child: Text(widget.config.helpActiveFor(_selectedState) ? 'Save' : 'Activate'),
                             ),
                           ),
                         ],
@@ -33031,7 +33150,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showContributionDialog(UserData u) {
-    if (!widget.config.helpModeActive) {
+    final state = _helpModeState();
+    if (!widget.config.helpActiveFor(state)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;
     }
@@ -33040,7 +33160,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final amountC = TextEditingController();
-    final noteC = TextEditingController(text: widget.config.helpPurpose.isNotEmpty ? widget.config.helpPurpose : 'Community contribution');
+    final noteC = TextEditingController(text: widget.config.helpPurposeFor(state).isNotEmpty ? widget.config.helpPurposeFor(state) : 'Community contribution');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -33072,10 +33192,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               final campaignId = _activeHelpCampaignId();
               final payload = jsonEncode({
                 'kind': 'contribution',
-                'purpose': widget.config.helpPurpose,
-                'note': noteC.text.trim().isEmpty ? widget.config.helpPurpose : noteC.text.trim(),
-                'scopeType': widget.config.helpScopeType,
-                'scopeValue': widget.config.helpScopeValue,
+                'purpose': widget.config.helpPurposeFor(state),
+                'note': noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim(),
+                'scopeType': widget.config.helpScopeTypeFor(state),
+                'scopeValue': widget.config.helpScopeValueFor(state),
                 'state': widget.user.state,
                 'campaignId': campaignId,
               });
@@ -33587,7 +33707,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             const SizedBox(height: 20),
 
             if (_canCurrentUserSeeHelpMode()) ...[
-              Container(
+              Builder(builder: (context) {
+                final helpModeStateName = _helpModeState();
+                return Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -33602,7 +33724,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(color: Colors.red.shade400, borderRadius: BorderRadius.circular(10)),
                       child: Text(
-                        'HELP MODE ACTIVE in ${widget.config.helpState.trim().isNotEmpty ? widget.config.helpState : widget.user.state} - ${widget.config.helpPurpose}',
+                        'HELP MODE ACTIVE in $helpModeStateName - ${widget.config.helpPurposeFor(helpModeStateName)}',
                         style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -33621,32 +33743,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          if (widget.config.helpCashApp.trim().isNotEmpty)
+                          if (widget.config.helpCashAppFor(helpModeStateName).trim().isNotEmpty)
                             _helpRow(
                               icon: Icons.attach_money,
                               title: 'Cash App',
-                              value: widget.config.helpCashApp,
+                              value: widget.config.helpCashAppFor(helpModeStateName),
                               color: Colors.green,
                               onTap: _openCashApp,
                               tapHint: 'Tap row to open Cash App',
-                              onCopyTap: () => _copyText(widget.config.helpCashApp, 'Cash App'),
+                              onCopyTap: () => _copyText(widget.config.helpCashAppFor(helpModeStateName), 'Cash App'),
                             ),
-                          if (widget.config.helpZelle.trim().isNotEmpty)
+                          if (widget.config.helpZelleFor(helpModeStateName).trim().isNotEmpty)
                             _helpRow(
                               icon: Icons.account_balance_wallet_outlined,
                               title: 'Zelle',
-                              value: widget.config.helpZelle,
+                              value: widget.config.helpZelleFor(helpModeStateName),
                               color: Colors.purple,
-                              onCopyTap: () => _copyText(widget.config.helpZelle, 'Zelle'),
+                              onCopyTap: () => _copyText(widget.config.helpZelleFor(helpModeStateName), 'Zelle'),
                             ),
                           _helpRow(
                             icon: Icons.call_outlined,
                             title: 'Call for Help',
-                            value: widget.config.helpPhone,
+                            value: widget.config.helpPhoneFor(helpModeStateName),
                             color: Colors.blue,
                             onTap: _callHelpPhone,
                             tapHint: 'Tap row to call now',
-                            onCopyTap: () => _copyText(widget.config.helpPhone, 'Phone'),
+                            onCopyTap: () => _copyText(widget.config.helpPhoneFor(helpModeStateName), 'Phone'),
                           ),
                           Container(
                             margin: const EdgeInsets.only(top: 8),
@@ -33666,7 +33788,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 child: OutlinedButton.icon(
                                   onPressed: () => _showHelpCampaignSpendingLedger(
                                     campaignId: _activeHelpCampaignId(),
-                                    campaignTitle: widget.config.helpPurpose,
+                                    campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                   ),
                                   icon: const Icon(Icons.receipt_long_rounded, size: 16),
                                   label: const Text('View Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
@@ -33684,7 +33806,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   child: FilledButton.icon(
                                     onPressed: () => _recordHelpCampaignSpending(
                                       campaignId: _activeHelpCampaignId(),
-                                      campaignTitle: widget.config.helpPurpose,
+                                      campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                     ),
                                     icon: const Icon(Icons.folder_open_rounded, size: 16),
                                     label: const Text('Record Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
@@ -33703,7 +33825,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ],
                 ),
-              ),
+              );
+              }),
               const SizedBox(height: 14),
             ],
 
@@ -34681,25 +34804,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         height: 26,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: widget.config.helpModeActive ? Colors.red : Colors.green,
+                          color: widget.config.helpActiveFor(_selectedState) ? Colors.red : Colors.green,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          widget.config.helpModeActive ? 'Deactivate Help Mode' : 'Activate Help Mode',
+                          widget.config.helpActiveFor(_selectedState) ? 'Deactivate Help Mode' : 'Activate Help Mode',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9),
                         ),
                       ),
                     ),
                   ),
-                  if (widget.config.helpModeActive) ...[
+                  if (widget.config.helpActiveFor(_selectedState)) ...[
                     const SizedBox(height: 5),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _recordHelpCampaignSpending(
-                              campaignId: _activeHelpCampaignId(),
-                              campaignTitle: widget.config.helpPurpose,
+                              campaignId: _activeHelpCampaignId(_selectedState),
+                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
                             ),
                             icon: const Icon(Icons.folder_open_rounded, size: 14),
                             label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
@@ -34714,8 +34837,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _showHelpCampaignSpendingLedger(
-                              campaignId: _activeHelpCampaignId(),
-                              campaignTitle: widget.config.helpPurpose,
+                              campaignId: _activeHelpCampaignId(_selectedState),
+                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
                             ),
                             icon: const Icon(Icons.receipt_long_rounded, size: 14),
                             label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
