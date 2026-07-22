@@ -29062,9 +29062,19 @@ class _CivicBackupActionTileState extends State<_CivicBackupActionTile> with Sin
 /// whichever campaign was active under the old system into this map the
 /// first time it's touched — see `migrateLegacyHelpModeIfNeeded`.
 extension AppConfigHelpMode on AppConfig {
+  /// Case-insensitive key — "Alabama" and "alabama" must be the same
+  /// campaign. A raw .trim() (what every accessor used before) let a
+  /// casing difference between wherever a state name was activated from
+  /// and wherever it was later read/deactivated from silently miss the
+  /// map entry: Map.remove() on a non-matching key is a silent no-op, so
+  /// Deactivate could run to completion, appear to succeed, and the
+  /// campaign would still show active because nothing was actually
+  /// removed under the key the read side was looking up.
+  String _stateKey(String state) => state.trim().toLowerCase();
+
   Map<String, dynamic> _campaignFor(String state) {
     migrateLegacyHelpModeIfNeeded(state);
-    final key = state.trim();
+    final key = _stateKey(state);
     final raw = helpModeByState[key];
     return raw is Map ? Map<String, dynamic>.from(raw) : const {};
   }
@@ -29097,7 +29107,7 @@ extension AppConfigHelpMode on AppConfig {
     required String scopeValue,
     required bool startNewCampaignId,
   }) {
-    final key = state.trim();
+    final key = _stateKey(state);
     if (key.isEmpty) return;
     // Read the raw existing entry directly (not via _campaignFor) — that
     // triggers migration, and this is called *from* the migration path
@@ -29120,7 +29130,7 @@ extension AppConfigHelpMode on AppConfig {
   }
 
   void deactivateHelpCampaign(String state) {
-    final key = state.trim();
+    final key = _stateKey(state);
     if (key.isEmpty) return;
     final next = Map<String, dynamic>.from(helpModeByState)..remove(key);
     helpModeByState = next;
@@ -29131,10 +29141,10 @@ extension AppConfigHelpMode on AppConfig {
   /// campaign, copy it in. No-op once migrated (the map entry then exists,
   /// so this never runs again for that state).
   void migrateLegacyHelpModeIfNeeded(String state) {
-    final key = state.trim();
+    final key = _stateKey(state);
     if (key.isEmpty || helpModeByState.containsKey(key)) return;
     if (!helpModeActive) return;
-    if (helpState.trim().isNotEmpty && helpState.trim() != key) return;
+    if (helpState.trim().isNotEmpty && _stateKey(helpState) != key) return;
     setHelpCampaign(
       key,
       purpose: helpPurpose,
@@ -34406,23 +34416,53 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   /// The "Clear Missed" pill above the member list had no onTap at all —
-  /// tapping it did nothing. Clears the missed count for every member
-  /// currently visible under the active city/room/search filters.
+  /// tapping it did nothing. Asks how many missed to subtract (not an
+  /// unconditional reset to 0) from every member currently visible under
+  /// the active city/room/search filters.
   Future<void> _confirmClearMissed(List<UserData> visibleMembers) async {
     final withMissed = visibleMembers.where((m) => m.missed > 0).toList();
     if (withMissed.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No members here have a missed count to clear.')));
       return;
     }
+    final maxMissed = withMissed.map((m) => m.missed).reduce((a, b) => a > b ? a : b);
+    final amountC = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear Missed?'),
-        content: Text('Reset the missed count to 0 for ${withMissed.length} member(s) shown in $_selectedState right now?'),
+        title: const Text('Clear Missed'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${withMissed.length} member(s) shown in $_selectedState have a missed count (highest: $maxMissed).'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountC,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'How many missed to clear',
+                hintText: 'e.g. 1',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text('Subtracts this many from each member\'s missed count (never below 0).', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              final n = int.tryParse(amountC.text.trim()) ?? 0;
+              if (n <= 0) {
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Clear'),
           ),
@@ -34430,9 +34470,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     );
     if (confirmed != true) return;
+    final amount = int.tryParse(amountC.text.trim()) ?? 0;
+    if (amount <= 0) return;
     setState(() {
       for (final m in withMissed) {
-        m.missed = 0;
+        m.missed = (m.missed - amount).clamp(0, 1 << 30);
       }
     });
     for (final m in withMissed) {
@@ -34440,7 +34482,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     widget.onDataChanged();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cleared missed for ${withMissed.length} member(s).')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cleared $amount missed from ${withMissed.length} member(s).')));
   }
 
   Widget _membersSection(bool isDark) {
