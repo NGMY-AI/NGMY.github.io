@@ -305,7 +305,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 4 * scale),
-                  _footerRow(registryId, phone, scale, onQrTap: onQrTap),
+                  _footerRow(registryId, phone, stateUpper, scale, onQrTap: onQrTap),
                 ],
               ),
             ),
@@ -474,9 +474,8 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _footerRow(String registryId, String phone, double scale, {VoidCallback? onQrTap}) {
-    final ddRaw = '5 DD ${registryId.padRight(20, '0')}${phone.replaceAll(RegExp(r'\D'), '').padRight(8, '0')}';
-    final dd = ddRaw.length > 28 ? ddRaw.substring(0, 28) : ddRaw;
+  Widget _footerRow(String registryId, String phone, String stateUpper, double scale, {VoidCallback? onQrTap}) {
+    final dd = "EMO 'YA M'MBONDO · $stateUpper";
     final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
     final qr = Container(
       padding: EdgeInsets.all(1.5 * scale),
@@ -502,7 +501,12 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
             dd,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            style: TextStyle(
+              fontSize: 7.5 * scale,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+              color: const Color(0xFF111827),
+            ),
           ),
         ),
         if (onQrTap != null)
@@ -523,9 +527,18 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.favorite, size: 8 * scale, color: const Color(0xFF111827)),
+            Icon(Icons.favorite, size: 9 * scale, color: const Color(0xFF111827)),
             SizedBox(width: 3 * scale),
-            Text('CIVIC REGISTRY', style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+            Text(
+              'CIVIC REGISTRY',
+              style: TextStyle(
+                fontSize: 7.5 * scale,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                color: const Color(0xFF111827),
+                decoration: TextDecoration.none,
+              ),
+            ),
           ],
         ),
       ],
