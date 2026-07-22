@@ -93,18 +93,23 @@ class NgmyCivicRegistrarApplication {
     return false;
   }
 
-  /// Ensures [application] is in [list] (replaces prior row for same email with same status family).
+  /// One application record per person, always — replaces every prior row
+  /// for this email (regardless of its status) with [application]. Used
+  /// to only replace same-status rows, which meant a revoke→reapply cycle
+  /// left the old "revoked" row behind (different status, so it survived)
+  /// AND added a new "pending" row — two cards for the same person in the
+  /// admin's Requests list, compounding by one more row every cycle. A
+  /// missing/empty email never matches another row so it can never wipe
+  /// out unrelated applicants.
   static List<Map<String, dynamic>> upsertInList(
     List<Map<String, dynamic>> list,
     Map<String, dynamic> application,
   ) {
     final email = (application['userEmail'] ?? '').toString().toLowerCase().trim();
-    final newStatus = _statusOf(application);
     final kept = list
         .where((a) {
-          final ae = (a['userEmail'] ?? '').toString().toLowerCase().trim();
-          if (ae != email) return true;
-          return _statusOf(a) != newStatus;
+          if (email.isEmpty) return true;
+          return (a['userEmail'] ?? '').toString().toLowerCase().trim() != email;
         })
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
