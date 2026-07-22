@@ -109,7 +109,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   List<Map<String, dynamic>> _members = const [];
 
   String _selectedState = 'Georgia';
-  String _registrarEmail = '';
+  // True when the state came from the link (?s=GA / ?state=Georgia) — the
+  // catalog-driven "pick a state with cities configured" fallback below
+  // must never override an explicitly-linked state, even if that state
+  // has no cities configured yet.
+  bool _stateLockedFromLink = false;
+  String _registrarToken = '';
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
@@ -129,8 +134,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _shimmer = AnimationController(vsync: this, duration: const Duration(milliseconds: 3600))..repeat();
     _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10000))..repeat();
     ngmyTakePendingCivicSelfEnrollmentOpen();
-    _selectedState = _stateFromLaunchUrl() ?? 'Georgia';
-    _registrarEmail = _registrarFromLaunchUrl();
+    final linkedState = _stateFromLaunchUrl();
+    _selectedState = linkedState ?? 'Georgia';
+    _stateLockedFromLink = linkedState != null;
+    _registrarToken = _registrarFromLaunchUrl();
     unawaited(_load());
   }
 
@@ -148,12 +155,17 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     super.dispose();
   }
 
+  /// Reads `?s=GA` (current short form) or `?state=Georgia` (older,
+  /// longer links already shared before the short form shipped) — matches
+  /// against either the state's full name or its 2-letter code.
   String? _stateFromLaunchUrl() {
     try {
-      final state = Uri.base.queryParameters['state']?.trim();
-      if (state != null && state.isNotEmpty) {
+      final raw = (Uri.base.queryParameters['s'] ?? Uri.base.queryParameters['state'])?.trim();
+      if (raw != null && raw.isNotEmpty) {
         for (final s in _kUsStates) {
-          if (s.toLowerCase() == state.toLowerCase()) return s;
+          if (s.toLowerCase() == raw.toLowerCase() || NgmyCivicRegistryIdCard.stateCode(s).toLowerCase() == raw.toLowerCase()) {
+            return s;
+          }
         }
       }
     } catch (_) {}
@@ -162,11 +174,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   /// The Authorized Registrar whose link this is — every member who
   /// self-enrolls through it is attributed back to this registrar (see
-  /// `registeredByEmail` on the built record), even when several
-  /// registrars share the same state.
+  /// `registeredByToken` on the built record), even when several
+  /// registrars share the same state. Reads `?r=<token>` (current short
+  /// form) or `?registrar=<email>` (older links).
   String _registrarFromLaunchUrl() {
     try {
-      return (Uri.base.queryParameters['registrar'] ?? '').trim().toLowerCase();
+      final raw = Uri.base.queryParameters['r'] ?? Uri.base.queryParameters['registrar'];
+      return (raw ?? '').trim().toLowerCase();
     } catch (_) {
       return '';
     }
@@ -215,7 +229,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     final byState = NgmyCivicRegistryStats.parseCivicCitiesByState(source['civicCitiesByState']);
     if (byState.isNotEmpty) {
       _citiesByState = byState;
-      if (_citiesForState().isEmpty) {
+      // Never override a state that came from the registrar's link, even
+      // when that state has no cities configured yet — falling back to
+      // "whichever state happens to have cities" was silently replacing
+      // e.g. Alabama with Georgia, since Georgia is usually first to have
+      // its city list populated.
+      if (!_stateLockedFromLink && _citiesForState().isEmpty) {
         final preferred = byState.keys.firstWhere(
           (k) => k.trim().toLowerCase() == _selectedState.toLowerCase(),
           orElse: () => byState.keys.first,
@@ -399,7 +418,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         familyMales: males,
         familyFemales: females,
         enrollmentSource: 'guest_self_enrollment',
-        registeredByEmail: _registrarEmail,
+        registeredByToken: _registrarToken,
       );
       remoteMembers.add(member);
 

@@ -13,6 +13,24 @@ class NgmyCivicRegistryMembers {
 
   static String emailKey(String email) => email.toLowerCase().trim();
 
+  /// Short, stable, deterministic token derived from an email — used to
+  /// keep self-enrollment links short (no full email/percent-encoding in
+  /// the URL) while still letting a registrar recognize their own
+  /// attributed enrollments later: recompute the token from their own
+  /// email and compare, rather than reversing the token back to an email.
+  /// FNV-1a 32-bit, base36-encoded — never rely on Dart's built-in
+  /// String.hashCode here, since it isn't guaranteed stable across
+  /// platforms/releases and an already-shared link must keep working.
+  static String registrarLinkToken(String email) {
+    final bytes = utf8.encode(emailKey(email));
+    var hash = 0x811c9dc5;
+    for (final b in bytes) {
+      hash ^= b;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(36);
+  }
+
   static List<Map<String, dynamic>> listFrom(dynamic config) {
     final raw = (config as dynamic).civicRegistryMembers;
     if (raw is! List) return [];
@@ -80,13 +98,13 @@ class NgmyCivicRegistryMembers {
     int missed = 0,
     String? enrolledAt,
     String? enrollmentSource,
-    String? registeredByEmail,
+    String? registeredByToken,
   }) {
     final total = familyMembers < 1 ? 1 : familyMembers;
     final males = familyMales < 0 ? 0 : familyMales;
     final females = familyFemales < 0 ? 0 : familyFemales;
     final source = (enrollmentSource ?? '').trim();
-    final registeredBy = emailKey(registeredByEmail ?? '');
+    final registeredBy = (registeredByToken ?? '').trim();
     return {
       'email': emailKey(email),
       'fullName': fullName.trim(),
@@ -105,10 +123,11 @@ class NgmyCivicRegistryMembers {
       'missed': missed,
       'enrolledAt': enrolledAt ?? DateTime.now().toUtc().toIso8601String(),
       if (source.isNotEmpty) 'enrollmentSource': source,
-      // Which Authorized Registrar's self-enrollment link the member used —
-      // lets a registrar's own self-enroll traffic be attributed to them
-      // even when several registrars share the same state.
-      if (registeredBy.isNotEmpty) 'registeredByEmail': registeredBy,
+      // Which Authorized Registrar's self-enrollment link the member used
+      // (see registrarLinkToken — a short opaque token, not the raw
+      // email) — lets a registrar's own self-enroll traffic be attributed
+      // to them even when several registrars share the same state.
+      if (registeredBy.isNotEmpty) 'registeredByToken': registeredBy,
     };
   }
 
@@ -165,8 +184,8 @@ class NgmyCivicRegistryMembers {
         next['enrollmentSource'] =
             (keep['enrollmentSource'] ?? keep['source'] ?? '').toString();
       }
-      if ((next['registeredByEmail'] ?? '').toString().trim().isEmpty) {
-        next['registeredByEmail'] = (keep['registeredByEmail'] ?? '').toString();
+      if ((next['registeredByToken'] ?? '').toString().trim().isEmpty) {
+        next['registeredByToken'] = (keep['registeredByToken'] ?? '').toString();
       }
       next['updatedAt'] = now;
       members[idx] = next;

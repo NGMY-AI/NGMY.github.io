@@ -31161,13 +31161,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  /// True only for the global Civic Registry King/Admin roles — the ones
+  /// meant to see and manage every state's data. A regular Authorized
+  /// Registrar (`_canManageCivicRegistry()`) is only authorized for their
+  /// own state and must stay state-gated like an ordinary member; see
+  /// `_canCurrentUserSeeHelpMode` below, which used to let *any* registrar
+  /// bypass the state check and see another state's active help mode.
+  bool _isGlobalCivicRegistryAdmin() => widget.user.isCivicRegistryKing || widget.user.isCivicRegistryAdmin;
+
   bool _canCurrentUserSeeHelpMode() {
     if (!widget.config.helpModeActive) return false;
     final helpState = widget.config.helpState.trim();
     if (helpState.isNotEmpty &&
         widget.user.state.trim().isNotEmpty &&
         widget.user.state.trim() != helpState &&
-        !_canManageCivicRegistry()) {
+        !_isGlobalCivicRegistryAdmin()) {
       return false;
     }
     if (_canManageCivicRegistry()) return true;
@@ -31692,6 +31700,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () async {
+                                  // A regular registrar only manages their own state's
+                                  // campaign — don't let them end another state's active
+                                  // one (only King/Admin operate across states).
+                                  final activeForOtherState = widget.config.helpState.trim().isNotEmpty &&
+                                      widget.config.helpState.trim() != _selectedState;
+                                  if (activeForOtherState && !_isGlobalCivicRegistryAdmin()) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('That campaign belongs to ${widget.config.helpState.trim()}, not $_selectedState.')),
+                                    );
+                                    return;
+                                  }
                                   final activeCampaignId = _activeHelpCampaignId();
                                   setState(() {
                                     _markMissedForNonContributorsInCampaign(activeCampaignId);
@@ -31738,6 +31757,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 }
                                 if (scopeType != 'all' && scopeValue.trim().isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select scope value.')));
+                                  return;
+                                }
+                                // Help mode is one shared slot (helpModeActive/helpPurpose/etc
+                                // aren't per-state), so without this guard a regular
+                                // registrar saving their own state's campaign would silently
+                                // stomp another state's still-running one. Only King/Admin —
+                                // who are meant to operate across every state — may do that.
+                                final activeForOtherState = widget.config.helpModeActive &&
+                                    widget.config.helpState.trim().isNotEmpty &&
+                                    widget.config.helpState.trim() != _selectedState;
+                                if (activeForOtherState && !_isGlobalCivicRegistryAdmin()) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Help mode is already active for ${widget.config.helpState.trim()}. Wait for that campaign to end before starting one for $_selectedState.')),
+                                  );
                                   return;
                                 }
                                 final wasActive = widget.config.helpModeActive;
