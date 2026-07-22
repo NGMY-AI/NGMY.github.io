@@ -33831,17 +33831,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   timestamp: now,
                                 ),
                               );
-                              final alreadyContributedInCampaign = widget.allTransactions.any((t) {
-                                if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
-                                if (t.userEmail.toLowerCase().trim() != u.email.toLowerCase().trim()) return false;
-                                final meta = _decodeContributionMeta(t);
-                                return (meta['campaignId'] ?? '').toString() == campaignId;
-                              });
+                              // A new contribution never clears an existing missed
+                              // count — missed only reflects campaigns the member
+                              // was actually closed out on without contributing;
+                              // it isn't a running balance a later contribution can
+                              // pay back down.
                               setState(() {
                                 u.helps += 1;
-                                if (!alreadyContributedInCampaign && u.missed > 0) {
-                                  u.missed -= 1;
-                                }
                               });
                               unawaited(_persistCivicMemberActivity(u));
                               widget.onDataChanged();
