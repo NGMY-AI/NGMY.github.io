@@ -8995,6 +8995,34 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .eq('email', email)
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
+      // Registrar status isn't a users-table column worth trusting here —
+      // _pushUserAuthorizedRegistrar is intentionally a no-op because the
+      // real source of truth is config.civicRegistrarApplications (see its
+      // comment). This 20-second loop is otherwise the only thing that
+      // ever re-checks an already-logged-in registrar's own access — the
+      // full config poll that would normally pick up a revoke only runs
+      // every 3 minutes for a non-admin, and does nothing at all if the
+      // app stays open without it firing. So an Admin revoking someone
+      // could leave that registrar fully operational for minutes, and
+      // "it's not working" is a completely fair read of that from the
+      // admin's side. Only bother fetching for someone who currently
+      // believes they have registrar access — most users never do.
+      if (_currentUser!.isAuthorizedRegistrar) {
+        final remoteApps = await _fetchRemoteCivicRegistrarApplications();
+        if (mounted && NgmyCivicRegistrarApplication.isRevokedForEmail(remoteApps, email)) {
+          setState(() {
+            _mergeRegistrarApplicationsIntoConfig(_config, remoteApps);
+            _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+          });
+          NgmyAdminLiveRefresh.notify();
+          unawaited(_pushInAppNotification(
+            title: 'Registrar access removed',
+            body: 'Your Authorized Registrar access was revoked by an admin.',
+            tag: 'registrar_revoked_$email',
+            cooldown: const Duration(minutes: 10),
+          ));
+        }
+      }
       if (photoRow == null || !mounted) return;
       final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
       if (!_ngmyIsCloudProfilePhoto(cloudPhoto)) return;

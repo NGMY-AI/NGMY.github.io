@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_civic_registry_members.dart';
 
@@ -72,6 +73,30 @@ bool ngmyIsCivicIdPhotoLocalToken(String? path) {
   return p == kNgmyCivicIdPhotoLocalToken || p.startsWith('local:civic');
 }
 
+/// Uploads ID photo bytes to Supabase Storage so the photo is tied to the
+/// account, not the device — a `local:civic` token only ever resolved
+/// through SharedPreferences on the exact device that took the photo, so
+/// the same person logging in anywhere else saw no photo at all. Returns
+/// the public URL, or null if the upload fails (caller falls back to the
+/// on-device copy, which still works offline).
+Future<String?> _uploadCivicIdPhotoToCloud(String email, Uint8List bytes) async {
+  try {
+    final safeKey = _emailKey(email).replaceAll(RegExp(r'[^a-z0-9@._-]'), '_');
+    if (safeKey.isEmpty) return null;
+    final path = 'civic_id_photos/$safeKey.jpg';
+    final storage = Supabase.instance.client.storage.from('media');
+    await storage
+        .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'))
+        .timeout(const Duration(seconds: 45));
+    final url = storage.getPublicUrl(path);
+    if (url.isEmpty) return null;
+    return '$url?v=${DateTime.now().millisecondsSinceEpoch}';
+  } catch (e) {
+    debugPrint('[civic id photo] cloud upload: $e');
+    return null;
+  }
+}
+
 Future<String?> ngmyPickCivicIdPhotoBytes() async {
   final img = await ImagePicker().pickImage(
     source: ImageSource.gallery,
@@ -83,7 +108,10 @@ Future<String?> ngmyPickCivicIdPhotoBytes() async {
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
 }
 
-/// Pick from gallery and save locally; returns the `local:civic` token.
+/// Pick from gallery, cache locally for instant/offline access, and
+/// upload to cloud storage so the photo is available on every device the
+/// account logs into. Returns the cloud URL when the upload succeeds, or
+/// the `local:civic` token as an offline fallback.
 Future<String?> ngmyPickAndPersistCivicIdPhoto(String email) async {
   final img = await ImagePicker().pickImage(
     source: ImageSource.gallery,
@@ -92,13 +120,21 @@ Future<String?> ngmyPickAndPersistCivicIdPhoto(String email) async {
   );
   if (img == null) return null;
   final bytes = await img.readAsBytes();
-  return ngmySaveCivicIdPhotoLocal(email, bytes);
+  final localToken = await ngmySaveCivicIdPhotoLocal(email, bytes);
+  final cloudUrl = await _uploadCivicIdPhotoToCloud(email, bytes);
+  return cloudUrl ?? localToken;
 }
 
-/// Migrates a data-URL photo into local storage; returns the token (or existing path).
+/// Migrates a data-URL photo into durable storage — uploads to cloud (see
+/// _uploadCivicIdPhotoToCloud) with the on-device cache kept for instant/
+/// offline access. Returns the cloud URL, the `local:civic` token as an
+/// offline fallback, or the original path unchanged if it's already a
+/// durable URL (never downgrades a working cloud URL back to a
+/// device-local token just because this device also has one cached).
 Future<String> ngmyEnsureCivicIdPhotoLocal(String email, String photoPath) async {
   final src = photoPath.trim();
   if (src.isEmpty) return '';
+  if (src.startsWith('http') || src.startsWith('blob:')) return src;
   if (ngmyIsCivicIdPhotoLocalToken(src)) {
     await ngmyLoadCivicIdPhotoLocal(email);
     return kNgmyCivicIdPhotoLocalToken;
@@ -106,12 +142,15 @@ Future<String> ngmyEnsureCivicIdPhotoLocal(String email, String photoPath) async
   if (src.startsWith('data:image')) {
     try {
       final b64 = src.contains(',') ? src.split(',').last : src;
-      return ngmySaveCivicIdPhotoLocal(email, base64Decode(b64));
+      final bytes = base64Decode(b64);
+      final localToken = await ngmySaveCivicIdPhotoLocal(email, bytes);
+      final cloudUrl = await _uploadCivicIdPhotoToCloud(email, bytes);
+      return cloudUrl ?? localToken;
     } catch (_) {
       return src;
     }
   }
-  // Already a short path / URL — keep, but prefer local if we have one.
+  // Unrecognized short path — keep, but prefer local if we have one.
   final local = await ngmyLoadCivicIdPhotoLocal(email);
   if (local != null) return kNgmyCivicIdPhotoLocalToken;
   return src;
@@ -168,10 +207,15 @@ Future<void> showNgmyCivicIdPhotoSheet(
             await onSaved();
             if (ctx.mounted) Navigator.pop(ctx);
             if (context.mounted) {
+              final synced = token.startsWith('http');
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('ID photo saved on this device — it stays available offline.'),
-                  backgroundColor: Color(0xFF059669),
+                SnackBar(
+                  content: Text(
+                    synced
+                        ? 'ID photo saved to your account — it will show on any device you log into.'
+                        : "ID photo saved on this device. Couldn't reach the server to sync it yet — it'll upload next time you're online.",
+                  ),
+                  backgroundColor: const Color(0xFF059669),
                 ),
               );
             }
@@ -199,8 +243,8 @@ Future<void> showNgmyCivicIdPhotoSheet(
                     const SizedBox(height: 8),
                     Text(
                       skippable
-                          ? 'Optional — upload a portrait for your Civic Registry ID. It is saved on this device so it stays when you are offline.'
-                          : 'Upload a portrait photo for your Civic Registry ID before adding it to Home. It is saved on this device.',
+                          ? 'Optional — upload a portrait for your Civic Registry ID. It saves to your account, so it shows up on any device you log into, and stays cached here for offline use.'
+                          : 'Upload a portrait photo for your Civic Registry ID before adding it to Home. It saves to your account and stays cached here for offline use.',
                       style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                     ),
                     const SizedBox(height: 16),

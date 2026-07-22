@@ -3961,11 +3961,15 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
         return;
       }
     }
-    // Persist a lean Civic ID snapshot; photo bytes live in on-device local storage.
+    // Persist a lean Civic ID snapshot. ngmyEnsureCivicIdPhotoLocal now
+    // returns a durable cloud URL when one exists (uploaded when the ID
+    // photo was first added) — use that directly instead of always
+    // forcing the device-local token, which made the pinned home card
+    // depend on this exact device's cache even when a real URL was
+    // already available and would have worked on any device.
     final lean = Map<String, dynamic>.from(record);
     if (photo.isNotEmpty) {
-      await ngmyEnsureCivicIdPhotoLocal(widget.userEmail, photo);
-      lean['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+      lean['idPhotoPath'] = await ngmyEnsureCivicIdPhotoLocal(widget.userEmail, photo);
     } else {
       lean['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
     }
