@@ -31623,6 +31623,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           });
                           widget.onDataChanged();
                           Navigator.pop(ctx);
+                          // Previously only updated local state — never reached
+                          // Supabase, so other users' "View Spending" and the
+                          // registrar's own other devices never saw it. This is
+                          // the same cloud channel Activate/Deactivate/Save use.
+                          unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Spending recorded — members can view it live.')));
                         },
                         style: ElevatedButton.styleFrom(
@@ -34557,62 +34562,151 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final maxMissed = withMissed.map((m) => m.missed).reduce((a, b) => a > b ? a : b);
     final amountC = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final searchC = TextEditingController();
+    // Default target is everybody shown (matches the old behavior); the
+    // registrar can switch to "One person" and search/pick a single member
+    // instead of clearing the whole visible list.
+    UserData? selectedMember;
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear Missed'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${withMissed.length} member(s) shown in $_selectedState have a missed count (highest: $maxMissed).'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: amountC,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'How many missed to clear',
-                hintText: 'e.g. 1',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final query = searchC.text.trim().toLowerCase();
+          final searchResults = query.isEmpty
+              ? withMissed
+              : withMissed.where((m) {
+                  final name = (m.fullName ?? m.username).toLowerCase();
+                  return name.contains(query) || m.email.toLowerCase().contains(query);
+                }).toList();
+          return AlertDialog(
+            title: const Text('Clear Missed'),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    selectedMember == null
+                        ? '${withMissed.length} member(s) shown in $_selectedState have a missed count (highest: $maxMissed).'
+                        : 'Clearing missed for ${selectedMember!.fullName ?? selectedMember!.username} only (currently ${selectedMember!.missed} missed).',
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Everybody'),
+                          selected: selectedMember == null,
+                          onSelected: (_) => setDialog(() => selectedMember = null),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('One person'),
+                          selected: selectedMember != null,
+                          onSelected: (_) => setDialog(() {
+                            selectedMember ??= withMissed.first;
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (selectedMember != null) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: searchC,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Search by name or email',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) => setDialog(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 160,
+                      child: searchResults.isEmpty
+                          ? const Center(child: Text('No matches', style: TextStyle(color: Colors.grey)))
+                          : ListView.builder(
+                              itemCount: searchResults.length,
+                              itemBuilder: (_, i) {
+                                final m = searchResults[i];
+                                final isSelected = m.email.toLowerCase().trim() == selectedMember?.email.toLowerCase().trim();
+                                return ListTile(
+                                  dense: true,
+                                  selected: isSelected,
+                                  title: Text(m.fullName ?? m.username),
+                                  subtitle: Text('${m.missed} missed'),
+                                  onTap: () => setDialog(() => selectedMember = m),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountC,
+                    autofocus: selectedMember == null,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'How many missed to clear',
+                      hintText: 'e.g. 1',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    selectedMember == null
+                        ? 'Subtracts this many from every shown member\'s missed count (never below 0).'
+                        : 'Subtracts this many from just this member\'s missed count (never below 0).',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text('Subtracts this many from each member\'s missed count (never below 0).', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final n = int.tryParse(amountC.text.trim()) ?? 0;
-              if (n <= 0) {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
-                return;
-              }
-              Navigator.pop(ctx, true);
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Clear'),
-          ),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () {
+                  final n = int.tryParse(amountC.text.trim()) ?? 0;
+                  if (n <= 0) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
+                    return;
+                  }
+                  Navigator.pop(ctx, {'amount': n, 'member': selectedMember});
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Clear'),
+              ),
+            ],
+          );
+        },
       ),
     );
-    if (confirmed != true) return;
-    final amount = int.tryParse(amountC.text.trim()) ?? 0;
-    if (amount <= 0) return;
+    if (result == null) return;
+    final amount = result['amount'] as int;
+    final UserData? target = result['member'] as UserData?;
+    final targets = target == null ? withMissed : [target];
     setState(() {
-      for (final m in withMissed) {
+      for (final m in targets) {
         m.missed = (m.missed - amount).clamp(0, 1 << 30);
       }
     });
-    for (final m in withMissed) {
+    for (final m in targets) {
       unawaited(_persistCivicMemberActivity(m));
     }
     widget.onDataChanged();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cleared $amount missed from ${withMissed.length} member(s).')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        target == null
+            ? 'Cleared $amount missed from ${targets.length} member(s).'
+            : 'Cleared $amount missed from ${target.fullName ?? target.username}.',
+      ),
+    ));
   }
 
   Widget _membersSection(bool isDark) {

@@ -1441,11 +1441,24 @@ Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
       // full app config resync happened.
       'helpModeByState': config.helpModeByState,
       'helpCampaignClosures': config.helpCampaignClosures,
+      'helpCampaignSpendings': config.helpCampaignSpendings,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
 void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
   if (payload.isEmpty) return;
+  // A registrar's own Activate/Deactivate/Save marks
+  // ngmyAdminConfigMutationAt (see ngmyPersistCivicHelpModeSettings below).
+  // Without this guard, the 75s poll (_refreshCivicHelpModeAndContributions)
+  // or any other concurrent fetch could read back a not-yet-caught-up cloud
+  // row and silently overwrite the local change — e.g. a registrar deactivates,
+  // the local UI updates, but a stale "still active" row from a lagging cloud
+  // read flips it back on moments later, which looked to registrars like
+  // Deactivate simply "did nothing." helpCampaignSpendings is exempt since
+  // it's merged (additive, id-keyed) rather than overwritten, so deferring it
+  // would only delay other users from seeing a just-recorded spend for no
+  // safety benefit.
+  final deferLiveFields = ngmyShouldDeferRemoteConfigOverwrite();
   if (payload.containsKey('helpModeActive')) {
     config.helpModeActive = payload['helpModeActive'] == true;
   }
@@ -1477,13 +1490,19 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
   if (payload.containsKey('helpCampaignStartedAt')) {
     config.helpCampaignStartedAt = (payload['helpCampaignStartedAt'] ?? '').toString().trim();
   }
-  if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map) {
+  if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map && !deferLiveFields) {
     config.helpModeByState = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
   }
-  if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List) {
+  if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List && !deferLiveFields) {
     config.helpCampaignClosures = (payload['helpCampaignClosures'] as List)
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+  }
+  if (payload.containsKey('helpCampaignSpendings') && payload['helpCampaignSpendings'] is List) {
+    final remote = (payload['helpCampaignSpendings'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(config.helpCampaignSpendings, remote);
   }
 }
 
@@ -1514,6 +1533,12 @@ Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
 }
 
 Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
+  // Marks "just mutated locally" so a concurrent/lagging remote fetch
+  // (the 75s help-mode poll, or another device's stale read) defers
+  // overwriting helpModeByState/helpCampaignClosures for the next 45s
+  // instead of silently reverting this activate/deactivate/save/spend.
+  // See _applyCivicHelpModeSettingsPayload.
+  ngmyAdminConfigMutationAt = DateTime.now();
   await _persistCivicHelpModeSettingsLocal(config);
   NgmyAdminLiveRefresh.notify();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
