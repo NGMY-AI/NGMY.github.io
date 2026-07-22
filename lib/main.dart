@@ -31886,16 +31886,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _showHelpModeDialog() async {
-    // Belt-and-suspenders: the only button that opens this is already
-    // hidden from plain registrars, but guard the entry point directly too
-    // so a King/Admin-only capability never depends solely on a widget
-    // being absent from the tree.
-    if (!_isGlobalCivicRegistryAdmin()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the state King or an Admin can manage help mode.')),
-      );
-      return;
-    }
+    // Any Authorized Registrar manages help mode for their own state; the
+    // Activate/Save and Deactivate actions below separately block editing
+    // another state's campaign unless the caller is King/Admin.
     final savedDraft = await NgmyCivicHelpModeStorage.loadDraft(
       email: widget.user.email,
       state: _selectedState,
@@ -35293,69 +35286,65 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ],
                 ),
                 if (_canManageCivicRegistry()) ...[
-                  // Activate/Deactivate + spending controls are King/Admin
-                  // only — a plain Authorized Registrar (not crowned King,
-                  // not Admin) must never get management controls here,
-                  // even for their own state's campaign. They fall through
-                  // to the ordinary read-only "HELP MODE ACTIVE" payment
-                  // card everyone else sees.
-                  if (_isGlobalCivicRegistryAdmin()) ...[
-                    const SizedBox(height: 5),
-                    SelectionContainer.disabled(
-                      child: GestureDetector(
-                        onTap: _showHelpModeDialog,
-                        child: Container(
-                          height: 26,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: widget.config.helpActiveFor(_selectedState) ? Colors.red : Colors.green,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            widget.config.helpActiveFor(_selectedState) ? 'Deactivate Help Mode' : 'Activate Help Mode',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9),
-                          ),
+                  // Any Authorized Registrar manages Activate/Deactivate +
+                  // spending for their own state's campaign; King/Admin can
+                  // additionally do this across every state (enforced at
+                  // the actual action buttons, not here).
+                  const SizedBox(height: 5),
+                  SelectionContainer.disabled(
+                    child: GestureDetector(
+                      onTap: _showHelpModeDialog,
+                      child: Container(
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: widget.config.helpActiveFor(_selectedState) ? Colors.red : Colors.green,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          widget.config.helpActiveFor(_selectedState) ? 'Deactivate Help Mode' : 'Activate Help Mode',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9),
                         ),
                       ),
                     ),
-                    if (widget.config.helpActiveFor(_selectedState)) ...[
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _recordHelpCampaignSpending(
-                                campaignId: _activeHelpCampaignId(_selectedState),
-                                campaignTitle: widget.config.helpPurposeFor(_selectedState),
-                              ),
-                              icon: const Icon(Icons.folder_open_rounded, size: 14),
-                              label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF2563EB),
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                visualDensity: VisualDensity.compact,
-                              ),
+                  ),
+                  if (widget.config.helpActiveFor(_selectedState)) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _recordHelpCampaignSpending(
+                              campaignId: _activeHelpCampaignId(_selectedState),
+                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
+                            ),
+                            icon: const Icon(Icons.folder_open_rounded, size: 14),
+                            label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF2563EB),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showHelpCampaignSpendingLedger(
-                                campaignId: _activeHelpCampaignId(_selectedState),
-                                campaignTitle: widget.config.helpPurposeFor(_selectedState),
-                              ),
-                              icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                              label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF059669),
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                visualDensity: VisualDensity.compact,
-                              ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showHelpCampaignSpendingLedger(
+                              campaignId: _activeHelpCampaignId(_selectedState),
+                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
+                            ),
+                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                            label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF059669),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ],
                 ] else if (slotsLeft > 0 && slotsLeft < kNgmyMaxRegistrarsPerState) ...[
                   const SizedBox(height: 3),

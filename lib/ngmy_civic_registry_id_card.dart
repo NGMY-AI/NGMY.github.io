@@ -763,46 +763,58 @@ Future<void> showNgmyEnlargedCivicQrDialog(BuildContext context, String registry
   final size = MediaQuery.sizeOf(context).width.clamp(260.0, 320.0);
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.72),
+    barrierColor: Colors.black.withOpacity(0.82),
     builder: (ctx) => Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Scan Civic Registry ID',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+      // No white card behind everything — only the QR itself needs a
+      // light backing (scanners need contrast between modules), so that's
+      // the only white surface left. Title/number/Close sit directly on
+      // the dark barrier, in white/bright text so they stay readable
+      // against it instead of the near-invisible black-on-white before.
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Scan Civic Registry ID',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            registryId.isEmpty ? 'Registry QR' : registryId,
+            style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 6))],
             ),
-            const SizedBox(height: 6),
-            Text(
-              registryId.isEmpty ? 'Registry QR' : registryId,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
+            child: QrImageView(
+              data: qrData,
+              size: size,
+              padding: EdgeInsets.zero,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
+              dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1E3A8A), width: 2),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
-              ),
-              child: QrImageView(
-                data: qrData,
-                size: size,
-                padding: EdgeInsets.zero,
-                backgroundColor: Colors.white,
-                eyeStyle: const QrEyeStyle(color: Color(0xFF111827)),
-                dataModuleStyle: const QrDataModuleStyle(color: Color(0xFF111827)),
-              ),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white, width: 1.4),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             ),
-            const SizedBox(height: 14),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-          ],
-        ),
+            child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ],
       ),
     ),
   );
