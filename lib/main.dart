@@ -21476,10 +21476,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ListTile(
                   leading: const Icon(Icons.link_rounded, color: Color(0xFF6200EE)),
                   title: const Text('Copy enrollment link', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Send to users so they can enroll without signing in'),
+                  subtitle: const Text('Your own link — members who self-enroll through it are attributed to you'),
                   trailing: const Icon(Icons.copy_rounded, color: Color(0xFF6200EE)),
                   onTap: () async {
-                    final link = ngmyCivicSelfEnrollmentShareUrl(state: widget.user.state);
+                    final link = ngmyCivicSelfEnrollmentShareUrl(state: widget.user.state, registrarEmail: widget.user.email);
                     await Clipboard.setData(ClipboardData(text: link));
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -29168,12 +29168,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _copyCivicEnrollShareLink() async {
-    final link = ngmyCivicSelfEnrollmentShareUrl(state: _selectedState);
+    final link = ngmyCivicSelfEnrollmentShareUrl(state: _selectedState, registrarEmail: widget.user.email);
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Enrollment link copied for $_selectedState — send it to users'),
+        content: Text('Your enrollment link for $_selectedState copied — members who use it are attributed to you'),
         backgroundColor: const Color(0xFF059669),
       ),
     );
@@ -34241,13 +34241,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase());
       });
     } else {
-      final userOrder = <String, int>{
-        for (int i = 0; i < members.length; i++) members[i].email.toLowerCase().trim(): i,
-      };
+      // Newest-enrolled-first — sort by the registry's own `enrolledAt`
+      // timestamp rather than list position, since list order isn't
+      // guaranteed to track enrollment order once cloud syncs/merges from
+      // multiple registrars interleave records.
+      DateTime? enrolledAtOf(UserData u) {
+        final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+        return DateTime.tryParse((raw?['enrolledAt'] ?? '').toString());
+      }
+
       members.sort((a, b) {
-        final aIndex = userOrder[a.email.toLowerCase().trim()] ?? -1;
-        final bIndex = userOrder[b.email.toLowerCase().trim()] ?? -1;
-        return bIndex.compareTo(aIndex);
+        final da = enrolledAtOf(a);
+        final db = enrolledAtOf(b);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return db.compareTo(da);
       });
     }
 

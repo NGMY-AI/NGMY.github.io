@@ -109,6 +109,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   List<Map<String, dynamic>> _members = const [];
 
   String _selectedState = 'Georgia';
+  String _registrarEmail = '';
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
@@ -129,6 +130,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _orbit = AnimationController(vsync: this, duration: const Duration(milliseconds: 10000))..repeat();
     ngmyTakePendingCivicSelfEnrollmentOpen();
     _selectedState = _stateFromLaunchUrl() ?? 'Georgia';
+    _registrarEmail = _registrarFromLaunchUrl();
     unawaited(_load());
   }
 
@@ -156,6 +158,18 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       }
     } catch (_) {}
     return null;
+  }
+
+  /// The Authorized Registrar whose link this is — every member who
+  /// self-enrolls through it is attributed back to this registrar (see
+  /// `registeredByEmail` on the built record), even when several
+  /// registrars share the same state.
+  String _registrarFromLaunchUrl() {
+    try {
+      return (Uri.base.queryParameters['registrar'] ?? '').trim().toLowerCase();
+    } catch (_) {
+      return '';
+    }
   }
 
   List<String> _citiesForState() => NgmyCivicRegistryStats.citiesForState(
@@ -385,6 +399,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         familyMales: males,
         familyFemales: females,
         enrollmentSource: 'guest_self_enrollment',
+        registeredByEmail: _registrarEmail,
       );
       remoteMembers.add(member);
 

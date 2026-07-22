@@ -80,11 +80,13 @@ class NgmyCivicRegistryMembers {
     int missed = 0,
     String? enrolledAt,
     String? enrollmentSource,
+    String? registeredByEmail,
   }) {
     final total = familyMembers < 1 ? 1 : familyMembers;
     final males = familyMales < 0 ? 0 : familyMales;
     final females = familyFemales < 0 ? 0 : familyFemales;
     final source = (enrollmentSource ?? '').trim();
+    final registeredBy = emailKey(registeredByEmail ?? '');
     return {
       'email': emailKey(email),
       'fullName': fullName.trim(),
@@ -103,6 +105,10 @@ class NgmyCivicRegistryMembers {
       'missed': missed,
       'enrolledAt': enrolledAt ?? DateTime.now().toUtc().toIso8601String(),
       if (source.isNotEmpty) 'enrollmentSource': source,
+      // Which Authorized Registrar's self-enrollment link the member used —
+      // lets a registrar's own self-enroll traffic be attributed to them
+      // even when several registrars share the same state.
+      if (registeredBy.isNotEmpty) 'registeredByEmail': registeredBy,
     };
   }
 
@@ -158,6 +164,9 @@ class NgmyCivicRegistryMembers {
       if ((next['enrollmentSource'] ?? '').toString().trim().isEmpty) {
         next['enrollmentSource'] =
             (keep['enrollmentSource'] ?? keep['source'] ?? '').toString();
+      }
+      if ((next['registeredByEmail'] ?? '').toString().trim().isEmpty) {
+        next['registeredByEmail'] = (keep['registeredByEmail'] ?? '').toString();
       }
       next['updatedAt'] = now;
       members[idx] = next;

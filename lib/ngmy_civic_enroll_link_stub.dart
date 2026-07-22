@@ -1,11 +1,12 @@
 bool ngmyPendingCivicSelfEnrollmentOpen = false;
 
-String ngmyCivicSelfEnrollmentShareUrl({String? state}) {
+String ngmyCivicSelfEnrollmentShareUrl({String? state, String? registrarEmail}) {
   final st = (state ?? '').trim();
-  if (st.isNotEmpty) {
-    return 'https://ngmy.org/?civic=enroll&state=${Uri.encodeQueryComponent(st)}';
-  }
-  return 'https://ngmy.org/?civic=enroll';
+  final reg = (registrarEmail ?? '').trim().toLowerCase();
+  final params = <String>['civic=enroll'];
+  if (st.isNotEmpty) params.add('state=${Uri.encodeQueryComponent(st)}');
+  if (reg.isNotEmpty) params.add('registrar=${Uri.encodeQueryComponent(reg)}');
+  return 'https://ngmy.org/?${params.join('&')}';
 }
 
 bool ngmyPeekCivicEnrollLaunchIntent() => ngmyPendingCivicSelfEnrollmentOpen;
