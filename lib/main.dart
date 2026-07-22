@@ -815,9 +815,14 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
   return total;
 }
 
-/// Authoritative balance from the transaction ledger, with cloud-stored balance as floor
-/// when the ledger is behind (another device earned). When the ledger is lower, local
-/// spends (bets, purchases) win so balance drops immediately on this device.
+/// Authoritative balance from the transaction ledger once this device has
+/// any history for the person — a bet/win/purchase lands as a local
+/// AppTransaction row immediately, and it must win over a stale cloud
+/// echo of the pre-bet balance so a spend visibly drops (and a payout
+/// visibly lands) right away instead of getting silently reverted by the
+/// next sync. Only falls back to the stored/cloud balance when this
+/// device has no transaction history at all for the person (e.g. a
+/// just-arrived realtime row for someone not loaded locally yet).
 double ngmyResolveAccountBalance(
   String email,
   double storedBalance,
@@ -826,12 +831,9 @@ double ngmyResolveAccountBalance(
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
   final stored = storedBalance.clamp(0.0, double.infinity);
-  final ledger = ngmyBalanceFromApprovedTransactions(email, transactions);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
   if (txnCount == 0) return stored;
-  if (ledger < stored - 0.01) return ledger;
-  if (stored > ledger + 0.01) return stored;
-  return ledger;
+  return ngmyBalanceFromApprovedTransactions(email, transactions);
 }
 
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {
@@ -4427,13 +4429,29 @@ Future<UserData?> _fetchCloudUserRow(String email) async {
   }
 }
 
-Future<bool> _pushUserBalanceToCloud(UserData u, {bool allowDecrease = false}) async {
+Future<bool> _pushUserBalanceToCloud(
+  UserData u, {
+  bool allowDecrease = false,
+  List<AppTransaction>? ledgerTransactions,
+}) async {
   if (!await ngmyCanReachCloud()) return false;
   final email = u.email.trim();
   if (email.isEmpty) return false;
   final local = u.accountBalance.clamp(0.0, double.infinity);
   try {
-    if (!allowDecrease) {
+    // A caller with ledger history for this person already knows `local`
+    // is authoritative (it's what ngmyResolveAccountBalance/
+    // ngmyReconcileUserAccountBalance just computed from their own
+    // AppTransaction rows — e.g. right after a bet was deducted or a win
+    // credited). Checking cloud and adopting it whenever it happens to
+    // still show the pre-bet/pre-payout number — because this push raced
+    // ahead of that number actually landing in Supabase — silently
+    // reverted the spend/credit and skipped writing the correct value.
+    // Only fall back to "trust cloud when it's higher" when the caller
+    // has no ledger to vouch for `local` at all.
+    final hasLedgerHistory = ledgerTransactions != null &&
+        ledgerTransactions.any((t) => ngmyNormalizeEmail(t.userEmail) == ngmyNormalizeEmail(email));
+    if (!allowDecrease && !hasLedgerHistory) {
       final row = await Supabase.instance.client
           .from('users')
           .select('accountBalance')
@@ -9207,7 +9225,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
           _currentUser = _allUsers[userIdx];
         }
-        unawaited(_pushUserBalanceToCloud(_allUsers[userIdx]));
+        unawaited(_pushUserBalanceToCloud(_allUsers[userIdx], ledgerTransactions: _allTransactions));
       }
     }
   }
@@ -11550,7 +11568,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (userIdx >= 0 &&
               (previous == null || statusChanged || becameApproved) &&
               ngmyNormalizeEmail(tx.userEmail) == ngmyNormalizeEmail(_currentUser!.email)) {
-            unawaited(_pushUserBalanceToCloud(_allUsers[userIdx]));
+            unawaited(_pushUserBalanceToCloud(_allUsers[userIdx], ledgerTransactions: _allTransactions));
           }
         }
         if (tx.status == TransactionStatus.pending &&
@@ -11602,6 +11620,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.points > remote.points) {
       remote.points = local.points;
     }
+    // A bet is deducted (and a win credited) locally the instant it happens
+    // via an AppTransaction row — but this merge runs on every realtime
+    // `users` row echo, and until that echo's own accountBalance catches up
+    // with the txn that already landed, adopting it raw silently reverted
+    // the spend/credit back to its pre-bet value. Once this device has any
+    // transaction history for the person, the ledger is authoritative —
+    // same rule ngmyResolveAccountBalance already applies elsewhere.
+    remote.accountBalance = ngmyResolveAccountBalance(remote.email, remote.accountBalance, _allTransactions);
     _mergeCloudProfileIdentityFields(local, remote);
     _mergeUserMediaProfileFields(local, remote);
     if (local.savedCashAppTag.trim().isNotEmpty && remote.savedCashAppTag.trim().isEmpty) {
@@ -12489,7 +12515,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     for (final email in affectedEmails) {
       final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
-      if (idx >= 0) unawaited(_pushUserBalanceToCloud(_allUsers[idx]));
+      if (idx >= 0) unawaited(_pushUserBalanceToCloud(_allUsers[idx], ledgerTransactions: _allTransactions));
     }
     _reconcileAllUserBalances();
     NgmyAdminLiveRefresh.notify();
