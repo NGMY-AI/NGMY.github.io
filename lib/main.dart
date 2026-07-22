@@ -33616,7 +33616,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Send Contributions To:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              const Text('Send Contributions To:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
                               Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: Colors.black54)),
                             ],
                           ),
@@ -33656,7 +33656,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             child: const Text(
                               'Include your NAME & PHONE in payment memo.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -34193,11 +34193,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
         ),
 
-        const SizedBox(height: 40),
+        // "Enroll Existing App Users" lists every app account regardless of
+        // state — fine for King/Admin (who operate across all states), but
+        // it let a regular state-scoped registrar browse and enroll
+        // accounts belonging to other states' users. Restricted to
+        // King/Admin only.
+        if (_isGlobalCivicRegistryAdmin()) ...[
+          const SizedBox(height: 40),
 
-        // APP USERS LIST
-        Container(
-          padding: const EdgeInsets.all(25),
+          // APP USERS LIST
+          Container(
+            padding: const EdgeInsets.all(25),
           decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -34239,6 +34245,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ],
           ),
         ),
+        ],
       ],
     );
   }
