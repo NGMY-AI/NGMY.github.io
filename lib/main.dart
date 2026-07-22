@@ -31525,6 +31525,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }) {
     final normalizedCampaignId = campaignId.trim();
     if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
+    // Idempotency guard: a campaign can only ever be closed out once. Two
+    // devices/sessions racing to deactivate the same campaign (or a
+    // manual Deactivate overlapping the 5-day auto-expiry sweep) would
+    // otherwise each independently decide "these members haven't
+    // contributed yet" and both increment missed for them — double
+    // counting. helpCampaignClosures already records every campaign this
+    // device knows has been closed (and syncs across devices via
+    // ngmyPersistCivicHelpModeSettings/ngmyHydrateCivicHelpModeFromAllBackups),
+    // so it doubles as the "already handled, don't do it again" record.
+    if (normalizedCampaignId.isNotEmpty &&
+        widget.config.helpCampaignClosures.any((c) => (c['campaignId'] ?? '').toString().trim() == normalizedCampaignId)) {
+      debugPrint('[help mode] campaign $normalizedCampaignId already closed — skipping duplicate missed marking');
+      return;
+    }
     // _civicTransactionsForDisplay(), not widget.allTransactions alone —
     // a contribution recorded on another registrar's device/session only
     // shows up locally through the separately-fetched community list
@@ -33739,6 +33753,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final amountC = TextEditingController();
     final noteC = TextEditingController(text: widget.config.helpPurposeFor(state).isNotEmpty ? widget.config.helpPurposeFor(state) : 'Community contribution');
+    // A rapid double-tap on Save (common on mobile, especially with any UI
+    // lag before the dialog actually closes) would otherwise fire
+    // onPressed twice and record the SAME contribution twice — money
+    // appearing that the registrar never intentionally added a second
+    // time. This flag makes the very first tap the only one that can ever
+    // go through; every tap after it is a synchronous no-op.
+    var submitted = false;
     showDialog(
       context: context,
       builder: (ctx) {
@@ -33832,11 +33853,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
+                              if (submitted) return;
                               final amount = double.tryParse(amountC.text.trim()) ?? 0;
                               if (amount <= 0) {
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount.')));
                                 return;
                               }
+                              submitted = true;
                               final now = DateTime.now();
                               final campaignId = _activeHelpCampaignId(state);
                               final payload = jsonEncode({
@@ -33898,6 +33921,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _showClaimDialog(UserData u) {
     final claimC = TextEditingController();
+    // Same double-tap guard as Add Contribution — one press, one claim.
+    var submitted = false;
     showDialog(
       context: context,
       builder: (ctx) {
@@ -33977,11 +34002,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          if (submitted) return;
                           final text = claimC.text.trim();
                           if (text.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Claim details are required.')));
                             return;
                           }
+                          submitted = true;
                           final now = DateTime.now();
                           widget.onAddTransaction(
                             AppTransaction(
@@ -34064,6 +34091,158 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
         ],
       ),
+    );
+  }
+
+  /// Lets a registrar remove a money/contribution record that was recorded
+  /// by mistake — the "Money" button repurposes to this once help mode is
+  /// off (there's nothing to add). Mirrors the claim delete pattern:
+  /// status flips to rejected (every contribution display already filters
+  /// to status == approved, so a rejected one vanishes everywhere and its
+  /// amount drops out of every derived total automatically) and syncs via
+  /// onAddTransaction the same way claim deletes do. helps is decremented
+  /// to undo exactly what adding the contribution incremented — missed is
+  /// never touched here, same as it's never touched when adding one.
+  void _showMoneyRecordsManageDialog(UserData u) {
+    final emailKey = u.email.toLowerCase().trim();
+    final records = widget.allTransactions
+        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (records.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No money records to remove.')));
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
+            final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+            final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+            Future<void> removeRecord(AppTransaction t) async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dctx) => AlertDialog(
+                  title: const Text('Remove this money record?'),
+                  content: Text(
+                    'This removes the \$${formatCurrency(t.amount)} contribution recorded on '
+                    '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}. This cannot be undone.',
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('Cancel')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dctx, true),
+                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              setState(() {
+                t.status = TransactionStatus.rejected;
+                if (u.helps > 0) u.helps -= 1;
+              });
+              widget.onAddTransaction(t);
+              unawaited(_persistCivicMemberActivity(u));
+              widget.onDataChanged();
+              records.removeWhere((r) => r.id == t.id);
+              setDialogState(() {});
+              if (records.isEmpty && ctx.mounted) Navigator.pop(ctx);
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: panelBg,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.14), blurRadius: 24, offset: const Offset(0, 12))],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFB91C1C)]),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.monetization_on_outlined, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Money Records', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                              Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: records.map((t) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.055 : 0.045),
+                                borderRadius: BorderRadius.circular(13),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(_txReadableDetails(t)),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    IconButton(
+                                      tooltip: 'Remove this record',
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                      visualDensity: VisualDensity.compact,
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () => removeRecord(t),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -35472,7 +35651,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             children: [
               _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
               if (manageActions) ...[
-                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => _showContributionDialog(u)),
+                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () {
+                  // While help mode is active, Money adds a contribution.
+                  // Once it's off there's nothing to add — repurpose the
+                  // same button to manage/remove a money record that was
+                  // recorded by mistake, same as Clean does for claims.
+                  if (widget.config.helpActiveFor(_selectedState)) {
+                    _showContributionDialog(u);
+                  } else {
+                    _showMoneyRecordsManageDialog(u);
+                  }
+                }),
                 _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
                 _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
                 _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
