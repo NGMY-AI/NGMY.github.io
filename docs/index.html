@@ -4,7 +4,7 @@
 
 <head>
 
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <script>
     (function () {
@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260722184939';
+      var embedded = '20260722150727';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -64,10 +64,12 @@
         }
       }
       window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
-      // silent:true is for the periodic/visibility checks — never auto-reloads
-      // (that would dump someone mid-edit) and never shows a popup; it just
-      // queues the pending build so a genuine cold reopen (a real fresh page
-      // load, handled by the non-silent call below) picks it up right away.
+      // Every caller passes silent:true (see below) — checkForUpdate never
+      // auto-reloads on its own. It only ever queues the pending build in
+      // localStorage; nothing currently reads that key to reload, so a
+      // newer build only actually takes over the next time this device
+      // does a real fresh load with no live session to disrupt (new tab,
+      // reinstall, or once a service-worker update naturally rolls in).
       function checkForUpdate(opts) {
         var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -86,21 +88,25 @@
           })
           .catch(function () {});
       }
-      // Cold open / fresh document: if the server has a newer build, reload once.
-      checkForUpdate();
-      // iOS home-screen PWAs typically *resume* a suspended page instead of
-      // reloading it when reopened from the app switcher — this script would
-      // otherwise never run again, leaving the app stuck on whatever build
-      // was live at install time no matter how many times a new one ships.
-      // Re-check right when the app comes back to the foreground so a stale
-      // install eventually notices a new deploy — but ALWAYS silent/deferred
-      // here, never the loud immediate reload. visibilitychange/pageshow
-      // fire on every brief backgrounding (switching apps for a second,
-      // screen auto-lock, a notification banner) while the user is very much
-      // mid-session, not just on a genuine close-and-reopen — a non-deferred
-      // reload here was yanking users back to Home while they were actively
-      // using the app. Only the toast-driven update (tap "Sasisha") or an
-      // actual fresh page load should ever reload.
+      // This script re-runs on every "fresh document load" — but JS has no
+      // way to tell a genuine cold open (user typed the URL, tapped the
+      // home-screen icon after fully closing it) apart from the OS quietly
+      // evicting a backgrounded tab/PWA under memory pressure and reloading
+      // the document when the user switches back, which looks identical
+      // from here. That second case happens constantly on phones — lock the
+      // screen for a bit, switch to camera to snap an ID photo mid-enrollment,
+      // take a call — and is exactly when someone is deepest into a flow
+      // (Civic Registry enrollment, Creator Toolkit, Advisors, Slides). The
+      // old non-deferred call here reloaded immediately whenever the server
+      // had shipped a newer build in the meantime (routine during active
+      // development), which is indistinguishable from "randomly refreshes
+      // and dumps me back on Home mid-task" from the user's side — because
+      // that is exactly what it was doing. So: always silent/deferred, no
+      // exceptions, no matter how this script came to run. A newer build
+      // only actually takes over next time nothing is relying on the page's
+      // in-memory state to begin with (a real fresh tab/reinstall) — never a
+      // reload injected into a session that's already live.
+      checkForUpdate({ silent: true });
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
       });
@@ -648,7 +654,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260722184939";
+      var CURRENT = "20260722150727";
 
       function showError(msg) {
 
@@ -700,7 +706,7 @@
 
   <script>
     (function () {
-      var deployId = '20260722184939';
+      var deployId = '20260722150727';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
