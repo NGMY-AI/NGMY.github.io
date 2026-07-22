@@ -12613,7 +12613,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onDataChanged: _onDataChanged,
                 onReferralLinked: _onReferralLinked,
                 onAddTransaction: (t) {
-                  final exists = _allTransactions.any((x) => x.id == t.id);
+                  final existingIdx = _allTransactions.indexWhere((x) => x.id == t.id);
+                  final exists = existingIdx != -1;
                   UserData? syncedUser;
                   if (!exists) {
                   setState(() {
@@ -12663,6 +12664,26 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     ngmyNotifyBalanceChanged();
                   }
                   unawaited(_persistLocalOnly());
+                  } else {
+                    // A caller mutated an already-known transaction in place
+                    // (e.g. Civic Registry claim delete/resolve sets
+                    // t.status = rejected directly) and re-fired this
+                    // callback expecting the change to sync. Nothing above
+                    // runs for the exists==true case, so without this the
+                    // status flip never gets marked dirty or pushed to
+                    // Supabase — the claim disappears for whoever mutated
+                    // it locally but stays visible to everyone else. `t`
+                    // here may not be the same object reference as the one
+                    // already in _allTransactions (civic screens can read
+                    // through a separately-fetched community list), so copy
+                    // the status across before syncing.
+                    if (!identical(_allTransactions[existingIdx], t)) {
+                      _allTransactions[existingIdx].status = t.status;
+                    }
+                    unawaited(_pushTransactionToCloudReliable(t));
+                    unawaited(_pushTransactionToCloudFast(t));
+                    _markTransactionDirty(t.id);
+                    if (mounted) setState(() {});
                   }
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
                     ngmyDeliverTransactionAlerts(t);
@@ -31332,7 +31353,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   /// own state and must stay state-gated like an ordinary member; see
   /// `_canCurrentUserSeeHelpMode` below, which used to let *any* registrar
   /// bypass the state check and see another state's active help mode.
-  bool _isGlobalCivicRegistryAdmin() => widget.user.isCivicRegistryKing || widget.user.isCivicRegistryAdmin;
+  ///
+  /// Must include the full app `isAdmin` flag, not just
+  /// `isCivicRegistryAdmin`/`isCivicRegistryKing` — an app-wide Admin whose
+  /// own `user.state` happened not to match the state they were trying to
+  /// manage (e.g. Alabama) was otherwise blocked by the own-state check
+  /// below and their Deactivate press silently did nothing.
+  bool _isGlobalCivicRegistryAdmin() =>
+      widget.user.isAdmin || widget.user.isCivicRegistryKing || widget.user.isCivicRegistryAdmin;
 
   bool _canCurrentUserSeeHelpMode() {
     if (!widget.config.helpActiveFor(_helpModeState())) return false;
@@ -31796,6 +31824,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _showHelpModeDialog() async {
+    // Belt-and-suspenders: the only button that opens this is already
+    // hidden from plain registrars, but guard the entry point directly too
+    // so a King/Admin-only capability never depends solely on a widget
+    // being absent from the tree.
+    if (!_isGlobalCivicRegistryAdmin()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the state King or an Admin can manage help mode.')),
+      );
+      return;
+    }
     final savedDraft = await NgmyCivicHelpModeStorage.loadDraft(
       email: widget.user.email,
       state: _selectedState,
@@ -32538,7 +32576,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
             void deleteClaim(AppTransaction t) {
               setState(() => t.status = TransactionStatus.rejected);
-              widget.onDataChanged();
+              // onAddTransaction (not onDataChanged) is what actually marks
+              // this transaction dirty and pushes the new status to
+              // Supabase — onDataChanged alone never touched the cloud row,
+              // so the claim only ever disappeared for the registrar who
+              // clicked delete and stayed visible to everyone else.
+              widget.onAddTransaction(t);
               setDialogState(() {});
             }
 
@@ -33517,7 +33560,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     setState(() {
                       c.status = TransactionStatus.rejected;
                     });
-                    widget.onDataChanged();
+                    // onAddTransaction marks this dirty and pushes the
+                    // rejected status to Supabase; onDataChanged alone does
+                    // not, which is why removed claims kept reappearing for
+                    // other users/devices.
+                    widget.onAddTransaction(c);
                     Navigator.pop(ctx);
                   },
                   child: const Text('Remove'),
@@ -35184,61 +35231,69 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ],
                 ),
                 if (_canManageCivicRegistry()) ...[
-                  const SizedBox(height: 5),
-                  SelectionContainer.disabled(
-                    child: GestureDetector(
-                      onTap: _showHelpModeDialog,
-                      child: Container(
-                        height: 26,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: widget.config.helpActiveFor(_selectedState) ? Colors.red : Colors.green,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          widget.config.helpActiveFor(_selectedState) ? 'Deactivate Help Mode' : 'Activate Help Mode',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9),
+                  // Activate/Deactivate + spending controls are King/Admin
+                  // only — a plain Authorized Registrar (not crowned King,
+                  // not Admin) must never get management controls here,
+                  // even for their own state's campaign. They fall through
+                  // to the ordinary read-only "HELP MODE ACTIVE" payment
+                  // card everyone else sees.
+                  if (_isGlobalCivicRegistryAdmin()) ...[
+                    const SizedBox(height: 5),
+                    SelectionContainer.disabled(
+                      child: GestureDetector(
+                        onTap: _showHelpModeDialog,
+                        child: Container(
+                          height: 26,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: widget.config.helpActiveFor(_selectedState) ? Colors.red : Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            widget.config.helpActiveFor(_selectedState) ? 'Deactivate Help Mode' : 'Activate Help Mode',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (widget.config.helpActiveFor(_selectedState)) ...[
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _recordHelpCampaignSpending(
-                              campaignId: _activeHelpCampaignId(_selectedState),
-                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
-                            ),
-                            icon: const Icon(Icons.folder_open_rounded, size: 14),
-                            label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF2563EB),
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showHelpCampaignSpendingLedger(
-                              campaignId: _activeHelpCampaignId(_selectedState),
-                              campaignTitle: widget.config.helpPurposeFor(_selectedState),
-                            ),
-                            icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                            label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF059669),
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              visualDensity: VisualDensity.compact,
+                    if (widget.config.helpActiveFor(_selectedState)) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _recordHelpCampaignSpending(
+                                campaignId: _activeHelpCampaignId(_selectedState),
+                                campaignTitle: widget.config.helpPurposeFor(_selectedState),
+                              ),
+                              icon: const Icon(Icons.folder_open_rounded, size: 14),
+                              label: const Text('Record Spending', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF2563EB),
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                visualDensity: VisualDensity.compact,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showHelpCampaignSpendingLedger(
+                                campaignId: _activeHelpCampaignId(_selectedState),
+                                campaignTitle: widget.config.helpPurposeFor(_selectedState),
+                              ),
+                              icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                              label: const Text('Spending Ledger', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF059669),
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ] else if (slotsLeft > 0 && slotsLeft < kNgmyMaxRegistrarsPerState) ...[
                   const SizedBox(height: 3),
