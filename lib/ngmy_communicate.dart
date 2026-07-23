@@ -3456,20 +3456,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
 
       Future<String?> generatePartnerPhotoB64() async {
-        Uint8List? portrait;
         try {
-          portrait = await ngmyAdvisorLoadPhotorealPortraitBytes(
-                id: widget.profile.id,
-                gender: widget.profile.gender,
-                role: widget.profile.role,
-                name: widget.profile.name,
-              ) ??
-              await ngmyAdvisorPortraitBytesAsync(
-                id: widget.profile.id,
-                gender: widget.profile.gender,
-                role: widget.profile.role,
-                name: widget.profile.name,
-              );
           final look = ngmyAdvisorVisualLookDescription(
             name: widget.profile.name,
             gender: widget.profile.gender,
@@ -3488,40 +3475,49 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             gender: widget.profile.gender,
             memory: mem,
           );
-          final mime = portrait.length >= 3 && portrait[0] == 0xFF && portrait[1] == 0xD8
-              ? 'image/jpeg'
-              : 'image/png';
           final wantsSelfieOnly = ngmyChatImageRequestWantsSelfie(scene);
-          // Hard ceiling so "is typing" cannot spin forever on slow image APIs.
+          // Never feed the profile headshot into variety requests — that is why
+          // "standing" / "body" kept returning the same portrait.
+          Uint8List? lookalike;
+          var lookalikeMime = 'image/jpeg';
+          if (wantsSelfieOnly) {
+            lookalike = await ngmyAdvisorLoadPhotorealPortraitBytes(
+                  id: widget.profile.id,
+                  gender: widget.profile.gender,
+                  role: widget.profile.role,
+                  name: widget.profile.name,
+                ) ??
+                await ngmyAdvisorPortraitBytesAsync(
+                  id: widget.profile.id,
+                  gender: widget.profile.gender,
+                  role: widget.profile.role,
+                  name: widget.profile.name,
+                );
+            if (lookalike.length >= 3 && lookalike[0] == 0xFF && lookalike[1] == 0xD8) {
+              lookalikeMime = 'image/jpeg';
+            } else {
+              lookalikeMime = 'image/png';
+            }
+          }
           final imgResult = await ngmyGenerateRomanticChatImage(
             primary,
             creds: creds,
-            lookalikePortraitBytes: portrait,
-            lookalikeMime: mime,
+            lookalikePortraitBytes: lookalike,
+            lookalikeMime: lookalikeMime,
             preferSceneVariety: !wantsSelfieOnly,
-            budget: const Duration(seconds: 22),
+            budget: const Duration(seconds: 40),
           ).timeout(
-            const Duration(seconds: 26),
+            const Duration(seconds: 45),
             onTimeout: () => (bytes: null, error: 'Photo timed out.'),
           );
           if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
             return base64Encode(imgResult.bytes!);
           }
-          // Instant fallback: still deliver a real photo of this advisor.
-          if (portrait.isNotEmpty) return base64Encode(portrait);
+          // Do NOT fall back to the profile portrait for standing/body/etc —
+          // that looked like "same picture every time." Caller shows retry text.
           return null;
         } catch (e) {
           debugPrint('[communicate] partner photo: $e');
-          if (portrait != null && portrait.isNotEmpty) return base64Encode(portrait);
-          try {
-            final fallback = await ngmyAdvisorLoadPhotorealPortraitBytes(
-              id: widget.profile.id,
-              gender: widget.profile.gender,
-              role: widget.profile.role,
-              name: widget.profile.name,
-            );
-            if (fallback != null && fallback.isNotEmpty) return base64Encode(fallback);
-          } catch (_) {}
           return null;
         }
       }
@@ -3606,8 +3602,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': photo}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: photo);
         } else {
-          // Should be rare — still avoid empty/heart-only replies when they asked for a pic.
-          const failReply = 'One sec baby — photo glitched, ask me again 💕';
+          const failReply =
+              'Mmm baby the photo didn\'t go through — ask me again and tell me exactly what you want (standing, full body, outfit…) 💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': failReply}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: failReply);

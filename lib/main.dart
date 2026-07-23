@@ -31683,33 +31683,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       debugPrint('[help mode] campaign $normalizedCampaignId already closed — skipping duplicate missed marking');
       return;
     }
-    // _civicTransactionsForDisplay(), not widget.allTransactions alone —
-    // a contribution recorded on another registrar's device/session only
-    // shows up locally through the separately-fetched community list
-    // until this device's own transactions catch up, and missing it here
-    // would wrongly mark someone missed who actually did contribute.
-    //
-    // Prefer the campaignStartedAt time window over matching the stored
-    // campaignId string: the ID-scan deposit flow records contributions
-    // without ever stamping a campaignId, and a campaign that went
-    // through an activate/deactivate cycle (Alabama, repeatedly, while
-    // the deactivate-resurrects-itself bug was live) could end up with a
-    // stale or empty campaignId that no longer matches what contributions
-    // were actually tagged with — silently zeroing out the contributor
-    // set and marking everyone missed even though they'd contributed. A
-    // contribution timestamped anywhere in [campaignStartedAt, now] counts
-    // regardless of its campaignId; a state can only have one active
-    // campaign at a time, so there's no ambiguity about which campaign a
-    // contribution in that window belongs to.
-    final contributors = _civicTransactionsForDisplay()
-        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-        .where((t) {
-          if (campaignStartedAt != null) return !t.timestamp.isBefore(campaignStartedAt);
-          final meta = _decodeContributionMeta(t);
-          return (meta['campaignId'] ?? '').toString() == normalizedCampaignId;
-        })
-        .map((t) => t.userEmail.toLowerCase().trim())
-        .toSet();
+    // Contributors for THIS campaign must never be marked missed.
+    // Match by campaignId first (Money dialog stamps it), then by time
+    // window / fallback purpose key for older ID-scan rows. Identity is
+    // email OR registryId — email-only matching wrongly missed people
+    // after guest→app rekey or empty-email enrollments.
+    final contributorKeys = <String>{};
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final meta = _decodeContributionMeta(t);
+      final cid = (meta['campaignId'] ?? '').toString().trim();
+      final receiptState = _contributionReceiptState(t, meta);
+      final fallbackId =
+          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState';
+      final matchesCampaignId =
+          normalizedCampaignId.isNotEmpty && (cid == normalizedCampaignId || fallbackId == normalizedCampaignId);
+      final matchesTimeWindow =
+          campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt);
+      // campaignId is primary proof. Time window is only a backup when the
+      // contribution has no campaignId (legacy ID-scan). Never ignore a
+      // stamped campaignId just because the timestamp is slightly off.
+      final isForThisCampaign = matchesCampaignId || (cid.isEmpty && matchesTimeWindow);
+      if (!isForThisCampaign) continue;
+      final emailKey = t.userEmail.toLowerCase().trim();
+      if (emailKey.isNotEmpty) contributorKeys.add(emailKey);
+      final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rid.isNotEmpty) contributorKeys.add('rid:$rid');
+    }
     // A member can end up listed more than once for one campaign check
     // (e.g. duplicate records from cloud merges) — track who's already
     // been marked so a single close-out never counts one person as
@@ -31727,12 +31727,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // without one get pruned on enrollment) so nobody with a real
       // registry record gets skipped.
       final emailKey = m.email.toLowerCase().trim();
-      final key = emailKey.isNotEmpty ? emailKey : 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
+      final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
+      final key = emailKey.isNotEmpty ? emailKey : ridKey;
       if (key == 'rid:' || !alreadyMarked.add(key)) continue;
-      if (!contributors.contains(emailKey)) {
-        m.missed += 1;
-        unawaited(_persistCivicMemberActivity(m));
-      }
+      final contributed = (emailKey.isNotEmpty && contributorKeys.contains(emailKey)) ||
+          (ridKey != 'rid:' && contributorKeys.contains(ridKey));
+      if (contributed) continue; // put money / recorded contribution → never missed
+      m.missed += 1;
+      unawaited(_persistCivicMemberActivity(m));
     }
   }
 
