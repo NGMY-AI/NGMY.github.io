@@ -118,12 +118,17 @@ class NgmyVaultBlobStore {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readonly');
       final result = await tx.objectStore(_storeName).getObject(id);
+      final type = mime.trim().isEmpty ? 'video/mp4' : mime.trim();
       if (result is html.Blob) {
-        return html.Url.createObjectUrlFromBlob(result);
+        // IndexedDB may return a Blob with an empty/wrong type — browsers then
+        // refuse to decode. Re-wrap with the stored MIME when needed.
+        final blob = (result.type.trim().isEmpty || !result.type.startsWith('video/'))
+            ? html.Blob([result], type)
+            : result;
+        return html.Url.createObjectUrlFromBlob(blob);
       }
       final bytes = await _asBytesAsync(result);
       if (bytes == null || bytes.isEmpty) return null;
-      final type = mime.trim().isEmpty ? 'video/mp4' : mime.trim();
       return html.Url.createObjectUrlFromBlob(html.Blob([bytes], type));
     } catch (_) {
       return null;

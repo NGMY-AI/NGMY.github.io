@@ -979,58 +979,70 @@ class _VaultViewerScreenState extends State<_VaultViewerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          GestureDetector(
-            onTap: () {
-              // Don't steal taps from the HTML video controls — only toggle
-              // chrome when the current page is a photo (or via long-press).
-              final item = _items.isEmpty ? null : _items[_index];
-              if (item?.kind == NgmyVaultKind.video) return;
-              _toggleActions();
+          PageView.builder(
+            controller: _pageCtrl,
+            itemCount: _items.length,
+            onPageChanged: (i) => setState(() {
+              _index = i;
+              if (_items[i].kind == NgmyVaultKind.video) {
+                _actionsVisible = true;
+              }
+            }),
+            itemBuilder: (context, i) {
+              final item = _items[i];
+              final page = _page(item);
+              // Photos: tap toggles chrome. Videos: never wrap in a parent
+              // GestureDetector — it steals the play-button tap arena on web.
+              if (item.kind == NgmyVaultKind.video) return page;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _toggleActions,
+                onLongPress: _toggleActions,
+                child: page,
+              );
             },
-            onLongPress: _toggleActions,
-            child: PageView.builder(
-              controller: _pageCtrl,
-              itemCount: _items.length,
-              onPageChanged: (i) => setState(() {
-                _index = i;
-                if (_items[i].kind == NgmyVaultKind.video) {
-                  _actionsVisible = true;
-                }
-              }),
-              itemBuilder: (context, i) => _page(_items[i]),
-            ),
           ),
-          AnimatedOpacity(
-            opacity: _actionsVisible ? 1 : 0,
-            duration: const Duration(milliseconds: 180),
-            child: IgnorePointer(
-              ignoring: !_actionsVisible,
+          // Top/bottom chrome only — never a full-screen sheet that steals
+          // play-button taps from the video in the center.
+          if (_actionsVisible) ...[
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
               child: SafeArea(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        children: [_roundBtn(Icons.close_rounded, () => Navigator.of(context).pop())],
-                      ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _actionBtn(Icons.download_rounded, 'Download', _download),
-                          const SizedBox(width: 24),
-                          _actionBtn(Icons.delete_outline_rounded, 'Delete', _delete, color: const Color(0xFFEF4444)),
-                        ],
-                      ),
-                    ),
-                  ],
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _roundBtn(Icons.close_rounded, () => Navigator.of(context).pop()),
+                  ),
                 ),
               ),
             ),
-          ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  // Sit above the video transport bar.
+                  padding: EdgeInsets.only(
+                    bottom: (_items.isNotEmpty && _items[_index].kind == NgmyVaultKind.video) ? 96 : 20,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _actionBtn(Icons.download_rounded, 'Download', _download),
+                      const SizedBox(width: 24),
+                      _actionBtn(Icons.delete_outline_rounded, 'Delete', _delete, color: const Color(0xFFEF4444)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
