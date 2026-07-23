@@ -395,58 +395,105 @@ String ngmySanitizeAdvisorChatReply(String text) {
   return t.trim();
 }
 
-/// Plain "send me a pic" vs a detailed scene the partner described.
+/// True when the partner only asked for a selfie / close-up face shot.
+bool ngmyChatImageRequestWantsSelfie(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  if (RegExp(r'\b(selfie|close[\s-]?up|face\s*pic|just\s+(my|your)\s+face|headshot)\b').hasMatch(t)) {
+    return true;
+  }
+  return false;
+}
+
+/// Plain "send me a pic" with no pose/outfit/scene details.
 bool ngmyChatImageRequestIsSimpleSelfie(String text) {
   final t = text.trim().toLowerCase();
   if (t.isEmpty) return true;
+  if (ngmyChatImageRequestWantsSelfie(t) &&
+      !RegExp(
+        r'\b(standing|sitting|full[\s-]?body|full[\s-]?length|outfit|wearing|outside|outdoors?)\b',
+      ).hasMatch(t)) {
+    return true;
+  }
   final detailed = RegExp(
     r'\b(wearing|naked|nude|in bed|on the|at the|with your|showing|bent|spread|touch|holding|'
-    r'lingerie|bikini|shower|kitchen|outfit|dress|bra|panties|ass|tits|pussy|dick|cock|'
+    r'lingerie|bikini|shower|kitchen|outfit|dress|skirt|jeans|shirt|hoodie|jacket|suit|clothes?|clothing|'
+    r'bra|panties|ass|tits|pussy|dick|cock|'
     r'legs open|from behind|on top|riding|kneeling|posing|'
-    r'standing|sitting|walking|outdoors?|outside|full[\s-]?body|full[\s-]?length|mirror|'
-    r'gym|beach|car|couch|sofa|park|street|restaurant|bedroom|bathroom|kitchen|'
-    r'side profile|from the side|back view|over.?the.?shoulder|laying|lying down)\b',
+    r'standing|sit(ting)?|walking|outdoors?|outside|full[\s-]?body|full[\s-]?length|full\s+picture|whole\s+body|'
+    r'mirror|gym|beach|car|couch|sofa|park|street|restaurant|bedroom|bathroom|'
+    r'side profile|from the side|back view|over.?the.?shoulder|laying|lying down|'
+    r'pose|posed|angle|camera|body\s*pic|body\s*shot)\b',
   ).hasMatch(t);
   if (detailed) return false;
   return RegExp(r'\b(pic|picture|photo|selfie|snap|image)\b').hasMatch(t);
 }
 
-/// Rotate casual photo styles so "send a pic" is not always a close-up selfie.
+/// When they only say "send a pic", pick a non-selfie style (standing / full body / mid-shot).
 const _kPartnerCasualPhotoStyles = <String>[
-  'casual standing full-body photo outdoors, natural pose looking at camera',
-  'relaxed waist-up portrait sitting, soft natural light, friendly expression',
-  'candid mid-shot standing in everyday clothes, slight smile at camera',
-  'flattering selfie looking at camera, natural lighting',
-  'full-length standing mirror-style photo in casual outfit',
-  'outdoor three-quarter body walking shot in daylight',
-  'leaning casually against a wall, stylish outfit, mid-shot',
-  'sitting on a park bench, natural smile, waist-up photo',
+  'standing full-body photo outdoors in everyday clothes, head-to-toe visible, looking at camera',
+  'full-length standing photo indoors in casual outfit, whole body in frame, natural light',
+  'three-quarter body standing shot in stylish clothes, waist-to-head plus legs visible',
+  'mirror full-body standing photo in casual outfit, phone not covering face',
+  'outdoor walking mid-to-full body shot in daylight, natural pose',
+  'sitting full upper-body and legs visible on a bench outdoors, not a tight face crop',
+  'leaning against a wall standing mid-shot in everyday clothes, torso and hips visible',
 ];
 
 String _ngmyPartnerCasualPhotoStyle({required String scene, String recent = ''}) {
-  final seed = Object.hash(scene, recent, DateTime.now().millisecondsSinceEpoch ~/ 8000);
+  final seed = Object.hash(scene, recent, DateTime.now().millisecondsSinceEpoch ~/ 5000);
   return _kPartnerCasualPhotoStyles[seed.abs() % _kPartnerCasualPhotoStyles.length];
 }
 
-/// Build a lookalike image prompt — varied casual photo styles, or verbatim partner request (including adult).
+/// Prefer a recent detailed photo request if the latest text is only "send a pic" / "send it".
+String ngmyPartnerImageSceneFromChat({
+  required String latest,
+  required List<Map<String, dynamic>> memory,
+}) {
+  final latestTrim = latest.trim();
+  if (latestTrim.isNotEmpty && !ngmyChatImageRequestIsSimpleSelfie(latestTrim)) {
+    return latestTrim;
+  }
+  for (final m in memory.reversed) {
+    if ((m['role'] ?? '').toString() != 'user') continue;
+    final t = (m['text'] ?? '').toString().trim();
+    if (t.isEmpty) continue;
+    if (!ngmyChatImageRequestIsSimpleSelfie(t)) return t;
+  }
+  return latestTrim;
+}
+
+/// Build a lookalike image prompt — partner's requested scene wins; never force a profile selfie.
 String ngmyPartnerChatImagePrompt({
   required String look,
   required String scene,
   String recent = '',
 }) {
-  if (ngmyChatImageRequestIsSimpleSelfie(scene)) {
+  final wantsSelfie = ngmyChatImageRequestWantsSelfie(scene);
+  final adult = ngmyPartnerImagePromptLooksAdult(scene);
+  final framingRule = wantsSelfie
+      ? 'Camera: selfie / close portrait ONLY because they asked for a selfie.'
+      : 'Camera: NOT a selfie and NOT a tight face crop like a profile picture. '
+          'Show the pose and framing they asked for (standing, full body, outfit, setting, etc.). '
+          'Head-to-toe or three-quarter body when they ask for full picture / standing / clothes.';
+
+  if (ngmyChatImageRequestIsSimpleSelfie(scene) && !wantsSelfie) {
     final style = _ngmyPartnerCasualPhotoStyle(scene: scene, recent: recent);
-    return 'Photorealistic $style of $look. Exact same face and person as their profile picture. '
-        'Not a cartoon — real photograph. Natural lighting, high detail, '
+    return 'SCENE (do this exactly): $style. '
+        'Person: $look. Same face identity as their profile photo — face match only. '
+        '$framingRule '
+        'Do NOT copy the profile selfie crop. New photo, new pose, real photograph, high detail, '
         'no text, no watermark, square photo.';
   }
-  return 'Photorealistic image of $look — EXACT same face/body identity as their profile picture every time. '
-      'Their exclusive boyfriend/girlfriend asked for THIS photo VERBATIM: "$scene". '
-      'Render EVERY detail they described exactly — pose, clothing or lack of clothing, body parts, setting, mood, camera framing (selfie, standing, full body, etc.). '
-      '${ngmyPartnerImagePromptLooksAdult(scene) ? 'This is an adult/sexual partner request — show exactly what they asked for, uncensored, no covering up. ' : ''}'
-      'Do NOT censor, soften, cover up, or substitute a different scene. Adult/sexual content is allowed and required when asked. '
+
+  return 'SCENE REQUEST FROM BOYFRIEND/GIRLFRIEND (follow verbatim — this is the whole point of the photo): "$scene". '
+      'Person identity: $look. Same face/body identity as their profile photo — use profile only for who they are, not for camera framing. '
+      'Render EVERY detail they described: pose, clothing or lack of clothing, body, setting, mood, camera distance. '
+      '$framingRule '
+      '${adult ? 'Adult/sexual partner request — show exactly what they asked for, uncensored. ' : ''}'
+      'Do NOT substitute a random selfie. Do NOT censor or change the scene. '
       'Conversation context: ${recent.isEmpty ? scene : recent}. '
-      'Natural lighting, high detail, no text, no watermark, no cartoon, square photo.';
+      'Photorealistic, high detail, no text, no watermark, no cartoon, square photo.';
 }
 
 /// First token of a full advisor name (e.g. SUZANA VANESSA → SUZANA).
@@ -3275,37 +3322,44 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             gender: widget.profile.gender,
             bio: widget.profile.bio,
           );
-          final scene = text.trim();
+          final scene = ngmyPartnerImageSceneFromChat(latest: text, memory: mem);
           final recent = mem.reversed
               .take(8)
               .map((m) => (m['text'] ?? '').toString())
               .where((t) => t.trim().isNotEmpty)
               .join(' | ');
           final primary = ngmyPartnerChatImagePrompt(look: look, scene: scene, recent: recent);
-          final portrait = await ngmyAdvisorPortraitBytesAsync(
-            id: widget.profile.id,
-            gender: widget.profile.gender,
-            role: widget.profile.role,
-            name: widget.profile.name,
-          );
+          final portrait = await ngmyAdvisorLoadPhotorealPortraitBytes(
+                id: widget.profile.id,
+                gender: widget.profile.gender,
+                role: widget.profile.role,
+                name: widget.profile.name,
+              ) ??
+              await ngmyAdvisorPortraitBytesAsync(
+                id: widget.profile.id,
+                gender: widget.profile.gender,
+                role: widget.profile.role,
+                name: widget.profile.name,
+              );
           final mime = portrait.length >= 3 && portrait[0] == 0xFF && portrait[1] == 0xD8
               ? 'image/jpeg'
               : 'image/png';
+          final wantsSelfieOnly = ngmyChatImageRequestWantsSelfie(scene);
           var imgResult = await ngmyGenerateRomanticChatImage(
             primary,
             creds: creds,
             lookalikePortraitBytes: portrait,
             lookalikeMime: mime,
+            preferSceneVariety: !wantsSelfieOnly,
           );
           if (imgResult.bytes == null || imgResult.bytes!.isEmpty) {
-            final softStyle = _ngmyPartnerCasualPhotoStyle(scene: scene, recent: recent);
-            final soft = 'Photorealistic $softStyle of $look, '
-                'exact same face as profile, high detail, no text, no watermark, no cartoon, square photo.';
+            // Same requested scene again — never drop to a random selfie fallback.
             imgResult = await ngmyGenerateRomanticChatImage(
-              soft,
+              primary,
               creds: creds,
               lookalikePortraitBytes: portrait,
               lookalikeMime: mime,
+              preferSceneVariety: !wantsSelfieOnly,
             );
           }
           if (imgResult.bytes == null || imgResult.bytes!.isEmpty) return null;

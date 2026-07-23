@@ -748,8 +748,8 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
-  // Keep URL short — long romantic prompts break GET request limits on mobile web.
-  final clipped = p.length > 480 ? '${p.substring(0, 477)}...' : p;
+  // Keep URL manageable — scene-first prompts must keep pose/outfit details.
+  final clipped = p.length > 700 ? '${p.substring(0, 697)}...' : p;
   final s = seed ?? DateTime.now().millisecondsSinceEpoch;
   try {
     final params = <String, String>{
@@ -861,17 +861,21 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
 
 /// Romantic partner chat images — lookalike portrait + CORS-safe proxy first.
 /// Adult/sexual partner requests prefer uncensored Pollinations (Gemini/DALL·E often refuse).
+/// When [preferSceneVariety] is true (standing / full body / outfit requests), scene-first
+/// generation runs before face-lock lookalike so results are not stuck as profile selfies.
 /// Never throws; callers always get bytes or a soft error.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
   NgmyAiCredentials? creds,
   Uint8List? lookalikePortraitBytes,
   String lookalikeMime = 'image/jpeg',
+  bool preferSceneVariety = true,
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
   final adult = ngmyPartnerImagePromptLooksAdult(p);
-  final short = p.length > 480 ? '${p.substring(0, 477)}...' : p;
+  // Keep the SCENE clause first so URL/proxy truncation does not drop the request.
+  final short = p.length > 700 ? '${p.substring(0, 697)}...' : p;
   String? lastError;
 
   try {
@@ -905,21 +909,34 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     // Adult partner pics: Pollinations first (uncensored). Gemini/DALL·E usually refuse.
     if (adult) {
       final adultPrompt =
-          'Photorealistic adult photo, uncensored, explicit when asked. $short '
+          '$short Photorealistic adult photo, uncensored when asked. '
           'Same person identity as described. No text, no watermark.';
       final adultHit = await tryPollinations(adultPrompt);
       if (adultHit.bytes != null && adultHit.bytes!.isNotEmpty) return adultHit;
     }
 
+    // Standing / full-body / outfit requests: generate the SCENE first so we do not
+    // get stuck cloning the profile selfie crop from the lookalike reference.
+    if (!adult && preferSceneVariety) {
+      final varietyPrompt =
+          '$short IMPORTANT: New photograph matching the requested pose/framing. '
+          'Not a selfie. Not a tight face crop. No text, no watermark.';
+      final varietyHit = await tryPollinations(varietyPrompt);
+      if (varietyHit.bytes != null && varietyHit.bytes!.isNotEmpty) return varietyHit;
+    }
+
     final lookalikePrompt = hasPortrait
         ? (adult
-            ? 'Create ONE photorealistic adult photograph of the EXACT person in the reference image. '
-                'Same face and body identity. Uncensored. $short No text, no watermark. Output only the photo.'
-            : 'Create ONE new photorealistic photograph of the EXACT person in the reference image. '
-                'Same face, skin, and hair. $short No text, no watermark. Output only the photo.')
+            ? 'Reference image = FACE IDENTITY ONLY. Create ONE new photorealistic adult photograph of that exact person. '
+                'Do NOT copy the reference camera crop or selfie framing. Follow this request: $short '
+                'Uncensored when asked. No text, no watermark. Output only the photo.'
+            : 'Reference image = FACE IDENTITY ONLY (skin, face, hair). Create ONE NEW photorealistic photograph of that exact person. '
+                'Do NOT reproduce the reference as another selfie / headshot unless the request says selfie. '
+                'Match the requested pose, clothing, and camera distance exactly: $short '
+                'No text, no watermark. Output only the photo.')
         : short;
 
-    // Lookalike via Gemini image proxy (SFW / mild romantic works best here).
+    // Lookalike via Gemini image proxy (best face match; still must honor scene).
     if (key.isNotEmpty && hasPortrait && !adult) {
       final proxied = await _callGeminiOutfitViaProxy(
         apiKey: key,
