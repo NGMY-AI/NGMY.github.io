@@ -571,7 +571,7 @@ class NgmyCommunicateRelationshipStore {
       r'i want you to be (my|mine)|let.?s be exclusive)\b',
     ).hasMatch(all);
     final softDating = RegExp(
-      r'\b(my love|babe|baby|papi|i love you|love you|suck your|your dick|my pussy|fuck me|'
+      r'\b(my love|babe|baby|papi|i love you|love you|miss you|handsome|suck your|your dick|my pussy|fuck me|'
       r'make me cum|i.?m your girl|i.?m your man)\b',
     ).hasMatch(all);
     final userCount = memory.where((m) => (m['role'] ?? '').toString() == 'user').length;
@@ -592,7 +592,8 @@ class NgmyCommunicateRelationshipStore {
       return;
     }
 
-    if (official || (softDating && userCount >= 2)) {
+    // Soft partner energy (babe/baby/my love) + at least one real user message = exclusive.
+    if (official || (softDating && userCount >= 1)) {
       await setPartner(profileId, email: email, status: 'exclusive');
     }
   }

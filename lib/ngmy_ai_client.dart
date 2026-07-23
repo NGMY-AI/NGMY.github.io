@@ -758,15 +758,20 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt)
   }
 }
 
-/// Romantic chat images — uses your configured AI API only.
+/// Romantic chat images — configured AI API first, then free image fallback.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
   NgmyAiCredentials? creds,
 }) async {
-  if (creds == null || creds.apiKey.trim().isEmpty) {
-    return (bytes: null, error: 'No AI API key configured in the app.');
+  if (creds != null && creds.apiKey.trim().isNotEmpty) {
+    final primary = await ngmyAiGenerateImage(creds, prompt);
+    if (primary.bytes != null && primary.bytes!.isNotEmpty) return primary;
+    // Partner selfies must not die on API content filters — try free fallback.
+    final fallback = await ngmyPollinationsImage(prompt);
+    if (fallback.bytes != null && fallback.bytes!.isNotEmpty) return fallback;
+    return (bytes: null, error: primary.error ?? fallback.error ?? 'Image generation failed.');
   }
-  return ngmyAiGenerateImage(creds, prompt);
+  return ngmyPollinationsImage(prompt);
 }
 
 /// Admin image generation — any prompt, no content filter (companion avatars, etc.).
