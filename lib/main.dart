@@ -30171,10 +30171,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (widget.config.helpActiveFor(state) && startedAtRaw.isEmpty) {
       // Backfill only the missing timestamp — setHelpCampaign(startNewCampaignId:
       // false) would just preserve this same empty value, not stamp "now".
+      // Keys in helpModeByState are always lowercased (_stateKey); writing
+      // with the display casing creates an orphan entry the read side never
+      // finds, so the campaign looks stuck / never expires.
+      final key = state.trim().toLowerCase();
       final next = Map<String, dynamic>.from(widget.config.helpModeByState);
-      final campaign = Map<String, dynamic>.from(next[state] as Map? ?? const {});
+      final campaign = Map<String, dynamic>.from(next[key] as Map? ?? const {});
       campaign['campaignStartedAt'] = now.toUtc().toIso8601String();
-      next[state] = campaign;
+      next[key] = campaign;
       widget.config.helpModeByState = next;
       changed = true;
     }
@@ -31600,9 +31604,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!widget.config.helpActiveFor(state)) return false;
     final scopeType = widget.config.helpScopeTypeFor(state);
     final scopeValue = widget.config.helpScopeValueFor(state).trim();
-    if (scopeType == 'city') return scopeValue.isNotEmpty && (u.city ?? '') == scopeValue;
-    if (scopeType == 'room') return scopeValue.isNotEmpty && (u.room ?? '') == scopeValue;
-    return true;
+    if (scopeType != 'city' && scopeType != 'room') return true;
+    if (scopeValue.isEmpty) return false;
+    // Prefer registry enrollment city/room — account UserData often leaves
+    // those empty even when the member is enrolled with a city/room.
+    final registry = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        (((u.registryId ?? '').trim().isNotEmpty)
+            ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId!)
+            : null);
+    final memberCity = ((registry?['city'] ?? u.city) ?? '').toString().trim();
+    final memberRoom = ((registry?['room'] ?? u.room) ?? '').toString().trim();
+    if (scopeType == 'city') {
+      return memberCity.toLowerCase() == scopeValue.toLowerCase();
+    }
+    return memberRoom.toLowerCase() == scopeValue.toLowerCase();
   }
 
   String _activeHelpCampaignId([String? forState]) {
@@ -31755,9 +31770,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _audienceMatchForViewer(String scopeType, String scopeValue) {
     if (_canManageCivicRegistry()) return true;
-    if (scopeType == 'city') return (widget.user.city ?? '') == scopeValue;
-    if (scopeType == 'room') return (widget.user.room ?? '') == scopeValue;
-    return true;
+    final wanted = scopeValue.trim().toLowerCase();
+    if (scopeType != 'city' && scopeType != 'room') return true;
+    if (wanted.isEmpty) return false;
+    final registry = NgmyCivicRegistryMembers.findByEmail(widget.config, widget.user.email) ??
+        (((widget.user.registryId ?? '').trim().isNotEmpty)
+            ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, widget.user.registryId!)
+            : null);
+    final memberCity = ((registry?['city'] ?? widget.user.city) ?? '').toString().trim().toLowerCase();
+    final memberRoom = ((registry?['room'] ?? widget.user.room) ?? '').toString().trim().toLowerCase();
+    if (scopeType == 'city') return memberCity == wanted;
+    return memberRoom == wanted;
   }
 
   /// A resolved (rejected/deleted) claim stays visible as history for
@@ -32302,7 +32325,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           final scopeOptions = scopeType == 'room' ? widget.config.rooms : _citiesForSelectedState();
           if (scopeType == 'all') {
             scopeValue = '';
-          } else if (scopeOptions.isNotEmpty && !scopeOptions.contains(scopeValue)) {
+          } else if (scopeOptions.isNotEmpty &&
+              !scopeOptions.any((e) => e.toLowerCase() == scopeValue.toLowerCase())) {
             scopeValue = scopeOptions.first;
           }
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -32401,11 +32425,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             initialValue: scopeType,
-                            decoration: framedInput('Who can see this help mode?'),
+                            decoration: framedInput('Who must contribute? (missed count)'),
                             items: const [
                               DropdownMenuItem(value: 'all', child: Text('Everyone in this state')),
-                              DropdownMenuItem(value: 'city', child: Text('Specific city')),
-                              DropdownMenuItem(value: 'room', child: Text('Specific room')),
+                              DropdownMenuItem(value: 'city', child: Text('Specific city only')),
+                              DropdownMenuItem(value: 'room', child: Text('Specific room only')),
                             ],
                             onChanged: (v) {
                               if (v == null) return;
@@ -32418,10 +32442,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           if (scopeType != 'all') ...[
                             const SizedBox(height: 10),
                             DropdownButtonFormField<String>(
-                              initialValue: scopeOptions.isNotEmpty ? scopeValue : null,
+                              initialValue: scopeOptions.isNotEmpty
+                                  ? (scopeOptions.any((e) => e.toLowerCase() == scopeValue.toLowerCase())
+                                      ? scopeOptions.firstWhere((e) => e.toLowerCase() == scopeValue.toLowerCase())
+                                      : scopeOptions.first)
+                                  : null,
                               decoration: framedInput(scopeType == 'city' ? 'Select City' : 'Select Room'),
                               items: scopeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                               onChanged: (v) => setDialog(() => scopeValue = v ?? ''),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Help mode is shown to this ${scopeType == 'city' ? 'city' : 'room'} only. '
+                              'Only those members are marked missed if they do not contribute. '
+                              'People in other cities/rooms can still contribute voluntarily and are never counted as missed.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.35,
+                                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ],
@@ -33904,10 +33944,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;
     }
-    if (!_memberMatchesHelpScope(u, forState: state)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This member is outside current help scope.')));
-      return;
-    }
+    final inScope = _memberMatchesHelpScope(u, forState: state);
+    void openDialog() {
     final amountC = TextEditingController();
     final noteC = TextEditingController(text: widget.config.helpPurposeFor(state).isNotEmpty ? widget.config.helpPurposeFor(state) : 'Community contribution');
     // A rapid double-tap on Save (common on mobile, especially with any UI
@@ -34073,6 +34111,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             );
       },
+    );
+    }
+
+    if (inScope) {
+      openDialog();
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Outside help scope'),
+        content: Text(
+          '${(u.fullName ?? '').trim().isNotEmpty ? u.fullName!.trim() : u.email} is not in the active city/room for this help mode.\n\n'
+          'You can still record a voluntary contribution. People outside the selected city/room are never counted as missed.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              openDialog();
+            },
+            child: const Text('Record voluntary'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -34823,7 +34888,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(color: Colors.red.shade400, borderRadius: BorderRadius.circular(10)),
                       child: Text(
-                        'HELP MODE ACTIVE in $helpModeStateName - ${widget.config.helpPurposeFor(helpModeStateName)}',
+                        'HELP MODE ACTIVE in $helpModeStateName - ${widget.config.helpPurposeFor(helpModeStateName)}'
+                        '${_helpScopeLabel().isNotEmpty ? ' · ${_helpScopeLabel()}' : ''}',
                         style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
