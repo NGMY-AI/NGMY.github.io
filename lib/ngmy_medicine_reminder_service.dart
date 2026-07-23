@@ -209,24 +209,35 @@ class _MedicineReminderOverlay extends StatefulWidget {
 
 class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
   static const _blockSeconds = 5;
+  /// Hold the "reminder complete" screen so it is readable (not a blink).
+  static const _completeHoldSeconds = 3;
   var _secondsLeft = _blockSeconds;
   var _canDismiss = false;
   var _finished = false;
   Timer? _timer;
+  Timer? _completeHoldTimer;
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
-      setState(() {
-        _secondsLeft--;
-        if (_secondsLeft <= 0) {
+      if (_secondsLeft <= 1) {
+        t.cancel();
+        setState(() {
+          _secondsLeft = 0;
           _canDismiss = true;
-          t.cancel();
-          unawaited(_finish());
-        }
-      });
+        });
+        _completeHoldTimer?.cancel();
+        _completeHoldTimer = Timer(
+          const Duration(seconds: _completeHoldSeconds),
+          () {
+            if (mounted && !_finished) unawaited(_finish());
+          },
+        );
+        return;
+      }
+      setState(() => _secondsLeft--);
     });
   }
 
@@ -234,12 +245,14 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
     if (_finished) return;
     _finished = true;
     _timer?.cancel();
+    _completeHoldTimer?.cancel();
     await widget.onDone();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _completeHoldTimer?.cancel();
     super.dispose();
   }
 

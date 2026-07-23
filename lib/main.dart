@@ -38900,11 +38900,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   List<Map<String, dynamic>> _activeShopListings() {
-    final me = widget.user.email.toLowerCase().trim();
+    // Sellers see their own items in Shop the same way buyers do.
     return _listings
         .where((l) =>
             (l['status'] ?? 'active').toString() == 'active' &&
-            (l['sellerEmail'] ?? '').toString().toLowerCase().trim() != me &&
             _matchesSearch(l) &&
             NgmyStoreListingExtras.isVisibleToBuyersToday(l))
         .toList()

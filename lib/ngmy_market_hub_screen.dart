@@ -100,7 +100,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 const SizedBox(height: 18),
                 _hudFrame(
                   t: t,
-                  title: 'Business Essentials',
+                  title: '',
                   subtitle: '',
                   thumbHeight: thumbH,
                   colors: const [Color(0xFF38BDF8), Color(0xFF1E3A8A), Color(0xFF0E7490)],
@@ -109,6 +109,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   orbit: orbit,
                   phase: 0.44,
                   badge: _essentialsCount > 0 ? '$_essentialsCount saved' : null,
+                  frameCenterLabel: 'Business Essentials',
                   preview: _EssentialsThumbPreview(isDark: t.isDark),
                   onTap: () async {
                     await showNgmyBusinessEssentialsHub(context, userEmail: widget.userEmail);
@@ -136,7 +137,9 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
     required Widget preview,
     required VoidCallback onTap,
     String? badge,
+    String? frameCenterLabel,
   }) {
+    final hasTitle = title.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,6 +172,29 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                     ),
                   ),
                 ),
+                if (frameCenterLabel != null && frameCenterLabel.trim().isNotEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: Text(
+                        frameCenterLabel,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          letterSpacing: 0.4,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   right: 14,
                   bottom: 14,
@@ -206,16 +232,18 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        Text(
-          title,
-          style: TextStyle(
-            color: t.title,
-            fontWeight: FontWeight.w900,
-            fontSize: 16,
-            letterSpacing: 0.2,
+        if (hasTitle) ...[
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: TextStyle(
+              color: t.title,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              letterSpacing: 0.2,
+            ),
           ),
-        ),
+        ],
         if (subtitle.trim().isNotEmpty) ...[
           const SizedBox(height: 3),
           Text(
@@ -319,31 +347,17 @@ class _EssentialsThumbPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _miniTile(Icons.contacts_rounded, const Color(0xFF38BDF8), isDark),
-          const SizedBox(width: 6),
-          _miniTile(Icons.map_rounded, const Color(0xFF34D399), isDark),
-          const SizedBox(width: 6),
-          _miniTile(Icons.phone_in_talk_rounded, const Color(0xFFFBBF24), isDark),
-        ],
-      ),
-    );
-  }
-
-  static Widget _miniTile(IconData icon, Color accent, bool isDark) {
-    return Container(
-      width: 52,
-      height: 52,
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.2),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF0B1220), Color(0xFF0E7490), Color(0xFF1E3A8A)]
+              : const [Color(0xFFE0F2FE), Color(0xFFBAE6FD), Color(0xFF7DD3FC)],
+        ),
       ),
-      child: Icon(icon, color: accent, size: 22),
+      child: const SizedBox.expand(),
     );
   }
 }
