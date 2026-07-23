@@ -148,7 +148,7 @@ String ngmyAdvisorPortraitAssetPath({
   return 'assets/images/advisors/${r}_$g.jpg';
 }
 
-/// Named advisors get unique faces so two girls in the same role never share a photo.
+/// Named advisors get unique faces so two people never share one photo.
 String? _personPortraitKey({required String name, required String id}) {
   final n = name.trim().toLowerCase();
   final i = id.trim().toLowerCase();
@@ -164,13 +164,20 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('mariam') || hit('miriam') || hit('maryam') || hit('dusabe')) return 'person_miriam';
   // New romantic advisor — check before generic "suzana".
   if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
-  // Elder Wisdom Advisor — older woman portrait asset.
+  // These three used to fall through to the same companion_f role photo.
+  if (hit('anna') || hit('amuri')) return 'person_anna_amuri';
+  if (hit('alisa') || hit('kenny')) return 'person_alisa_john';
+  if (hit('mbuto') || (hit('suzana') && !n.contains('vanessa'))) return 'person_suzana_mbuto';
+  // Elder Wisdom Advisor — older woman portrait asset (intentional).
   if (hit('amani') || (hit('mshauri') && n.contains('amani'))) return 'marriage_advisor_f';
   // Spelling variants used in the app / by the user.
   if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey') || hit('benet')) {
     return 'person_susie';
   }
   if (hit('mina') || (hit('samuel') && hit('mina'))) return 'person_mina';
+  // Core men — keep them off shared role fallbacks.
+  if (hit('alex') || hit('remy')) return 'person_alex_remy';
+  if (hit('jeremiah') || hit('nesto')) return 'person_jeremiah_nesto';
   return null;
 }
 
@@ -188,6 +195,8 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
     'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
+    'person_anna_amuri', 'person_alisa_john', 'person_suzana_mbuto',
+    'person_alex_remy', 'person_jeremiah_nesto',
   ];
   await Future.wait(keys.map((k) async {
     final path = 'assets/images/advisors/$k.jpg';
