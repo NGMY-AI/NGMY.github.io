@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+  <base href="/">
+
+  <script>
+    (function () {
+      function ngmyBasePath() {
+        var host = (location.hostname || '').toLowerCase();
+        if (host === 'ngmy.org' || host === 'www.ngmy.org') return '/';
+        var p = location.pathname || '/';
+        if (p.indexOf('/NGMY.github.io') === 0) return '/NGMY.github.io/';
+        if (host.indexOf('github.io') !== -1) return '/NGMY.github.io/';
+        return '/';
+      }
+      window.__NGMY_BASE_PATH__ = ngmyBasePath();
+      var b = document.querySelector('base');
+      if (b) b.setAttribute('href', window.__NGMY_BASE_PATH__);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var embedded = '20260723034902';
+      var base = window.__NGMY_BASE_PATH__ || '/';
+      var KEY = 'ngmy_deploy_id';
+      function forceRefreshForBuild(serverBuild, opts) {
+        if (!serverBuild) return;
+        // Up to date: live HTML shell matches server — never reload on SW activate alone.
+        if (serverBuild === embedded) {
+          try { localStorage.setItem(KEY, serverBuild); } catch (e) {}
+          return;
+        }
+        var onceKey = 'ngmy_force_reload_' + serverBuild;
+        if (sessionStorage.getItem(onceKey)) return;
+
+        // Mid-session callers always pass deferIfVisible=true and must ONLY queue —
+        // never reload while someone is using the app (backgrounding counts as using).
+        var defer = opts && opts.deferIfVisible;
+        if (defer) {
+          try { localStorage.setItem('ngmy_pending_deploy', serverBuild); } catch (e2) {}
+          return;
+        }
+
+        sessionStorage.setItem(onceKey, '1');
+        try { localStorage.setItem(KEY, serverBuild); } catch (e) {}
+        try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e3) {}
+        var done = function () { location.replace(location.pathname + location.search + (location.search ? '&' : '?') + '_=' + Date.now()); };
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }).then(function () {
+            if ('caches' in window) {
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; }).map(function (k) { return caches.delete(k); }));
+              });
+            }
+          }).then(done).catch(done);
+        } else {
+          done();
+        }
+      }
+      window.__ngmyForceRefreshForBuild = forceRefreshForBuild;
+      // Every caller passes silent:true (see below) — checkForUpdate never
+      // auto-reloads on its own. It only ever queues the pending build in
+      // localStorage; nothing currently reads that key to reload, so a
+      // newer build only actually takes over the next time this device
+      // does a real fresh load with no live session to disrupt (new tab,
+      // reinstall, or once a service-worker update naturally rolls in).
+      function checkForUpdate(opts) {
+        var silent = opts && opts.silent;
+        fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (v) {
+            if (!v || !v.build_number) return;
+            if (v.build_number === embedded) {
+              try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
+              return;
+            }
+            if (silent) {
+              try { localStorage.setItem('ngmy_pending_deploy', v.build_number); } catch (e2) {}
+            } else {
+              forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+            }
+          })
+          .catch(function () {});
+      }
+      // This script re-runs on every "fresh document load" — but JS has no
+      // way to tell a genuine cold open (user typed the URL, tapped the
+      // home-screen icon after fully closing it) apart from the OS quietly
+      // evicting a backgrounded tab/PWA under memory pressure and reloading
+      // the document when the user switches back, which looks identical
+      // from here. That second case happens constantly on phones — lock the
+      // screen for a bit, switch to camera to snap an ID photo mid-enrollment,
+      // take a call — and is exactly when someone is deepest into a flow
+      // (Civic Registry enrollment, Creator Toolkit, Advisors, Slides). The
+      // old non-deferred call here reloaded immediately whenever the server
+      // had shipped a newer build in the meantime (routine during active
+      // development), which is indistinguishable from "randomly refreshes
+      // and dumps me back on Home mid-task" from the user's side — because
+      // that is exactly what it was doing. So: always silent/deferred, no
+      // exceptions, no matter how this script came to run. A newer build
+      // only actually takes over next time nothing is relying on the page's
+      // in-memory state to begin with (a real fresh tab/reinstall) — never a
+      // reload injected into a session that's already live.
+      checkForUpdate({ silent: true });
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
+      });
+      window.addEventListener('pageshow', function (ev) {
+        if (ev.persisted) checkForUpdate({ silent: true });
+      });
+      // The gap this closes: if the tab/app just stays open and in the
+      // foreground the whole time (never backgrounded, never reloaded —
+      // exactly what happens during a long back-and-forth testing a fix),
+      // none of the checks above ever fire again, so a brand new deploy
+      // could go completely unnoticed no matter how many times it ships.
+      // This periodic, silent check is what actually surfaces it.
+      setInterval(function () {
+        if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
+      }, 45000);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      // Service worker registers once in startApp() — avoids double install/activate reload storms.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', function (ev) {
+          if (ev.data && ev.data.type === 'NGMY_NEW_VERSION' && ev.data.build && window.__ngmyForceRefreshForBuild) {
+            window.__ngmyForceRefreshForBuild(ev.data.build, { deferIfVisible: true });
+          }
+        });
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyExtractGuestAppSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/app\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_app");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("app/") === 0) {
+          var part = hash.substring(4).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var slug = ngmyExtractGuestAppSlug();
+      if (slug) {
+        try { sessionStorage.setItem("ngmy_guest_app_slug", slug); } catch (e) {}
+        try { document.title = "Loading app…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_app_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyExtractGuestMenuSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/menu\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        var parts = path.split("/").filter(Boolean);
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === "menu" && parts[i + 1]) {
+            return parts[i + 1].trim().toLowerCase();
+          }
+        }
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_menu");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("menu/") === 0) {
+          var part = hash.substring(5).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var menuSlug = ngmyExtractGuestMenuSlug();
+      if (menuSlug) {
+        try { sessionStorage.setItem("ngmy_guest_menu_slug", menuSlug); } catch (e) {}
+        try { document.title = "Loading menu…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_menu_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyExtractGuestBioSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/bio\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        var parts = path.split("/").filter(Boolean);
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === "bio" && parts[i + 1]) {
+            return parts[i + 1].trim().toLowerCase();
+          }
+        }
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_bio");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("bio/") === 0) {
+          var part = hash.substring(4).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var bioSlug = ngmyExtractGuestBioSlug();
+      if (bioSlug) {
+        try { sessionStorage.setItem("ngmy_guest_bio_slug", bioSlug); } catch (e) {}
+        try { document.title = "Loading bio…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_bio_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyExtractGuestLocalMenuSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/local-menu\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        var parts = path.split("/").filter(Boolean);
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === "local-menu" && parts[i + 1]) {
+            return parts[i + 1].trim().toLowerCase();
+          }
+        }
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_local_menu");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("local-menu/") === 0) {
+          var part = hash.substring(11).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var localMenuSlug = ngmyExtractGuestLocalMenuSlug();
+      if (localMenuSlug) {
+        try { sessionStorage.setItem("ngmy_guest_local_menu_slug", localMenuSlug); } catch (e) {}
+        try { document.title = "Loading local menu…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_local_menu_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyExtractGuestLocalBioSlug() {
+        var path = location.pathname || "";
+        var m = path.match(/\/local-bio\/([^/?#]+)/i);
+        if (m && m[1]) return m[1].trim().toLowerCase();
+        var parts = path.split("/").filter(Boolean);
+        for (var i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === "local-bio" && parts[i + 1]) {
+            return parts[i + 1].trim().toLowerCase();
+          }
+        }
+        try {
+          var q = new URLSearchParams(location.search).get("ngmy_local_bio");
+          if (q) return q.trim().toLowerCase();
+        } catch (e) {}
+        var hash = (location.hash || "").replace(/^#\/?/, "");
+        if (hash.indexOf("local-bio/") === 0) {
+          var part = hash.substring(9).split("/")[0];
+          if (part) return part.trim().toLowerCase();
+        }
+        return "";
+      }
+      var localBioSlug = ngmyExtractGuestLocalBioSlug();
+      if (localBioSlug) {
+        try { sessionStorage.setItem("ngmy_guest_local_bio_slug", localBioSlug); } catch (e) {}
+        try { document.title = "Loading local bio…"; } catch (e2) {}
+      } else {
+        try { sessionStorage.removeItem("ngmy_guest_local_bio_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+
+
+  <meta charset="UTF-8">
+
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <meta name="description" content="Next Generation - Make Yours">
+
+  <link rel="canonical" href="https://ngmy.org/">
+
+  <!-- Link preview: Instagram, Facebook, iMessage, WhatsApp, etc. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NGMY">
+  <meta property="og:url" content="https://ngmy.org/">
+  <meta property="og:title" content="NGMY">
+  <meta property="og:description" content="Next Generation - Make Yours">
+  <meta property="og:image" content="https://ngmy.org/og-share.png">
+  <meta property="og:image:secure_url" content="https://ngmy.org/og-share.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="NGMY logo">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NGMY">
+  <meta name="twitter:description" content="Next Generation - Make Yours">
+  <meta name="twitter:image" content="https://ngmy.org/og-share.png">
+
+  <meta itemprop="name" content="NGMY">
+  <meta itemprop="description" content="Next Generation - Make Yours">
+  <meta itemprop="image" content="https://ngmy.org/og-share.png">
+
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta name="apple-mobile-web-app-title" content="NGMY">
+
+  <script>
+    (function () {
+      function ngmyThemeIsLight() {
+        try {
+          var keys = ['flutter.theme_mode', 'theme_mode'];
+          for (var i = 0; i < keys.length; i++) {
+            var raw = localStorage.getItem(keys[i]);
+            if (!raw) continue;
+            var v = raw.replace(/^"|"$/g, '');
+            if (v === 'dark') return false;
+            if (v === 'light') return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+      function ngmyApplyLightChromeEarly() {
+        var root = document.documentElement;
+        root.classList.add('ngmy-app-light');
+        root.classList.remove('ngmy-app-dark');
+        root.style.setProperty('background-color', '#ffffff', 'important');
+        root.style.setProperty('color-scheme', 'light');
+        if (document.body) {
+          document.body.style.setProperty('background-color', '#ffffff', 'important');
+        }
+        var statusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (statusMeta) statusMeta.setAttribute('content', 'black');
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          m.setAttribute('content', '#ffffff');
+        });
+      }
+      function ngmyApplyDarkChromeEarly() {
+        var root = document.documentElement;
+        root.classList.remove('ngmy-app-light');
+        root.classList.add('ngmy-app-dark');
+        root.style.setProperty('background-color', '#121212', 'important');
+        root.style.setProperty('color-scheme', 'dark');
+        if (document.body) {
+          document.body.style.setProperty('background-color', '#121212', 'important');
+        }
+        document.querySelectorAll('flutter-view, flt-glass-pane').forEach(function (el) {
+          el.style.setProperty('background-color', '#121212', 'important');
+        });
+        var statusMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (statusMeta) statusMeta.setAttribute('content', 'black-translucent');
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+          m.setAttribute('content', '#121212');
+        });
+      }
+      if (ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
+      else ngmyApplyDarkChromeEarly();
+    })();
+  </script>
+
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>NGMY</title>
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Preload bundled fonts so iOS Safari PWA shows text offline (CanvasKit must not hit fonts.gstatic.com). -->
+  <link rel="preload" href="assets/assets/fonts/Roboto-Regular.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="preload" href="assets/assets/fonts/Roboto-Medium.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="preload" href="assets/assets/fonts/Roboto-Bold.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+  <link rel="preload" href="assets/fonts/MaterialIcons-Regular.otf" as="font" type="font/otf" crossorigin="anonymous">
+  <link rel="preload" href="assets/packages/cupertino_icons/assets/CupertinoIcons.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+
+
+
+  <style>
+
+    html, body {
+
+      margin: 0;
+
+      padding: 0;
+
+      height: 100%;
+
+      background-color: #121212;
+
+      color-scheme: dark;
+
+      overscroll-behavior-x: none;
+
+      -webkit-font-smoothing: antialiased;
+
+      -moz-osx-font-smoothing: grayscale;
+
+    }
+
+    @media (prefers-color-scheme: light) {
+
+      html.ngmy-app-light, html.ngmy-app-light body { background-color: #ffffff; }
+
+    }
+
+    flutter-view, flt-glass-pane {
+
+      background-color: #121212;
+
+      -webkit-user-select: text;
+
+      user-select: text;
+
+    }
+
+    flt-semantics, .flt-text-editing {
+
+      -webkit-user-select: text;
+
+      user-select: text;
+
+    }
+
+    @media (prefers-color-scheme: light) {
+
+      html.ngmy-app-light, html.ngmy-app-light body, html.ngmy-app-light flutter-view, html.ngmy-app-light flt-glass-pane {
+
+        background-color: #ffffff !important;
+
+      }
+
+    }
+
+    @media (prefers-color-scheme: dark) {
+
+      html, body, flutter-view, flt-glass-pane { background-color: #121212; }
+
+    }
+
+    html.ngmy-app-dark,
+    html.ngmy-app-dark body,
+    html.ngmy-app-dark flutter-view,
+    html.ngmy-app-dark flt-glass-pane {
+
+      background-color: #121212 !important;
+
+      color-scheme: dark;
+
+    }
+
+    html.ngmy-app-light,
+    html.ngmy-app-light body {
+
+      background-color: #ffffff !important;
+
+      color-scheme: light;
+
+    }
+
+    html.ngmy-app-light flutter-view,
+    html.ngmy-app-light flt-glass-pane {
+
+      background-color: #ffffff !important;
+
+    }
+
+    html.ngmy-app-light::before {
+
+      content: '';
+
+      position: fixed;
+
+      top: 0;
+
+      left: 0;
+
+      right: 0;
+
+      height: env(safe-area-inset-top, 0px);
+
+      background: #ffffff;
+
+      z-index: 2147483646;
+
+      pointer-events: none;
+
+    }
+
+    html.ngmy-app-dark::before {
+
+      content: '';
+
+      position: fixed;
+
+      top: 0;
+
+      left: 0;
+
+      right: 0;
+
+      height: env(safe-area-inset-top, 0px);
+
+      background: #121212;
+
+      z-index: 2147483646;
+
+      pointer-events: none;
+
+    }
+
+    #ngmy-splash {
+
+      display: flex;
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 9999;
+
+      align-items: center;
+
+      justify-content: center;
+
+      flex-direction: column;
+
+      gap: 12px;
+
+      background: #121212;
+
+      color: #ffffff;
+
+      font-family: system-ui, sans-serif;
+
+      font-size: 16px;
+
+      font-weight: 600;
+
+      -webkit-font-smoothing: antialiased;
+
+      text-rendering: optimizeLegibility;
+
+    }
+
+    html.ngmy-app-light #ngmy-splash {
+
+      background: #ffffff;
+
+      color: #121212;
+
+    }
+
+    html.ngmy-app-dark #ngmy-splash {
+
+      background: #121212;
+
+      color: #ffffff;
+
+    }
+
+    #ngmy-error {
+
+      display: none;
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 10000;
+
+      padding: 24px;
+
+      text-align: center;
+
+      background: #121212;
+
+      color: #fff;
+
+      font-family: system-ui, sans-serif;
+
+      align-items: center;
+
+      justify-content: center;
+
+      flex-direction: column;
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div id="ngmy-splash" aria-live="polite">
+    <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
+    <div>Loading NGMY</div>
+  </div>
+  <style>
+    @keyframes ngmy-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <div id="ngmy-error">
+
+    <p style="font-size:18px;font-weight:800">NGMY could not start</p>
+
+    <p id="ngmy-error-msg" style="opacity:0.8;max-width:320px;line-height:1.45"></p>
+
+    <button onclick="location.reload()" style="margin-top:16px;padding:12px 24px;border:none;border-radius:8px;background:#00B25A;color:#fff;font-weight:700">Reload</button>
+
+  </div>
+
+  <script>
+
+    (function () {
+
+      var KEY = "ngmy_deploy_id";
+
+      var CURRENT = "20260723034902";
+
+      function showError(msg) {
+
+        var splash = document.getElementById("ngmy-splash");
+
+        if (splash) splash.style.display = "none";
+
+        var err = document.getElementById("ngmy-error");
+
+        var msgEl = document.getElementById("ngmy-error-msg");
+
+        if (err) err.style.display = "flex";
+
+        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps — try mobile data or home internet.";
+
+      }
+
+      function hideSplash() {
+
+        var splash = document.getElementById("ngmy-splash");
+
+        if (splash) splash.style.display = "none";
+
+      }
+
+      window.__ngmyShowLoadError = showError;
+      window.__ngmyHideSplash = hideSplash;
+
+      try {
+
+        try { localStorage.setItem(KEY, CURRENT); } catch (e) {}
+
+      } catch (e) {}
+
+    })();
+
+  </script>
+
+  <script>
+    (function () {
+      function scrollTopOnce() {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        if (document.body) document.body.scrollTop = 0;
+      }
+      window.addEventListener('pageshow', scrollTopOnce);
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var deployId = '20260723034902';
+      var loadAttempts = 0;
+      var swScope = window.__NGMY_BASE_PATH__ || '/';
+      var cacheBootActive = false;
+      var activeCache = null;
+
+      var OFFLINE_CRITICAL = [
+        'flutter_bootstrap.js',
+        'main.dart.js',
+        'canvaskit/canvaskit.js',
+        'canvaskit/canvaskit.wasm',
+        'canvaskit/chromium/canvaskit.js',
+        'canvaskit/chromium/canvaskit.wasm',
+        'assets/AssetManifest.bin.json',
+        'assets/FontManifest.json',
+      ];
+
+      function showBootstrapError(hint) {
+        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login — try home internet or cellular data.';
+        window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
+      }
+
+      function pathFromUrl(src) {
+        try {
+          var u = new URL(src, location.href);
+          if (u.origin !== location.origin) return null;
+          var p = u.pathname || '';
+          var base = swScope || '/';
+          if (base !== '/' && p.indexOf(base) === 0) p = p.substring(base.length);
+          if (p.charAt(0) === '/') p = p.substring(1);
+          return p;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function openOfflineCache() {
+        if (!('caches' in window)) return Promise.resolve(null);
+        return caches.keys().then(function (keys) {
+          var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
+          if (!ngmyKeys.length) return null;
+          return caches.open(ngmyKeys[ngmyKeys.length - 1]);
+        });
+      }
+
+      function loadFromCache(cache, path) {
+        if (!cache || !path) return Promise.resolve(null);
+        return cache.match('./' + path).then(function (hit) {
+          if (hit) return hit;
+          return cache.match(path);
+        }).then(function (hit) {
+          if (hit) return hit;
+          return cache.keys().then(function (reqs) {
+            for (var i = 0; i < reqs.length; i++) {
+              if ((reqs[i].url || '').indexOf(path) !== -1) return cache.match(reqs[i]);
+            }
+            return null;
+          });
+        });
+      }
+
+      function warmOfflineCache() {
+        if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+        try {
+          var urls = OFFLINE_CRITICAL.slice();
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              var ngmyKeys = keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; });
+              if (!ngmyKeys.length) {
+                navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+                return;
+              }
+              caches.open(ngmyKeys[ngmyKeys.length - 1]).then(function (cache) {
+                return cache.keys().then(function (reqs) {
+                  reqs.forEach(function (r) {
+                    var p = (r.url || '').split('/').pop() || '';
+                    if (/main\.dart\.js.*\.part\.js/i.test(r.url || '')) urls.push(r.url.replace(location.origin + (swScope === '/' ? '' : swScope.replace(/\/$/, '')), '').replace(/^\//, ''));
+                  });
+                  navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+                });
+              });
+            });
+          } else {
+            navigator.serviceWorker.controller.postMessage({ type: 'ENSURE_CACHED', urls: urls });
+          }
+        } catch (e) {}
+      }
+
+      function installCacheHooks(cache) {
+        if (!cache || window.__ngmyCacheHooks) return;
+        window.__ngmyCacheHooks = true;
+        activeCache = cache;
+        cacheBootActive = true;
+
+        if (window.fetch && !window.__ngmyFetchHooked) {
+          window.__ngmyFetchHooked = true;
+          var origFetch = window.fetch.bind(window);
+          window.fetch = function (input, init) {
+            var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+            var path = pathFromUrl(url);
+            if (path) {
+              return loadFromCache(cache, path).then(function (hit) {
+                if (hit) return hit;
+                return origFetch(input, init).catch(function () {
+                  return loadFromCache(cache, path);
+                });
+              });
+            }
+            return origFetch(input, init);
+          };
+        }
+
+        var srcDesc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+        if (srcDesc && srcDesc.set && !window.__ngmySrcHooked) {
+          window.__ngmySrcHooked = true;
+          Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+            get: srcDesc.get,
+            set: function (val) {
+              var mapped = val;
+              if (cacheBootActive) {
+                if (val === window.__NGMY_MAIN_BLOB_PATH && window.__NGMY_MAIN_BLOB) {
+                  mapped = window.__NGMY_MAIN_BLOB;
+                } else {
+                  var path = pathFromUrl(val);
+                  if (path === 'main.dart.js' && window.__NGMY_MAIN_BLOB) mapped = window.__NGMY_MAIN_BLOB;
+                }
+              }
+              srcDesc.set.call(this, mapped);
+            },
+            configurable: true,
+          });
+        }
+      }
+
+      function offlineShellReady(cache) {
+        if (!cache) return Promise.resolve(false);
+        var required = [
+          'flutter_bootstrap.js',
+          'main.dart.js',
+          'canvaskit/canvaskit.js',
+          'canvaskit/canvaskit.wasm',
+          'canvaskit/chromium/canvaskit.js',
+          'canvaskit/chromium/canvaskit.wasm',
+        ];
+        return required.reduce(function (chain, path) {
+          return chain.then(function (ok) {
+            if (!ok) return false;
+            return loadFromCache(cache, path).then(function (hit) { return !!hit; });
+          });
+        }, Promise.resolve(true));
+      }
+
+      function waitForServiceWorkerControl(maxMs) {
+        if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+        if (navigator.serviceWorker.controller) return Promise.resolve(true);
+        return new Promise(function (resolve) {
+          var done = false;
+          var finish = function (ok) {
+            if (done) return;
+            done = true;
+            resolve(!!ok);
+          };
+          var timer = setTimeout(function () { finish(navigator.serviceWorker.controller); }, maxMs || 12000);
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            clearTimeout(timer);
+            finish(navigator.serviceWorker.controller);
+          }, { once: true });
+          if (navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(function () {
+              clearTimeout(timer);
+              finish(navigator.serviceWorker.controller);
+            }).catch(function () { finish(false); });
+          }
+        });
+      }
+
+      function registerServiceWorkerAndWait() {
+        if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+        return navigator.serviceWorker
+          .register('ngmy_service_worker.js?v=' + deployId, { scope: swScope })
+          .then(function (reg) {
+            if (navigator.serviceWorker.controller) return reg;
+            return navigator.serviceWorker.ready.then(function () { return reg; }).catch(function () { return reg; });
+          })
+          .catch(function (e) {
+            console.warn('[ngmy] sw register', e);
+            return null;
+          });
+      }
+
+      function registerServiceWorkerBackground() {
+        registerServiceWorkerAndWait();
+      }
+
+      function sanitizeBootstrap(code) {
+        if (!code) return code;
+        // Repair broken deploys that left invalid `});.catch(` JavaScript.
+        return code.replace(/\}\);\s*\.catch\(/g, '}).catch(');
+      }
+
+      function verifyBootstrapReady(deadlineMs) {
+        return new Promise(function (resolve, reject) {
+          var start = Date.now();
+          (function check() {
+            if (window._flutter && window._flutter.loader) {
+              resolve();
+              return;
+            }
+            if (Date.now() - start > deadlineMs) {
+              reject(new Error('bootstrap init timeout'));
+              return;
+            }
+            setTimeout(check, 120);
+          })();
+        });
+      }
+
+      function injectBootstrap(code) {
+        code = sanitizeBootstrap(code);
+        var s = document.createElement('script');
+        s.textContent = code;
+        s.async = false;
+        try {
+          document.head.appendChild(s);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+        warmOfflineCache();
+        return verifyBootstrapReady(12000);
+      }
+
+      function fetchBootstrapText(url) {
+        return fetch(url, { cache: 'no-cache' }).then(function (resp) {
+          if (!resp.ok) throw new Error('bootstrap fetch failed');
+          return resp.text();
+        });
+      }
+
+      function fallbackToOfflineCache() {
+        return openOfflineCache().then(function (cache) {
+          if (!cache) {
+            showBootstrapError();
+            return;
+          }
+          return offlineShellReady(cache).then(function (ready) {
+            if (ready) return runBootstrapFromCache(cache);
+            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. School or library Wi-Fi may block the server.');
+          });
+        });
+      }
+
+      function runBootstrapFromCache(cache) {
+        loadAttempts += 1;
+        installCacheHooks(cache);
+        window.__NGMY_MAIN_BLOB_PATH = new URL('main.dart.js', location.href).href;
+
+        return loadFromCache(cache, 'main.dart.js').then(function (mainHit) {
+          if (!mainHit) throw new Error('main.dart.js missing');
+          return mainHit.blob().then(function (blob) {
+            window.__NGMY_MAIN_BLOB = URL.createObjectURL(blob);
+            return loadFromCache(cache, 'flutter_bootstrap.js');
+          });
+        }).then(function (bootHit) {
+          if (!bootHit) throw new Error('bootstrap missing');
+          return bootHit.text().then(function (code) {
+            return injectBootstrap(code);
+          });
+        }).catch(function () {
+          if (loadAttempts < 2) {
+            return runBootstrapFromCache(cache);
+          }
+          showBootstrapError();
+        });
+      }
+
+      function bootFromNetwork() {
+        loadAttempts += 1;
+        fetchBootstrapText('flutter_bootstrap.js?v=' + deployId)
+          .then(function (code) {
+            return injectBootstrap(code);
+          })
+          .catch(function () {
+            if (loadAttempts < 2) {
+              setTimeout(bootFromNetwork, 600);
+              return;
+            }
+            fallbackToOfflineCache();
+          });
+      }
+
+      function startApp() {
+        var bootTimer = setTimeout(function () {
+          showBootstrapError('NGMY is still loading. If you are on school or library Wi-Fi, try home internet or mobile data, then tap Reload.');
+        }, 180000);
+
+        var bootstrapTimer = setTimeout(function () {
+          if (!window._flutter || !window._flutter.loader) {
+            showBootstrapError('NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
+          }
+        }, 25000);
+
+        window.addEventListener('flutter-first-frame', function () {
+          clearTimeout(bootTimer);
+          clearTimeout(bootstrapTimer);
+          window.__ngmyHideSplash && window.__ngmyHideSplash();
+        }, { once: true });
+
+        registerServiceWorkerAndWait();
+
+        if (navigator.onLine) {
+          bootFromNetwork();
+          return;
+        }
+
+        Promise.all([
+          waitForServiceWorkerControl(15000),
+          openOfflineCache(),
+        ]).then(function (results) {
+          var controlled = results[0];
+          var cache = results[1];
+          if (controlled) {
+            bootFromNetwork();
+            return;
+          }
+          return offlineShellReady(cache).then(function (ready) {
+            if (ready) return runBootstrapFromCache(cache);
+            showBootstrapError('Open NGMY once on mobile data or home Wi-Fi, wait for the home screen, then you can use it offline. School or library Wi-Fi may block the server.');
+          });
+        }).catch(function () {
+          bootFromNetwork();
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startApp);
+      } else {
+        startApp();
+      }
+
+      window.addEventListener('pagehide', warmOfflineCache);
+    })();
+  </script>
+
+</body>
+
+</html>
+
