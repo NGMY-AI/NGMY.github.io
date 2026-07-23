@@ -2311,32 +2311,32 @@ int _registrarStatusRank(String status) {
 }
 
 /// Recency decides which of two application records for the same person
-/// is "current" — NOT a fixed status rank. A fixed rank that put
-/// "revoked" permanently above "approved" meant a revoked applicant
-/// could never be shown as approved again: even a brand new Restore
-/// Access approval would still lose to the older revoked record every
-/// time it was picked, both for the live in-session status check and
-/// (worse) for _mergeCivicRegistrarApplications, which collapses a
-/// person's history down to a single kept record — so the "approved"
-/// row wouldn't just display wrong, it would get discarded outright on
-/// the next cloud merge.
+/// is current. Every reviewer decision writes [updatedAt]. For legacy rows
+/// with the same decision timestamp, a revoke wins over an older approval;
+/// a deliberate Restore Access always has a later [updatedAt] and wins.
 Map<String, dynamic> _pickRegistrarApplicationRow(
   Map<String, dynamic> a,
   Map<String, dynamic> b,
 ) {
   DateTime? ts(Map<String, dynamic> m) {
-    final raw = (m['reviewedAt'] ?? m['updatedAt'] ?? m['revokedAt'] ?? m['createdAt'] ?? '').toString();
+    final raw = (m['updatedAt'] ?? m['revokedAt'] ?? m['reviewedAt'] ?? m['createdAt'] ?? '').toString();
     if (raw.trim().isEmpty) return null;
     return DateTime.tryParse(raw)?.toUtc();
   }
 
   final at = ts(a);
   final bt = ts(b);
-  if (at != null && bt != null) return bt.isAfter(at) ? b : a;
+  if (at != null && bt != null) {
+    if (bt.isAfter(at)) return b;
+    if (at.isAfter(bt)) return a;
+    final ar = _registrarStatusRank((a['status'] ?? 'pending').toString());
+    final br = _registrarStatusRank((b['status'] ?? 'pending').toString());
+    return ar >= br ? a : b;
+  }
   if (at != null) return a;
   if (bt != null) return b;
-  // Neither row has a usable timestamp — fall back to status rank as a
-  // last resort so a comparison never fails outright.
+  // Neither row has a usable timestamp — revoked/rejected must beat a
+  // stale approval until an administrator explicitly restores the record.
   final ar = _registrarStatusRank((a['status'] ?? 'pending').toString());
   final br = _registrarStatusRank((b['status'] ?? 'pending').toString());
   return ar >= br ? a : b;
@@ -3846,8 +3846,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                         Expanded(
                                           child: OutlinedButton(
                                             onPressed: () async {
+                                              final decidedAt = DateTime.now().toUtc().toIso8601String();
                                               app['status'] = 'rejected';
-                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedAt'] = decidedAt;
+                                              app['updatedAt'] = decidedAt;
                                               app['reviewedBy'] = reviewer.email;
                                               // Write the update back into the FULL config list, not
                                               // `apps` — `apps` is scope-filtered to this reviewer's own
@@ -3893,8 +3895,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
+                                              final decidedAt = DateTime.now().toUtc().toIso8601String();
                                               app['status'] = 'approved';
-                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedAt'] = decidedAt;
+                                              app['updatedAt'] = decidedAt;
                                               app['reviewedBy'] = reviewer.email;
                                               config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
                                                 config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -3924,8 +3928,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                       child: OutlinedButton(
                                         style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                                         onPressed: () async {
+                                          final revokedAt = DateTime.now().toUtc().toIso8601String();
                                           app['status'] = 'revoked';
-                                          app['revokedAt'] = DateTime.now().toUtc().toIso8601String();
+                                          app['revokedAt'] = revokedAt;
+                                          app['updatedAt'] = revokedAt;
                                           app['revokedBy'] = reviewer.email;
                                           config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
                                             config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -3981,8 +3987,10 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
+                                              final restoredAt = DateTime.now().toUtc().toIso8601String();
                                               app['status'] = 'approved';
-                                              app['reviewedAt'] = DateTime.now().toIso8601String();
+                                              app['reviewedAt'] = restoredAt;
+                                              app['updatedAt'] = restoredAt;
                                               app['reviewedBy'] = reviewer.email;
                                               config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
                                                 config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
