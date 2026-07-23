@@ -872,30 +872,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
     final existing = _decks.where((d) => d.deckKind == partnerKind && d.id != source.id).toList();
 
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        title: Text('Transfer to $partnerTitle?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        content: Text(
-          'Optionally copy the names, date, mahari, witnesses, writer, and signatures from "${source.name}" into $partnerTitle. '
-          'Names in the first paragraph are placed in the matching family roles on the other document.',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.72), height: 1.35),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          if (existing.isNotEmpty)
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'existing'),
-              child: Text('Use existing (${existing.length})'),
-            ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'new'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
-            child: const Text('Create new & transfer'),
-          ),
-        ],
-      ),
+    final choice = await _showHatiTransferSheet(
+      sourceName: source.name,
+      partnerTitle: partnerTitle,
+      existingCount: existing.length,
     );
     if (choice == null || !mounted) return;
 
@@ -907,53 +887,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     } else {
       String? pickedId = existing.length == 1 ? existing.first.id : null;
       if (pickedId == null) {
-        pickedId = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF111827),
-            title: Text('Choose $partnerTitle', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            content: SizedBox(
-              width: 360,
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: existing.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final d = existing[i];
-                  return ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    tileColor: Colors.white.withValues(alpha: 0.06),
-                    title: Text(d.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                    subtitle: Text('Updated ${_formatDate(d.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45))),
-                    onTap: () => Navigator.pop(ctx, d.id),
-                  );
-                },
-              ),
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))],
-          ),
+        pickedId = await _showHatiTransferPickExistingSheet(
+          partnerTitle: partnerTitle,
+          existing: existing,
         );
       }
       if (pickedId == null || !mounted) return;
       final found = _decks.firstWhere((d) => d.id == pickedId);
-      final overwrite = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF111827),
-          title: const Text('Overwrite matching fields?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          content: Text(
-            'Filled names and shared details from "${source.name}" will replace matching blanks on "${found.name}".',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
-              child: const Text('Transfer'),
-            ),
-          ],
-        ),
+      final overwrite = await _showHatiTransferConfirmSheet(
+        sourceName: source.name,
+        destName: found.name,
       );
       if (overwrite != true || !mounted) return;
       dest = found.copy();
@@ -968,25 +911,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       return;
     }
 
-    final openAfter = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        title: const Text('Transfer complete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        content: Text(
-          'Moved ${stats.names} name${stats.names == 1 ? '' : 's'}, ${stats.fields} field${stats.fields == 1 ? '' : 's'}, '
-          'and ${stats.signatures} signature${stats.signatures == 1 ? '' : 's'} into $partnerTitle.',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay here')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
-            child: Text('Open $partnerTitle'),
-          ),
-        ],
-      ),
+    final openAfter = await _showHatiTransferDoneSheet(
+      partnerTitle: partnerTitle,
+      names: stats.names,
+      fields: stats.fields,
+      signatures: stats.signatures,
     );
     if (!mounted) return;
 
@@ -1009,6 +938,465 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       }
     });
     _scheduleAutosave();
+  }
+
+  Future<String?> _showHatiTransferSheet({
+    required String sourceName,
+    required String partnerTitle,
+    required int existingCount,
+  }) {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _HatiTransferSheetScaffold(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _hatiTransferHandle(),
+            const SizedBox(height: 8),
+            _hatiTransferHero(
+              icon: Icons.swap_horiz_rounded,
+              accent: const Color(0xFF0D9488),
+              title: 'Transfer details',
+              subtitle: 'Copy filled names, date, mahari, witnesses, and signatures into $partnerTitle.',
+            ),
+            const SizedBox(height: 18),
+            _hatiTransferRouteCard(fromLabel: sourceName, toLabel: partnerTitle),
+            const SizedBox(height: 18),
+            _hatiTransferOptionCard(
+              ctx: ctx,
+              value: 'new',
+              icon: Icons.note_add_rounded,
+              accent: const Color(0xFF0D9488),
+              title: 'Create new & transfer',
+              subtitle: 'Make a fresh $partnerTitle and fill it automatically',
+              primary: true,
+            ),
+            if (existingCount > 0) ...[
+              const SizedBox(height: 10),
+              _hatiTransferOptionCard(
+                ctx: ctx,
+                value: 'existing',
+                icon: Icons.folder_open_rounded,
+                accent: const Color(0xFF38BDF8),
+                title: 'Use existing',
+                subtitle: existingCount == 1
+                    ? 'Update your saved $partnerTitle'
+                    : 'Choose among $existingCount saved documents',
+              ),
+            ],
+            const SizedBox(height: 14),
+            _hatiTransferGhostButton(ctx: ctx, label: 'Not now'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _showHatiTransferPickExistingSheet({
+    required String partnerTitle,
+    required List<NgmySlideDeck> existing,
+  }) {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _HatiTransferSheetScaffold(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _hatiTransferHandle(),
+            const SizedBox(height: 8),
+            _hatiTransferHero(
+              icon: Icons.library_books_rounded,
+              accent: const Color(0xFF38BDF8),
+              title: 'Choose $partnerTitle',
+              subtitle: 'Pick which saved document should receive the details.',
+            ),
+            const SizedBox(height: 16),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.42),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: existing.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final d = existing[i];
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(ctx, d.id),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF0F766E), Color(0xFF0D9488)],
+                                ),
+                              ),
+                              child: const Icon(Icons.description_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    d.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Updated ${_formatDate(d.updatedAt)}',
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.35)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            _hatiTransferGhostButton(ctx: ctx, label: 'Cancel'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _showHatiTransferConfirmSheet({
+    required String sourceName,
+    required String destName,
+  }) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _HatiTransferSheetScaffold(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _hatiTransferHandle(),
+            const SizedBox(height: 8),
+            _hatiTransferHero(
+              icon: Icons.sync_alt_rounded,
+              accent: const Color(0xFFF59E0B),
+              title: 'Replace matching fields?',
+              subtitle: 'Names and shared details from “$sourceName” will fill matching spots on “$destName”.',
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Transfer', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _showHatiTransferDoneSheet({
+    required String partnerTitle,
+    required int names,
+    required int fields,
+    required int signatures,
+  }) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _HatiTransferSheetScaffold(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _hatiTransferHandle(),
+            const SizedBox(height: 8),
+            _hatiTransferHero(
+              icon: Icons.check_circle_rounded,
+              accent: const Color(0xFF10B981),
+              title: 'Transfer complete',
+              subtitle: 'Everything that could be matched is now on $partnerTitle.',
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _hatiTransferStatChip(label: 'Names', value: '$names')),
+                const SizedBox(width: 8),
+                Expanded(child: _hatiTransferStatChip(label: 'Fields', value: '$fields')),
+                const SizedBox(width: 8),
+                Expanded(child: _hatiTransferStatChip(label: 'Signatures', value: '$signatures')),
+              ],
+            ),
+            const SizedBox(height: 18),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text('Open $partnerTitle', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+            const SizedBox(height: 10),
+            _hatiTransferGhostButton(ctx: ctx, label: 'Stay here', value: false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hatiTransferHandle() {
+    return Center(
+      child: Container(
+        width: 44,
+        height: 4,
+        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+      ),
+    );
+  }
+
+  Widget _hatiTransferHero({
+    required IconData icon,
+    required Color accent,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [accent, Color.lerp(accent, const Color(0xFF0B1220), 0.35)!],
+            ),
+            boxShadow: [
+              BoxShadow(color: accent.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, height: 1.15)),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 13.5, height: 1.35, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _hatiTransferRouteCard({required String fromLabel, required String toLabel}) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.07),
+            Colors.white.withValues(alpha: 0.03),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _hatiTransferDocPill(fromLabel, const Color(0xFF64748B))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF2DD4BF), size: 18),
+            ),
+          ),
+          Expanded(child: _hatiTransferDocPill(toLabel, const Color(0xFF0D9488))),
+        ],
+      ),
+    );
+  }
+
+  Widget _hatiTransferDocPill(String label, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.2),
+      ),
+    );
+  }
+
+  Widget _hatiTransferOptionCard({
+    required BuildContext ctx,
+    required String value,
+    required IconData icon,
+    required Color accent,
+    required String title,
+    required String subtitle,
+    bool primary = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => Navigator.pop(ctx, value),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: primary
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      accent.withValues(alpha: 0.22),
+                      accent.withValues(alpha: 0.08),
+                    ],
+                  )
+                : null,
+            color: primary ? null : Colors.white.withValues(alpha: 0.05),
+            border: Border.all(
+              color: primary ? accent.withValues(alpha: 0.45) : Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: primary ? 0.22 : 0.14),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.25),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white.withValues(alpha: 0.35)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _hatiTransferStatChip({required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontWeight: FontWeight.w700, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _hatiTransferGhostButton({required BuildContext ctx, required String label, Object? value}) {
+    return FilledButton(
+      onPressed: () => Navigator.pop(ctx, value),
+      style: FilledButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+    );
   }
 
   Future<void> _shareOutline() async {
@@ -4141,6 +4529,33 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HatiTransferSheetScaffold extends StatelessWidget {
+  const _HatiTransferSheetScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF152033), Color(0xFF0B1220)],
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+          child: child,
         ),
       ),
     );
