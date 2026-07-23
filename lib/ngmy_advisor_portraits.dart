@@ -169,6 +169,7 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('alisa') || hit('kenny')) return 'person_alisa_john';
   if (hit('mbuto') || (hit('suzana') && !n.contains('vanessa'))) return 'person_suzana_mbuto';
   // Elder Wisdom Advisor — older woman portrait asset (intentional).
+  // Must stay above other marriage-advisor names so Nia never inherits this face.
   if (hit('amani') || (hit('mshauri') && n.contains('amani'))) return 'marriage_advisor_f';
   // Spelling variants used in the app / by the user.
   if (hit('susie') || hit('suzy') || hit('suzie') || hit('suzi') || hit('suzey') || hit('benet')) {
@@ -178,6 +179,13 @@ String? _personPortraitKey({required String name, required String id}) {
   // Core men — keep them off shared role fallbacks.
   if (hit('alex') || hit('remy')) return 'person_alex_remy';
   if (hit('jeremiah') || hit('nesto')) return 'person_jeremiah_nesto';
+  // Batch advisors that would otherwise share role assets in the avatar UI:
+  // Nia used marriage_advisor_f (Wisdom), Sophie aliased to financial_advisor_f (Grace),
+  // Olivia aliased to companion_f (Aaliyah / friends).
+  if (hit('nia') || hit('robertson')) return 'person_nia_robertson';
+  if (hit('grace') || hit('anderson')) return 'person_grace_anderson';
+  if (hit('sophie') || hit('morgan')) return 'person_sophie_morgan';
+  if (hit('olivia') || hit('bennett')) return 'person_olivia_bennett';
   return null;
 }
 
@@ -197,6 +205,8 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
     'person_anna_amuri', 'person_alisa_john', 'person_suzana_mbuto',
     'person_alex_remy', 'person_jeremiah_nesto',
+    'person_nia_robertson', 'person_grace_anderson', 'person_sophie_morgan',
+    'person_olivia_bennett',
   ];
   await Future.wait(keys.map((k) async {
     final path = 'assets/images/advisors/$k.jpg';
