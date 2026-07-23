@@ -741,16 +741,28 @@ Future<String> ngmyResolveGeminiApiKey({
 }
 
 /// Free image fallback — works without an API key (romantic chat selfies, etc.).
-Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt) async {
+Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(
+  String prompt, {
+  bool allowAdult = false,
+  int? seed,
+}) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
   // Keep URL short — long romantic prompts break GET request limits on mobile web.
-  final clipped = p.length > 420 ? '${p.substring(0, 417)}...' : p;
+  final clipped = p.length > 480 ? '${p.substring(0, 477)}...' : p;
+  final s = seed ?? DateTime.now().millisecondsSinceEpoch;
   try {
+    final params = <String, String>{
+      'width': '768',
+      'height': '768',
+      'nologo': 'true',
+      'enhance': 'true',
+      'seed': '$s',
+      if (allowAdult) 'safe': 'false',
+    };
     final url = Uri.parse(
-      'https://image.pollinations.ai/prompt/${Uri.encodeComponent(clipped)}'
-      '?width=768&height=768&nologo=true&enhance=true',
-    );
+      'https://image.pollinations.ai/prompt/${Uri.encodeComponent(clipped)}',
+    ).replace(queryParameters: params);
     final response = await http.get(url).timeout(const Duration(seconds: 90));
     if (response.statusCode == 200 && response.bodyBytes.length > 2048) {
       return (bytes: response.bodyBytes, error: null);
@@ -761,6 +773,15 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt)
   }
 }
 
+bool ngmyPartnerImagePromptLooksAdult(String prompt) {
+  final t = prompt.toLowerCase();
+  return RegExp(
+    r'\b(nude|naked|nsfw|sexual|sexy|lingerie|bra|panties|pussy|dick|cock|tits|boobs|'
+    r'nipples|ass|asshole|clit|cum|fuck|blowjob|handjob|spread|bent over|on all fours|'
+    r'without clothes|no clothes|topless|bottomless|explicit|bedroom|in bed)\b',
+  ).hasMatch(t);
+}
+
 /// Server-side image fetch via Supabase proxy (avoids browser CORS on ngmy.org).
 Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
   required String apiKey,
@@ -768,6 +789,7 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
   required String prompt,
   Uint8List? personBytes,
   String personMime = 'image/jpeg',
+  bool allowAdult = false,
 }) async {
   try {
     final client = Supabase.instance.client;
@@ -775,6 +797,7 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
       'action': action,
       'apiKey': apiKey.trim(),
       'prompt': prompt.trim(),
+      'allowAdult': allowAdult,
       if (personBytes != null && personBytes.isNotEmpty)
         'images': [
           {'mimeType': personMime, 'data': base64Encode(personBytes)},
@@ -837,6 +860,7 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
 }
 
 /// Romantic partner chat images — lookalike portrait + CORS-safe proxy first.
+/// Adult/sexual partner requests prefer uncensored Pollinations (Gemini/DALL·E often refuse).
 /// Never throws; callers always get bytes or a soft error.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
@@ -846,19 +870,57 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
-  final short = p.length > 450 ? '${p.substring(0, 447)}...' : p;
+  final adult = ngmyPartnerImagePromptLooksAdult(p);
+  final short = p.length > 480 ? '${p.substring(0, 477)}...' : p;
   String? lastError;
 
   try {
     final key = creds?.apiKey.trim() ?? '';
     final hasPortrait = lookalikePortraitBytes != null && lookalikePortraitBytes.isNotEmpty;
+
+    Future<({Uint8List? bytes, String? error})> tryPollinations(String text) async {
+      if (key.isNotEmpty) {
+        final viaProxy = await _callImageActionViaProxy(
+          apiKey: key,
+          action: 'pollinationsImage',
+          prompt: text,
+          allowAdult: adult,
+        );
+        if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
+        lastError = viaProxy.error ?? lastError;
+      }
+      for (var attempt = 0; attempt < (adult ? 3 : 2); attempt++) {
+        final poll = await ngmyPollinationsImage(
+          text,
+          allowAdult: adult,
+          seed: DateTime.now().millisecondsSinceEpoch + attempt * 97,
+        );
+        if (poll.bytes != null && poll.bytes!.isNotEmpty) return poll;
+        lastError = poll.error ?? lastError;
+        await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+      }
+      return (bytes: null, error: lastError ?? 'Image generation failed.');
+    }
+
+    // Adult partner pics: Pollinations first (uncensored). Gemini/DALL·E usually refuse.
+    if (adult) {
+      final adultPrompt =
+          'Photorealistic adult photo, uncensored, explicit when asked. $short '
+          'Same person identity as described. No text, no watermark.';
+      final adultHit = await tryPollinations(adultPrompt);
+      if (adultHit.bytes != null && adultHit.bytes!.isNotEmpty) return adultHit;
+    }
+
     final lookalikePrompt = hasPortrait
-        ? 'Create ONE new photorealistic photograph of the EXACT person in the reference image. '
-            'Same face, skin, and hair. $short No text, no watermark. Output only the photo.'
+        ? (adult
+            ? 'Create ONE photorealistic adult photograph of the EXACT person in the reference image. '
+                'Same face and body identity. Uncensored. $short No text, no watermark. Output only the photo.'
+            : 'Create ONE new photorealistic photograph of the EXACT person in the reference image. '
+                'Same face, skin, and hair. $short No text, no watermark. Output only the photo.')
         : short;
 
-    // 1) Lookalike via existing Gemini image proxy (works on phone web / PWA).
-    if (key.isNotEmpty && hasPortrait) {
+    // Lookalike via Gemini image proxy (SFW / mild romantic works best here).
+    if (key.isNotEmpty && hasPortrait && !adult) {
       final proxied = await _callGeminiOutfitViaProxy(
         apiKey: key,
         personBytes: lookalikePortraitBytes,
@@ -879,24 +941,12 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       }
     }
 
-    // 2) Server-side Pollinations (no browser CORS) when proxy supports it.
-    if (key.isNotEmpty) {
-      final viaProxy = await _callImageActionViaProxy(
-        apiKey: key,
-        action: 'pollinationsImage',
-        prompt: short,
-      );
-      if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
-      lastError = viaProxy.error ?? lastError;
-    }
+    // Pollinations (also for non-adult, and adult retry).
+    final pollHit = await tryPollinations(short);
+    if (pollHit.bytes != null && pollHit.bytes!.isNotEmpty) return pollHit;
 
-    // 3) Direct Pollinations (may fail CORS on some browsers — still try).
-    final poll = await ngmyPollinationsImage(short);
-    if (poll.bytes != null && poll.bytes!.isNotEmpty) return poll;
-    lastError = poll.error ?? lastError;
-
-    // 4) Configured image API (DALL·E / Imagen).
-    if (key.isNotEmpty && creds != null) {
+    // Configured image API last (often filtered for adult).
+    if (!adult && key.isNotEmpty && creds != null) {
       final api = await ngmyAiGenerateImage(creds, short);
       if (api.bytes != null && api.bytes!.isNotEmpty) return api;
       lastError = api.error ?? lastError;

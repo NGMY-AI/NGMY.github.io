@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_communicate_chat_images.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Long-term local storage for Communicate companion chats (months on same device).
@@ -29,6 +30,7 @@ class NgmyCommunicateMemoryStore {
       final now = DateTime.now();
       final cutoff = now.subtract(const Duration(days: retentionDays));
       final kept = <Map<String, dynamic>>[];
+      var migratedInlineImages = false;
       for (final item in decoded) {
         if (item is! Map) continue;
         final map = Map<String, dynamic>.from(item);
@@ -36,14 +38,39 @@ class NgmyCommunicateMemoryStore {
         if (at != null && at.isBefore(cutoff)) continue;
         final role = (map['role'] ?? '').toString();
         final text = (map['text'] ?? '').toString().trim();
-        final imageB64 = (map['imageB64'] ?? '').toString().trim();
-        if (text.isEmpty && imageB64.isEmpty) continue;
+        var imageB64 = (map['imageB64'] ?? '').toString().trim();
+        var imageId = (map['imageId'] ?? '').toString().trim();
+        if (text.isEmpty && imageB64.isEmpty && imageId.isEmpty) continue;
         if (role != 'user' && role != 'ai') continue;
-        final row = <String, dynamic>{'role': role, 'text': text, 'at': (at ?? now).toUtc().toIso8601String()};
+
+        // Migrate old inline base64 → durable local blob store (survives restarts).
+        if (imageB64.isNotEmpty && imageId.isEmpty) {
+          imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
+          final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, imageB64);
+          if (ok) {
+            migratedInlineImages = true;
+          } else {
+            imageId = '';
+          }
+        }
+        if (imageId.isNotEmpty && imageB64.isEmpty) {
+          imageB64 = (await NgmyCommunicateChatImageStore.getBase64(imageId)) ?? '';
+        }
+
+        final row = <String, dynamic>{
+          'role': role,
+          'text': text,
+          'at': (at ?? now).toUtc().toIso8601String(),
+        };
+        if (imageId.isNotEmpty) row['imageId'] = imageId;
         if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
+        final mime = (map['imageMime'] ?? '').toString().trim();
+        if (mime.isNotEmpty) row['imageMime'] = mime;
         kept.add(row);
       }
-      if (kept.length != decoded.length) await _persist(email, profileId, kept);
+      if (kept.length != decoded.length || migratedInlineImages) {
+        await _persist(email, profileId, kept);
+      }
       return kept;
     } catch (_) {
       return [];
@@ -78,7 +105,16 @@ class NgmyCommunicateMemoryStore {
       'at': DateTime.now().toUtc().toIso8601String(),
     };
     if (img.isNotEmpty) {
-      row['imageB64'] = img;
+      final imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
+      final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
+      if (ok) {
+        row['imageId'] = imageId;
+        // Keep in-memory for this session; disk load uses imageId.
+        row['imageB64'] = img;
+      } else {
+        // Last resort — still show in session even if durable write failed.
+        row['imageB64'] = img;
+      }
       final mime = imageMime.trim();
       if (mime.isNotEmpty) row['imageMime'] = mime;
     }
@@ -90,38 +126,21 @@ class NgmyCommunicateMemoryStore {
     if (email.trim().isEmpty || profileId.trim().isEmpty) return;
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(days: retentionDays));
-    final cleaned = _cleanMessageRows(messages, cutoff: cutoff);
+    final cleaned = await _cleanMessageRowsAsync(email, profileId, messages, cutoff: cutoff);
     while (cleaned.length > maxStoredMessages) {
-      cleaned.removeAt(0);
+      final dropped = cleaned.removeAt(0);
+      final dropId = (dropped['imageId'] ?? '').toString().trim();
+      if (dropId.isNotEmpty) {
+        unawaited(NgmyCommunicateChatImageStore.delete(dropId));
+      }
     }
     await _persist(email, profileId, cleaned);
   }
 
   /// Full history for backup export (no message cap).
   static Future<List<Map<String, dynamic>>> loadAllForExport(String email, String profileId) async {
-    if (email.trim().isEmpty || profileId.trim().isEmpty) return [];
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_chatKey(email, profileId));
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-      final kept = <Map<String, dynamic>>[];
-      for (final item in decoded) {
-        if (item is! Map) continue;
-        final map = Map<String, dynamic>.from(item);
-        final role = (map['role'] ?? '').toString();
-        final text = (map['text'] ?? '').toString().trim();
-        final imageB64 = (map['imageB64'] ?? '').toString().trim();
-        if (text.isEmpty && imageB64.isEmpty) continue;
-        if (role != 'user' && role != 'ai') continue;
-        kept.add(map);
-      }
-      kept.sort((a, b) => (a['at'] ?? '').toString().compareTo((b['at'] ?? '').toString()));
-      return kept;
-    } catch (_) {
-      return [];
-    }
+    // Hydrated load — export includes base64 for portability.
+    return load(email, profileId);
   }
 
   /// Merge imported messages into local chat (keeps all history).
@@ -144,33 +163,78 @@ class NgmyCommunicateMemoryStore {
     final at = (m['at'] ?? '').toString();
     final role = (m['role'] ?? '').toString();
     final text = (m['text'] ?? '').toString();
-    return '$at|$role|$text';
+    final imageId = (m['imageId'] ?? '').toString();
+    final imgHint = imageId.isNotEmpty
+        ? imageId
+        : (m['imageB64'] ?? '').toString().hashCode.toString();
+    return '$at|$role|$text|$imgHint';
   }
 
-  static List<Map<String, dynamic>> _cleanMessageRows(List<Map<String, dynamic>> messages, {required DateTime cutoff}) {
+  static Future<List<Map<String, dynamic>>> _cleanMessageRowsAsync(
+    String email,
+    String profileId,
+    List<Map<String, dynamic>> messages, {
+    required DateTime cutoff,
+  }) async {
     final now = DateTime.now();
     final cleaned = <Map<String, dynamic>>[];
     for (final m in messages) {
       final role = (m['role'] ?? '').toString();
       final text = (m['text'] ?? '').toString().trim();
-      final imageB64 = (m['imageB64'] ?? '').toString().trim();
-      if (text.isEmpty && imageB64.isEmpty) continue;
+      var imageB64 = (m['imageB64'] ?? '').toString().trim();
+      var imageId = (m['imageId'] ?? '').toString().trim();
+      if (text.isEmpty && imageB64.isEmpty && imageId.isEmpty) continue;
       final at = DateTime.tryParse((m['at'] ?? '').toString()) ?? now;
       if (at.isBefore(cutoff)) continue;
-      final row = <String, dynamic>{'role': role, 'text': text, 'at': at.toUtc().toIso8601String()};
-      if (imageB64.isNotEmpty) {
-        row['imageB64'] = imageB64;
-        final mime = (m['imageMime'] ?? '').toString().trim();
-        if (mime.isNotEmpty) row['imageMime'] = mime;
+
+      if (imageB64.isNotEmpty && imageId.isEmpty) {
+        imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
+        final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, imageB64);
+        if (!ok) imageId = '';
       }
+
+      final row = <String, dynamic>{'role': role, 'text': text, 'at': at.toUtc().toIso8601String()};
+      if (imageId.isNotEmpty) row['imageId'] = imageId;
+      // Keep b64 in RAM list for UI; _persist strips it from prefs.
+      if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
+      final mime = (m['imageMime'] ?? '').toString().trim();
+      if (mime.isNotEmpty) row['imageMime'] = mime;
       cleaned.add(row);
     }
     return cleaned;
   }
 
+  /// Persist metadata only — image bytes live in [NgmyCommunicateChatImageStore].
   static Future<void> _persist(String email, String profileId, List<Map<String, dynamic>> list) async {
+    final slim = <Map<String, dynamic>>[];
+    for (final m in list) {
+      final role = (m['role'] ?? '').toString();
+      final text = (m['text'] ?? '').toString().trim();
+      final imageId = (m['imageId'] ?? '').toString().trim();
+      final imageB64 = (m['imageB64'] ?? '').toString().trim();
+      if (text.isEmpty && imageId.isEmpty && imageB64.isEmpty) continue;
+      final row = <String, dynamic>{
+        'role': role,
+        'text': text,
+        'at': (m['at'] ?? DateTime.now().toUtc().toIso8601String()).toString(),
+      };
+      if (imageId.isNotEmpty) {
+        row['imageId'] = imageId;
+      } else if (imageB64.isNotEmpty) {
+        // Extremely small inline fallback only (should be rare).
+        if (imageB64.length < 80000) {
+          row['imageB64'] = imageB64;
+        }
+      }
+      final mime = (m['imageMime'] ?? '').toString().trim();
+      if (mime.isNotEmpty) row['imageMime'] = mime;
+      slim.add(row);
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_chatKey(email, profileId), jsonEncode(list));
+    final ok = await prefs.setString(_chatKey(email, profileId), jsonEncode(slim));
+    if (!ok) {
+      debugPrint('[communicate] chat prefs write failed (quota?) for $profileId');
+    }
   }
 
   static String transcriptForPrompt(List<Map<String, dynamic>> memory, {int maxMessages = 40}) {

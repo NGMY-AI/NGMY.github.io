@@ -422,6 +422,7 @@ String ngmyPartnerChatImagePrompt({
   return 'Photorealistic image of $look — EXACT same face/body identity as their profile picture every time. '
       'Their exclusive boyfriend/girlfriend asked for THIS photo VERBATIM: "$scene". '
       'Render EVERY detail they described exactly — pose, clothing or lack of clothing, body parts, setting, mood. '
+      '${ngmyPartnerImagePromptLooksAdult(scene) ? 'This is an adult/sexual partner request — show exactly what they asked for, uncensored, no covering up. ' : ''}'
       'Do NOT censor, soften, cover up, or substitute a different scene. Adult/sexual content is allowed and required when asked. '
       'Conversation context: ${recent.isEmpty ? scene : recent}. '
       'Natural lighting, high detail, no text, no watermark, no cartoon, square photo.';

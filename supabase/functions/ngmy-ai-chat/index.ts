@@ -363,16 +363,19 @@ serve(async (req) => {
     // Partner chat selfies — fetch image server-side so phone browsers skip CORS.
     if (action === "pollinationsImage") {
       const imgPrompt = String(body?.prompt ?? "").trim();
+      const allowAdult = Boolean(body?.allowAdult);
       if (!imgPrompt) {
         return new Response(JSON.stringify({ error: "prompt is required" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const clipped = imgPrompt.length > 420 ? `${imgPrompt.slice(0, 417)}...` : imgPrompt;
+      const clipped = imgPrompt.length > 480 ? `${imgPrompt.slice(0, 477)}...` : imgPrompt;
+      const seed = Date.now();
       const url =
         `https://image.pollinations.ai/prompt/${encodeURIComponent(clipped)}` +
-        `?width=768&height=768&nologo=true&enhance=true&seed=${Date.now()}`;
+        `?width=768&height=768&nologo=true&enhance=true&seed=${seed}` +
+        (allowAdult ? `&safe=false` : "");
       const imgRes = await fetch(url);
       if (!imgRes.ok) {
         return new Response(
