@@ -429,20 +429,134 @@ bool ngmyChatImageRequestIsSimpleSelfie(String text) {
   return RegExp(r'\b(pic|picture|photo|selfie|snap|image)\b').hasMatch(t);
 }
 
-/// When they only say "send a pic", pick a non-selfie style (standing / full body / mid-shot).
-const _kPartnerCasualPhotoStyles = <String>[
-  'standing full-body photo outdoors in everyday clothes, head-to-toe visible, looking at camera',
-  'full-length standing photo indoors in casual outfit, whole body in frame, natural light',
-  'three-quarter body standing shot in stylish clothes, waist-to-head plus legs visible',
-  'mirror full-body standing photo in casual outfit, phone not covering face',
-  'outdoor walking mid-to-full body shot in daylight, natural pose',
-  'sitting full upper-body and legs visible on a bench outdoors, not a tight face crop',
-  'leaning against a wall standing mid-shot in everyday clothes, torso and hips visible',
-];
+/// Conversation vibe that should drive an unspecific "send me a pic" request.
+enum NgmyPartnerChatPhotoVibe {
+  sexual,
+  romantic,
+  fitness,
+  business,
+  nightOut,
+  homeChill,
+  casual,
+}
 
-String _ngmyPartnerCasualPhotoStyle({required String scene, String recent = ''}) {
-  final seed = Object.hash(scene, recent, DateTime.now().millisecondsSinceEpoch ~/ 5000);
-  return _kPartnerCasualPhotoStyles[seed.abs() % _kPartnerCasualPhotoStyles.length];
+/// Infer photo vibe from what they are talking about right now (recent chat wins).
+NgmyPartnerChatPhotoVibe ngmyPartnerChatPhotoVibeFromChat({
+  required String latest,
+  required List<Map<String, dynamic>> memory,
+  String gender = 'female',
+}) {
+  final recentUser = memory.reversed
+      .where((m) => (m['role'] ?? '').toString() == 'user')
+      .take(6)
+      .map((m) => (m['text'] ?? '').toString())
+      .join(' ');
+  final recentAll = memory.reversed.take(10).map((m) => (m['text'] ?? '').toString()).join(' ');
+  final blob = '$latest $recentUser $recentAll'.toLowerCase();
+
+  if (RegExp(
+    r'\b(nude|naked|sex|sexy|horny|freaky|nasty|filthy|lingerie|bra|panties|pussy|dick|cock|tits|boobs|'
+    r'nipples|ass|asshole|clit|cum|fuck|suck|blowjob|handjob|in bed|bedroom|shower|wet|hard|'
+    r'topless|bottomless|without clothes|no clothes|spread|bent over|ride me|fuck me)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.sexual;
+  }
+  if (RegExp(
+    r'\b(workout|gym|fitness|running|weights|training|exercise|yoga|sweat|abs|muscles?)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.fitness;
+  }
+  if (RegExp(
+    r'\b(work|office|meeting|business|interview|client|career|resume|professional|suit|presentation)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.business;
+  }
+  if (RegExp(
+    r'\b(club|party|night out|date night|dinner|restaurant|drinks|going out|dress up)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.nightOut;
+  }
+  if (RegExp(
+    r'\b(love you|miss you|babe|baby|my love|cuddle|kiss|romantic|goodnight|good morning|thinking of you)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.romantic;
+  }
+  if (RegExp(
+    r'\b(home|couch|netflix|chillin|chilling|tired|lazy|pajamas|pjs|movie)\b',
+  ).hasMatch(blob)) {
+    return NgmyPartnerChatPhotoVibe.homeChill;
+  }
+  return NgmyPartnerChatPhotoVibe.casual;
+}
+
+String _ngmyPartnerVibePhotoScene({
+  required NgmyPartnerChatPhotoVibe vibe,
+  required String gender,
+  required String latest,
+  required String recent,
+}) {
+  final isMale = gender.trim().toLowerCase() == 'male';
+  final seed = Object.hash(latest, recent, vibe.name, DateTime.now().millisecondsSinceEpoch ~/ 4000);
+  List<String> options;
+  switch (vibe) {
+    case NgmyPartnerChatPhotoVibe.sexual:
+      options = isMale
+          ? [
+              'sexy bedroom photo, shirtless standing by the bed, seductive look, adult partner vibe, uncensored when fitting',
+              'steamy full-body standing photo in only underwear, bedroom lighting, explicit partner mood',
+              'lying on bed seductive pose, low light, sexual energy matching the chat, not a face-only selfie',
+            ]
+          : [
+              'sexy bedroom photo in lingerie, standing full body by the bed, seductive look, adult partner vibe',
+              'steamy full-body standing photo in revealing lingerie, bedroom lighting, explicit partner mood',
+              'lying on bed seductive pose in lingerie, low light, sexual energy matching the chat, not a face-only selfie',
+            ];
+      break;
+    case NgmyPartnerChatPhotoVibe.romantic:
+      options = [
+        'soft romantic standing mid-shot in a cute outfit, warm evening light, loving smile, date-night energy',
+        'cozy romantic photo sitting by a window in casual nice clothes, tender vibe, not a selfie crop',
+        'full-body standing photo dressed up a little for their partner, soft romantic lighting',
+      ];
+      break;
+    case NgmyPartnerChatPhotoVibe.fitness:
+      options = [
+        'gym standing full-body photo in workout clothes, athletic pose after training, natural gym lighting',
+        'fitness mid-to-full body shot in activewear, confident stance, sweaty fresh-from-workout vibe',
+        'outdoor running stretch standing photo in workout gear, whole body visible',
+      ];
+      break;
+    case NgmyPartnerChatPhotoVibe.business:
+      options = [
+        'professional standing full-body photo in business attire, office-ready look, clean lighting',
+        'smart business mid-shot in work clothes, confident professional pose, not a selfie',
+        'standing in a modern office hallway in polished business outfit, head-to-toe framing',
+      ];
+      break;
+    case NgmyPartnerChatPhotoVibe.nightOut:
+      options = [
+        'night-out full-body standing photo dressed up for going out, city evening lights',
+        'restaurant date mid-to-full body photo in a stylish outfit, warm nightlife vibe',
+        'standing mirror photo ready for a party/night out in a sharp outfit, whole body visible',
+      ];
+      break;
+    case NgmyPartnerChatPhotoVibe.homeChill:
+      options = [
+        'casual at-home standing photo in comfy clothes, living-room light, relaxed natural pose',
+        'chilling on the couch mid-shot in loungewear, cozy everyday vibe, not a tight selfie',
+        'full-body standing kitchen/home photo in casual clothes, natural daylight',
+      ];
+      break;
+    case NgmyPartnerChatPhotoVibe.casual:
+      options = [
+        'standing full-body photo outdoors in everyday clothes, head-to-toe visible, natural daylight',
+        'three-quarter body standing shot in stylish casual clothes, natural smile, not a selfie crop',
+        'full-length standing mirror-style photo in everyday outfit, whole body in frame',
+        'outdoor walking mid-to-full body shot in daylight, natural pose matching a normal chat vibe',
+      ];
+      break;
+  }
+  return options[seed.abs() % options.length];
 }
 
 /// Prefer a recent detailed photo request if the latest text is only "send a pic" / "send it".
@@ -454,36 +568,53 @@ String ngmyPartnerImageSceneFromChat({
   if (latestTrim.isNotEmpty && !ngmyChatImageRequestIsSimpleSelfie(latestTrim)) {
     return latestTrim;
   }
+  // Only reuse a prior message when it was itself a specific picture description —
+  // not any old detailed sentence from a different topic.
   for (final m in memory.reversed) {
     if ((m['role'] ?? '').toString() != 'user') continue;
     final t = (m['text'] ?? '').toString().trim();
     if (t.isEmpty) continue;
+    if (!ngmyUserRequestedChatImage(t)) continue;
     if (!ngmyChatImageRequestIsSimpleSelfie(t)) return t;
   }
   return latestTrim;
 }
 
-/// Build a lookalike image prompt — partner's requested scene wins; never force a profile selfie.
+/// Build a lookalike image prompt — specific asks are verbatim; plain "send a pic" follows chat vibe.
 String ngmyPartnerChatImagePrompt({
   required String look,
   required String scene,
   String recent = '',
+  String gender = 'female',
+  List<Map<String, dynamic>> memory = const [],
 }) {
   final wantsSelfie = ngmyChatImageRequestWantsSelfie(scene);
-  final adult = ngmyPartnerImagePromptLooksAdult(scene);
+  final specificAsk = !ngmyChatImageRequestIsSimpleSelfie(scene) || wantsSelfie;
+  final vibe = ngmyPartnerChatPhotoVibeFromChat(latest: scene, memory: memory, gender: gender);
+  final vibeScene = _ngmyPartnerVibePhotoScene(
+    vibe: vibe,
+    gender: gender,
+    latest: scene,
+    recent: recent,
+  );
+  final adult = specificAsk
+      ? ngmyPartnerImagePromptLooksAdult(scene)
+      : vibe == NgmyPartnerChatPhotoVibe.sexual || ngmyPartnerImagePromptLooksAdult('$scene $recent');
   final framingRule = wantsSelfie
       ? 'Camera: selfie / close portrait ONLY because they asked for a selfie.'
       : 'Camera: NOT a selfie and NOT a tight face crop like a profile picture. '
-          'Show the pose and framing they asked for (standing, full body, outfit, setting, etc.). '
-          'Head-to-toe or three-quarter body when they ask for full picture / standing / clothes.';
+          'Match the chat vibe with real body/pose framing (standing, full body, mid-shot, outfit, setting).';
 
-  if (ngmyChatImageRequestIsSimpleSelfie(scene) && !wantsSelfie) {
-    final style = _ngmyPartnerCasualPhotoStyle(scene: scene, recent: recent);
-    return 'SCENE (do this exactly): $style. '
+  if (!specificAsk) {
+    return 'CURRENT CHAT VIBE: ${vibe.name}. '
+        'They only said send a picture — invent ONE photo that matches what you two are talking about right now. '
+        'SCENE: $vibeScene. '
         'Person: $look. Same face identity as their profile photo — face match only. '
         '$framingRule '
-        'Do NOT copy the profile selfie crop. New photo, new pose, real photograph, high detail, '
-        'no text, no watermark, square photo.';
+        '${adult ? 'Sexual chat vibe — make it adult/sexy to match the conversation, uncensored. ' : ''}'
+        'Do NOT send a random profile selfie. New photo matching this moment. '
+        'Recent chat: ${recent.isEmpty ? scene : recent}. '
+        'Photorealistic, high detail, no text, no watermark, square photo.';
   }
 
   return 'SCENE REQUEST FROM BOYFRIEND/GIRLFRIEND (follow verbatim — this is the whole point of the photo): "$scene". '
@@ -870,8 +1001,8 @@ class NgmyCommunicateProfile {
           'Only after a real breakup are you free to entertain others again. '
           'If you later become exclusive with someone new, the same lock applies again.\n'
           'PHOTOS: Only your exclusive boyfriend/girlfriend may ask you for pictures. When they ask, the app creates '
-          'and attaches a REAL photo that looks exactly like YOU doing exactly what they asked '
-          '(selfie, standing, full body, outfit, outdoor, adult/sexual — any style they describe, verbatim). '
+          'and attaches a REAL photo matching the CURRENT chat vibe (sexual if the chat is sexual, casual/business/etc. if that is the topic) '
+          '— or exactly what they described when they are specific. Not a profile selfie every time. '
           'NEVER write fake stage directions like "[Name sends a selfie]" or describe the photo instead of sending — '
           'the app attaches the image for you. Never send or offer photos to anyone you are not dating.\n';
       final topicFlow = lastMsgFreaky
@@ -1099,10 +1230,10 @@ class NgmyCommunicateProfile {
           'Follow the conversation like a human: freaky only when they go freaky; stay normal when they talk normal. '
           'Do not keep dragging past sexual talk into a new subject. '
           'Sexual talk is open and verbatim when the vibe is sexual — real body words, never shy euphemisms.\n'
-          'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
-          'When they ask for a picture (any style — selfie, standing, full body, outfit, outdoor, nude, or scene they describe), the app generates and attaches '
-          'a REAL photo that looks exactly like YOU doing exactly what they asked verbatim — including sexual requests. '
-          'NEVER write "[sends a selfie]" or narrate sending a photo. Never offer or send photos to people you are not dating.\n'
+          'PHOTOS (exclusive partners only): You can send pics ONLY to your boyfriend/girlfriend. '
+          'When they ask for a picture, the app attaches a REAL photo matching the current chat vibe '
+          '(sexual chat → sexy/adult pic; normal chat → normal pic) or exactly what they described if they are specific. '
+          'NEVER write "[sends a selfie]" or narrate sending a photo. Never offer or send photos to people you are not dating.\n';
           'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
           'and later ask if they did it / how it went — only when enough time has passed. '
           'Never re-ask "what are you up to today?" if you already asked recently or you just talked.\n',
@@ -3328,7 +3459,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               .map((m) => (m['text'] ?? '').toString())
               .where((t) => t.trim().isNotEmpty)
               .join(' | ');
-          final primary = ngmyPartnerChatImagePrompt(look: look, scene: scene, recent: recent);
+          final primary = ngmyPartnerChatImagePrompt(
+            look: look,
+            scene: scene,
+            recent: recent,
+            gender: widget.profile.gender,
+            memory: mem,
+          );
           final portrait = await ngmyAdvisorLoadPhotorealPortraitBytes(
                 id: widget.profile.id,
                 gender: widget.profile.gender,
