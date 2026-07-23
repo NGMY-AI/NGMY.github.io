@@ -778,7 +778,8 @@ bool ngmyPartnerImagePromptLooksAdult(String prompt) {
   return RegExp(
     r'\b(nude|naked|nsfw|sexual|sexy|lingerie|bra|panties|pussy|dick|cock|tits|boobs|'
     r'nipples|ass|asshole|clit|cum|fuck|blowjob|handjob|spread|bent over|on all fours|'
-    r'without clothes|no clothes|topless|bottomless|explicit|bedroom|in bed)\b',
+    r'without clothes|no clothes|topless|bottomless|explicit|bedroom|in bed|'
+    r'your body|body pics?|body shots?|adult partner|uncensored)\b',
   ).hasMatch(t);
 }
 
@@ -906,21 +907,26 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       return (bytes: null, error: lastError ?? 'Image generation failed.');
     }
 
-    // Adult partner pics: Pollinations first (uncensored). Gemini/DALL·E usually refuse.
+    // Adult partner pics: short Pollinations prompts first (long NSFW prompts often fail).
     if (adult) {
-      final adultPrompt =
-          '$short Photorealistic adult photo, uncensored when asked. '
-          'Same person identity as described. No text, no watermark.';
-      final adultHit = await tryPollinations(adultPrompt);
-      if (adultHit.bytes != null && adultHit.bytes!.isNotEmpty) return adultHit;
+      final adultShorts = <String>[
+        'Photorealistic sexy full-body photo of the same woman/man described, adult partner vibe, uncensored, no text, no watermark',
+        'Photorealistic seductive body photo matching this request: ${p.length > 220 ? p.substring(0, 220) : p}. Uncensored. No text.',
+        short,
+      ];
+      for (final adultPrompt in adultShorts) {
+        final adultHit = await tryPollinations(adultPrompt);
+        if (adultHit.bytes != null && adultHit.bytes!.isNotEmpty) return adultHit;
+      }
     }
 
     // Standing / full-body / outfit requests: generate the SCENE first so we do not
     // get stuck cloning the profile selfie crop from the lookalike reference.
-    if (!adult && preferSceneVariety) {
-      final varietyPrompt =
-          '$short IMPORTANT: New photograph matching the requested pose/framing. '
-          'Not a selfie. Not a tight face crop. No text, no watermark.';
+    if (preferSceneVariety) {
+      final varietyPrompt = adult
+          ? 'Photorealistic adult full-body photo. $short No text, no watermark.'
+          : '$short IMPORTANT: New photograph matching the requested pose/framing. '
+              'Not a selfie. Not a tight face crop. No text, no watermark.';
       final varietyHit = await tryPollinations(varietyPrompt);
       if (varietyHit.bytes != null && varietyHit.bytes!.isNotEmpty) return varietyHit;
     }
@@ -936,8 +942,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
                 'No text, no watermark. Output only the photo.')
         : short;
 
-    // Lookalike via Gemini image proxy (best face match; still must honor scene).
-    if (key.isNotEmpty && hasPortrait && !adult) {
+    // Lookalike via Gemini — try for adult too after Pollinations (better than sending nothing).
+    if (key.isNotEmpty && hasPortrait) {
       final proxied = await _callGeminiOutfitViaProxy(
         apiKey: key,
         personBytes: lookalikePortraitBytes,
@@ -962,9 +968,17 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     final pollHit = await tryPollinations(short);
     if (pollHit.bytes != null && pollHit.bytes!.isNotEmpty) return pollHit;
 
-    // Configured image API last (often filtered for adult).
-    if (!adult && key.isNotEmpty && creds != null) {
-      final api = await ngmyAiGenerateImage(creds, short);
+    // Soft non-explicit retry so the partner still gets a real photo if NSFW APIs refuse.
+    if (adult) {
+      final soft = 'Photorealistic attractive full-body standing photo in lingerie or fitted clothes, '
+          'same person as described, bedroom lighting, seductive look, no text, no watermark';
+      final softHit = await tryPollinations(soft);
+      if (softHit.bytes != null && softHit.bytes!.isNotEmpty) return softHit;
+    }
+
+    // Configured image API last.
+    if (key.isNotEmpty && creds != null) {
+      final api = await ngmyAiGenerateImage(creds, adult ? 'Photorealistic attractive full-body partner photo, no text' : short);
       if (api.bytes != null && api.bytes!.isNotEmpty) return api;
       lastError = api.error ?? lastError;
     }

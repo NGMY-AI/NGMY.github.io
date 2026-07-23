@@ -176,19 +176,23 @@ bool ngmyUserRequestedChatImage(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
   return RegExp(
-        r'\b(pic|picture|photo|selfie|snap|image|nudes?|portrait)\b',
+        r'\b(pics?|pictures?|photos?|selfies?|snaps?|images?|nudes?|portraits?)\b',
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(
-        r'\b(send|show|make|create|generate|snap)\s+(me\s+)?(a\s+|an\s+|your\s+|another\s+|the\s+)?(pic|photo|picture|selfie|image|nudes?)\b',
+        r'\b(send|show|make|create|generate|snap)\s+(me\s+)?(a\s+|an\s+|some\s+|your\s+|another\s+|the\s+)?(pics?|photos?|pictures?|selfies?|images?|nudes?)\b',
         caseSensitive: false,
       ).hasMatch(t) ||
-      RegExp(r'\b(pic|photo|selfie|picture)\s+of\s+(you|yourself|it|that)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(
+        r'\b(pics?|photos?|selfies?|pictures?)\s+of\s+(you|yourself|your\s+body|it|that)\b',
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(r'\b(your\s+body|body\s+pics?|body\s+shots?|send\s+.{0,20}\bbody)\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\blet me see\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bshow me\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bsend (it|that|one)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bi want (to see|a pic|a photo|the pic|the picture)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bsend me your (pic|picture|photo|selfie)\b', caseSensitive: false).hasMatch(t);
+      RegExp(r'\bi want (to see|a pic|a photo|the pic|the picture|pics|pictures|photos)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(r'\bsend me (your|some|a|an)?\s*(pics?|pictures?|photos?|selfies?)\b', caseSensitive: false).hasMatch(t);
 }
 
 /// True when the model role-played sending a photo instead of a real image.
@@ -204,7 +208,11 @@ bool ngmyAdvisorReplyFakesSendingPhoto(String text) {
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(
-        r"\b(here's|here is) (a |my )?(pic|picture|photo|selfie)\b",
+        r"\b(here's|here is) (a |my |some )?(pic|picture|photo|selfie|little something)\b",
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(
+        r'\b(little something for you|something special for you|sent you (a |my )?(pic|picture|photo))\b',
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(
@@ -423,10 +431,10 @@ bool ngmyChatImageRequestIsSimpleSelfie(String text) {
     r'standing|sit(ting)?|walking|outdoors?|outside|full[\s-]?body|full[\s-]?length|full\s+picture|whole\s+body|'
     r'mirror|gym|beach|car|couch|sofa|park|street|restaurant|bedroom|bathroom|'
     r'side profile|from the side|back view|over.?the.?shoulder|laying|lying down|'
-    r'pose|posed|angle|camera|body\s*pic|body\s*shot)\b',
+    r'pose|posed|angle|camera|body\s*pics?|body\s*shots?|your\s+body)\b',
   ).hasMatch(t);
   if (detailed) return false;
-  return RegExp(r'\b(pic|picture|photo|selfie|snap|image)\b').hasMatch(t);
+  return RegExp(r'\b(pics?|pictures?|photos?|selfies?|snaps?|images?)\b').hasMatch(t);
 }
 
 /// Conversation vibe that should drive an unspecific "send me a pic" request.
@@ -457,7 +465,8 @@ NgmyPartnerChatPhotoVibe ngmyPartnerChatPhotoVibeFromChat({
   if (RegExp(
     r'\b(nude|naked|sex|sexy|horny|freaky|nasty|filthy|lingerie|bra|panties|pussy|dick|cock|tits|boobs|'
     r'nipples|ass|asshole|clit|cum|fuck|suck|blowjob|handjob|in bed|bedroom|shower|wet|hard|'
-    r'topless|bottomless|without clothes|no clothes|spread|bent over|ride me|fuck me)\b',
+    r'topless|bottomless|without clothes|no clothes|spread|bent over|ride me|fuck me|'
+    r'your body|body pics?|body shots?|nudes?)\b',
   ).hasMatch(blob)) {
     return NgmyPartnerChatPhotoVibe.sexual;
   }
@@ -3490,19 +3499,35 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             preferSceneVariety: !wantsSelfieOnly,
           );
           if (imgResult.bytes == null || imgResult.bytes!.isEmpty) {
-            // Same requested scene again — never drop to a random selfie fallback.
+            // Shorter second try — long prompts often fail on mobile web image APIs.
+            final shortRetry = ngmyPartnerImagePromptLooksAdult('$scene $primary')
+                ? 'Photorealistic sexy full-body photo of $look, adult partner vibe, uncensored, no text, no watermark'
+                : 'Photorealistic full-body standing photo of $look matching: $scene. Not a selfie. No text, no watermark';
             imgResult = await ngmyGenerateRomanticChatImage(
-              primary,
+              shortRetry,
               creds: creds,
               lookalikePortraitBytes: portrait,
               lookalikeMime: mime,
               preferSceneVariety: !wantsSelfieOnly,
             );
           }
-          if (imgResult.bytes == null || imgResult.bytes!.isEmpty) return null;
-          return base64Encode(imgResult.bytes!);
+          if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
+            return base64Encode(imgResult.bytes!);
+          }
+          // Last resort: still send a real photo of this advisor (profile face) — never only hearts.
+          if (portrait.isNotEmpty) return base64Encode(portrait);
+          return null;
         } catch (e) {
           debugPrint('[communicate] partner photo: $e');
+          try {
+            final fallback = await ngmyAdvisorLoadPhotorealPortraitBytes(
+              id: widget.profile.id,
+              gender: widget.profile.gender,
+              role: widget.profile.role,
+              name: widget.profile.name,
+            );
+            if (fallback != null && fallback.isNotEmpty) return base64Encode(fallback);
+          } catch (_) {}
           return null;
         }
       }
@@ -3573,7 +3598,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
       } else if (wantsImage) {
-        // Dating partner asked for a pic → ONLY send a real image (no chat narration).
+        // Dating partner asked for a pic → send a REAL image (generation, then profile face fallback).
         String? b64;
         try {
           b64 = await generatePartnerPhotoB64();
@@ -3587,7 +3612,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': photo}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: photo);
         } else {
-          const failReply = '💕';
+          // Should be rare — still avoid empty/heart-only replies when they asked for a pic.
+          const failReply = 'One sec baby — photo glitched, ask me again 💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': failReply}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: failReply);
