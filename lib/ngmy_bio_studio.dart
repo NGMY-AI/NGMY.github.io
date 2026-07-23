@@ -642,18 +642,86 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         _sectionCard(
           t,
           title: 'Link cards',
-          subtitle: 'Each card has an image, title, and URL. Tap to edit.',
+          subtitle: 'Photo, name, and URL — tap a card to edit. Guests tap these on your bio page.',
           child: Column(
             children: [
+              if (_doc.links.isEmpty)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      colors: [
+                        _kBioAccent.withValues(alpha: 0.10),
+                        t.scaffold,
+                      ],
+                    ),
+                    border: Border.all(color: _kBioAccent.withValues(alpha: 0.28)),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _kBioAccent.withValues(alpha: 0.15),
+                          border: Border.all(color: _kBioAccent.withValues(alpha: 0.4)),
+                        ),
+                        child: const Icon(Icons.add_link_rounded, color: _kBioAccent, size: 26),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No links yet',
+                        style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Add your store, socials, booking page, or anything guests should open.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
               ..._doc.links.asMap().entries.map((e) => _linkEditor(t, e.key, e.value)),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() => _doc.links.add(NgmyBioLink(id: ngmyBioNewId(), title: 'New link', url: ''))),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add link'),
-                  style: OutlinedButton.styleFrom(foregroundColor: _kBioAccent, side: BorderSide(color: _kBioAccent.withValues(alpha: 0.5))),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kBioAccent.withValues(alpha: 0.28),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => setState(() => _doc.links.add(NgmyBioLink(id: ngmyBioNewId(), title: 'New link', url: ''))),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Add link card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -664,52 +732,186 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   Widget _linkEditor(NgmyHubTheme t, int index, NgmyBioLink link) {
+    final hasImage = link.imageBase64.isNotEmpty;
+    final hasUrl = link.url.trim().isNotEmpty;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: t.scaffold, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: t.isDark
+              ? [const Color(0xFF1A1F2E), const Color(0xFF12161F)]
+              : [Colors.white, const Color(0xFFFFFBF0)],
+        ),
+        border: Border.all(color: hasUrl ? _kBioAccent.withValues(alpha: 0.45) : t.border, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: t.isDark ? 0.28 : 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => _pickImage((b) => setState(() => link.imageBase64 = b), maxSize: 400),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: t.fieldFill, border: Border.all(color: t.border)),
-                  clipBehavior: Clip.antiAlias,
-                  child: link.imageBase64.isNotEmpty
-                      ? Image.memory(base64Decode(link.imageBase64.split(',').last), fit: BoxFit.cover)
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.image_outlined, color: t.muted, size: 20),
-                            Text('Image', style: TextStyle(color: t.muted, fontSize: 8)),
-                          ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kBioAccent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'LINK ${index + 1}',
+                    style: const TextStyle(color: _kBioAccent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.8),
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Remove link',
+                  onPressed: () => setState(() => _doc.links.removeAt(index)),
+                  icon: Icon(Icons.delete_outline_rounded, color: t.muted),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => _pickImage((b) => setState(() => link.imageBase64 = b), maxSize: 400),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            colors: [
+                              _kBioAccent.withValues(alpha: 0.18),
+                              _kBioAccent.withValues(alpha: 0.05),
+                            ],
+                          ),
+                          border: Border.all(color: _kBioAccent.withValues(alpha: 0.4), width: 1.3),
                         ),
+                        clipBehavior: Clip.antiAlias,
+                        child: hasImage
+                            ? Image.memory(base64Decode(link.imageBase64.split(',').last), fit: BoxFit.cover)
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_photo_alternate_outlined, color: _kBioAccent.withValues(alpha: 0.85), size: 24),
+                                  const SizedBox(height: 2),
+                                  Text('Photo', style: TextStyle(color: t.muted, fontSize: 9, fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        bottom: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  initialValue: link.title,
-                  decoration: InputDecoration(labelText: 'Link name', hintText: 'My store', isDense: true, filled: true, fillColor: t.fieldFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: t.border))),
-                  onChanged: (v) {
-                    link.title = v;
-                    setState(() {});
-                  },
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        initialValue: link.title,
+                        style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 15),
+                        decoration: InputDecoration(
+                          labelText: 'Link name',
+                          hintText: 'My store',
+                          isDense: true,
+                          filled: true,
+                          fillColor: t.fieldFill,
+                          prefixIcon: const Icon(Icons.label_outline_rounded, size: 18, color: _kBioAccent),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBioAccent, width: 1.4)),
+                        ),
+                        onChanged: (v) {
+                          link.title = v;
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: link.url,
+                        style: TextStyle(color: t.title, fontSize: 13.5),
+                        decoration: InputDecoration(
+                          labelText: 'URL',
+                          hintText: 'https://…',
+                          isDense: true,
+                          filled: true,
+                          fillColor: t.fieldFill,
+                          prefixIcon: Icon(
+                            Icons.link_rounded,
+                            size: 18,
+                            color: hasUrl ? _kBioAccent : t.muted,
+                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBioAccent, width: 1.4)),
+                        ),
+                        onChanged: (v) {
+                          link.url = v;
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+          if (hasUrl || link.title.trim().isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: t.isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFFFF8E7),
+                border: Border.all(color: _kBioAccent.withValues(alpha: 0.22)),
               ),
-              IconButton(onPressed: () => setState(() => _doc.links.removeAt(index)), icon: Icon(Icons.delete_outline_rounded, color: t.muted)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            initialValue: link.url,
-            decoration: InputDecoration(labelText: 'URL', hintText: 'https://...', isDense: true, filled: true, fillColor: t.fieldFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: t.border)), prefixIcon: const Icon(Icons.link_rounded, size: 18)),
-            onChanged: (v) => link.url = v,
-          ),
+              child: Row(
+                children: [
+                  Icon(Icons.visibility_outlined, size: 16, color: t.muted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      link.title.trim().isEmpty ? 'Untitled link' : link.title.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                  ),
+                  if (hasUrl)
+                    Text(
+                      'Live preview',
+                      style: TextStyle(color: _kBioAccent.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 10),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );

@@ -796,6 +796,42 @@ const _emojiCategories = <String, List<String>>{
   'Symbols': ['•', '→', '←', '↑', '↓', '★', '☆', '♥', '♦', '♣', '♠', '✓', '✗', '⚡', '⚠️', 'ℹ️'],
 };
 
+bool _noteTitleOverflowsOneLine(String text, TextStyle style, double maxWidth) {
+  final t = text.trim();
+  if (t.isEmpty || maxWidth <= 0) return false;
+  final painter = TextPainter(
+    text: TextSpan(text: t, style: style),
+    maxLines: 1,
+    textDirection: TextDirection.ltr,
+  )..layout(maxWidth: double.infinity);
+  return painter.width > maxWidth;
+}
+
+/// Note title: left-aligned when short; up to 2 lines centered when long
+/// so a shorter second line sits in the middle.
+class _NoteTitleLines extends StatelessWidget {
+  const _NoteTitleLines({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final overflow = _noteTitleOverflowsOneLine(text, style, constraints.maxWidth);
+        return Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: overflow ? TextAlign.center : TextAlign.start,
+          style: style,
+        );
+      },
+    );
+  }
+}
+
 class NgmyBusinessNote {
   NgmyBusinessNote({
     String? id,
@@ -1466,7 +1502,10 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                               color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04),
                                               borderRadius: BorderRadius.circular(12),
                                             ),
-                                            child: Icon(Icons.note_alt_rounded, size: 22, color: dark ? Colors.white70 : const Color(0xFF64748B)),
+                                            child: Text(
+                                              n.icon.trim().isEmpty ? '📝' : n.icon.trim(),
+                                              style: const TextStyle(fontSize: 22),
+                                            ),
                                           ),
                                           const SizedBox(width: 14),
                                           Expanded(
@@ -1474,16 +1513,20 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Row(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
                                                     Expanded(
-                                                      child: Text(
-                                                        n.preview,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: TextStyle(color: dark ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16),
+                                                      child: _NoteTitleLines(
+                                                        text: n.preview,
+                                                        style: TextStyle(
+                                                          color: dark ? Colors.white : const Color(0xFF0F172A),
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 16,
+                                                          height: 1.2,
+                                                        ),
                                                       ),
                                                     ),
-                                                    if (n.pinned) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.push_pin_rounded, size: 14, color: Color(0xFF8B5CF6))),
+                                                    if (n.pinned) const Padding(padding: EdgeInsets.only(left: 6, top: 2), child: Icon(Icons.push_pin_rounded, size: 14, color: Color(0xFF8B5CF6))),
                                                   ],
                                                 ),
                                                 const SizedBox(height: 4),
@@ -1806,7 +1849,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _title = TextEditingController(text: _note.title);
     _body = TextEditingController(text: _storedBody);
     _bodyFocus = FocusNode();
-    _title.addListener(_markDirty);
+    _title.addListener(() {
+      _markDirty();
+      if (mounted) setState(() {});
+    });
     _body.addListener(_onBodyEdited);
     if (!widget.isNew && _note.openInPreview) {
       _previewMode = true;
@@ -2386,6 +2432,78 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
             children: [
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 12),
+              const Text('Cover icon', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(
+                'Shown on the note card — not in your title text.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              ..._emojiCategories.entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.key, style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w700, fontSize: 11)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: entry.value.map((e) {
+                          return InkWell(
+                            onTap: () => Navigator.pop(ctx, e),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: e == _note.icon
+                                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.28)
+                                    : Colors.white.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(10),
+                                border: e == _note.icon
+                                    ? Border.all(color: const Color(0xFFA78BFA), width: 1.4)
+                                    : null,
+                              ),
+                              child: Text(e, style: const TextStyle(fontSize: 22)),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) {
+      // Title-adjacent / cover picker always sets the note cover icon —
+      // never injects into the title or body text.
+      setState(() => _note.icon = picked);
+      _markDirty();
+    }
+  }
+
+  Future<void> _showBodyEmojiPicker() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 12),
               const Text('Insert emoji', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 12),
               ..._emojiCategories.entries.map((entry) {
@@ -2422,13 +2540,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         ),
       ),
     );
-    if (picked != null) {
-      if (_bodyFocus.hasFocus || _body.text.isNotEmpty) {
-        _insertAtCursor(picked);
-      } else {
-        setState(() => _note.icon = picked);
-      }
-    }
+    if (picked != null) _insertAtCursor(picked);
   }
 
   Future<void> _showInsertTemplate() async {
@@ -2750,14 +2862,15 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           onPressed: _onWillPop,
                         ),
                         if (_previewMode) ...[
-                          Icon(_bgOfflineIcon(_note.effectiveBackgroundId), size: 20, color: fg.withValues(alpha: 0.7)),
+                          Text(
+                            _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
+                            style: const TextStyle(fontSize: 20),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              _title.text.trim().isEmpty ? 'Untitled' : _title.text,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3),
+                            child: _NoteTitleLines(
+                              text: _title.text.trim().isEmpty ? 'Untitled' : _title.text,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3, height: 1.2),
                             ),
                           ),
                           _headerBtn(
@@ -2772,23 +2885,55 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         ] else ...[
                           GestureDetector(
                             onTap: _showEmojiPicker,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: Icon(Icons.emoji_emotions_outlined, color: fg.withValues(alpha: 0.75), size: 22),
+                            child: Tooltip(
+                              message: 'Cover icon',
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                margin: const EdgeInsets.only(right: 6),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: dark ? Colors.white24 : Colors.black12),
+                                ),
+                                child: Text(
+                                  _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                              ),
                             ),
                           ),
                           Expanded(
-                            child: TextField(
-                              controller: _title,
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3, height: 1.2),
-                              decoration: InputDecoration(
-                                hintText: 'Title',
-                                hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1), fontSize: 17),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              maxLines: 1,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final titleStyle = TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: fg,
+                                  letterSpacing: -0.3,
+                                  height: 1.25,
+                                );
+                                final center = _noteTitleOverflowsOneLine(
+                                  _title.text,
+                                  titleStyle,
+                                  constraints.maxWidth,
+                                );
+                                return TextField(
+                                  controller: _title,
+                                  style: titleStyle,
+                                  textAlign: center ? TextAlign.center : TextAlign.start,
+                                  decoration: InputDecoration(
+                                    hintText: 'Title',
+                                    hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1), fontSize: 17),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  maxLines: 2,
+                                  minLines: 1,
+                                );
+                              },
                             ),
                           ),
                           IconButton(
@@ -2878,7 +3023,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           ),
                           _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
                           _tool(Icons.image_outlined, 'Photo', () => unawaited(_attachPhoto()), fg),
-                          _tool(Icons.emoji_emotions_outlined, 'Emoji', _showEmojiPicker, fg),
+                          _tool(Icons.emoji_emotions_outlined, 'Emoji', _showBodyEmojiPicker, fg),
                           _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
                           _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
                           _tool(Icons.palette_rounded, 'Any color', _showCustomColorPicker, fg),
