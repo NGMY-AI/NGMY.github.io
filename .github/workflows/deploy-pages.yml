@@ -1,5 +1,5 @@
 # Builds Flutter web and publishes to ngmy.org via main/docs (single deploy path).
-# Do NOT also use actions/deploy-pages or gh-pages mirror — that causes duplicate deploy failures.
+# Do NOT also force-push gh-pages — that races the built-in Pages job and emails failures.
 
 name: Deploy GitHub Pages
 
@@ -25,12 +25,13 @@ concurrency:
 jobs:
   configure:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Point Pages at main/docs + ngmy.org (single branch deploy)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -e
+          set +e
           api="https://api.github.com/repos/${{ github.repository }}/pages"
           body='{"source":{"branch":"main","path":"/docs"},"cname":"ngmy.org"}'
           code=$(curl -sS -o /tmp/pages.json -w "%{http_code}" -X PUT \
@@ -49,9 +50,11 @@ jobs:
             echo "POST Pages HTTP ${code}"
             cat /tmp/pages.json || true
           fi
+          exit 0
 
   build-and-publish:
     needs: configure
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -59,6 +62,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -165,19 +169,9 @@ jobs:
           git add docs
           if ! git diff --staged --quiet; then
             git commit -m "Deploy web build to docs/ for ngmy.org [skip ci]"
+            # Avoid rejected push if another job updated main while we built.
+            git pull --rebase origin main || git pull --no-rebase origin main || true
             git push origin HEAD:main
           else
             echo "docs/ unchanged — skip push"
-          fi
-
-          # Mirror to gh-pages branch root (best-effort; main/docs is the primary Pages source).
-          git checkout --orphan gh-pages-deploy
-          git rm -rf . 2>/dev/null || true
-          cp -r _site/* .
-          touch .nojekyll
-          printf '%s' 'ngmy.org' > CNAME
-          git add -A
-          git commit -m "Deploy web build to gh-pages for ngmy.org [skip ci]" || true
-          if ! git push origin HEAD:gh-pages -f; then
-            echo "WARN: gh-pages mirror push failed — main/docs deploy already succeeded"
           fi

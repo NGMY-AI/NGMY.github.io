@@ -3390,9 +3390,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           b64 = null;
         }
         if (b64 != null && b64.isNotEmpty) {
+          final photo = b64;
           if (!mounted) return;
-          setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64}));
-          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64);
+          setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': photo}));
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: photo);
         } else {
           const failReply = '💕';
           if (!mounted) return;
@@ -3421,11 +3422,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         var cleaned = _cleanAdvisorReply(result.text);
         // If the model faked sending a photo while we can actually send one, send a real image.
         if (canSendPartnerImage && (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
-          final b64 = await generatePartnerPhotoB64();
-          if (b64 != null && b64.isNotEmpty) {
+          final b64Photo = await generatePartnerPhotoB64();
+          if (b64Photo != null && b64Photo.isNotEmpty) {
             if (!mounted) return;
-            setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64}));
-            await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64);
+            setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64Photo}));
+            await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64Photo);
             return;
           }
           cleaned = '💕';
