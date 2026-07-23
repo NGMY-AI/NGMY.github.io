@@ -61,9 +61,9 @@ const _byName = <String, NgmyAdvisorBadgeCopy>{
     style: 'Calm voice. Practical wisdom. Modern elegance.',
   ),
   'ALISA JOHN': NgmyAdvisorBadgeCopy(
-    roleTitle: 'Confidence Advisor',
-    about: 'I sharpen how you speak and carry yourself — from ordinary moments to high-stakes ones.',
-    style: 'Bright energy. Kind candor. No performance fluff.',
+    roleTitle: 'Bible Study Advisor',
+    about: 'Scripture opened with care — teaching, clarity, and pastoral warmth on $_kHub.',
+    style: 'Humble instruction. Faith-led. Respectful and clear.',
   ),
   'SUZANA MBUTO': NgmyAdvisorBadgeCopy(
     roleTitle: 'Growth Advisor',
@@ -94,6 +94,11 @@ const _byName = <String, NgmyAdvisorBadgeCopy>{
     roleTitle: 'Wisdom Advisor',
     about: 'Elder experience for life’s harder questions — patience and time-tested judgment.',
     style: 'Mature listening. Traditional wisdom. Modern respect.',
+  ),
+  'CHLOE MITCHELL': NgmyAdvisorBadgeCopy(
+    roleTitle: 'Bible Study Advisor',
+    about: 'Scripture opened with care — teaching, clarity, and pastoral warmth on $_kHub.',
+    style: 'Humble instruction. Faith-led. Respectful and clear.',
   ),
 };
 
@@ -144,8 +149,8 @@ const _byRole = <String, NgmyAdvisorBadgeCopy>{
     style: 'Gentle authority. Hopeful. Grounded.',
   ),
   'bible_study_teacher': NgmyAdvisorBadgeCopy(
-    roleTitle: 'Scripture Study Advisor',
-    about: 'Bible study with teaching care — clarity over performance.',
+    roleTitle: 'Bible Study Advisor',
+    about: 'Bible study with teaching care — clarity, Scripture, and pastoral respect.',
     style: 'Humble instruction. Scripture-led. Accessible.',
   ),
   'debater': NgmyAdvisorBadgeCopy(

@@ -445,6 +445,22 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
   };
 }
 
+Map<String, dynamic> _alisaJohnBibleStudyPatch(Map<String, dynamic> existing) {
+  return {
+    ...existing,
+    'name': 'ALISA JOHN',
+    'gender': 'female',
+    'role': 'bible_study_teacher',
+    'emoji': '📖',
+    'bio':
+        'Bible Study Advisor on NGMY Advisors — Scripture explained clearly with pastoral care and respect.',
+    'personality':
+        'You are ALISA JOHN, a devoted young Bible Study Advisor and teacher of the Word. '
+        'Explain Scripture clearly, invite real questions, and counsel with pastoral warmth and dignity. '
+        'Respectful, wise, never flashy. Sound like a real young woman who loves teaching the Bible.',
+  };
+}
+
 Map<String, dynamic> _mshauriAmaniWisdomPatch(Map<String, dynamic> existing) {
   return {
     ...existing,
@@ -502,6 +518,22 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
     } else if ((row['name'] ?? '').toString() != upper) {
       changed = true;
       row['name'] = upper;
+    }
+
+    // Bible Study Advisor — Alisa is religious teaching, never "Confidence Advisor".
+    if (upper == 'ALISA JOHN') {
+      final patched = _alisaJohnBibleStudyPatch(row);
+      if (patched['role'] != row['role'] ||
+          patched['bio'] != row['bio'] ||
+          patched['personality'] != row['personality'] ||
+          patched['emoji'] != row['emoji'] ||
+          patched['name'] != row['name']) {
+        changed = true;
+        patched['avatarUrl'] = '';
+        patched['avatar_url'] = '';
+        next.add(patched);
+        continue;
+      }
     }
 
     // Last advisor: older woman Wisdom Advisor (never male).

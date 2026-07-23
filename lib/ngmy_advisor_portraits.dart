@@ -186,6 +186,7 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('grace') || hit('anderson')) return 'person_grace_anderson';
   if (hit('sophie') || hit('morgan')) return 'person_sophie_morgan';
   if (hit('olivia') || hit('bennett')) return 'person_olivia_bennett';
+  if (hit('chloe') || hit('mitchell')) return 'person_chloe_mitchell';
   return null;
 }
 
@@ -206,7 +207,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'person_anna_amuri', 'person_alisa_john', 'person_suzana_mbuto',
     'person_alex_remy', 'person_jeremiah_nesto',
     'person_nia_robertson', 'person_grace_anderson', 'person_sophie_morgan',
-    'person_olivia_bennett',
+    'person_olivia_bennett', 'person_chloe_mitchell',
   ];
   await Future.wait(keys.map((k) async {
     final path = 'assets/images/advisors/$k.jpg';
