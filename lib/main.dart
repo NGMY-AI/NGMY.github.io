@@ -2444,21 +2444,22 @@ void _applyRegistrarGrantsFromConfig(
   UserData? currentUser,
 }) {
   for (final u in users) {
-    final status = _registrarApplicationStatusForEmail(config, u.email);
-    if (status == 'revoked' || status == 'rejected') {
-      u.isAuthorizedRegistrar = false;
-    } else if (status == 'approved') {
-      u.isAuthorizedRegistrar = true;
-    }
+    u.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(config, u);
   }
   if (currentUser != null) {
-    final status = _registrarApplicationStatusForEmail(config, currentUser.email);
-    if (status == 'revoked' || status == 'rejected') {
-      currentUser.isAuthorizedRegistrar = false;
-    } else if (status == 'approved') {
-      currentUser.isAuthorizedRegistrar = true;
-    }
+    currentUser.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(config, currentUser);
   }
+}
+
+/// Registrar controls are granted only by an approved application, never by
+/// the cached flag stored on a user record. Explicit Registry King/Admin
+/// assignments remain valid only when they have no application record; an
+/// explicit revoke or rejection always overrides every registrar grant.
+bool _hasEffectiveRegistrarAccess(AppConfig config, UserData user) {
+  final status = _registrarApplicationStatusForEmail(config, user.email);
+  if (status == 'approved') return true;
+  if (status == null) return user.isCivicRegistryKing || user.isCivicRegistryAdmin;
+  return false;
 }
 
 List<Map<String, dynamic>> _civicRegistrarApplicationsFromConfigValue(dynamic raw) {
@@ -2669,7 +2670,12 @@ Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
 }
 
 Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
-  // Registrar grants live in config.civicRegistrarApplications (cloud) and local users.
+  final email = u.email.trim();
+  if (email.isEmpty || !await ngmyCanReachCloud()) return;
+  await _safeUpsertUserRow({
+    'email': email,
+    'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
+  });
 }
 
 Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
@@ -2780,14 +2786,10 @@ Future<void> _syncRegistrarStateAfterConfigChange(
 }) async {
   // Revoke/approve only updates registrar access — civicRegistryMembers, spendings, and cities stay.
   _applyRegistrarGrantsFromConfig(config, users, currentUser: currentUser);
-  final targets = <UserData>[];
+  // Include every known account. A deleted application has no status, so it
+  // must be pushed as false just like an explicit revoke.
+  final targets = <UserData>[...users];
   if (currentUser != null) targets.add(currentUser);
-  for (final u in users) {
-    final status = _registrarApplicationStatusForEmail(config, u.email);
-    if (status == 'approved' || status == 'revoked' || status == 'rejected') {
-      targets.add(u);
-    }
-  }
   final seen = <String>{};
   for (final u in targets) {
     final key = u.email.toLowerCase().trim();
@@ -4047,6 +4049,12 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                   .where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() != email)
                                                   .map((e) => Map<String, dynamic>.from(e))
                                                   .toList();
+                                              if (userIndex != -1) {
+                                                // Deleting the request also removes its registrar
+                                                // grant; their regular civic membership remains.
+                                                allUsers[userIndex].isAuthorizedRegistrar = false;
+                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+                                              }
                                               await NgmyCivicRegistrarApplication.clear(email);
                                               await _persistCivicRegistrarApplications(config);
                                               await _syncRegistrarStateAfterConfigChange(config, allUsers);
@@ -9013,32 +9021,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .eq('email', email)
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
-      // Registrar status isn't a users-table column worth trusting here —
-      // _pushUserAuthorizedRegistrar is intentionally a no-op because the
-      // real source of truth is config.civicRegistrarApplications (see its
-      // comment). This 20-second loop is otherwise the only thing that
-      // ever re-checks an already-logged-in registrar's own access — the
-      // full config poll that would normally pick up a revoke only runs
-      // every 3 minutes for a non-admin, and does nothing at all if the
-      // app stays open without it firing. So an Admin revoking someone
-      // could leave that registrar fully operational for minutes, and
-      // "it's not working" is a completely fair read of that from the
-      // admin's side. Only bother fetching for someone who currently
-      // believes they have registrar access — most users never do.
-      if (_currentUser!.isAuthorizedRegistrar) {
+      // Re-check any logged-in member with a registrar application so both
+      // revokes and restores take effect while the Civic Registry is open.
+      final localRegistrarStatus = _registrarApplicationStatusForEmail(_config, email);
+      if (_currentUser!.isAuthorizedRegistrar || localRegistrarStatus != null) {
         final remoteApps = await _fetchRemoteCivicRegistrarApplications();
-        if (mounted && NgmyCivicRegistrarApplication.isRevokedForEmail(remoteApps, email)) {
+        final remoteConfig = AppConfig();
+        remoteConfig.civicRegistrarApplications = remoteApps;
+        final remoteRegistrarStatus = _registrarApplicationStatusForEmail(remoteConfig, email);
+        if (mounted && remoteRegistrarStatus != localRegistrarStatus) {
           setState(() {
             _mergeRegistrarApplicationsIntoConfig(_config, remoteApps);
             _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
           });
           NgmyAdminLiveRefresh.notify();
-          unawaited(_pushInAppNotification(
-            title: 'Registrar access removed',
-            body: 'Your Authorized Registrar access was revoked by an admin.',
-            tag: 'registrar_revoked_$email',
-            cooldown: const Duration(minutes: 10),
-          ));
+          if (remoteRegistrarStatus == 'revoked' || remoteRegistrarStatus == 'rejected') {
+            unawaited(_pushInAppNotification(
+              title: 'Registrar access removed',
+              body: 'Your Authorized Registrar access was revoked by an admin.',
+              tag: 'registrar_revoked_$email',
+              cooldown: const Duration(minutes: 10),
+            ));
+          }
         }
       }
       if (photoRow == null || !mounted) return;
@@ -11639,12 +11643,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     remote.phone = ngmyMergeAccountPhone(local: local.phone, remote: remote.phone);
     if (local.isApprovedWorker && !remote.isApprovedWorker) remote.isApprovedWorker = true;
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
-    if (local.isAuthorizedRegistrar && !remote.isAuthorizedRegistrar) {
-      final key = local.email.toLowerCase().trim();
-      if (!NgmyCivicRegistrarApplication.isRevokedForEmail(_config.civicRegistrarApplications, key)) {
-        remote.isAuthorizedRegistrar = true;
-      }
-    }
+    // Never revive a registrar grant from stale local state. The approved
+    // application list is authoritative for revoke, restore, and delete.
+    remote.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(_config, remote);
     _preserveRegistryEnrollmentFromLocal(local, remote);
   }
 
@@ -25678,9 +25679,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _canScanCivicRegistryIds() =>
       widget.user.isAdmin ||
-      widget.user.isAuthorizedRegistrar ||
-      widget.user.isCivicRegistryAdmin ||
-      widget.user.isCivicRegistryKing;
+      _hasEffectiveRegistrarAccess(widget.config, widget.user);
 
   void _openCivicIdScanner() {
     showNgmyCivicIdScannerSheet(
@@ -29637,14 +29636,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _hasRegistrarAccess() {
-    if (widget.user.isCivicRegistryAdmin && widget.user.isAuthorizedRegistrar) return true;
-    if (widget.user.isCivicRegistryKing && widget.user.isAuthorizedRegistrar) return true;
-    return NgmyCivicRegistrarApplication.hasRegistrarAccess(
-      applications: widget.config.civicRegistrarApplications,
-      email: widget.user.email,
-      userFlag: widget.user.isAuthorizedRegistrar,
-      localBackup: _localRegistrarBackup,
-    );
+    return _hasEffectiveRegistrarAccess(widget.config, widget.user);
   }
 
   bool _canBypassCivicGate() => _hasRegistrarAccess();
@@ -31822,13 +31814,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _canDeleteReceiptForState(String receiptState) {
-    if (!widget.user.isAuthorizedRegistrar) return false;
+    if (!_hasEffectiveRegistrarAccess(widget.config, widget.user)) return false;
     final st = receiptState.trim().isEmpty ? widget.user.state.trim() : receiptState.trim();
     if (st.isEmpty) return false;
     return NgmyCivicRegistryStats.isRegistrarAssignedToState(
       email: widget.user.email,
       userState: widget.user.state,
-      isAuthorizedRegistrar: widget.user.isAuthorizedRegistrar,
+      isAuthorizedRegistrar: true,
       applications: widget.config.civicRegistrarApplications,
       state: st,
     );

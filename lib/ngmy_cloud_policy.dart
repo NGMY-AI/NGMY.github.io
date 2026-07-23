@@ -34,6 +34,9 @@ class NgmyCloudPolicy {
     'passwordHash',
     'status',
     'isAdmin',
+    // Admin approval, revoke, restore, and deletion synchronize this cached
+    // flag; effective access still comes from civicRegistrarApplications.
+    'isAuthorizedRegistrar',
     'profilePicturePath',
   };
 
