@@ -6,16 +6,29 @@ import 'ngmy_slides_models.dart';
 ///
 /// The two marriage documents share the same people, but the first paragraph
 /// names them from opposite family sides. This maps each filled name into the
-/// matching slot on the other document and copies shared fields/signatures.
+/// matching slot on the other document and copies every other editable field
+/// and signature below that paragraph as-is.
+
+const String kNgmyHatiPlacedSignPrefix = '${kMarriageSignPrefix}placed_';
 
 String? ngmyHatiMarriageFieldKey(NgmySlideElement e) {
   if (!ngmyMarriageElementIsField(e)) return null;
   return e.fileName.replaceFirst(kMarriageFieldPrefix, '').split(':').first;
 }
 
-String? ngmyHatiMarriageSignKey(NgmySlideElement e) {
-  if (!ngmyMarriageElementIsSignZone(e)) return null;
-  return e.fileName.replaceFirst(kMarriageSignPrefix, '');
+/// Slot id for an empty tap-to-sign zone (`marriage_sign_mke_witness_1`).
+String? ngmyHatiEmptySignZoneSlot(NgmySlideElement e) {
+  if (!e.fileName.startsWith(kMarriageSignPrefix)) return null;
+  if (e.fileName.startsWith(kNgmyHatiPlacedSignPrefix)) return null;
+  if (e.type == NgmySlideElementType.signature) return null;
+  return e.fileName.substring(kMarriageSignPrefix.length);
+}
+
+/// Slot id for a captured signature (`marriage_sign_placed_mke_witness_1`).
+String? ngmyHatiPlacedSignatureSlot(NgmySlideElement e) {
+  if (e.type != NgmySlideElementType.signature) return null;
+  if (!e.fileName.startsWith(kNgmyHatiPlacedSignPrefix)) return null;
+  return e.fileName.substring(kNgmyHatiPlacedSignPrefix.length);
 }
 
 bool ngmyHatiIsTransferableDeck(NgmySlideDeck deck) =>
@@ -128,14 +141,7 @@ NgmySlideElement? _findField(NgmySlideDeck deck, String key) {
   return null;
 }
 
-NgmySlideElement? _findSign(NgmySlideDeck deck, String key) {
-  for (final slide in deck.slides) {
-    for (final e in slide.elements) {
-      if (ngmyHatiMarriageSignKey(e) == key) return e;
-    }
-  }
-  return null;
-}
+NgmySlide? _primarySlide(NgmySlideDeck deck) => deck.slides.isEmpty ? null : deck.slides.first;
 
 String ngmyHatiPaperTemplateIdFromDeck(NgmySlideDeck deck) {
   final theme = deck.themeId.trim();
@@ -150,8 +156,14 @@ String ngmyHatiPaperTemplateIdFromDeck(NgmySlideDeck deck) {
   return kNgmyHatiKuhowaTemplates.first.id;
 }
 
+bool _isUnfilledWitnessPlaceholder(String text) {
+  final t = text.trim();
+  return t.isEmpty || t == '[Jina la Shahidi]';
+}
+
 /// Copies names / date / mahari / witnesses / writer / signatures from [source]
-/// into [destination], remapping the first-paragraph names correctly.
+/// into [destination], remapping the first-paragraph names correctly and
+/// transferring everything under that paragraph as-is.
 ({int names, int fields, int signatures}) ngmyHatiTransferDocumentContent({
   required NgmySlideDeck source,
   required NgmySlideDeck destination,
@@ -169,6 +181,7 @@ String ngmyHatiPaperTemplateIdFromDeck(NgmySlideDeck deck) {
   var fields = 0;
   var signatures = 0;
 
+  // ── First paragraph: role-mapped names ───────────────────────────────────
   final sourceIntroEl = _findField(source, 'utangulizi');
   final destIntroEl = _findField(destination, 'utangulizi');
   if (sourceIntroEl != null && destIntroEl != null) {
@@ -186,41 +199,73 @@ String ngmyHatiPaperTemplateIdFromDeck(NgmySlideDeck deck) {
     }
   }
 
-  const sharedFieldKeys = <String>[
-    'tarehe',
-    'mahari_1',
-    'mahari_2',
-    'mahari_3',
-    'mahari_4',
-    'witness_mke_1_name',
-    'witness_mke_2_name',
-    'witness_mke_3_name',
-    'witness_mume_1_name',
-    'witness_mume_2_name',
-    'witness_mume_3_name',
-    'mwandishi_jina',
-  ];
-  for (final key in sharedFieldKeys) {
+  // ── Everything else under the intro: copy matching fields as-is ──────────
+  // Includes tarehe, mahari_1..4, witness names, mwandishi_jina, and
+  // nimetowe_label when both documents have that editable banner.
+  final sourceFieldKeys = <String>{};
+  for (final slide in source.slides) {
+    for (final e in slide.elements) {
+      final key = ngmyHatiMarriageFieldKey(e);
+      if (key == null || key == 'utangulizi') continue;
+      sourceFieldKeys.add(key);
+    }
+  }
+  for (final key in sourceFieldKeys) {
     final from = _findField(source, key);
     final to = _findField(destination, key);
     if (from == null || to == null) continue;
-    final text = from.text.trim();
-    if (text.isEmpty) continue;
-    if (text == '[Jina la Shahidi]') continue;
-    to.text = from.text;
+    final text = from.text;
+    if (key.startsWith('witness_') && _isUnfilledWitnessPlaceholder(text)) continue;
+    if (text.trim().isEmpty) continue;
+    to.text = text;
     fields++;
   }
 
-  for (final slide in source.slides) {
-    for (final e in slide.elements) {
-      final signKey = ngmyHatiMarriageSignKey(e);
-      if (signKey == null) continue;
-      final image = (e.imageRef ?? '').trim();
-      if (image.isEmpty) continue;
-      final dest = _findSign(destination, signKey);
-      if (dest == null) continue;
-      dest.imageRef = e.imageRef;
-      signatures++;
+  // ── Signatures: placed images replace empty tap-to-sign zones ────────────
+  // After signing, the empty zone is removed and a `marriage_sign_placed_*`
+  // signature element holds the ink. Transfer that image into the matching
+  // slot on the partner document.
+  final destSlide = _primarySlide(destination);
+  if (destSlide != null) {
+    for (final slide in source.slides) {
+      for (final e in slide.elements) {
+        final slot = ngmyHatiPlacedSignatureSlot(e);
+        if (slot == null) continue;
+        final image = (e.imageRef ?? '').trim();
+        if (image.isEmpty) continue;
+
+        double x = e.x;
+        double y = e.y;
+        double w = e.w;
+        double h = e.h;
+        for (final xEl in destSlide.elements) {
+          if (ngmyHatiEmptySignZoneSlot(xEl) == slot || ngmyHatiPlacedSignatureSlot(xEl) == slot) {
+            x = xEl.x;
+            y = xEl.y;
+            w = xEl.w;
+            h = xEl.h;
+            break;
+          }
+        }
+
+        destSlide.elements.removeWhere((xEl) {
+          return ngmyHatiPlacedSignatureSlot(xEl) == slot || ngmyHatiEmptySignZoneSlot(xEl) == slot;
+        });
+
+        destSlide.elements.add(
+          NgmySlideElement(
+            id: NgmySlidesTemplates.newId(),
+            type: NgmySlideElementType.signature,
+            x: x,
+            y: y,
+            w: w,
+            h: h,
+            imageRef: e.imageRef,
+            fileName: '$kNgmyHatiPlacedSignPrefix$slot',
+          ),
+        );
+        signatures++;
+      }
     }
   }
 

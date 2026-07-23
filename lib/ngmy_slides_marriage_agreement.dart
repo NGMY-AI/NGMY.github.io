@@ -13,7 +13,10 @@ bool ngmyMarriageElementIsLocked(NgmySlideElement e) =>
 
 bool ngmyMarriageElementIsField(NgmySlideElement e) => e.fileName.startsWith(kMarriageFieldPrefix);
 
-bool ngmyMarriageElementIsSignZone(NgmySlideElement e) => e.fileName.startsWith(kMarriageSignPrefix);
+bool ngmyMarriageElementIsSignZone(NgmySlideElement e) =>
+    e.fileName.startsWith(kMarriageSignPrefix) &&
+    !e.fileName.startsWith('${kMarriageSignPrefix}placed_') &&
+    e.type != NgmySlideElementType.signature;
 
 /// Pack elements on the same row closer after a name field shrinks.
 void ngmyMarriagePackRow(NgmySlide slide, double anchorY) {

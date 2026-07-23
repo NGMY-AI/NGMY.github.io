@@ -858,6 +858,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
     NgmySlideDeck source = sourceDeck;
     if (fromEditor && _activeDeck != null && _activeDeck!.id == sourceDeck.id) {
+      _stopTextEditing(unfocus: true);
       _syncDeckIntoList();
       source = _activeDeck!.copy();
     } else {
