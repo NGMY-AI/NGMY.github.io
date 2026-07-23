@@ -25725,6 +25725,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         } else {
+          final member = NgmyCivicRegistryMembers.findByEmail(widget.config, memberEmail) ??
+              NgmyCivicRegistryMembers.findByRegistryId(widget.config, registryId);
+          final receiptState = ((member?['state'] ?? '').toString().trim().isNotEmpty
+                  ? (member?['state'] ?? '').toString().trim()
+                  : widget.user.state.trim());
+          final campaignId = widget.config.helpCampaignIdFor(receiptState).trim();
+          final payload = <String, dynamic>{
+            'kind': 'contribution',
+            'note': 'Registrar deposit via ID scan',
+            'registryId': registryId,
+            // Always stamp the member's Civic state so this receipt cannot
+            // appear in every state's Contribution Receipts after help mode ends.
+            'state': receiptState,
+            'purpose': widget.config.helpPurposeFor(receiptState),
+            'scopeType': widget.config.helpScopeTypeFor(receiptState),
+            'scopeValue': widget.config.helpScopeValueFor(receiptState),
+          };
+          if (campaignId.isNotEmpty) payload['campaignId'] = campaignId;
           widget.onAddTransaction(
             AppTransaction(
               id: 'civic_scan_${registryId}_${now.millisecondsSinceEpoch}',
@@ -25732,7 +25750,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               amount: amount,
               type: TransactionType.contribution,
               method: PaymentMethod.system,
-              sourceDetails: '{"kind":"contribution","note":"Registrar deposit via ID scan","registryId":"$registryId","state":"${widget.user.state}"}',
+              sourceDetails: jsonEncode(payload),
               status: TransactionStatus.approved,
               timestamp: now,
             ),
@@ -30127,13 +30145,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  void _markCampaignClosed(String campaignId, DateTime closedAt) {
+  void _markCampaignClosed(String campaignId, DateTime closedAt, {String? state}) {
     if (campaignId.trim().isEmpty) return;
     final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
     final idx = closures.indexWhere((e) => (e['campaignId'] ?? '').toString() == campaignId);
     final record = <String, dynamic>{
       'campaignId': campaignId,
       'closedAt': closedAt.toUtc().toIso8601String(),
+      if ((state ?? '').trim().isNotEmpty) 'state': state!.trim(),
     };
     if (idx >= 0) {
       closures[idx] = record;
@@ -30170,7 +30189,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             campaignStartedAt: startedAt,
           );
           widget.config.deactivateHelpCampaign(state);
-          _markCampaignClosed(campaignId, now);
+          _markCampaignClosed(campaignId, now, state: state);
           changed = true;
         }
       } catch (_) {}
@@ -31794,27 +31813,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  /// Resolves which Civic Registry state owns a contribution receipt.
+  /// Prefer the stamped campaign state; fall back to the contributor's
+  /// enrolled member record / account so older rows without a stamp still
+  /// stay inside one state instead of leaking nationwide after deactivate.
+  String _contributionReceiptState(AppTransaction t, [Map<String, dynamic>? meta]) {
+    final decoded = meta ?? _decodeContributionMeta(t);
+    final stamped = (decoded['state'] ?? '').toString().trim();
+    if (stamped.isNotEmpty) return stamped;
+    final email = t.userEmail.trim();
+    if (email.isNotEmpty) {
+      final member = NgmyCivicRegistryMembers.findByEmail(widget.config, email);
+      final memberState = (member?['state'] ?? '').toString().trim();
+      if (memberState.isNotEmpty) return memberState;
+      for (final u in widget.allUsers) {
+        if (u.email.toLowerCase().trim() != email.toLowerCase().trim()) continue;
+        if (u.state.trim().isNotEmpty) return u.state.trim();
+      }
+    }
+    return '';
+  }
+
   List<AppTransaction> _visibleContributionTx() {
+    final viewerState = _selectedState.trim().toLowerCase();
     return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
       final meta = _decodeContributionMeta(t);
       final scopeType = (meta['scopeType'] ?? 'all').toString();
       final scopeValue = (meta['scopeValue'] ?? '').toString();
-      final targetState = (meta['state'] ?? '').toString().trim();
-      // A contribution receipt belongs to the state whose help-mode
-      // campaign it was recorded under and must stay visible only to
-      // that state — not the whole country. Two things broke that:
-      // `_canManageCivicRegistry()` is true for an Authorized Registrar
-      // in ANY state, so it bypassed the state check for every
-      // registrar, not just that state's own; and the ID-scan deposit
-      // flow never stamped a `state` at all, so `targetState.isEmpty`
-      // skipped the check entirely and showed to everyone. Only
-      // King/Admin (genuinely cross-state roles) bypass the match now,
-      // and a missing state tag hides the receipt rather than leaking it.
-      if (!_isGlobalCivicRegistryAdmin()) {
-        if (targetState.isEmpty) return false;
-        if (targetState.toLowerCase() != _selectedState.trim().toLowerCase()) return false;
-      }
+      // Every viewer — member, registrar, King, or Admin — only sees the
+      // receipts for the Civic state they are currently viewing. Help-mode
+      // deactivate must not open Alabama receipts to Georgia (or vice
+      // versa). Changing state is the only way to see another state's
+      // contribution receipts.
+      final targetState = _contributionReceiptState(t, meta);
+      if (viewerState.isEmpty || targetState.isEmpty) return false;
+      if (targetState.toLowerCase() != viewerState) return false;
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -32091,7 +32125,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final cid = (meta['campaignId'] ?? '').toString().trim();
       if (cid.isNotEmpty) return cid == id;
-      final fallback = '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}';
+      final receiptState = _contributionReceiptState(t, meta);
+      final fallback = '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState';
       return fallback == id;
     }).toList();
   }
@@ -32186,7 +32221,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final groups = <String, List<AppTransaction>>{};
     for (final t in txs) {
       final meta = _decodeContributionMeta(t);
-      final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${meta['state'] ?? widget.user.state}')
+      final receiptState = _contributionReceiptState(t, meta);
+      final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState')
           .toString();
       if (_dismissedReceiptKeys.contains(key)) continue;
       if (widget.config.dismissedContributionReceiptKeys.contains(key)) continue;
@@ -32457,7 +32493,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       debugPrint('[help mode] mark missed on deactivate: $e');
                                     }
                                     try {
-                                      _markCampaignClosed(activeCampaignId, DateTime.now());
+                                      _markCampaignClosed(activeCampaignId, DateTime.now(), state: _selectedState);
                                     } catch (e) {
                                       debugPrint('[help mode] mark campaign closed: $e');
                                     }
