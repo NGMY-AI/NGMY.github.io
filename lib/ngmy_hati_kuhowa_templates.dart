@@ -820,6 +820,9 @@ const _kHatiKuhowaIntro = 'Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyu
     'yanayoheshimiwa na pande zote mbili za familia, kwa nia ya '
     'kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.';
 
+/// Public intro template used when transferring names into Hati ya Kuhowa.
+const String kNgmyHatiKuhowaIntroTemplate = _kHatiKuhowaIntro;
+
 const _kHatiKuhowaMahariItems = [
   'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
   'Mbuzi Mbili',
@@ -868,6 +871,9 @@ const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], 
     'upendo na mshikamano. Hivyo, ninathibitisha mbele ya mashahidi kuwa '
     'makubaliano haya yamefanyika kwa amani na kwa ridhaa kamili ya '
     'familia zote mbili.';
+
+/// Public intro template used when transferring names into Hati ya Kuhoweya.
+const String kNgmyHatiKuhoweshaIntroTemplate = _kHatiKuhoweshaIntro;
 
 const _kHatiKuhoweshaMahariItems = [
   'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',

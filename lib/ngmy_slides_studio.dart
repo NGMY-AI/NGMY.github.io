@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_hati_document_transfer.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -849,6 +850,164 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
     }
+  }
+
+  /// Optional: map filled names/fields/signatures from Hati ya Kuhowa ↔ Hati ya Kuhoweya.
+  Future<void> _transferHatiToPartner(NgmySlideDeck sourceDeck, {required bool fromEditor}) async {
+    if (!ngmyHatiIsTransferableDeck(sourceDeck)) return;
+
+    NgmySlideDeck source = sourceDeck;
+    if (fromEditor && _activeDeck != null && _activeDeck!.id == sourceDeck.id) {
+      _syncDeckIntoList();
+      source = _activeDeck!.copy();
+    } else {
+      final i = _decks.indexWhere((d) => d.id == sourceDeck.id);
+      source = i >= 0 ? _decks[i].copy() : sourceDeck.copy();
+    }
+
+    final partnerKind = ngmyHatiTransferPartnerKind(source.deckKind ?? '');
+    final partnerTitle = ngmyHatiTransferPartnerTitle(source.deckKind ?? '');
+    if (partnerKind.isEmpty) return;
+
+    final existing = _decks.where((d) => d.deckKind == partnerKind && d.id != source.id).toList();
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        title: Text('Transfer to $partnerTitle?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text(
+          'Optionally copy the names, date, mahari, witnesses, writer, and signatures from "${source.name}" into $partnerTitle. '
+          'Names in the first paragraph are placed in the matching family roles on the other document.',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.72), height: 1.35),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          if (existing.isNotEmpty)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'existing'),
+              child: Text('Use existing (${existing.length})'),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'new'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+            child: const Text('Create new & transfer'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    NgmySlideDeck dest;
+    var isNew = false;
+    if (choice == 'new') {
+      dest = ngmyHatiBuildPartnerDeck(source);
+      isNew = true;
+    } else {
+      String? pickedId = existing.length == 1 ? existing.first.id : null;
+      if (pickedId == null) {
+        pickedId = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            title: Text('Choose $partnerTitle', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            content: SizedBox(
+              width: 360,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: existing.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) {
+                  final d = existing[i];
+                  return ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    tileColor: Colors.white.withValues(alpha: 0.06),
+                    title: Text(d.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    subtitle: Text('Updated ${_formatDate(d.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45))),
+                    onTap: () => Navigator.pop(ctx, d.id),
+                  );
+                },
+              ),
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))],
+          ),
+        );
+      }
+      if (pickedId == null || !mounted) return;
+      final found = _decks.firstWhere((d) => d.id == pickedId);
+      final overwrite = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF111827),
+          title: const Text('Overwrite matching fields?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          content: Text(
+            'Filled names and shared details from "${source.name}" will replace matching blanks on "${found.name}".',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+              child: const Text('Transfer'),
+            ),
+          ],
+        ),
+      );
+      if (overwrite != true || !mounted) return;
+      dest = found.copy();
+    }
+
+    final stats = ngmyHatiTransferDocumentContent(source: source, destination: dest);
+    if (stats.names == 0 && stats.fields == 0 && stats.signatures == 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nothing to transfer yet — fill names or details on this document first.')),
+      );
+      return;
+    }
+
+    final openAfter = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        title: const Text('Transfer complete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text(
+          'Moved ${stats.names} name${stats.names == 1 ? '' : 's'}, ${stats.fields} field${stats.fields == 1 ? '' : 's'}, '
+          'and ${stats.signatures} signature${stats.signatures == 1 ? '' : 's'} into $partnerTitle.',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.72)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay here')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            child: Text('Open $partnerTitle'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+
+    setState(() {
+      if (isNew) {
+        _decks.insert(0, dest);
+      } else {
+        final i = _decks.indexWhere((d) => d.id == dest.id);
+        if (i >= 0) _decks[i] = dest;
+      }
+      if (openAfter == true) {
+        _activeDeck = dest.copy();
+        _slideIndex = 0;
+        _selectedElementId = null;
+        _isDraft = false;
+        _undo.clear();
+        _redo.clear();
+        _clearTextControllers();
+        _syncTextControllersForCurrentSlide();
+      }
+    });
+    _scheduleAutosave();
   }
 
   Future<void> _shareOutline() async {
@@ -1700,6 +1859,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               ),
               const SizedBox(height: 20),
               _deckActionRow(ctx, Icons.picture_as_pdf_outlined, 'Download PDF', 'Visual PDF like your slides', const Color(0xFF2563EB), 'pdf'),
+              if (ngmyHatiIsTransferableDeck(deck)) ...[
+                const SizedBox(height: 10),
+                _deckActionRow(
+                  ctx,
+                  Icons.swap_horiz_rounded,
+                  'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
+                  'Copy names & details into the matching marriage document',
+                  const Color(0xFF059669),
+                  'transfer_hati',
+                ),
+              ],
               const SizedBox(height: 10),
               _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
               const SizedBox(height: 10),
@@ -1732,6 +1902,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not create PDF: $e')));
       }
+    } else if (action == 'transfer_hati') {
+      await _transferHatiToPartner(deck, fromEditor: false);
     } else if (action == 'delete') {
       final ok = await showDialog<bool>(
         context: context,
@@ -2713,6 +2885,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               }
             }, isDark),
             _ribbonBtn(Icons.picture_as_pdf_outlined, 'Download PDF', () => unawaited(_downloadPdf()), isDark),
+            if (_activeDeck != null && ngmyHatiIsTransferableDeck(_activeDeck!))
+              _ribbonBtn(
+                Icons.swap_horiz_rounded,
+                'Transfer',
+                () => unawaited(_transferHatiToPartner(_activeDeck!, fromEditor: true)),
+                isDark,
+              ),
             if (el != null) ...[
               const SizedBox(width: 8),
               _ribbonBtn(Icons.format_bold, 'Bold', () {
