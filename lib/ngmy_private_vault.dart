@@ -9,9 +9,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'ngmy_studio_html_video_stub.dart' if (dart.library.html) 'ngmy_studio_html_video.dart' as studio_html_video;
 import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
+import 'ngmy_vault_html_video.dart';
+import 'ngmy_vault_pick_video.dart';
 import 'ngmy_vault_web_io.dart';
 
 const _kPinKey = 'ngmy_vault_pin_v1';
@@ -100,7 +101,18 @@ String _extFromMime(String mime) {
       return 'webp';
     case 'image/gif':
       return 'gif';
+    case 'video/webm':
+      return 'webm';
+    case 'video/quicktime':
+      return 'mov';
+    case 'video/ogg':
+      return 'ogv';
+    case 'video/x-m4v':
+      return 'm4v';
+    case 'video/mp4':
+      return 'mp4';
     default:
+      if (mime.startsWith('video/')) return 'mp4';
       return 'jpg';
   }
 }
@@ -429,13 +441,20 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
         final bytes = await f.readAsBytes();
         if (bytes.isEmpty) continue;
         final id = '${DateTime.now().microsecondsSinceEpoch}_$added';
-        final ok = await NgmyVaultBlobStore.put(id, bytes);
+        final mime = _guessImageMime(f.name);
+        final ok = await NgmyVaultBlobStore.put(id, bytes, mime: mime);
         if (!ok) continue;
-        _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.photo, mime: _guessImageMime(f.name), createdAt: DateTime.now()));
+        _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.photo, mime: mime, createdAt: DateTime.now()));
         added++;
       } catch (_) {}
     }
-    if (added == 0) return;
+    if (added == 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save photos. Try again with a smaller image.')),
+      );
+      return;
+    }
     await _saveIndex(widget.userEmail, _items);
     if (!mounted) return;
     setState(() {});
@@ -443,26 +462,32 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
   }
 
   Future<void> _addVideo() async {
-    final picker = ImagePicker();
-    XFile? f;
     try {
-      f = await picker.pickVideo(source: ImageSource.gallery);
-    } catch (_) {
-      f = null;
-    }
-    if (f == null) return;
-    try {
-      final bytes = await f.readAsBytes();
-      if (bytes.isEmpty) return;
+      final picked = await ngmyVaultPickVideoBytes();
+      if (picked == null) return;
       final id = '${DateTime.now().microsecondsSinceEpoch}_v';
-      final ok = await NgmyVaultBlobStore.put(id, bytes);
-      if (!ok) return;
-      _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.video, mime: 'video/mp4', createdAt: DateTime.now()));
+      final ok = await NgmyVaultBlobStore.put(id, picked.bytes, mime: picked.mime);
+      if (!ok) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save video. Storage may be full — try a shorter clip.')),
+        );
+        return;
+      }
+      _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.video, mime: picked.mime, createdAt: DateTime.now()));
       await _saveIndex(widget.userEmail, _items);
       if (!mounted) return;
       setState(() {});
       _notice('Saved 1 video privately.');
-    } catch (_) {}
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not add that video. Try MP4 or a shorter clip.')),
+      );
+    }
   }
 
   void _notice(String saved) {
@@ -583,8 +608,10 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     for (final item in _items.where((e) => ids.contains(e.id))) {
       final bytes = await NgmyVaultBlobStore.getBytes(item.id);
       if (bytes == null) continue;
-      final ext = item.kind == NgmyVaultKind.video ? 'mp4' : _extFromMime(item.mime);
-      final mime = item.kind == NgmyVaultKind.video ? 'video/mp4' : item.mime;
+      final mime = item.kind == NgmyVaultKind.video
+          ? (item.mime.trim().isEmpty ? 'video/mp4' : item.mime.trim())
+          : (item.mime.trim().isEmpty ? 'image/jpeg' : item.mime.trim());
+      final ext = _extFromMime(mime);
       final ok = await ngmyVaultDownloadBytes(bytes, 'ngmy_${item.id}.$ext', mime);
       if (ok) count++;
     }
@@ -894,6 +921,10 @@ class _VaultViewerScreenState extends State<_VaultViewerScreen> {
     _items = List.of(widget.items);
     _index = widget.initialIndex.clamp(0, math.max(0, _items.length - 1));
     _pageCtrl = PageController(initialPage: _index);
+    // Videos need chrome for Download; photos stay immersive until tap.
+    if (_items.isNotEmpty && _items[_index].kind == NgmyVaultKind.video) {
+      _actionsVisible = true;
+    }
   }
 
   @override
@@ -912,8 +943,10 @@ class _VaultViewerScreenState extends State<_VaultViewerScreen> {
     final item = _items[_index];
     final bytes = await NgmyVaultBlobStore.getBytes(item.id);
     if (bytes == null || !mounted) return;
-    final ext = item.kind == NgmyVaultKind.video ? 'mp4' : _extFromMime(item.mime);
-    final mime = item.kind == NgmyVaultKind.video ? 'video/mp4' : item.mime;
+    final mime = item.kind == NgmyVaultKind.video
+        ? (item.mime.trim().isEmpty ? 'video/mp4' : item.mime.trim())
+        : (item.mime.trim().isEmpty ? 'image/jpeg' : item.mime.trim());
+    final ext = _extFromMime(mime);
     final ok = await ngmyVaultDownloadBytes(bytes, 'ngmy_${item.id}.$ext', mime);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Downloaded.' : 'Could not download.')));
@@ -947,12 +980,23 @@ class _VaultViewerScreenState extends State<_VaultViewerScreen> {
       body: Stack(
         children: [
           GestureDetector(
-            onTap: _toggleActions,
+            onTap: () {
+              // Don't steal taps from the HTML video controls — only toggle
+              // chrome when the current page is a photo (or via long-press).
+              final item = _items.isEmpty ? null : _items[_index];
+              if (item?.kind == NgmyVaultKind.video) return;
+              _toggleActions();
+            },
             onLongPress: _toggleActions,
             child: PageView.builder(
               controller: _pageCtrl,
               itemCount: _items.length,
-              onPageChanged: (i) => setState(() => _index = i),
+              onPageChanged: (i) => setState(() {
+                _index = i;
+                if (_items[i].kind == NgmyVaultKind.video) {
+                  _actionsVisible = true;
+                }
+              }),
               itemBuilder: (context, i) => _page(_items[i]),
             ),
           ),
@@ -1054,6 +1098,8 @@ class _VaultVideoPage extends StatefulWidget {
 
 class _VaultVideoPageState extends State<_VaultVideoPage> {
   String? _blobUrl;
+  String? _error;
+  bool _loading = true;
 
   @override
   void initState() {
@@ -1062,27 +1108,60 @@ class _VaultVideoPageState extends State<_VaultVideoPage> {
   }
 
   Future<void> _load() async {
-    final bytes = await NgmyVaultBlobStore.getBytes(widget.itemId);
-    if (bytes == null || !mounted) return;
-    setState(() => _blobUrl = ngmyVaultBytesToBlobUrl(bytes, widget.mime));
+    final mime = widget.mime.trim().isEmpty ? 'video/mp4' : widget.mime.trim();
+    try {
+      final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, mime);
+      if (!mounted) return;
+      if (url == null || url.isEmpty) {
+        setState(() {
+          _loading = false;
+          _error = 'Video data missing. Re-add the clip from your gallery.';
+        });
+        return;
+      }
+      setState(() {
+        _blobUrl = url;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not open this video.';
+      });
+    }
   }
 
   @override
   void dispose() {
     final url = _blobUrl;
-    if (url != null) ngmyVaultRevokeBlobUrl(url);
+    if (url != null) {
+      NgmyVaultBlobStore.revokeObjectUrl(url);
+      ngmyVaultRevokeBlobUrl(url);
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white54));
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        ),
+      );
+    }
     final url = _blobUrl;
-    if (url == null) return const Center(child: CircularProgressIndicator(color: Colors.white54));
-    // video_player's web backend (NgmyStudioSlotVideo) doesn't reliably load
-    // local blob: URLs — Video Studio hit the same thing and switched to a
-    // native <video> element (NgmyStudioHtmlVideo) for exactly this local-
-    // preview case. This app only ships as a web build, but keep the same
-    // kIsWeb split the rest of the codebase uses for parity.
-    return kIsWeb ? studio_html_video.NgmyStudioHtmlVideo(source: url) : NgmyStudioSlotVideo(source: url);
+    if (url == null) {
+      return const Center(child: Text('Video unavailable', style: TextStyle(color: Colors.white54)));
+    }
+    // Dedicated vault player with native controls — studio cover player is not
+    // reliable for full-clip private vault playback.
+    if (kIsWeb) return NgmyVaultHtmlVideo(source: url);
+    return NgmyStudioSlotVideo(source: url);
   }
 }
