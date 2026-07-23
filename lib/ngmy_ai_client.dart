@@ -744,9 +744,12 @@ Future<String> ngmyResolveGeminiApiKey({
 Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
+  // Keep URL short — long romantic prompts break GET request limits on mobile web.
+  final clipped = p.length > 420 ? '${p.substring(0, 417)}...' : p;
   try {
     final url = Uri.parse(
-      'https://image.pollinations.ai/prompt/${Uri.encodeComponent(p)}?width=768&height=768&nologo=true',
+      'https://image.pollinations.ai/prompt/${Uri.encodeComponent(clipped)}'
+      '?width=768&height=768&nologo=true&enhance=true',
     );
     final response = await http.get(url).timeout(const Duration(seconds: 90));
     if (response.statusCode == 200 && response.bodyBytes.length > 2048) {
@@ -758,20 +761,151 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(String prompt)
   }
 }
 
-/// Romantic chat images — configured AI API first, then free image fallback.
+/// Server-side image fetch via Supabase proxy (avoids browser CORS on ngmy.org).
+Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
+  required String apiKey,
+  required String action,
+  required String prompt,
+  Uint8List? personBytes,
+  String personMime = 'image/jpeg',
+}) async {
+  try {
+    final client = Supabase.instance.client;
+    final body = <String, dynamic>{
+      'action': action,
+      'apiKey': apiKey.trim(),
+      'prompt': prompt.trim(),
+      if (personBytes != null && personBytes.isNotEmpty)
+        'images': [
+          {'mimeType': personMime, 'data': base64Encode(personBytes)},
+        ],
+      if (personBytes != null && personBytes.isNotEmpty) 'personOnly': true,
+    };
+
+    Future<({Uint8List? bytes, String? error})> parse(dynamic data, int status) async {
+      if (status == 200 && data is Map) {
+        final b64 = data['imageBase64']?.toString();
+        if (b64 != null && b64.trim().isNotEmpty) {
+          return (bytes: base64Decode(b64.trim()), error: null);
+        }
+        final err = data['error']?.toString();
+        if (err != null && err.isNotEmpty) return (bytes: null, error: err);
+      }
+      if (status == 404) {
+        return (bytes: null, error: 'AI image proxy not deployed.');
+      }
+      return (bytes: null, error: 'AI image proxy HTTP $status');
+    }
+
+    try {
+      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
+      final parsed = await parse(res.data, res.status);
+      if (parsed.bytes != null) return parsed;
+      if (res.status != 404 && (parsed.error ?? '').isNotEmpty && !parsed.error!.contains('HTTP')) {
+        // Keep trying other methods unless it's a hard miss.
+      }
+    } catch (e) {
+      debugPrint('[partner-img] functions.invoke $action: $e');
+    }
+
+    final restUrl = client.rest.url;
+    final base = restUrl.contains('/rest/v1')
+        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
+        : restUrl;
+    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
+    final session = client.auth.currentSession;
+    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
+    final token = session?.accessToken ?? anonKey;
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            if (anonKey.isNotEmpty) 'apikey': anonKey,
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 120));
+    if (response.statusCode == 200) {
+      return parse(jsonDecode(response.body), 200);
+    }
+    return parse(null, response.statusCode);
+  } catch (e) {
+    return (bytes: null, error: _extractApiErrorMessage(e));
+  }
+}
+
+/// Romantic partner chat images — lookalike portrait + CORS-safe proxy first.
+/// Never throws; callers always get bytes or a soft error.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
   NgmyAiCredentials? creds,
+  Uint8List? lookalikePortraitBytes,
+  String lookalikeMime = 'image/jpeg',
 }) async {
-  if (creds != null && creds.apiKey.trim().isNotEmpty) {
-    final primary = await ngmyAiGenerateImage(creds, prompt);
-    if (primary.bytes != null && primary.bytes!.isNotEmpty) return primary;
-    // Partner selfies must not die on API content filters — try free fallback.
-    final fallback = await ngmyPollinationsImage(prompt);
-    if (fallback.bytes != null && fallback.bytes!.isNotEmpty) return fallback;
-    return (bytes: null, error: primary.error ?? fallback.error ?? 'Image generation failed.');
+  final p = prompt.trim();
+  if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
+  final short = p.length > 450 ? '${p.substring(0, 447)}...' : p;
+  String? lastError;
+
+  try {
+    final key = creds?.apiKey.trim() ?? '';
+    final hasPortrait = lookalikePortraitBytes != null && lookalikePortraitBytes.isNotEmpty;
+    final lookalikePrompt = hasPortrait
+        ? 'Create ONE new photorealistic photograph of the EXACT person in the reference image. '
+            'Same face, skin, and hair. $short No text, no watermark. Output only the photo.'
+        : short;
+
+    // 1) Lookalike via existing Gemini image proxy (works on phone web / PWA).
+    if (key.isNotEmpty && hasPortrait) {
+      final proxied = await _callGeminiOutfitViaProxy(
+        apiKey: key,
+        personBytes: lookalikePortraitBytes,
+        personMime: lookalikeMime,
+        prompt: lookalikePrompt,
+      );
+      if (proxied.bytes != null && proxied.bytes!.isNotEmpty) return proxied;
+      lastError = proxied.error;
+      if (!kIsWeb) {
+        final direct = await _callGeminiOutfitDirect(
+          apiKey: key,
+          personBytes: lookalikePortraitBytes,
+          personMime: lookalikeMime,
+          prompt: lookalikePrompt,
+        );
+        if (direct.bytes != null && direct.bytes!.isNotEmpty) return direct;
+        lastError = direct.error ?? lastError;
+      }
+    }
+
+    // 2) Server-side Pollinations (no browser CORS) when proxy supports it.
+    if (key.isNotEmpty) {
+      final viaProxy = await _callImageActionViaProxy(
+        apiKey: key,
+        action: 'pollinationsImage',
+        prompt: short,
+      );
+      if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
+      lastError = viaProxy.error ?? lastError;
+    }
+
+    // 3) Direct Pollinations (may fail CORS on some browsers — still try).
+    final poll = await ngmyPollinationsImage(short);
+    if (poll.bytes != null && poll.bytes!.isNotEmpty) return poll;
+    lastError = poll.error ?? lastError;
+
+    // 4) Configured image API (DALL·E / Imagen).
+    if (key.isNotEmpty && creds != null) {
+      final api = await ngmyAiGenerateImage(creds, short);
+      if (api.bytes != null && api.bytes!.isNotEmpty) return api;
+      lastError = api.error ?? lastError;
+    }
+
+    return (bytes: null, error: lastError ?? 'Image generation failed.');
+  } catch (e) {
+    return (bytes: null, error: _extractApiErrorMessage(e));
   }
-  return ngmyPollinationsImage(prompt);
 }
 
 /// Admin image generation — any prompt, no content filter (companion avatars, etc.).

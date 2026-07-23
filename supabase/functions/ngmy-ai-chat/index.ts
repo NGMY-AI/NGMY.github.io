@@ -360,6 +360,41 @@ serve(async (req) => {
       });
     }
 
+    // Partner chat selfies — fetch image server-side so phone browsers skip CORS.
+    if (action === "pollinationsImage") {
+      const imgPrompt = String(body?.prompt ?? "").trim();
+      if (!imgPrompt) {
+        return new Response(JSON.stringify({ error: "prompt is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const clipped = imgPrompt.length > 420 ? `${imgPrompt.slice(0, 417)}...` : imgPrompt;
+      const url =
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(clipped)}` +
+        `?width=768&height=768&nologo=true&enhance=true&seed=${Date.now()}`;
+      const imgRes = await fetch(url);
+      if (!imgRes.ok) {
+        return new Response(
+          JSON.stringify({ error: `Image service HTTP ${imgRes.status}` }),
+          {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const buf = new Uint8Array(await imgRes.arrayBuffer());
+      if (buf.length < 2048) {
+        return new Response(JSON.stringify({ error: "Image service returned empty body" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ imageBase64: bytesToBase64(buf) }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const prompt = String(body?.prompt ?? "").trim();
     const provider = String(body?.provider ?? "gemini") as Provider;
     const openAiBaseUrl = body?.openAiBaseUrl

@@ -3256,32 +3256,62 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
-      final canSendPartnerImage = allowsPartnerPhotos && canDateThisChatter && isExclusivePartner;
-      final wantsImage = requestedImage && canSendPartnerImage && !_allowsPhotoUpload;
+      final datingVibeNow = ngmyCommunicateMemoryLooksLikeDating(mem) ||
+          RegExp(r'\b(babe|baby|my love|handsome|miss you|boyfriend|girlfriend)\b', caseSensitive: false)
+              .hasMatch('$text ${mem.map((m) => m['text'] ?? '').join(' ')}');
+      // Prefer exclusive stamp; if store lags, dating vibe + datable role still unlocks pics.
+      final canSendPartnerImage = allowsPartnerPhotos &&
+          canDateThisChatter &&
+          (isExclusivePartner || datingVibeNow);
+      // Partner pics do NOT require the user to upload a photo first — camera is only for homework roles.
+      final wantsImage = requestedImage && canSendPartnerImage;
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
 
       Future<String?> generatePartnerPhotoB64() async {
-        final look = ngmyAdvisorVisualLookDescription(
-          name: widget.profile.name,
-          gender: widget.profile.gender,
-          bio: widget.profile.bio,
-        );
-        final scene = text.trim();
-        final recent = mem.reversed
-            .take(8)
-            .map((m) => (m['text'] ?? '').toString())
-            .where((t) => t.trim().isNotEmpty)
-            .join(' | ');
-        final primary = ngmyPartnerChatImagePrompt(look: look, scene: scene, recent: recent);
-        var imgResult = await ngmyGenerateRomanticChatImage(primary, creds: creds);
-        if (imgResult.bytes == null || imgResult.bytes!.isEmpty) {
-          // Soft retry — still the same person, plain selfie, so partners aren't stuck.
-          final soft = 'Photorealistic selfie of $look looking at the camera, natural lighting, '
-              'exact same face as profile, high detail, no text, no watermark, square photo.';
-          imgResult = await ngmyGenerateRomanticChatImage(soft, creds: creds);
+        try {
+          final look = ngmyAdvisorVisualLookDescription(
+            name: widget.profile.name,
+            gender: widget.profile.gender,
+            bio: widget.profile.bio,
+          );
+          final scene = text.trim();
+          final recent = mem.reversed
+              .take(8)
+              .map((m) => (m['text'] ?? '').toString())
+              .where((t) => t.trim().isNotEmpty)
+              .join(' | ');
+          final primary = ngmyPartnerChatImagePrompt(look: look, scene: scene, recent: recent);
+          final portrait = await ngmyAdvisorPortraitBytesAsync(
+            id: widget.profile.id,
+            gender: widget.profile.gender,
+            role: widget.profile.role,
+            name: widget.profile.name,
+          );
+          final mime = portrait.length >= 3 && portrait[0] == 0xFF && portrait[1] == 0xD8
+              ? 'image/jpeg'
+              : 'image/png';
+          var imgResult = await ngmyGenerateRomanticChatImage(
+            primary,
+            creds: creds,
+            lookalikePortraitBytes: portrait,
+            lookalikeMime: mime,
+          );
+          if (imgResult.bytes == null || imgResult.bytes!.isEmpty) {
+            final soft = 'Photorealistic selfie of $look looking at the camera, natural lighting, '
+                'exact same face as profile, high detail, no text, no watermark, square photo.';
+            imgResult = await ngmyGenerateRomanticChatImage(
+              soft,
+              creds: creds,
+              lookalikePortraitBytes: portrait,
+              lookalikeMime: mime,
+            );
+          }
+          if (imgResult.bytes == null || imgResult.bytes!.isEmpty) return null;
+          return base64Encode(imgResult.bytes!);
+        } catch (e) {
+          debugPrint('[communicate] partner photo: $e');
+          return null;
         }
-        if (imgResult.bytes == null || imgResult.bytes!.isEmpty) return null;
-        return base64Encode(imgResult.bytes!);
       }
 
       if (userSentPhoto) {
@@ -3326,7 +3356,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
-      } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
+      } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner && !datingVibeNow) {
         // Datable advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -3350,15 +3380,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
       } else if (wantsImage) {
-        final b64 = await generatePartnerPhotoB64();
+        // Dating partner asked for a pic → ONLY send a real image (no chat narration).
+        String? b64;
+        try {
+          b64 = await generatePartnerPhotoB64();
+        } catch (e) {
+          debugPrint('[communicate] wantsImage: $e');
+          b64 = null;
+        }
         if (b64 != null && b64.isNotEmpty) {
-          // Real picture only — never narrate "[sends a selfie]".
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64);
         } else {
-          // Do NOT ask the LLM to pretend — that produces fake selfie narration.
-          const failReply = 'One sec babe — pic glitched, ask me again 💕';
+          const failReply = '💕';
           if (!mounted) return;
           setState(() => _messages.add({'role': 'ai', 'text': failReply}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: failReply);
@@ -3384,9 +3419,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             : await ngmyAiGenerateWithRetry(creds, prompt);
         var cleaned = _cleanAdvisorReply(result.text);
         // If the model faked sending a photo while we can actually send one, send a real image.
-        if (canSendPartnerImage &&
-            !_allowsPhotoUpload &&
-            (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
+        if (canSendPartnerImage && (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
           final b64 = await generatePartnerPhotoB64();
           if (b64 != null && b64.isNotEmpty) {
             if (!mounted) return;
@@ -3394,10 +3427,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64);
             return;
           }
-          cleaned = 'One sec babe — pic glitched, ask me again 💕';
+          cleaned = '💕';
         } else if (ngmyAdvisorReplyFakesSendingPhoto(cleaned)) {
           cleaned = canSendPartnerImage
-              ? 'One sec babe — pic glitched, ask me again 💕'
+              ? '💕'
               : 'I don\'t send pics like that unless we\'re official 😌';
         }
         final reply = cleaned.isNotEmpty
