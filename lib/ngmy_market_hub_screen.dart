@@ -100,7 +100,7 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                 const SizedBox(height: 18),
                 _hudFrame(
                   t: t,
-                  title: '',
+                  title: 'Business Essentials',
                   subtitle: '',
                   thumbHeight: thumbH,
                   colors: const [Color(0xFF38BDF8), Color(0xFF1E3A8A), Color(0xFF0E7490)],
@@ -109,7 +109,6 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   orbit: orbit,
                   phase: 0.44,
                   badge: _essentialsCount > 0 ? '$_essentialsCount saved' : null,
-                  frameCenterLabel: 'Business Essentials',
                   preview: _EssentialsThumbPreview(isDark: t.isDark),
                   onTap: () async {
                     await showNgmyBusinessEssentialsHub(context, userEmail: widget.userEmail);
@@ -347,17 +346,84 @@ class _EssentialsThumbPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF0B1220), Color(0xFF0E7490), Color(0xFF1E3A8A)]
-              : const [Color(0xFFE0F2FE), Color(0xFFBAE6FD), Color(0xFF7DD3FC)],
+    const accent = Color(0xFF38BDF8);
+    return Center(
+      child: Transform.rotate(
+        angle: -0.05,
+        child: Container(
+          width: 200,
+          height: 114,
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? const [Color(0xFF0B1220), Color(0xFF0E7490), Color(0xFF1E3A8A)]
+                  : const [Color(0xFFF0F9FF), Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
+            ),
+            border: Border.all(color: accent.withValues(alpha: 0.65), width: 1.3),
+            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12))],
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      gradient: const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)]),
+                    ),
+                    child: const Icon(Icons.business_center_rounded, color: Colors.white, size: 16),
+                  ),
+                  const Spacer(),
+                  _miniDot(const Color(0xFF38BDF8)),
+                  const SizedBox(width: 4),
+                  _miniDot(const Color(0xFFA78BFA)),
+                  const SizedBox(width: 4),
+                  _miniDot(const Color(0xFFEC4899)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'ESSENTIALS',
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0C4A6E),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 1.3,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Notes · Contacts · Tools',
+                style: TextStyle(
+                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      child: const SizedBox.expand(),
+    );
+  }
+
+  static Widget _miniDot(Color color) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.85),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 4)],
+      ),
     );
   }
 }
