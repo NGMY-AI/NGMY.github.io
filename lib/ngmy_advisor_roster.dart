@@ -314,13 +314,13 @@ const _kYoungFemaleOrder = <String>[
   'MARIAM DUSABE',
   'SUZANA VANESSA',
   'ANNA AMURI',
-  'ALISA JOHN',
   'SUZANA MBUTO',
   'SUZY BENET',
   'MINA SAMUEL',
 ];
 
 const _kMaleOrder = <String>[
+  'ISAIAH JOHN',
   'ALEX REMY',
   'JEREMIAH NESTO',
 ];
@@ -383,7 +383,12 @@ String? _canonicalNameFor(Map<String, dynamic> m) {
   if (_nameLooksLike(n, 'malcom') || _nameLooksLike(n, 'malcolm') || _nameLooksLike(n, 'mbuto')) {
     return 'SUZANA MBUTO';
   }
-  if (_nameLooksLike(n, 'kenny') || _nameLooksLike(n, 'alisa')) return 'ALISA JOHN';
+  if (_nameLooksLike(n, 'kenny') ||
+      _nameLooksLike(n, 'alisa') ||
+      _nameLooksLike(n, 'isaiah') ||
+      (n.contains('isaiah') && n.contains('john'))) {
+    return 'ISAIAH JOHN';
+  }
   if (_nameLooksLike(n, 'suzy') || _nameLooksLike(n, 'susie') || _nameLooksLike(n, 'suzie') || _nameLooksLike(n, 'benet')) {
     return 'SUZY BENET';
   }
@@ -445,19 +450,21 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
   };
 }
 
-Map<String, dynamic> _alisaJohnBibleStudyPatch(Map<String, dynamic> existing) {
+Map<String, dynamic> _isaiahJohnBibleStudyPatch(Map<String, dynamic> existing) {
   return {
     ...existing,
-    'name': 'ALISA JOHN',
-    'gender': 'female',
+    'name': 'ISAIAH JOHN',
+    'gender': 'male',
     'role': 'bible_study_teacher',
     'emoji': '📖',
     'bio':
-        'Bible Study Advisor on NGMY Advisors — Scripture explained clearly with pastoral care and respect.',
+        'Bible Study Advisor on NGMY Advisors — a seasoned Black pastor (about 35–45) who opens Scripture '
+        'with clarity, pastoral care, and dignity.',
     'personality':
-        'You are ALISA JOHN, a devoted young Bible Study Advisor and teacher of the Word. '
-        'Explain Scripture clearly, invite real questions, and counsel with pastoral warmth and dignity. '
-        'Respectful, wise, never flashy. Sound like a real young woman who loves teaching the Bible.',
+        'You are ISAIAH JOHN, a distinguished Black pastor and Bible Study Advisor in your late 30s to mid-40s. '
+        'You teach the Word with calm authority, pastoral warmth, and real scholarship — never flashy, never soft on truth. '
+        'Explain Scripture clearly, invite honest questions, and counsel with dignity. '
+        'Sound like a real man of God in a sharp black suit — respectful, wise, grounded, and present.',
   };
 }
 
@@ -520,10 +527,11 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       row['name'] = upper;
     }
 
-    // Bible Study Advisor — Alisa is religious teaching, never "Confidence Advisor".
-    if (upper == 'ALISA JOHN') {
-      final patched = _alisaJohnBibleStudyPatch(row);
+    // Bible Study Advisor — Isaiah John is a male pastor (35–45), never Alisa / female.
+    if (upper == 'ISAIAH JOHN' || upper == 'ALISA JOHN') {
+      final patched = _isaiahJohnBibleStudyPatch(row);
       if (patched['role'] != row['role'] ||
+          patched['gender'] != row['gender'] ||
           patched['bio'] != row['bio'] ||
           patched['personality'] != row['personality'] ||
           patched['emoji'] != row['emoji'] ||

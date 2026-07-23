@@ -269,8 +269,9 @@ String ngmyAdvisorVisualLookDescription({
   if (n.contains('ANNA')) {
     return 'beautiful young African Black woman early 20s, polished graceful look — exact same person every time';
   }
-  if (n.contains('ALISA')) {
-    return 'beautiful young African Black woman about 22–23, polished braided bun, elegant burgundy blazer over ivory blouse, delicate gold cross necklace, pastoral Bible study teacher look — exact same person every time';
+  if (n.contains('ISAIAH') || n.contains('ALISA')) {
+    return 'distinguished Black African pastor man about 38–42, neat professional short haircut, warm confident expression, '
+        'elegant tailored black suit with crisp white shirt and dark tie — exact same person every time';
   }
   if (bio.trim().isNotEmpty) {
     return '${bio.trim()} — same person identity consistent across photos';

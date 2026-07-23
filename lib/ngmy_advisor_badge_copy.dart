@@ -60,10 +60,16 @@ const _byName = <String, NgmyAdvisorBadgeCopy>{
     about: 'Balance and next-step clarity — that is what I bring to every $_kHub session.',
     style: 'Calm voice. Practical wisdom. Modern elegance.',
   ),
+  'ISAIAH JOHN': NgmyAdvisorBadgeCopy(
+    roleTitle: 'Bible Study Advisor',
+    about: 'Scripture opened with pastoral authority — a seasoned Black pastor teaching with clarity and care on $_kHub.',
+    style: 'Calm dignity. Faith-led. Clear and respectful.',
+  ),
+  // Legacy rename — Alisa John became Isaiah John (male pastor).
   'ALISA JOHN': NgmyAdvisorBadgeCopy(
     roleTitle: 'Bible Study Advisor',
-    about: 'Scripture opened with care — teaching, clarity, and pastoral warmth on $_kHub.',
-    style: 'Humble instruction. Faith-led. Respectful and clear.',
+    about: 'Scripture opened with pastoral authority — a seasoned Black pastor teaching with clarity and care on $_kHub.',
+    style: 'Calm dignity. Faith-led. Clear and respectful.',
   ),
   'SUZANA MBUTO': NgmyAdvisorBadgeCopy(
     roleTitle: 'Growth Advisor',

@@ -166,7 +166,9 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
   // These three used to fall through to the same companion_f role photo.
   if (hit('anna') || hit('amuri')) return 'person_anna_amuri';
-  if (hit('alisa') || hit('kenny')) return 'person_alisa_john';
+  if (hit('isaiah') || hit('alisa') || hit('kenny') || (hit('john') && (n.contains('isaiah') || n.contains('alisa')))) {
+    return 'person_isaiah_john';
+  }
   if (hit('mbuto') || (hit('suzana') && !n.contains('vanessa'))) return 'person_suzana_mbuto';
   // Elder Wisdom Advisor — older woman portrait asset (intentional).
   // Must stay above other marriage-advisor names so Nia never inherits this face.
@@ -204,7 +206,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
     'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
-    'person_anna_amuri', 'person_alisa_john', 'person_suzana_mbuto',
+    'person_anna_amuri', 'person_isaiah_john', 'person_suzana_mbuto',
     'person_alex_remy', 'person_jeremiah_nesto',
     'person_nia_robertson', 'person_grace_anderson', 'person_sophie_morgan',
     'person_olivia_bennett', 'person_chloe_mitchell',
