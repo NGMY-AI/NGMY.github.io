@@ -30191,6 +30191,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             campaignId,
             members: _membersInCurrentHelpScope(forState: state),
             campaignStartedAt: startedAt,
+            campaignState: state,
           );
           widget.config.deactivateHelpCampaign(state);
           _markCampaignClosed(campaignId, now, state: state);
@@ -31666,6 +31667,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     String campaignId, {
     List<UserData>? members,
     DateTime? campaignStartedAt,
+    String? campaignState,
   }) {
     final normalizedCampaignId = campaignId.trim();
     if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
@@ -31683,56 +31685,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       debugPrint('[help mode] campaign $normalizedCampaignId already closed — skipping duplicate missed marking');
       return;
     }
-    // Contributors for THIS campaign must never be marked missed.
-    // Match by campaignId first (Money dialog stamps it), then by time
-    // window / fallback purpose key for older ID-scan rows. Identity is
-    // email OR registryId — email-only matching wrongly missed people
-    // after guest→app rekey or empty-email enrollments.
+    final stateKey = (campaignState ?? _selectedState).trim().toLowerCase();
+    // Anyone who put money / was recorded for THIS campaign must never be
+    // marked missed. Match by campaignId, fallback purpose key, OR time
+    // window in the same state — never require all three. Identity is
+    // email OR registryId (Money stamps both).
     final contributorKeys = <String>{};
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       final meta = _decodeContributionMeta(t);
       final cid = (meta['campaignId'] ?? '').toString().trim();
-      final receiptState = _contributionReceiptState(t, meta);
+      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
       final fallbackId =
-          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState';
+          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${_contributionReceiptState(t, meta)}';
       final matchesCampaignId =
           normalizedCampaignId.isNotEmpty && (cid == normalizedCampaignId || fallbackId == normalizedCampaignId);
       final matchesTimeWindow =
           campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt);
-      // campaignId is primary proof. Time window is only a backup when the
-      // contribution has no campaignId (legacy ID-scan). Never ignore a
-      // stamped campaignId just because the timestamp is slightly off.
-      final isForThisCampaign = matchesCampaignId || (cid.isEmpty && matchesTimeWindow);
+      final matchesState = stateKey.isEmpty ||
+          receiptState.isEmpty ||
+          receiptState == stateKey;
+      // campaignId OR (time window in this state). Do not drop a paid
+      // member because a campaignId string drifted slightly.
+      final isForThisCampaign =
+          matchesCampaignId || (matchesTimeWindow && matchesState);
       if (!isForThisCampaign) continue;
-      final emailKey = t.userEmail.toLowerCase().trim();
+      final emailKey = NgmyCivicRegistryMembers.emailKey(t.userEmail);
       if (emailKey.isNotEmpty) contributorKeys.add(emailKey);
+      final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+      if (metaEmail.isNotEmpty) contributorKeys.add(metaEmail);
       final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
       if (rid.isNotEmpty) contributorKeys.add('rid:$rid');
     }
-    // A member can end up listed more than once for one campaign check
-    // (e.g. duplicate records from cloud merges) — track who's already
-    // been marked so a single close-out never counts one person as
-    // missed more than once.
     final alreadyMarked = <String>{};
     for (final m in members ?? _membersInCurrentHelpScope()) {
-      // Registrars can enroll a member without an email (guest
-      // enrollment — registryId is the unique key in that case; see
-      // NgmyCivicRegistryMembers.upsert). Keying purely on email meant
-      // every such member had an empty key here and was silently
-      // `continue`d past — never marked missed, no matter what — which
-      // is exactly how one person out of a full state roster could
-      // vanish from the missed count while everyone else was handled
-      // correctly. Fall back to registryId (always present — rows
-      // without one get pruned on enrollment) so nobody with a real
-      // registry record gets skipped.
-      final emailKey = m.email.toLowerCase().trim();
+      final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
       final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
       final key = emailKey.isNotEmpty ? emailKey : ridKey;
       if (key == 'rid:' || !alreadyMarked.add(key)) continue;
       final contributed = (emailKey.isNotEmpty && contributorKeys.contains(emailKey)) ||
           (ridKey != 'rid:' && contributorKeys.contains(ridKey));
-      if (contributed) continue; // put money / recorded contribution → never missed
+      if (contributed) continue; // recorded money → never missed for this campaign
       m.missed += 1;
       unawaited(_persistCivicMemberActivity(m));
     }
@@ -32530,6 +32523,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                         activeCampaignId,
                                         members: membersInScope,
                                         campaignStartedAt: campaignStartedAt,
+                                        campaignState: _selectedState,
                                       );
                                     } catch (e) {
                                       debugPrint('[help mode] mark missed on deactivate: $e');
@@ -34059,6 +34053,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               submitted = true;
                               final now = DateTime.now();
                               final campaignId = _activeHelpCampaignId(state);
+                              final memberEmail = NgmyCivicRegistryMembers.emailKey(u.email);
+                              final memberRid = (u.registryId ?? '').trim().toUpperCase();
                               final payload = jsonEncode({
                                 'kind': 'contribution',
                                 'purpose': widget.config.helpPurposeFor(state),
@@ -34072,26 +34068,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 // and hiding it from the state it actually belongs to.
                                 'state': state,
                                 'campaignId': campaignId,
+                                'memberEmail': memberEmail,
+                                'registryId': memberRid,
                               });
-                              widget.onAddTransaction(
-                                AppTransaction(
-                                  id: 'contrib_${u.email}_$now',
-                                  userEmail: u.email,
-                                  amount: amount,
-                                  type: TransactionType.contribution,
-                                  method: PaymentMethod.system,
-                                  sourceDetails: payload,
-                                  status: TransactionStatus.approved,
-                                  timestamp: now,
-                                ),
+                              final tx = AppTransaction(
+                                id: 'contrib_${memberEmail.isNotEmpty ? memberEmail : memberRid}_${now.microsecondsSinceEpoch}',
+                                userEmail: memberEmail.isNotEmpty ? memberEmail : u.email,
+                                amount: amount,
+                                type: TransactionType.contribution,
+                                method: PaymentMethod.system,
+                                sourceDetails: payload,
+                                status: TransactionStatus.approved,
+                                timestamp: now,
                               );
-                              // A new contribution never clears an existing missed
-                              // count — missed only reflects campaigns the member
-                              // was actually closed out on without contributing;
-                              // it isn't a running balance a later contribution can
-                              // pay back down.
+                              widget.onAddTransaction(tx);
+                              // Keep civic money list in sync instantly so Remove /
+                              // deactivate / receipts see this contribution immediately
+                              // (do not wait on a cloud round-trip).
                               setState(() {
                                 u.helps += 1;
+                                _communityContributions = [
+                                  ..._communityContributions.where((t) => t.id != tx.id),
+                                  tx,
+                                ];
                               });
                               unawaited(_persistCivicMemberActivity(u));
                               widget.onDataChanged();
@@ -34318,21 +34317,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  /// Lets a registrar remove a money/contribution record that was recorded
-  /// by mistake — the "Money" button repurposes to this once help mode is
-  /// off (there's nothing to add). Mirrors the claim delete pattern:
-  /// status flips to rejected (every contribution display already filters
-  /// to status == approved, so a rejected one vanishes everywhere and its
-  /// amount drops out of every derived total automatically) and syncs via
-  /// onAddTransaction the same way claim deletes do. helps is decremented
-  /// to undo exactly what adding the contribution incremented — missed is
-  /// never touched here, same as it's never touched when adding one.
-  void _showMoneyRecordsManageDialog(UserData u) {
-    final emailKey = u.email.toLowerCase().trim();
-    final records = widget.allTransactions
-        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-        .toList()
+  /// Money records for a member — local + community merge, matched by email
+  /// or registryId so Remove works instantly after Save (no cloud wait).
+  List<AppTransaction> _moneyRecordsForMember(UserData u) {
+    final emailKey = NgmyCivicRegistryMembers.emailKey(u.email);
+    final rid = (u.registryId ?? '').trim().toUpperCase();
+    final records = _civicTransactionsForDisplay().where((t) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+      final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+      if (emailKey.isNotEmpty && txEmail == emailKey) return true;
+      final meta = _decodeContributionMeta(t);
+      final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+      if (emailKey.isNotEmpty && metaEmail == emailKey) return true;
+      final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rid.isNotEmpty && metaRid == rid) return true;
+      return false;
+    }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return records;
+  }
+
+  /// Lets a registrar remove a money/contribution record that was recorded
+  /// by mistake — available while help mode is on or off. Mirrors the claim
+  /// delete pattern: status flips to rejected and syncs via onAddTransaction.
+  /// helps is decremented to undo the add; missed is never touched here.
+  void _showMoneyRecordsManageDialog(UserData u) {
+    final records = _moneyRecordsForMember(u);
     if (records.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No money records to remove.')));
       return;
@@ -34369,6 +34379,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               setState(() {
                 t.status = TransactionStatus.rejected;
                 if (u.helps > 0) u.helps -= 1;
+                _communityContributions = _communityContributions
+                    .map((c) => c.id == t.id ? t : c)
+                    .where((c) => c.status == TransactionStatus.approved)
+                    .toList();
               });
               widget.onAddTransaction(t);
               unawaited(_persistCivicMemberActivity(u));
@@ -35874,15 +35888,56 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
               if (manageActions) ...[
                 _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () {
-                  // While help mode is active, Money adds a contribution.
-                  // Once it's off there's nothing to add — repurpose the
-                  // same button to manage/remove a money record that was
-                  // recorded by mistake, same as Clean does for claims.
-                  if (widget.config.helpActiveFor(_selectedState)) {
+                  // Help active: add money, or manage/remove existing records.
+                  // Help off: remove only. Always use the instant local+community
+                  // merge so Save → Remove never says "No money records".
+                  final helpOn = widget.config.helpActiveFor(_selectedState);
+                  final hasRecords = _moneyRecordsForMember(u).isNotEmpty;
+                  if (helpOn && !hasRecords) {
                     _showContributionDialog(u);
-                  } else {
-                    _showMoneyRecordsManageDialog(u);
+                    return;
                   }
+                  if (helpOn && hasRecords) {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) {
+                        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                        return Container(
+                          margin: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF111827) : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
+                                title: const Text('Add contribution', style: TextStyle(fontWeight: FontWeight.w800)),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _showContributionDialog(u);
+                                },
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                                title: const Text('Remove money record', style: TextStyle(fontWeight: FontWeight.w800)),
+                                subtitle: Text('${_moneyRecordsForMember(u).length} on file'),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _showMoneyRecordsManageDialog(u);
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                    return;
+                  }
+                  _showMoneyRecordsManageDialog(u);
                 }),
                 _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
                 _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
