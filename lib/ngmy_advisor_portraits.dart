@@ -166,10 +166,8 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
   // These three used to fall through to the same companion_f role photo.
   if (hit('anna') || hit('amuri')) return 'person_anna_amuri';
-  // person_isaiah_john.jpg was accidentally a duplicate of bible_study_teacher_m;
-  // the real unique pastor portrait is person_alisa_john.jpg.
   if (hit('isaiah') || hit('alisa') || hit('kenny') || (hit('john') && (n.contains('isaiah') || n.contains('alisa')))) {
-    return 'person_alisa_john';
+    return 'person_isaiah_john';
   }
   if (hit('mbuto') || (hit('suzana') && !n.contains('vanessa'))) return 'person_suzana_mbuto';
   // Elder Wisdom Advisor — older woman portrait asset (intentional).
@@ -208,7 +206,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
     'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
-    'person_anna_amuri', 'person_alisa_john', 'person_isaiah_john', 'person_suzana_mbuto',
+    'person_anna_amuri', 'person_isaiah_john', 'person_suzana_mbuto',
     'person_alex_remy', 'person_jeremiah_nesto',
     'person_nia_robertson', 'person_grace_anderson', 'person_sophie_morgan',
     'person_olivia_bennett', 'person_chloe_mitchell',
@@ -259,6 +257,29 @@ _PortraitSpec? _newBatchSpecFor(String name, bool isMale) {
   if (wi >= 0) return _femaleWhiteSpecs[wi];
   final ai = _kNewBatchAfricanFemaleNames.indexOf(n);
   return ai >= 0 ? _kNewBatchAfricanFemaleSpecs[ai] : null;
+}
+
+/// Load the exact bundled JPG used by the advisor avatar circle (same path as
+/// [ngmyAdvisorPortraitAssetPath] / Image.asset). Never invents illustrated cartoons.
+Future<Uint8List?> ngmyAdvisorLoadPhotorealPortraitBytes({
+  required String id,
+  required String gender,
+  String role = '',
+  String name = '',
+}) async {
+  await ngmyWarmAdvisorPortraitAssets();
+  final path = ngmyAdvisorPortraitAssetPath(gender: gender, role: role, name: name, id: id);
+  final cached = _assetCache[path];
+  if (cached != null && cached.isNotEmpty) return cached;
+  try {
+    final data = await rootBundle.load(path);
+    final bytes = data.buffer.asUint8List();
+    if (bytes.isEmpty) return null;
+    _assetCache[path] = bytes;
+    return bytes;
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.

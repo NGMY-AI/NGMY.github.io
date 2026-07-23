@@ -1611,23 +1611,17 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
     final id = widget.profile.id.trim();
     final name = widget.profile.name.trim();
 
-    // Named overrides (Mariam / Suzy / Mina) always win over old cached role photos.
-    if (ngmyAdvisorHasNamedPortrait(name: name, id: id)) {
-      try {
-        final namedBytes = await ngmyAdvisorPortraitBytesAsync(
-          id: id,
-          gender: widget.profile.gender,
-          role: widget.profile.role,
-          name: name,
-        );
-        if (namedBytes.isNotEmpty) {
-          await NgmyCommunicateAvatarCache.saveBytes(id, namedBytes);
-          // Asset face is already correct — keep painting the asset (no blink).
-          if (_useBundledAsset) return;
-          if (mounted) _applyBytes(namedBytes);
-          return;
-        }
-      } catch (_) {}
+    // Keep disk/RAM cache aligned with the bundled profile face (never cartoons).
+    final assetBytes = await ngmyAdvisorLoadPhotorealPortraitBytes(
+      id: id,
+      gender: widget.profile.gender,
+      role: widget.profile.role,
+      name: name,
+    );
+    if (assetBytes != null && assetBytes.isNotEmpty) {
+      await NgmyCommunicateAvatarCache.saveBytes(id, assetBytes);
+      if (!_useBundledAsset && mounted) _applyBytes(assetBytes);
+      return;
     }
 
     var bytes = NgmyCommunicateAvatarCache.bytesInRam(id);
@@ -1648,20 +1642,6 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         }
       } catch (_) {}
     }
-    try {
-      await ngmyWarmAdvisorPortraitAssets();
-      final roleBytes = ngmyAdvisorPhotorealBytesSync(
-        id: id,
-        gender: widget.profile.gender,
-        role: widget.profile.role,
-        name: name,
-      );
-      if (roleBytes != null && roleBytes.isNotEmpty) {
-        if (_useBundledAsset) return;
-        if (mounted) _applyBytes(roleBytes);
-        return;
-      }
-    } catch (_) {}
     await _resolveNetwork();
     if (mounted && (_bytes == null || _bytes!.isEmpty) && !_useBundledAsset) {
       _retryTimer = Timer(const Duration(seconds: 4), () {
@@ -1746,43 +1726,15 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
 
   void _openFullscreen() {
     unawaited(() async {
-      // Always open the SAME face shown on the profile — never swap to a
-      // generated cartoon when a photoreal bundled/cached portrait exists.
-      Uint8List? bytes = _bytes;
-      if (bytes == null || bytes.isEmpty) {
-        bytes = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id.trim());
-      }
-      if (bytes == null || bytes.isEmpty) {
-        bytes = ngmyAdvisorPhotorealBytesSync(
-          id: widget.profile.id,
-          gender: widget.profile.gender,
-          role: widget.profile.role,
-          name: widget.profile.name,
-        );
-      }
-      if (bytes == null || bytes.isEmpty) {
-        try {
-          await ngmyWarmAdvisorPortraitAssets();
-          bytes = ngmyAdvisorPhotorealBytesSync(
-            id: widget.profile.id,
-            gender: widget.profile.gender,
-            role: widget.profile.role,
-            name: widget.profile.name,
-          );
-        } catch (_) {}
-      }
-      if (bytes == null || bytes.isEmpty) {
-        try {
-          bytes = await ngmyAdvisorPortraitBytesAsync(
-            id: widget.profile.id,
-            gender: widget.profile.gender,
-            role: widget.profile.role,
-            name: widget.profile.name,
-          );
-        } catch (_) {
-          bytes = _bytes;
-        }
-      }
+      // Open the EXACT same bundled JPG the circle uses (Image.asset path).
+      // Do not use RAM/disk cache or illustrated cartoons — those can differ
+      // from the face already shown on the profile.
+      final bytes = await ngmyAdvisorLoadPhotorealPortraitBytes(
+        id: widget.profile.id,
+        gender: widget.profile.gender,
+        role: widget.profile.role,
+        name: widget.profile.name,
+      );
       if (bytes == null || bytes.isEmpty || !mounted) return;
       await showNgmyAdvisorPortraitFullscreen(
         context,
