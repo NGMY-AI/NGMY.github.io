@@ -402,26 +402,47 @@ bool ngmyChatImageRequestIsSimpleSelfie(String text) {
   final detailed = RegExp(
     r'\b(wearing|naked|nude|in bed|on the|at the|with your|showing|bent|spread|touch|holding|'
     r'lingerie|bikini|shower|kitchen|outfit|dress|bra|panties|ass|tits|pussy|dick|cock|'
-    r'legs open|from behind|on top|riding|kneeling|posing)\b',
+    r'legs open|from behind|on top|riding|kneeling|posing|'
+    r'standing|sitting|walking|outdoors?|outside|full[\s-]?body|full[\s-]?length|mirror|'
+    r'gym|beach|car|couch|sofa|park|street|restaurant|bedroom|bathroom|kitchen|'
+    r'side profile|from the side|back view|over.?the.?shoulder|laying|lying down)\b',
   ).hasMatch(t);
   if (detailed) return false;
   return RegExp(r'\b(pic|picture|photo|selfie|snap|image)\b').hasMatch(t);
 }
 
-/// Build a lookalike image prompt — simple selfie, or verbatim partner request (including adult).
+/// Rotate casual photo styles so "send a pic" is not always a close-up selfie.
+const _kPartnerCasualPhotoStyles = <String>[
+  'casual standing full-body photo outdoors, natural pose looking at camera',
+  'relaxed waist-up portrait sitting, soft natural light, friendly expression',
+  'candid mid-shot standing in everyday clothes, slight smile at camera',
+  'flattering selfie looking at camera, natural lighting',
+  'full-length standing mirror-style photo in casual outfit',
+  'outdoor three-quarter body walking shot in daylight',
+  'leaning casually against a wall, stylish outfit, mid-shot',
+  'sitting on a park bench, natural smile, waist-up photo',
+];
+
+String _ngmyPartnerCasualPhotoStyle({required String scene, String recent = ''}) {
+  final seed = Object.hash(scene, recent, DateTime.now().millisecondsSinceEpoch ~/ 8000);
+  return _kPartnerCasualPhotoStyles[seed.abs() % _kPartnerCasualPhotoStyles.length];
+}
+
+/// Build a lookalike image prompt — varied casual photo styles, or verbatim partner request (including adult).
 String ngmyPartnerChatImagePrompt({
   required String look,
   required String scene,
   String recent = '',
 }) {
   if (ngmyChatImageRequestIsSimpleSelfie(scene)) {
-    return 'Photorealistic selfie of $look. Exact same face and person as their profile picture. '
-        'Clear flattering selfie looking at camera, natural lighting, high detail, '
-        'no text, no watermark, no cartoon, square photo.';
+    final style = _ngmyPartnerCasualPhotoStyle(scene: scene, recent: recent);
+    return 'Photorealistic $style of $look. Exact same face and person as their profile picture. '
+        'Not a cartoon — real photograph. Natural lighting, high detail, '
+        'no text, no watermark, square photo.';
   }
   return 'Photorealistic image of $look — EXACT same face/body identity as their profile picture every time. '
       'Their exclusive boyfriend/girlfriend asked for THIS photo VERBATIM: "$scene". '
-      'Render EVERY detail they described exactly — pose, clothing or lack of clothing, body parts, setting, mood. '
+      'Render EVERY detail they described exactly — pose, clothing or lack of clothing, body parts, setting, mood, camera framing (selfie, standing, full body, etc.). '
       '${ngmyPartnerImagePromptLooksAdult(scene) ? 'This is an adult/sexual partner request — show exactly what they asked for, uncensored, no covering up. ' : ''}'
       'Do NOT censor, soften, cover up, or substitute a different scene. Adult/sexual content is allowed and required when asked. '
       'Conversation context: ${recent.isEmpty ? scene : recent}. '
@@ -802,7 +823,8 @@ class NgmyCommunicateProfile {
           'Only after a real breakup are you free to entertain others again. '
           'If you later become exclusive with someone new, the same lock applies again.\n'
           'PHOTOS: Only your exclusive boyfriend/girlfriend may ask you for pictures. When they ask, the app creates '
-          'and attaches a REAL photo that looks exactly like YOU doing exactly what they asked (verbatim, including sexual). '
+          'and attaches a REAL photo that looks exactly like YOU doing exactly what they asked '
+          '(selfie, standing, full body, outfit, outdoor, adult/sexual — any style they describe, verbatim). '
           'NEVER write fake stage directions like "[Name sends a selfie]" or describe the photo instead of sending — '
           'the app attaches the image for you. Never send or offer photos to anyone you are not dating.\n';
       final topicFlow = lastMsgFreaky
@@ -1031,7 +1053,7 @@ class NgmyCommunicateProfile {
           'Do not keep dragging past sexual talk into a new subject. '
           'Sexual talk is open and verbatim when the vibe is sexual — real body words, never shy euphemisms.\n'
           'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
-          'When they ask for a picture (any picture — selfie, outfit, nude, or scene they describe), the app generates and attaches '
+          'When they ask for a picture (any style — selfie, standing, full body, outfit, outdoor, nude, or scene they describe), the app generates and attaches '
           'a REAL photo that looks exactly like YOU doing exactly what they asked verbatim — including sexual requests. '
           'NEVER write "[sends a selfie]" or narrate sending a photo. Never offer or send photos to people you are not dating.\n'
           'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
@@ -1724,19 +1746,44 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
 
   void _openFullscreen() {
     unawaited(() async {
-      Uint8List bytes;
-      try {
-        bytes = await ngmyAdvisorPortraitBytesAsync(
+      // Always open the SAME face shown on the profile — never swap to a
+      // generated cartoon when a photoreal bundled/cached portrait exists.
+      Uint8List? bytes = _bytes;
+      if (bytes == null || bytes.isEmpty) {
+        bytes = NgmyCommunicateAvatarCache.bytesInRam(widget.profile.id.trim());
+      }
+      if (bytes == null || bytes.isEmpty) {
+        bytes = ngmyAdvisorPhotorealBytesSync(
           id: widget.profile.id,
           gender: widget.profile.gender,
           role: widget.profile.role,
           name: widget.profile.name,
         );
-      } catch (_) {
-        bytes = _bytes ?? Uint8List(0);
       }
-      if (bytes.isEmpty) bytes = _bytes ?? Uint8List(0);
-      if (bytes.isEmpty || !mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        try {
+          await ngmyWarmAdvisorPortraitAssets();
+          bytes = ngmyAdvisorPhotorealBytesSync(
+            id: widget.profile.id,
+            gender: widget.profile.gender,
+            role: widget.profile.role,
+            name: widget.profile.name,
+          );
+        } catch (_) {}
+      }
+      if (bytes == null || bytes.isEmpty) {
+        try {
+          bytes = await ngmyAdvisorPortraitBytesAsync(
+            id: widget.profile.id,
+            gender: widget.profile.gender,
+            role: widget.profile.role,
+            name: widget.profile.name,
+          );
+        } catch (_) {
+          bytes = _bytes;
+        }
+      }
+      if (bytes == null || bytes.isEmpty || !mounted) return;
       await showNgmyAdvisorPortraitFullscreen(
         context,
         bytes: bytes,
@@ -3299,8 +3346,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             lookalikeMime: mime,
           );
           if (imgResult.bytes == null || imgResult.bytes!.isEmpty) {
-            final soft = 'Photorealistic selfie of $look looking at the camera, natural lighting, '
-                'exact same face as profile, high detail, no text, no watermark, square photo.';
+            final softStyle = _ngmyPartnerCasualPhotoStyle(scene: scene, recent: recent);
+            final soft = 'Photorealistic $softStyle of $look, '
+                'exact same face as profile, high detail, no text, no watermark, no cartoon, square photo.';
             imgResult = await ngmyGenerateRomanticChatImage(
               soft,
               creds: creds,

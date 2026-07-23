@@ -166,8 +166,10 @@ String? _personPortraitKey({required String name, required String id}) {
   if (hit('vanessa') || (hit('suzana') && n.contains('vanessa'))) return 'person_suzana_vanessa';
   // These three used to fall through to the same companion_f role photo.
   if (hit('anna') || hit('amuri')) return 'person_anna_amuri';
+  // person_isaiah_john.jpg was accidentally a duplicate of bible_study_teacher_m;
+  // the real unique pastor portrait is person_alisa_john.jpg.
   if (hit('isaiah') || hit('alisa') || hit('kenny') || (hit('john') && (n.contains('isaiah') || n.contains('alisa')))) {
-    return 'person_isaiah_john';
+    return 'person_alisa_john';
   }
   if (hit('mbuto') || (hit('suzana') && !n.contains('vanessa'))) return 'person_suzana_mbuto';
   // Elder Wisdom Advisor — older woman portrait asset (intentional).
@@ -206,7 +208,7 @@ Future<void> ngmyWarmAdvisorPortraitAssets() async {
     'doctor_m', 'doctor_f', 'mshauri_m', 'marriage_advisor_m', 'marriage_advisor_f',
     'therapist_f', 'companion_m', 'companion_f', 'career_coach_m', 'fitness_coach_m',
     'person_miriam', 'person_susie', 'person_mina', 'person_suzana_vanessa',
-    'person_anna_amuri', 'person_isaiah_john', 'person_suzana_mbuto',
+    'person_anna_amuri', 'person_alisa_john', 'person_isaiah_john', 'person_suzana_mbuto',
     'person_alex_remy', 'person_jeremiah_nesto',
     'person_nia_robertson', 'person_grace_anderson', 'person_sophie_morgan',
     'person_olivia_bennett', 'person_chloe_mitchell',
@@ -261,20 +263,22 @@ _PortraitSpec? _newBatchSpecFor(String name, bool isMale) {
 
 /// Prefer photoreal asset bytes for named person or [role]+[gender]; otherwise illustrated PNG.
 /// Prefer [ngmyAdvisorPhotorealBytesSync] / [Image.asset] in UI — illustrated is offline-only.
+///
+/// Always try the bundled JPG first (including the 20-advisor batch). Illustrated
+/// cartoons are a last-resort offline fallback only — never preferred over the
+/// face already shown on the advisor profile card.
 Uint8List ngmyAdvisorPortraitBytes({
   required String id,
   required String gender,
   String role = '',
   String name = '',
 }) {
+  final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
+  if (photoreal != null) return photoreal;
+
   final isMale = gender.trim().toLowerCase() == 'male';
   final normalizedName = name.trim().toLowerCase();
   final batchSpec = _newBatchSpecFor(normalizedName, isMale);
-
-  if (batchSpec == null) {
-    final photoreal = ngmyAdvisorPhotorealBytesSync(id: id, gender: gender, role: role, name: name);
-    if (photoreal != null) return photoreal;
-  }
 
   if (batchSpec != null) {
     final key = 'ill_batch_$normalizedName';
