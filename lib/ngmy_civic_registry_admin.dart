@@ -222,7 +222,7 @@ class _ResetCivicStateSwitchesSheetState extends State<_ResetCivicStateSwitchesS
 
               Text(
 
-                'Users get ${NgmyCivicStateSwitches.maxSwitches} state changes after their first state. Reset gives 3 more.',
+                'Users get ${NgmyCivicStateSwitches.maxSwitches} state changes after their first state. Reset restores all ${NgmyCivicStateSwitches.maxSwitches}.',
 
                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
 

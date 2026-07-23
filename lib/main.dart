@@ -2675,6 +2675,9 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
   await _safeUpsertUserRow({
     'email': email,
     'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
+    'state': u.state,
+    'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
+    'civicRegistryAnchorState': u.civicRegistryAnchorState,
   });
 }
 
@@ -12337,13 +12340,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
           _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
         }
-        final civicLocal = await NgmyCivicStateSwitches.loadLocal(registrarEmail);
-        if (civicLocal != null) {
-          final used = civicLocal['used'];
-          final anchor = (civicLocal['anchor'] ?? '').toString();
-          if (used is int) _currentUser!.civicRegistryStateSwitchesUsed = used;
-          if (anchor.isNotEmpty && _currentUser!.civicRegistryAnchorState.trim().isEmpty) {
-            _currentUser!.civicRegistryAnchorState = anchor;
+        // Supabase is authoritative while online so an administrator's reset
+        // cannot be undone by an older device-local switch counter. Local
+        // storage remains the offline fallback.
+        if (!await ngmyCanReachCloud()) {
+          final civicLocal = await NgmyCivicStateSwitches.loadLocal(registrarEmail);
+          if (civicLocal != null) {
+            final used = civicLocal['used'];
+            final anchor = (civicLocal['anchor'] ?? '').toString();
+            final parsedUsed = used is num ? used.toInt() : int.tryParse('$used');
+            if (parsedUsed != null) _currentUser!.civicRegistryStateSwitchesUsed = parsedUsed;
+            if (anchor.isNotEmpty && _currentUser!.civicRegistryAnchorState.trim().isEmpty) {
+              _currentUser!.civicRegistryAnchorState = anchor;
+            }
           }
         }
         final key = _currentUser!.email.toLowerCase().trim();
@@ -21896,7 +21905,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ListTile(
                 leading: const Icon(Icons.restart_alt_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Reset State Change Limit', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Search users — grant 3 more state changes'),
+                subtitle: const Text('Search users — reset their 5 state changes'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -29691,7 +29700,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  // Everyone gets the same 3 free state switches (King/Admin/Civic
+  // Everyone gets the same 5 free state switches (King/Admin/Civic
   // Registry Admin bypass the limit entirely) — a plain Authorized
   // Registrar used to be blocked from ever changing state at all here,
   // before NgmyCivicStateSwitches.canChangeState below even got a
@@ -29722,7 +29731,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'You have used all 3 state changes. Ask an admin to reset your limit in Civic Registry settings.',
+              'You have used all 5 state changes. Ask an admin to reset your limit in Civic Registry settings.',
             ),
           ),
         );
@@ -29756,10 +29765,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     if (!mounted) return false;
     setState(() {
+      // The chosen state is the member's active Civic Registry state. It is
+      // persisted with the switch allowance and controls receipt visibility.
+      widget.user.state = newState;
       _selectedState = newState;
       _selectedCity = 'All Cities';
       _selectedRoom = 'All Rooms';
     });
+    unawaited(NgmyCivicStateSwitches.saveLocal(
+      email: widget.user.email,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      anchorState: widget.user.civicRegistryAnchorState,
+    ));
+    unawaited(_pushUserAuthorizedRegistrar(widget.user));
+    widget.onDataChanged();
     return true;
   }
 
@@ -31794,7 +31813,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // and a missing state tag hides the receipt rather than leaking it.
       if (!_isGlobalCivicRegistryAdmin()) {
         if (targetState.isEmpty) return false;
-        if (targetState.toLowerCase() != widget.user.state.trim().toLowerCase()) return false;
+        if (targetState.toLowerCase() != _selectedState.trim().toLowerCase()) return false;
       }
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()

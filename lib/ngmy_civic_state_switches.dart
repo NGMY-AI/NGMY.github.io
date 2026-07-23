@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Civic Registry state picker limits (first anchor state is free; then 3 switches).
+/// Civic Registry state picker limits (first anchor state is free; then 5 switches).
 class NgmyCivicStateSwitches {
-  static const int maxSwitches = 3;
+  static const int maxSwitches = 5;
 
   static String _key(String email) => 'ngmy_civic_state_switches_${email.toLowerCase().trim()}';
 

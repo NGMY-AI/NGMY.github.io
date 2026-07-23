@@ -35,7 +35,8 @@ class NgmySupabaseColumns {
 
   /// Login probe — small payload, fast on slow networks.
   static const userLogin =
-      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath';
+      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,'
+      'state,civicRegistryStateSwitchesUsed,civicRegistryAnchorState';
 
   /// Optional — only when users.crownBadge column exists (see users_crown_badge_column.sql).
   static const userCrownBadge = 'crownBadge';

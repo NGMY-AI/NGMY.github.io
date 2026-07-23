@@ -37,6 +37,11 @@ class NgmyCloudPolicy {
     // Admin approval, revoke, restore, and deletion synchronize this cached
     // flag; effective access still comes from civicRegistrarApplications.
     'isAuthorizedRegistrar',
+    // Civic state is an account setting. The state-change allowance must
+    // survive restarts, logins, and device changes until an admin resets it.
+    'state',
+    'civicRegistryStateSwitchesUsed',
+    'civicRegistryAnchorState',
     'profilePicturePath',
   };
 
