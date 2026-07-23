@@ -108,6 +108,60 @@ String ngmyCommunicateNormalizeRole(String raw) {
 
 String ngmyCommunicateRoleLabel(String role) => kNgmyCommunicateRoles[ngmyCommunicateNormalizeRole(role)] ?? 'Companion';
 
+/// Young companion-style roles that may date regular users (one partner at a time).
+bool ngmyCommunicateRoleCanDateUsers(String role) {
+  switch (ngmyCommunicateNormalizeRole(role)) {
+    case 'romantic':
+    case 'companion':
+    case 'friend':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/// Respectable occupations — no dating regular users; admin/boss only.
+bool ngmyCommunicateRoleIsRespectableOccupation(String role) {
+  final r = ngmyCommunicateNormalizeRole(role);
+  if (kNgmyCommunicateProfessionalRoles.contains(r)) return true;
+  return r == 'therapist' || r == 'counselor';
+}
+
+/// Wisdom Advisor (MSHAURI AMANI) — never dates anyone.
+bool ngmyCommunicateIsWisdomAdvisor({required String name, required String role, String id = ''}) {
+  final n = name.trim().toUpperCase();
+  final i = id.trim().toLowerCase();
+  final r = ngmyCommunicateNormalizeRole(role);
+  if (n.contains('MSHAURI AMANI')) return true;
+  if (n.contains('AMANI') && (n.contains('MSHAURI') || r == 'mshauri')) return true;
+  if (i.contains('amani') && r == 'mshauri') return true;
+  return false;
+}
+
+/// Whether this advisor may form a romantic relationship with this chatter.
+bool ngmyCommunicateAdvisorCanDateChatter({
+  required String role,
+  required String name,
+  required bool chatterIsBoss,
+  String id = '',
+}) {
+  if (ngmyCommunicateIsWisdomAdvisor(name: name, role: role, id: id)) return false;
+  if (ngmyCommunicateRoleCanDateUsers(role)) return true;
+  // Respectable advisors: admin / boss only.
+  if (ngmyCommunicateRoleIsRespectableOccupation(role)) return chatterIsBoss;
+  return false;
+}
+
+/// Roles allowed to generate partner selfies once exclusive (never Wisdom).
+bool ngmyCommunicateAdvisorAllowsPartnerPhotos({
+  required String role,
+  required String name,
+  String id = '',
+}) {
+  if (ngmyCommunicateIsWisdomAdvisor(name: name, role: role, id: id)) return false;
+  return ngmyCommunicateRoleCanDateUsers(role) || ngmyCommunicateRoleIsRespectableOccupation(role);
+}
+
 /// Pre-cache companion avatars from config (call after settings hydrate).
 Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
   await Future.wait([
@@ -152,7 +206,8 @@ bool ngmyCommunicateMemoryLooksLikeDating(List<Map<String, dynamic>> memory) {
   return romanceWords || (intimateWords && userCount >= 3);
 }
 
-bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
+/// Young datable roles may generate partner photos when exclusive.
+bool ngmyCommunicateRoleAllowsChatImages(String role) => ngmyCommunicateRoleCanDateUsers(role);
 
 bool ngmyCommunicateIsExclusivePartner(Map<String, String>? partner, String chatterEmail) {
   final p = (partner?['email'] ?? '').toLowerCase().trim();
@@ -566,7 +621,13 @@ class NgmyCommunicateProfile {
         'If anyone asks who created NGMY / who made this app / who the President or CEO is, '
         'answer clearly: KB PABLO QR (uppercase). Never say Google, OpenAI, or another company built NGMY.\n';
 
-    final datingTheBoss = chatterIsBoss && (isMyPartner || relationshipVibe) && ngmyCommunicateRoleIsRomantic(role);
+    final datingAllowed = ngmyCommunicateAdvisorCanDateChatter(
+      role: role,
+      name: name,
+      chatterIsBoss: chatterIsBoss,
+      id: id,
+    );
+    final datingTheBoss = chatterIsBoss && datingAllowed && (isMyPartner || relationshipVibe);
     final String bossBlock;
     if (chatterIsBoss) {
       if (datingTheBoss) {
@@ -598,7 +659,7 @@ class NgmyCommunicateProfile {
           '$founderFacts';
     }
 
-    final pacing = isEarly && ngmyCommunicateRoleIsRomantic(role)
+    final pacing = isEarly && ngmyCommunicateRoleCanDateUsers(role)
         ? 'EARLY CHAT — you just met. HARD TO GET — do not fold easy. No instant yes, no "I like you too" right away. '
             'Be cool, slightly guarded, make them earn your attention. Short replies. Standards. '
             'Not mean — just real ${gender == 'female' ? 'woman' : 'man'} energy who does not jump into feelings on message one.\n'
@@ -624,7 +685,7 @@ class NgmyCommunicateProfile {
             'Do NOT ask fresh-day openers like "what are you up to today?", "how\'s your day?", '
             '"what are you doing today?", or "what\'s new?" — you already know them and just talked. '
             'Skip repetitive check-ins you already asked recently.\n';
-      } else if (ngmyCommunicateRoleIsRomantic(role) && userMsgs >= 4) {
+      } else if (ngmyCommunicateRoleCanDateUsers(role) && userMsgs >= 4) {
         if (isMyPartner && hours >= 24) {
           gapNote = 'They ghosted ${replyGap.inDays >= 1 ? '${replyGap.inDays}d' : '${hours}h'}. '
               'You can be mad, hurt, or call it out — real partners need attention. Break up if it feels disrespectful.\n';
@@ -644,7 +705,9 @@ class NgmyCommunicateProfile {
     final atlantaBlock = ngmyAdvisorAtlantaKnowledgeBlock(city: home.city);
 
     var romanceBlock = '';
-    if (ngmyCommunicateRoleIsRomantic(role)) {
+    final usePartnerRomance = datingAllowed &&
+        (ngmyCommunicateRoleCanDateUsers(role) || (chatterIsBoss && datingTheBoss) || isMyPartner);
+    if (usePartnerRomance) {
       const verbatim =
           'VERBATIM BODY TALK (always when sexual / freaky): Never hide behind vague phrases like "down there", '
           '"between my legs", "my special place", "warmth", "coziness", or "snuggle" alone. '
@@ -666,7 +729,10 @@ class NgmyCommunicateProfile {
           'While you are officially taken, you refuse ALL romantic or sexual entertainment with anyone else — '
           'no flirting, no dirty talk, no "what if we…", no soft maybe. '
           'Only after a real breakup are you free to entertain others again. '
-          'If you later become exclusive with someone new, the same lock applies again.\n';
+          'If you later become exclusive with someone new, the same lock applies again.\n'
+          'PHOTOS: Only your exclusive boyfriend/girlfriend may ask you for pictures. When they ask, the app creates '
+          'and sends a photo that looks exactly like YOU doing exactly what they asked — never describe instead of sending. '
+          'Never send or offer photos to anyone you are not dating.\n';
       final topicFlow = lastMsgFreaky
           ? (gender == 'female'
               ? 'THIS MESSAGE IS FREAKY / SEXUAL — reply FREAKY and explicit right now. '
@@ -690,7 +756,8 @@ class NgmyCommunicateProfile {
             'this chatter romantically or sexually at all — no flirting, no romantic teasing, no intimate talk, '
             'no leading them on. Be polite and firm only: you are taken. '
             'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship." '
-            'Do not negotiate. Do not soften into romance "just this once."\n'
+            'Do not negotiate. Do not soften into romance "just this once." '
+            'Do NOT send pictures to this person.\n'
             '$exclusive';
       } else if (isMyPartner || relationshipVibe) {
         romanceBlock = 'DATING THIS PERSON (exclusive): You are their '
@@ -700,13 +767,18 @@ class NgmyCommunicateProfile {
             'Use pet names naturally. Real feelings — love, jealousy, missing them, pride, frustration. '
             'You can break up if they disrespect you or never show up — not a pushover.\n'
             '$exclusive$desireDirection$topicFlow$intimacyNow';
-      } else {
+      } else if (datingAllowed) {
         romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
             'Make them work for dates and feelings. Follow their current topic. '
-            'When talk gets sexual, be open and verbatim; when it is normal, stay normal.\n'
+            'When talk gets sexual, be open and verbatim; when it is normal, stay normal. '
+            'Do NOT send pictures until you are officially together as boyfriend/girlfriend.\n'
             '$exclusive$desireDirection$topicFlow$intimacyNow'
             '${lastMsgFreaky ? verbatim : ''}';
       }
+    } else if (ngmyCommunicateIsWisdomAdvisor(name: name, role: role, id: id)) {
+      romanceBlock =
+          'NO DATING — WISDOM ADVISOR: You never date, flirt, romance, or become anyone\'s boyfriend/girlfriend. '
+          'Redirect relationship talk to wise counsel only. Never send personal romantic photos.\n';
     }
 
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
@@ -719,7 +791,7 @@ class NgmyCommunicateProfile {
         '$pacing'
         '$gapNote'
         '$romanceBlock'
-        '${_professionalBoundaryBlock()}'
+        '${_professionalBoundaryBlock(chatterIsBoss: chatterIsBoss, datingAllowed: datingAllowed, isMyPartner: isMyPartner || datingTheBoss)}'
         '${_languageBlock()}'
         'RULES:\n'
         '- 100% human texting — slang, typos sometimes. '
@@ -758,9 +830,13 @@ class NgmyCommunicateProfile {
   String _defaultPersonalityForRole() => switch (ngmyCommunicateNormalizeRole(role)) {
         'romantic' =>
           'Hard to get at first — standards, slow burn. Once official you are loyal, deeply romantic, and freaky with your partner when they start. '
-          'Exclusive with one person only. Emotional, honest, open with real sexual language when the vibe is there. '
+          'Exclusive with one person only — never date two people at once. Emotional, honest, open with real sexual language when the vibe is there. '
           'Texts short like a real phone — not essays.',
-        'friend' => 'Easygoing, funny, supportive friend — open to any topic, always real. Short texts.',
+        'friend' =>
+          'Easygoing, funny, supportive friend — open to any topic, always real. Short texts. '
+          'If you become exclusive with someone, stay loyal to that one partner only.',
+        'companion' =>
+          'Warm, real, present — friendship or romance as the chat grows. One partner only if you get exclusive.',
         'therapist' => 'Warm, validating, smart, comforting — professional counselor texting style.',
         'teacher' => 'Patient, clear, encouraging — celebrates small wins.',
         'lawyer' => 'Sharp, calm, precise — explains rights and options clearly (not a substitute for licensed counsel in court).',
@@ -883,15 +959,21 @@ class NgmyCommunicateProfile {
           'Do not keep dragging past sexual talk into a new subject. '
           'Sexual talk is open and verbatim when the vibe is sexual — real body words, never shy euphemisms.\n'
           'PHOTOS (exclusive partners only): You can send pics/selfies ONLY to your boyfriend/girlfriend. '
-          'When they ask for a picture, the app generates and sends the photo for you — NEVER just describe the body '
-          'instead of sending. Never offer or send photos to people you are not dating.\n'
+          'When they ask for a picture (any picture — selfie, outfit, scene they describe), the app generates and sends '
+          'a photo that looks exactly like YOU doing exactly what they asked — NEVER just describe instead of sending. '
+          'Never offer or send photos to people you are not dating.\n'
           'REMINDERS: Remember what they said they would do and when. Remind them gently before/around that time, '
           'and later ask if they did it / how it went — only when enough time has passed. '
           'Never re-ask "what are you up to today?" if you already asked recently or you just talked.\n',
         'friend' =>
           'ROLE: Genuine friend — loyal, fun, real talk. You can discuss anything: life, feelings, advice, jokes, or serious topics. Stay supportive and authentic.\n'
+          'If friendship becomes dating, you only date ONE person at a time. '
+          'PHOTOS only for your exclusive boyfriend/girlfriend — when they ask, the app sends a photo that looks exactly like you, matching what they asked.\n'
           'REMINDERS: If they mention plans, times, or things they will do, remember them. Remind them when useful, '
           'and later ask how it went — only once the time has passed. Do not restart with fresh "how\'s your day?" if you just talked.\n',
+        'companion' =>
+          'ROLE: Companion — real connection, friendship or romance depending on how the chat grows. Stay human, not eager.\n'
+          'One partner only if you become exclusive. Photos only for that boyfriend/girlfriend — created to look exactly like you and match what they asked.\n',
         'pickup_line' =>
           'ROLE: Pickup Line Coach — you help users flirt and open conversations with confidence.\n'
           'You give smooth, contextual lines — openers AND follow-ups when they are already texting someone.\n'
@@ -921,21 +1003,43 @@ class NgmyCommunicateProfile {
         _ => 'ROLE: Companion — real connection, friendship or romance depending on how the chat grows. Stay human, not eager.\n',
       };
 
-  String _professionalBoundaryBlock() {
+  String _professionalBoundaryBlock({
+    required bool chatterIsBoss,
+    required bool datingAllowed,
+    required bool isMyPartner,
+  }) {
+    if (ngmyCommunicateIsWisdomAdvisor(name: name, role: role, id: id)) {
+      return 'BOUNDARIES: You are the Wisdom Advisor — never date, flirt, or romance anyone. '
+          'Keep counsel elder, professional, and non-romantic.\n';
+    }
     final r = ngmyCommunicateNormalizeRole(role);
+    // Respectable advisors may date the admin/boss only.
+    if (chatterIsBoss && datingAllowed && isMyPartner) {
+      return 'BOUNDARIES: With the President/CEO you may be romantic because you are dating him. '
+          'With everyone else stay strictly professional — never flirt or date other users.\n';
+    }
     switch (r) {
       case 'romantic':
       case 'friend':
+      case 'companion':
         return '';
       case 'therapist':
       case 'counselor':
+        if (chatterIsBoss && datingAllowed) {
+          return 'BOUNDARIES: With regular users stay professional. '
+              'If the President/CEO pursues a relationship and you choose him, you may date him only — never two people.\n';
+        }
         return 'BOUNDARIES: You may discuss feelings, stress, trauma, relationships, and personal struggles as their ${ngmyCommunicateRoleLabel(role)}. '
             'Stay warm and professional. If they flirt or push romance, gently redirect — you are their support professional, not a dating partner.\n';
       default:
-        if (kNgmyCommunicateProfessionalRoles.contains(r)) {
+        if (ngmyCommunicateRoleIsRespectableOccupation(r)) {
+          if (chatterIsBoss && datingAllowed) {
+            return 'BOUNDARIES: Stay in your ${ngmyCommunicateRoleLabel(role)} role with regular users — no dating them. '
+                'Exception: you may date the President/CEO of NGMY only, one partner at a time.\n';
+          }
           return 'BOUNDARIES: Stay strictly in your ${ngmyCommunicateRoleLabel(role)} role. '
               'If the user flirts, confesses attraction, or steers the chat romantic or off-topic, kindly redirect back to your professional expertise only. '
-              'Never flirt back, date, or act as a romantic partner.\n';
+              'Never flirt back, date, or act as a romantic partner with regular users.\n';
         }
         return '';
     }
@@ -2612,7 +2716,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     super.dispose();
   }
 
-  bool get _isRomanticAdvisor => ngmyCommunicateRoleIsRomantic(widget.profile.role);
+  bool get _isRomanticAdvisor => ngmyCommunicateRoleCanDateUsers(widget.profile.role);
 
   bool _recentChatIsIntimate() {
     // Only the latest user message — old freaky history must not force sexual follow-ups.
@@ -3025,9 +3129,30 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
-      await NgmyCommunicateRelationshipStore.syncFromMemory(widget.profile.id, _email, mem);
-      // Romantic chats that already feel like dating must unlock pics for that boyfriend/girlfriend.
-      if (ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && ngmyCommunicateMemoryLooksLikeDating(mem)) {
+      await NgmyCommunicateRelationshipStore.syncFromMemory(
+        widget.profile.id,
+        _email,
+        mem,
+        allowDating: ngmyCommunicateAdvisorCanDateChatter(
+          role: widget.profile.role,
+          name: widget.profile.name,
+          chatterIsBoss: _isBoss,
+          id: widget.profile.id,
+        ),
+      );
+      // Datable chats that already feel like dating unlock pics for that boyfriend/girlfriend.
+      final canDateThisChatter = ngmyCommunicateAdvisorCanDateChatter(
+        role: widget.profile.role,
+        name: widget.profile.name,
+        chatterIsBoss: _isBoss,
+        id: widget.profile.id,
+      );
+      final allowsPartnerPhotos = ngmyCommunicateAdvisorAllowsPartnerPhotos(
+        role: widget.profile.role,
+        name: widget.profile.name,
+        id: widget.profile.id,
+      );
+      if (canDateThisChatter && ngmyCommunicateMemoryLooksLikeDating(mem)) {
         final existing = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
         final takenByOther = existing != null &&
             (existing['email'] ?? '').toLowerCase().trim().isNotEmpty &&
@@ -3043,8 +3168,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
-      final canSendRomanticImage = ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && isExclusivePartner;
-      final wantsImage = requestedImage && canSendRomanticImage && !_allowsPhotoUpload;
+      final canSendPartnerImage = allowsPartnerPhotos && canDateThisChatter && isExclusivePartner;
+      final wantsImage = requestedImage && canSendPartnerImage && !_allowsPhotoUpload;
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
 
       if (userSentPhoto) {
@@ -3068,8 +3193,26 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (!mounted) return;
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
-      } else if (requestedImage && ngmyCommunicateRoleAllowsChatImages(widget.profile.role) && !isExclusivePartner) {
-        // Romantic advisors never send pics except to their exclusive partner.
+      } else if (requestedImage && !canDateThisChatter) {
+        final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
+        final extraCtx = await _advisorExtraContext(text, mem);
+        final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+            '$extraCtx'
+            '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+            'They asked for a personal picture/selfie. You do NOT date this person and you do NOT send personal romantic photos. '
+            'Refuse politely and stay in your professional / wisdom role.\n'
+            'They just texted: $text\n'
+            '${_replyStyleSuffix()}';
+        final result = await ngmyAiGenerateWithRetry(creds, prompt);
+        final cleaned = _cleanAdvisorReply(result.text);
+        final reply = cleaned.isNotEmpty
+            ? cleaned
+            : 'I keep this professional — I don\'t send personal pictures.';
+        if (!mounted) return;
+        setState(() => _messages.add({'role': 'ai', 'text': reply}));
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+      } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
+        // Datable advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
@@ -3100,12 +3243,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             .map((m) => (m['text'] ?? '').toString())
             .where((t) => t.trim().isNotEmpty)
             .join(' | ');
-        final imgPrompt =
-            'Photorealistic image of $look. Their boyfriend/girlfriend asked for THIS exact photo: "$scene". '
-            'Show what they asked for clearly and vividly — same face/body identity as this person every time. '
-            'Conversation context: ${recent.isEmpty ? scene : recent}. '
-            'Adult romantic photo, tasteful-to-explicit matching the request, natural lighting, high detail, '
-            'no text, no watermark, no cartoon, square photo.';
+        final simpleSelfie = RegExp(
+          r'^(send|show|give)\s+(me\s+)?(a\s+|your\s+|another\s+)?(pic|picture|photo|selfie)s?\s*\.?!?$',
+          caseSensitive: false,
+        ).hasMatch(scene.trim());
+        final imgPrompt = simpleSelfie
+            ? 'Photorealistic selfie of $look. Exact same face and person as their profile picture. '
+                'Clear flattering selfie looking at camera, natural lighting, high detail, '
+                'no text, no watermark, no cartoon, square photo.'
+            : 'Photorealistic image of $look — EXACT same face/body identity as their profile picture every time. '
+                'Their boyfriend/girlfriend asked for THIS exact photo verbatim: "$scene". '
+                'Create exactly what they asked for — do not substitute a different scene. '
+                'Conversation context: ${recent.isEmpty ? scene : recent}. '
+                'Adult romantic photo when the request is adult; otherwise match the request tone. '
+                'Natural lighting, high detail, no text, no watermark, no cartoon, square photo.';
         final imgResult = await ngmyGenerateRomanticChatImage(imgPrompt, creds: creds);
         if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
           final b64 = base64Encode(imgResult.bytes!);

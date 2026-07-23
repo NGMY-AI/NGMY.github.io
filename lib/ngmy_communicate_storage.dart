@@ -550,7 +550,13 @@ class NgmyCommunicateRelationshipStore {
   }
 
   /// Infer relationship changes from chat history.
-  static Future<void> syncFromMemory(String profileId, String chatterEmail, List<Map<String, dynamic>> memory) async {
+  /// [allowDating] false for Wisdom / non-datable respectable chats with regular users.
+  static Future<void> syncFromMemory(
+    String profileId,
+    String chatterEmail,
+    List<Map<String, dynamic>> memory, {
+    bool allowDating = true,
+  }) async {
     if (profileId.trim().isEmpty || chatterEmail.trim().isEmpty || memory.isEmpty) return;
     final all = memory.map((m) => (m['text'] ?? '').toString().toLowerCase()).join(' ');
     final email = chatterEmail.toLowerCase().trim();
@@ -575,8 +581,16 @@ class NgmyCommunicateRelationshipStore {
       await clearPartner(profileId);
       return;
     }
-    // Someone else already has this advisor — don't steal the relationship.
+    // Someone else already has this advisor — don't steal the relationship (one partner only).
     if (existing != null && existing['email'] != email) return;
+
+    if (!allowDating) {
+      // Wisdom / respectable-with-regular-user: never form a relationship stamp.
+      if (existing != null && existing['email'] == email) {
+        await clearPartner(profileId);
+      }
+      return;
+    }
 
     if (official || (softDating && userCount >= 2)) {
       await setPartner(profileId, email: email, status: 'exclusive');
