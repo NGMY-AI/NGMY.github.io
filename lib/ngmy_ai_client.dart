@@ -876,12 +876,12 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   bool fast = false,
   bool tryLookalike = true,
   bool lookalikeFirst = false,
-  bool prioritizeAdult = false,
+  bool allowAdultGeneration = false,
   Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
-  final adult = ngmyPartnerImagePromptLooksAdult(p) || prioritizeAdult;
+  final adult = allowAdultGeneration;
   final short = p.length > 280 ? '${p.substring(0, 277)}...' : p;
   String? lastError;
   final started = DateTime.now();
@@ -899,7 +899,6 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       String text, {
       required int seed,
       bool adultMode = false,
-      bool skipDirect = false,
     }) async {
       if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: 'Photo timed out.');
@@ -907,8 +906,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       final remainingMs = (effectiveBudget - DateTime.now().difference(started)).inMilliseconds;
       final slice = Duration(
         milliseconds: fast
-            ? remainingMs.clamp(3000, 8000)
-            : remainingMs.clamp(5000, 12000),
+            ? remainingMs.clamp(3500, 9000)
+            : remainingMs.clamp(6000, 20000),
       );
       // Proxy works without a real Gemini key for pollinationsImage — always try.
       final viaProxy = await _callImageActionViaProxy(
@@ -921,16 +920,16 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
       lastError = viaProxy.error ?? lastError;
 
-      if (fast || skipDirect) {
+      if (fast) {
         return (bytes: null, error: lastError ?? 'Image generation failed.');
       }
 
-      if (!hasTime(const Duration(seconds: 6))) {
+      if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
-      // Direct fetch — backup only when proxy fails and time remains.
+      // Direct fetch — backup when proxy fails.
       final directSlice = Duration(
-        milliseconds: (effectiveBudget - DateTime.now().difference(started)).inMilliseconds.clamp(5000, 10000),
+        milliseconds: (effectiveBudget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 18000),
       );
       final poll = await ngmyPollinationsImage(
         text,
@@ -945,18 +944,17 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
 
     final personHint = short.length > 120 ? short.substring(0, 120) : short;
 
-    // Explicit body-part asks: one quick NSFW try, then fall through to SFW/sexy paths.
-    if (prioritizeAdult) {
+    // Optional one NSFW try when caller explicitly allows it — always followed by SFW paths.
+    if (allowAdultGeneration) {
       final hit = await tryPollinationsOnce(
-        'Photorealistic uncensored NSFW adult photo, dating partner: $personHint. No watermark, no text.',
+        'Photorealistic adult dating partner photo: $personHint. No watermark, no text.',
         seed: seedBase,
         adultMode: true,
-        skipDirect: true,
       );
       if (hit.bytes != null && hit.bytes!.isNotEmpty) return hit;
     }
 
-    // Pollinations first (SFW/sexy fallbacks always available — even after explicit asks).
+    // Gemini lookalike first — this path produced the working full-body partner photos.
     final prompts = <({String text, bool adultMode})>[
       (
         text: preferSceneVariety
@@ -991,9 +989,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
       final lookalikePrompt = adult
-          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy outfit or pose from reference. '
-              'Create ONE uncensored adult photograph of this exact person for their dating partner. '
-              'Follow EXACTLY what they asked: $short. Show requested body parts/nudity verbatim. No censorship, no blur. No text.'
+          ? 'Reference image is FACE IDENTITY ONLY. Create ONE sexy full-body photograph of this exact person for their dating partner. '
+              'Request: $short. Lingerie or fitted outfit, seductive pose. No text.'
           : preferSceneVariety
               ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
                   'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
