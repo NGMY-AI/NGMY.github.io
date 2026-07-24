@@ -32887,10 +32887,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       username: u.username,
     );
     final emailKey = u.email.toLowerCase().trim();
-    final contributions = _civicTransactionsForDisplay()
-        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final contributions = _contributionsForMember(u);
     final claims = _civicTransactionsForDisplay()
         .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.claim)
         .toList()
@@ -33075,13 +33072,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // profile. Rejected == deleted (see the trash button below) —
             // excluded so a deleted claim actually disappears instead of
             // lingering as "Resolved claim".
-            final contributions = _civicTransactionsForDisplay()
-                .where((t) =>
-                    t.userEmail.toLowerCase().trim() == emailKey &&
-                    t.type == TransactionType.contribution &&
-                    t.status == TransactionStatus.approved)
-                .toList()
-              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            final contributions = _contributionsForMember(u);
             final claims = _civicTransactionsForDisplay()
                 .where((t) =>
                     t.userEmail.toLowerCase().trim() == emailKey &&
@@ -34317,25 +34308,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  /// Money records for a member — local + community merge, matched by email
-  /// or registryId so Remove works instantly after Save (no cloud wait).
-  List<AppTransaction> _moneyRecordsForMember(UserData u) {
+  /// Money records for a member — same set as Contribution Records in View.
+  List<AppTransaction> _contributionsForMember(UserData u) {
+    return _civicTransactionsForDisplay().where((t) => _contributionBelongsToMember(t, u)).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  bool _contributionBelongsToMember(AppTransaction t, UserData u) {
+    if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
     final emailKey = NgmyCivicRegistryMembers.emailKey(u.email);
     final rid = (u.registryId ?? '').trim().toUpperCase();
-    final records = _civicTransactionsForDisplay().where((t) {
-      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
-      final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
-      if (emailKey.isNotEmpty && txEmail == emailKey) return true;
-      final meta = _decodeContributionMeta(t);
-      final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
-      if (emailKey.isNotEmpty && metaEmail == emailKey) return true;
-      final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
-      if (rid.isNotEmpty && metaRid == rid) return true;
-      return false;
-    }).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return records;
+    final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+    if (emailKey.isNotEmpty && txEmail == emailKey) return true;
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        (rid.isNotEmpty ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid) : null);
+    if (raw != null) {
+      final regEmail = NgmyCivicRegistryMembers.emailKey((raw['email'] ?? '').toString());
+      if (regEmail.isNotEmpty && txEmail == regEmail) return true;
+      final linked = NgmyCivicRegistryMembers.emailKey((raw['linkedAppEmail'] ?? '').toString());
+      if (linked.isNotEmpty && txEmail == linked) return true;
+    }
+    final meta = _decodeContributionMeta(t);
+    final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+    if (emailKey.isNotEmpty && metaEmail == emailKey) return true;
+    if (raw != null) {
+      final linked = NgmyCivicRegistryMembers.emailKey((raw['linkedAppEmail'] ?? '').toString());
+      if (linked.isNotEmpty && metaEmail == linked) return true;
+    }
+    final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+    if (rid.isNotEmpty && metaRid == rid) return true;
+    return false;
   }
+
+  List<AppTransaction> _moneyRecordsForMember(UserData u) => _contributionsForMember(u);
 
   /// Lets a registrar remove a money/contribution record that was recorded
   /// by mistake — available while help mode is on or off. Mirrors the claim
@@ -35831,6 +35836,57 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<void> _openMoneyForMember(UserData u) async {
+    await _refreshCivicHelpModeAndContributions();
+    if (!mounted) return;
+    final helpOn = widget.config.helpActiveFor(_selectedState);
+    final records = _contributionsForMember(u);
+    if (helpOn && records.isEmpty) {
+      _showContributionDialog(u);
+      return;
+    }
+    if (helpOn && records.isNotEmpty) {
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF111827) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
+                  title: const Text('Add contribution', style: TextStyle(fontWeight: FontWeight.w800)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showContributionDialog(u);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                  title: const Text('Remove money record', style: TextStyle(fontWeight: FontWeight.w800)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showMoneyRecordsManageDialog(u);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      return;
+    }
+    _showMoneyRecordsManageDialog(u);
+  }
+
   Widget _memberCard(UserData u, bool isDark, {bool manageActions = true}) {
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
         NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
@@ -35887,58 +35943,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             children: [
               _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
               if (manageActions) ...[
-                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () {
-                  // Help active: add money, or manage/remove existing records.
-                  // Help off: remove only. Always use the instant local+community
-                  // merge so Save → Remove never says "No money records".
-                  final helpOn = widget.config.helpActiveFor(_selectedState);
-                  final hasRecords = _moneyRecordsForMember(u).isNotEmpty;
-                  if (helpOn && !hasRecords) {
-                    _showContributionDialog(u);
-                    return;
-                  }
-                  if (helpOn && hasRecords) {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      builder: (ctx) {
-                        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-                        return Container(
-                          margin: const EdgeInsets.all(12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF111827) : Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
-                                title: const Text('Add contribution', style: TextStyle(fontWeight: FontWeight.w800)),
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  _showContributionDialog(u);
-                                },
-                              ),
-                              ListTile(
-                                leading: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                                title: const Text('Remove money record', style: TextStyle(fontWeight: FontWeight.w800)),
-                                subtitle: Text('${_moneyRecordsForMember(u).length} on file'),
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  _showMoneyRecordsManageDialog(u);
-                                },
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                    return;
-                  }
-                  _showMoneyRecordsManageDialog(u);
-                }),
+                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => unawaited(_openMoneyForMember(u))),
                 _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
                 _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
                 _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
