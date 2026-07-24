@@ -9,16 +9,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'ngmy_civic_member_report_print_stub.dart'
-    if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
 import 'ngmy_invoice_letter.dart';
 import 'ngmy_invoice_payments.dart';
+import 'ngmy_invoice_print.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_slides_download.dart';
+import 'ngmy_slides_pdf_ios.dart';
 
 class _InvoiceGuestUser {
   _InvoiceGuestUser(this.email);
@@ -390,6 +390,56 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return bytes;
   }
 
+  /// Letter-size, edge-to-edge capture for print (one page, no white gutters).
+  Future<Uint8List> _captureInvoicePngForPrint(BuildContext ctx, double subtotal, {required bool locked}) async {
+    const letterW = 850.0;
+    const letterH = 1100.0; // US Letter aspect (8.5 × 11)
+
+    final boundaryKey = GlobalKey();
+    final overlay = Overlay.of(ctx, rootOverlay: true);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => IgnorePointer(
+        child: Transform.translate(
+          offset: const Offset(-25000, 0),
+          child: Material(
+            type: MaterialType.transparency,
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: SizedBox(
+                width: letterW,
+                height: letterH,
+                child: FittedBox(
+                  fit: BoxFit.fill,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: letterW,
+                    child: NgmyInvoicePreview(data: _previewData(subtotal, locked: locked)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+    try {
+      await Future.delayed(const Duration(milliseconds: 220));
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 80));
+      final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Print preview is not ready yet. Try again.');
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+      if (bytes == null) throw Exception('Could not render print invoice.');
+      return bytes;
+    } finally {
+      entry.remove();
+    }
+  }
+
   String _invoiceExportBaseName() {
     final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
     return 'invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}';
@@ -418,34 +468,56 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
   /// Full US Letter page (same size as Slides/Documents PDF) for printing.
   Future<void> _printInvoice(BuildContext ctx) async {
     try {
-      final bytes = await _captureInvoicePng();
+      final subtotal = _subtotal();
+      final locked = _contentLocked();
+      final bytes = await _captureInvoicePngForPrint(ctx, subtotal, locked: locked);
+      final pdfBytes = await ngmyInvoiceBuildLetterPdf(bytes);
       final filename = _invoiceExportBaseName();
-      if (kIsWeb) {
-        final html = ngmyInvoiceBuildLetterPrintHtml(bytes, title: 'NGMY Invoice');
-        await ngmyPrintCivicMemberReport(
-          htmlContent: html,
-          plainText: 'NGMY Invoice',
-          fileName: filename,
-        );
-        if (ctx.mounted) {
+
+      final msg = await saveNgmySlidesPdf(pdfBytes, filename);
+      if (!ctx.mounted) return;
+
+      if (msg == kNgmySlidesPdfStagedToken) {
+        final opened = await ngmyOpenStagedSlidesPdfInSafari();
+        if (!ctx.mounted) return;
+        if (opened) {
           ScaffoldMessenger.of(ctx).showSnackBar(
             const SnackBar(
-              content: Text('Opening letter-size print preview…'),
+              content: Text('PDF opened — tap Share ↗ then Print (one full page).'),
               backgroundColor: Color(0xFF16A34A),
+              duration: Duration(seconds: 8),
             ),
           );
+        } else {
+          await ngmyShowIosSlidesPdfDialog(ctx, deckName: 'Invoice');
         }
-      } else {
-        final pdfBytes = await ngmyInvoiceBuildLetterPdf(bytes);
-        final msg = await saveNgmySlidesPdf(pdfBytes, filename);
+        return;
+      }
+
+      if (kIsWeb) {
+        final opened = await ngmyInvoiceOpenPdfInBrowser(pdfBytes);
         if (ctx.mounted) {
           ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(
-              content: Text('$msg — open the letter-size PDF to print on full paper.'),
+              content: Text(
+                opened
+                    ? 'Letter PDF opened — tap Print (one full page).'
+                    : '$msg — open the PDF to print on full paper.',
+              ),
               backgroundColor: const Color(0xFF16A34A),
             ),
           );
         }
+        return;
+      }
+
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('$msg — open the letter PDF to print on full paper.'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
       }
     } catch (e) {
       if (ctx.mounted) {
@@ -491,7 +563,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                 leading: const Icon(Icons.print_rounded, color: Color(0xFF60A5FA)),
                 title: const Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 subtitle: Text(
-                  'Full letter-size paper for your printer',
+                  'One letter PDF that fills the whole page',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
                 ),
                 onTap: () => Navigator.pop(sheetCtx, 'print'),
