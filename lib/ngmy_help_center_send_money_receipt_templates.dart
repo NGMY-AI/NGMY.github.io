@@ -201,12 +201,14 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
     required this.templateId,
     this.deliveryStatus = NgmyTransferDeliveryStatus.hidden,
     this.deliveredAt,
+    this.onEditDeliveredTime,
   });
 
   final NgmyHelpCenterSendMoneyReceipt receipt;
   final String templateId;
   final NgmyTransferDeliveryStatus deliveryStatus;
   final DateTime? deliveredAt;
+  final VoidCallback? onEditDeliveredTime;
 
   @override
   Widget build(BuildContext context) {
@@ -287,7 +289,11 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                   ),
                   if (deliveryStatus != NgmyTransferDeliveryStatus.hidden) ...[
                     const SizedBox(height: 12),
-                    NgmyTransferDeliveryStatusCard(status: deliveryStatus, deliveredAt: deliveredAt),
+                    NgmyTransferDeliveryStatusCard(
+                      status: deliveryStatus,
+                      deliveredAt: deliveredAt,
+                      onEditDeliveredTime: onEditDeliveredTime,
+                    ),
                   ],
                   const SizedBox(height: 14),
                   _panel(

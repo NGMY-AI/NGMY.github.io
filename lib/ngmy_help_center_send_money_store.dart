@@ -54,12 +54,16 @@ class NgmyHelpCenterSavedRecipient {
     required this.receiverPhone,
     required this.receiverCountry,
     this.lastUsedMs = 0,
+    this.pinned = false,
+    this.pinnedMs = 0,
   });
 
   final String receiverName;
   final String receiverPhone;
   final String receiverCountry;
   final int lastUsedMs;
+  final bool pinned;
+  final int pinnedMs;
 
   String get id => '${receiverName.trim().toLowerCase()}|${receiverPhone.trim()}|${receiverCountry.trim().toLowerCase()}';
 
@@ -68,6 +72,8 @@ class NgmyHelpCenterSavedRecipient {
         'receiverPhone': receiverPhone,
         'receiverCountry': receiverCountry,
         'lastUsedMs': lastUsedMs,
+        'pinned': pinned,
+        'pinnedMs': pinnedMs,
       };
 
   factory NgmyHelpCenterSavedRecipient.fromMap(Map<String, dynamic> raw) {
@@ -76,6 +82,26 @@ class NgmyHelpCenterSavedRecipient {
       receiverPhone: (raw['receiverPhone'] ?? '').toString(),
       receiverCountry: (raw['receiverCountry'] ?? '').toString(),
       lastUsedMs: raw['lastUsedMs'] is int ? raw['lastUsedMs'] as int : int.tryParse('${raw['lastUsedMs']}') ?? 0,
+      pinned: raw['pinned'] == true,
+      pinnedMs: raw['pinnedMs'] is int ? raw['pinnedMs'] as int : int.tryParse('${raw['pinnedMs']}') ?? 0,
+    );
+  }
+
+  NgmyHelpCenterSavedRecipient copyWith({
+    String? receiverName,
+    String? receiverPhone,
+    String? receiverCountry,
+    int? lastUsedMs,
+    bool? pinned,
+    int? pinnedMs,
+  }) {
+    return NgmyHelpCenterSavedRecipient(
+      receiverName: receiverName ?? this.receiverName,
+      receiverPhone: receiverPhone ?? this.receiverPhone,
+      receiverCountry: receiverCountry ?? this.receiverCountry,
+      lastUsedMs: lastUsedMs ?? this.lastUsedMs,
+      pinned: pinned ?? this.pinned,
+      pinnedMs: pinnedMs ?? this.pinnedMs,
     );
   }
 }
@@ -110,7 +136,11 @@ Future<List<NgmyHelpCenterSavedRecipient>> ngmyLoadHelpCenterSavedRecipients() a
         .map((e) => NgmyHelpCenterSavedRecipient.fromMap(Map<String, dynamic>.from(e)))
         .where((e) => e.receiverName.trim().isNotEmpty && e.receiverPhone.trim().length >= 6)
         .toList()
-      ..sort((a, b) => b.lastUsedMs.compareTo(a.lastUsedMs));
+      ..sort((a, b) {
+        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+        if (a.pinned && b.pinned) return b.pinnedMs.compareTo(a.pinnedMs);
+        return b.lastUsedMs.compareTo(a.lastUsedMs);
+      });
   } catch (_) {}
   return const [];
 }
@@ -125,28 +155,73 @@ Future<void> ngmySaveHelpCenterSavedRecipient({
   final country = receiverCountry.trim();
   if (name.isEmpty || phone.length < 6 || country.isEmpty) return;
 
-  final entry = NgmyHelpCenterSavedRecipient(
-    receiverName: name,
-    receiverPhone: phone,
-    receiverCountry: country,
-    lastUsedMs: DateTime.now().millisecondsSinceEpoch,
-  );
-
   try {
     final prefs = await SharedPreferences.getInstance();
     final existing = await ngmyLoadHelpCenterSavedRecipients();
+    NgmyHelpCenterSavedRecipient? priorEntry;
+    for (final e in existing) {
+      if (e.receiverName.trim().toLowerCase() == name.toLowerCase() &&
+          e.receiverPhone.trim() == phone &&
+          e.receiverCountry.trim().toLowerCase() == country.toLowerCase()) {
+        priorEntry = e;
+        break;
+      }
+    }
+
+    final entry = NgmyHelpCenterSavedRecipient(
+      receiverName: name,
+      receiverPhone: phone,
+      receiverCountry: country,
+      lastUsedMs: DateTime.now().millisecondsSinceEpoch,
+      pinned: priorEntry?.pinned ?? false,
+      pinnedMs: priorEntry?.pinnedMs ?? 0,
+    );
+
     final next = <NgmyHelpCenterSavedRecipient>[
       entry,
       ...existing.where((e) => e.id != entry.id),
     ];
     if (next.length > kNgmyHelpCenterSavedRecipientsMax) {
-      next.removeRange(kNgmyHelpCenterSavedRecipientsMax, next.length);
+      final unpinned = next.where((e) => !e.pinned).toList();
+      final pinned = next.where((e) => e.pinned).toList();
+      while (pinned.length + unpinned.length > kNgmyHelpCenterSavedRecipientsMax && unpinned.isNotEmpty) {
+        unpinned.removeLast();
+      }
+      next
+        ..clear()
+        ..addAll(pinned)
+        ..addAll(unpinned);
     }
     await prefs.setString(
       kNgmyHelpCenterSavedRecipientsKey,
       jsonEncode(next.map((e) => e.toMap()).toList()),
     );
   } catch (_) {}
+}
+
+Future<void> ngmyPersistHelpCenterSavedRecipients(List<NgmyHelpCenterSavedRecipient> list) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      kNgmyHelpCenterSavedRecipientsKey,
+      jsonEncode(list.map((e) => e.toMap()).toList()),
+    );
+  } catch (_) {}
+}
+
+Future<void> ngmyDeleteHelpCenterSavedRecipient(String id) async {
+  final existing = await ngmyLoadHelpCenterSavedRecipients();
+  await ngmyPersistHelpCenterSavedRecipients(existing.where((e) => e.id != id).toList());
+}
+
+Future<void> ngmyToggleHelpCenterSavedRecipientPin(String id) async {
+  final existing = await ngmyLoadHelpCenterSavedRecipients();
+  final next = existing.map((e) {
+    if (e.id != id) return e;
+    final pin = !e.pinned;
+    return e.copyWith(pinned: pin, pinnedMs: pin ? DateTime.now().millisecondsSinceEpoch : 0);
+  }).toList();
+  await ngmyPersistHelpCenterSavedRecipients(next);
 }
 
 Future<String> ngmyLoadHelpCenterReceiptTemplateId() async {

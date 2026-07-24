@@ -27520,6 +27520,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                             clientName: widget.user.username.trim().isNotEmpty ? widget.user.username.trim() : widget.user.email,
                             clientEmail: widget.user.email,
                             clientPhone: widget.user.phone,
+                            isAdmin: widget.user.isAdmin,
                           ),
                           routeName: 'NgmyHelpCenterScreen',
                         ),

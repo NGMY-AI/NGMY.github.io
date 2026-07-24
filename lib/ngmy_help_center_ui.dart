@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_phone.dart';
+import 'ngmy_help_center_saved_recipients_dialog.dart';
 import 'ngmy_help_center_send_money_delivery_status.dart';
 import 'ngmy_help_center_send_money_receipt.dart';
 import 'ngmy_help_center_send_money_receipt_templates.dart';
@@ -28,12 +29,14 @@ class NgmyHelpCenterScreen extends StatefulWidget {
     required this.clientName,
     this.clientEmail = '',
     this.clientPhone = '',
+    this.isAdmin = false,
   });
 
   final Map<String, dynamic> configMap;
   final String clientName;
   final String clientEmail;
   final String clientPhone;
+  final bool isAdmin;
 
   @override
   State<NgmyHelpCenterScreen> createState() => _NgmyHelpCenterScreenState();
@@ -308,7 +311,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   }
 
   Future<void> _openSendMoneyReceipt() async {
-    if (!_isSendMoney) return;
+    if (!_isSendMoney || !widget.isAdmin) return;
     HapticFeedback.lightImpact();
     await _persistSenderInfo();
     final receipt = _buildReceipt();
@@ -334,6 +337,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
         onSaveRecipient: () async {
           await _saveSavedRecipientFromForm();
           if (mounted) _snack('Recipient saved — tap the people icon anytime to reuse.');
+        },
+        onListChanged: () async {
+          final saved = await ngmyLoadHelpCenterSavedRecipients();
+          if (mounted) setState(() => _savedRecipients = saved);
         },
       ),
     );
@@ -825,7 +832,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           Row(
             children: [
               Expanded(
-                child: isMoney
+                child: isMoney && widget.isAdmin
                     ? Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -853,7 +860,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                       )
                     : Row(
                         children: [
-                          const Icon(Icons.receipt_long_rounded, color: _accent, size: 20),
+                          Icon(
+                            Icons.receipt_long_rounded,
+                            color: isMoney ? (isDark ? Colors.white38 : Colors.black38) : _accent,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'REQUEST SUMMARY',
@@ -861,7 +872,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                               fontSize: 10,
                               letterSpacing: 1.6,
                               fontWeight: FontWeight.w900,
-                              color: isDark ? Colors.white70 : Colors.black54,
+                              color: isMoney
+                                  ? (isDark ? Colors.white38 : Colors.black38)
+                                  : (isDark ? Colors.white70 : Colors.black54),
                             ),
                           ),
                         ],
@@ -1277,6 +1290,7 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
     required this.onApplyRecipient,
     required this.onTemplateChanged,
     required this.onSaveRecipient,
+    required this.onListChanged,
   });
 
   final NgmyHelpCenterSendMoneyReceipt receipt;
@@ -1287,6 +1301,7 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
   final ValueChanged<NgmyHelpCenterSavedRecipient> onApplyRecipient;
   final ValueChanged<String> onTemplateChanged;
   final Future<void> Function() onSaveRecipient;
+  final Future<void> Function() onListChanged;
 
   @override
   State<_SendMoneyReceiptDialog> createState() => _SendMoneyReceiptDialogState();
@@ -1355,10 +1370,21 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
       onSelect: (status, at) {
         setState(() {
           _deliveryStatus = status;
-          _deliveredAt = at;
+          _deliveredAt = status == NgmyTransferDeliveryStatus.arrived ? (at ?? DateTime.now()) : at;
         });
       },
     );
+  }
+
+  Future<void> _editDeliveredTime() async {
+    if (_deliveryStatus != NgmyTransferDeliveryStatus.arrived) return;
+    final picked = await showNgmyTransferDeliveryTimePicker(
+      context,
+      initial: _deliveredAt ?? DateTime.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() => _deliveredAt = picked);
+    }
   }
 
   Future<void> _pickTemplate() async {
@@ -1373,73 +1399,11 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
   }
 
   Future<void> _showSavedRecipients() async {
-    final list = widget.savedRecipients;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF0B1020),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Saved recipients', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap someone to fill the request form for a new transfer.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
-                ),
-                const SizedBox(height: 14),
-                if (list.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'No saved recipients yet. Download or share a completed receipt to save someone here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: list.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) {
-                        final entry = list[i];
-                        return Material(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: _accent.withValues(alpha: 0.2),
-                              child: Icon(Icons.person_rounded, color: _accent, size: 18),
-                            ),
-                            title: Text(entry.receiverName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                            subtitle: Text(
-                              entry.receiverPhone.isEmpty
-                                  ? entry.receiverCountry
-                                  : '${entry.receiverCountry} · ${entry.receiverPhone}',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
-                            ),
-                            trailing: const Icon(Icons.north_west_rounded, color: Colors.white54, size: 16),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              widget.onApplyRecipient(entry);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+    await showNgmySavedRecipientsDialog(
+      context,
+      recipients: widget.savedRecipients,
+      onApply: widget.onApplyRecipient,
+      onListChanged: widget.onListChanged,
     );
   }
 
@@ -1547,6 +1511,8 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                             templateId: _templateId,
                             deliveryStatus: _deliveryStatus,
                             deliveredAt: _deliveredAt,
+                            onEditDeliveredTime:
+                                _deliveryStatus == NgmyTransferDeliveryStatus.arrived ? _editDeliveredTime : null,
                           ),
                         ),
                       ],

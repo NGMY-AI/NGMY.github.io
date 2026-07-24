@@ -75,10 +75,12 @@ class NgmyTransferDeliveryStatusCard extends StatelessWidget {
     super.key,
     required this.status,
     this.deliveredAt,
+    this.onEditDeliveredTime,
   });
 
   final NgmyTransferDeliveryStatus status;
   final DateTime? deliveredAt;
+  final VoidCallback? onEditDeliveredTime;
 
   static const _green = Color(0xFF1B5E20);
   static const _greenLight = Color(0xFF2E7D32);
@@ -104,15 +106,18 @@ class NgmyTransferDeliveryStatusCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            status.headline(at: deliveredAt),
-            style: const TextStyle(
-              color: Color(0xFF212121),
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              height: 1.25,
+          if (status == NgmyTransferDeliveryStatus.arrived)
+            _arrivedHeadline()
+          else
+            Text(
+              status.headline(at: deliveredAt),
+              style: const TextStyle(
+                color: Color(0xFF212121),
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                height: 1.25,
+              ),
             ),
-          ),
           const SizedBox(height: 4),
           Text(
             status.subtitle(),
@@ -122,6 +127,58 @@ class NgmyTransferDeliveryStatusCard extends StatelessWidget {
           _tracker(steps),
         ],
       ),
+    );
+  }
+
+  Widget _arrivedHeadline() {
+    final at = deliveredAt ?? DateTime.now();
+    final timeLabel = ngmyFormatTransferDeliveryTime(at);
+    const baseStyle = TextStyle(
+      color: Color(0xFF212121),
+      fontWeight: FontWeight.w800,
+      fontSize: 14,
+      height: 1.25,
+    );
+
+    if (onEditDeliveredTime == null) {
+      return Text('Delivered at $timeLabel', style: baseStyle);
+    }
+
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 0,
+      runSpacing: 4,
+      children: [
+        const Text('Delivered at ', style: baseStyle),
+        Material(
+          color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onEditDeliveredTime,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    timeLabel,
+                    style: const TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      decoration: TextDecoration.underline,
+                      decorationColor: Color(0xFF2E7D32),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.schedule_rounded, size: 15, color: Color(0xFF2E7D32)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -170,104 +227,267 @@ class NgmyTransferDeliveryStatusCard extends StatelessWidget {
   }
 }
 
-Future<void> showNgmyTransferDeliveryStatusPicker(
+/// Centered clock picker — admin adjusts delivery time (date stays the same).
+Future<DateTime?> showNgmyTransferDeliveryTimePicker(
   BuildContext context, {
-  required NgmyTransferDeliveryStatus selected,
-  required void Function(NgmyTransferDeliveryStatus status, DateTime? deliveredAt) onSelect,
+  DateTime? initial,
 }) async {
-  await showModalBottomSheet<void>(
+  final base = initial ?? DateTime.now();
+
+  final result = await showTimePicker(
     context: context,
-    backgroundColor: const Color(0xFF0B1020),
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-    builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Delivery status', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text(
-                'Show on the receipt whether the money is pending, arriving soon, or delivered.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+    initialTime: TimeOfDay.fromDateTime(base),
+    helpText: 'Adjust delivery time',
+    cancelText: 'Cancel',
+    confirmText: 'Save time',
+    builder: (ctx, child) {
+      final themed = Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF4ADE80),
+            onPrimary: Color(0xFF052E16),
+            surface: Color(0xFF0C1220),
+            onSurface: Colors.white,
+          ),
+          timePickerTheme: TimePickerThemeData(
+            backgroundColor: const Color(0xFF0C1220),
+            dialBackgroundColor: const Color(0xFF1B5E20).withValues(alpha: 0.35),
+            dialHandColor: const Color(0xFF4ADE80),
+            dialTextColor: Colors.white,
+            hourMinuteColor: const Color(0xFF1B5E20).withValues(alpha: 0.45),
+            hourMinuteTextColor: Colors.white,
+            dayPeriodColor: const Color(0xFF1B5E20).withValues(alpha: 0.45),
+            dayPeriodTextColor: Colors.white,
+            entryModeIconColor: const Color(0xFF4ADE80),
+            helpTextStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: const Color(0xFF0C1220),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+        ),
+        child: child!,
+      );
+
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Material(
+              color: const Color(0xFF0C1220),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)]),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.schedule_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Delivery time', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                              SizedBox(height: 2),
+                              Text('Defaults to now — adjust if needed', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  themed,
+                ],
               ),
-              const SizedBox(height: 14),
-              _statusTile(
-                ctx,
-                title: 'Don\'t show',
-                subtitle: 'Hide delivery tracker on receipt',
-                icon: Icons.visibility_off_outlined,
-                selected: selected == NgmyTransferDeliveryStatus.hidden,
-                onTap: () {
-                  onSelect(NgmyTransferDeliveryStatus.hidden, null);
-                  Navigator.pop(ctx);
-                },
-              ),
-              _statusTile(
-                ctx,
-                title: NgmyTransferDeliveryStatus.pending.label,
-                subtitle: NgmyTransferDeliveryStatus.pending.subtitle(),
-                icon: Icons.hourglass_top_rounded,
-                selected: selected == NgmyTransferDeliveryStatus.pending,
-                onTap: () {
-                  onSelect(NgmyTransferDeliveryStatus.pending, null);
-                  Navigator.pop(ctx);
-                },
-              ),
-              _statusTile(
-                ctx,
-                title: NgmyTransferDeliveryStatus.arrivingSoon.label,
-                subtitle: NgmyTransferDeliveryStatus.arrivingSoon.subtitle(),
-                icon: Icons.local_shipping_outlined,
-                selected: selected == NgmyTransferDeliveryStatus.arrivingSoon,
-                onTap: () {
-                  onSelect(NgmyTransferDeliveryStatus.arrivingSoon, null);
-                  Navigator.pop(ctx);
-                },
-              ),
-              _statusTile(
-                ctx,
-                title: NgmyTransferDeliveryStatus.arrived.label,
-                subtitle: NgmyTransferDeliveryStatus.arrived.subtitle(),
-                icon: Icons.check_circle_outline_rounded,
-                selected: selected == NgmyTransferDeliveryStatus.arrived,
-                onTap: () {
-                  onSelect(NgmyTransferDeliveryStatus.arrived, DateTime.now());
-                  Navigator.pop(ctx);
-                },
-              ),
-            ],
+            ),
           ),
         ),
       );
     },
   );
+
+  if (result == null) return null;
+  return DateTime(base.year, base.month, base.day, result.hour, result.minute);
 }
 
-Widget _statusTile(
-  BuildContext ctx, {
+Future<void> showNgmyTransferDeliveryStatusPicker(
+  BuildContext context, {
+  required NgmyTransferDeliveryStatus selected,
+  required void Function(NgmyTransferDeliveryStatus status, DateTime? deliveredAt) onSelect,
+}) async {
+  await showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.78),
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Material(
+            color: const Color(0xFF0C1220),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)]),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Delivery status', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                            SizedBox(height: 2),
+                            Text('Show on receipt', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  child: Column(
+                    children: [
+                      _statusOptionCard(
+                        title: 'Don\'t show',
+                        subtitle: 'Hide tracker on receipt',
+                        icon: Icons.visibility_off_outlined,
+                        accent: const Color(0xFF64748B),
+                        selected: selected == NgmyTransferDeliveryStatus.hidden,
+                        onTap: () {
+                          onSelect(NgmyTransferDeliveryStatus.hidden, null);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                      _statusOptionCard(
+                        title: NgmyTransferDeliveryStatus.pending.label,
+                        subtitle: NgmyTransferDeliveryStatus.pending.subtitle(),
+                        icon: Icons.hourglass_top_rounded,
+                        accent: const Color(0xFFF59E0B),
+                        selected: selected == NgmyTransferDeliveryStatus.pending,
+                        onTap: () {
+                          onSelect(NgmyTransferDeliveryStatus.pending, null);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                      _statusOptionCard(
+                        title: NgmyTransferDeliveryStatus.arrivingSoon.label,
+                        subtitle: NgmyTransferDeliveryStatus.arrivingSoon.subtitle(),
+                        icon: Icons.local_shipping_outlined,
+                        accent: const Color(0xFF0284C7),
+                        selected: selected == NgmyTransferDeliveryStatus.arrivingSoon,
+                        onTap: () {
+                          onSelect(NgmyTransferDeliveryStatus.arrivingSoon, null);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                      _statusOptionCard(
+                        title: NgmyTransferDeliveryStatus.arrived.label,
+                        subtitle: NgmyTransferDeliveryStatus.arrived.subtitle(),
+                        icon: Icons.check_circle_rounded,
+                        accent: const Color(0xFF16A34A),
+                        selected: selected == NgmyTransferDeliveryStatus.arrived,
+                        onTap: () {
+                          onSelect(NgmyTransferDeliveryStatus.arrived, DateTime.now());
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _statusOptionCard({
   required String title,
   required String subtitle,
   required IconData icon,
+  required Color accent,
   required bool selected,
   required VoidCallback onTap,
 }) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Material(
-      color: selected ? const Color(0xFF14B8A6).withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06),
-      borderRadius: BorderRadius.circular(12),
-      child: ListTile(
-        leading: Icon(icon, color: selected ? const Color(0xFF5EEAD4) : Colors.white70),
-        title: Text(title, style: TextStyle(color: Colors.white, fontWeight: selected ? FontWeight.w900 : FontWeight.w700)),
-        subtitle: Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11)),
-        trailing: selected ? const Icon(Icons.check_circle_rounded, color: Color(0xFF5EEAD4)) : null,
+      color: selected ? accent.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: selected ? const Color(0xFF14B8A6).withValues(alpha: 0.55) : Colors.white12),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? accent.withValues(alpha: 0.65) : Colors.white12, width: selected ? 1.5 : 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: selected ? 0.28 : 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: accent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: Colors.white, fontWeight: selected ? FontWeight.w900 : FontWeight.w700, fontSize: 13)),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, height: 1.25), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              if (selected) Icon(Icons.check_circle_rounded, color: accent, size: 20),
+            ],
+          ),
         ),
       ),
     ),
