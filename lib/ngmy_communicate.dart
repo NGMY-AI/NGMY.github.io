@@ -585,6 +585,15 @@ String _ngmyPartnerVibePhotoScene({
 int ngmyPartnerPhotosSentCount(List<Map<String, dynamic>> memory) =>
     memory.where((m) => (m['role'] ?? '').toString() == 'ai' && (m['imageB64'] ?? '').toString().trim().isNotEmpty).length;
 
+String? ngmyLastPartnerPhotoB64(List<Map<String, dynamic>> memory) {
+  for (final m in memory.reversed) {
+    if ((m['role'] ?? '').toString() != 'ai') continue;
+    final img = (m['imageB64'] ?? '').toString().trim();
+    if (img.isNotEmpty) return img;
+  }
+  return null;
+}
+
 bool ngmyPartnerImageBytesSame(Uint8List a, Uint8List b) {
   if (identical(a, b)) return true;
   if (a.length != b.length || a.isEmpty) return false;
@@ -3519,14 +3528,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 gender: widget.profile.gender,
                 role: widget.profile.role,
                 name: widget.profile.name,
-              ) ??
+              )
+              .timeout(const Duration(seconds: 4), onTimeout: () => null) ??
               await ngmyAdvisorPortraitBytesAsync(
                 id: widget.profile.id,
                 gender: widget.profile.gender,
                 role: widget.profile.role,
                 name: widget.profile.name,
-              );
+              ).timeout(const Duration(seconds: 4), onTimeout: () => Uint8List(0));
+          if (portrait.isEmpty) portrait = null;
+
           final photoCount = ngmyPartnerPhotosSentCount(mem);
+          final lastSent = ngmyLastPartnerPhotoB64(mem);
           final look = ngmyAdvisorFaceIdentityForImageGen(
             name: widget.profile.name,
             gender: widget.profile.gender,
@@ -3539,11 +3552,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               .where((t) => t.trim().isNotEmpty)
               .join(' | ');
           final wantsSelfieOnly = ngmyChatImageRequestWantsSelfie(scene);
-          final mime = portrait.length >= 3 && portrait[0] == 0xFF && portrait[1] == 0xD8
+          final mime = portrait != null &&
+                  portrait.length >= 3 &&
+                  portrait[0] == 0xFF &&
+                  portrait[1] == 0xD8
               ? 'image/jpeg'
               : 'image/png';
 
-          Future<Uint8List?> tryGenerate({required int varietySeed, String? sceneOverride}) async {
+          Future<Uint8List?> tryGenerate({
+            required int varietySeed,
+            String? sceneOverride,
+            bool tryLookalike = false,
+          }) async {
             final primary = ngmyPartnerChatImagePrompt(
               look: look,
               scene: sceneOverride ?? scene,
@@ -3555,38 +3575,49 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             final imgResult = await ngmyGenerateRomanticChatImage(
               primary,
               creds: creds,
-              lookalikePortraitBytes: portrait,
+              lookalikePortraitBytes: tryLookalike ? portrait : null,
               lookalikeMime: mime,
               preferSceneVariety: !wantsSelfieOnly,
               varietySeed: varietySeed,
-              budget: const Duration(seconds: 38),
+              fast: true,
+              tryLookalike: tryLookalike,
             ).timeout(
-              const Duration(seconds: 42),
+              const Duration(seconds: 13),
               onTimeout: () => (bytes: null, error: 'Photo timed out.'),
             );
             final bytes = imgResult.bytes;
             if (bytes == null || bytes.isEmpty) return null;
             if (portrait != null && ngmyPartnerImageBytesSame(bytes, portrait)) return null;
+            final b64 = base64Encode(bytes);
+            if (lastSent != null && b64 == lastSent) return null;
             return bytes;
           }
 
-          for (var attempt = 0; attempt < 3; attempt++) {
-            final seed = photoCount + attempt * 17 + DateTime.now().millisecond;
-            final altScene = attempt == 0
-                ? scene
-                : '${ngmyPartnerImageVarietyOutfitHint(photoCount: seed, gender: widget.profile.gender)} — $scene';
-            final bytes = await tryGenerate(varietySeed: seed, sceneOverride: attempt == 0 ? null : altScene);
-            if (bytes != null && bytes.isNotEmpty) {
-              return base64Encode(bytes);
-            }
+          // Two quick tries — plain "send me a pic" uses vibe/outfit rotation, no long typing wait.
+          for (var attempt = 0; attempt < 2; attempt++) {
+            final seed = photoCount + attempt * 23 + DateTime.now().millisecond % 11;
+            final outfit = ngmyPartnerImageVarietyOutfitHint(photoCount: seed, gender: widget.profile.gender);
+            final altScene = attempt == 0 ? scene : '$outfit — send me a picture';
+            final bytes = await tryGenerate(
+              varietySeed: seed,
+              sceneOverride: altScene,
+              tryLookalike: attempt == 1 && portrait != null,
+            );
+            if (bytes != null && bytes.isNotEmpty) return base64Encode(bytes);
           }
 
-          // Last resort: bundled portrait so chat never loops empty — only if generation truly failed.
-          if (portrait.isNotEmpty) return base64Encode(portrait);
+          if (portrait != null && portrait.isNotEmpty) {
+            final fallback = base64Encode(portrait);
+            if (lastSent == null || fallback != lastSent) return fallback;
+          }
           return null;
         } catch (e) {
           debugPrint('[communicate] partner photo: $e');
-          if (portrait != null && portrait.isNotEmpty) return base64Encode(portrait);
+          if (portrait != null && portrait.isNotEmpty) {
+            final fallback = base64Encode(portrait);
+            final lastSent = ngmyLastPartnerPhotoB64(mem);
+            if (lastSent == null || fallback != lastSent) return fallback;
+          }
           return null;
         }
       }
@@ -3657,10 +3688,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         setState(() => _messages.add({'role': 'ai', 'text': reply}));
         await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
       } else if (wantsImage) {
-        // Dating partner asked for a pic → send a REAL image (generation, then profile face fallback).
+        // Dating partner asked for a pic → send a REAL image quickly (hard cap so typing cannot hang).
         String? b64;
         try {
-          b64 = await generatePartnerPhotoB64();
+          b64 = await generatePartnerPhotoB64().timeout(
+            const Duration(seconds: 22),
+            onTimeout: () => null,
+          );
         } catch (e) {
           debugPrint('[communicate] wantsImage: $e');
           b64 = null;
@@ -3714,7 +3748,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         var cleaned = _cleanAdvisorReply(result.text);
         // If the model faked sending a photo while we can actually send one, send a real image.
         if (canSendPartnerImage && (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
-          final b64Photo = await generatePartnerPhotoB64();
+          final b64Photo = await generatePartnerPhotoB64().timeout(
+            const Duration(seconds: 22),
+            onTimeout: () => null,
+          );
           if (b64Photo != null && b64Photo.isNotEmpty) {
             if (!mounted) return;
             setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64Photo}));

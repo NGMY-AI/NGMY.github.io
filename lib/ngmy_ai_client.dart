@@ -873,6 +873,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String lookalikeMime = 'image/jpeg',
   bool preferSceneVariety = true,
   int varietySeed = 0,
+  bool fast = false,
+  bool tryLookalike = true,
   Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
@@ -881,10 +883,11 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   final short = p.length > 280 ? '${p.substring(0, 277)}...' : p;
   String? lastError;
   final started = DateTime.now();
+  final effectiveBudget = fast ? const Duration(seconds: 12) : budget;
   final seedBase = DateTime.now().microsecondsSinceEpoch ^ short.hashCode ^ (varietySeed * 7919);
 
   bool hasTime([Duration need = const Duration(seconds: 3)]) =>
-      DateTime.now().difference(started) + need <= budget;
+      DateTime.now().difference(started) + need <= effectiveBudget;
 
   try {
     final key = creds?.apiKey.trim() ?? '';
@@ -898,8 +901,11 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: 'Photo timed out.');
       }
+      final remainingMs = (effectiveBudget - DateTime.now().difference(started)).inMilliseconds;
       final slice = Duration(
-        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 20000),
+        milliseconds: fast
+            ? remainingMs.clamp(3500, 9000)
+            : remainingMs.clamp(6000, 20000),
       );
       // Proxy works without a real Gemini key for pollinationsImage — always try.
       final viaProxy = await _callImageActionViaProxy(
@@ -912,12 +918,16 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
       lastError = viaProxy.error ?? lastError;
 
+      if (fast) {
+        return (bytes: null, error: lastError ?? 'Image generation failed.');
+      }
+
       if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
       // Direct fetch — try on web too (some browsers allow it; proxy is primary).
       final directSlice = Duration(
-        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 18000),
+        milliseconds: (effectiveBudget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 18000),
       );
       final poll = await ngmyPollinationsImage(
         text,
@@ -955,7 +965,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
         ),
     ];
 
-    for (var i = 0; i < prompts.length; i++) {
+    final promptLimit = fast ? 2 : prompts.length;
+    for (var i = 0; i < promptLimit; i++) {
       final hit = await tryPollinationsOnce(
         prompts[i].text,
         seed: seedBase + i * 91,
@@ -965,9 +976,11 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (!hasTime(const Duration(seconds: 5))) break;
     }
 
-    // Gemini lookalike — best chance on web when Pollinations proxy is down.
-    // Always try when we have a portrait (selfie OR standing/body request).
-    if (hasPortrait && key.isNotEmpty && hasTime(const Duration(seconds: 8))) {
+    // Gemini lookalike — second fast attempt only (keeps "typing…" under ~15s on first try).
+    if (tryLookalike &&
+        hasPortrait &&
+        key.isNotEmpty &&
+        hasTime(fast ? const Duration(seconds: 4) : const Duration(seconds: 8))) {
       final lookalikePrompt = preferSceneVariety
           ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
               'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
@@ -975,13 +988,14 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
               'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
           : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
       try {
-        final remaining = budget - DateTime.now().difference(started);
+        final remaining = effectiveBudget - DateTime.now().difference(started);
+        final geminiCap = fast ? const Duration(seconds: 10) : const Duration(seconds: 12);
         final proxied = await _callGeminiOutfitViaProxy(
           apiKey: key,
           personBytes: lookalikePortraitBytes,
           personMime: lookalikeMime,
           prompt: lookalikePrompt,
-        ).timeout(remaining > const Duration(seconds: 12) ? remaining : const Duration(seconds: 12));
+        ).timeout(remaining > geminiCap ? remaining : geminiCap);
         if (proxied.bytes != null && proxied.bytes!.isNotEmpty) return proxied;
         lastError = proxied.error ?? lastError;
       } catch (e) {
@@ -989,9 +1003,9 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       }
     }
 
-    if (key.isNotEmpty && creds != null && hasTime(const Duration(seconds: 8))) {
+    if (!fast && key.isNotEmpty && creds != null && hasTime(const Duration(seconds: 8))) {
       try {
-        final remaining = budget - DateTime.now().difference(started);
+        final remaining = effectiveBudget - DateTime.now().difference(started);
         final api = await ngmyAiGenerateImage(creds, prompts.first.text).timeout(
           remaining > const Duration(seconds: 10) ? remaining : const Duration(seconds: 10),
         );
