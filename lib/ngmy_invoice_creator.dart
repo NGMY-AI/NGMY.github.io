@@ -499,46 +499,18 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
   }
 
   Future<void> _showDownloadOrPrintOptions(BuildContext ctx) async {
-    final choice = await showModalBottomSheet<String>(
+    final choice = await showDialog<String>(
       context: ctx,
-      backgroundColor: const Color(0xFF0B1020),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-      builder: (sheetCtx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Invoice export',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Download keeps the receipt image. Print uses a full letter-size page like Documents.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              ListTile(
-                leading: const Icon(Icons.download_rounded, color: Color(0xFF10B981)),
-                title: const Text('Download', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  'Receipt image (same as before)',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
-                ),
-                onTap: () => Navigator.pop(sheetCtx, 'download'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.print_rounded, color: Color(0xFF60A5FA)),
-                title: const Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  'One letter PDF that fills the whole page',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
-                ),
-                onTap: () => Navigator.pop(sheetCtx, 'print'),
-              ),
-            ],
+      barrierColor: Colors.black.withValues(alpha: 0.78),
+      builder: (dCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: _InvoiceExportDialog(
+            onDownload: () => Navigator.pop(dCtx, 'download'),
+            onPrint: () => Navigator.pop(dCtx, 'print'),
+            onCancel: () => Navigator.pop(dCtx),
           ),
         ),
       ),
@@ -1225,6 +1197,206 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                   style: TextStyle(fontSize: 11),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InvoiceExportDialog extends StatelessWidget {
+  const _InvoiceExportDialog({
+    required this.onDownload,
+    required this.onPrint,
+    required this.onCancel,
+  });
+
+  final VoidCallback onDownload;
+  final VoidCallback onPrint;
+  final VoidCallback onCancel;
+
+  static const _glow = Color(0xFF14B8A6);
+  static const _header = [Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF14B8A6)];
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: _glow.withValues(alpha: 0.38), width: 1.2),
+          boxShadow: [
+            BoxShadow(color: _glow.withValues(alpha: 0.32), blurRadius: 32, spreadRadius: 1),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 24, offset: const Offset(0, 12)),
+          ],
+        ),
+        child: Material(
+          color: const Color(0xFF0B0F18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: _header,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                          ),
+                          child: const Text(
+                            'INVOICE EXPORT',
+                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(colors: [Color(0xFF14B8A6), Color(0xFF10B981)]),
+                            boxShadow: [BoxShadow(color: _glow.withValues(alpha: 0.55), blurRadius: 18)],
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 34),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Export Invoice',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.15),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Save a receipt image or print a full letter-size page.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.86), fontSize: 13.5, height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: IconButton(
+                      onPressed: onCancel,
+                      icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.85)),
+                      tooltip: 'Close',
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+                child: Column(
+                  children: [
+                    _InvoiceExportOptionCard(
+                      icon: Icons.download_rounded,
+                      iconColors: const [Color(0xFF10B981), Color(0xFF059669)],
+                      borderColor: const Color(0xFF10B981),
+                      title: 'Download',
+                      subtitle: 'Receipt image — same as before',
+                      onTap: onDownload,
+                    ),
+                    const SizedBox(height: 10),
+                    _InvoiceExportOptionCard(
+                      icon: Icons.print_rounded,
+                      iconColors: const [Color(0xFF60A5FA), Color(0xFF2563EB)],
+                      borderColor: const Color(0xFF60A5FA),
+                      title: 'Print',
+                      subtitle: 'One full letter page for your printer',
+                      onTap: onPrint,
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: onCancel,
+                      child: Text('Cancel', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InvoiceExportOptionCard extends StatelessWidget {
+  const _InvoiceExportOptionCard({
+    required this.icon,
+    required this.iconColors,
+    required this.borderColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final List<Color> iconColors;
+  final Color borderColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              colors: [Colors.white.withValues(alpha: 0.04), borderColor.withValues(alpha: 0.1)],
+            ),
+            border: Border.all(color: borderColor.withValues(alpha: 0.38)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: iconColors),
+                  boxShadow: [BoxShadow(color: borderColor.withValues(alpha: 0.35), blurRadius: 10)],
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.58), fontSize: 12, height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.white.withValues(alpha: 0.35)),
             ],
           ),
         ),
