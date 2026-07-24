@@ -1732,33 +1732,7 @@ Future<void> showNgmyAdvisorBadgeCard(
                                 advisorName: profile.name,
                               );
                             },
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
-                          if (sentPhotos.isNotEmpty)
-                            Positioned(
-                              right: -2,
-                              bottom: -2,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE11D48),
-                                  borderRadius: BorderRadius.circular(99),
-                                  border: Border.all(color: Colors.white, width: 1.5),
-                                ),
-                                child: Text(
-                                  '${sentPhotos.length}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      child: NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1837,7 +1811,7 @@ Future<void> showNgmyAdvisorBadgeCard(
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Photos from ${profile.name} (${sentPhotos.length})',
+                              'Photos from ${profile.name}',
                               style: TextStyle(
                                 color: isDark ? Colors.white : const Color(0xFF1F1218),
                                 fontWeight: FontWeight.w800,
@@ -2281,8 +2255,185 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
   );
 }
 
-/// Swipeable gallery of every photo this advisor sent in chat.
+/// Decorative frame for advisor photo grid tiles.
+Widget _advisorGalleryPhotoFrame({
+  required Widget child,
+  required bool isDark,
+}) {
+  return Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFEC4899), Color(0xFF9333EA), Color(0xFFE11D48)],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF9333EA).withValues(alpha: 0.28),
+          blurRadius: 14,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    padding: const EdgeInsets.all(2.5),
+    child: Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        color: isDark ? const Color(0xFF140F1E) : Colors.white,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: isDark ? 0.22 : 0.95),
+          width: 2,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    ),
+  );
+}
+
+/// Grid of advisor-sent photos (3 per row) — tap any tile for fullscreen.
 Future<void> showNgmyAdvisorPhotoGallery(
+  BuildContext context, {
+  required List<String> photosB64,
+  required String advisorName,
+}) {
+  if (photosB64.isEmpty) return Future.value();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final title = advisorName.trim().isEmpty ? 'Photos' : advisorName.trim();
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close gallery',
+    barrierColor: Colors.black.withValues(alpha: 0.72),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (ctx, anim, secondary) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+          child: Material(
+            color: Colors.transparent,
+            child: _loveGlassPanel(
+              context: ctx,
+              isDark: isDark,
+              borderRadius: BorderRadius.circular(28),
+              fillAlpha: isDark ? 0.14 : 0.92,
+              blur: 18,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFEC4899), Color(0xFF9333EA)],
+                            ),
+                          ),
+                          child: const Icon(Icons.photo_library_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : const Color(0xFF1F1218),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Tap a photo to open full size',
+                                style: TextStyle(
+                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: Icon(Icons.close_rounded, color: isDark ? Colors.white70 : Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.78,
+                      ),
+                      itemCount: photosB64.length,
+                      itemBuilder: (_, i) {
+                        Uint8List? bytes;
+                        try {
+                          bytes = base64Decode(photosB64[i]);
+                        } catch (_) {}
+                        return GestureDetector(
+                          onTap: () => showNgmyAdvisorPhotoViewer(
+                            ctx,
+                            photosB64: photosB64,
+                            advisorName: advisorName,
+                            initialIndex: i,
+                          ),
+                          child: _advisorGalleryPhotoFrame(
+                            isDark: isDark,
+                            child: bytes != null && bytes.isNotEmpty
+                                ? Image.memory(
+                                    bytes,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    filterQuality: FilterQuality.medium,
+                                    gaplessPlayback: true,
+                                  )
+                                : Container(
+                                    color: isDark ? Colors.white10 : Colors.black12,
+                                    child: Icon(
+                                      Icons.broken_image_outlined,
+                                      color: isDark ? Colors.white38 : Colors.black38,
+                                    ),
+                                  ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (ctx, anim, secondary, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Fullscreen swipe viewer — opened from grid tile.
+Future<void> showNgmyAdvisorPhotoViewer(
   BuildContext context, {
   required List<String> photosB64,
   required String advisorName,
@@ -2293,84 +2444,70 @@ Future<void> showNgmyAdvisorPhotoGallery(
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'Close gallery',
+    barrierLabel: 'Close photo',
     barrierColor: Colors.black.withValues(alpha: 0.94),
     transitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (ctx, anim, secondary) {
       final page = PageController(initialPage: start);
-      var index = start;
       return SafeArea(
         child: Material(
           color: Colors.transparent,
-          child: StatefulBuilder(
-            builder: (ctx, setLocal) {
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  PageView.builder(
-                    controller: page,
-                    itemCount: photosB64.length,
-                    onPageChanged: (i) => setLocal(() => index = i),
-                    itemBuilder: (_, i) {
-                      Uint8List? bytes;
-                      try {
-                        bytes = base64Decode(photosB64[i]);
-                      } catch (_) {}
-                      if (bytes == null || bytes.isEmpty) {
-                        return const Center(
-                          child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
-                        );
-                      }
-                      return InteractiveViewer(
-                        minScale: 0.5,
-                        maxScale: 6,
-                        child: Center(
-                          child: Image.memory(
-                            bytes,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                            gaplessPlayback: true,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 12,
-                    right: 12,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            advisorName.trim().isEmpty ? 'Photos' : advisorName.trim(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          '${index + 1} / ${photosB64.length}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white),
-                        ),
-                      ],
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PageView.builder(
+                controller: page,
+                itemCount: photosB64.length,
+                itemBuilder: (_, i) {
+                  Uint8List? bytes;
+                  try {
+                    bytes = base64Decode(photosB64[i]);
+                  } catch (_) {}
+                  if (bytes == null || bytes.isEmpty) {
+                    return const Center(
+                      child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                    );
+                  }
+                  return InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 6,
+                    child: Center(
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        gaplessPlayback: true,
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  );
+                },
+              ),
+              Positioned(
+                top: 8,
+                left: 12,
+                right: 12,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        advisorName.trim().isEmpty ? 'Photo' : advisorName.trim(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
