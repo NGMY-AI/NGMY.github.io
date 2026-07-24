@@ -872,6 +872,7 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   Uint8List? lookalikePortraitBytes,
   String lookalikeMime = 'image/jpeg',
   bool preferSceneVariety = true,
+  int varietySeed = 0,
   Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
@@ -880,7 +881,7 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   final short = p.length > 280 ? '${p.substring(0, 277)}...' : p;
   String? lastError;
   final started = DateTime.now();
-  final seedBase = DateTime.now().microsecondsSinceEpoch ^ short.hashCode;
+  final seedBase = DateTime.now().microsecondsSinceEpoch ^ short.hashCode ^ (varietySeed * 7919);
 
   bool hasTime([Duration need = const Duration(seconds: 3)]) =>
       DateTime.now().difference(started) + need <= budget;
@@ -935,13 +936,17 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     final prompts = <({String text, bool adultMode})>[
       (
         text: preferSceneVariety
-            ? 'Photorealistic full-body standing photo of $personHint, whole body visible head to toe, stylish casual clothes, natural light, looking at camera, no text, no watermark'
-            : 'Photorealistic flattering photo of $personHint, natural light, no text, no watermark',
+            ? 'Brand-new photorealistic full-body photo, different outfit and pose than reference: $personHint, whole body visible, natural light, no text'
+            : 'Photorealistic flattering photo of $personHint, new angle, natural light, no text, no watermark',
         adultMode: false,
       ),
       (
-        text: 'Photorealistic photo matching: $short. Full body or three-quarter if standing/body. No text, no watermark.',
+        text: 'Photorealistic photo matching: $short. New wardrobe and background. Full body or three-quarter. No text, no watermark.',
         adultMode: adult,
+      ),
+      (
+        text: 'Completely new photograph, NOT a profile selfie copy: $personHint. Different clothes, jewelry, and setting. Photorealistic.',
+        adultMode: false,
       ),
       if (adult)
         (
@@ -964,10 +969,11 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     // Always try when we have a portrait (selfie OR standing/body request).
     if (hasPortrait && key.isNotEmpty && hasTime(const Duration(seconds: 8))) {
       final lookalikePrompt = preferSceneVariety
-          ? 'Reference image is FACE IDENTITY ONLY. Create ONE NEW photorealistic photograph of this exact person. '
-              'CRITICAL: full-body or three-quarter standing pose — whole body in frame, not a selfie headshot. '
-              'Request: $short. Natural lighting. No text, no watermark. Output only the photo.'
-          : 'Reference image is this person. Create ONE NEW photorealistic photo of them. $short No text, no watermark.';
+          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
+              'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
+              'CRITICAL: full-body or three-quarter standing pose — whole body in frame, not a profile selfie. '
+              'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
+          : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
       try {
         final remaining = budget - DateTime.now().difference(started);
         final proxied = await _callGeminiOutfitViaProxy(

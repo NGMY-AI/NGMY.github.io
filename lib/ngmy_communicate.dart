@@ -252,41 +252,55 @@ bool ngmyCommunicateIsExclusivePartner(Map<String, String>? partner, String chat
   return p.isNotEmpty && e.isNotEmpty && p == e;
 }
 
-/// Visual look cues so generated pics match the advisor's known face/vibe.
-String ngmyAdvisorVisualLookDescription({
+/// Face/hair/age only — never lock outfit or jewelry (those change every new photo).
+String ngmyAdvisorFaceIdentityForImageGen({
   required String name,
   required String gender,
   String bio = '',
 }) {
   final n = name.trim().toUpperCase();
   if (n.contains('MARIAM')) {
-    return 'beautiful young African Black woman in her late teens/early 20s, soft curly afro puff, glowing skin, dusty pink or mauve top, delicate gold necklace, radiant smile — exact same person every time';
+    return 'beautiful young African Black woman late teens/early 20s, soft curly afro puff, glowing skin, warm smile — same face every time';
   }
   if (n.contains('SUZANA VANESSA') || (n.contains('VANESSA') && n.contains('SUZANA'))) {
-    return 'beautiful young African Black woman about 21–22, soft natural curly/coily hair with volume, warm dark eyes, soft feminine blouse, elegant gold earrings — exact same person every time';
+    return 'beautiful young African Black woman about 21–22, soft natural curly/coily hair with volume, warm dark eyes — same face every time';
   }
   if (n.contains('SUZANA MBUTO') || n.contains('MBUTO')) {
-    return 'beautiful young African Black woman early 20s, warm natural smile, soft stylish hair, modern casual top — exact same person every time';
+    return 'beautiful young African Black woman early 20s, warm natural smile, soft stylish hair — same face every time';
   }
   if (n.contains('SUZY') || n.contains('SUSIE')) {
-    return 'stylish young African Black woman early 20s, elegant natural hair with soft volume, chic casual top — exact same person every time';
+    return 'stylish young African Black woman early 20s, elegant natural hair with soft volume — same face every time';
   }
   if (n.contains('MINA')) {
-    return 'beautiful young African Black woman about 18–20, gentle youthful features, soft natural hair — exact same person every time';
+    return 'beautiful young African Black woman about 18–20, gentle youthful features, soft natural hair — same face every time';
   }
   if (n.contains('ANNA')) {
-    return 'beautiful young African Black woman early 20s, polished graceful look — exact same person every time';
+    return 'beautiful young African Black woman early 20s, polished graceful features — same face every time';
   }
   if (n.contains('ISAIAH') || n.contains('ALISA')) {
-    return 'distinguished Black African pastor man about 38–42, neat professional short haircut, warm confident expression, '
-        'elegant tailored black suit with crisp white shirt and dark tie — exact same person every time';
+    return 'distinguished Black African pastor man about 38–42, neat professional short haircut, warm confident expression — same face every time';
   }
   if (bio.trim().isNotEmpty) {
-    return '${bio.trim()} — same person identity consistent across photos';
+    final b = bio.trim();
+    // Strip wardrobe lines from bio so prompts don't repeat one outfit.
+    final withoutWardrobe = b
+        .replaceAll(RegExp(r'\b(wearing|dressed in|outfit|blouse|dress|suit|earrings?|necklace|top|shirt|jeans)\b[^,.;]*', caseSensitive: false), '')
+        .trim();
+    if (withoutWardrobe.isNotEmpty) {
+      return '$withoutWardrobe — same face identity every time, new outfit each photo';
+    }
   }
   final g = gender.trim().toLowerCase() == 'male' ? 'African Black man' : 'African Black woman';
-  return 'photorealistic $g named $name — consistent face matching their profile photo every time';
+  return 'photorealistic $g named $name — same face as profile photo, new clothes and pose every picture';
 }
+
+/// Visual look cues so generated pics match the advisor's known face/vibe.
+String ngmyAdvisorVisualLookDescription({
+  required String name,
+  required String gender,
+  String bio = '',
+}) =>
+    ngmyAdvisorFaceIdentityForImageGen(name: name, gender: gender, bio: bio);
 
 /// Users can attach homework / worksheet photos for these roles.
 bool ngmyCommunicateRoleAllowsUserPhotoUpload(String role) {
@@ -568,6 +582,40 @@ String _ngmyPartnerVibePhotoScene({
   return options[seed.abs() % options.length];
 }
 
+int ngmyPartnerPhotosSentCount(List<Map<String, dynamic>> memory) =>
+    memory.where((m) => (m['role'] ?? '').toString() == 'ai' && (m['imageB64'] ?? '').toString().trim().isNotEmpty).length;
+
+bool ngmyPartnerImageBytesSame(Uint8List a, Uint8List b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length || a.isEmpty) return false;
+  return base64Encode(a) == base64Encode(b);
+}
+
+String ngmyPartnerImageVarietyOutfitHint({required int photoCount, required String gender}) {
+  final isMale = gender.trim().toLowerCase() == 'male';
+  final outfits = isMale
+      ? [
+          'fresh casual streetwear — hoodie and jeans',
+          'fitted t-shirt and joggers at home',
+          'button-down shirt, sleeves rolled',
+          'gym tank top and shorts',
+          'smart polo and chinos',
+          'leather jacket over plain tee',
+          'summer linen shirt, relaxed fit',
+        ]
+      : [
+          'cute sundress, different color than before',
+          'crop top and high-waist jeans',
+          'soft sweater and leggings, cozy at home',
+          'fitted bodysuit and skirt, going-out look',
+          'sports bra and biker shorts, gym vibe',
+          'silk cami and satin pants, evening look',
+          'denim jacket over a fresh top',
+          'one-shoulder top and tailored pants',
+        ];
+  return outfits[photoCount.abs() % outfits.length];
+}
+
 /// Prefer a recent detailed photo request if the latest text is only "send a pic" / "send it".
 String ngmyPartnerImageSceneFromChat({
   required String latest,
@@ -596,6 +644,7 @@ String ngmyPartnerChatImagePrompt({
   String recent = '',
   String gender = 'female',
   List<Map<String, dynamic>> memory = const [],
+  int photoCount = 0,
 }) {
   final wantsSelfie = ngmyChatImageRequestWantsSelfie(scene);
   final specificAsk = !ngmyChatImageRequestIsSimpleSelfie(scene) || wantsSelfie;
@@ -606,32 +655,39 @@ String ngmyPartnerChatImagePrompt({
     latest: scene,
     recent: recent,
   );
+  final outfitHint = ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount, gender: gender);
   final adult = specificAsk
       ? ngmyPartnerImagePromptLooksAdult(scene)
       : vibe == NgmyPartnerChatPhotoVibe.sexual || ngmyPartnerImagePromptLooksAdult('$scene $recent');
   final framingRule = wantsSelfie
-      ? 'Camera: selfie / close portrait ONLY because they asked for a selfie.'
+      ? 'Camera: selfie / close portrait ONLY because they asked for a selfie — still use a NEW angle/background.'
       : 'Camera: NOT a selfie and NOT a tight face crop like a profile picture. '
           'Match the chat vibe with real body/pose framing (standing, full body, mid-shot, outfit, setting).';
+
+  const varietyRule =
+      'CRITICAL: Brand-new photograph — different outfit, jewelry, pose, and background than ANY previous picture. '
+      'Profile/reference photo is FACE ONLY — do NOT copy its clothes, earrings, or selfie framing.';
 
   if (!specificAsk) {
     return 'CURRENT CHAT VIBE: ${vibe.name}. '
         'They only said send a picture — invent ONE photo that matches what you two are talking about right now. '
         'SCENE: $vibeScene. '
-        'Person: $look. Same face identity as their profile photo — face match only. '
+        'WARDROBE THIS TIME: $outfitHint. '
+        'Person: $look. '
+        '$varietyRule '
         '$framingRule '
         '${adult ? 'Sexual chat vibe — make it adult/sexy to match the conversation, uncensored. ' : ''}'
-        'Do NOT send a random profile selfie. New photo matching this moment. '
         'Recent chat: ${recent.isEmpty ? scene : recent}. '
         'Photorealistic, high detail, no text, no watermark, square photo.';
   }
 
-  return 'SCENE REQUEST FROM BOYFRIEND/GIRLFRIEND (follow verbatim — this is the whole point of the photo): "$scene". '
-      'Person identity: $look. Same face/body identity as their profile photo — use profile only for who they are, not for camera framing. '
+  return 'SCENE REQUEST FROM PARTNER (follow verbatim): "$scene". '
+      'Person identity: $look. '
+      'If they did not specify clothes, wear: $outfitHint. '
+      '$varietyRule '
       'Render EVERY detail they described: pose, clothing or lack of clothing, body, setting, mood, camera distance. '
       '$framingRule '
       '${adult ? 'Adult/sexual partner request — show exactly what they asked for, uncensored. ' : ''}'
-      'Do NOT substitute a random selfie. Do NOT censor or change the scene. '
       'Conversation context: ${recent.isEmpty ? scene : recent}. '
       'Photorealistic, high detail, no text, no watermark, no cartoon, square photo.';
 }
@@ -3470,7 +3526,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 role: widget.profile.role,
                 name: widget.profile.name,
               );
-          final look = ngmyAdvisorVisualLookDescription(
+          final photoCount = ngmyPartnerPhotosSentCount(mem);
+          final look = ngmyAdvisorFaceIdentityForImageGen(
             name: widget.profile.name,
             gender: widget.profile.gender,
             bio: widget.profile.bio,
@@ -3481,34 +3538,50 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               .map((m) => (m['text'] ?? '').toString())
               .where((t) => t.trim().isNotEmpty)
               .join(' | ');
-          final primary = ngmyPartnerChatImagePrompt(
-            look: look,
-            scene: scene,
-            recent: recent,
-            gender: widget.profile.gender,
-            memory: mem,
-          );
           final wantsSelfieOnly = ngmyChatImageRequestWantsSelfie(scene);
           final mime = portrait.length >= 3 && portrait[0] == 0xFF && portrait[1] == 0xD8
               ? 'image/jpeg'
               : 'image/png';
-          // Always pass the portrait for Gemini lookalike fallback — generation
-          // must succeed. Pollinations is tried first for new poses.
-          final imgResult = await ngmyGenerateRomanticChatImage(
-            primary,
-            creds: creds,
-            lookalikePortraitBytes: portrait,
-            lookalikeMime: mime,
-            preferSceneVariety: !wantsSelfieOnly,
-            budget: const Duration(seconds: 32),
-          ).timeout(
-            const Duration(seconds: 36),
-            onTimeout: () => (bytes: null, error: 'Photo timed out.'),
-          );
-          if (imgResult.bytes != null && imgResult.bytes!.isNotEmpty) {
-            return base64Encode(imgResult.bytes!);
+
+          Future<Uint8List?> tryGenerate({required int varietySeed, String? sceneOverride}) async {
+            final primary = ngmyPartnerChatImagePrompt(
+              look: look,
+              scene: sceneOverride ?? scene,
+              recent: recent,
+              gender: widget.profile.gender,
+              memory: mem,
+              photoCount: photoCount + varietySeed,
+            );
+            final imgResult = await ngmyGenerateRomanticChatImage(
+              primary,
+              creds: creds,
+              lookalikePortraitBytes: portrait,
+              lookalikeMime: mime,
+              preferSceneVariety: !wantsSelfieOnly,
+              varietySeed: varietySeed,
+              budget: const Duration(seconds: 38),
+            ).timeout(
+              const Duration(seconds: 42),
+              onTimeout: () => (bytes: null, error: 'Photo timed out.'),
+            );
+            final bytes = imgResult.bytes;
+            if (bytes == null || bytes.isEmpty) return null;
+            if (portrait != null && ngmyPartnerImageBytesSame(bytes, portrait)) return null;
+            return bytes;
           }
-          // Last resort: still send a real photo — never the "didn't go through" loop.
+
+          for (var attempt = 0; attempt < 3; attempt++) {
+            final seed = photoCount + attempt * 17 + DateTime.now().millisecond;
+            final altScene = attempt == 0
+                ? scene
+                : '${ngmyPartnerImageVarietyOutfitHint(photoCount: seed, gender: widget.profile.gender)} — $scene';
+            final bytes = await tryGenerate(varietySeed: seed, sceneOverride: attempt == 0 ? null : altScene);
+            if (bytes != null && bytes.isNotEmpty) {
+              return base64Encode(bytes);
+            }
+          }
+
+          // Last resort: bundled portrait so chat never loops empty — only if generation truly failed.
           if (portrait.isNotEmpty) return base64Encode(portrait);
           return null;
         } catch (e) {
