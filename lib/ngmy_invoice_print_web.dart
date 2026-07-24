@@ -49,7 +49,9 @@ Future<bool> _printPdfInIframe(Uint8List pdfBytes) async {
       ..src = url;
     html.document.body?.append(iframe);
 
-    await iframe.onLoad.first.timeout(const Duration(seconds: 6), onTimeout: () {});
+    try {
+      await iframe.onLoad.first.timeout(const Duration(seconds: 6));
+    } catch (_) {}
     final win = iframe.contentWindow;
     if (win == null) return false;
     try {
