@@ -1,18 +1,34 @@
 import 'package:flutter/services.dart';
 
-/// Dial-code + grouping patterns for African destinations (and US senders).
+/// Dial-code + grouping patterns for US senders and African receivers.
 class NgmyHelpCenterPhonePattern {
   const NgmyHelpCenterPhonePattern({
     required this.dialCode,
     required this.groups,
     this.label = '',
+    this.optionalLeadingPlus = false,
+    this.emptyWhenBlank = false,
   });
 
   final String dialCode;
   final List<int> groups;
   final String label;
 
-  static const us = NgmyHelpCenterPhonePattern(dialCode: '1', groups: [3, 3, 4], label: 'US');
+  /// US sender: + is optional in the field.
+  final bool optionalLeadingPlus;
+
+  /// Return empty string instead of "+" when the field is cleared.
+  final bool emptyWhenBlank;
+
+  /// US senders — country code 1, grouped 3 · 3 · 6 (optional leading +).
+  static const usSender = NgmyHelpCenterPhonePattern(
+    dialCode: '1',
+    groups: [3, 3, 6],
+    label: 'US Sender',
+    optionalLeadingPlus: true,
+    emptyWhenBlank: true,
+  );
+
   static const tanzania = NgmyHelpCenterPhonePattern(dialCode: '255', groups: [3, 3, 3], label: 'Tanzania');
   static const kenya = NgmyHelpCenterPhonePattern(dialCode: '254', groups: [3, 3, 3], label: 'Kenya');
   static const uganda = NgmyHelpCenterPhonePattern(dialCode: '256', groups: [3, 3, 3], label: 'Uganda');
@@ -32,7 +48,7 @@ class NgmyHelpCenterPhonePattern {
 }
 
 NgmyHelpCenterPhonePattern ngmyHelpCenterPhonePatternForCountry(String country, {bool sender = false}) {
-  if (sender && country.trim().isEmpty) return NgmyHelpCenterPhonePattern.us;
+  if (sender) return NgmyHelpCenterPhonePattern.usSender;
   final c = country.trim().toLowerCase();
   if (c.isEmpty) return NgmyHelpCenterPhonePattern.generic;
   if (c.contains('tanzania') || c.contains('tanz')) return NgmyHelpCenterPhonePattern.tanzania;
@@ -50,15 +66,31 @@ NgmyHelpCenterPhonePattern ngmyHelpCenterPhonePatternForCountry(String country, 
   if (c.contains('ethiopia')) return NgmyHelpCenterPhonePattern.ethiopia;
   if (c.contains('cameroon')) return NgmyHelpCenterPhonePattern.cameroon;
   if (c.contains('burundi')) return NgmyHelpCenterPhonePattern.burundi;
-  if (c.contains('united states') || c == 'usa' || c == 'us') return NgmyHelpCenterPhonePattern.us;
+  if (c.contains('united states') || c == 'usa' || c == 'us') return NgmyHelpCenterPhonePattern.usSender;
   return NgmyHelpCenterPhonePattern.generic;
 }
 
-String ngmyHelpCenterDigitsOnly(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+String ngmyHelpCenterDigitsOnly(String raw) => raw.replaceAll(RegExp(r'[^\d]'), '');
+
+List<String> _chunkDigits(String digits, List<int> groups) {
+  final chunks = <String>[];
+  var idx = 0;
+  for (final size in groups) {
+    if (idx >= digits.length) break;
+    final end = (idx + size).clamp(0, digits.length);
+    if (end <= idx) break;
+    chunks.add(digits.substring(idx, end));
+    idx += size;
+  }
+  if (idx < digits.length) chunks.add(digits.substring(idx));
+  return chunks;
+}
 
 String ngmyHelpCenterFormatPhone(String raw, NgmyHelpCenterPhonePattern pattern) {
+  if (pattern.optionalLeadingPlus) return ngmyHelpCenterFormatSenderPhone(raw);
+
   var digits = ngmyHelpCenterDigitsOnly(raw);
-  if (digits.isEmpty) return '+';
+  if (digits.isEmpty) return pattern.emptyWhenBlank ? '' : '+';
 
   if (pattern.dialCode.isNotEmpty) {
     if (!digits.startsWith(pattern.dialCode)) {
@@ -66,30 +98,34 @@ String ngmyHelpCenterFormatPhone(String raw, NgmyHelpCenterPhonePattern pattern)
       digits = pattern.dialCode + digits;
     }
     final local = digits.substring(pattern.dialCode.length);
-    final chunks = <String>[];
-    var idx = 0;
-    for (final size in pattern.groups) {
-      if (idx >= local.length) break;
-      final end = (idx + size).clamp(0, local.length);
-      if (end <= idx) break;
-      chunks.add(local.substring(idx, end));
-      idx += size;
-    }
-    if (idx < local.length) chunks.add(local.substring(idx));
+    final chunks = _chunkDigits(local, pattern.groups);
     return '+${pattern.dialCode}${chunks.isEmpty ? '' : ' ${chunks.join(' ')}'}'.trim();
   }
 
-  final chunks = <String>[];
-  var idx = 0;
-  while (idx < digits.length) {
-    final end = (idx + 3).clamp(0, digits.length);
-    chunks.add(digits.substring(idx, end));
-    idx += 3;
-  }
+  final chunks = _chunkDigits(digits, pattern.groups);
   return '+${chunks.join(' ')}';
 }
 
-/// Formats international phone numbers with leading + and spaced groups.
+/// US sender — 3 · 3 · 6 grouping; leading +1 is optional.
+String ngmyHelpCenterFormatSenderPhone(String raw) {
+  var digits = ngmyHelpCenterDigitsOnly(raw);
+  if (digits.isEmpty) return '';
+
+  final usePlus = raw.trim().startsWith('+');
+  var national = digits;
+  if (digits.startsWith('1') && digits.length > 1) {
+    national = digits.substring(1);
+  }
+
+  final chunks = _chunkDigits(national, NgmyHelpCenterPhonePattern.usSender.groups);
+  final spaced = chunks.where((c) => c.isNotEmpty).join(' ');
+  if (spaced.isEmpty) return usePlus ? '+' : '';
+
+  if (usePlus) return '+1 $spaced'.trim();
+  return spaced;
+}
+
+/// Formats phone numbers with spaced groups.
 class NgmyHelpCenterPhoneFormatter extends TextInputFormatter {
   NgmyHelpCenterPhoneFormatter({required this.pattern});
 
@@ -106,9 +142,18 @@ class NgmyHelpCenterPhoneFormatter extends TextInputFormatter {
 }
 
 String ngmyHelpCenterPhoneHint(NgmyHelpCenterPhonePattern pattern) {
+  if (pattern.optionalLeadingPlus) return '234 567 890123 or +1 234 567 890123';
   if (pattern.dialCode == '255') return '+255 712 345 678';
   if (pattern.dialCode == '254') return '+254 712 345 678';
-  if (pattern.dialCode == '1') return '+1 234 567 8901';
   if (pattern.dialCode.isNotEmpty) return '+${pattern.dialCode} XXX XXX XXX';
   return '+ country code, then number';
+}
+
+String ngmyHelpCenterDisplayPhone(String raw, {String country = '', bool sender = false}) {
+  if (raw.trim().isEmpty) return '—';
+  if (sender) return ngmyHelpCenterFormatSenderPhone(raw);
+  final pattern = ngmyHelpCenterPhonePatternForCountry(country);
+  final formatted = ngmyHelpCenterFormatPhone(raw, pattern);
+  if (formatted.isEmpty || formatted == '+') return raw.trim();
+  return formatted;
 }

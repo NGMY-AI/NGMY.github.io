@@ -115,7 +115,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           ? sender.phone.trim()
           : widget.clientPhone.trim();
       if (phone.isNotEmpty && _senderPhoneC.text.trim().isEmpty) {
-        _senderPhoneC.text = ngmyHelpCenterFormatPhone(phone, NgmyHelpCenterPhonePattern.us);
+        _senderPhoneC.text = ngmyHelpCenterFormatSenderPhone(phone);
       }
     });
   }
@@ -127,7 +127,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     });
   }
 
-  NgmyHelpCenterPhonePattern get _senderPhonePattern => ngmyHelpCenterPhonePatternForCountry('', sender: true);
+  NgmyHelpCenterPhonePattern get _senderPhonePattern => NgmyHelpCenterPhonePattern.usSender;
 
   NgmyHelpCenterPhonePattern get _receiverPhonePattern =>
       ngmyHelpCenterPhonePatternForCountry(_receiverCountryC.text.trim());
