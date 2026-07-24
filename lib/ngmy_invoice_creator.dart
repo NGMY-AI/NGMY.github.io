@@ -11,7 +11,6 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_invoice_letter.dart';
 import 'ngmy_invoice_payments.dart';
-import 'ngmy_invoice_print.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_invoice_storage.dart';
@@ -390,56 +389,6 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return bytes;
   }
 
-  /// Letter-size, edge-to-edge capture for print (one page, no white gutters).
-  Future<Uint8List> _captureInvoicePngForPrint(BuildContext ctx, double subtotal, {required bool locked}) async {
-    const letterW = 850.0;
-    const letterH = 1100.0; // US Letter aspect (8.5 × 11)
-
-    final boundaryKey = GlobalKey();
-    final overlay = Overlay.of(ctx, rootOverlay: true);
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => IgnorePointer(
-        child: Transform.translate(
-          offset: const Offset(-25000, 0),
-          child: Material(
-            type: MaterialType.transparency,
-            child: RepaintBoundary(
-              key: boundaryKey,
-              child: SizedBox(
-                width: letterW,
-                height: letterH,
-                child: FittedBox(
-                  fit: BoxFit.fill,
-                  alignment: Alignment.center,
-                  child: SizedBox(
-                    width: letterW,
-                    child: NgmyInvoicePreview(data: _previewData(subtotal, locked: locked)),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(entry);
-    try {
-      await Future.delayed(const Duration(milliseconds: 220));
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 80));
-      final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) throw Exception('Print preview is not ready yet. Try again.');
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
-      if (bytes == null) throw Exception('Could not render print invoice.');
-      return bytes;
-    } finally {
-      entry.remove();
-    }
-  }
-
   String _invoiceExportBaseName() {
     final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
     return 'invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}';
@@ -465,52 +414,58 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     }
   }
 
+  void _dismissPrintLoading(BuildContext ctx) {
+    if (!ctx.mounted) return;
+    Navigator.of(ctx, rootNavigator: true).maybePop();
+  }
+
   /// Full US Letter page (same size as Slides/Documents PDF) for printing.
   Future<void> _printInvoice(BuildContext ctx) async {
+    if (!ctx.mounted) return;
+    unawaited(
+      showDialog<void>(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (dCtx) => const PopScope(
+          canPop: false,
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 14),
+                      Text('Preparing print PDF…', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
-      final subtotal = _subtotal();
-      final locked = _contentLocked();
-      final bytes = await _captureInvoicePngForPrint(ctx, subtotal, locked: locked);
+      final bytes = await _captureInvoicePng();
       final pdfBytes = await ngmyInvoiceBuildLetterPdf(bytes);
       final filename = _invoiceExportBaseName();
-
-      final msg = await saveNgmySlidesPdf(pdfBytes, filename);
+      _dismissPrintLoading(ctx);
       if (!ctx.mounted) return;
 
-      if (msg == kNgmySlidesPdfStagedToken) {
-        final opened = await ngmyOpenStagedSlidesPdfInSafari();
-        if (!ctx.mounted) return;
-        if (opened) {
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            const SnackBar(
-              content: Text('PDF opened — tap Share ↗ then Print (one full page).'),
-              backgroundColor: Color(0xFF16A34A),
-              duration: Duration(seconds: 8),
-            ),
-          );
-        } else {
-          await ngmyShowIosSlidesPdfDialog(ctx, deckName: 'Invoice');
-        }
-        return;
-      }
-
       if (kIsWeb) {
-        final opened = await ngmyInvoiceOpenPdfInBrowser(pdfBytes);
-        if (ctx.mounted) {
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(
-              content: Text(
-                opened
-                    ? 'Letter PDF opened — tap Print (one full page).'
-                    : '$msg — open the PDF to print on full paper.',
-              ),
-              backgroundColor: const Color(0xFF16A34A),
-            ),
-          );
-        }
+        // Stage then show buttons — iOS blocks window.open after async work unless
+        // the user taps Share or Safari here (same pattern as Slides/Documents).
+        ngmyStageSlidesPdfBytes(pdfBytes, filename);
+        await ngmyShowIosSlidesPdfDialog(ctx, deckName: 'Invoice');
         return;
       }
 
+      final msg = await saveNgmySlidesPdf(pdfBytes, filename);
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(
@@ -520,6 +475,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
         );
       }
     } catch (e) {
+      _dismissPrintLoading(ctx);
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text('Print failed: $e'), backgroundColor: const Color(0xFFEF4444)),

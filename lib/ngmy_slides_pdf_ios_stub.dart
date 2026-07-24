@@ -8,6 +8,8 @@ String? ngmyStagedSlidesPdfNameImpl() => null;
 
 void ngmyClearStagedSlidesPdfImpl() {}
 
+void ngmyStageSlidesPdfBytesImpl(Uint8List bytes, String filename) {}
+
 Future<bool> ngmyShareStagedSlidesPdfImpl() async => false;
 
 Future<bool> ngmyDownloadStagedSlidesPdfImpl() async => false;

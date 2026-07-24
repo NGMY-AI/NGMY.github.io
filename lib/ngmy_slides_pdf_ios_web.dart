@@ -47,6 +47,9 @@ void _stagePdf(Uint8List bytes, String filename) {
   _pendingUrl = html.Url.createObjectUrlFromBlob(blob);
 }
 
+/// Stage PDF bytes for Share / Safari / Download (user tap — not blocked on iOS).
+void ngmyStageSlidesPdfBytesImpl(Uint8List bytes, String filename) => _stagePdf(bytes, filename);
+
 Future<bool> _shareBytes(Uint8List bytes, String name) async {
   try {
     if (bytes.isEmpty) return false;

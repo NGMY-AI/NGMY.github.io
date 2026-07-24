@@ -13,6 +13,9 @@ String? get ngmyStagedSlidesPdfName => ngmyStagedSlidesPdfNameImpl();
 
 void ngmyClearStagedSlidesPdf() => ngmyClearStagedSlidesPdfImpl();
 
+void ngmyStageSlidesPdfBytes(Uint8List bytes, String filename) =>
+    ngmyStageSlidesPdfBytesImpl(bytes, filename);
+
 Future<bool> ngmyShareStagedSlidesPdf() => ngmyShareStagedSlidesPdfImpl();
 
 Future<bool> ngmyDownloadStagedSlidesPdf() => ngmyDownloadStagedSlidesPdfImpl();
@@ -35,19 +38,21 @@ Future<void> ngmyHandleSlidesPdfDownloadResult(BuildContext context, String msg,
 
 Future<void> ngmyShowIosSlidesPdfDialog(BuildContext context, {required String deckName}) async {
   final name = ngmyStagedSlidesPdfName ?? '$deckName.pdf';
+  final forInvoicePrint = deckName == 'Invoice';
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     isDismissible: false,
-    builder: (ctx) => _NgmySlidesPdfSaveSheet(fileName: name),
+    builder: (ctx) => _NgmySlidesPdfSaveSheet(fileName: name, forInvoicePrint: forInvoicePrint),
   );
 }
 
 class _NgmySlidesPdfSaveSheet extends StatelessWidget {
-  const _NgmySlidesPdfSaveSheet({required this.fileName});
+  const _NgmySlidesPdfSaveSheet({required this.fileName, this.forInvoicePrint = false});
 
   final String fileName;
+  final bool forInvoicePrint;
 
   Future<void> _finish(BuildContext context, Future<bool> Function() action, String okMsg, String failMsg) async {
     final ok = await action();
@@ -86,15 +91,31 @@ class _NgmySlidesPdfSaveSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Save your PDF', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  Text(
+                    forInvoicePrint ? 'Print your invoice' : 'Save your PDF',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    fileName,
+                    forInvoicePrint
+                        ? 'One full letter page — tap Share then Print, or open in Safari.'
+                        : fileName,
                     textAlign: TextAlign.center,
-                    maxLines: 2,
+                    maxLines: forInvoicePrint ? 3 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12, fontWeight: FontWeight.w600),
                   ),
+                  if (!forInvoicePrint) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      fileName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -121,8 +142,10 @@ class _NgmySlidesPdfSaveSheet extends StatelessWidget {
                           onTap: () => _finish(
                             context,
                             ngmyShareStagedSlidesPdf,
-                            'Pick Save to Files or send from the share menu.',
-                            'Share unavailable — try Download.',
+                            forInvoicePrint
+                                ? 'Choose Print from the share menu for one full page.'
+                                : 'Pick Save to Files or send from the share menu.',
+                            'Share unavailable — try Safari.',
                           ),
                         ),
                       ),
@@ -135,8 +158,10 @@ class _NgmySlidesPdfSaveSheet extends StatelessWidget {
                           onTap: () => _finish(
                             context,
                             ngmyOpenStagedSlidesPdfInSafari,
-                            'PDF opened — use Share ↗ at the bottom of Safari.',
-                            'Could not open Safari — try Download.',
+                            forInvoicePrint
+                                ? 'PDF opened — tap Share ↗ then Print.'
+                                : 'PDF opened — use Share ↗ at the bottom of Safari.',
+                            'Could not open Safari — try Share.',
                           ),
                         ),
                       ),
