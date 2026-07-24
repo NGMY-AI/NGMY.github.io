@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String kNgmyHelpCenterSenderInfoKey = 'ngmy_help_center_sender_info_v1';
-const String kNgmyHelpCenterServingLocallyKey = 'ngmy_help_center_serving_locally_v1';
-const int kNgmyHelpCenterServingLocallyMax = 40;
+const String kNgmyHelpCenterSavedRecipientsKey = 'ngmy_help_center_serving_locally_v1';
+const String kNgmyHelpCenterReceiptTemplateKey = 'ngmy_help_center_receipt_template_v1';
+const int kNgmyHelpCenterSavedRecipientsMax = 40;
 
 /// Saved sender profile for Help Center Send Money receipts.
 class NgmyHelpCenterSenderInfo {
@@ -46,9 +47,9 @@ class NgmyHelpCenterSenderInfo {
   }
 }
 
-/// Locally saved recipient — "Serving locally" quick picks.
-class NgmyHelpCenterServingLocallyEntry {
-  const NgmyHelpCenterServingLocallyEntry({
+/// Locally saved recipient for quick reuse.
+class NgmyHelpCenterSavedRecipient {
+  const NgmyHelpCenterSavedRecipient({
     required this.receiverName,
     required this.receiverPhone,
     required this.receiverCountry,
@@ -69,8 +70,8 @@ class NgmyHelpCenterServingLocallyEntry {
         'lastUsedMs': lastUsedMs,
       };
 
-  factory NgmyHelpCenterServingLocallyEntry.fromMap(Map<String, dynamic> raw) {
-    return NgmyHelpCenterServingLocallyEntry(
+  factory NgmyHelpCenterSavedRecipient.fromMap(Map<String, dynamic> raw) {
+    return NgmyHelpCenterSavedRecipient(
       receiverName: (raw['receiverName'] ?? '').toString(),
       receiverPhone: (raw['receiverPhone'] ?? '').toString(),
       receiverCountry: (raw['receiverCountry'] ?? '').toString(),
@@ -97,16 +98,16 @@ Future<void> ngmySaveHelpCenterSenderInfo(NgmyHelpCenterSenderInfo info) async {
   } catch (_) {}
 }
 
-Future<List<NgmyHelpCenterServingLocallyEntry>> ngmyLoadHelpCenterServingLocally() async {
+Future<List<NgmyHelpCenterSavedRecipient>> ngmyLoadHelpCenterSavedRecipients() async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(kNgmyHelpCenterServingLocallyKey);
+    final raw = prefs.getString(kNgmyHelpCenterSavedRecipientsKey) ?? prefs.getString('ngmy_help_center_serving_locally_v1');
     if (raw == null || raw.trim().isEmpty) return const [];
     final decoded = jsonDecode(raw);
     if (decoded is! List) return const [];
     return decoded
         .whereType<Map>()
-        .map((e) => NgmyHelpCenterServingLocallyEntry.fromMap(Map<String, dynamic>.from(e)))
+        .map((e) => NgmyHelpCenterSavedRecipient.fromMap(Map<String, dynamic>.from(e)))
         .where((e) => e.receiverName.trim().isNotEmpty && e.receiverPhone.trim().length >= 6)
         .toList()
       ..sort((a, b) => b.lastUsedMs.compareTo(a.lastUsedMs));
@@ -114,7 +115,7 @@ Future<List<NgmyHelpCenterServingLocallyEntry>> ngmyLoadHelpCenterServingLocally
   return const [];
 }
 
-Future<void> ngmySaveHelpCenterServingLocallyEntry({
+Future<void> ngmySaveHelpCenterSavedRecipient({
   required String receiverName,
   required String receiverPhone,
   required String receiverCountry,
@@ -124,7 +125,7 @@ Future<void> ngmySaveHelpCenterServingLocallyEntry({
   final country = receiverCountry.trim();
   if (name.isEmpty || phone.length < 6 || country.isEmpty) return;
 
-  final entry = NgmyHelpCenterServingLocallyEntry(
+  final entry = NgmyHelpCenterSavedRecipient(
     receiverName: name,
     receiverPhone: phone,
     receiverCountry: country,
@@ -133,17 +134,48 @@ Future<void> ngmySaveHelpCenterServingLocallyEntry({
 
   try {
     final prefs = await SharedPreferences.getInstance();
-    final existing = await ngmyLoadHelpCenterServingLocally();
-    final next = <NgmyHelpCenterServingLocallyEntry>[
+    final existing = await ngmyLoadHelpCenterSavedRecipients();
+    final next = <NgmyHelpCenterSavedRecipient>[
       entry,
       ...existing.where((e) => e.id != entry.id),
     ];
-    if (next.length > kNgmyHelpCenterServingLocallyMax) {
-      next.removeRange(kNgmyHelpCenterServingLocallyMax, next.length);
+    if (next.length > kNgmyHelpCenterSavedRecipientsMax) {
+      next.removeRange(kNgmyHelpCenterSavedRecipientsMax, next.length);
     }
     await prefs.setString(
-      kNgmyHelpCenterServingLocallyKey,
+      kNgmyHelpCenterSavedRecipientsKey,
       jsonEncode(next.map((e) => e.toMap()).toList()),
     );
   } catch (_) {}
 }
+
+Future<String> ngmyLoadHelpCenterReceiptTemplateId() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString(kNgmyHelpCenterReceiptTemplateKey);
+    if (id != null && id.trim().isNotEmpty) return id.trim();
+  } catch (_) {}
+  return 'modern';
+}
+
+Future<void> ngmySaveHelpCenterReceiptTemplateId(String id) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kNgmyHelpCenterReceiptTemplateKey, id.trim());
+  } catch (_) {}
+}
+
+@Deprecated('Use ngmyLoadHelpCenterSavedRecipients')
+Future<List<NgmyHelpCenterSavedRecipient>> ngmyLoadHelpCenterServingLocally() => ngmyLoadHelpCenterSavedRecipients();
+
+@Deprecated('Use ngmySaveHelpCenterSavedRecipient')
+Future<void> ngmySaveHelpCenterServingLocallyEntry({
+  required String receiverName,
+  required String receiverPhone,
+  required String receiverCountry,
+}) =>
+    ngmySaveHelpCenterSavedRecipient(
+      receiverName: receiverName,
+      receiverPhone: receiverPhone,
+      receiverCountry: receiverCountry,
+    );

@@ -1,15 +1,20 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_help_center.dart';
+import 'ngmy_help_center_phone.dart';
 import 'ngmy_help_center_send_money_receipt.dart';
+import 'ngmy_help_center_send_money_receipt_templates.dart';
 import 'ngmy_help_center_send_money_store.dart';
 import 'ngmy_nav.dart';
-import 'ngmy_slides_download.dart';
+import 'ngmy_qr_download.dart';
 
 const _accent = Color(0xFF00E5FF);
 const _accent2 = Color(0xFF7C3AED);
@@ -63,7 +68,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   String _reference = '';
   bool _cashAppOpened = false;
   NgmyHelpCenterSenderInfo _savedSender = const NgmyHelpCenterSenderInfo();
-  List<NgmyHelpCenterServingLocallyEntry> _servingLocally = const [];
+  List<NgmyHelpCenterSavedRecipient> _savedRecipients = const [];
+  String _receiptTemplateId = 'modern';
+  Timer? _senderPhoneSaveTimer;
 
   @override
   void initState() {
@@ -97,20 +104,48 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
 
   Future<void> _loadSendMoneyLocalData() async {
     final sender = await ngmyLoadHelpCenterSenderInfo();
-    final serving = await ngmyLoadHelpCenterServingLocally();
+    final saved = await ngmyLoadHelpCenterSavedRecipients();
+    final templateId = await ngmyLoadHelpCenterReceiptTemplateId();
     if (!mounted) return;
     setState(() {
       _savedSender = sender;
-      _servingLocally = serving;
-      if (_senderPhoneC.text.trim().isEmpty) {
-        final phone = widget.clientPhone.trim().isNotEmpty ? widget.clientPhone.trim() : sender.phone.trim();
-        if (phone.isNotEmpty) _senderPhoneC.text = phone;
+      _savedRecipients = saved;
+      _receiptTemplateId = templateId;
+      final phone = sender.phone.trim().isNotEmpty
+          ? sender.phone.trim()
+          : widget.clientPhone.trim();
+      if (phone.isNotEmpty && _senderPhoneC.text.trim().isEmpty) {
+        _senderPhoneC.text = ngmyHelpCenterFormatPhone(phone, NgmyHelpCenterPhonePattern.us);
       }
     });
   }
 
+  void _scheduleSenderPhoneSave() {
+    _senderPhoneSaveTimer?.cancel();
+    _senderPhoneSaveTimer = Timer(const Duration(milliseconds: 400), () {
+      unawaited(_persistSenderInfo());
+    });
+  }
+
+  NgmyHelpCenterPhonePattern get _senderPhonePattern => ngmyHelpCenterPhonePatternForCountry('', sender: true);
+
+  NgmyHelpCenterPhonePattern get _receiverPhonePattern =>
+      ngmyHelpCenterPhonePatternForCountry(_receiverCountryC.text.trim());
+
+  void _onReceiverCountryChanged(String value) {
+    _resetCashApp();
+    final pattern = ngmyHelpCenterPhonePatternForCountry(value.trim());
+    final current = _receiverPhoneC.text.trim();
+    if (current.isEmpty || current == '+') {
+      _receiverPhoneC.text = '+${pattern.dialCode} ';
+    } else {
+      _receiverPhoneC.text = ngmyHelpCenterFormatPhone(current, pattern);
+    }
+  }
+
   @override
   void dispose() {
+    _senderPhoneSaveTimer?.cancel();
     _notesC.dispose();
     _qtyC.dispose();
     _priceC.dispose();
@@ -203,9 +238,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   }
 
   String get _resolvedSenderPhone {
+    final typed = _senderPhoneC.text.trim();
+    if (typed.isNotEmpty && typed != '+') return typed;
     final fromWidget = widget.clientPhone.trim();
     if (fromWidget.isNotEmpty) return fromWidget;
-    return _senderPhoneC.text.trim().isNotEmpty ? _senderPhoneC.text.trim() : _savedSender.phone.trim();
+    return _savedSender.phone.trim();
   }
 
   String get _resolvedSenderEmail {
@@ -227,10 +264,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   bool get _canShowReceipt {
     if (!_isSendMoney) return false;
     if (_receiverC.text.trim().isEmpty) return false;
-    if (_receiverPhoneC.text.trim().length < 6) return false;
+    if (ngmyHelpCenterDigitsOnly(_receiverPhoneC.text).length < 9) return false;
     if (_receiverCountryC.text.trim().isEmpty) return false;
     if (_transferAmount <= 0) return false;
-    if (_resolvedSenderPhone.trim().length < 6) return false;
+    if (ngmyHelpCenterDigitsOnly(_resolvedSenderPhone).length < 6) return false;
     return true;
   }
 
@@ -248,21 +285,24 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
-  Future<void> _saveServingLocallyFromForm() async {
-    await ngmySaveHelpCenterServingLocallyEntry(
+  Future<void> _saveSavedRecipientFromForm() async {
+    await ngmySaveHelpCenterSavedRecipient(
       receiverName: _receiverC.text,
       receiverPhone: _receiverPhoneC.text,
       receiverCountry: _receiverCountryC.text,
     );
-    final serving = await ngmyLoadHelpCenterServingLocally();
-    if (mounted) setState(() => _servingLocally = serving);
+    final saved = await ngmyLoadHelpCenterSavedRecipients();
+    if (mounted) setState(() => _savedRecipients = saved);
   }
 
-  void _applyServingLocallyEntry(NgmyHelpCenterServingLocallyEntry entry) {
+  void _applySavedRecipient(NgmyHelpCenterSavedRecipient entry) {
     HapticFeedback.lightImpact();
     setState(() {
       _receiverC.text = entry.receiverName;
-      _receiverPhoneC.text = entry.receiverPhone;
+      _receiverPhoneC.text = ngmyHelpCenterFormatPhone(
+        entry.receiverPhone,
+        ngmyHelpCenterPhonePatternForCountry(entry.receiverCountry),
+      );
       _receiverCountryC.text = entry.receiverCountry;
       _cashAppOpened = false;
     });
@@ -279,15 +319,22 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       barrierColor: Colors.black.withValues(alpha: 0.72),
       builder: (ctx) => _SendMoneyReceiptDialog(
         receipt: receipt,
+        templateId: _receiptTemplateId,
         isDark: Theme.of(context).brightness == Brightness.dark,
         isComplete: _canShowReceipt,
-        onSavedLocally: () async {
-          await _saveServingLocallyFromForm();
-          if (mounted) _snack('Recipient saved under Serving locally.');
+        savedRecipients: _savedRecipients,
+        onApplyRecipient: (entry) {
+          _applySavedRecipient(entry);
+          Navigator.pop(ctx);
+        },
+        onTemplateChanged: (id) async {
+          _receiptTemplateId = id;
+          await ngmySaveHelpCenterReceiptTemplateId(id);
+          if (mounted) setState(() {});
         },
       ),
     );
-    if (_canShowReceipt) await _saveServingLocallyFromForm();
+    if (_canShowReceipt) await _saveSavedRecipientFromForm();
   }
 
   bool get _canContact {
@@ -295,10 +342,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     if (s == null) return false;
     if (_isSendMoney) {
       if (_receiverC.text.trim().isEmpty) return false;
-      if (_receiverPhoneC.text.trim().length < 10) return false;
+      if (ngmyHelpCenterDigitsOnly(_receiverPhoneC.text).length < 9) return false;
       if (_receiverCountryC.text.trim().isEmpty) return false;
       if (_senderCashAppC.text.trim().isEmpty) return false;
-      if (_resolvedSenderPhone.trim().length < 6) return false;
+      if (ngmyHelpCenterDigitsOnly(_resolvedSenderPhone).length < 6) return false;
       if ((double.tryParse(_priceC.text.trim()) ?? 0) <= 0) return false;
       return true;
     }
@@ -829,38 +876,36 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             _summaryLine('Your phone', isMoney ? _resolvedSenderPhone : widget.clientPhone, isDark),
           if (isMoney) ...[
             const SizedBox(height: 10),
-            if (widget.clientPhone.trim().isEmpty)
-              _textField('Your phone *', _senderPhoneC, isDark, onChanged: (_) => _resetCashApp(), keyboard: TextInputType.phone),
-            if (widget.clientPhone.trim().isEmpty) const SizedBox(height: 10),
-            if (_servingLocally.isNotEmpty) ...[
-              Text(
-                'SERVING LOCALLY',
-                style: TextStyle(fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _servingLocally.take(8).map((entry) {
-                  return ActionChip(
-                    label: Text(
-                      entry.receiverName,
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                    ),
-                    avatar: Icon(Icons.person_pin_rounded, size: 16, color: isDark ? _accent : const Color(0xFF0E7490)),
-                    backgroundColor: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF0FDFA),
-                    side: BorderSide(color: _accent.withOpacity(0.35)),
-                    onPressed: () => _applyServingLocallyEntry(entry),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 10),
-            ],
+            _phoneField(
+              'Your phone *',
+              _senderPhoneC,
+              isDark,
+              pattern: _senderPhonePattern,
+              onChanged: (_) {
+                _resetCashApp();
+                _scheduleSenderPhoneSave();
+              },
+            ),
+            const SizedBox(height: 10),
             _textField('Receiver full name *', _receiverC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words),
             const SizedBox(height: 10),
-            _textField('Receiver phone number *', _receiverPhoneC, isDark, onChanged: (_) => _resetCashApp(), keyboard: TextInputType.phone),
+            _textField(
+              'Destination country *',
+              _receiverCountryC,
+              isDark,
+              onChanged: _onReceiverCountryChanged,
+              textCapitalization: TextCapitalization.words,
+              hint: 'e.g. Tanzania, DRC Congo, Kenya',
+            ),
             const SizedBox(height: 10),
-            _textField('Destination country *', _receiverCountryC, isDark, onChanged: (_) => _resetCashApp(), textCapitalization: TextCapitalization.words, hint: 'e.g. Tanzania, DRC Congo, Kenya'),
+            _phoneField(
+              'Receiver phone number *',
+              _receiverPhoneC,
+              isDark,
+              pattern: _receiverPhonePattern,
+              fieldKey: ValueKey('recv-${_receiverPhonePattern.dialCode}'),
+              onChanged: (_) => _resetCashApp(),
+            ),
             const SizedBox(height: 10),
             _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => _resetCashApp()),
             const SizedBox(height: 10),
@@ -1029,6 +1074,31 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
+  Widget _phoneField(
+    String label,
+    TextEditingController c,
+    bool isDark, {
+    required NgmyHelpCenterPhonePattern pattern,
+    ValueChanged<String>? onChanged,
+    Key? fieldKey,
+  }) {
+    return TextField(
+      key: fieldKey,
+      controller: c,
+      onChanged: onChanged ?? (_) => _touchForm(),
+      keyboardType: TextInputType.phone,
+      inputFormatters: [NgmyHelpCenterPhoneFormatter(pattern: pattern)],
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: ngmyHelpCenterPhoneHint(pattern),
+        prefixIcon: const Icon(Icons.phone_rounded, size: 18),
+        filled: true,
+        fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
   Widget _textField(
     String label,
     TextEditingController c,
@@ -1183,15 +1253,21 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
 class _SendMoneyReceiptDialog extends StatefulWidget {
   const _SendMoneyReceiptDialog({
     required this.receipt,
+    required this.templateId,
     required this.isDark,
     required this.isComplete,
-    required this.onSavedLocally,
+    required this.savedRecipients,
+    required this.onApplyRecipient,
+    required this.onTemplateChanged,
   });
 
   final NgmyHelpCenterSendMoneyReceipt receipt;
+  final String templateId;
   final bool isDark;
   final bool isComplete;
-  final Future<void> Function() onSavedLocally;
+  final List<NgmyHelpCenterSavedRecipient> savedRecipients;
+  final ValueChanged<NgmyHelpCenterSavedRecipient> onApplyRecipient;
+  final ValueChanged<String> onTemplateChanged;
 
   @override
   State<_SendMoneyReceiptDialog> createState() => _SendMoneyReceiptDialogState();
@@ -1199,19 +1275,42 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
 
 class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
   bool _busy = false;
+  late String _templateId;
+  final GlobalKey _previewKey = GlobalKey();
 
-  Future<void> _downloadPdf() async {
+  @override
+  void initState() {
+    super.initState();
+    _templateId = widget.templateId;
+  }
+
+  Future<Uint8List> _captureReceiptPng() async {
+    await Future.delayed(const Duration(milliseconds: 180));
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) throw Exception('Receipt preview is not ready yet.');
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+    if (bytes == null) throw Exception('Could not render receipt image.');
+    return bytes;
+  }
+
+  Future<void> _downloadReceipt() async {
     if (_busy || !widget.isComplete) return;
     setState(() => _busy = true);
     try {
-      final bytes = await ngmyBuildHelpCenterSendMoneyReceiptPdf(widget.receipt);
-      final msg = await saveNgmySlidesPdf(bytes, widget.receipt.pdfFilename);
+      final bytes = await _captureReceiptPng();
+      final msg = await downloadNgmyQrImage(bytes, widget.receipt.pngFilename);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: const Color(0xFF16A34A)),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not download receipt: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1222,48 +1321,105 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
     if (_busy || !widget.isComplete) return;
     setState(() => _busy = true);
     try {
-      await Share.share(widget.receipt.toShareText(), subject: 'NGMY Money Transfer Receipt ${widget.receipt.reference}');
+      await Share.share(
+        widget.receipt.toShareText(),
+        subject: 'NGMY Money Transfer Receipt ${widget.receipt.reference}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Widget _receiptLine(String label, String value, {bool highlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 118,
-            child: Text(label, style: TextStyle(fontSize: 11, color: widget.isDark ? Colors.white54 : Colors.black54)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: highlight ? FontWeight.w900 : FontWeight.w700,
-                color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
+  Future<void> _pickTemplate() async {
+    await showNgmyTransferReceiptTemplatePicker(
+      context,
+      selectedId: _templateId,
+      onSelect: (id) {
+        setState(() => _templateId = id);
+        widget.onTemplateChanged(id);
+      },
+    );
+  }
+
+  Future<void> _showSavedRecipients() async {
+    final list = widget.savedRecipients;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1020),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Saved recipients', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap someone to fill the request form for a new transfer.',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                ),
+                const SizedBox(height: 14),
+                if (list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'No saved recipients yet. Download or share a completed receipt to save someone here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final entry = list[i];
+                        return Material(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: _accent.withValues(alpha: 0.2),
+                              child: Icon(Icons.person_rounded, color: _accent, size: 18),
+                            ),
+                            title: Text(entry.receiverName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                            subtitle: Text(
+                              '${entry.receiverCountry} · ${ngmyHelpCenterFormatPhone(entry.receiverPhone, ngmyHelpCenterPhonePatternForCountry(entry.receiverCountry))}',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                            ),
+                            trailing: const Icon(Icons.north_west_rounded, color: Colors.white54, size: 16),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              widget.onApplyRecipient(entry);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.receipt;
     final panelBg = widget.isDark ? const Color(0xFF0C1220) : Colors.white;
-    final border = _accent.withOpacity(0.35);
+    final border = _accent.withValues(alpha: 0.35);
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 720),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Material(
@@ -1273,7 +1429,7 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 12, 14),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: widget.isDark
@@ -1283,36 +1439,47 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
-                      const SizedBox(width: 10),
+                      const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'NGMY Money Transfer Receipt',
+                          'Money Transfer Receipt',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Receipt template',
+                        onPressed: _busy ? null : _pickTemplate,
+                        icon: const Icon(Icons.palette_outlined, color: Colors.white, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      IconButton(
+                        tooltip: 'Saved recipients',
+                        onPressed: _busy ? null : _showSavedRecipients,
+                        icon: Badge(
+                          isLabelVisible: widget.savedRecipients.isNotEmpty,
+                          label: Text('${widget.savedRecipients.length}'),
+                          child: const Icon(Icons.people_outline_rounded, color: Colors.white, size: 20),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      IconButton(
                         onPressed: _busy ? null : () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
                 ),
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text('Ref: ${r.reference}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: widget.isDark ? Colors.white70 : Colors.black87))),
-                            Text(r.formattedDate, style: TextStyle(fontSize: 10, color: widget.isDark ? Colors.white38 : Colors.black45)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
                         if (!widget.isComplete)
                           Container(
+                            margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF59E0B).withValues(alpha: widget.isDark ? 0.14 : 0.12),
@@ -1320,57 +1487,28 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.45)),
                             ),
                             child: Text(
-                              'Fill receiver name, phone, country, transfer amount, and your phone to download or share this receipt.',
+                              'Fill receiver name, phone, country, transfer amount, and your phone to download or share.',
                               style: TextStyle(fontSize: 10, height: 1.35, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.amber.shade100 : const Color(0xFFB45309)),
                             ),
                           ),
-                        if (!widget.isComplete) const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _accent.withValues(alpha: widget.isDark ? 0.12 : 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: border),
+                        RepaintBoundary(
+                          key: _previewKey,
+                          child: NgmyTransferReceiptPreview(
+                            receipt: widget.receipt,
+                            templateId: _templateId,
                           ),
-                          child: Text(
-                            'Category: ${r.category} · ${r.serviceName}',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: widget.isDark ? _accent : const Color(0xFF0E7490)),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text('SENDER', style: TextStyle(fontSize: 10, letterSpacing: 1.3, fontWeight: FontWeight.w900, color: widget.isDark ? Colors.white54 : Colors.black45)),
-                        const SizedBox(height: 6),
-                        _receiptLine('Name', r.senderName.isEmpty ? '—' : r.senderName),
-                        _receiptLine('Phone', r.senderPhone.isEmpty ? '—' : r.senderPhone),
-                        if (r.senderEmail.isNotEmpty) _receiptLine('Email', r.senderEmail),
-                        const SizedBox(height: 12),
-                        Text('RECEIVER', style: TextStyle(fontSize: 10, letterSpacing: 1.3, fontWeight: FontWeight.w900, color: widget.isDark ? Colors.white54 : Colors.black45)),
-                        const SizedBox(height: 6),
-                        _receiptLine('Full name', r.receiverName, highlight: true),
-                        _receiptLine('Phone', r.receiverPhone),
-                        _receiptLine('Destination country', r.receiverCountry, highlight: true),
-                        const SizedBox(height: 12),
-                        Text('TRANSFER SUMMARY', style: TextStyle(fontSize: 10, letterSpacing: 1.3, fontWeight: FontWeight.w900, color: widget.isDark ? Colors.white54 : Colors.black45)),
-                        const SizedBox(height: 6),
-                        _receiptLine('Transfer amount', '\$${r.transferAmount.toStringAsFixed(2)}'),
-                        _receiptLine(r.feeDescription, '\$${r.serviceFee.toStringAsFixed(2)}'),
-                        _receiptLine('Recipient receives', '\$${r.recipientGets.toStringAsFixed(2)}', highlight: true),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Review this quote before payment. Cash App tag is not shown on this receipt.',
-                          style: TextStyle(fontSize: 10, height: 1.35, color: widget.isDark ? Colors.white38 : Colors.black45),
                         ),
                       ],
                     ),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       FilledButton.icon(
-                        onPressed: (_busy || !widget.isComplete) ? null : _downloadPdf,
+                        onPressed: (_busy || !widget.isComplete) ? null : _downloadReceipt,
                         icon: _busy
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.download_rounded),
@@ -1393,11 +1531,6 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _busy ? null : widget.onSavedLocally,
-                        child: const Text('Save recipient under Serving locally', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
