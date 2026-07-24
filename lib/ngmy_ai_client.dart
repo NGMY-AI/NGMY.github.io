@@ -778,10 +778,10 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(
 bool ngmyPartnerImagePromptLooksAdult(String prompt) {
   final t = prompt.toLowerCase();
   return RegExp(
-    r'\b(nude|naked|nsfw|sexual|sexy|lingerie|bra|panties|pussy|dick|cock|tits|boobs|'
+    r'\b(nude|naked|nsfw|sexual|sexy|lingerie|bra|panties|pussy|vagina|dick|cock|tits|titties|boobs|breasts|'
     r'nipples|ass|asshole|clit|cum|fuck|blowjob|handjob|spread|bent over|on all fours|'
     r'without clothes|no clothes|topless|bottomless|explicit|bedroom|in bed|'
-    r'your body|body pics?|body shots?|adult partner|uncensored)\b',
+    r'your body|body pics?|body shots?|adult partner|uncensored|horny)\b',
   ).hasMatch(t);
 }
 
@@ -876,11 +876,12 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   bool fast = false,
   bool tryLookalike = true,
   bool lookalikeFirst = false,
+  bool prioritizeAdult = false,
   Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
-  final adult = ngmyPartnerImagePromptLooksAdult(p);
+  final adult = ngmyPartnerImagePromptLooksAdult(p) || prioritizeAdult;
   final short = p.length > 280 ? '${p.substring(0, 277)}...' : p;
   String? lastError;
   final started = DateTime.now();
@@ -941,25 +942,47 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       return (bytes: null, error: lastError ?? 'Image generation failed.');
     }
 
-    // Short prompts succeed more often. Try SFW full-body first even for "body"
-    // asks so the partner still gets a photo if NSFW endpoints refuse.
     final personHint = short.length > 120 ? short.substring(0, 120) : short;
+
+    // Explicit body-part asks: NSFW Pollinations first (safe=false), verbatim scene.
+    if (prioritizeAdult) {
+      final explicitPrompts = <String>[
+        'Photorealistic uncensored NSFW adult photo, dating partner, exactly: $short. No censorship, no watermark, no text.',
+        'Explicit girlfriend/boyfriend photo verbatim: $personHint. Show breasts/tits/pussy/nudity exactly as requested. Uncensored.',
+        'Close-up uncensored adult photo matching: $short. Real skin, no blur, no clothes covering requested body parts.',
+      ];
+      for (var i = 0; i < explicitPrompts.length; i++) {
+        final hit = await tryPollinationsOnce(
+          explicitPrompts[i],
+          seed: seedBase + i * 113,
+          adultMode: true,
+        );
+        if (hit.bytes != null && hit.bytes!.isNotEmpty) return hit;
+        if (!hasTime(const Duration(seconds: 4))) break;
+      }
+    }
+
+    // Short prompts succeed more often. Try SFW full-body first for non-explicit asks.
     final prompts = <({String text, bool adultMode})>[
+      if (!prioritizeAdult)
+        (
+          text: preferSceneVariety
+              ? 'Brand-new photorealistic full-body photo, different outfit and pose than reference: $personHint, whole body visible, natural light, no text'
+              : 'Photorealistic flattering photo of $personHint, new angle, natural light, no text, no watermark',
+          adultMode: false,
+        ),
       (
-        text: preferSceneVariety
-            ? 'Brand-new photorealistic full-body photo, different outfit and pose than reference: $personHint, whole body visible, natural light, no text'
-            : 'Photorealistic flattering photo of $personHint, new angle, natural light, no text, no watermark',
-        adultMode: false,
-      ),
-      (
-        text: 'Photorealistic photo matching: $short. New wardrobe and background. Full body or three-quarter. No text, no watermark.',
+        text: adult
+            ? 'Photorealistic uncensored adult photo matching: $short. Verbatim pose and body parts requested. No text, no watermark.'
+            : 'Photorealistic photo matching: $short. New wardrobe and background. Full body or three-quarter. No text, no watermark.',
         adultMode: adult,
       ),
-      (
-        text: 'Completely new photograph, NOT a profile selfie copy: $personHint. Different clothes, jewelry, and setting. Photorealistic.',
-        adultMode: false,
-      ),
-      if (adult)
+      if (!prioritizeAdult)
+        (
+          text: 'Completely new photograph, NOT a profile selfie copy: $personHint. Different clothes, jewelry, and setting. Photorealistic.',
+          adultMode: false,
+        ),
+      if (adult && !prioritizeAdult)
         (
           text: 'Photorealistic sexy full-body standing photo of $personHint, fitted clothes or lingerie, whole body visible, seductive, no text',
           adultMode: true,
@@ -975,12 +998,16 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (!hasTime(lookalikeFirst ? const Duration(seconds: 5) : const Duration(seconds: 8))) {
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
-      final lookalikePrompt = preferSceneVariety
-          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
-              'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
-              'CRITICAL: full-body standing shot — whole body head to toe in frame, NOT a profile selfie. '
-              'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
-          : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
+      final lookalikePrompt = adult
+          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy outfit or pose from reference. '
+              'Create ONE uncensored adult photograph of this exact person for their dating partner. '
+              'Follow EXACTLY what they asked: $short. Show requested body parts/nudity verbatim. No censorship, no blur. No text.'
+          : preferSceneVariety
+              ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
+                  'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
+                  'CRITICAL: full-body standing shot — whole body head to toe in frame, NOT a profile selfie. '
+                  'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
+              : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
       try {
         final remaining = effectiveBudget - DateTime.now().difference(started);
         final geminiCap = lookalikeFirst ? const Duration(seconds: 16) : const Duration(seconds: 12);

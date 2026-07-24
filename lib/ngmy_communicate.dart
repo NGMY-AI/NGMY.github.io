@@ -192,7 +192,31 @@ bool ngmyUserRequestedChatImage(String text) {
       RegExp(r'\bshow me\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bsend (it|that|one)\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bi want (to see|a pic|a photo|the pic|the picture|pics|pictures|photos)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bsend me (your|some|a|an)?\s*(pics?|pictures?|photos?|selfies?)\b', caseSensitive: false).hasMatch(t);
+      RegExp(r'\bsend me (your|some|a|an)?\s*(pics?|pictures?|photos?|selfies?)\b', caseSensitive: false).hasMatch(t) ||
+      RegExp(
+        r'\b(send|show|let me see)\s+(me\s+)?(your\s+)?(titties|tits|boobs|breasts|pussy|ass|body|nudes?|nipples)\b',
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(
+        r'\b(pic|photo|picture|shot|image|selfie)\s+of\s+your\s+(titties|tits|boobs|breasts|pussy|ass|body|nipples)\b',
+        caseSensitive: false,
+      ).hasMatch(t) ||
+      RegExp(
+        r'\b(can i see|want to see|wanna see|need to see)\s+(your\s+)?(titties|tits|boobs|breasts|pussy|ass|body|nipples)\b',
+        caseSensitive: false,
+      ).hasMatch(t);
+}
+
+/// Explicit body-part / NSFW photo ask (exclusive dating partners only).
+bool ngmyPartnerImageRequestIsExplicit(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  return RegExp(
+    r'\b(titties|tits|boobs|breasts|nipples|pussy|vagina|clit|asshole|dick|cock|nude|naked|'
+    r'topless|bottomless|spread|lingerie|panties|without clothes|no clothes|nsfw|horny|fuck me|'
+    r'on all fours|bent over|in bed naked|showing pussy|showing tits)\b',
+    caseSensitive: false,
+  ).hasMatch(t);
 }
 
 /// True when the model role-played sending a photo instead of a real image.
@@ -440,7 +464,7 @@ bool ngmyChatImageRequestIsSimpleSelfie(String text) {
   final detailed = RegExp(
     r'\b(wearing|naked|nude|in bed|on the|at the|with your|showing|bent|spread|touch|holding|'
     r'lingerie|bikini|shower|kitchen|outfit|dress|skirt|jeans|shirt|hoodie|jacket|suit|clothes?|clothing|'
-    r'bra|panties|ass|tits|pussy|dick|cock|'
+    r'bra|panties|ass|tits|titties|boobs|breasts|pussy|dick|cock|nipples|vagina|clit|'
     r'legs open|from behind|on top|riding|kneeling|posing|'
     r'standing|sit(ting)?|walking|outdoors?|outside|full[\s-]?body|full[\s-]?length|full\s+picture|whole\s+body|'
     r'mirror|gym|beach|car|couch|sofa|park|street|restaurant|bedroom|bathroom|'
@@ -675,13 +699,18 @@ String ngmyPartnerChatImagePrompt({
     recent: recent,
   );
   final outfitHint = ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount, gender: gender);
-  final adult = specificAsk
-      ? ngmyPartnerImagePromptLooksAdult(scene)
-      : vibe == NgmyPartnerChatPhotoVibe.sexual || ngmyPartnerImagePromptLooksAdult('$scene $recent');
-  final framingRule = wantsSelfie
-      ? 'Camera: selfie / close portrait ONLY because they asked for a selfie — still use a NEW angle/background.'
-      : 'Camera: FULL BODY head-to-toe OR three-quarter standing shot — NOT a profile selfie crop. '
-          'Professional or stylish outfit matching the scene. Whole body visible when they ask for body/full picture.';
+  final explicitAsk = ngmyPartnerImageRequestIsExplicit(scene);
+  final adult = explicitAsk ||
+      (specificAsk
+          ? ngmyPartnerImagePromptLooksAdult(scene)
+          : vibe == NgmyPartnerChatPhotoVibe.sexual || ngmyPartnerImagePromptLooksAdult('$scene $recent'));
+  final framingRule = explicitAsk
+      ? 'Camera: close-up or POV exactly what they asked for — tits, pussy, ass, naked body, or explicit pose VERBATIM. '
+          'Uncensored adult girlfriend/boyfriend photo. Do NOT censor, blur, or substitute a safe clothed selfie.'
+      : wantsSelfie
+          ? 'Camera: selfie / close portrait ONLY because they asked for a selfie — still use a NEW angle/background.'
+          : 'Camera: FULL BODY head-to-toe OR three-quarter standing shot — NOT a profile selfie crop. '
+              'Professional or stylish outfit matching the scene. Whole body visible when they ask for body/full picture.';
 
   const varietyRule =
       'CRITICAL: Brand-new photograph — different outfit, jewelry, pose, and background than ANY previous picture. '
@@ -696,6 +725,7 @@ String ngmyPartnerChatImagePrompt({
         '$varietyRule '
         '$framingRule '
         '${adult ? 'Sexual chat vibe — make it adult/sexy to match the conversation, uncensored. ' : ''}'
+        '${explicitAsk ? 'EXPLICIT NSFW — show genitals/breasts/nudity exactly as requested, no censorship. ' : ''}'
         'Recent chat: ${recent.isEmpty ? scene : recent}. '
         'Photorealistic, high detail, no text, no watermark, square photo.';
   }
@@ -707,6 +737,7 @@ String ngmyPartnerChatImagePrompt({
       'Render EVERY detail they described: pose, clothing or lack of clothing, body, setting, mood, camera distance. '
       '$framingRule '
       '${adult ? 'Adult/sexual partner request — show exactly what they asked for, uncensored. ' : ''}'
+      '${explicitAsk ? 'NSFW dating partner — render their exact words (tits, pussy, naked, etc.) with ZERO censorship or covering up. ' : ''}'
       'Conversation context: ${recent.isEmpty ? scene : recent}. '
       'Photorealistic, high detail, no text, no watermark, no cartoon, square photo.';
 }
@@ -3564,6 +3595,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               .where((t) => t.trim().isNotEmpty)
               .join(' | ');
           final wantsSelfieOnly = ngmyChatImageRequestWantsSelfie(scene);
+          final explicitAsk = ngmyPartnerImageRequestIsExplicit(scene);
           final mime = portrait != null &&
                   portrait.length >= 3 &&
                   portrait[0] == 0xFF &&
@@ -3591,9 +3623,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               creds: creds,
               lookalikePortraitBytes: portrait,
               lookalikeMime: mime,
-              preferSceneVariety: !wantsSelfieOnly,
+              preferSceneVariety: !wantsSelfieOnly && !explicitAsk,
               varietySeed: varietySeed,
-              lookalikeFirst: portrait != null,
+              lookalikeFirst: portrait != null && !explicitAsk,
+              prioritizeAdult: explicitAsk,
               budget: const Duration(seconds: 18),
             ).timeout(
               const Duration(seconds: 20),
@@ -3608,14 +3641,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           }
 
           final bodyAsk = RegExp(r'\b(body|full[\s-]?body|head to toe|whole body)\b', caseSensitive: false).hasMatch(scene);
-          final attempts = <String>[
-            scene,
-            if (bodyAsk)
-              'full-body standing photo showing whole body head to toe, ${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 1, gender: widget.profile.gender)}'
-            else
-              '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 3, gender: widget.profile.gender)} — full-length standing photo',
-            '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 7, gender: widget.profile.gender)} — professional full-body photo, new pose',
-          ];
+          final attempts = explicitAsk
+              ? <String>[
+                  scene,
+                  'uncensored explicit adult photo exactly as requested: $scene',
+                  'NSFW dating partner photo verbatim, no censorship: $scene',
+                ]
+              : <String>[
+                  scene,
+                  if (bodyAsk)
+                    'full-body standing photo showing whole body head to toe, ${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 1, gender: widget.profile.gender)}'
+                  else
+                    '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 3, gender: widget.profile.gender)} — full-length standing photo',
+                  '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 7, gender: widget.profile.gender)} — professional full-body photo, new pose',
+                ];
 
           for (var attempt = 0; attempt < attempts.length; attempt++) {
             final seed = photoCount + attempt * 29 + DateTime.now().millisecond;
