@@ -54,6 +54,7 @@ class NgmyCloudPolicy {
   static bool allowNgmySettingsKey(String key) {
     final k = key.trim();
     if (k.isEmpty) return false;
+    if (k == 'management_operational_lists') return true;
     // Published menus / bios / essentials transfer codes
     if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
     if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;

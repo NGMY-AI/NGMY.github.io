@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_feature_sync_session.dart';
+import 'ngmy_loan_phone.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
 
@@ -77,6 +78,15 @@ void ngmyLoanMergePhotoRefsIntoApp(Map<String, dynamic> dst, Map<String, dynamic
     final dCloud = d.startsWith('supabase://');
     final sCloud = s.startsWith('supabase://');
     if (!dCloud && sCloud) dst[k] = s;
+  }
+}
+
+/// Keep list/config storage small — photo bytes live in NgmyLoanPhotosStore + Supabase.
+void ngmyLoanCompactPhotoRefsForListStorage(Map<String, dynamic> app) {
+  for (final k in ngmyLoanPhotoKeys) {
+    final v = (app[k] ?? '').toString().trim();
+    if (v.isEmpty || v.startsWith('supabase://') || v.startsWith('http')) continue;
+    app[k] = '';
   }
 }
 
@@ -1267,7 +1277,17 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
   void initState() {
     super.initState();
     _emailC.text = widget.userEmail;
-    _loadDraft();
+    unawaited(_loadDraft().then((_) {
+      if (!mounted) return;
+      if (_phoneC.text.trim().isEmpty) {
+        _phoneC.text = '+1 ';
+      } else {
+        _phoneC.text = ngmyLoanFormatUsPhone(_phoneC.text);
+      }
+      if (_idExpC.text.trim().isNotEmpty) {
+        _idExpC.text = ngmyLoanFormatDateInput(_idExpC.text);
+      }
+    }));
     for (final c in [_amountC, _fullNameC, _phoneC, _emailC, _addressC, _govIdC, _idExpC, _ssnC, _receiveDetailC, _customCollateralC]) {
       c.addListener(_scheduleDraftSave);
     }
@@ -1428,49 +1448,129 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
 
   Future<ImageSource?> _showPhotoSourceSheet(String label) async {
     final ui = _LoanUi(isDark);
-    return showModalBottomSheet<ImageSource>(
+    return showDialog<ImageSource>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (c) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: ui.card,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
+            child: Material(
+              color: ui.card,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF059669)]),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.add_a_photo_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                              const SizedBox(height: 2),
+                              const Text('Choose camera or gallery', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                    child: Column(
+                      children: [
+                        _photoSourceOption(
+                          ui,
+                          icon: Icons.camera_alt_rounded,
+                          title: 'Take photo',
+                          subtitle: 'Use your camera now',
+                          onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                        ),
+                        const SizedBox(height: 10),
+                        _photoSourceOption(
+                          ui,
+                          icon: Icons.photo_library_rounded,
+                          title: 'Choose from gallery',
+                          subtitle: 'Pick an existing photo',
+                          onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _photoSourceOption(
+    _LoanUi ui, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: ui.fieldFill,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: ui.border),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              const SizedBox(height: 10),
-              Container(width: 36, height: 4, decoration: BoxDecoration(color: ui.border, borderRadius: BorderRadius.circular(99))),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: ui.textPrimary)),
-              ),
-              Text('Choose how to add your photo', style: TextStyle(fontSize: 12, color: ui.textSecondary)),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: _loanGreen.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.camera_alt_rounded, color: _loanGreen),
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _loanGreen.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                title: Text('Take photo', style: TextStyle(fontWeight: FontWeight.w700, color: ui.textPrimary)),
-                onTap: () => Navigator.pop(c, ImageSource.camera),
+                child: Icon(icon, color: _loanGreen, size: 22),
               ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: _loanGreen.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.photo_library_rounded, color: _loanGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: ui.textPrimary, fontSize: 14)),
+                    Text(subtitle, style: TextStyle(fontSize: 11, color: ui.textSecondary)),
+                  ],
                 ),
-                title: Text('Choose from gallery', style: TextStyle(fontWeight: FontWeight.w700, color: ui.textPrimary)),
-                onTap: () => Navigator.pop(c, ImageSource.gallery),
               ),
-              const SizedBox(height: 8),
-              TextButton(onPressed: () => Navigator.pop(c), child: Text('Cancel', style: TextStyle(color: ui.textSecondary))),
-              const SizedBox(height: 8),
+              Icon(Icons.chevron_right_rounded, color: ui.textSecondary, size: 20),
             ],
           ),
         ),
@@ -1502,12 +1602,12 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
     if (_amount <= 0) missing.add('Requested loan amount');
     if (_fullNameC.text.trim().isEmpty) missing.add('Full legal name');
     if (_dateOfBirth == null) missing.add('Date of birth');
-    if (_phoneC.text.trim().isEmpty) missing.add('Phone number');
+    if (!ngmyLoanIsCompleteUsPhone(_phoneC.text)) missing.add('Phone number (+1 234 567 8901)');
     if (_emailC.text.trim().isEmpty) missing.add('Email address');
     if (_addressC.text.trim().isEmpty) missing.add('Home address');
     if (_ssnC.text.replaceAll(RegExp(r'\D'), '').length != 9) missing.add('Social Security Number (9 digits)');
     if (_govIdC.text.trim().isEmpty) missing.add('Government ID number');
-    if (_idExpC.text.trim().isEmpty) missing.add('ID expiration date');
+    if (_idExpC.text.trim().isEmpty || !ngmyLoanIsCompleteDate(_idExpC.text)) missing.add('ID expiration date (MM/DD/YYYY)');
     if (_idFront == null) missing.add('ID photo — front');
     if (_idBack == null) missing.add('ID photo — back');
     if (_selfie == null) missing.add('Selfie photo');
@@ -1575,11 +1675,11 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
         'collateralCustomNote': _customCollateralC.text.trim(),
         'fullLegalName': _fullNameC.text.trim(),
         'dateOfBirth': _dateOfBirth?.toUtc().toIso8601String() ?? '',
-        'phone': _phoneC.text.trim(),
+        'phone': ngmyLoanFormatUsPhone(_phoneC.text).trim(),
         'email': _emailC.text.trim(),
         'homeAddress': _addressC.text.trim(),
         'idType': _idType,
-        'idExpiration': _idExpC.text.trim(),
+        'idExpiration': ngmyLoanFormatDateInput(_idExpC.text),
         'ssn': _ssnC.text.trim(),
         'governmentId': _govIdC.text.trim(),
         'idFrontRef': _idFront,
@@ -1598,6 +1698,7 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       final submitted = widget.config.loanApplications.first;
       await NgmyLoanStore.ensureCloudPhotoRefs(submitted);
       await NgmyLoanPhotosStore.saveForApp(submitted);
+      ngmyLoanCompactPhotoRefsForListStorage(submitted);
       widget.onDataChanged();
       final saved = await widget.onPersistNow?.call() ?? false;
       await NgmyLoanDraftStore.clear(widget.userEmail);
@@ -1721,13 +1822,19 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
                 child: InputDecorator(
                   decoration: _fieldDeco(ui, 'Date of Birth'),
                   child: Text(
-                    _dateOfBirth == null ? 'Select date' : '${_dateOfBirth!.month}/${_dateOfBirth!.day}/${_dateOfBirth!.year}',
+                    ngmyLoanFormatDobDisplay(_dateOfBirth),
                     style: TextStyle(color: _dateOfBirth == null ? ui.textSecondary : ui.textPrimary),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
-              TextField(controller: _phoneC, style: TextStyle(color: ui.textPrimary), keyboardType: TextInputType.phone, decoration: _fieldDeco(ui, 'Phone Number', hint: '+1 (555) 123-4567')),
+              TextField(
+                controller: _phoneC,
+                style: TextStyle(color: ui.textPrimary),
+                keyboardType: TextInputType.phone,
+                inputFormatters: const [NgmyLoanUsPhoneFormatter()],
+                decoration: _fieldDeco(ui, 'Phone Number', hint: '+1 234 567 8901'),
+              ),
               const SizedBox(height: 10),
               TextField(controller: _emailC, style: TextStyle(color: ui.textPrimary), keyboardType: TextInputType.emailAddress, decoration: _fieldDeco(ui, 'Email Address', hint: 'you@email.com')),
               const SizedBox(height: 10),
@@ -1750,7 +1857,13 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
               const SizedBox(height: 10),
               TextField(controller: _govIdC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'ID Number', hint: 'Enter ID number')),
               const SizedBox(height: 10),
-              TextField(controller: _idExpC, style: TextStyle(color: ui.textPrimary), decoration: _fieldDeco(ui, 'ID Expiration Date', hint: 'MM/DD/YYYY')),
+              TextField(
+                controller: _idExpC,
+                style: TextStyle(color: ui.textPrimary),
+                keyboardType: TextInputType.number,
+                inputFormatters: const [NgmyLoanDateFormatter()],
+                decoration: _fieldDeco(ui, 'ID Expiration Date', hint: 'MM/DD/YYYY'),
+              ),
               _uploadBox(ui, label: 'ID — front', hint: 'Tap to add front of ID', done: _idFront != null, onTap: () async { final r = await _pickPhoto('ID — front'); if (r != null) { setState(() => _idFront = r); _scheduleDraftSave(); } }),
               _uploadBox(ui, label: 'ID — back', hint: 'Tap to add back of ID', done: _idBack != null, onTap: () async { final r = await _pickPhoto('ID — back'); if (r != null) { setState(() => _idBack = r); _scheduleDraftSave(); } }),
               const SizedBox(height: 6),
@@ -3061,7 +3174,7 @@ class _NgmyLoanAdminDetailScreen extends StatelessWidget {
                     ('Full legal name', (app['fullLegalName'] ?? '').toString()),
                     ('Username', (app['username'] ?? '').toString()),
                     ('Email', (app['email'] ?? app['userEmail'] ?? '').toString()),
-                    ('Phone', (app['phone'] ?? '').toString()),
+                    ('Phone', ngmyLoanDisplayUsPhone((app['phone'] ?? '').toString())),
                     ('Date of birth', _ngmyLoanAdminFmtDate(app['dateOfBirth'])),
                     ('Home address', (app['homeAddress'] ?? '').toString()),
                   ],

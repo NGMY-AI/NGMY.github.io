@@ -139,7 +139,8 @@ Map<String, dynamic> _managementOperationalListsPayload(AppConfig config, {bool 
 Future<void> _persistManagementOperationalListsLocal(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kNgmyManagementListsPrefsKey, jsonEncode(_managementOperationalListsPayload(config)));
+    final payload = _managementOperationalListsPayload(config, forCloud: true);
+    await prefs.setString(_kNgmyManagementListsPrefsKey, jsonEncode(payload));
   } catch (e) {
     debugPrint('[admin mgmt] local lists backup: $e');
   }
@@ -249,6 +250,22 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final cloud = await _fetchManagementOperationalListsCloud();
     if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
+    try {
+      final row = await Supabase.instance.client
+          .from('config')
+          .select('loanApplications')
+          .eq('id', kNgmyConfigRowId)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      if (row != null && row['loanApplications'] is List) {
+        final remoteLoans = _managementListFromPayload(row['loanApplications']);
+        if (remoteLoans.isNotEmpty) {
+          config.loanApplications = _mergeLoanApplicationsLists(config.loanApplications, remoteLoans);
+        }
+      }
+    } catch (e) {
+      debugPrint('[admin mgmt] loanApplications column hydrate: $e');
+    }
     await NgmyLoanPhotosStore.applyTo(config.loanApplications);
     await NgmyLoanStatusStore.applyTo(config.loanApplications);
     await NgmyLoanStatusCloud.fetchAndApply(config.loanApplications);
@@ -262,21 +279,48 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
 
 /// User loan screen — pull latest approve/reject from cloud before showing status.
 Future<void> ngmyRefreshUserLoanApplications(AppConfig config) async {
+  final snapshot = config.loanApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   await ngmyHydrateManagementListsFromAllBackups(config);
+  if (snapshot.isNotEmpty) {
+    config.loanApplications = _mergeLoanApplicationsLists(snapshot, config.loanApplications);
+  }
+  await NgmyLoanPhotosStore.applyTo(config.loanApplications);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+}
+
+Future<bool> _pushLoanApplicationsColumnOnly(AppConfig config) async {
+  try {
+    final loans = _loanApplicationsForCloudSync(config.loanApplications);
+    await Supabase.instance.client.from('config').upsert({
+      'id': kNgmyConfigRowId,
+      'loanApplications': loans,
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    debugPrint('[loan] loanApplications column push: $e');
+    return await _upsertManagementListColumn('loanApplications', _loanApplicationsForCloudSync(config.loanApplications));
+  }
 }
 
 /// User loan submit — upload to authoritative management lists so admin receives applications.
 Future<bool> ngmyUserPersistLoanApplications(AppConfig config) async {
   await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
+  for (final app in config.loanApplications) {
+    await NgmyLoanPhotosStore.saveForApp(app);
+    ngmyLoanCompactPhotoRefsForListStorage(app);
+  }
   await _persistManagementOperationalListsLocal(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
   unawaited(NgmyLoanPaymentsCloud.pushFromApps(config.loanApplications));
-  if (await ngmyCanReachCloud()) {
-    return _persistManagementOperationalListsAuthoritative(config);
+  if (!await ngmyCanReachCloud()) return true;
+
+  for (var attempt = 0; attempt < 3; attempt++) {
+    final ok = await _persistManagementOperationalListsAuthoritative(config);
+    if (ok) return true;
+    if (attempt < 2) await Future.delayed(Duration(milliseconds: 450 * (attempt + 1)));
   }
-  return true;
+  return _pushLoanApplicationsColumnOnly(config);
 }
 
 Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
