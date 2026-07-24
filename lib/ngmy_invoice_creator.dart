@@ -11,13 +11,13 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_invoice_letter.dart';
 import 'ngmy_invoice_payments.dart';
+import 'ngmy_invoice_print.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_slides_download.dart';
-import 'ngmy_slides_pdf_ios.dart';
 
 class _InvoiceGuestUser {
   _InvoiceGuestUser(this.email);
@@ -104,6 +104,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
   final List<Offset?> _providerSignaturePoints = [];
   final List<Offset?> _clientSignaturePoints = [];
   final GlobalKey _previewKey = GlobalKey();
+  Uint8List? _printPdfCache;
+  String? _printPdfCacheKey;
+  Timer? _printPdfWarmTimer;
 
   final _invoiceNoC = TextEditingController(text: '1');
   final _issuedDateC = TextEditingController();
@@ -203,6 +206,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
 
   @override
   void dispose() {
+    _printPdfWarmTimer?.cancel();
     for (final c in [_bizNameC, _bizStreetC, _bizCityStateZipC, _bizPhoneC, _paymentInfoC]) {
       c.removeListener(_persistProviderProfile);
     }
@@ -376,17 +380,59 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return count;
   }
 
-  Future<Uint8List> _captureInvoicePng() async {
-    await Future.delayed(const Duration(milliseconds: 180));
+  Future<Uint8List> _captureInvoicePng({bool fast = false}) async {
+    if (fast) {
+      await Future.delayed(const Duration(milliseconds: 24));
+    } else {
+      await Future.delayed(const Duration(milliseconds: 180));
+    }
     await WidgetsBinding.instance.endOfFrame;
     final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) {
       throw Exception('Preview is not ready yet. Scroll to the invoice preview and try again.');
     }
-    final image = await boundary.toImage(pixelRatio: 3.0);
+    final image = await boundary.toImage(pixelRatio: fast ? 2.0 : 3.0);
     final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
     if (bytes == null) throw Exception('Could not render invoice image.');
     return bytes;
+  }
+
+  String _printPdfCacheSignature(double subtotal) =>
+      '$_templateId|$_invoicePaid|${_invoiceNoC.text}|${_issuedDateC.text}|${_dueDateC.text}|'
+      '${_bizNameC.text}|${_clientNameC.text}|${_itemNameC.text}|${_itemPriceC.text}|'
+      '${_itemQtyC.text}|${_itemDiscountC.text}|$subtotal|'
+      '${_providerSignaturePoints.length}|${_clientSignaturePoints.length}|'
+      '${_providerPhotoBytes?.length ?? 0}';
+
+  void _schedulePrintPdfWarm(double subtotal) {
+    _printPdfWarmTimer?.cancel();
+    _printPdfWarmTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      unawaited(_warmPrintPdfCache(subtotal));
+    });
+  }
+
+  Future<void> _warmPrintPdfCache(double subtotal) async {
+    try {
+      final key = _printPdfCacheSignature(subtotal);
+      if (_printPdfCache != null && _printPdfCacheKey == key) return;
+      final png = await _captureInvoicePng(fast: true);
+      if (!mounted) return;
+      final pdf = await ngmyInvoiceBuildLetterPdf(png);
+      if (!mounted) return;
+      _printPdfCache = pdf;
+      _printPdfCacheKey = key;
+    } catch (_) {}
+  }
+
+  Future<Uint8List> _printPdfBytes(double subtotal) async {
+    final key = _printPdfCacheSignature(subtotal);
+    if (_printPdfCache != null && _printPdfCacheKey == key) return _printPdfCache!;
+    final png = await _captureInvoicePng(fast: true);
+    final pdf = await ngmyInvoiceBuildLetterPdf(png);
+    _printPdfCache = pdf;
+    _printPdfCacheKey = key;
+    return pdf;
   }
 
   String _invoiceExportBaseName() {
@@ -414,54 +460,23 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     }
   }
 
-  void _dismissPrintLoading(BuildContext ctx) {
-    if (!ctx.mounted) return;
-    Navigator.of(ctx, rootNavigator: true).maybePop();
-  }
-
-  /// Full US Letter page (same size as Slides/Documents PDF) for printing.
-  Future<void> _printInvoice(BuildContext ctx) async {
-    if (!ctx.mounted) return;
-    unawaited(
-      showDialog<void>(
-        context: ctx,
-        barrierDismissible: false,
-        builder: (dCtx) => const PopScope(
-          canPop: false,
-          child: Center(
-            child: Material(
-              color: Colors.transparent,
-              child: Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 14),
-                      Text('Preparing print PDF…', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
+  /// Full US Letter page — opens print/share immediately (no extra menus).
+  Future<void> _printInvoice(BuildContext ctx, double subtotal) async {
     try {
-      final bytes = await _captureInvoicePng();
-      final pdfBytes = await ngmyInvoiceBuildLetterPdf(bytes);
+      final pdfBytes = await _printPdfBytes(subtotal);
       final filename = _invoiceExportBaseName();
-      _dismissPrintLoading(ctx);
-      if (!ctx.mounted) return;
 
       if (kIsWeb) {
-        // Stage then show buttons — iOS blocks window.open after async work unless
-        // the user taps Share or Safari here (same pattern as Slides/Documents).
-        ngmyStageSlidesPdfBytes(pdfBytes, filename);
-        await ngmyShowIosSlidesPdfDialog(ctx, deckName: 'Invoice');
+        final ok = await ngmyInvoicePrintPdfDirect(pdfBytes, filename);
+        if (!ctx.mounted) return;
+        if (!ok) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open print — try again.'),
+              backgroundColor: Color(0xFFEF4444),
+            ),
+          );
+        }
         return;
       }
 
@@ -475,7 +490,6 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
         );
       }
     } catch (e) {
-      _dismissPrintLoading(ctx);
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text('Print failed: $e'), backgroundColor: const Color(0xFFEF4444)),
@@ -530,8 +544,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
       ),
     );
     if (!ctx.mounted || choice == null) return;
+    final subtotal = _subtotal();
     if (choice == 'print') {
-      await _printInvoice(ctx);
+      await _printInvoice(ctx, subtotal);
     } else {
       await _downloadInvoice(ctx);
     }
@@ -851,6 +866,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     final subtotal = _subtotal();
     final screen = MediaQuery.of(context).size;
     final locked = _contentLocked();
+    _schedulePrintPdfWarm(subtotal);
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
