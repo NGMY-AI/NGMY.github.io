@@ -628,6 +628,17 @@ Set<String> ngmyPartnerPhotosSentB64Set(List<Map<String, dynamic>> memory) {
   return out;
 }
 
+/// All advisor-sent photos in chat order (for badge gallery).
+List<String> ngmyAdvisorSentPhotoB64List(List<Map<String, dynamic>> memory) {
+  final out = <String>[];
+  for (final m in memory) {
+    if ((m['role'] ?? '').toString() != 'ai') continue;
+    final img = (m['imageB64'] ?? '').toString().trim();
+    if (img.isNotEmpty) out.add(img);
+  }
+  return out;
+}
+
 bool ngmyPartnerImageBytesSame(Uint8List a, Uint8List b) {
   if (identical(a, b)) return true;
   if (a.length != b.length || a.isEmpty) return false;
@@ -1639,10 +1650,21 @@ Widget _roleBadgeForProfile(NgmyCommunicateProfile profile, {bool small = false,
   );
 }
 
-Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfile profile) {
+Future<void> showNgmyAdvisorBadgeCard(
+  BuildContext context,
+  NgmyCommunicateProfile profile, {
+  String? chatterEmail,
+}) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final copy = ngmyAdvisorBadgeCopy(name: profile.name, role: profile.role);
   final colors = _ngmyAdvisorBadgeColors(profile.roleBadgeLabel);
+  var sentPhotos = <String>[];
+  final email = (chatterEmail ?? '').trim();
+  if (email.isNotEmpty && profile.id.trim().isNotEmpty) {
+    final mem = await NgmyCommunicateMemoryStore.load(email, profile.id);
+    sentPhotos = ngmyAdvisorSentPhotoB64List(mem);
+  }
+  if (!context.mounted) return;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1699,7 +1721,45 @@ Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfi
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
+                    GestureDetector(
+                      onTap: sentPhotos.isEmpty
+                          ? null
+                          : () {
+                              Navigator.of(ctx).pop();
+                              showNgmyAdvisorPhotoGallery(
+                                context,
+                                photosB64: sentPhotos,
+                                advisorName: profile.name,
+                              );
+                            },
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          NgmyCommunicateAvatar(profile: profile, size: 72, glow: true),
+                          if (sentPhotos.isNotEmpty)
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE11D48),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                ),
+                                child: Text(
+                                  '${sentPhotos.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -1750,6 +1810,47 @@ Future<void> showNgmyAdvisorBadgeCard(BuildContext context, NgmyCommunicateProfi
                   title: 'Style',
                   body: copy.style,
                 ),
+                if (sentPhotos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      showNgmyAdvisorPhotoGallery(
+                        context,
+                        photosB64: sentPhotos,
+                        advisorName: profile.name,
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0x14E11D48),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0x33E11D48),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.photo_library_rounded, color: Color(0xFFE11D48), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Photos from ${profile.name} (${sentPhotos.length})',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : const Color(0xFF1F1218),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: isDark ? Colors.white54 : Colors.black45),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Text(
                   'Issued by $kNgmyAdvisorsHubTitle',
@@ -2167,6 +2268,109 @@ Future<void> showNgmyAdvisorPortraitFullscreen(
                 ),
               ),
             ],
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (ctx, anim, secondary, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: child,
+      );
+    },
+  );
+}
+
+/// Swipeable gallery of every photo this advisor sent in chat.
+Future<void> showNgmyAdvisorPhotoGallery(
+  BuildContext context, {
+  required List<String> photosB64,
+  required String advisorName,
+  int initialIndex = 0,
+}) {
+  if (photosB64.isEmpty) return Future.value();
+  final start = initialIndex.clamp(0, photosB64.length - 1);
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close gallery',
+    barrierColor: Colors.black.withValues(alpha: 0.94),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (ctx, anim, secondary) {
+      final page = PageController(initialPage: start);
+      var index = start;
+      return SafeArea(
+        child: Material(
+          color: Colors.transparent,
+          child: StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    controller: page,
+                    itemCount: photosB64.length,
+                    onPageChanged: (i) => setLocal(() => index = i),
+                    itemBuilder: (_, i) {
+                      Uint8List? bytes;
+                      try {
+                        bytes = base64Decode(photosB64[i]);
+                      } catch (_) {}
+                      if (bytes == null || bytes.isEmpty) {
+                        return const Center(
+                          child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                        );
+                      }
+                      return InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 6,
+                        child: Center(
+                          child: Image.memory(
+                            bytes,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                            gaplessPlayback: true,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Positioned(
+                    top: 8,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            advisorName.trim().isEmpty ? 'Photos' : advisorName.trim(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${index + 1} / ${photosB64.length}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       );
@@ -2787,6 +2991,59 @@ class _LoveWorldBackground extends StatelessWidget {
   }
 }
 
+/// Hold message text ~3 seconds to auto-copy to clipboard.
+class _HoldToCopyBubble extends StatefulWidget {
+  const _HoldToCopyBubble({
+    required this.child,
+    required this.copyText,
+    required this.onCopied,
+  });
+
+  final Widget child;
+  final String copyText;
+  final Future<void> Function(String text) onCopied;
+
+  @override
+  State<_HoldToCopyBubble> createState() => _HoldToCopyBubbleState();
+}
+
+class _HoldToCopyBubbleState extends State<_HoldToCopyBubble> {
+  Timer? _holdTimer;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    final t = widget.copyText.trim();
+    if (t.isEmpty) return;
+    _holdTimer?.cancel();
+    _holdTimer = Timer(const Duration(seconds: 3), () {
+      _holdTimer = null;
+      unawaited(widget.onCopied(t));
+    });
+  }
+
+  void _cancelHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.copyText.trim().isEmpty) return widget.child;
+    return GestureDetector(
+      onLongPressStart: (_) => _startHold(),
+      onLongPressEnd: (_) => _cancelHold(),
+      onLongPressCancel: _cancelHold,
+      behavior: HitTestBehavior.opaque,
+      child: widget.child,
+    );
+  }
+}
+
 class _LoveWorldChat extends StatefulWidget {
   final dynamic user;
   final dynamic config;
@@ -2860,6 +3117,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _debateToolbarExpanded = true;
   Timer? _romanticNudgeTimer;
   int _romanticNudgeGen = 0;
+  int _sendGen = 0;
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   Future<void> _saveDebateSession() async {
@@ -3407,15 +3665,60 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return kept.length <= 260 ? kept : '${kept.substring(0, 257).trim()}…';
   }
 
-  Future<void> _copyDebateReply(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
+  Future<void> _copyChatText(String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: t));
     if (!mounted) return;
+    HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isTextCoach ? 'Line copied — paste it in your chat.' : 'Debate reply copied.'),
-        backgroundColor: const Color(0xFF16A34A),
+      const SnackBar(
+        content: Text('Copied'),
+        backgroundColor: Color(0xFF16A34A),
+        duration: Duration(seconds: 1),
       ),
     );
+  }
+
+  Future<void> _copyDebateReply(String text) async {
+    await _copyChatText(text);
+  }
+
+  /// Persist advisor reply even if user left chat; notify when away.
+  Future<void> _deliverAiReply({
+    required int sendGen,
+    required String text,
+    String? imageB64,
+  }) async {
+    final photo = (imageB64 ?? '').trim();
+    if (photo.isNotEmpty) {
+      await NgmyCommunicateMemoryStore.append(
+        _email,
+        widget.profile.id,
+        role: 'ai',
+        text: text,
+        imageB64: photo,
+      );
+    } else {
+      await NgmyCommunicateMemoryStore.append(
+        _email,
+        widget.profile.id,
+        role: 'ai',
+        text: text,
+      );
+    }
+    final away = !mounted || sendGen != _sendGen;
+    if (away) {
+      final preview = text.trim().isNotEmpty
+          ? text.trim()
+          : '📷 ${widget.profile.name} sent you a photo';
+      unawaited(_notifyAdvisorMessage(preview));
+      return;
+    }
+    final row = <String, String>{'role': 'ai', 'text': text};
+    if (photo.isNotEmpty) row['imageB64'] = photo;
+    setState(() => _messages.add(row));
+    _scrollBottom();
   }
 
   Future<void> _sendDebateReply(String text) async {
@@ -3480,6 +3783,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _pendingImageMime = 'image/jpeg';
       _busy = true;
     });
+    final sendGen = ++_sendGen;
     if (imageB64 != null) {
       await NgmyCommunicateMemoryStore.appendWithMime(
         _email,
@@ -3497,13 +3801,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
     final apiKey = await _resolveApiKey();
     if (apiKey.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _messages.add({'role': 'ai', 'text': ngmyCommunicateAiFailureMessage(apiKey: '')});
-        _busy = false;
-      });
-      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: _messages.last['text'] ?? '');
-      _scrollBottom();
+      await _deliverAiReply(
+        sendGen: sendGen,
+        text: ngmyCommunicateAiFailureMessage(apiKey: ''),
+      );
+      if (mounted) setState(() => _busy = false);
       return;
     }
 
@@ -3698,9 +4000,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-        if (!mounted) return;
-        setState(() => _messages.add({'role': 'ai', 'text': reply}));
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+        await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && !canDateThisChatter) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -3719,9 +4019,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I keep this professional — I don\'t send personal pictures.';
         }
-        if (!mounted) return;
-        setState(() => _messages.add({'role': 'ai', 'text': reply}));
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+        await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner && !datingVibeNow) {
         // Datable advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
@@ -3742,9 +4040,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I don\'t send pics like that unless we\'re official 😌';
         }
-        if (!mounted) return;
-        setState(() => _messages.add({'role': 'ai', 'text': reply}));
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+        await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (wantsImage) {
         String? b64;
         try {
@@ -3757,10 +4053,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           b64 = null;
         }
         if (b64 != null && b64.isNotEmpty) {
-          final photo = b64;
-          if (!mounted) return;
-          setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': photo}));
-          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: photo);
+          await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64);
         } else {
           // Never show "tap send again" — keep trying until a real photo is ready.
           try {
@@ -3788,9 +4081,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             final emergencyB64 = emergency.bytes != null && emergency.bytes!.isNotEmpty
                 ? base64Encode(emergency.bytes!)
                 : null;
-            if (emergencyB64 != null && emergencyB64.isNotEmpty && mounted) {
-              setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': emergencyB64}));
-              await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: emergencyB64);
+            if (emergencyB64 != null && emergencyB64.isNotEmpty) {
+              await _deliverAiReply(sendGen: sendGen, text: '', imageB64: emergencyB64);
             }
           } catch (e) {
             debugPrint('[communicate] emergency photo: $e');
@@ -3823,9 +4115,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             onTimeout: () => null,
           );
           if (b64Photo != null && b64Photo.isNotEmpty) {
-            if (!mounted) return;
-            setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': b64Photo}));
-            await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: b64Photo);
+            await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64Photo);
             return;
           }
           cleaned = '💕';
@@ -3837,18 +4127,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-        if (!mounted) return;
-        setState(() => _messages.add({'role': 'ai', 'text': reply}));
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: reply);
+        await _deliverAiReply(sendGen: sendGen, text: reply);
       }
     } catch (e) {
       debugPrint('[communicate] send error: $e');
-      if (mounted) {
-        setState(() => _messages.add({
-          'role': 'ai',
-          'text': ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
-        }));
-      }
+      await _deliverAiReply(
+        sendGen: sendGen,
+        text: ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -3937,64 +4223,70 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 }
                 final m = _messages[msgIndex];
                 final user = m['role'] == 'user';
+                final msgText = (m['text'] ?? '').toString();
+                final bubble = Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(user ? 20 : 4),
+                      bottomRight: Radius.circular(user ? 4 : 20),
+                    ),
+                    gradient: user
+                        ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
+                        : LinearGradient(colors: [const Color(0xFF2D1B4E), const Color(0xFF1E1B4B).withValues(alpha: 0.95)]),
+                    border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.1)),
+                    boxShadow: [BoxShadow(color: (user ? const Color(0xFFEC4899) : const Color(0xFF9333EA)).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if ((m['imageB64'] ?? '').toString().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: _chatImageBubble((m['imageB64'] ?? '').toString()),
+                          ),
+                        ),
+                      if (msgText.isNotEmpty)
+                        Text(msgText, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                      if (!user && _isTextCoach && msgText.trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: TextButton.icon(
+                            onPressed: () => _copyDebateReply(msgText),
+                            icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white70),
+                            label: const Text('Copy line', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ),
+                      if (!user && _isDebater && msgText.trim().isNotEmpty)
+                        ngmyDebateReplyActions(
+                          replyText: msgText,
+                          opponentName: _debateOpponentC.text.trim(),
+                          opponentPhone: _debateOpponentPhoneC.text.trim(),
+                          channel: _debateChannel,
+                          accent: accent,
+                          onCopy: () => _copyDebateReply(msgText),
+                          onSend: () => _sendDebateReply(msgText),
+                        ),
+                    ],
+                  ),
+                );
                 return Align(
                   alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: Radius.circular(user ? 20 : 4),
-                        bottomRight: Radius.circular(user ? 4 : 20),
-                      ),
-                      gradient: user
-                          ? const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFF9333EA)])
-                          : LinearGradient(colors: [const Color(0xFF2D1B4E), const Color(0xFF1E1B4B).withValues(alpha: 0.95)]),
-                      border: Border.all(color: Colors.white.withValues(alpha: user ? 0.2 : 0.1)),
-                      boxShadow: [BoxShadow(color: (user ? const Color(0xFFEC4899) : const Color(0xFF9333EA)).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if ((m['imageB64'] ?? '').toString().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: _chatImageBubble((m['imageB64'] ?? '').toString()),
-                            ),
-                          ),
-                        if ((m['text'] ?? '').toString().isNotEmpty)
-                          Text(m['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
-                        if (!user && _isTextCoach && (m['text'] ?? '').toString().trim().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: TextButton.icon(
-                              onPressed: () => _copyDebateReply(m['text'] ?? ''),
-                              icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white70),
-                              label: const Text('Copy line', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ),
-                          ),
-                        if (!user && _isDebater && (m['text'] ?? '').toString().trim().isNotEmpty)
-                          ngmyDebateReplyActions(
-                            replyText: m['text'] ?? '',
-                            opponentName: _debateOpponentC.text.trim(),
-                            opponentPhone: _debateOpponentPhoneC.text.trim(),
-                            channel: _debateChannel,
-                            accent: accent,
-                            onCopy: () => _copyDebateReply(m['text'] ?? ''),
-                            onSend: () => _sendDebateReply(m['text'] ?? ''),
-                          ),
-                      ],
-                    ),
+                  child: _HoldToCopyBubble(
+                    copyText: msgText,
+                    onCopied: _copyChatText,
+                    child: bubble,
                   ),
                 );
               },
@@ -4035,7 +4327,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                   Text(widget.profile.name, style: TextStyle(color: panelFg, fontWeight: FontWeight.w900, fontSize: 16)),
                                   const SizedBox(height: 3),
                                   GestureDetector(
-                                    onTap: () => showNgmyAdvisorBadgeCard(context, widget.profile),
+                                    onTap: () => showNgmyAdvisorBadgeCard(context, widget.profile, chatterEmail: _email),
                                     child: _roleBadgeForProfile(widget.profile, small: true),
                                   ),
                                   const SizedBox(height: 2),
@@ -4048,7 +4340,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                             ),
                             IconButton(
                               tooltip: 'NGMY Advisors badge',
-                              onPressed: () => showNgmyAdvisorBadgeCard(context, widget.profile),
+                              onPressed: () => showNgmyAdvisorBadgeCard(context, widget.profile, chatterEmail: _email),
                               icon: Icon(Icons.badge_rounded, color: const Color(0xFFE11D48), size: 22),
                             ),
                             if (_isTranslator)
