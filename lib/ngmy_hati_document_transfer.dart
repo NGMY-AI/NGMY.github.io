@@ -48,14 +48,14 @@ String ngmyHatiTransferPartnerTitle(String deckKind) {
 
 /// Doc1 (Kuhowa — groom's father speaking) placeholder → Doc2 (Kuhoweya).
 const Map<String, String> kNgmyHatiKuhowaToKuhoweyaPlaceholders = {
-  '[Jina la Baba]': '[Jina la Baba wa Mume]',
-  '[Jina la Jamii]': '[Jina la Jamii ya Mume]',
-  '[Jina la Nyumba]': '[Jina la Nyumba ya Mume]',
-  '[Jina la Kijana]': '[Jina la Mume]',
+  '[Jina la Baba wa Mume]': '[Jina la Baba wa Mume]',
+  '[Jina la Jamii ya Mume]': '[Jina la Jamii ya Mume]',
+  '[Jina la Nyumba ya Mume]': '[Jina la Nyumba ya Mume]',
+  '[Jina la Kijana]': '[Jina la Kijana]',
   '[Jina la Binti]': '[Jina la Binti]',
-  '[Jina la Baba wa Binti]': '[Jina la Baba]',
-  '[Jina la Jamii ya Binti]': '[Jina la Jamii]',
-  '[Jina la Nyumba ya Binti]': '[Jina la Nyumba]',
+  '[Jina la Baba wa Binti]': '[Jina la Baba wa Binti]',
+  '[Jina la Jamii ya Binti]': '[Jina la Jamii ya Binti]',
+  '[Jina la Nyumba ya Binti]': '[Jina la Nyumba ya Binti]',
 };
 
 /// Doc2 → Doc1 reverse map.

@@ -811,14 +811,12 @@ Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
   );
 }
 
-const _kHatiKuhowaIntro = 'Mimi [Jina la Baba], wa jamii ya [Jina la Jamii], nyumba ya [Jina la '
-    'Nyumba], nimesimama rasmi kuthibitisha utoaji wa mahali ya kuhoweya '
-    'kijana wangu aitwaye [Jina la Kijana], pamoja na [Jina la Binti], '
-    'binti wa [Jina la Baba wa Binti], wa jamii ya [Jina la Jamii ya '
-    'Binti], nyumba ya [Jina la Nyumba ya Binti]. Makubaliano haya '
-    'yanatekelezwa kwa kufuata desturi, taratibu, na mapokeo '
-    'yanayoheshimiwa na pande zote mbili za familia, kwa nia ya '
-    'kuimarisha uhusiano wa kifamilia na kuheshimu mila za wazee wetu.';
+const _kHatiKuhowaIntro = 'Mimi [Jina la Baba wa Mume], wa jamaa ya [Jina la Jamii ya Mume], '
+    'Nyumba ya [Jina la Nyumba ya Mume]. Nimetowa mahali ya kuhoweya kijana wangu aitwaye '
+    '[Jina la Kijana] na [Jina la Binti], binti wa [Jina la Baba wa Binti], wa jamaa ya '
+    '[Jina la Jamii ya Binti], Nyumba ya [Jina la Nyumba ya Binti]. Makubaliano haya '
+    'yanathibitishwa rasmi na pande zote mbili ili kuweka kumbukumbu na kuimarisha '
+    'uhusiano mwema kati ya familia zote mbili.';
 
 /// Public intro template used when transferring names into Hati ya Kuhowa.
 const String kNgmyHatiKuhowaIntroTemplate = _kHatiKuhowaIntro;
@@ -861,16 +859,12 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
   );
 }
 
-const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba], wa jamaa la [Jina la Jamii], nyumba ya [Jina la '
-    'Nyumba], kwa hiari yangu na kwa ridhaa ya familia yangu, '
-    'nimemuhowesha binti wangu [Jina la Binti] kwa [Jina la Mume], wa '
-    'jamaa la [Jina la Jamii ya Mume], nyumba ya [Jina la Nyumba ya '
-    'Mume], mwana wa [Jina la Baba wa Mume]. Uhoweshaji huu umefanyika '
-    'kwa makubaliano ya pande zote mbili, kwa kufuata mila na desturi za '
-    'wazee wetu, kwa lengo la kuunganisha familia zetu katika heshima, '
-    'upendo na mshikamano. Hivyo, ninathibitisha mbele ya mashahidi kuwa '
-    'makubaliano haya yamefanyika kwa amani na kwa ridhaa kamili ya '
-    'familia zote mbili.';
+const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba wa Binti], wa jamaa ya [Jina la Jamii ya Binti], '
+    'Nyumba ya [Jina la Nyumba ya Binti]. Nimehowesha binti wangu aitwaye [Jina la Binti], '
+    'na ndugu [Jina la Kijana], wa jamaa ya [Jina la Jamii ya Mume], Nyumba ya '
+    '[Jina la Nyumba ya Mume], kijana wa [Jina la Baba wa Mume]. Makubaliano haya '
+    'yanathibitishwa rasmi na pande zote mbili ili kuweka kumbukumbu na kuimarisha '
+    'uhusiano mwema kati ya familia zote mbili.';
 
 /// Public intro template used when transferring names into Hati ya Kuhoweya.
 const String kNgmyHatiKuhoweshaIntroTemplate = _kHatiKuhoweshaIntro;
