@@ -4,16 +4,21 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_civic_member_report_print_stub.dart'
+    if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
+import 'ngmy_invoice_letter.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_invoice_protected_preview.dart';
 import 'ngmy_invoice_signature.dart';
 import 'ngmy_invoice_storage.dart';
 import 'ngmy_invoice_templates.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_slides_download.dart';
 
 class _InvoiceGuestUser {
   _InvoiceGuestUser(this.email);
@@ -372,20 +377,29 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return count;
   }
 
+  Future<Uint8List> _captureInvoicePng() async {
+    await Future.delayed(const Duration(milliseconds: 180));
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) {
+      throw Exception('Preview is not ready yet. Scroll to the invoice preview and try again.');
+    }
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+    if (bytes == null) throw Exception('Could not render invoice image.');
+    return bytes;
+  }
+
+  String _invoiceExportBaseName() {
+    final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
+    return 'invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Receipt-sized PNG download — same behavior as before.
   Future<void> _downloadInvoice(BuildContext ctx) async {
     try {
-      await Future.delayed(const Duration(milliseconds: 180));
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        throw Exception('Preview is not ready yet. Scroll to the invoice preview and try again.');
-      }
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
-      if (bytes == null) throw Exception('Could not render invoice image.');
-
-      final invoiceNo = _invoiceNoC.text.trim().isEmpty ? 'invoice' : _invoiceNoC.text.trim();
-      final filename = 'invoice_${invoiceNo}_${DateTime.now().millisecondsSinceEpoch}';
+      final bytes = await _captureInvoicePng();
+      final filename = _invoiceExportBaseName();
       final msg = await downloadNgmyQrImage(bytes, filename);
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
@@ -398,6 +412,100 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
           SnackBar(content: Text('Download failed: $e'), backgroundColor: const Color(0xFFEF4444)),
         );
       }
+    }
+  }
+
+  /// Full US Letter page (same size as Slides/Documents PDF) for printing.
+  Future<void> _printInvoice(BuildContext ctx) async {
+    try {
+      final bytes = await _captureInvoicePng();
+      final filename = _invoiceExportBaseName();
+      if (kIsWeb) {
+        final html = ngmyInvoiceBuildLetterPrintHtml(bytes, title: 'NGMY Invoice');
+        await ngmyPrintCivicMemberReport(
+          htmlContent: html,
+          plainText: 'NGMY Invoice',
+          fileName: filename,
+        );
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Opening letter-size print preview…'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } else {
+        final pdfBytes = await ngmyInvoiceBuildLetterPdf(bytes);
+        final msg = await saveNgmySlidesPdf(pdfBytes, filename);
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(
+              content: Text('$msg — open the letter-size PDF to print on full paper.'),
+              backgroundColor: const Color(0xFF16A34A),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text('Print failed: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDownloadOrPrintOptions(BuildContext ctx) async {
+    final choice = await showModalBottomSheet<String>(
+      context: ctx,
+      backgroundColor: const Color(0xFF0B1020),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Invoice export',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Download keeps the receipt image. Print uses a full letter-size page like Documents.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                leading: const Icon(Icons.download_rounded, color: Color(0xFF10B981)),
+                title: const Text('Download', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  'Receipt image (same as before)',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
+                ),
+                onTap: () => Navigator.pop(sheetCtx, 'download'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.print_rounded, color: Color(0xFF60A5FA)),
+                title: const Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  'Full letter-size paper for your printer',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
+                ),
+                onTap: () => Navigator.pop(sheetCtx, 'print'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!ctx.mounted || choice == null) return;
+    if (choice == 'print') {
+      await _printInvoice(ctx);
+    } else {
+      await _downloadInvoice(ctx);
     }
   }
 
@@ -598,7 +706,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                                           }
                                           _applyEntry(inv);
                                           await Future.delayed(const Duration(milliseconds: 250));
-                                          if (ctx.mounted) await _downloadInvoice(ctx);
+                                          if (ctx.mounted) await _showDownloadOrPrintOptions(ctx);
                                         },
                                         icon: const Icon(Icons.download_rounded, size: 16),
                                         label: const Text('Download'),
@@ -1058,7 +1166,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                     child: FilledButton.icon(
                       onPressed: () async {
                         if (!await _ensureTemplatePaid(context)) return;
-                        await _downloadInvoice(context);
+                        await _showDownloadOrPrintOptions(context);
                       },
                       icon: const Icon(Icons.download_rounded),
                       label: const Text('Download'),
