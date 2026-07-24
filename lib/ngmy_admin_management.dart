@@ -266,15 +266,15 @@ Future<void> ngmyRefreshUserLoanApplications(AppConfig config) async {
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
 }
 
-/// User loan submit — merge cloud first so pending never overwrites admin approval.
+/// User loan submit — upload to authoritative management lists so admin receives applications.
 Future<bool> ngmyUserPersistLoanApplications(AppConfig config) async {
-  await ngmyHydrateManagementListsFromAllBackups(config);
+  await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
   await _persistManagementOperationalListsLocal(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   unawaited(NgmyLoanStatusCloud.pushFromApps(config.loanApplications));
   unawaited(NgmyLoanPaymentsCloud.pushFromApps(config.loanApplications));
   if (await ngmyCanReachCloud()) {
-    return _persistOperationalConfigToCloud(config);
+    return _persistManagementOperationalListsAuthoritative(config);
   }
   return true;
 }

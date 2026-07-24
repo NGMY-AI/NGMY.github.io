@@ -41,17 +41,21 @@ class NgmyLoanPhotosStore {
 
   static Future<void> applyTo(List<Map<String, dynamic>> apps) async {
     if (apps.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    for (var i = 0; i < apps.length; i++) {
-      final id = (apps[i]['id'] ?? '').toString().trim();
-      if (id.isEmpty) continue;
-      final raw = prefs.getString(_key(id));
-      if (raw == null || raw.isEmpty) continue;
-      try {
-        final stored = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-        ngmyLoanMergePhotoRefsIntoApp(apps[i], stored);
-      } catch (_) {}
+    for (final app in apps) {
+      await applyToApp(app);
     }
+  }
+
+  static Future<void> applyToApp(Map<String, dynamic> app) async {
+    final id = (app['id'] ?? '').toString().trim();
+    if (id.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(id));
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final stored = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      ngmyLoanMergePhotoRefsIntoApp(app, stored);
+    } catch (_) {}
   }
 
   static Future<void> remove(String loanId) async {
@@ -484,6 +488,12 @@ class _NgmyLoanImageState extends State<NgmyLoanImage> {
     if (url.startsWith('http')) {
       return Image.network(url, fit: widget.fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
     }
+    if (!kIsWeb && url.isNotEmpty && !url.startsWith('http') && !url.startsWith('data:')) {
+      final file = File(url);
+      if (file.existsSync()) {
+        return Image.file(file, fit: widget.fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, size: 28));
+      }
+    }
     if (!kIsWeb && url.startsWith('/')) {
       return Image.file(File(url), fit: widget.fit, gaplessPlayback: true);
     }
@@ -703,7 +713,7 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
                 const SizedBox(height: 20),
                 Text('Pending review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ui.textPrimary)),
                 const SizedBox(height: 8),
-                ...pending.map((a) => _loanTile(context, a, isDark)),
+                ...pending.map((a) => _pendingLoanCard(context, a, isDark)),
               ],
               if (rejected.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -975,6 +985,135 @@ class _NgmyLoanServicesScreenState extends State<NgmyLoanServicesScreen> with Wi
         ),
       );
 
+  Widget _pendingLoanCard(BuildContext context, Map<String, dynamic> app, bool isDark) {
+    final amount = (app['amount'] as num?)?.toDouble() ?? 0;
+    final submitted = _fmtDate(app['createdAt']);
+    final collateral = NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString());
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1A2332), const Color(0xFF151B28)]
+              : [const Color(0xFFFFFBEB), const Color(0xFFFFF7ED)],
+        ),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.45)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.08 : 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Application under review',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          color: isDark ? Colors.white : const Color(0xFF92400E),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Submitted${submitted.isNotEmpty ? ' · $submitted' : ''}',
+                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFFB45309)),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
+                  ),
+                  child: const Text('PENDING', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _pendingStatChip('Amount', '\$${ngmyLoanFormatCurrency(amount)}', isDark),
+                const SizedBox(width: 8),
+                Expanded(child: _pendingStatChip('Collateral', collateral, isDark)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              (app['scheduleSummary'] ?? '').toString(),
+              style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white60 : const Color(0xFF78716C)),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: isDark ? Colors.white38 : const Color(0xFFA8A29E)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Your application stays saved. Admin will review it soon.',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white54 : const Color(0xFF78716C)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pendingStatChip(String label, String value, bool isDark) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFFDE68A)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFFA8A29E))),
+            const SizedBox(height: 2),
+            Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF1C1917)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      );
+
+  String _fmtDate(dynamic raw) {
+    final dt = DateTime.tryParse((raw ?? '').toString());
+    if (dt == null) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
   Widget _loanTile(BuildContext context, Map<String, dynamic> app, bool isDark) {
     final status = (app['status'] ?? 'pending').toString();
     final amount = (app['amount'] as num?)?.toDouble() ?? 0;
@@ -1143,7 +1282,6 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
     final d = await NgmyLoanDraftStore.load(widget.userEmail);
     if (d == null || !mounted) return;
     setState(() {
-      _amountC.text = (d['amount'] ?? '').toString();
       _fullNameC.text = (d['fullLegalName'] ?? '').toString();
       _phoneC.text = (d['phone'] ?? '').toString();
       _emailC.text = (d['email'] ?? widget.userEmail).toString();
@@ -1159,17 +1297,11 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       _termMonths = (d['termMonths'] as num?)?.toInt() ?? 12;
       final dob = DateTime.tryParse((d['dateOfBirth'] ?? '').toString());
       if (dob != null) _dateOfBirth = dob;
-      _idFront = (d['idFrontRef'] as String?)?.isNotEmpty == true ? d['idFrontRef'].toString() : null;
-      _idBack = (d['idBackRef'] as String?)?.isNotEmpty == true ? d['idBackRef'].toString() : null;
-      _selfie = (d['selfieRef'] as String?)?.isNotEmpty == true ? d['selfieRef'].toString() : null;
-      _titleFront = (d['titleFrontRef'] as String?)?.isNotEmpty == true ? d['titleFrontRef'].toString() : null;
-      _titleBack = (d['titleBackRef'] as String?)?.isNotEmpty == true ? d['titleBackRef'].toString() : null;
     });
   }
 
   Future<void> _saveDraft() async {
     await NgmyLoanDraftStore.save(widget.userEmail, {
-      'amount': _amountC.text.trim(),
       'fullLegalName': _fullNameC.text.trim(),
       'phone': _phoneC.text.trim(),
       'email': _emailC.text.trim(),
@@ -1185,11 +1317,6 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       'collateralType': _collateralChoice ?? '',
       'termMonths': _termMonths,
       'dateOfBirth': _dateOfBirth?.toUtc().toIso8601String() ?? '',
-      'idFrontRef': _idFront ?? '',
-      'idBackRef': _idBack ?? '',
-      'selfieRef': _selfie ?? '',
-      'titleFrontRef': _titleFront ?? '',
-      'titleBackRef': _titleBack ?? '',
     });
   }
 
@@ -1472,11 +1599,20 @@ class _NgmyLoanApplicationScreenState extends State<NgmyLoanApplicationScreen> {
       await NgmyLoanStore.ensureCloudPhotoRefs(submitted);
       await NgmyLoanPhotosStore.saveForApp(submitted);
       widget.onDataChanged();
-      await widget.onPersistNow?.call();
+      final saved = await widget.onPersistNow?.call() ?? false;
       await NgmyLoanDraftStore.clear(widget.userEmail);
       if (!mounted) return;
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loan application submitted. Admin will review soon.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved
+                ? 'Loan application submitted. Admin will review soon.'
+                : 'Application saved on this device. Syncing to admin — check connection if it stays pending.',
+          ),
+          backgroundColor: saved ? const Color(0xFF16A34A) : const Color(0xFFF59E0B),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -2645,172 +2781,33 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     );
   }
 
-  void _openLoanDetail(BuildContext context, Map<String, dynamic> app) {
-    final id = (app['id'] ?? '').toString();
-    final status = (app['status'] ?? 'pending').toString();
-    Navigator.push(
+  Future<void> _openLoanDetail(BuildContext context, Map<String, dynamic> app) async {
+    final copy = Map<String, dynamic>.from(app);
+    await NgmyLoanPhotosStore.applyToApp(copy);
+    if (!context.mounted) return;
+    await Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
-        builder: (ctx) => Scaffold(
-          backgroundColor: widget.isDark ? const Color(0xFF0A0E18) : const Color(0xFFF3F4F6),
-          appBar: AppBar(
-            title: Text((app['fullLegalName'] ?? 'Loan application').toString(), style: const TextStyle(fontWeight: FontWeight.w900)),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                tooltip: 'Delete loan',
-                onPressed: () => _confirmDeleteLoan(ctx, app, popDetail: true),
-              ),
-              if (status == 'approved')
-                IconButton(
-                  icon: const Icon(Icons.payments_outlined),
-                  onPressed: () => Navigator.push(
-                    ctx,
-                    MaterialPageRoute<void>(
-                      builder: (_) => NgmyLoanTrackingScreen(
-                        loanId: id,
-                        config: widget.config,
-                        onDataChanged: widget.onDataChanged,
-                        isAdmin: true,
-                        onPersistNow: widget.onPersistNow,
-                        onRefreshLoans: widget.onRefreshLoans,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _detailSection('Loan', [
-                _detailRow('Amount', '\$${ngmyLoanFormatCurrency((app['amount'] as num?)?.toDouble() ?? 0)}'),
-                _detailRow('Total repayment', '\$${ngmyLoanFormatCurrency((app['totalRepayment'] as num?)?.toDouble() ?? 0)}'),
-                _detailRow('Schedule', (app['scheduleSummary'] ?? '').toString()),
-                _detailRow('Term weeks', (app['termWeeks'] ?? '').toString()),
-                _detailRow('Status', status),
-              ]),
-              _detailSection('Applicant', [
-                _detailRow('Full legal name', (app['fullLegalName'] ?? '').toString()),
-                _detailRow('Username', (app['username'] ?? '').toString()),
-                _detailRow('Email', (app['email'] ?? app['userEmail'] ?? '').toString()),
-                _detailRow('Phone', (app['phone'] ?? '').toString()),
-                _detailRow('Date of birth', _fmtDate(app['dateOfBirth'])),
-                _detailRow('Home address', (app['homeAddress'] ?? '').toString()),
-              ]),
-              _detailSection('Government ID', [
-                _detailRow('ID type', _idTypeLabel((app['idType'] ?? '').toString())),
-                _detailRow('ID number', (app['governmentId'] ?? '').toString()),
-                _detailRow('ID expiration', (app['idExpiration'] ?? '').toString()),
-                _detailRow('SSN', (app['ssn'] ?? '').toString()),
-              ]),
-              _detailSection('Payout', [
-                _detailRow('Method', (app['receiveMethod'] ?? '').toString()),
-                _detailRow('Details', (app['receiveDetails'] ?? app['payoutDestination'] ?? '').toString()),
-              ]),
-              _detailSection('Collateral', [
-                _detailRow('Type', NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())),
-                if ((app['collateralCustomNote'] ?? '').toString().isNotEmpty)
-                  _detailRow('Description', (app['collateralCustomNote'] ?? '').toString()),
-              ]),
-              _detailSection('Photos — tap to zoom', [
-                _photoGrid(ctx, [
-                  if ((app['idFrontRef'] ?? '').toString().isNotEmpty) ('ID front', app['idFrontRef']),
-                  if ((app['idBackRef'] ?? '').toString().isNotEmpty) ('ID back', app['idBackRef']),
-                  if ((app['selfieRef'] ?? '').toString().isNotEmpty) ('Selfie', app['selfieRef']),
-                  if ((app['titleFrontRef'] ?? '').toString().isNotEmpty) ('Collateral front', app['titleFrontRef']),
-                  if ((app['titleBackRef'] ?? '').toString().isNotEmpty) ('Collateral back', app['titleBackRef']),
-                ]),
-              ]),
-              if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty)
-                _detailSection('Rejection', [_detailRow('Reason', (app['rejectionReason'] ?? '').toString())]),
-              if (status == 'pending') ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: OutlinedButton(onPressed: () { Navigator.pop(ctx); _reject(context, id); }, child: const Text('Reject'))),
-                    const SizedBox(width: 10),
-                    Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _loanGreen), onPressed: () { Navigator.pop(ctx); _approve(id); }, child: const Text('Approve loan'))),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 24),
-            ],
-          ),
+        builder: (ctx) => _NgmyLoanAdminDetailScreen(
+          app: copy,
+          isDark: widget.isDark,
+          config: widget.config,
+          onDataChanged: widget.onDataChanged,
+          onPersistNow: widget.onPersistNow,
+          onRefreshLoans: widget.onRefreshLoans,
+          onDelete: () => _confirmDeleteLoan(ctx, copy, popDetail: true),
+          onApprove: (id) {
+            Navigator.pop(ctx);
+            _approve(id);
+          },
+          onReject: (id) {
+            Navigator.pop(ctx);
+            _reject(context, id);
+          },
         ),
       ),
     );
   }
-
-  Widget _detailSection(String title, List<Widget> children) => Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: widget.isDark ? const Color(0xFF151B28) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: widget.isDark ? Colors.white12 : Colors.grey.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _loanGreenDark)),
-            const SizedBox(height: 10),
-            ...children,
-          ],
-        ),
-      );
-
-  Widget _detailRow(String label, String value) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey.shade600, letterSpacing: 0.3)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.35)),
-        ],
-      ),
-    );
-  }
-
-  Widget _photoGrid(BuildContext context, List<(String, dynamic)> items) {
-    if (items.isEmpty) return const Text('No photos attached', style: TextStyle(fontSize: 12, color: Colors.grey));
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: items.map((e) {
-        return GestureDetector(
-          onTap: () => NgmyLoanStore.openZoom(context, e.$2, label: e.$1),
-          child: Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(width: 100, height: 100, child: NgmyLoanImage(e.$2)),
-              ),
-              const SizedBox(height: 4),
-              Text(e.$1, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  String _fmtDate(dynamic raw) {
-    final d = DateTime.tryParse((raw ?? '').toString())?.toLocal();
-    if (d == null) return (raw ?? '').toString();
-    return '${d.month}/${d.day}/${d.year}';
-  }
-
-  String _idTypeLabel(String t) => switch (t) {
-        'drivers_license' => "Driver's License",
-        'passport' => 'Passport',
-        'state_id' => 'State ID',
-        'other' => 'Other',
-        _ => t,
-      };
 
   Future<bool> _confirmDeleteLoan(BuildContext context, Map<String, dynamic> app, {bool popDetail = false}) async {
     final id = (app['id'] ?? '').toString();
@@ -2906,6 +2903,398 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
       SnackBar(
         content: Text(saved ? 'Loan rejected and saved.' : 'Rejected locally — cloud sync failed.'),
         backgroundColor: saved ? _loanGreen : Colors.orange,
+      ),
+    );
+  }
+}
+
+String _ngmyLoanIdTypeLabel(String t) => switch (t) {
+      'drivers_license' => "Driver's License",
+      'passport' => 'Passport',
+      'state_id' => 'State ID',
+      'other' => 'Other',
+      _ => t.isEmpty ? '—' : t,
+    };
+
+String _ngmyLoanAdminFmtDate(dynamic raw) {
+  final d = DateTime.tryParse((raw ?? '').toString())?.toLocal();
+  if (d == null) return (raw ?? '').toString();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return '${months[d.month - 1]} ${d.day}, ${d.year}';
+}
+
+class _NgmyLoanAdminDetailScreen extends StatelessWidget {
+  const _NgmyLoanAdminDetailScreen({
+    required this.app,
+    required this.isDark,
+    required this.config,
+    required this.onDataChanged,
+    required this.onDelete,
+    required this.onApprove,
+    required this.onReject,
+    this.onPersistNow,
+    this.onRefreshLoans,
+  });
+
+  final Map<String, dynamic> app;
+  final bool isDark;
+  final NgmyLoanConfigBridge config;
+  final VoidCallback onDataChanged;
+  final Future<bool> Function()? onDelete;
+  final void Function(String id) onApprove;
+  final void Function(String id) onReject;
+  final Future<bool> Function()? onPersistNow;
+  final Future<void> Function()? onRefreshLoans;
+
+  List<(String, IconData, dynamic)> get _photos => [
+        if ((app['idFrontRef'] ?? '').toString().isNotEmpty) ('ID front', Icons.badge_outlined, app['idFrontRef']),
+        if ((app['idBackRef'] ?? '').toString().isNotEmpty) ('ID back', Icons.badge_outlined, app['idBackRef']),
+        if ((app['selfieRef'] ?? '').toString().isNotEmpty) ('Selfie', Icons.face_retouching_natural_rounded, app['selfieRef']),
+        if ((app['titleFrontRef'] ?? '').toString().isNotEmpty) ('Collateral front', Icons.photo_library_outlined, app['titleFrontRef']),
+        if ((app['titleBackRef'] ?? '').toString().isNotEmpty) ('Collateral back', Icons.photo_library_outlined, app['titleBackRef']),
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    final status = (app['status'] ?? 'pending').toString();
+    final id = (app['id'] ?? '').toString();
+    final name = (app['fullLegalName'] ?? app['username'] ?? 'Applicant').toString();
+    final amount = (app['amount'] as num?)?.toDouble() ?? 0;
+    final pageBg = isDark ? const Color(0xFF0A0E18) : const Color(0xFFF3F4F6);
+    final card = isDark ? const Color(0xFF151B28) : Colors.white;
+
+    return Scaffold(
+      backgroundColor: pageBg,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 168,
+            pinned: true,
+            backgroundColor: _loanGreenDark,
+            foregroundColor: Colors.white,
+            actions: [
+              if (status == 'approved')
+                IconButton(
+                  icon: const Icon(Icons.payments_outlined),
+                  tooltip: 'Payment tracking',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => NgmyLoanTrackingScreen(
+                        loanId: id,
+                        config: config,
+                        onDataChanged: onDataChanged,
+                        isAdmin: true,
+                        onPersistNow: onPersistNow,
+                        onRefreshLoans: onRefreshLoans,
+                      ),
+                    ),
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded),
+                tooltip: 'Delete loan',
+                onPressed: () => onDelete?.call(),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF00B25A), Color(0xFF059669), Color(0xFF0F766E)],
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(56, 8, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white30),
+                          ),
+                          child: Text(status.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.15)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${ngmyLoanFormatCurrency(amount)} · ${NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())}',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _adminInfoCard(
+                  card,
+                  icon: Icons.payments_rounded,
+                  title: 'Loan terms',
+                  rows: [
+                    ('Amount requested', '\$${ngmyLoanFormatCurrency(amount)}'),
+                    ('Total repayment', '\$${ngmyLoanFormatCurrency((app['totalRepayment'] as num?)?.toDouble() ?? 0)}'),
+                    ('Schedule', (app['scheduleSummary'] ?? '').toString()),
+                    ('Term', '${app['termWeeks'] ?? ''} weeks'),
+                    ('Submitted', _ngmyLoanAdminFmtDate(app['createdAt'])),
+                  ],
+                ),
+                _adminInfoCard(
+                  card,
+                  icon: Icons.person_rounded,
+                  title: 'Applicant',
+                  rows: [
+                    ('Full legal name', (app['fullLegalName'] ?? '').toString()),
+                    ('Username', (app['username'] ?? '').toString()),
+                    ('Email', (app['email'] ?? app['userEmail'] ?? '').toString()),
+                    ('Phone', (app['phone'] ?? '').toString()),
+                    ('Date of birth', _ngmyLoanAdminFmtDate(app['dateOfBirth'])),
+                    ('Home address', (app['homeAddress'] ?? '').toString()),
+                  ],
+                ),
+                _adminInfoCard(
+                  card,
+                  icon: Icons.verified_user_outlined,
+                  title: 'Government ID',
+                  rows: [
+                    ('ID type', _ngmyLoanIdTypeLabel((app['idType'] ?? '').toString())),
+                    ('ID number', (app['governmentId'] ?? '').toString()),
+                    ('Expiration', (app['idExpiration'] ?? '').toString()),
+                    ('SSN', (app['ssn'] ?? '').toString()),
+                  ],
+                ),
+                _adminInfoCard(
+                  card,
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Payout',
+                  rows: [
+                    ('Method', (app['receiveMethod'] ?? '').toString()),
+                    ('Details', (app['receiveDetails'] ?? app['payoutDestination'] ?? '').toString()),
+                  ],
+                ),
+                _adminInfoCard(
+                  card,
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Collateral',
+                  rows: [
+                    ('Type', NgmyLoanLogic.collateralLabel((app['collateralType'] ?? '').toString())),
+                    if ((app['collateralCustomNote'] ?? '').toString().isNotEmpty) ('Description', (app['collateralCustomNote'] ?? '').toString()),
+                  ],
+                ),
+                _adminPhotosCard(context, card),
+                if (status == 'rejected' && (app['rejectionReason'] ?? '').toString().isNotEmpty)
+                  _adminInfoCard(
+                    card,
+                    icon: Icons.block_rounded,
+                    title: 'Rejection reason',
+                    rows: [('Reason', (app['rejectionReason'] ?? '').toString())],
+                    accent: Colors.redAccent,
+                  ),
+                if (status == 'pending') ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: id.isEmpty ? null : () => onReject(id),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: id.isEmpty ? null : () => onApprove(id),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _loanGreen,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Approve loan', style: TextStyle(fontWeight: FontWeight.w900)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _adminInfoCard(
+    Color card, {
+    required IconData icon,
+    required String title,
+    required List<(String, String)> rows,
+    Color accent = _loanGreen,
+  }) {
+    final visible = rows.where((r) => r.$2.trim().isNotEmpty).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+        boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: isDark ? 0.12 : 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: accent),
+                const SizedBox(width: 8),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF111827))),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: Column(
+              children: visible.map((row) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 118,
+                        child: Text(row.$1, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFF6B7280))),
+                      ),
+                      Expanded(
+                        child: Text(row.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.35, color: isDark ? Colors.white : const Color(0xFF111827))),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _adminPhotosCard(BuildContext context, Color card) {
+    final photos = _photos;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withValues(alpha: isDark ? 0.12 : 0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.photo_library_rounded, size: 18, color: Color(0xFF3B82F6)),
+                const SizedBox(width: 8),
+                Text('Photos & documents', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF111827))),
+                const Spacer(),
+                Text('Tap to open', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFF6B7280))),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: photos.isEmpty
+                ? Text('No photos attached to this application.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600))
+                : Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: photos.map((item) {
+                      return Material(
+                        color: isDark ? const Color(0xFF1E2535) : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          onTap: () => NgmyLoanStore.openZoom(context, item.$3, label: item.$1),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 148,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                            ),
+                            child: Column(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    height: 120,
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        NgmyLoanImage(item.$3),
+                                        Positioned(
+                                          right: 6,
+                                          bottom: 6,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(8)),
+                                            child: const Icon(Icons.open_in_full_rounded, color: Colors.white, size: 14),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(item.$2, size: 14, color: const Color(0xFF3B82F6)),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(item.$1, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF374151)), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -20746,6 +20746,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       onPersistNow: () => ngmyAdminPersistManagementConfig(widget.config),
       onRefreshLoans: () async {
         await widget.onRefreshManagementData?.call();
+        await NgmyLoanPhotosStore.applyTo(widget.config.loanApplications);
         await NgmyLoanStatusCloud.fetchAndApply(widget.config.loanApplications);
         await NgmyLoanPaymentsCloud.fetchAndApply(widget.config.loanApplications);
       },
