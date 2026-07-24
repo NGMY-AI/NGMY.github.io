@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_phone.dart';
+import 'ngmy_help_center_send_money_delivery_status.dart';
 import 'ngmy_help_center_send_money_receipt.dart';
 import 'ngmy_help_center_send_money_receipt_templates.dart';
 import 'ngmy_help_center_send_money_store.dart';
@@ -1294,6 +1295,8 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
 class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
   bool _busy = false;
   late String _templateId;
+  NgmyTransferDeliveryStatus _deliveryStatus = NgmyTransferDeliveryStatus.hidden;
+  DateTime? _deliveredAt;
   final GlobalKey _previewKey = GlobalKey();
 
   @override
@@ -1343,6 +1346,19 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _pickDeliveryStatus() async {
+    await showNgmyTransferDeliveryStatusPicker(
+      context,
+      selected: _deliveryStatus,
+      onSelect: (status, at) {
+        setState(() {
+          _deliveryStatus = status;
+          _deliveredAt = at;
+        });
+      },
+    );
   }
 
   Future<void> _pickTemplate() async {
@@ -1465,6 +1481,22 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Delivery status',
+                        onPressed: _busy ? null : _pickDeliveryStatus,
+                        icon: Icon(
+                          _deliveryStatus == NgmyTransferDeliveryStatus.arrived
+                              ? Icons.check_circle_rounded
+                              : _deliveryStatus == NgmyTransferDeliveryStatus.hidden
+                                  ? Icons.local_shipping_outlined
+                                  : Icons.local_shipping_rounded,
+                          color: _deliveryStatus == NgmyTransferDeliveryStatus.arrived
+                              ? const Color(0xFF86EFAC)
+                              : Colors.white,
+                          size: 20,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      IconButton(
                         tooltip: 'Receipt template',
                         onPressed: _busy ? null : _pickTemplate,
                         icon: const Icon(Icons.palette_outlined, color: Colors.white, size: 20),
@@ -1513,6 +1545,8 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                           child: NgmyTransferReceiptPreview(
                             receipt: widget.receipt,
                             templateId: _templateId,
+                            deliveryStatus: _deliveryStatus,
+                            deliveredAt: _deliveredAt,
                           ),
                         ),
                       ],

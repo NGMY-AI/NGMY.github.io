@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_help_center_phone.dart';
+import 'ngmy_help_center_send_money_delivery_status.dart';
 import 'ngmy_help_center_send_money_receipt.dart';
 
 enum NgmyTransferReceiptDesign {
@@ -198,10 +199,14 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
     super.key,
     required this.receipt,
     required this.templateId,
+    this.deliveryStatus = NgmyTransferDeliveryStatus.hidden,
+    this.deliveredAt,
   });
 
   final NgmyHelpCenterSendMoneyReceipt receipt;
   final String templateId;
+  final NgmyTransferDeliveryStatus deliveryStatus;
+  final DateTime? deliveredAt;
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +285,10 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (deliveryStatus != NgmyTransferDeliveryStatus.hidden) ...[
+                    const SizedBox(height: 12),
+                    NgmyTransferDeliveryStatusCard(status: deliveryStatus, deliveredAt: deliveredAt),
+                  ],
                   const SizedBox(height: 14),
                   _panel(
                     t,
