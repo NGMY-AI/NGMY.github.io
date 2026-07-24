@@ -899,6 +899,7 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       String text, {
       required int seed,
       bool adultMode = false,
+      bool skipDirect = false,
     }) async {
       if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: 'Photo timed out.');
@@ -906,8 +907,8 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       final remainingMs = (effectiveBudget - DateTime.now().difference(started)).inMilliseconds;
       final slice = Duration(
         milliseconds: fast
-            ? remainingMs.clamp(3500, 9000)
-            : remainingMs.clamp(6000, 20000),
+            ? remainingMs.clamp(3000, 8000)
+            : remainingMs.clamp(5000, 12000),
       );
       // Proxy works without a real Gemini key for pollinationsImage — always try.
       final viaProxy = await _callImageActionViaProxy(
@@ -920,16 +921,16 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
       lastError = viaProxy.error ?? lastError;
 
-      if (fast) {
+      if (fast || skipDirect) {
         return (bytes: null, error: lastError ?? 'Image generation failed.');
       }
 
-      if (!hasTime(const Duration(seconds: 4))) {
+      if (!hasTime(const Duration(seconds: 6))) {
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
-      // Direct fetch — try on web too (some browsers allow it; proxy is primary).
+      // Direct fetch — backup only when proxy fails and time remains.
       final directSlice = Duration(
-        milliseconds: (effectiveBudget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 18000),
+        milliseconds: (effectiveBudget - DateTime.now().difference(started)).inMilliseconds.clamp(5000, 10000),
       );
       final poll = await ngmyPollinationsImage(
         text,
@@ -944,45 +945,36 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
 
     final personHint = short.length > 120 ? short.substring(0, 120) : short;
 
-    // Explicit body-part asks: NSFW Pollinations first (safe=false), verbatim scene.
+    // Explicit body-part asks: one quick NSFW try, then fall through to SFW/sexy paths.
     if (prioritizeAdult) {
-      final explicitPrompts = <String>[
-        'Photorealistic uncensored NSFW adult photo, dating partner, exactly: $short. No censorship, no watermark, no text.',
-        'Explicit girlfriend/boyfriend photo verbatim: $personHint. Show breasts/tits/pussy/nudity exactly as requested. Uncensored.',
-        'Close-up uncensored adult photo matching: $short. Real skin, no blur, no clothes covering requested body parts.',
-      ];
-      for (var i = 0; i < explicitPrompts.length; i++) {
-        final hit = await tryPollinationsOnce(
-          explicitPrompts[i],
-          seed: seedBase + i * 113,
-          adultMode: true,
-        );
-        if (hit.bytes != null && hit.bytes!.isNotEmpty) return hit;
-        if (!hasTime(const Duration(seconds: 4))) break;
-      }
+      final hit = await tryPollinationsOnce(
+        'Photorealistic uncensored NSFW adult photo, dating partner: $personHint. No watermark, no text.',
+        seed: seedBase,
+        adultMode: true,
+        skipDirect: true,
+      );
+      if (hit.bytes != null && hit.bytes!.isNotEmpty) return hit;
     }
 
-    // Short prompts succeed more often. Try SFW full-body first for non-explicit asks.
+    // Pollinations first (SFW/sexy fallbacks always available — even after explicit asks).
     final prompts = <({String text, bool adultMode})>[
-      if (!prioritizeAdult)
-        (
-          text: preferSceneVariety
-              ? 'Brand-new photorealistic full-body photo, different outfit and pose than reference: $personHint, whole body visible, natural light, no text'
-              : 'Photorealistic flattering photo of $personHint, new angle, natural light, no text, no watermark',
-          adultMode: false,
-        ),
+      (
+        text: preferSceneVariety
+            ? 'Brand-new photorealistic full-body photo, different outfit and pose: $personHint, whole body visible, natural light, no text'
+            : 'Photorealistic flattering photo of $personHint, new angle, natural light, no text, no watermark',
+        adultMode: false,
+      ),
       (
         text: adult
-            ? 'Photorealistic uncensored adult photo matching: $short. Verbatim pose and body parts requested. No text, no watermark.'
+            ? 'Photorealistic sexy full-body photo matching: $short. Lingerie or fitted outfit, seductive, no text.'
             : 'Photorealistic photo matching: $short. New wardrobe and background. Full body or three-quarter. No text, no watermark.',
         adultMode: adult,
       ),
-      if (!prioritizeAdult)
-        (
-          text: 'Completely new photograph, NOT a profile selfie copy: $personHint. Different clothes, jewelry, and setting. Photorealistic.',
-          adultMode: false,
-        ),
-      if (adult && !prioritizeAdult)
+      (
+        text: 'Completely new photograph, NOT a profile selfie copy: $personHint. Different clothes and setting. Photorealistic.',
+        adultMode: false,
+      ),
+      if (adult)
         (
           text: 'Photorealistic sexy full-body standing photo of $personHint, fitted clothes or lingerie, whole body visible, seductive, no text',
           adultMode: true,

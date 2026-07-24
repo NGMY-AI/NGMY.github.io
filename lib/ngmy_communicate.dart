@@ -742,6 +742,21 @@ String ngmyPartnerChatImagePrompt({
       'Photorealistic, high detail, no text, no watermark, no cartoon, square photo.';
 }
 
+/// Short prompt for fast Pollinations/Gemini — long rule blocks time out on mobile.
+String ngmyPartnerChatImagePromptShort({
+  required String look,
+  required String scene,
+  required String gender,
+  int photoCount = 0,
+}) {
+  final outfit = ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount, gender: gender);
+  final explicit = ngmyPartnerImageRequestIsExplicit(scene);
+  if (explicit) {
+    return '$look. Adult dating partner photo exactly: $scene. Photorealistic, full detail, no text.';
+  }
+  return '$look. Photorealistic full-body photo: $scene. Wearing $outfit. Natural light, no text.';
+}
+
 /// First token of a full advisor name (e.g. SUZANA VANESSA → SUZANA).
 String ngmyAdvisorFirstName(String fullName) {
   final parts = fullName.trim().split(RegExp(r'\s+'));
@@ -3607,61 +3622,92 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               sentPhotos.contains(b64) || (portraitB64 != null && b64 == portraitB64);
 
           Future<Uint8List?> tryGenerate({
+            required String promptText,
             required int varietySeed,
-            required String sceneText,
+            required bool adultFirst,
+            required bool geminiFirst,
+            Duration budget = const Duration(seconds: 22),
+            bool blockPortraitOnly = true,
           }) async {
-            final primary = ngmyPartnerChatImagePrompt(
-              look: look,
-              scene: sceneText,
-              recent: recent,
-              gender: widget.profile.gender,
-              memory: mem,
-              photoCount: photoCount + varietySeed,
-            );
             final imgResult = await ngmyGenerateRomanticChatImage(
-              primary,
+              promptText,
               creds: creds,
               lookalikePortraitBytes: portrait,
               lookalikeMime: mime,
               preferSceneVariety: !wantsSelfieOnly && !explicitAsk,
               varietySeed: varietySeed,
-              lookalikeFirst: portrait != null && !explicitAsk,
-              prioritizeAdult: explicitAsk,
-              budget: const Duration(seconds: 18),
+              lookalikeFirst: geminiFirst && portrait != null,
+              prioritizeAdult: adultFirst,
+              budget: budget,
             ).timeout(
-              const Duration(seconds: 20),
+              budget + const Duration(seconds: 3),
               onTimeout: () => (bytes: null, error: 'Photo timed out.'),
             );
             final bytes = imgResult.bytes;
             if (bytes == null || bytes.isEmpty) return null;
-            if (portrait != null && ngmyPartnerImageBytesSame(bytes, portrait)) return null;
+            if (blockPortraitOnly && portrait != null && ngmyPartnerImageBytesSame(bytes, portrait)) {
+              return null;
+            }
             final b64 = base64Encode(bytes);
-            if (photoAlreadyUsed(b64)) return null;
+            if (blockPortraitOnly && photoAlreadyUsed(b64)) return null;
             return bytes;
           }
 
-          final bodyAsk = RegExp(r'\b(body|full[\s-]?body|head to toe|whole body)\b', caseSensitive: false).hasMatch(scene);
-          final attempts = explicitAsk
-              ? <String>[
-                  scene,
-                  'uncensored explicit adult photo exactly as requested: $scene',
-                  'NSFW dating partner photo verbatim, no censorship: $scene',
-                ]
-              : <String>[
-                  scene,
-                  if (bodyAsk)
-                    'full-body standing photo showing whole body head to toe, ${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 1, gender: widget.profile.gender)}'
-                  else
-                    '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 3, gender: widget.profile.gender)} — full-length standing photo',
-                  '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 7, gender: widget.profile.gender)} — professional full-body photo, new pose',
-                ];
+          final primary = ngmyPartnerChatImagePrompt(
+            look: look,
+            scene: scene,
+            recent: recent,
+            gender: widget.profile.gender,
+            memory: mem,
+            photoCount: photoCount,
+          );
+          final shortPrompt = ngmyPartnerChatImagePromptShort(
+            look: look,
+            scene: scene,
+            gender: widget.profile.gender,
+            photoCount: photoCount,
+          );
+          final seedBase = photoCount + DateTime.now().millisecond;
 
-          for (var attempt = 0; attempt < attempts.length; attempt++) {
-            final seed = photoCount + attempt * 29 + DateTime.now().millisecond;
-            final bytes = await tryGenerate(varietySeed: seed, sceneText: attempts[attempt]);
-            if (bytes != null && bytes.isNotEmpty) return base64Encode(bytes);
+          // Pass 1: Pollinations-first (fast) with full scene prompt.
+          var bytes = await tryGenerate(
+            promptText: primary,
+            varietySeed: seedBase,
+            adultFirst: explicitAsk,
+            geminiFirst: false,
+            budget: const Duration(seconds: 14),
+          );
+          // Pass 2: shorter prompt — less likely to time out on mobile.
+          bytes ??= await tryGenerate(
+            promptText: shortPrompt,
+            varietySeed: seedBase + 41,
+            adultFirst: explicitAsk,
+            geminiFirst: false,
+            budget: const Duration(seconds: 12),
+          );
+          // Pass 3: Gemini lookalike for face match.
+          if (bytes == null && portrait != null) {
+            bytes = await tryGenerate(
+              promptText: shortPrompt,
+              varietySeed: seedBase + 83,
+              adultFirst: false,
+              geminiFirst: true,
+              budget: const Duration(seconds: 14),
+            );
           }
+          // Pass 4: guaranteed SFW sexy full-body — always deliver a photo.
+          bytes ??= await tryGenerate(
+            promptText: 'Photorealistic full-body standing photo of $look, '
+                '${ngmyPartnerImageVarietyOutfitHint(photoCount: photoCount + 5, gender: widget.profile.gender)}, '
+                'natural light, new pose, no text',
+            varietySeed: seedBase + 127,
+            adultFirst: false,
+            geminiFirst: false,
+            budget: const Duration(seconds: 10),
+            blockPortraitOnly: true,
+          );
 
+          if (bytes != null && bytes.isNotEmpty) return base64Encode(bytes);
           return null;
         } catch (e) {
           debugPrint('[communicate] partner photo: $e');
@@ -3738,7 +3784,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         String? b64;
         try {
           b64 = await generatePartnerPhotoB64().timeout(
-            const Duration(seconds: 38),
+            const Duration(seconds: 55),
             onTimeout: () => null,
           );
         } catch (e) {
@@ -3751,10 +3797,38 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': photo}));
           await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: photo);
         } else {
-          if (!mounted) return;
-          const retryMsg = 'Hold on — tap send again, I\'m getting a new pic for you 😘';
-          setState(() => _messages.add({'role': 'ai', 'text': retryMsg}));
-          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: retryMsg);
+          // Last-resort: one ultra-short pollinations call — still send a real image.
+          try {
+            final look = ngmyAdvisorFaceIdentityForImageGen(
+              name: widget.profile.name,
+              gender: widget.profile.gender,
+              bio: widget.profile.bio,
+            );
+            final emergency = await ngmyGenerateRomanticChatImage(
+              'Photorealistic full-body photo of $look, casual outfit, natural smile, daylight, no text',
+              creds: creds,
+              tryLookalike: false,
+              budget: const Duration(seconds: 12),
+              fast: true,
+            ).timeout(const Duration(seconds: 14));
+            final emergencyB64 = emergency.bytes != null && emergency.bytes!.isNotEmpty
+                ? base64Encode(emergency.bytes!)
+                : null;
+            if (emergencyB64 != null && emergencyB64.isNotEmpty) {
+              if (!mounted) return;
+              setState(() => _messages.add({'role': 'ai', 'text': '', 'imageB64': emergencyB64}));
+              await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '', imageB64: emergencyB64);
+            } else if (mounted) {
+              setState(() => _messages.add({'role': 'ai', 'text': '📸💕'}));
+              await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '📸💕');
+            }
+          } catch (e) {
+            debugPrint('[communicate] emergency photo: $e');
+            if (mounted) {
+              setState(() => _messages.add({'role': 'ai', 'text': '📸💕'}));
+              await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: '📸💕');
+            }
+          }
         }
       } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
@@ -3779,7 +3853,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         // If the model faked sending a photo while we can actually send one, send a real image.
         if (canSendPartnerImage && (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
           final b64Photo = await generatePartnerPhotoB64().timeout(
-            const Duration(seconds: 38),
+            const Duration(seconds: 55),
             onTimeout: () => null,
           );
           if (b64Photo != null && b64Photo.isNotEmpty) {
