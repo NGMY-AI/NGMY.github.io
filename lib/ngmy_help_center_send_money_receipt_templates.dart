@@ -296,10 +296,7 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                     title: 'RECEIVER',
                     rows: [
                       _Row('Full name', r.receiverName.isEmpty ? '—' : r.receiverName, bold: true),
-                      _Row(
-                        'Phone',
-                        r.receiverPhone.isEmpty ? '—' : ngmyHelpCenterDisplayPhone(r.receiverPhone, country: r.receiverCountry),
-                      ),
+                      _Row('Phone', r.receiverPhone.isEmpty ? '—' : r.receiverPhone),
                       _Row('Destination', r.receiverCountry.isEmpty ? '—' : r.receiverCountry, bold: true),
                     ],
                   ),

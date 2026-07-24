@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_help_center.dart';
@@ -132,15 +131,13 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   NgmyHelpCenterPhonePattern get _receiverPhonePattern =>
       ngmyHelpCenterPhonePatternForCountry(_receiverCountryC.text.trim());
 
+  String get _fullReceiverPhone =>
+      ngmyHelpCenterFormatReceiverFull(_receiverPhoneC.text, _receiverPhonePattern);
+
   void _onReceiverCountryChanged(String value) {
     _resetCashApp();
-    final pattern = ngmyHelpCenterPhonePatternForCountry(value.trim());
-    final current = _receiverPhoneC.text.trim();
-    if (current.isEmpty || current == '+') {
-      _receiverPhoneC.text = '+${pattern.dialCode} ';
-    } else {
-      _receiverPhoneC.text = ngmyHelpCenterFormatPhone(current, pattern);
-    }
+    final local = ngmyHelpCenterReceiverLocalFromStored(_receiverPhoneC.text, value);
+    _receiverPhoneC.text = local;
   }
 
   @override
@@ -264,8 +261,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   bool get _canShowReceipt {
     if (!_isSendMoney) return false;
     if (_receiverC.text.trim().isEmpty) return false;
-    if (ngmyHelpCenterDigitsOnly(_receiverPhoneC.text).length < 9) return false;
     if (_receiverCountryC.text.trim().isEmpty) return false;
+    if (_receiverPhonePattern.dialCode.isEmpty) return false;
+    if (ngmyHelpCenterReceiverLocalDigitCount(_receiverPhoneC.text) < 9) return false;
     if (_transferAmount <= 0) return false;
     if (ngmyHelpCenterDigitsOnly(_resolvedSenderPhone).length < 6) return false;
     return true;
@@ -278,7 +276,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       senderPhone: _resolvedSenderPhone,
       senderEmail: _resolvedSenderEmail,
       receiverName: _receiverC.text,
-      receiverPhone: _receiverPhoneC.text,
+      receiverPhone: _fullReceiverPhone,
       receiverCountry: _receiverCountryC.text,
       transferAmountText: _priceC.text,
       serviceName: _selected?.name ?? 'Send Money',
@@ -288,7 +286,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   Future<void> _saveSavedRecipientFromForm() async {
     await ngmySaveHelpCenterSavedRecipient(
       receiverName: _receiverC.text,
-      receiverPhone: _receiverPhoneC.text,
+      receiverPhone: _fullReceiverPhone,
       receiverCountry: _receiverCountryC.text,
     );
     final saved = await ngmyLoadHelpCenterSavedRecipients();
@@ -299,9 +297,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     HapticFeedback.lightImpact();
     setState(() {
       _receiverC.text = entry.receiverName;
-      _receiverPhoneC.text = ngmyHelpCenterFormatPhone(
+      _receiverPhoneC.text = ngmyHelpCenterReceiverLocalFromStored(
         entry.receiverPhone,
-        ngmyHelpCenterPhonePatternForCountry(entry.receiverCountry),
+        entry.receiverCountry,
       );
       _receiverCountryC.text = entry.receiverCountry;
       _cashAppOpened = false;
@@ -332,9 +330,12 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           await ngmySaveHelpCenterReceiptTemplateId(id);
           if (mounted) setState(() {});
         },
+        onSaveRecipient: () async {
+          await _saveSavedRecipientFromForm();
+          if (mounted) _snack('Recipient saved — tap the people icon anytime to reuse.');
+        },
       ),
     );
-    if (_canShowReceipt) await _saveSavedRecipientFromForm();
   }
 
   bool get _canContact {
@@ -342,8 +343,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     if (s == null) return false;
     if (_isSendMoney) {
       if (_receiverC.text.trim().isEmpty) return false;
-      if (ngmyHelpCenterDigitsOnly(_receiverPhoneC.text).length < 9) return false;
       if (_receiverCountryC.text.trim().isEmpty) return false;
+      if (_receiverPhonePattern.dialCode.isEmpty) return false;
+      if (ngmyHelpCenterReceiverLocalDigitCount(_receiverPhoneC.text) < 9) return false;
       if (_senderCashAppC.text.trim().isEmpty) return false;
       if (ngmyHelpCenterDigitsOnly(_resolvedSenderPhone).length < 6) return false;
       if ((double.tryParse(_priceC.text.trim()) ?? 0) <= 0) return false;
@@ -375,7 +377,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       clientEmail: widget.clientEmail,
       clientPhone: widget.clientPhone,
       receiverName: _receiverC.text,
-      receiverPhone: _receiverPhoneC.text,
+      receiverPhone: _fullReceiverPhone,
       receiverCountry: _receiverCountryC.text,
       senderCashAppTag: _senderCashAppC.text,
       helpTopic: _helpTopicC.text,
@@ -895,17 +897,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               isDark,
               onChanged: _onReceiverCountryChanged,
               textCapitalization: TextCapitalization.words,
-              hint: 'e.g. Tanzania, DRC Congo, Kenya',
+              hint: 'e.g. Tanzania, Ghana, DRC Congo, Kenya, Nigeria',
             ),
             const SizedBox(height: 10),
-            _phoneField(
-              'Receiver phone number *',
-              _receiverPhoneC,
-              isDark,
-              pattern: _receiverPhonePattern,
-              fieldKey: ValueKey('recv-${_receiverPhonePattern.dialCode}'),
-              onChanged: (_) => _resetCashApp(),
-            ),
+            _receiverPhoneField(isDark),
             const SizedBox(height: 10),
             _field('Transfer amount (\$) *', _priceC, isDark, onChanged: (_) => _resetCashApp()),
             const SizedBox(height: 10),
@@ -1070,6 +1065,27 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _receiverPhoneField(bool isDark) {
+    final pattern = _receiverPhonePattern;
+    final prefix = pattern.dialCode.isNotEmpty ? '+${pattern.dialCode} ' : null;
+    return TextField(
+      key: ValueKey('recv-${pattern.dialCode}'),
+      controller: _receiverPhoneC,
+      onChanged: (_) => _resetCashApp(),
+      keyboardType: TextInputType.phone,
+      inputFormatters: const [NgmyHelpCenterReceiverLocalFormatter()],
+      decoration: InputDecoration(
+        labelText: 'Receiver phone number *',
+        hintText: ngmyHelpCenterPhoneHint(pattern, receiverLocal: true),
+        prefixText: prefix,
+        prefixIcon: prefix == null ? const Icon(Icons.phone_rounded, size: 18) : null,
+        filled: true,
+        fillColor: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
   }
@@ -1259,6 +1275,7 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
     required this.savedRecipients,
     required this.onApplyRecipient,
     required this.onTemplateChanged,
+    required this.onSaveRecipient,
   });
 
   final NgmyHelpCenterSendMoneyReceipt receipt;
@@ -1268,6 +1285,7 @@ class _SendMoneyReceiptDialog extends StatefulWidget {
   final List<NgmyHelpCenterSavedRecipient> savedRecipients;
   final ValueChanged<NgmyHelpCenterSavedRecipient> onApplyRecipient;
   final ValueChanged<String> onTemplateChanged;
+  final Future<void> Function() onSaveRecipient;
 
   @override
   State<_SendMoneyReceiptDialog> createState() => _SendMoneyReceiptDialogState();
@@ -1317,14 +1335,11 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
     }
   }
 
-  Future<void> _shareReceipt() async {
+  Future<void> _saveRecipient() async {
     if (_busy || !widget.isComplete) return;
     setState(() => _busy = true);
     try {
-      await Share.share(
-        widget.receipt.toShareText(),
-        subject: 'NGMY Money Transfer Receipt ${widget.receipt.reference}',
-      );
+      await widget.onSaveRecipient();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1389,7 +1404,9 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                             ),
                             title: Text(entry.receiverName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                             subtitle: Text(
-                              '${entry.receiverCountry} · ${ngmyHelpCenterFormatPhone(entry.receiverPhone, ngmyHelpCenterPhonePatternForCountry(entry.receiverCountry))}',
+                              entry.receiverPhone.isEmpty
+                                  ? entry.receiverCountry
+                                  : '${entry.receiverCountry} · ${entry.receiverPhone}',
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
                             ),
                             trailing: const Icon(Icons.north_west_rounded, color: Colors.white54, size: 16),
@@ -1487,7 +1504,7 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.45)),
                             ),
                             child: Text(
-                              'Fill receiver name, phone, country, transfer amount, and your phone to download or share.',
+                              'Fill receiver name, phone, country, transfer amount, and your phone to download or save.',
                               style: TextStyle(fontSize: 10, height: 1.35, fontWeight: FontWeight.w600, color: widget.isDark ? Colors.amber.shade100 : const Color(0xFFB45309)),
                             ),
                           ),
@@ -1522,9 +1539,9 @@ class _SendMoneyReceiptDialogState extends State<_SendMoneyReceiptDialog> {
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
-                        onPressed: (_busy || !widget.isComplete) ? null : _shareReceipt,
-                        icon: const Icon(Icons.share_rounded),
-                        label: const Text('Share receipt', style: TextStyle(fontWeight: FontWeight.w800)),
+                        onPressed: (_busy || !widget.isComplete) ? null : _saveRecipient,
+                        icon: const Icon(Icons.person_add_alt_1_rounded),
+                        label: const Text('Save recipient', style: TextStyle(fontWeight: FontWeight.w800)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: widget.isDark ? Colors.white : const Color(0xFF0F172A),
                           side: BorderSide(color: border),
