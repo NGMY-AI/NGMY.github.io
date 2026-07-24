@@ -875,6 +875,7 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   int varietySeed = 0,
   bool fast = false,
   bool tryLookalike = true,
+  bool lookalikeFirst = false,
   Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
@@ -966,6 +967,42 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     ];
 
     final promptLimit = fast ? 2 : prompts.length;
+
+    Future<({Uint8List? bytes, String? error})> tryGeminiLookalike() async {
+      if (!tryLookalike || !hasPortrait || key.isEmpty) {
+        return (bytes: null, error: lastError);
+      }
+      if (!hasTime(lookalikeFirst ? const Duration(seconds: 5) : const Duration(seconds: 8))) {
+        return (bytes: null, error: lastError ?? 'Photo timed out.');
+      }
+      final lookalikePrompt = preferSceneVariety
+          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
+              'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
+              'CRITICAL: full-body standing shot — whole body head to toe in frame, NOT a profile selfie. '
+              'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
+          : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
+      try {
+        final remaining = effectiveBudget - DateTime.now().difference(started);
+        final geminiCap = lookalikeFirst ? const Duration(seconds: 16) : const Duration(seconds: 12);
+        final proxied = await _callGeminiOutfitViaProxy(
+          apiKey: key,
+          personBytes: lookalikePortraitBytes!,
+          personMime: lookalikeMime,
+          prompt: lookalikePrompt,
+        ).timeout(remaining > geminiCap ? remaining : geminiCap);
+        if (proxied.bytes != null && proxied.bytes!.isNotEmpty) return proxied;
+        lastError = proxied.error ?? lastError;
+      } catch (e) {
+        lastError = _extractApiErrorMessage(e);
+      }
+      return (bytes: null, error: lastError);
+    }
+
+    if (lookalikeFirst) {
+      final geminiHit = await tryGeminiLookalike();
+      if (geminiHit.bytes != null && geminiHit.bytes!.isNotEmpty) return geminiHit;
+    }
+
     for (var i = 0; i < promptLimit; i++) {
       final hit = await tryPollinationsOnce(
         prompts[i].text,
@@ -976,31 +1013,14 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       if (!hasTime(const Duration(seconds: 5))) break;
     }
 
-    // Gemini lookalike — second fast attempt only (keeps "typing…" under ~15s on first try).
-    if (tryLookalike &&
+    // Gemini lookalike — after Pollinations unless lookalikeFirst already ran.
+    if (!lookalikeFirst &&
+        tryLookalike &&
         hasPortrait &&
         key.isNotEmpty &&
         hasTime(fast ? const Duration(seconds: 4) : const Duration(seconds: 8))) {
-      final lookalikePrompt = preferSceneVariety
-          ? 'Reference image is FACE IDENTITY ONLY — do NOT copy its outfit, jewelry, pose, background, or selfie framing. '
-              'Create ONE BRAND-NEW photorealistic photograph of this exact person. '
-              'CRITICAL: full-body or three-quarter standing pose — whole body in frame, not a profile selfie. '
-              'Different clothes and setting from the reference. Request: $short. Natural lighting. No text, no watermark.'
-          : 'Reference is face only — new photo, new outfit and angle. $short No text, no watermark.';
-      try {
-        final remaining = effectiveBudget - DateTime.now().difference(started);
-        final geminiCap = fast ? const Duration(seconds: 10) : const Duration(seconds: 12);
-        final proxied = await _callGeminiOutfitViaProxy(
-          apiKey: key,
-          personBytes: lookalikePortraitBytes,
-          personMime: lookalikeMime,
-          prompt: lookalikePrompt,
-        ).timeout(remaining > geminiCap ? remaining : geminiCap);
-        if (proxied.bytes != null && proxied.bytes!.isNotEmpty) return proxied;
-        lastError = proxied.error ?? lastError;
-      } catch (e) {
-        lastError = _extractApiErrorMessage(e);
-      }
+      final geminiHit = await tryGeminiLookalike();
+      if (geminiHit.bytes != null && geminiHit.bytes!.isNotEmpty) return geminiHit;
     }
 
     if (!fast && key.isNotEmpty && creds != null && hasTime(const Duration(seconds: 8))) {
