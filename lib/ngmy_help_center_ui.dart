@@ -832,13 +832,34 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           Row(
             children: [
               Expanded(
-                child: isMoney && widget.isAdmin
-                    ? Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _openSendMoneyReceipt,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Padding(
+                child: isMoney
+                    ? widget.isAdmin
+                        ? Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _openSendMoneyReceipt,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.receipt_long_rounded, color: _accent, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'REQUEST SUMMARY',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        letterSpacing: 1.6,
+                                        fontWeight: FontWeight.w900,
+                                        color: isDark ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
                             child: Row(
                               children: [
@@ -855,16 +876,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      )
+                          )
                     : Row(
                         children: [
-                          Icon(
-                            Icons.receipt_long_rounded,
-                            color: isMoney ? (isDark ? Colors.white38 : Colors.black38) : _accent,
-                            size: 20,
-                          ),
+                          const Icon(Icons.receipt_long_rounded, color: _accent, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'REQUEST SUMMARY',
@@ -872,9 +887,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                               fontSize: 10,
                               letterSpacing: 1.6,
                               fontWeight: FontWeight.w900,
-                              color: isMoney
-                                  ? (isDark ? Colors.white38 : Colors.black38)
-                                  : (isDark ? Colors.white70 : Colors.black54),
+                              color: isDark ? Colors.white70 : Colors.black54,
                             ),
                           ),
                         ],

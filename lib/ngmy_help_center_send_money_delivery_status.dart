@@ -167,8 +167,6 @@ class NgmyTransferDeliveryStatusCard extends StatelessWidget {
                       color: Color(0xFF1B5E20),
                       fontWeight: FontWeight.w900,
                       fontSize: 14,
-                      decoration: TextDecoration.underline,
-                      decorationColor: Color(0xFF2E7D32),
                     ),
                   ),
                   const SizedBox(width: 4),
