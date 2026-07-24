@@ -304,7 +304,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Tap fields to edit names & amounts. Use Sign for signatures. Print from the View tab.'),
+        content: Text('Tap fields to edit names. Tap signature boxes to sign or re-sign. Print from the View tab.'),
         duration: Duration(seconds: 4),
       ),
     );
@@ -1520,8 +1520,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addSignature() async {
-    final imageRef = await ngmySlidesCaptureSignature(context);
-    if (imageRef == null || _currentSlide == null) return;
+    final result = await ngmySlidesCaptureSignature(context);
+    if (result == null || _currentSlide == null) return;
     _mutate(() {
       final el = NgmySlideElement(
         id: NgmySlidesTemplates.newId(),
@@ -1530,7 +1530,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         y: 0.62,
         w: 0.35,
         h: 0.22,
-        imageRef: imageRef,
+        imageRef: result.imageRef,
         fileName: _activeDeck?.isLockedTemplateDoc == true ? '${kMarriageSignPrefix}placed' : 'Signature',
       );
       _currentSlide!.elements.add(el);
@@ -1538,10 +1538,31 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
+  Color? _deckSignatureInkColor() {
+    final argb = _activeDeck?.signatureInkColor;
+    return argb == null ? null : Color(argb);
+  }
+
+  void _rememberFirstDocumentSignatureStyle(NgmySlidesSignatureResult result) {
+    final deck = _activeDeck;
+    if (deck == null || !deck.isLockedTemplateDoc || deck.signatureStrokeWidth != null) return;
+    deck.signatureStrokeWidth = result.strokeWidth;
+    deck.signatureInkColor = result.color.toARGB32();
+  }
+
+  Future<NgmySlidesSignatureResult?> _captureDocumentSignature() {
+    return ngmySlidesCaptureSignature(
+      context,
+      initialStrokeWidth: _activeDeck?.signatureStrokeWidth,
+      initialInkColor: _deckSignatureInkColor(),
+    );
+  }
+
   Future<void> _addMarriageSignatureAtZone(NgmySlideElement zone) async {
-    final imageRef = await ngmySlidesCaptureSignature(context);
-    if (imageRef == null || _currentSlide == null) return;
+    final result = await _captureDocumentSignature();
+    if (result == null || _currentSlide == null) return;
     _mutate(() {
+      _rememberFirstDocumentSignatureStyle(result);
       final el = NgmySlideElement(
         id: NgmySlidesTemplates.newId(),
         type: NgmySlideElementType.signature,
@@ -1549,11 +1570,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         y: zone.y,
         w: zone.w,
         h: zone.h,
-        imageRef: imageRef,
+        imageRef: result.imageRef,
         fileName: '${kMarriageSignPrefix}placed_${zone.fileName.replaceFirst(kMarriageSignPrefix, '')}',
       );
       _currentSlide!.elements.add(el);
       _currentSlide!.elements.removeWhere((e) => e.id == zone.id);
+      _selectedElementId = null;
+    });
+  }
+
+  Future<void> _redoMarriageSignature(NgmySlideElement placed) async {
+    final result = await _captureDocumentSignature();
+    if (result == null || _currentSlide == null) return;
+    _mutate(() {
+      _rememberFirstDocumentSignatureStyle(result);
+      placed.imageRef = result.imageRef;
       _selectedElementId = null;
     });
   }
@@ -3606,6 +3637,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   Widget _canvasElement(NgmySlideElement e, double cw, double ch, bool isDark) {
     final marriage = _activeDeck?.isLockedTemplateDoc == true;
     final signZone = marriage && ngmyMarriageElementIsSignZone(e);
+    final placedSign = marriage && ngmyMarriageElementIsPlacedSign(e);
     final selectable = !marriage || _marriageElementSelectable(e);
     final movable = !marriage || _marriageElementMovable(e);
     final selected = selectable && _selectedElementId == e.id;
@@ -3623,6 +3655,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         onTap: () {
           if (signZone) {
             unawaited(_addMarriageSignatureAtZone(e));
+            return;
+          }
+          if (placedSign) {
+            unawaited(_redoMarriageSignature(e));
             return;
           }
           if (selectable) _selectElement(e.id);

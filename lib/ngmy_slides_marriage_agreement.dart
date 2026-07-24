@@ -18,6 +18,10 @@ bool ngmyMarriageElementIsSignZone(NgmySlideElement e) =>
     !e.fileName.startsWith('${kMarriageSignPrefix}placed_') &&
     e.type != NgmySlideElementType.signature;
 
+bool ngmyMarriageElementIsPlacedSign(NgmySlideElement e) =>
+    e.type == NgmySlideElementType.signature &&
+    e.fileName.startsWith('${kMarriageSignPrefix}placed_');
+
 /// Pack elements on the same row closer after a name field shrinks.
 void ngmyMarriagePackRow(NgmySlide slide, double anchorY) {
   const yTol = 0.03;

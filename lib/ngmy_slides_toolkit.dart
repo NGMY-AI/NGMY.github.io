@@ -129,15 +129,33 @@ Future<String?> ngmySlidesSignatureToImage(
   }
 }
 
-Future<String?> ngmySlidesCaptureSignature(BuildContext context) async {
+class NgmySlidesSignatureResult {
+  const NgmySlidesSignatureResult({
+    required this.imageRef,
+    required this.strokeWidth,
+    required this.color,
+  });
+
+  final String imageRef;
+  final double strokeWidth;
+  final Color color;
+}
+
+Future<NgmySlidesSignatureResult?> ngmySlidesCaptureSignature(
+  BuildContext context, {
+  double? initialStrokeWidth,
+  Color? initialInkColor,
+}) async {
   final points = <Offset?>[];
   Size? size;
-  var color = const Color(0xFF111827);
-  var strokeWidth = 3.5;
+  var color = initialInkColor ?? const Color(0xFF111827);
+  var strokeWidth = initialStrokeWidth ?? 3.5;
   await showNgmyFullscreenSignature(
     context,
     title: 'Sign document',
     points: points,
+    initialStrokeWidth: initialStrokeWidth,
+    initialInkColor: initialInkColor,
     onSave: (saved, canvasSize, inkColor, inkStrokeWidth) {
       points
         ..clear()
@@ -148,7 +166,9 @@ Future<String?> ngmySlidesCaptureSignature(BuildContext context) async {
     },
   );
   if (points.whereType<Offset>().isEmpty || size == null) return null;
-  return ngmySlidesSignatureToImage(points, size!, color: color, strokeWidth: strokeWidth);
+  final imageRef = await ngmySlidesSignatureToImage(points, size!, color: color, strokeWidth: strokeWidth);
+  if (imageRef == null) return null;
+  return NgmySlidesSignatureResult(imageRef: imageRef, strokeWidth: strokeWidth, color: color);
 }
 
 String ngmySlidesPrintHtml(NgmySlideDeck deck) {

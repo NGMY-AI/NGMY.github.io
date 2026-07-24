@@ -8,6 +8,8 @@ Future<void> showNgmyFullscreenSignature(
   required String title,
   required List<Offset?> points,
   required void Function(List<Offset?> saved, Size canvasSize, Color color, double strokeWidth) onSave,
+  double? initialStrokeWidth,
+  Color? initialInkColor,
 }) async {
   await showDialog<void>(
     context: context,
@@ -16,6 +18,8 @@ Future<void> showNgmyFullscreenSignature(
       title: title,
       initialPoints: List<Offset?>.from(points),
       onSave: onSave,
+      initialStrokeWidth: initialStrokeWidth,
+      initialInkColor: initialInkColor,
     ),
   );
 }
@@ -24,11 +28,15 @@ class _FullscreenSignatureDialog extends StatefulWidget {
   final String title;
   final List<Offset?> initialPoints;
   final void Function(List<Offset?>, Size canvasSize, Color color, double strokeWidth) onSave;
+  final double? initialStrokeWidth;
+  final Color? initialInkColor;
 
   const _FullscreenSignatureDialog({
     required this.title,
     required this.initialPoints,
     required this.onSave,
+    this.initialStrokeWidth,
+    this.initialInkColor,
   });
 
   @override
@@ -47,6 +55,8 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
   void initState() {
     super.initState();
     _points = List<Offset?>.from(widget.initialPoints);
+    if (widget.initialStrokeWidth != null) _strokeWidth = widget.initialStrokeWidth!;
+    if (widget.initialInkColor != null) _inkColor = widget.initialInkColor!;
     // Forcing a landscape orientation lock here (via the browser's Screen
     // Orientation API on web) only actually works inside true browser
     // fullscreen, which this dialog isn't — the attempted lock could fail

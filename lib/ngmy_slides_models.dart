@@ -316,6 +316,8 @@ class NgmySlideDeck {
     this.autoAdvanceSeconds = 5,
     this.deckKind,
     this.marriageState,
+    this.signatureStrokeWidth,
+    this.signatureInkColor,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -331,6 +333,11 @@ class NgmySlideDeck {
   /// e.g. `marriage_agreement` for Congolese marriage certificates.
   String? deckKind;
   String? marriageState;
+  /// Ink stroke width chosen on the document's first signature — reused as
+  /// the default for every later signature box on this deck.
+  double? signatureStrokeWidth;
+  /// ARGB ink color from the first signature (same propagation as stroke).
+  int? signatureInkColor;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
 
@@ -351,6 +358,8 @@ class NgmySlideDeck {
         updatedAt: updatedAt,
         deckKind: deckKind,
         marriageState: marriageState,
+        signatureStrokeWidth: signatureStrokeWidth,
+        signatureInkColor: signatureInkColor,
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -363,6 +372,8 @@ class NgmySlideDeck {
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         if (deckKind != null) 'deckKind': deckKind,
         if (marriageState != null) 'marriageState': marriageState,
+        if (signatureStrokeWidth != null) 'signatureStrokeWidth': signatureStrokeWidth,
+        if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -375,6 +386,8 @@ class NgmySlideDeck {
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
         deckKind: json['deckKind']?.toString(),
         marriageState: json['marriageState']?.toString(),
+        signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
+        signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))
