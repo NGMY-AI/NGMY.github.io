@@ -745,19 +745,20 @@ Future<({Uint8List? bytes, String? error})> ngmyPollinationsImage(
   String prompt, {
   bool allowAdult = false,
   int? seed,
-  Duration timeout = const Duration(seconds: 22),
+  Duration timeout = const Duration(seconds: 28),
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Enter an image description.');
-  // Keep URL manageable — scene-first prompts must keep pose/outfit details.
-  final clipped = p.length > 500 ? '${p.substring(0, 497)}...' : p;
+  // Keep URL short — long NSFW prompts fail more often and waste the typing wait.
+  final clipped = p.length > 320 ? '${p.substring(0, 317)}...' : p;
   final s = seed ?? DateTime.now().millisecondsSinceEpoch;
   try {
     final params = <String, String>{
       'width': '768',
       'height': '768',
       'nologo': 'true',
-      'enhance': 'true',
+      // enhance slows mobile web and often times out — keep it off for chat pics.
+      'enhance': 'false',
       'seed': '$s',
       if (allowAdult) 'safe': 'false',
     };
@@ -862,71 +863,64 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
   }
 }
 
-/// Romantic partner chat images — must honor requested pose/scene.
-/// Prefer text scene generation (unique seed) so results are not clones of the
-/// profile headshot. Lookalike reference is optional and skipped for variety
-/// requests. Hard [budget] so chat typing cannot hang forever.
-/// Never throws; callers always get bytes or a soft error.
+/// Romantic partner chat images — deliver a real photo every time when possible.
+/// Order: short Pollinations (proxy + direct) → Gemini lookalike → soft retry.
+/// Hard [budget] so chat typing cannot hang forever. Never throws.
 Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
   String prompt, {
   NgmyAiCredentials? creds,
   Uint8List? lookalikePortraitBytes,
   String lookalikeMime = 'image/jpeg',
   bool preferSceneVariety = true,
-  Duration budget = const Duration(seconds: 40),
+  Duration budget = const Duration(seconds: 35),
 }) async {
   final p = prompt.trim();
   if (p.isEmpty) return (bytes: null, error: 'Empty image prompt.');
   final adult = ngmyPartnerImagePromptLooksAdult(p);
-  final short = p.length > 380 ? '${p.substring(0, 377)}...' : p;
+  final short = p.length > 280 ? '${p.substring(0, 277)}...' : p;
   String? lastError;
   final started = DateTime.now();
-  // Unique seed every request so "standing" / "body" never reuse a cached headshot.
   final seedBase = DateTime.now().microsecondsSinceEpoch ^ short.hashCode;
 
-  bool hasTime([Duration need = const Duration(seconds: 4)]) =>
+  bool hasTime([Duration need = const Duration(seconds: 3)]) =>
       DateTime.now().difference(started) + need <= budget;
 
   try {
     final key = creds?.apiKey.trim() ?? '';
-    // For standing/body/outfit asks, do NOT feed the profile selfie into the
-    // model — that forces another headshot of the same crop.
-    final useLookalike = !preferSceneVariety &&
-        lookalikePortraitBytes != null &&
-        lookalikePortraitBytes.isNotEmpty;
+    final hasPortrait = lookalikePortraitBytes != null && lookalikePortraitBytes.isNotEmpty;
 
     Future<({Uint8List? bytes, String? error})> tryPollinationsOnce(
       String text, {
       required int seed,
+      bool adultMode = false,
     }) async {
-      if (!hasTime(const Duration(seconds: 5))) {
+      if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: 'Photo timed out.');
       }
       final slice = Duration(
-        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(5000, 22000),
+        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 20000),
       );
-      if (key.isNotEmpty) {
-        final viaProxy = await _callImageActionViaProxy(
-          apiKey: key,
-          action: 'pollinationsImage',
-          prompt: text,
-          allowAdult: adult,
-          timeout: slice,
-        );
-        if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
-        lastError = viaProxy.error ?? lastError;
-      }
-      // Direct Pollinations often fails CORS on web — skip wasting budget there.
-      if (kIsWeb) return (bytes: null, error: lastError ?? 'Image generation failed.');
+      // Proxy works without a real Gemini key for pollinationsImage — always try.
+      final viaProxy = await _callImageActionViaProxy(
+        apiKey: key.isNotEmpty ? key : 'pollinations',
+        action: 'pollinationsImage',
+        prompt: text,
+        allowAdult: adultMode,
+        timeout: slice,
+      );
+      if (viaProxy.bytes != null && viaProxy.bytes!.isNotEmpty) return viaProxy;
+      lastError = viaProxy.error ?? lastError;
+
       if (!hasTime(const Duration(seconds: 4))) {
         return (bytes: null, error: lastError ?? 'Photo timed out.');
       }
+      // Direct fetch — try on web too (some browsers allow it; proxy is primary).
       final directSlice = Duration(
-        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(5000, 20000),
+        milliseconds: (budget - DateTime.now().difference(started)).inMilliseconds.clamp(6000, 18000),
       );
       final poll = await ngmyPollinationsImage(
         text,
-        allowAdult: adult,
+        allowAdult: adultMode,
         seed: seed,
         timeout: directSlice,
       );
@@ -935,53 +929,68 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       return (bytes: null, error: lastError ?? 'Image generation failed.');
     }
 
-    // Punchy scene-first prompts (short = better success rate on image APIs).
-    final prompts = <String>[
+    // Short prompts succeed more often. Try SFW full-body first even for "body"
+    // asks so the partner still gets a photo if NSFW endpoints refuse.
+    final personHint = short.length > 120 ? short.substring(0, 120) : short;
+    final prompts = <({String text, bool adultMode})>[
+      (
+        text: preferSceneVariety
+            ? 'Photorealistic full-body standing photo of $personHint, whole body visible head to toe, stylish casual clothes, natural light, looking at camera, no text, no watermark'
+            : 'Photorealistic flattering photo of $personHint, natural light, no text, no watermark',
+        adultMode: false,
+      ),
+      (
+        text: 'Photorealistic photo matching: $short. Full body or three-quarter if standing/body. No text, no watermark.',
+        adultMode: adult,
+      ),
       if (adult)
-        'Photorealistic full-body sexy photo of the woman/man described here, standing, whole body visible, adult partner vibe, uncensored: $short. No text, no watermark, not a selfie crop.'
-      else if (preferSceneVariety)
-        'Photorealistic NEW photo, whole body or three-quarter standing pose matching this request exactly: $short. Not a selfie. Not a headshot. No text, no watermark.'
-      else
-        short,
-      if (preferSceneVariety)
-        adult
-            ? 'Full-length standing body photo, seductive, photorealistic, same person identity as described, uncensored, square photo, no text'
-            : 'Full-length standing photo outdoors in everyday clothes, photorealistic, whole body in frame, natural light, no text, no watermark',
+        (
+          text: 'Photorealistic sexy full-body standing photo of $personHint, fitted clothes or lingerie, whole body visible, seductive, no text',
+          adultMode: true,
+        ),
     ];
 
     for (var i = 0; i < prompts.length; i++) {
-      final hit = await tryPollinationsOnce(prompts[i], seed: seedBase + i * 97);
+      final hit = await tryPollinationsOnce(
+        prompts[i].text,
+        seed: seedBase + i * 91,
+        adultMode: prompts[i].adultMode,
+      );
       if (hit.bytes != null && hit.bytes!.isNotEmpty) return hit;
-      if (!hasTime(const Duration(seconds: 6))) break;
+      if (!hasTime(const Duration(seconds: 5))) break;
     }
 
-    // Text-only image API (no profile reference) — better pose variety than lookalike.
-    if (key.isNotEmpty && creds != null && hasTime(const Duration(seconds: 10))) {
-      try {
-        final remaining = budget - DateTime.now().difference(started);
-        final api = await ngmyAiGenerateImage(
-          creds,
-          prompts.first,
-        ).timeout(remaining > const Duration(seconds: 12) ? remaining : const Duration(seconds: 12));
-        if (api.bytes != null && api.bytes!.isNotEmpty) return api;
-        lastError = api.error ?? lastError;
-      } catch (e) {
-        lastError = _extractApiErrorMessage(e);
-      }
-    }
-
-    // Lookalike only for explicit selfie asks (avoids cloning the profile headshot).
-    if (useLookalike && key.isNotEmpty && hasTime(const Duration(seconds: 8))) {
+    // Gemini lookalike — best chance on web when Pollinations proxy is down.
+    // Always try when we have a portrait (selfie OR standing/body request).
+    if (hasPortrait && key.isNotEmpty && hasTime(const Duration(seconds: 8))) {
+      final lookalikePrompt = preferSceneVariety
+          ? 'Reference image is FACE IDENTITY ONLY. Create ONE NEW photorealistic photograph of this exact person. '
+              'CRITICAL: full-body or three-quarter standing pose — whole body in frame, not a selfie headshot. '
+              'Request: $short. Natural lighting. No text, no watermark. Output only the photo.'
+          : 'Reference image is this person. Create ONE NEW photorealistic photo of them. $short No text, no watermark.';
       try {
         final remaining = budget - DateTime.now().difference(started);
         final proxied = await _callGeminiOutfitViaProxy(
           apiKey: key,
           personBytes: lookalikePortraitBytes,
           personMime: lookalikeMime,
-          prompt: 'Same face as reference. New photo: $short No text.',
-        ).timeout(remaining > const Duration(seconds: 10) ? remaining : const Duration(seconds: 10));
+          prompt: lookalikePrompt,
+        ).timeout(remaining > const Duration(seconds: 12) ? remaining : const Duration(seconds: 12));
         if (proxied.bytes != null && proxied.bytes!.isNotEmpty) return proxied;
         lastError = proxied.error ?? lastError;
+      } catch (e) {
+        lastError = _extractApiErrorMessage(e);
+      }
+    }
+
+    if (key.isNotEmpty && creds != null && hasTime(const Duration(seconds: 8))) {
+      try {
+        final remaining = budget - DateTime.now().difference(started);
+        final api = await ngmyAiGenerateImage(creds, prompts.first.text).timeout(
+          remaining > const Duration(seconds: 10) ? remaining : const Duration(seconds: 10),
+        );
+        if (api.bytes != null && api.bytes!.isNotEmpty) return api;
+        lastError = api.error ?? lastError;
       } catch (e) {
         lastError = _extractApiErrorMessage(e);
       }
