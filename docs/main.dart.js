@@ -289013,7 +289013,7 @@ l=A.J(m.k(l+s*0.22),B.r,1.25)
 m=A.m(10)
 n=A.q(h,A.V(r.glQ()?B.xD:B.us,B.c,h,h,22),B.j,h,h,new A.o(h,h,h,m,h,new A.a7(B.a0,B.a2,B.E,n,h,h),B.o),h,36,h,h,h,h,h,52)
 m=r.b
-m=A.d(m,h,h,h,h,h,h,A.l(h,h,p?B.c:B.U,h,h,h,h,h,h,h,h,h,h,h,B.K,h,h,!0,h,h,h,h,h,h,h,h),h,h,h)
+m=A.d(m.toUpperCase(),h,h,h,h,h,h,A.l(h,h,p?B.c:B.U,h,h,h,h,h,h,h,h,h,h,h,B.K,h,h,!0,h,h,h,h,h,h,h,h),h,h,h)
 k=r.w
 if(k==="marriage_agreement")k="Hati ya Kuhowesha \u2022 Updated "+g.Q9(r.f)
 else if(k==="hati_kuhowa")k="Hati ya Kuhowa \u2022 Updated "+g.Q9(r.f)
