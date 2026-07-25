@@ -552,7 +552,7 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuho
 
 // ── Content builder — "Hati ya Kuhowa" ──────────────────────────────────────
 // A single printable page: title + Tarehe, UTANGULIZI, NIMETOWE, MASHAHIDI
-// (NGAMBO YA MKE then NGAMBO YA MUME, two columns), MWANDISHI.
+// (UPANDE WA MKE then UPANDE WA MUME, two columns), MWANDISHI.
 
 List<NgmySlideElement> _buildPageContent(
   NgmyHatiKuhowaTemplate tpl, {
@@ -683,7 +683,7 @@ List<NgmySlideElement> _layoutSingle(
   y += 0.046;
 
   // MASHAHIDI as one bordered table: a single outer frame around both
-  // columns with one vertical line dividing NGAMBO YA MKE from NGAMBO YA
+  // columns with one vertical line dividing UPANDE WA MKE from UPANDE WA
   // MUME, a header row, and a line under the header row.
   const colW = cw / 2;
   const innerPad = 0.016;
@@ -702,8 +702,8 @@ List<NgmySlideElement> _layoutSingle(
     // instead — that's why the dividing line wasn't showing up before.
     _hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW - 0.0012, y: tableTop, w: 0.0024, h: tableH, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_table_divider'),
     _hLockedShape(shape: NgmySlideShapeKind.line, x: cx, y: tableTop + hdrH, w: cw, h: 0.0022, strokeColor: accent, strokeWidth: 1.1, tag: 'wit_table_hdrline'),
-    _hLockedText('NGAMBO YA MKE', x: cx, y: tableTop + 0.012, w: colW, h: 0.03, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'wit_h_mke_t'),
-    _hLockedText('NGAMBO YA MUME', x: cx + colW, y: tableTop + 0.012, w: colW, h: 0.03, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'wit_h_mume_t'),
+    _hLockedText('UPANDE WA MKE', x: cx, y: tableTop + 0.012, w: colW, h: 0.03, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'wit_h_mke_t'),
+    _hLockedText('UPANDE WA MUME', x: cx + colW, y: tableTop + 0.012, w: colW, h: 0.03, fontSize: 20, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'wit_h_mume_t'),
   ]);
   y = tableTop + hdrH + 0.01;
   for (var n = 1; n <= witnessRows; n++) {
