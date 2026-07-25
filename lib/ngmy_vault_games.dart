@@ -39,7 +39,7 @@ class VaultGameDef {
   final IconData icon;
 }
 
-const kVaultGames = <VaultGameDef>[
+const kVaultCoreGames = <VaultGameDef>[
   // Row 1
   VaultGameDef(
     id: 'vault_sync',
@@ -112,97 +112,6 @@ const kVaultGames = <VaultGameDef>[
     engine: VaultEngine.gravityHook,
     colors: [Color(0xFF2DD4BF), Color(0xFF22D3EE)],
     icon: Icons.style_rounded,
-  ),
-  // ── Mind games for adults (logic / strategy / deduction) ─────────────────
-  VaultGameDef(
-    id: 'merge_2048',
-    title: 'Merge 2048',
-    shortTitle: 'Merge 2048',
-    tagline: 'Slide and merge tiles. Plan every move.',
-    techLabel: 'MERGE',
-    engine: VaultEngine.pulseForge,
-    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
-    icon: Icons.grid_on_rounded,
-  ),
-  VaultGameDef(
-    id: 'code_breaker',
-    title: 'Code Breaker',
-    shortTitle: 'Code Breaker',
-    tagline: 'Deduce the secret code with logic, not luck.',
-    techLabel: 'LOGIC',
-    engine: VaultEngine.laserLane,
-    colors: [Color(0xFF818CF8), Color(0xFFA78BFA)],
-    icon: Icons.password_rounded,
-  ),
-  VaultGameDef(
-    id: 'connect_four',
-    title: 'Connect Four',
-    shortTitle: 'Connect Four',
-    tagline: 'Outthink the AI. Line up four first.',
-    techLabel: 'STRATEGY',
-    engine: VaultEngine.nodeDash,
-    colors: [Color(0xFFEF4444), Color(0xFFFBBF24)],
-    icon: Icons.view_column_rounded,
-  ),
-  VaultGameDef(
-    id: 'slide_lock',
-    title: 'Slide Lock',
-    shortTitle: 'Slide Lock',
-    tagline: 'Unscramble the 15-tile locked grid.',
-    techLabel: 'PUZZLE',
-    engine: VaultEngine.orbPop,
-    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
-    icon: Icons.extension_rounded,
-  ),
-  VaultGameDef(
-    id: 'sudoku_six',
-    title: 'Sudoku Six',
-    shortTitle: 'Sudoku Six',
-    tagline: 'Fill the 6×6 grid. No repeats in row, column, or box.',
-    techLabel: 'SUDOKU',
-    engine: VaultEngine.helixHold,
-    colors: [Color(0xFF60A5FA), Color(0xFF38BDF8)],
-    icon: Icons.apps_rounded,
-  ),
-  VaultGameDef(
-    id: 'cipher_five',
-    title: 'Cipher Five',
-    shortTitle: 'Cipher Five',
-    tagline: 'Guess the 5-letter word in six tries.',
-    techLabel: 'CIPHER',
-    engine: VaultEngine.wordMatch,
-    colors: [Color(0xFF10B981), Color(0xFF22D3EE)],
-    icon: Icons.abc_rounded,
-  ),
-  VaultGameDef(
-    id: 'reversi_duel',
-    title: 'Reversi Duel',
-    shortTitle: 'Reversi',
-    tagline: 'Flank and flip. Control the board.',
-    techLabel: 'DUEL',
-    engine: VaultEngine.gravityHook,
-    colors: [Color(0xFFE2E8F0), Color(0xFF64748B)],
-    icon: Icons.contrast_rounded,
-  ),
-  VaultGameDef(
-    id: 'hanoi_spire',
-    title: 'Hanoi Spire',
-    shortTitle: 'Hanoi Spire',
-    tagline: 'Move the tower. Never place larger on smaller.',
-    techLabel: 'HANOI',
-    engine: VaultEngine.pulseForge,
-    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
-    icon: Icons.filter_none_rounded,
-  ),
-  VaultGameDef(
-    id: 'make_twenty_four',
-    title: 'Make 24',
-    shortTitle: 'Make 24',
-    tagline: 'Use all four numbers exactly once to reach 24.',
-    techLabel: 'MATH',
-    engine: VaultEngine.laserLane,
-    colors: [Color(0xFFFACC15), Color(0xFF34D399)],
-    icon: Icons.calculate_rounded,
   ),
 ];
 

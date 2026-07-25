@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
 import 'ngmy_vault_games.dart';
-import 'ngmy_vault_mind_games.dart';
 import 'ngmy_vault_new_games.dart';
+import 'ngmy_vault_realistic_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
 
@@ -95,25 +95,10 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
         return const NgmyVaultMazeDashGame();
       case 'memory_flip':
         return const NgmyVaultMemoryFlipGame();
-      case 'merge_2048':
-        return NgmyVaultMerge2048Game(game: game);
-      case 'code_breaker':
-        return NgmyVaultCodeBreakerGame(game: game);
-      case 'connect_four':
-        return NgmyVaultConnectFourGame(game: game);
-      case 'slide_lock':
-        return NgmyVaultSlideLockGame(game: game);
-      case 'sudoku_six':
-        return NgmyVaultSudokuSixGame(game: game);
-      case 'cipher_five':
-        return NgmyVaultCipherFiveGame(game: game);
-      case 'reversi_duel':
-        return NgmyVaultReversiDuelGame(game: game);
-      case 'hanoi_spire':
-        return NgmyVaultHanoiSpireGame(game: game);
-      case 'make_twenty_four':
-        return NgmyVaultMakeTwentyFourGame(game: game);
       default:
+        if (ngmyVaultIsRealisticGame(game.id)) {
+          return ngmyVaultRealisticGameScreen(game);
+        }
         if (game.engine == VaultEngine.neonSerpent) {
           return NgmyVaultLeveledGameScreen(game: game);
         }
