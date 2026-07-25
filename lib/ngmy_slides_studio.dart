@@ -2440,7 +2440,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                           size: 22,
                         ),
                       ),
-                      title: Text(deck.name, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                      title: Text(deck.name.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                       subtitle: Text(
                         deck.deckKind == 'marriage_agreement'
                             ? 'Hati ya Kuhowesha • Updated ${_formatDate(deck.updatedAt)}'
