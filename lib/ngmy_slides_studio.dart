@@ -2234,86 +2234,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _showDeckActionsSheet(NgmySlideDeck deck, bool isDark) async {
-    final action = await showDialog<String>(
+    final action = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: const Color(0xFF0B1220),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-                        ),
-                        child: const Icon(Icons.slideshow_rounded, color: Colors.white, size: 26),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(deck.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            const SizedBox(height: 4),
-                            Text('${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.55)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _deckActionRow(ctx, Icons.picture_as_pdf_outlined, 'Download PDF', 'Visual PDF like your slides', const Color(0xFF2563EB), 'pdf'),
-                  if (ngmyHatiIsTransferableDeck(deck)) ...[
-                    const SizedBox(height: 10),
-                    _deckActionRow(
-                      ctx,
-                      Icons.swap_horiz_rounded,
-                      'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
-                      'Copy names & details into the matching marriage document',
-                      const Color(0xFF059669),
-                      'transfer_hati',
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
-                  const SizedBox(height: 10),
-                  _deckActionRow(ctx, Icons.content_copy_rounded, 'Duplicate', 'Create a copy you can edit', const Color(0xFF059669), 'duplicate'),
-                  const SizedBox(height: 10),
-                  _deckActionRow(ctx, Icons.delete_outline_rounded, 'Delete presentation', 'Remove permanently', const Color(0xFFEF4444), 'delete'),
-                  const SizedBox(height: 18),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                  ),
-                ],
-              ),
-            ),
+      barrierLabel: 'Dismiss',
+      barrierColor: const Color(0xD9000000),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (ctx, anim, secondary) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, anim, secondary, child) {
+        final curve = Curves.easeOutCubic.transform(anim.value);
+        return Opacity(
+          opacity: curve,
+          child: Transform.scale(
+            scale: 0.94 + curve * 0.06,
+            child: _DeckActionsDialog(deck: deck, isDark: isDark),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (action == null || !mounted) return;
     if (action == 'pdf') {
@@ -2328,17 +2265,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     } else if (action == 'transfer_hati') {
       await _transferHatiToPartner(deck, fromEditor: false);
     } else if (action == 'delete') {
-      final ok = await showDialog<bool>(
+      final ok = await showGeneralDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF111827),
-          title: const Text('Delete presentation?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-          content: Text('Delete "${deck.name}" permanently?', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)), child: const Text('Delete')),
-          ],
-        ),
+        barrierDismissible: true,
+        barrierLabel: 'Dismiss',
+        barrierColor: const Color(0xD9000000),
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, anim, secondary) => const SizedBox.shrink(),
+        transitionBuilder: (ctx, anim, secondary, child) {
+          final curve = Curves.easeOutCubic.transform(anim.value);
+          return Opacity(
+            opacity: curve,
+            child: Transform.scale(
+              scale: 0.94 + curve * 0.06,
+              child: _DeleteDeckDialog(deckName: deck.name),
+            ),
+          );
+        },
       );
       if (ok == true) _deleteDeck(deck);
     } else if (action == 'rename') {
@@ -2351,45 +2294,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       setState(() => _decks.insert(0, NgmySlideDeck.fromJson(json)));
       _scheduleAutosave();
     }
-  }
-
-  Widget _deckActionRow(BuildContext ctx, IconData icon, String title, String subtitle, Color accent, String value) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => Navigator.pop(ctx, value),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: accent, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: TextStyle(color: value == 'delete' ? const Color(0xFFFCA5A5) : Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.25)),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _panelDoneButton({required VoidCallback onDone, bool isDark = true}) {
@@ -4238,6 +4142,319 @@ class _UndoSnapshot {
   final NgmySlideDeck deck;
   final int slideIndex;
   final String? selectedId;
+}
+
+class _DeckActionsDialog extends StatelessWidget {
+  const _DeckActionsDialog({required this.deck, required this.isDark});
+
+  final NgmySlideDeck deck;
+  final bool isDark;
+
+  String get _subtitle {
+    final d = deck.updatedAt.toLocal();
+    final when = '${d.month}/${d.day}/${d.year}';
+    if (deck.deckKind == 'marriage_agreement') return 'Hati ya Kuhowesha · Updated $when';
+    if (deck.deckKind == 'hati_kuhowa') return 'Hati ya Kuhowa · Updated $when';
+    if (deck.deckKind == 'hati_kuhoweya') return 'Hati ya Kuhoweya · Updated $when';
+    return '${deck.slides.length} slides · Updated $when';
+  }
+
+  List<Color> get _accent => deck.isLockedTemplateDoc
+      ? const [Color(0xFFB8860B), Color(0xFF92400E)]
+      : const [Color(0xFF2563EB), Color(0xFF1D4ED8)];
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 44),
+        child: Material(
+          color: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 340),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFF334155), width: 1),
+              boxShadow: const [
+                BoxShadow(color: Color(0x80000000), blurRadius: 28, offset: Offset(0, 16)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(20, 18, 8, 16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0F172A),
+                      border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _accent),
+                          ),
+                          child: Icon(
+                            deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'PRESENTATION',
+                                style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                deck.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17, height: 1.25),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _subtitle,
+                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600, height: 1.2),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _DeckActionTile(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'Download PDF',
+                    value: 'pdf',
+                    tint: const Color(0xFF3B82F6),
+                  ),
+                  if (ngmyHatiIsTransferableDeck(deck))
+                    _DeckActionTile(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
+                      value: 'transfer_hati',
+                      tint: const Color(0xFF10B981),
+                    ),
+                  _DeckActionTile(
+                    icon: Icons.drive_file_rename_outline_rounded,
+                    label: 'Rename presentation',
+                    value: 'rename',
+                    tint: const Color(0xFF6366F1),
+                  ),
+                  _DeckActionTile(
+                    icon: Icons.content_copy_outlined,
+                    label: 'Duplicate',
+                    value: 'duplicate',
+                    tint: const Color(0xFF8B5CF6),
+                    showDivider: false,
+                  ),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFF1E293B)),
+                  _DeckActionTile(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete presentation',
+                    value: 'delete',
+                    tint: const Color(0xFFEF4444),
+                    destructive: true,
+                    showDivider: false,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF94A3B8),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteDeckDialog extends StatelessWidget {
+  const _DeleteDeckDialog({required this.deckName});
+
+  final String deckName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 44),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFF334155), width: 1),
+              boxShadow: const [
+                BoxShadow(color: Color(0x80000000), blurRadius: 28, offset: Offset(0, 16)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 26),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Delete presentation?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18, height: 1.25),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '"$deckName" will be permanently removed. This cannot be undone.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 14, height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFF1E293B)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF94A3B8),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: const RoundedRectangleBorder(),
+                          ),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                        ),
+                      ),
+                      Container(width: 1, height: 48, color: const Color(0xFF1E293B)),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFEF4444),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: const RoundedRectangleBorder(),
+                          ),
+                          child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeckActionTile extends StatelessWidget {
+  const _DeckActionTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.tint,
+    this.destructive = false,
+    this.showDivider = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color tint;
+  final bool destructive;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.pop(context, value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: destructive ? 0.14 : 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: tint, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: destructive ? const Color(0xFFFCA5A5) : Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (showDivider) const Divider(height: 1, thickness: 1, indent: 68, color: Color(0xFF1E293B)),
+      ],
+    );
+  }
 }
 
 class _DocumentCategoryTile extends StatelessWidget {
