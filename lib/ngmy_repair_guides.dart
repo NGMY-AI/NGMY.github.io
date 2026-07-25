@@ -2,14 +2,127 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_repair_guides_models.dart';
 import 'ngmy_repair_guides_storage.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 const _accent = Color(0xFFF97316);
 const _accent2 = Color(0xFFEA580C);
-const _hudColors = [_accent, _accent2];
+const _pageBg = Color(0xFF0B1220);
+const _cardBg = Color(0xFF111827);
+
+const _noSpellCheck = SpellCheckConfiguration.disabled();
+
+InputDecoration _repairFieldDeco(String label) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
+    filled: true,
+    fillColor: Colors.white.withValues(alpha: 0.06),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: _accent, width: 1.4),
+    ),
+  );
+}
+
+class _RepairPageScaffold extends StatelessWidget {
+  const _RepairPageScaffold({
+    required this.title,
+    this.subtitle,
+    required this.onClose,
+    this.trailing,
+    required this.child,
+  });
+
+  final String title;
+  final String? subtitle;
+  final VoidCallback onClose;
+  final Widget? trailing;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _pageBg,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111827),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: onClose,
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 0.3)),
+            if (subtitle != null && subtitle!.isNotEmpty)
+              Text(subtitle!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.52))),
+          ],
+        ),
+        actions: trailing != null ? [trailing!] : null,
+      ),
+      body: child,
+    );
+  }
+}
+
+class _RepairGuideImage extends StatelessWidget {
+  const _RepairGuideImage({this.base64, this.url, this.height, this.accent});
+
+  final String? base64;
+  final String? url;
+  final double? height;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = height ?? 200.0;
+    Widget img;
+    if (base64 != null && base64!.startsWith('data:image')) {
+      img = Image.memory(base64Decode(base64!.split(',').last), fit: BoxFit.cover, width: double.infinity);
+    } else if (url != null && url!.trim().isNotEmpty) {
+      img = Image.network(
+        url!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: _cardBg,
+            child: const Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
+          );
+        },
+        errorBuilder: (_, __, ___) => _placeholder(h),
+      );
+    } else {
+      return _placeholder(h);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(height: h, width: double.infinity, child: img),
+    );
+  }
+
+  Widget _placeholder(double h) {
+    return Container(
+      height: h,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: (accent ?? _accent).withValues(alpha: 0.12),
+        border: Border.all(color: (accent ?? _accent).withValues(alpha: 0.25)),
+      ),
+      child: Icon(Icons.image_not_supported_outlined, color: accent ?? _accent, size: 32),
+    );
+  }
+}
 
 void showNgmyRepairGuides({required BuildContext context, String? userEmail}) {
   Navigator.of(context).push<void>(
@@ -94,47 +207,69 @@ class _NgmyRepairGuidesPageState extends State<NgmyRepairGuidesPage> {
   @override
   Widget build(BuildContext context) {
     final filtered = filterRepairGuides(_guides, query: _query);
-    return NgmyHudMotion(
-      builder: (context, pulse, scan, orbit) {
-        return NgmyToolkitAlivePageChrome(
-          colors: _hudColors,
-          pulse: pulse,
-          scan: scan,
-          orbit: orbit,
-          header: NgmyToolkitAliveHeader(
-            colors: _hudColors,
-            pulse: pulse,
-            orbit: orbit,
-            title: 'FIX MANUAL',
-            subtitle: 'Step-by-step repair guides · make · model · year',
-            onClose: () => Navigator.pop(context),
-            trailing: IconButton(
-              tooltip: 'Create guide',
-              onPressed: _createGuide,
-              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
-            ),
-          ),
-          child: _loading
-              ? const Center(child: CircularProgressIndicator(color: _accent))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+    return _RepairPageScaffold(
+      title: 'FIX MANUAL',
+      subtitle: 'Step-by-step repair guides',
+      onClose: () => Navigator.pop(context),
+      trailing: IconButton(
+        tooltip: 'Create guide',
+        onPressed: _createGuide,
+        icon: const Icon(Icons.add_circle_outline_rounded),
+      ),
+      child: _loading
+          ? const Center(child: CircularProgressIndicator(color: _accent))
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+              children: [
+                const _HeroBanner(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _searchC,
+                  onChanged: (v) => setState(() => _query = v),
+                  spellCheckConfiguration: _noSpellCheck,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _repairFieldDeco('Search make, model, year, repair…').copyWith(
+                    prefixIcon: const Icon(Icons.search_rounded, color: _accent),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'BROWSE BY CATEGORY',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.35,
+                  ),
+                  itemCount: kRepairGuideCategories.length,
+                  itemBuilder: (_, i) {
+                    final cat = kRepairGuideCategories[i];
+                    final count = _guides.where((g) => g.categoryId == cat.id).length;
+                    return _CategoryTile(
+                      category: cat,
+                      count: count,
+                      onTap: () => _openCategory(cat),
+                    );
+                  },
+                ),
+                const SizedBox(height: 22),
+                Row(
                   children: [
-                    _HeroBanner(pulse: pulse),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _searchC,
-                      onChanged: (v) => setState(() => _query = v),
-                      decoration: InputDecoration(
-                        hintText: 'Search make, model, year, repair…',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.06),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
                     Text(
-                      'BROWSE BY CATEGORY',
+                      'ALL GUIDES',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 11,
@@ -142,67 +277,30 @@ class _NgmyRepairGuidesPageState extends State<NgmyRepairGuidesPage> {
                         color: Colors.white.withValues(alpha: 0.55),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 1.35,
-                      ),
-                      itemCount: kRepairGuideCategories.length,
-                      itemBuilder: (_, i) {
-                        final cat = kRepairGuideCategories[i];
-                        final count = _guides.where((g) => g.categoryId == cat.id).length;
-                        return _CategoryTile(
-                          category: cat,
-                          count: count,
-                          onTap: () => _openCategory(cat),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 22),
-                    Row(
-                      children: [
-                        Text(
-                          'ALL GUIDES',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11,
-                            letterSpacing: 1.2,
-                            color: Colors.white.withValues(alpha: 0.55),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text('${filtered.length}', style: TextStyle(color: _accent.withValues(alpha: 0.9), fontWeight: FontWeight.w800)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    if (filtered.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Text(
-                          'No guides yet. Tap + to create your first repair manual.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                        ),
-                      )
-                    else
-                      ...filtered.map((g) => _GuideListTile(guide: g, onTap: () => _openGuide(g))),
+                    const Spacer(),
+                    Text('${filtered.length}', style: TextStyle(color: _accent.withValues(alpha: 0.9), fontWeight: FontWeight.w800)),
                   ],
                 ),
-        );
-      },
+                const SizedBox(height: 10),
+                if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'No guides yet. Tap + to create your first repair manual.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                    ),
+                  )
+                else
+                  ...filtered.map((g) => _GuideListTile(guide: g, onTap: () => _openGuide(g))),
+              ],
+            ),
     );
   }
 }
 
 class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.pulse});
-
-  final double pulse;
+  const _HeroBanner();
 
   @override
   Widget build(BuildContext context) {
@@ -210,15 +308,12 @@ class _HeroBanner extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            _accent.withValues(alpha: 0.35 + pulse * 0.1),
-            const Color(0xFF1E293B),
-          ],
+          colors: [Color(0xFF1E293B), Color(0xFF111827)],
         ),
-        border: Border.all(color: _accent.withValues(alpha: 0.45)),
+        border: Border.all(color: _accent.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,22 +461,33 @@ class _GuideThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final img = guide.coverImageBase64 ??
-        () {
-          for (final s in guide.steps) {
-            if (s.imageBase64 != null && s.imageBase64!.isNotEmpty) return s.imageBase64;
-          }
-          return null;
-        }();
+    final cat = repairGuideCategoryById(guide.categoryId);
+    final accent = cat != null ? Color(cat.colors.first) : _accent;
+    String? imgUrl = guide.coverImageUrl;
+    String? imgB64 = guide.coverImageBase64;
+    if (imgUrl == null && imgB64 == null) {
+      for (final s in guide.steps) {
+        if (s.imageUrl != null && s.imageUrl!.isNotEmpty) {
+          imgUrl = s.imageUrl;
+          break;
+        }
+        if (s.imageBase64 != null && s.imageBase64!.isNotEmpty) {
+          imgB64 = s.imageBase64;
+          break;
+        }
+      }
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: SizedBox(
         width: 56,
         height: 56,
-        color: accent.withValues(alpha: 0.15),
-        child: img != null && img.startsWith('data:image')
-            ? Image.memory(base64Decode(img.split(',').last), fit: BoxFit.cover)
-            : Icon(Icons.build_circle_outlined, color: accent, size: 28),
+        child: (imgUrl != null || imgB64 != null)
+            ? _RepairGuideImage(base64: imgB64, url: imgUrl, height: 56, accent: accent)
+            : Container(
+                color: accent.withValues(alpha: 0.15),
+                child: Icon(Icons.directions_car_filled_rounded, color: accent, size: 28),
+              ),
       ),
     );
   }
@@ -402,47 +508,33 @@ class _RepairGuideBrowsePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = [Color(category.colors.first), Color(category.colors.length > 1 ? category.colors[1] : category.colors.first)];
-    return NgmyHudMotion(
-      builder: (context, pulse, scan, orbit) {
-        return NgmyToolkitAlivePageChrome(
-          colors: colors,
-          pulse: pulse,
-          scan: scan,
-          orbit: orbit,
-          header: NgmyToolkitAliveHeader(
-            colors: colors,
-            pulse: pulse,
-            orbit: orbit,
-            title: category.label.toUpperCase(),
-            subtitle: '${guides.length} repair guides',
-            onClose: () => Navigator.pop(context),
-          ),
-          child: guides.isEmpty
-              ? Center(
-                  child: Text(
-                    'No guides in this category yet.\nCreate one from the main Fix Manual screen.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                  ),
-                )
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-                  children: guides
-                      .map(
-                        (g) => _GuideListTile(
-                          guide: g,
-                          onTap: () => Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) => _RepairGuideReaderPage(guide: g),
-                            ),
-                          ),
+    return _RepairPageScaffold(
+      title: category.label.toUpperCase(),
+      subtitle: '${guides.length} repair guides',
+      onClose: () => Navigator.pop(context),
+      child: guides.isEmpty
+          ? Center(
+              child: Text(
+                'No guides in this category yet.\nCreate one from the main Fix Manual screen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+              children: guides
+                  .map(
+                    (g) => _GuideListTile(
+                      guide: g,
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => _RepairGuideReaderPage(guide: g),
                         ),
-                      )
-                      .toList(),
-                ),
-        );
-      },
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
     );
   }
 }
@@ -477,60 +569,55 @@ class _RepairGuideReaderPageState extends State<_RepairGuideReaderPage> {
     final guide = widget.guide;
     final steps = guide.steps;
     final cat = repairGuideCategoryById(guide.categoryId);
-    final colors = cat != null
-        ? [Color(cat.colors.first), Color(cat.colors.length > 1 ? cat.colors[1] : cat.colors.first)]
-        : _hudColors;
+    final accent = cat != null ? Color(cat.colors.first) : _accent;
 
-    return NgmyHudMotion(
-      builder: (context, pulse, scan, orbit) {
-        return NgmyToolkitAlivePageChrome(
-          colors: colors,
-          pulse: pulse,
-          scan: scan,
-          orbit: orbit,
-          header: NgmyToolkitAliveHeader(
-            colors: colors,
-            pulse: pulse,
-            orbit: orbit,
-            title: guide.repairTitle.toUpperCase(),
-            subtitle: guide.deviceLabel,
-            onClose: () => Navigator.pop(context),
-          ),
-          child: Column(
-            children: [
-              if (guide.summary.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-                  child: Text(guide.summary, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12.5, height: 1.4)),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-                child: Row(
-                  children: [
-                    Text(
-                      'STEP ${_step + 1} OF ${steps.length}',
-                      style: TextStyle(color: colors.first, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
-                    ),
-                    const Spacer(),
-                    if (_step > 0)
-                      TextButton(onPressed: () => _pageC.previousPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic), child: const Text('Back')),
-                    if (_step < steps.length - 1)
-                      TextButton(onPressed: () => _pageC.nextPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic), child: const Text('Next')),
-                  ],
-                ),
+    return _RepairPageScaffold(
+      title: guide.repairTitle.toUpperCase(),
+      subtitle: guide.deviceLabel,
+      onClose: () => Navigator.pop(context),
+      child: Column(
+        children: [
+          if (guide.coverImageUrl != null || guide.coverImageBase64 != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: _RepairGuideImage(
+                url: guide.coverImageUrl,
+                base64: guide.coverImageBase64,
+                height: 160,
+                accent: accent,
               ),
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageC,
-                  itemCount: steps.length,
-                  onPageChanged: (i) => setState(() => _step = i),
-                  itemBuilder: (_, i) => _StepCard(step: steps[i], accent: colors.first, index: i),
+            ),
+          if (guide.summary.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              child: Text(guide.summary, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12.5, height: 1.4)),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: Row(
+              children: [
+                Text(
+                  'STEP ${_step + 1} OF ${steps.length}',
+                  style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
                 ),
-              ),
-            ],
+                const Spacer(),
+                if (_step > 0)
+                  TextButton(onPressed: () => _pageC.previousPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic), child: const Text('Back')),
+                if (_step < steps.length - 1)
+                  TextButton(onPressed: () => _pageC.nextPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic), child: const Text('Next')),
+              ],
+            ),
           ),
-        );
-      },
+          Expanded(
+            child: PageView.builder(
+              controller: _pageC,
+              itemCount: steps.length,
+              onPageChanged: (i) => setState(() => _step = i),
+              itemBuilder: (_, i) => _StepCard(step: steps[i], accent: accent, index: i),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -549,31 +636,12 @@ class _StepCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (step.imageBase64 != null && step.imageBase64!.startsWith('data:image'))
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: AspectRatio(
-                aspectRatio: 16 / 10,
-                child: Image.memory(base64Decode(step.imageBase64!.split(',').last), fit: BoxFit.cover),
-              ),
-            )
-          else
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(colors: [accent.withValues(alpha: 0.25), const Color(0xFF1E293B)]),
-                border: Border.all(color: accent.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.photo_camera_outlined, color: accent, size: 36),
-                  const SizedBox(height: 8),
-                  Text('Step ${index + 1} photo', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-                ],
-              ),
-            ),
+          _RepairGuideImage(
+            base64: step.imageBase64,
+            url: step.imageUrl,
+            height: 200,
+            accent: accent,
+          ),
           const SizedBox(height: 16),
           Text(step.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
           const SizedBox(height: 10),
@@ -710,82 +778,59 @@ class _RepairGuideEditorPageState extends State<_RepairGuideEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    return NgmyHudMotion(
-      builder: (context, pulse, scan, orbit) {
-        return NgmyToolkitAlivePageChrome(
-          colors: _hudColors,
-          pulse: pulse,
-          scan: scan,
-          orbit: orbit,
-          header: NgmyToolkitAliveHeader(
-            colors: _hudColors,
-            pulse: pulse,
-            orbit: orbit,
-            title: 'NEW GUIDE',
-            subtitle: 'Build a step-by-step repair manual',
-            onClose: () => Navigator.pop(context),
-            trailing: TextButton(onPressed: _save, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
+    return _RepairPageScaffold(
+      title: 'NEW GUIDE',
+      subtitle: 'Build a step-by-step repair manual',
+      onClose: () => Navigator.pop(context),
+      trailing: TextButton(onPressed: _save, child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+        children: [
+          DropdownButtonFormField<String>(
+            value: _categoryId,
+            decoration: _repairFieldDeco('Category'),
+            dropdownColor: const Color(0xFF1E293B),
+            style: const TextStyle(color: Colors.white),
+            items: kRepairGuideCategories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.label))).toList(),
+            onChanged: (v) => setState(() => _categoryId = v ?? 'car'),
           ),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+          const SizedBox(height: 12),
+          TextField(controller: _makeC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, enableSuggestions: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Make (e.g. Nissan)')),
+          const SizedBox(height: 10),
+          TextField(controller: _modelC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, enableSuggestions: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Model (e.g. Altima)')),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              DropdownButtonFormField<String>(
-                value: _categoryId,
-                decoration: _fieldDeco('Category'),
-                dropdownColor: const Color(0xFF1E293B),
-                items: kRepairGuideCategories
-                    .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
-                    .toList(),
-                onChanged: (v) => setState(() => _categoryId = v ?? 'car'),
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: _makeC, decoration: _fieldDeco('Make (e.g. Nissan)')),
-              const SizedBox(height: 10),
-              TextField(controller: _modelC, decoration: _fieldDeco('Model (e.g. Altima)')),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: _yearC, keyboardType: TextInputType.number, decoration: _fieldDeco('Year'))),
-                  const SizedBox(width: 10),
-                  Expanded(child: TextField(controller: _variantC, decoration: _fieldDeco('Trim / variant'))),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextField(controller: _titleC, decoration: _fieldDeco('Repair title (e.g. Spark Plug Replacement)')),
-              const SizedBox(height: 10),
-              TextField(controller: _summaryC, maxLines: 2, decoration: _fieldDeco('Short summary')),
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: _pickCover,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(_coverBase64 == null ? 'Add cover photo' : 'Change cover photo'),
-              ),
-              const SizedBox(height: 20),
-              Text('STEPS', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
-              const SizedBox(height: 10),
-              ..._steps.asMap().entries.map((e) => _StepEditor(
-                    index: e.key,
-                    step: e.value,
-                    onRemove: _steps.length > 1 ? () => setState(() => _steps.removeAt(e.key)) : null,
-                  )),
-              TextButton.icon(
-                onPressed: () => setState(() => _steps.add(_EditableStep())),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add step'),
-              ),
+              Expanded(child: TextField(controller: _yearC, keyboardType: TextInputType.number, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Year'))),
+              const SizedBox(width: 10),
+              Expanded(child: TextField(controller: _variantC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Trim / variant'))),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  InputDecoration _fieldDeco(String label) {
-    return InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.06),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          const SizedBox(height: 10),
+          TextField(controller: _titleC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Repair title')),
+          const SizedBox(height: 10),
+          TextField(controller: _summaryC, maxLines: 2, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Short summary')),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _pickCover,
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(_coverBase64 == null ? 'Add cover photo' : 'Change cover photo'),
+          ),
+          const SizedBox(height: 20),
+          Text('STEPS', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.1, color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
+          const SizedBox(height: 10),
+          ..._steps.asMap().entries.map((e) => _StepEditor(
+                index: e.key,
+                step: e.value,
+                onRemove: _steps.length > 1 ? () => setState(() => _steps.removeAt(e.key)) : null,
+              )),
+          TextButton.icon(
+            onPressed: () => setState(() => _steps.add(_EditableStep())),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add step'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -849,13 +894,13 @@ class _StepEditorState extends State<_StepEditor> {
                 IconButton(onPressed: widget.onRemove, icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.45), size: 20)),
             ],
           ),
-          TextField(controller: step.titleC, decoration: const InputDecoration(labelText: 'Step title')),
+          TextField(controller: step.titleC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Step title')),
           const SizedBox(height: 8),
-          TextField(controller: step.bodyC, maxLines: 4, decoration: const InputDecoration(labelText: 'Instructions')),
+          TextField(controller: step.bodyC, maxLines: 4, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Instructions')),
           const SizedBox(height: 8),
-          TextField(controller: step.toolsC, decoration: const InputDecoration(labelText: 'Tools (comma separated)')),
+          TextField(controller: step.toolsC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Tools (comma separated)')),
           const SizedBox(height: 8),
-          TextField(controller: step.warningC, decoration: const InputDecoration(labelText: 'Warning (optional)')),
+          TextField(controller: step.warningC, spellCheckConfiguration: _noSpellCheck, autocorrect: false, style: const TextStyle(color: Colors.white), decoration: _repairFieldDeco('Warning (optional)')),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: _pickPhoto,

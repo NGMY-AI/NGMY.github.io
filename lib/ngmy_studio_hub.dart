@@ -143,13 +143,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
       ),
       _CreatorTool(
-        icon: Icons.build_circle_rounded,
-        colors: const [Color(0xFFF97316), Color(0xFFEA580C)],
-        title: 'Fix Manual',
-        subtitle: 'Repair guides · make · model · year · photos',
-        onTap: () => showNgmyRepairGuides(context: context, userEmail: userEmail),
-      ),
-      _CreatorTool(
         icon: Icons.style_rounded,
         colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
         title: 'AI Outfit',
@@ -174,6 +167,13 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Virtual Device',
         subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
         onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
+      ),
+      _CreatorTool(
+        icon: Icons.build_circle_rounded,
+        colors: const [Color(0xFFF97316), Color(0xFFEA580C)],
+        title: 'Fix Manual',
+        subtitle: 'Car repair guides · photos · step-by-step',
+        onTap: () => showNgmyRepairGuides(context: context, userEmail: userEmail),
       ),
     ];
 

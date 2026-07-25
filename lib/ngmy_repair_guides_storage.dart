@@ -4,10 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_repair_guides_models.dart';
+import 'ngmy_repair_guides_seed_cars.dart';
 
 const _indexPrefix = 'ngmy_repair_guides_index_v1_';
 const _itemPrefix = 'ngmy_repair_guide_item_v1_';
-const _seedLoadedPrefix = 'ngmy_repair_guides_seed_loaded_v1_';
+const _seedVersionPrefix = 'ngmy_repair_guides_seed_version_v1_';
+
+/// Bump when seed library changes so existing users receive new guides + photos.
+const kRepairGuideSeedVersion = 3;
 
 String _emailSlug(String email) {
   final e = email.toLowerCase().trim();
@@ -17,23 +21,22 @@ String _emailSlug(String email) {
 
 String _indexKey(String email) => '$_indexPrefix${_emailSlug(email)}';
 String _itemKey(String email, String id) => '$_itemPrefix${_emailSlug(email)}_$id';
-String _seedKey(String email) => '$_seedLoadedPrefix${_emailSlug(email)}';
+String _seedVersionKey(String email) => '$_seedVersionPrefix${_emailSlug(email)}';
 
 Future<void> _ensureSeedGuidesLoaded(String userEmail) async {
   final prefs = await SharedPreferences.getInstance();
-  final seedKey = _seedKey(userEmail);
-  if (prefs.getBool(seedKey) == true) return;
+  final versionKey = _seedVersionKey(userEmail);
+  final loadedVersion = prefs.getInt(versionKey) ?? 0;
+  if (loadedVersion >= kRepairGuideSeedVersion) return;
 
   final indexKey = _indexKey(userEmail);
-  final existing = prefs.getStringList(indexKey) ?? const [];
-  final ids = existing.toList();
+  final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
   for (final seed in kRepairGuideSeedGuides()) {
-    if (ids.contains(seed.id)) continue;
     await prefs.setString(_itemKey(userEmail, seed.id), jsonEncode(seed.toJson()));
-    ids.add(seed.id);
+    if (!ids.contains(seed.id)) ids.add(seed.id);
   }
   await prefs.setStringList(indexKey, ids);
-  await prefs.setBool(seedKey, true);
+  await prefs.setInt(versionKey, kRepairGuideSeedVersion);
 }
 
 Future<List<RepairGuide>> loadRepairGuides({required String userEmail}) async {
@@ -109,4 +112,10 @@ List<RepairGuide> filterRepairGuides(
     final hay = '${g.make} ${g.model} ${g.year ?? ''} ${g.repairTitle} ${g.summary}'.toLowerCase();
     return hay.contains(q);
   }).toList();
+}
+
+/// Force-refresh built-in guides (photos + new cars) on next load.
+Future<void> ngmyRefreshRepairGuideSeeds(String userEmail) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_seedVersionKey(userEmail));
 }
