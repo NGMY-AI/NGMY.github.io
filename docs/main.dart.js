@@ -73455,7 +73455,7 @@ r+=0.046
 e=0.05+c4*0.056+0.011
 s=r+0.05
 o=r+0.012
-B.f.A(b0,A.a([A.Hi(0,e,B.b1,a8,1.3,"wit_table_border",0.82,0.09,r),A.Hi(a8,e,B.b1,a8,0,"wit_table_divider",0.0024,0.4988,r),A.Hi(0,0.0022,B.e7,a8,1.1,"wit_table_hdrline",0.82,0.09,s),A.uo("NGAMBO YA MKE",B.Q,a8,20,B.C,0.03,0,"wit_h_mke_t",0.41,0.09,o),A.uo("NGAMBO YA MUME",B.Q,a8,20,B.C,0.03,0,"wit_h_mume_t",0.41,0.5,o)],a9))
+B.f.A(b0,A.a([A.Hi(0,e,B.b1,a8,1.3,"wit_table_border",0.82,0.09,r),A.Hi(a8,e,B.b1,a8,0,"wit_table_divider",0.0024,0.4988,r),A.Hi(0,0.0022,B.e7,a8,1.1,"wit_table_hdrline",0.82,0.09,s),A.uo("UPANDE WA MKE",B.Q,a8,20,B.C,0.03,0,"wit_h_mke_t",0.41,0.09,o),A.uo("UPANDE WA MUME",B.Q,a8,20,B.C,0.03,0,"wit_h_mume_t",0.41,0.5,o)],a9))
 d=s+0.01
 for(c=1;c<=c4;++c){B.f.A(b0,A.e29("mke",c,0.106,d,0.378,a8,a7))
 B.f.A(b0,A.e29("mume",c,0.516,d,0.378,a8,a7))
