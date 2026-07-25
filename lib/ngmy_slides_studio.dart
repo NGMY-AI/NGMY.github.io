@@ -2234,80 +2234,83 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _showDeckActionsSheet(NgmySlideDeck deck, bool isDark) async {
-    final action = await showModalBottomSheet<String>(
+    final action = await showDialog<String>(
       context: context,
-      backgroundColor: const Color(0xFF0B1220),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF0B1220),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-                    ),
-                    child: const Icon(Icons.slideshow_rounded, color: Colors.white, size: 26),
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+                        ),
+                        child: const Icon(Icons.slideshow_rounded, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(deck.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                            const SizedBox(height: 4),
+                            Text('${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.55)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(deck.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                        const SizedBox(height: 4),
-                        Text('${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
+                  const SizedBox(height: 20),
+                  _deckActionRow(ctx, Icons.picture_as_pdf_outlined, 'Download PDF', 'Visual PDF like your slides', const Color(0xFF2563EB), 'pdf'),
+                  if (ngmyHatiIsTransferableDeck(deck)) ...[
+                    const SizedBox(height: 10),
+                    _deckActionRow(
+                      ctx,
+                      Icons.swap_horiz_rounded,
+                      'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
+                      'Copy names & details into the matching marriage document',
+                      const Color(0xFF059669),
+                      'transfer_hati',
                     ),
+                  ],
+                  const SizedBox(height: 10),
+                  _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
+                  const SizedBox(height: 10),
+                  _deckActionRow(ctx, Icons.content_copy_rounded, 'Duplicate', 'Create a copy you can edit', const Color(0xFF059669), 'duplicate'),
+                  const SizedBox(height: 10),
+                  _deckActionRow(ctx, Icons.delete_outline_rounded, 'Delete presentation', 'Remove permanently', const Color(0xFFEF4444), 'delete'),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _deckActionRow(ctx, Icons.picture_as_pdf_outlined, 'Download PDF', 'Visual PDF like your slides', const Color(0xFF2563EB), 'pdf'),
-              if (ngmyHatiIsTransferableDeck(deck)) ...[
-                const SizedBox(height: 10),
-                _deckActionRow(
-                  ctx,
-                  Icons.swap_horiz_rounded,
-                  'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
-                  'Copy names & details into the matching marriage document',
-                  const Color(0xFF059669),
-                  'transfer_hati',
-                ),
-              ],
-              const SizedBox(height: 10),
-              _deckActionRow(ctx, Icons.drive_file_rename_outline_rounded, 'Rename presentation', 'Rename this deck', const Color(0xFF2563EB), 'rename'),
-              const SizedBox(height: 10),
-              _deckActionRow(ctx, Icons.content_copy_rounded, 'Duplicate', 'Create a copy you can edit', const Color(0xFF059669), 'duplicate'),
-              const SizedBox(height: 10),
-              _deckActionRow(ctx, Icons.delete_outline_rounded, 'Delete presentation', 'Remove permanently', const Color(0xFFEF4444), 'delete'),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.1),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-              ),
-            ],
+            ),
           ),
         ),
       ),
