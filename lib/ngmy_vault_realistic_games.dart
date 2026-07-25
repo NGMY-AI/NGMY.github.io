@@ -1,263 +1,268 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_vault_card_games.dart';
 import 'ngmy_vault_games.dart';
-import 'ngmy_vault_games_pack2.dart';
-import 'ngmy_vault_games_pack3.dart';
+import 'ngmy_vault_mind_games.dart';
+import 'ngmy_vault_pro_wrapper.dart';
 
-/// Twenty skill-based Vault Channel games — driving, shooting, timing, and
-/// strategy. Replaces the older puzzle-only row below Memory Flip.
+/// Adult Vault Channel games — casino tables, classic boards, and strategy
+/// puzzles with proper UI (playing cards, roulette wheel, grids, AI opponents).
 const kVaultRealisticGames = <VaultGameDef>[
+  // ── Casino & card tables ─────────────────────────────────────────────────
   VaultGameDef(
-    id: 'night_highway',
-    title: 'Night Highway',
-    shortTitle: 'Night Highway',
-    tagline: 'Three-lane dodge at speed. No second chances.',
-    techLabel: 'DRIVE',
-    engine: VaultEngine.laserLane,
-    colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
-    icon: Icons.directions_car_filled_rounded,
-  ),
-  VaultGameDef(
-    id: 'drag_strip',
-    title: 'Drag Strip',
-    shortTitle: 'Drag Strip',
-    tagline: 'Release at green. Nail the perfect launch.',
-    techLabel: 'LAUNCH',
+    id: 'blackjack_vegas',
+    title: 'Vegas Blackjack',
+    shortTitle: 'Blackjack',
+    tagline: 'Hit or stand against the dealer. Real 21.',
+    techLabel: 'TABLE',
     engine: VaultEngine.pulseForge,
-    colors: [Color(0xFFEF4444), Color(0xFFF97316)],
-    icon: Icons.speed_rounded,
+    colors: [Color(0xFF0B1220), Color(0xFFFBBF24)],
+    icon: Icons.style_rounded,
   ),
   VaultGameDef(
-    id: 'precision_park',
-    title: 'Precision Park',
-    shortTitle: 'Precision Park',
-    tagline: 'Slide into tight spots without touching the curb.',
-    techLabel: 'PARK',
-    engine: VaultEngine.orbPop,
-    colors: [Color(0xFF22C55E), Color(0xFF14B8A6)],
-    icon: Icons.local_parking_rounded,
-  ),
-  VaultGameDef(
-    id: 'wheelie_king',
-    title: 'Wheelie King',
-    shortTitle: 'Wheelie King',
-    tagline: 'Hold the balance. Push too far and you flip.',
-    techLabel: 'BIKE',
-    engine: VaultEngine.helixHold,
-    colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-    icon: Icons.two_wheeler_rounded,
-  ),
-  VaultGameDef(
-    id: 'roof_run',
-    title: 'Roof Run',
-    shortTitle: 'Roof Run',
-    tagline: 'Jump gaps across rooftops before the city swallows you.',
-    techLabel: 'RUN',
-    engine: VaultEngine.nodeDash,
-    colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-    icon: Icons.directions_run_rounded,
-  ),
-  VaultGameDef(
-    id: 'cargo_haul',
-    title: 'Cargo Haul',
-    shortTitle: 'Cargo Haul',
-    tagline: 'Grab contracts under the clock. Miss nothing.',
-    techLabel: 'HAUL',
-    engine: VaultEngine.gravityHook,
-    colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)],
-    icon: Icons.inventory_2_rounded,
-  ),
-  VaultGameDef(
-    id: 'range_master',
-    title: 'Range Master',
-    shortTitle: 'Range Master',
-    tagline: 'Lead your shots. Clear every target lane.',
-    techLabel: 'AIM',
+    id: 'roulette_euro',
+    title: 'Euro Roulette',
+    shortTitle: 'Roulette',
+    tagline: 'Pick your number. Spin the wheel.',
+    techLabel: 'WHEEL',
     engine: VaultEngine.laserLane,
-    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
-    icon: Icons.gps_fixed_rounded,
+    colors: [Color(0xFF7F1D1D), Color(0xFF22C55E)],
+    icon: Icons.trip_origin_rounded,
   ),
   VaultGameDef(
-    id: 'trader_math',
-    title: 'Trader Math',
-    shortTitle: 'Trader Math',
-    tagline: 'Fast market math under pressure. No calculator.',
-    techLabel: 'TRADE',
+    id: 'slots_jackpot',
+    title: 'Jackpot Slots',
+    shortTitle: 'Slots',
+    tagline: 'Match three symbols on the machine.',
+    techLabel: 'SLOTS',
+    engine: VaultEngine.orbPop,
+    colors: [Color(0xFF7C3AED), Color(0xFFDB2777)],
+    icon: Icons.casino_rounded,
+  ),
+  VaultGameDef(
+    id: 'billiards_snooker',
+    title: 'Snooker Pro',
+    shortTitle: 'Snooker',
+    tagline: 'Aim, power up, and pocket the shot.',
+    techLabel: 'CUE',
+    engine: VaultEngine.gravityHook,
+    colors: [Color(0xFF14532D), Color(0xFF22C55E)],
+    icon: Icons.sports_rounded,
+  ),
+  VaultGameDef(
+    id: 'baccarat_punto',
+    title: 'Punto Banco',
+    shortTitle: 'Baccarat',
+    tagline: 'Player or banker — closest to nine wins.',
+    techLabel: 'BAC',
+    engine: VaultEngine.helixHold,
+    colors: [Color(0xFF312E81), Color(0xFF6366F1)],
+    icon: Icons.diamond_rounded,
+  ),
+  VaultGameDef(
+    id: 'casino_war',
+    title: 'Casino War',
+    shortTitle: 'Casino War',
+    tagline: 'Higher card takes the table. War on ties.',
+    techLabel: 'WAR',
+    engine: VaultEngine.nodeDash,
+    colors: [Color(0xFFBE123C), Color(0xFFE11D48)],
+    icon: Icons.compare_arrows_rounded,
+  ),
+  VaultGameDef(
+    id: 'video_poker',
+    title: 'Video Poker',
+    shortTitle: 'Video Poker',
+    tagline: 'Hold the best cards. Draw for payout.',
+    techLabel: 'POKER',
     engine: VaultEngine.wordMatch,
-    colors: [Color(0xFFFBBF24), Color(0xFF059669)],
-    icon: Icons.candlestick_chart_rounded,
+    colors: [Color(0xFF14532D), Color(0xFF059669)],
+    icon: Icons.filter_none_rounded,
   ),
   VaultGameDef(
-    id: 'signal_decode',
-    title: 'Signal Decode',
-    shortTitle: 'Signal Decode',
-    tagline: 'Memorize encrypted bursts. Replay them clean.',
-    techLabel: 'SIGNAL',
-    engine: VaultEngine.helixHold,
-    colors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
-    icon: Icons.radar_rounded,
-  ),
-  VaultGameDef(
-    id: 'vault_breaker',
-    title: 'Vault Breaker',
-    shortTitle: 'Vault Breaker',
-    tagline: 'Break the security wall. Keep the ball alive.',
-    techLabel: 'BREAK',
+    id: 'hi_lo_cards',
+    title: 'Hi-Lo Cards',
+    shortTitle: 'Hi-Lo',
+    tagline: 'Call the next card. Build your streak.',
+    techLabel: 'HI-LO',
     engine: VaultEngine.pulseForge,
-    colors: [Color(0xFFA855F7), Color(0xFF6366F1)],
-    icon: Icons.sports_esports_rounded,
+    colors: [Color(0xFF1E3A8A), Color(0xFF60A5FA)],
+    icon: Icons.swap_vert_rounded,
   ),
+  // ── Classic board games ──────────────────────────────────────────────────
   VaultGameDef(
-    id: 'jet_corridor',
-    title: 'Jet Corridor',
-    shortTitle: 'Jet Corridor',
-    tagline: 'Thread a narrow corridor at full thrust.',
-    techLabel: 'JET',
-    engine: VaultEngine.neonSerpent,
-    colors: [Color(0xFF38BDF8), Color(0xFF0284C7)],
-    icon: Icons.flight_rounded,
-  ),
-  VaultGameDef(
-    id: 'rush_hour',
-    title: 'Rush Hour',
-    shortTitle: 'Rush Hour',
-    tagline: 'Weave through live traffic without clipping a bumper.',
-    techLabel: 'WEAVE',
-    engine: VaultEngine.laserLane,
-    colors: [Color(0xFFF97316), Color(0xFFEA580C)],
-    icon: Icons.traffic_rounded,
-  ),
-  VaultGameDef(
-    id: 'blade_slice',
-    title: 'Blade Slice',
-    shortTitle: 'Blade Slice',
-    tagline: 'Cut the lane clean. One swipe, one target.',
-    techLabel: 'SLICE',
-    engine: VaultEngine.orbPop,
-    colors: [Color(0xFFEF4444), Color(0xFFBE123C)],
-    icon: Icons.content_cut_rounded,
-  ),
-  VaultGameDef(
-    id: 'pub_darts',
-    title: 'Pub Darts',
-    shortTitle: 'Pub Darts',
-    tagline: 'Release on the sweet spot. Bullseye pays.',
-    techLabel: 'DARTS',
-    engine: VaultEngine.pulseForge,
-    colors: [Color(0xFF16A34A), Color(0xFF14532D)],
-    icon: Icons.adjust_rounded,
-  ),
-  VaultGameDef(
-    id: 'ring_toss_pro',
-    title: 'Ring Toss Pro',
-    shortTitle: 'Ring Toss',
-    tagline: 'Arc the ring onto the peg. Physics, not luck.',
-    techLabel: 'TOSS',
-    engine: VaultEngine.gravityHook,
-    colors: [Color(0xFFEC4899), Color(0xFFDB2777)],
-    icon: Icons.album_rounded,
-  ),
-  VaultGameDef(
-    id: 'perimeter_defense',
-    title: 'Perimeter Defense',
-    shortTitle: 'Perimeter',
-    tagline: 'Rotate shields and block incoming fire.',
-    techLabel: 'DEFENSE',
+    id: 'checkers_deluxe',
+    title: 'Checkers',
+    shortTitle: 'Checkers',
+    tagline: 'Jump and crown pieces. Beat the AI.',
+    techLabel: 'BOARD',
     engine: VaultEngine.nodeDash,
-    colors: [Color(0xFF22D3EE), Color(0xFF0891B2)],
-    icon: Icons.shield_rounded,
+    colors: [Color(0xFF44403C), Color(0xFFF8FAFC)],
+    icon: Icons.grid_view_rounded,
   ),
   VaultGameDef(
-    id: 'steel_walk',
-    title: 'Steel Walk',
-    shortTitle: 'Steel Walk',
-    tagline: 'Hop narrow beams. One misstep ends the run.',
-    techLabel: 'BALANCE',
-    engine: VaultEngine.helixHold,
-    colors: [Color(0xFF94A3B8), Color(0xFF475569)],
-    icon: Icons.height_rounded,
+    id: 'connect_four',
+    title: 'Connect Four',
+    shortTitle: 'Connect 4',
+    tagline: 'Drop discs. Line up four first.',
+    techLabel: 'C4',
+    engine: VaultEngine.laserLane,
+    colors: [Color(0xFFEF4444), Color(0xFFFBBF24)],
+    icon: Icons.view_column_rounded,
   ),
   VaultGameDef(
-    id: 'deep_space',
-    title: 'Deep Space Drift',
-    shortTitle: 'Deep Space',
-    tagline: 'Drift through asteroid fields. Don\'t clip the rock.',
-    techLabel: 'DRIFT',
-    engine: VaultEngine.neonSerpent,
-    colors: [Color(0xFF312E81), Color(0xFF7C3AED)],
-    icon: Icons.public_rounded,
-  ),
-  VaultGameDef(
-    id: 'slingshot_pro',
-    title: 'Slingshot Pro',
-    shortTitle: 'Slingshot Pro',
-    tagline: 'Pull, aim, release — knock down every block.',
-    techLabel: 'SLING',
+    id: 'reversi_duel',
+    title: 'Reversi',
+    shortTitle: 'Reversi',
+    tagline: 'Flank discs and control the board.',
+    techLabel: 'REV',
     engine: VaultEngine.gravityHook,
-    colors: [Color(0xFF84CC16), Color(0xFF65A30D)],
-    icon: Icons.architecture_rounded,
+    colors: [Color(0xFFE2E8F0), Color(0xFF64748B)],
+    icon: Icons.contrast_rounded,
   ),
   VaultGameDef(
-    id: 'orbit_dock',
-    title: 'Orbit Dock',
-    shortTitle: 'Orbit Dock',
-    tagline: 'Match velocity and dock the capsule on the ring.',
-    techLabel: 'DOCK',
+    id: 'tic_tac_go',
+    title: 'Tic Tac Toe',
+    shortTitle: 'Tic Tac Toe',
+    tagline: 'Three in a row against smart AI.',
+    techLabel: 'XOX',
+    engine: VaultEngine.helixHold,
+    colors: [Color(0xFF2563EB), Color(0xFF818CF8)],
+    icon: Icons.grid_3x3_rounded,
+  ),
+  VaultGameDef(
+    id: 'profit_solve',
+    title: 'Profit Lab',
+    shortTitle: 'Profit Lab',
+    tagline: 'Real business math scenarios under pressure.',
+    techLabel: 'PROFIT',
+    engine: VaultEngine.wordMatch,
+    colors: [Color(0xFF047857), Color(0xFF10B981)],
+    icon: Icons.attach_money_rounded,
+  ),
+  // ── Strategy & logic ─────────────────────────────────────────────────────
+  VaultGameDef(
+    id: 'merge_2048',
+    title: 'Merge 2048',
+    shortTitle: '2048',
+    tagline: 'Slide tiles. Plan merges to 2048.',
+    techLabel: '2048',
     engine: VaultEngine.pulseForge,
-    colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
-    icon: Icons.satellite_alt_rounded,
+    colors: [Color(0xFFFBBF24), Color(0xFFF97316)],
+    icon: Icons.grid_on_rounded,
+  ),
+  VaultGameDef(
+    id: 'code_breaker',
+    title: 'Code Breaker',
+    shortTitle: 'Code Breaker',
+    tagline: 'Crack the secret code with pure logic.',
+    techLabel: 'LOGIC',
+    engine: VaultEngine.laserLane,
+    colors: [Color(0xFF818CF8), Color(0xFFA78BFA)],
+    icon: Icons.password_rounded,
+  ),
+  VaultGameDef(
+    id: 'cipher_five',
+    title: 'Cipher Five',
+    shortTitle: 'Cipher 5',
+    tagline: 'Guess the five-letter word in six tries.',
+    techLabel: 'WORD',
+    engine: VaultEngine.wordMatch,
+    colors: [Color(0xFF10B981), Color(0xFF22D3EE)],
+    icon: Icons.abc_rounded,
+  ),
+  VaultGameDef(
+    id: 'sudoku_six',
+    title: 'Sudoku Six',
+    shortTitle: 'Sudoku',
+    tagline: 'Fill the 6×6 grid. No repeats.',
+    techLabel: 'SUDOKU',
+    engine: VaultEngine.helixHold,
+    colors: [Color(0xFF60A5FA), Color(0xFF38BDF8)],
+    icon: Icons.apps_rounded,
+  ),
+  VaultGameDef(
+    id: 'slide_lock',
+    title: 'Slide Lock',
+    shortTitle: 'Slide Lock',
+    tagline: 'Unscramble the numbered 15-tile lock.',
+    techLabel: 'PUZZLE',
+    engine: VaultEngine.orbPop,
+    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
+    icon: Icons.extension_rounded,
+  ),
+  VaultGameDef(
+    id: 'hanoi_spire',
+    title: 'Tower of Hanoi',
+    shortTitle: 'Hanoi',
+    tagline: 'Move the tower in the fewest moves.',
+    techLabel: 'HANOI',
+    engine: VaultEngine.pulseForge,
+    colors: [Color(0xFFF472B6), Color(0xFFA78BFA)],
+    icon: Icons.filter_none_rounded,
+  ),
+  VaultGameDef(
+    id: 'make_twenty_four',
+    title: 'Make 24',
+    shortTitle: 'Make 24',
+    tagline: 'Use four numbers once each to hit 24.',
+    techLabel: 'MATH',
+    engine: VaultEngine.laserLane,
+    colors: [Color(0xFFFACC15), Color(0xFF34D399)],
+    icon: Icons.calculate_rounded,
   ),
 ];
 
+const _kVaultProGameIds = {
+  'blackjack_vegas',
+  'roulette_euro',
+  'slots_jackpot',
+  'billiards_snooker',
+  'checkers_deluxe',
+  'tic_tac_go',
+  'profit_solve',
+};
+
+const _kVaultCardGameIds = {
+  'baccarat_punto',
+  'casino_war',
+  'video_poker',
+  'hi_lo_cards',
+};
+
 Widget ngmyVaultRealisticGameScreen(VaultGameDef game) {
+  if (_kVaultProGameIds.contains(game.id)) {
+    return NgmyVaultProGameScreen(game: game);
+  }
+  if (_kVaultCardGameIds.contains(game.id)) {
+    return NgmyVaultCardGameScreen(game: game);
+  }
   switch (game.id) {
-    case 'night_highway':
-      return NgmyVaultLaneRacerGame(game: game);
-    case 'drag_strip':
-      return NgmyVaultDragLaunchGame(game: game);
-    case 'precision_park':
-      return NgmyVaultPerfectParkGame(game: game);
-    case 'wheelie_king':
-      return NgmyVaultWheelieGame(game: game);
-    case 'roof_run':
-      return NgmyVaultJumpRunnerGame(game: game);
-    case 'cargo_haul':
-      return NgmyVaultCollectorGame(game: game);
-    case 'range_master':
-      return NgmyVaultTargetAimGame(game: game);
-    case 'trader_math':
-      return NgmyVaultQuickMathGame(game: game);
-    case 'signal_decode':
-      return NgmyVaultPatternGame(game: game);
-    case 'vault_breaker':
-      return NgmyVaultBrickBreakerGame(game: game);
-    case 'jet_corridor':
-      return NgmyVaultGravityFlapGame(game: game);
-    case 'rush_hour':
-      return NgmyVaultTrafficWeaveGame(game: game);
-    case 'blade_slice':
-      return NgmyVaultSliceDriftGame(game: game);
-    case 'pub_darts':
-      return NgmyVaultDartsTimingGame(game: game);
-    case 'ring_toss_pro':
-      return NgmyVaultRingTossGame(game: game);
-    case 'perimeter_defense':
-      return NgmyVaultLaserDefenseGame(game: game);
-    case 'steel_walk':
-      return NgmyVaultPlatformHopGame(game: game);
-    case 'deep_space':
-      return NgmyVaultAsteroidDriftGame(game: game);
-    case 'slingshot_pro':
-      return NgmyVaultSlingshotScoreGame(game: game);
-    case 'orbit_dock':
-      return NgmyVaultOrbitDockGame(game: game);
+    case 'merge_2048':
+      return NgmyVaultMerge2048Game(game: game);
+    case 'code_breaker':
+      return NgmyVaultCodeBreakerGame(game: game);
+    case 'connect_four':
+      return NgmyVaultConnectFourGame(game: game);
+    case 'slide_lock':
+      return NgmyVaultSlideLockGame(game: game);
+    case 'sudoku_six':
+      return NgmyVaultSudokuSixGame(game: game);
+    case 'cipher_five':
+      return NgmyVaultCipherFiveGame(game: game);
+    case 'reversi_duel':
+      return NgmyVaultReversiDuelGame(game: game);
+    case 'hanoi_spire':
+      return NgmyVaultHanoiSpireGame(game: game);
+    case 'make_twenty_four':
+      return NgmyVaultMakeTwentyFourGame(game: game);
     default:
-      throw ArgumentError('Unknown realistic vault game: ${game.id}');
+      throw ArgumentError('Unknown vault game: ${game.id}');
   }
 }
 
 bool ngmyVaultIsRealisticGame(String id) =>
     kVaultRealisticGames.any((g) => g.id == id);
 
-/// Full Vault Channel grid: core row games + twenty realistic skill games.
+/// Full Vault Channel grid: core row games + twenty adult skill games.
 const kVaultGames = [...kVaultCoreGames, ...kVaultRealisticGames];
