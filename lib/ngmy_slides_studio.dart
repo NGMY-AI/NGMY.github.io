@@ -373,7 +373,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               _DocumentCategoryTile(
                 icon: Icons.description_rounded,
                 colors: const [Color(0xFF2E4270), Color(0xFF12213D), Color(0xFF0A1526)],
-                title: 'Hati ya Kuhowa',
+                title: 'HATI YA KUHOWA',
                 subtitle: 'Hati ya mahari',
                 onTap: () => Navigator.pop(ctx, 'hati_kuhowa'),
               ),
@@ -381,7 +381,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               _DocumentCategoryTile(
                 icon: Icons.receipt_long_rounded,
                 colors: const [Color(0xFF3E7A4F), Color(0xFF14532D), Color(0xFF0A2E17)],
-                title: 'Hati ya Kuhoweya',
+                title: 'HATI YA KUHOWESHA',
                 subtitle: 'Hati ya kupokea',
                 onTap: () => Navigator.pop(ctx, 'hati_kuhoweya'),
               ),
@@ -389,7 +389,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               _DocumentCategoryTile(
                 icon: Icons.payments_rounded,
                 colors: const [Color(0xFFB8860B), Color(0xFF6B4A12), Color(0xFF3A2708)],
-                title: 'Malipo ya Awamu ya Mahari',
+                title: 'MALIPO YA AWAMU YA MAHARI',
                 subtitle: 'Makubaliano ya mahari iliyosalia',
                 onTap: () => Navigator.pop(ctx, 'hati_malipo_awamu'),
               ),
