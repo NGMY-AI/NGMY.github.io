@@ -6,6 +6,7 @@ import 'ngmy_fun_games.dart';
 import 'ngmy_invoice_creator.dart';
 import 'ngmy_studio_hub.dart' show showNgmyStandaloneQuoteCalc;
 import 'ngmy_swahili_school.dart';
+import 'ngmy_repair_guides.dart';
 import 'ngmy_outfit_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
@@ -45,8 +46,12 @@ void ngmyRegisterAiAppTools({
         return 'Opened Kiswahili School — learn English with Mwalimu Amina.';
       },
       'mechanic_lab': (ctx) async {
-        showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
-        return 'Opened Kiswahili School.';
+        showNgmyRepairGuides(context: ctx, userEmail: userEmail);
+        return 'Opened Fix Manual — step-by-step repair guides with photos.';
+      },
+      'repair_guides': (ctx) async {
+        showNgmyRepairGuides(context: ctx, userEmail: userEmail);
+        return 'Opened Fix Manual — browse or create repair guides by make, model, and year.';
       },
       'ai_outfit': (ctx) async {
         showNgmyOutfitStudio(

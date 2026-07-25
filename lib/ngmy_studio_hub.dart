@@ -13,6 +13,7 @@ import 'ngmy_outfit_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_repair_guides.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
 import 'ngmy_ai_client.dart';
@@ -140,6 +141,13 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Kiswahili School',
         subtitle: 'Jifunze Kiingereza kwa picha na Mwalimu Amina',
         onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
+      ),
+      _CreatorTool(
+        icon: Icons.build_circle_rounded,
+        colors: const [Color(0xFFF97316), Color(0xFFEA580C)],
+        title: 'Fix Manual',
+        subtitle: 'Repair guides · make · model · year · photos',
+        onTap: () => showNgmyRepairGuides(context: context, userEmail: userEmail),
       ),
       _CreatorTool(
         icon: Icons.style_rounded,
