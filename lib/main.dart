@@ -14797,6 +14797,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
+  @override
+  void didChangeMetrics() {
+    // iOS PWA/web can leave stale viewInsets after the keyboard closes — rebuild
+    // so the pinned bottom nav and body layout stay in sync.
+    if (mounted) setState(() {});
+  }
+
   Future<void> _refreshOnlineStatus() async {
     final online = await ngmyCanReachCloud();
     if (!mounted) return;
@@ -15513,7 +15520,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shellBg = Theme.of(context).scaffoldBackgroundColor;
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 40;
+    final viewportH = MediaQuery.sizeOf(context).height;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
@@ -15539,35 +15547,53 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           onResolvePhoneFromCloud: _resolveUserPhoneFromCloud,
           child: Scaffold(
         extendBody: true,
-        resizeToAvoidBottomInset: true,
+        // Keep the shell height stable; keyboard overlays content instead of
+        // removing the bottom nav (stale viewInsets used to leave a blank band).
+        resizeToAvoidBottomInset: false,
         backgroundColor: shellBg,
-        body: _idx == 0
-            ? _buildHomeTabWidget()
-            : Builder(
-                builder: (context) {
-                  final sorted = _sortedTransactions();
-                  return Stack(
-                    children: [
-                      if (!isDark)
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: MediaQuery.of(context).padding.top,
-                          child: ColoredBox(color: shellBg),
-                        ),
-                      Positioned.fill(
-                        child: ColoredBox(
-                          color: shellBg,
-                          child: _buildMainTabBody(sorted),
-                        ),
+        body: SizedBox(
+          width: double.infinity,
+          height: viewportH,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: _idx == 0
+                    ? _buildHomeTabWidget()
+                    : Builder(
+                        builder: (context) {
+                          final sorted = _sortedTransactions();
+                          return Stack(
+                            children: [
+                              if (!isDark)
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: MediaQuery.of(context).padding.top,
+                                  child: ColoredBox(color: shellBg),
+                                ),
+                              Positioned.fill(
+                                child: ColoredBox(
+                                  color: shellBg,
+                                  child: _buildMainTabBody(sorted),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
-                    ],
-                  );
-                },
               ),
-        // Hide bottom nav while typing — it sat above the keyboard as a black block.
-        bottomNavigationBar: keyboardOpen ? null : _buildBottomNavBar(),
+              Positioned(
+                left: 15,
+                right: 15,
+                bottom: 20 + bottomInset,
+                height: NgmyBottomNavMetrics.barHeight,
+                child: _buildBottomNavBar(),
+              ),
+            ],
+          ),
+        ),
         ),
         ),
       ),
@@ -15577,66 +15603,50 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget _buildBottomNavBar() {
     const orb = NgmyBottomNavMetrics.selectionOrb;
     const barH = NgmyBottomNavMetrics.barHeight;
-    // extendBody stacks this over the body. Size a slot for layout, but only the
-    // pill itself hit-tests — empty space above must pass through to Core/Vault.
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return SizedBox(
-      height: barH + 20 + bottomInset,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 15,
-            right: 15,
-            bottom: 20 + bottomInset,
-            height: barH,
-            child: Material(
-              type: MaterialType.transparency,
-              elevation: 0,
-              color: Colors.transparent,
-              child: NgmySculptedBottomNavFrame(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final tabW = constraints.maxWidth / 7;
-                    final ballLeft = _idx * tabW + (tabW - orb) / 2;
-                    final ballTop = (barH - orb) / 2;
-                    final accent = switch (_idx) {
-                      3 => const Color(0xFFBB86FC),
-                      4 => kNgmyAdvisorsHubAccent,
-                      5 => const Color(0xFF8B5CF6),
-                      _ => const Color(0xFF67E8F9),
-                    };
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedPositioned(
-                          duration: const Duration(milliseconds: 320),
-                          curve: Curves.easeOutCubic,
-                          left: ballLeft,
-                          top: ballTop,
-                          width: orb,
-                          height: orb,
-                          child: IgnorePointer(child: NgmyNavSelectionOrb(size: orb, accent: accent)),
-                        ),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _nav(0, Icons.home_rounded),
-                            _navToolHub(),
-                            _nav(2, Icons.auto_stories_rounded),
-                            _navC(3),
-                            _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
-                            _navStudio(),
-                            _nav(6, Icons.person_rounded),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
+    return Material(
+      type: MaterialType.transparency,
+      elevation: 0,
+      color: Colors.transparent,
+      child: NgmySculptedBottomNavFrame(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final tabW = constraints.maxWidth / 7;
+            final ballLeft = _idx * tabW + (tabW - orb) / 2;
+            final ballTop = (barH - orb) / 2;
+            final accent = switch (_idx) {
+              3 => const Color(0xFFBB86FC),
+              4 => kNgmyAdvisorsHubAccent,
+              5 => const Color(0xFF8B5CF6),
+              _ => const Color(0xFF67E8F9),
+            };
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                  left: ballLeft,
+                  top: ballTop,
+                  width: orb,
+                  height: orb,
+                  child: IgnorePointer(child: NgmyNavSelectionOrb(size: orb, accent: accent)),
                 ),
-              ),
-            ),
-          ),
-        ],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _nav(0, Icons.home_rounded),
+                    _navToolHub(),
+                    _nav(2, Icons.auto_stories_rounded),
+                    _navC(3),
+                    _nav(4, kNgmyAdvisorsHubNavIcon, selectedColor: kNgmyAdvisorsHubAccent),
+                    _navStudio(),
+                    _nav(6, Icons.person_rounded),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
