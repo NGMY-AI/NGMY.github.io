@@ -4144,19 +4144,29 @@ class _UndoSnapshot {
   final String? selectedId;
 }
 
-class _DeckActionsDialog extends StatelessWidget {
+class _DeckActionsDialog extends StatefulWidget {
   const _DeckActionsDialog({required this.deck, required this.isDark});
 
   final NgmySlideDeck deck;
   final bool isDark;
 
+  @override
+  State<_DeckActionsDialog> createState() => _DeckActionsDialogState();
+}
+
+class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final AnimationController _enter;
+
+  NgmySlideDeck get deck => widget.deck;
+
   String get _subtitle {
     final d = deck.updatedAt.toLocal();
     final when = '${d.month}/${d.day}/${d.year}';
-    if (deck.deckKind == 'marriage_agreement') return 'Hati ya Kuhowesha · Updated $when';
-    if (deck.deckKind == 'hati_kuhowa') return 'Hati ya Kuhowa · Updated $when';
-    if (deck.deckKind == 'hati_kuhoweya') return 'Hati ya Kuhoweya · Updated $when';
-    return '${deck.slides.length} slides · Updated $when';
+    if (deck.deckKind == 'marriage_agreement') return 'Hati ya Kuhowesha · $when';
+    if (deck.deckKind == 'hati_kuhowa') return 'Hati ya Kuhowa · $when';
+    if (deck.deckKind == 'hati_kuhoweya') return 'Hati ya Kuhoweya · $when';
+    return '${deck.slides.length} slides · $when';
   }
 
   List<Color> get _accent => deck.isLockedTemplateDoc
@@ -4164,137 +4174,239 @@ class _DeckActionsDialog extends StatelessWidget {
       : const [Color(0xFF2563EB), Color(0xFF1D4ED8)];
 
   @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+    _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 680))..forward();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _enter.dispose();
+    super.dispose();
+  }
+
+  double _stagger(int index) {
+    final start = 0.12 + index * 0.09;
+    final end = (start + 0.55).clamp(0.0, 1.0);
+    return Curves.easeOutCubic.transform(
+      Interval(start, end, curve: Curves.easeOutCubic).transform(_enter.value),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 44),
-        child: Material(
-          color: Colors.transparent,
-          elevation: 0,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 340),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111827),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFF334155), width: 1),
-              boxShadow: const [
-                BoxShadow(color: Color(0x80000000), blurRadius: 28, offset: Offset(0, 16)),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 18, 8, 16),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0F172A),
-                      border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _accent),
-                          ),
-                          child: Icon(
-                            deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_pulse, _enter]),
+          builder: (context, _) {
+            final pulse = Curves.easeInOut.transform(_pulse.value);
+            final shell = Curves.easeOutBack.transform(_enter.value.clamp(0.0, 1.0));
+            return Transform.scale(
+              scale: 0.88 + shell * 0.12,
+              child: Opacity(
+                opacity: Curves.easeOut.transform(_enter.value),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    width: 320,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111827),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: Color.lerp(const Color(0xFF334155), _accent.first, pulse * 0.35)!,
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _accent.first.withValues(alpha: 0.18 + pulse * 0.12),
+                          blurRadius: 32 + pulse * 10,
+                          spreadRadius: pulse * 2,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'PRESENTATION',
-                                style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                deck.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17, height: 1.25),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _subtitle,
-                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600, height: 1.2),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
-                        ),
+                        const BoxShadow(color: Color(0x90000000), blurRadius: 28, offset: Offset(0, 18)),
                       ],
                     ),
-                  ),
-                  _DeckActionTile(
-                    icon: Icons.picture_as_pdf_outlined,
-                    label: 'Download PDF',
-                    value: 'pdf',
-                    tint: const Color(0xFF3B82F6),
-                  ),
-                  if (ngmyHatiIsTransferableDeck(deck))
-                    _DeckActionTile(
-                      icon: Icons.swap_horiz_rounded,
-                      label: 'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
-                      value: 'transfer_hati',
-                      tint: const Color(0xFF10B981),
-                    ),
-                  _DeckActionTile(
-                    icon: Icons.drive_file_rename_outline_rounded,
-                    label: 'Rename presentation',
-                    value: 'rename',
-                    tint: const Color(0xFF6366F1),
-                  ),
-                  _DeckActionTile(
-                    icon: Icons.content_copy_outlined,
-                    label: 'Duplicate',
-                    value: 'duplicate',
-                    tint: const Color(0xFF8B5CF6),
-                    showDivider: false,
-                  ),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFF1E293B)),
-                  _DeckActionTile(
-                    icon: Icons.delete_outline_rounded,
-                    label: 'Delete presentation',
-                    value: 'delete',
-                    tint: const Color(0xFFEF4444),
-                    destructive: true,
-                    showDivider: false,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF94A3B8),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(26),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: -40,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 120,
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  center: Alignment.topCenter,
+                                  radius: 0.9,
+                                  colors: [
+                                    _accent.first.withValues(alpha: 0.22 + pulse * 0.1),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Container(
+                                      width: 88 + pulse * 10,
+                                      height: 88 + pulse * 10,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            _accent.first.withValues(alpha: 0.28 + pulse * 0.14),
+                                            _accent.last.withValues(alpha: 0.08),
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    Transform.scale(
+                                      scale: 1 + pulse * 0.04,
+                                      child: Container(
+                                        width: 62,
+                                        height: 62,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(20),
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: _accent,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: _accent.first.withValues(alpha: 0.45 + pulse * 0.2),
+                                              blurRadius: 18,
+                                              offset: const Offset(0, 6),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'PRESENTATION',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _accent.first.withValues(alpha: 0.85 + pulse * 0.15),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  deck.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 18,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _subtitle,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
+                                _DeckActionTile(
+                                  icon: Icons.picture_as_pdf_outlined,
+                                  label: 'Download PDF',
+                                  value: 'pdf',
+                                  tint: const Color(0xFF3B82F6),
+                                  enter: _stagger(0),
+                                ),
+                                if (ngmyHatiIsTransferableDeck(deck)) ...[
+                                  const SizedBox(height: 10),
+                                  _DeckActionTile(
+                                    icon: Icons.swap_horiz_rounded,
+                                    label: 'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
+                                    value: 'transfer_hati',
+                                    tint: const Color(0xFF10B981),
+                                    enter: _stagger(1),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                _DeckActionTile(
+                                  icon: Icons.drive_file_rename_outline_rounded,
+                                  label: 'Rename presentation',
+                                  value: 'rename',
+                                  tint: const Color(0xFF6366F1),
+                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 2 : 1),
+                                ),
+                                const SizedBox(height: 10),
+                                _DeckActionTile(
+                                  icon: Icons.content_copy_outlined,
+                                  label: 'Duplicate',
+                                  value: 'duplicate',
+                                  tint: const Color(0xFF8B5CF6),
+                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 3 : 2),
+                                ),
+                                const SizedBox(height: 14),
+                                _DeckActionTile(
+                                  icon: Icons.delete_outline_rounded,
+                                  label: 'Delete presentation',
+                                  value: 'delete',
+                                  tint: const Color(0xFFEF4444),
+                                  destructive: true,
+                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 4 : 3),
+                                ),
+                                const SizedBox(height: 14),
+                                Transform.translate(
+                                  offset: Offset(0, (1 - _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4)) * 12),
+                                  child: Opacity(
+                                    opacity: _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4),
+                                    child: TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: const Color(0xFF94A3B8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+                                      ),
+                                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -4395,55 +4507,87 @@ class _DeleteDeckDialog extends StatelessWidget {
   }
 }
 
-class _DeckActionTile extends StatelessWidget {
+class _DeckActionTile extends StatefulWidget {
   const _DeckActionTile({
     required this.icon,
     required this.label,
     required this.value,
     required this.tint,
+    required this.enter,
     this.destructive = false,
-    this.showDivider = true,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color tint;
+  final double enter;
   final bool destructive;
-  final bool showDivider;
+
+  @override
+  State<_DeckActionTile> createState() => _DeckActionTileState();
+}
+
+class _DeckActionTileState extends State<_DeckActionTile> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.pop(context, value),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-              child: Row(
+    final tint = widget.tint;
+    final destructive = widget.destructive;
+    final enter = widget.enter;
+    return Transform.translate(
+      offset: Offset(0, (1 - enter) * 16),
+      child: Opacity(
+        opacity: enter,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTap: () => Navigator.pop(context, widget.value),
+          child: AnimatedScale(
+            scale: _pressed ? 0.96 : 1,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: tint.withValues(alpha: destructive ? 0.1 + (_pressed ? 0.06 : 0) : 0.08 + (_pressed ? 0.05 : 0)),
+                border: Border.all(color: tint.withValues(alpha: destructive ? 0.34 : 0.28)),
+                boxShadow: _pressed
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: tint.withValues(alpha: 0.12),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: tint.withValues(alpha: destructive ? 0.14 : 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      color: tint.withValues(alpha: destructive ? 0.16 : 0.14),
+                      borderRadius: BorderRadius.circular(13),
                     ),
-                    child: Icon(icon, color: tint, size: 20),
+                    child: Icon(widget.icon, color: tint, size: 22),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: destructive ? const Color(0xFFFCA5A5) : Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        height: 1.2,
-                      ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: destructive ? const Color(0xFFFCA5A5) : Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.25,
                     ),
                   ),
                 ],
@@ -4451,8 +4595,7 @@ class _DeckActionTile extends StatelessWidget {
             ),
           ),
         ),
-        if (showDivider) const Divider(height: 1, thickness: 1, indent: 68, color: Color(0xFF1E293B)),
-      ],
+      ),
     );
   }
 }
