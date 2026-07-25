@@ -6,12 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_repair_guides_models.dart';
 import 'ngmy_repair_guides_seed_cars.dart';
 
-const _indexPrefix = 'ngmy_repair_guides_index_v1_';
-const _itemPrefix = 'ngmy_repair_guide_item_v1_';
-const _seedVersionPrefix = 'ngmy_repair_guides_seed_version_v1_';
-
-/// Bump when seed library changes so existing users receive new guides + photos.
-const kRepairGuideSeedVersion = 3;
+const _indexPrefix = 'ngmy_repair_guides_user_index_v1_';
+const _itemPrefix = 'ngmy_repair_guide_user_item_v1_';
 
 String _emailSlug(String email) {
   final e = email.toLowerCase().trim();
@@ -21,39 +17,49 @@ String _emailSlug(String email) {
 
 String _indexKey(String email) => '$_indexPrefix${_emailSlug(email)}';
 String _itemKey(String email, String id) => '$_itemPrefix${_emailSlug(email)}_$id';
-String _seedVersionKey(String email) => '$_seedVersionPrefix${_emailSlug(email)}';
 
-Future<void> _ensureSeedGuidesLoaded(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  final versionKey = _seedVersionKey(userEmail);
-  final loadedVersion = prefs.getInt(versionKey) ?? 0;
-  if (loadedVersion >= kRepairGuideSeedVersion) return;
+/// Built-in guides live in memory only — avoids slow/hanging SharedPreferences writes on web.
+List<RepairGuide> _builtInGuides() => kRepairGuideSeedGuides();
 
-  final indexKey = _indexKey(userEmail);
-  final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
-  for (final seed in kRepairGuideSeedGuides()) {
-    await prefs.setString(_itemKey(userEmail, seed.id), jsonEncode(seed.toJson()));
-    if (!ids.contains(seed.id)) ids.add(seed.id);
+Future<List<RepairGuide>> _loadUserGuidesFromPrefs(String userEmail) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_indexKey(userEmail)) ?? const [];
+    final guides = <RepairGuide>[];
+    for (final id in ids) {
+      if (id.startsWith('seed_')) continue;
+      final raw = prefs.getString(_itemKey(userEmail, id));
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final g = repairGuideFromJsonString(raw);
+        if (!g.isSeed) guides.add(g);
+      } catch (e) {
+        debugPrint('[repair_guides] skip bad user item $id: $e');
+      }
+    }
+    return guides;
+  } catch (e) {
+    debugPrint('[repair_guides] prefs read failed: $e');
+    return const [];
   }
-  await prefs.setStringList(indexKey, ids);
-  await prefs.setInt(versionKey, kRepairGuideSeedVersion);
 }
 
 Future<List<RepairGuide>> loadRepairGuides({required String userEmail}) async {
-  await _ensureSeedGuidesLoaded(userEmail);
-  final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList(_indexKey(userEmail)) ?? const [];
-  final guides = <RepairGuide>[];
-  for (final id in ids) {
-    final raw = prefs.getString(_itemKey(userEmail, id));
-    if (raw == null || raw.isEmpty) continue;
-    try {
-      guides.add(repairGuideFromJsonString(raw));
-    } catch (e) {
-      debugPrint('[repair_guides] bad item $id: $e');
-    }
+  final merged = <String, RepairGuide>{
+    for (final g in _builtInGuides()) g.id: g,
+  };
+  final userGuides = await _loadUserGuidesFromPrefs(userEmail);
+  for (final g in userGuides) {
+    merged[g.id] = g;
   }
-  guides.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  final guides = merged.values.toList();
+  guides.sort((a, b) {
+    final makeCmp = a.make.compareTo(b.make);
+    if (makeCmp != 0) return makeCmp;
+    final modelCmp = a.model.compareTo(b.model);
+    if (modelCmp != 0) return modelCmp;
+    return a.repairTitle.compareTo(b.repairTitle);
+  });
   return guides;
 }
 
@@ -61,11 +67,13 @@ Future<RepairGuide?> loadRepairGuideById({
   required String userEmail,
   required String id,
 }) async {
-  await _ensureSeedGuidesLoaded(userEmail);
-  final prefs = await SharedPreferences.getInstance();
-  final raw = prefs.getString(_itemKey(userEmail, id));
-  if (raw == null || raw.isEmpty) return null;
+  for (final g in _builtInGuides()) {
+    if (g.id == id) return g;
+  }
   try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_itemKey(userEmail, id));
+    if (raw == null || raw.isEmpty) return null;
     return repairGuideFromJsonString(raw);
   } catch (e) {
     debugPrint('[repair_guides] load $id failed: $e');
@@ -77,27 +85,39 @@ Future<bool> upsertRepairGuide({
   required String userEmail,
   required RepairGuide guide,
 }) async {
+  if (guide.isSeed || guide.id.startsWith('seed_')) return false;
   if (userEmail.trim().isEmpty) return false;
-  final prefs = await SharedPreferences.getInstance();
-  final indexKey = _indexKey(userEmail);
-  final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
-  if (!ids.contains(guide.id)) ids.insert(0, guide.id);
-  final ok = await prefs.setString(_itemKey(userEmail, guide.id), jsonEncode(guide.toJson()));
-  if (ok) await prefs.setStringList(indexKey, ids);
-  return ok;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final indexKey = _indexKey(userEmail);
+    final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
+    if (!ids.contains(guide.id)) ids.insert(0, guide.id);
+    final ok = await prefs.setString(_itemKey(userEmail, guide.id), jsonEncode(guide.toJson()));
+    if (ok) await prefs.setStringList(indexKey, ids);
+    return ok;
+  } catch (e) {
+    debugPrint('[repair_guides] save failed: $e');
+    return false;
+  }
 }
 
 Future<bool> deleteRepairGuide({
   required String userEmail,
   required String id,
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  final indexKey = _indexKey(userEmail);
-  final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
-  ids.remove(id);
-  await prefs.remove(_itemKey(userEmail, id));
-  await prefs.setStringList(indexKey, ids);
-  return true;
+  if (id.startsWith('seed_')) return false;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final indexKey = _indexKey(userEmail);
+    final ids = prefs.getStringList(indexKey)?.toList() ?? <String>[];
+    ids.remove(id);
+    await prefs.remove(_itemKey(userEmail, id));
+    await prefs.setStringList(indexKey, ids);
+    return true;
+  } catch (e) {
+    debugPrint('[repair_guides] delete failed: $e');
+    return false;
+  }
 }
 
 List<RepairGuide> filterRepairGuides(
@@ -114,8 +134,6 @@ List<RepairGuide> filterRepairGuides(
   }).toList();
 }
 
-/// Force-refresh built-in guides (photos + new cars) on next load.
 Future<void> ngmyRefreshRepairGuideSeeds(String userEmail) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.remove(_seedVersionKey(userEmail));
+  // Built-in guides are always fresh from code — nothing to refresh in prefs.
 }

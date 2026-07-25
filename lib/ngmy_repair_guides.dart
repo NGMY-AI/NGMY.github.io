@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_repair_guides_models.dart';
+import 'ngmy_repair_guides_seed_cars.dart';
 import 'ngmy_repair_guides_storage.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -161,13 +163,23 @@ class _NgmyRepairGuidesPageState extends State<NgmyRepairGuidesPage> {
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = true);
-    final list = await loadRepairGuides(userEmail: widget.userEmail);
     if (!mounted) return;
-    setState(() {
-      _guides = list;
-      _loading = false;
-    });
+    setState(() => _loading = true);
+    try {
+      final list = await loadRepairGuides(userEmail: widget.userEmail);
+      if (!mounted) return;
+      setState(() {
+        _guides = list;
+        _loading = false;
+      });
+    } catch (e, st) {
+      debugPrint('[repair_guides] reload failed: $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _guides = kRepairGuideSeedGuides();
+        _loading = false;
+      });
+    }
   }
 
   void _openCategory(RepairGuideCategory cat) {
