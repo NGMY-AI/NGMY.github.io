@@ -288277,7 +288277,7 @@ s.z="Home"},
 $S:0}
 A.cRq.prototype={
 $1(a){var s=null
-return A.bD(!0,new A.D(B.tK,A.v(A.a([A.aC(A.q(s,s,B.j,s,s,new A.o(B.b4,s,s,A.m(2),s,s,B.o),s,4,s,s,s,s,s,44),s,s,s),B.bB,B.dmp,B.aJ,A.d("Chagua aina ya hati",s,s,s,s,s,s,A.l(s,s,B.c.k(0.55),s,s,s,s,s,s,s,s,13,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),B.bB,new A.Ya(B.D3,B.abb,"Hati ya Kuhowa","Hati ya mahari",new A.cRn(a),s),B.W,new A.Ya(B.h5,B.c03,"Hati ya Kuhoweya","Hati ya kupokea",new A.cRo(a),s),B.W,new A.Ya(B.kA,B.bS2,"Malipo ya Awamu ya Mahari","Makubaliano ya mahari iliyosalia",new A.cRp(a),s)],t.p),B.am,s,B.i,B.Z,0,B.p),s),!1,B.ab,!0,!0)},
+return A.bD(!0,new A.D(B.tK,A.v(A.a([A.aC(A.q(s,s,B.j,s,s,new A.o(B.b4,s,s,A.m(2),s,s,B.o),s,4,s,s,s,s,s,44),s,s,s),B.bB,B.dmp,B.aJ,A.d("Chagua aina ya hati",s,s,s,s,s,s,A.l(s,s,B.c.k(0.55),s,s,s,s,s,s,s,s,13,s,s,s,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),B.bB,new A.Ya(B.D3,B.abb,"HATI YA KUHOWA","Hati ya mahari",new A.cRn(a),s),B.W,new A.Ya(B.h5,B.c03,"HATI YA KUHOWESHA","Hati ya kupokea",new A.cRo(a),s),B.W,new A.Ya(B.kA,B.bS2,"MALIPO YA AWAMU YA MAHARI","Makubaliano ya mahari iliyosalia",new A.cRp(a),s)],t.p),B.am,s,B.i,B.Z,0,B.p),s),!1,B.ab,!0,!0)},
 $S:50}
 A.cRn.prototype={
 $0(){A.a0(this.a,!1).N("hati_kuhowa")
