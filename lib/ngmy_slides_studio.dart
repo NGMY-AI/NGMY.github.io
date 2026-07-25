@@ -4199,7 +4199,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 44),
         child: AnimatedBuilder(
           animation: Listenable.merge([_pulse, _enter]),
           builder: (context, _) {
@@ -4212,10 +4212,10 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                 child: Material(
                   color: Colors.transparent,
                   child: Container(
-                    width: 320,
+                    constraints: const BoxConstraints(maxWidth: 300),
                     decoration: BoxDecoration(
                       color: const Color(0xFF111827),
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: Color.lerp(const Color(0xFF334155), _accent.first, pulse * 0.35)!,
                         width: 1.2,
@@ -4230,15 +4230,15 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                       ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(22),
                       child: Stack(
                         children: [
                           Positioned(
-                            top: -40,
+                            top: -28,
                             left: 0,
                             right: 0,
                             child: Container(
-                              height: 120,
+                              height: 80,
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   center: Alignment.topCenter,
@@ -4252,7 +4252,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -4261,8 +4261,8 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   alignment: Alignment.center,
                                   children: [
                                     Container(
-                                      width: 88 + pulse * 10,
-                                      height: 88 + pulse * 10,
+                                      width: 64 + pulse * 6,
+                                      height: 64 + pulse * 6,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         gradient: RadialGradient(
@@ -4277,10 +4277,10 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                     Transform.scale(
                                       scale: 1 + pulse * 0.04,
                                       child: Container(
-                                        width: 62,
-                                        height: 62,
+                                        width: 46,
+                                        height: 46,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(14),
                                           gradient: LinearGradient(
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
@@ -4297,13 +4297,13 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                         child: Icon(
                                           deck.isLockedTemplateDoc ? Icons.description_rounded : Icons.slideshow_rounded,
                                           color: Colors.white,
-                                          size: 28,
+                                          size: 22,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 10),
                                 Text(
                                   'PRESENTATION',
                                   textAlign: TextAlign.center,
@@ -4314,7 +4314,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                     letterSpacing: 1.4,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 5),
                                 Text(
                                   deck.name,
                                   maxLines: 2,
@@ -4323,22 +4323,22 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 18,
-                                    height: 1.25,
+                                    fontSize: 16,
+                                    height: 1.2,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   _subtitle,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     color: Color(0xFF94A3B8),
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    height: 1.3,
+                                    height: 1.2,
                                   ),
                                 ),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 14),
                                 _DeckActionTile(
                                   icon: Icons.picture_as_pdf_outlined,
                                   label: 'Download PDF',
@@ -4347,7 +4347,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   enter: _stagger(0),
                                 ),
                                 if (ngmyHatiIsTransferableDeck(deck)) ...[
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 6),
                                   _DeckActionTile(
                                     icon: Icons.swap_horiz_rounded,
                                     label: 'Transfer to ${ngmyHatiTransferPartnerTitle(deck.deckKind ?? '')}',
@@ -4356,7 +4356,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                     enter: _stagger(1),
                                   ),
                                 ],
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 6),
                                 _DeckActionTile(
                                   icon: Icons.drive_file_rename_outline_rounded,
                                   label: 'Rename presentation',
@@ -4364,7 +4364,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   tint: const Color(0xFF6366F1),
                                   enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 2 : 1),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 6),
                                 _DeckActionTile(
                                   icon: Icons.content_copy_outlined,
                                   label: 'Duplicate',
@@ -4372,7 +4372,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   tint: const Color(0xFF8B5CF6),
                                   enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 3 : 2),
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 8),
                                 _DeckActionTile(
                                   icon: Icons.delete_outline_rounded,
                                   label: 'Delete presentation',
@@ -4381,18 +4381,20 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   destructive: true,
                                   enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 4 : 3),
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 4),
                                 Transform.translate(
-                                  offset: Offset(0, (1 - _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4)) * 12),
+                                  offset: Offset(0, (1 - _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4)) * 8),
                                   child: Opacity(
                                     opacity: _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4),
                                     child: TextButton(
                                       onPressed: () => Navigator.pop(context),
                                       style: TextButton.styleFrom(
                                         foregroundColor: const Color(0xFF94A3B8),
-                                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 10),
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                                     ),
                                   ),
                                 ),
@@ -4552,42 +4554,47 @@ class _DeckActionTileState extends State<_DeckActionTile> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 color: tint.withValues(alpha: destructive ? 0.1 + (_pressed ? 0.06 : 0) : 0.08 + (_pressed ? 0.05 : 0)),
                 border: Border.all(color: tint.withValues(alpha: destructive ? 0.34 : 0.28)),
                 boxShadow: _pressed
                     ? []
                     : [
                         BoxShadow(
-                          color: tint.withValues(alpha: 0.12),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                          color: tint.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
               ),
-              child: Column(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: tint.withValues(alpha: destructive ? 0.16 : 0.14),
-                      borderRadius: BorderRadius.circular(13),
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    child: Icon(widget.icon, color: tint, size: 22),
+                    child: Icon(widget.icon, color: tint, size: 18),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    widget.label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: destructive ? const Color(0xFFFCA5A5) : Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      height: 1.25,
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: destructive ? const Color(0xFFFCA5A5) : Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                 ],
