@@ -31491,14 +31491,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return totals;
   }
 
-  String _formatContributionCampaignStarted(DateTime? started) {
-    if (started == null) return 'Campaign start not recorded';
-    final local = started.toLocal();
-    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final ampm = local.hour >= 12 ? 'PM' : 'AM';
-    return 'Started ${local.month}/${local.day}/${local.year} $h:${local.minute.toString().padLeft(2, '0')} $ampm';
-  }
-
   NgmyCivicContributionReportData? _buildContributionReportData() {
     final state = _selectedState.trim();
     if (state.isEmpty) return null;
@@ -31562,7 +31554,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       scopeLabel: _helpScopeLabelForState(state),
       generatedAt: generatedAt,
       campaignActive: campaignActive,
-      campaignStartedLabel: _formatContributionCampaignStarted(campaignStartedAt),
+      campaignStartedAt: campaignStartedAt,
       rows: rows,
     );
   }
