@@ -147,6 +147,7 @@ import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
+import 'ngmy_civic_contribution_report.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
@@ -31414,6 +31415,160 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;');
 
+  String _helpScopeLabelForState(String state) {
+    if (widget.config.helpScopeTypeFor(state) == 'city') {
+      return 'City: ${widget.config.helpScopeValueFor(state)}';
+    }
+    if (widget.config.helpScopeTypeFor(state) == 'room') {
+      return 'Room: ${widget.config.helpScopeValueFor(state)}';
+    }
+    return 'All members';
+  }
+
+  List<UserData> _membersForContributionReport(String state) {
+    final stateLower = state.trim().toLowerCase();
+    final allInState = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((m) => m.state.trim().toLowerCase() == stateLower)
+        .toList();
+    if (widget.config.helpActiveFor(state)) {
+      return _membersInCurrentHelpScope(forState: state);
+    }
+    final scopeType = widget.config.helpScopeTypeFor(state);
+    final scopeValue = widget.config.helpScopeValueFor(state).trim();
+    if (scopeType != 'city' && scopeType != 'room') return allInState;
+    if (scopeValue.isEmpty) return allInState;
+    final wanted = scopeValue.toLowerCase();
+    return allInState.where((m) {
+      final registry = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email) ??
+          (((m.registryId ?? '').trim().isNotEmpty)
+              ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, m.registryId!)
+              : null);
+      final memberCity = ((registry?['city'] ?? m.city) ?? '').toString().trim().toLowerCase();
+      final memberRoom = ((registry?['room'] ?? m.room) ?? '').toString().trim().toLowerCase();
+      if (scopeType == 'city') return memberCity == wanted;
+      return memberRoom == wanted;
+    }).toList();
+  }
+
+  Map<String, double> _contributionTotalsForCampaign({
+    required String state,
+    required String campaignId,
+    DateTime? campaignStartedAt,
+  }) {
+    final normalizedCampaignId = campaignId.trim();
+    final stateKey = state.trim().toLowerCase();
+    final totals = <String, double>{};
+
+    void addAmount(String key, double amount) {
+      if (key.isEmpty || amount <= 0) return;
+      totals[key] = (totals[key] ?? 0) + amount;
+    }
+
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final meta = _decodeContributionMeta(t);
+      final cid = (meta['campaignId'] ?? '').toString().trim();
+      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
+      final fallbackId =
+          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${_contributionReceiptState(t, meta)}';
+      final matchesCampaignId =
+          normalizedCampaignId.isNotEmpty && (cid == normalizedCampaignId || fallbackId == normalizedCampaignId);
+      final matchesTimeWindow = campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt);
+      final matchesState = stateKey.isEmpty || receiptState.isEmpty || receiptState == stateKey;
+      final isForThisCampaign = normalizedCampaignId.isNotEmpty
+          ? (matchesCampaignId || (matchesTimeWindow && matchesState))
+          : (matchesState && (campaignStartedAt == null || matchesTimeWindow));
+      if (!isForThisCampaign) continue;
+
+      final emailKey = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+      if (emailKey.isNotEmpty) addAmount(emailKey, t.amount);
+      final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+      if (metaEmail.isNotEmpty) addAmount(metaEmail, t.amount);
+      final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rid.isNotEmpty) addAmount('rid:$rid', t.amount);
+    }
+    return totals;
+  }
+
+  NgmyCivicContributionReportData? _buildContributionReportData() {
+    final state = _selectedState.trim();
+    if (state.isEmpty) return null;
+
+    final campaignActive = widget.config.helpActiveFor(state);
+    final campaignId = widget.config.helpCampaignIdFor(state).trim();
+    final fallbackCampaignId = _activeHelpCampaignId(state);
+    final resolvedCampaignId = campaignId.isNotEmpty ? campaignId : fallbackCampaignId;
+    DateTime? campaignStartedAt;
+    try {
+      final raw = widget.config.helpCampaignStartedAtFor(state).trim();
+      if (raw.isNotEmpty) campaignStartedAt = DateTime.parse(raw).toLocal();
+    } catch (_) {}
+
+    final campaignTitle = widget.config.helpPurposeFor(state).trim().isNotEmpty
+        ? widget.config.helpPurposeFor(state).trim()
+        : 'Community Contribution Campaign';
+
+    final members = _membersForContributionReport(state)
+      ..sort((a, b) => (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase()));
+    if (members.isEmpty) return null;
+
+    final totals = _contributionTotalsForCampaign(
+      state: state,
+      campaignId: resolvedCampaignId,
+      campaignStartedAt: campaignStartedAt,
+    );
+    final contributorKeys = totals.keys.toSet();
+
+    final now = DateTime.now().toLocal();
+    final generatedAt =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+        '${now.hour % 12 == 0 ? 12 : now.hour % 12}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+
+    final rows = members.map((m) {
+      final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
+      final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
+      final contributed = (emailKey.isNotEmpty && contributorKeys.contains(emailKey)) ||
+          (ridKey != 'rid:' && contributorKeys.contains(ridKey));
+      final amount = (emailKey.isNotEmpty ? totals[emailKey] : null) ??
+          (ridKey != 'rid:' ? totals[ridKey] : null) ??
+          0.0;
+      final phoneDigits = m.phone.replaceAll(RegExp(r'\D'), '');
+      final phone = phoneDigits.isEmpty
+          ? ''
+          : ngmyFormatPhoneDisplay(phoneDigits.length >= 10 ? phoneDigits.substring(phoneDigits.length - 10) : phoneDigits);
+      return NgmyCivicContributionReportRow(
+        name: (m.fullName ?? m.username).trim(),
+        registryId: (m.registryId ?? '').trim(),
+        city: (m.city ?? '').trim(),
+        room: (m.room ?? '').trim(),
+        phone: phone,
+        contributed: contributed,
+        amount: amount,
+      );
+    }).toList();
+
+    return NgmyCivicContributionReportData(
+      state: state,
+      campaignTitle: campaignTitle,
+      scopeLabel: _helpScopeLabelForState(state),
+      generatedAt: generatedAt,
+      campaignActive: campaignActive,
+      rows: rows,
+    );
+  }
+
+  Future<void> _openCivicContributionReportSheet() async {
+    final data = _buildContributionReportData();
+    if (data == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No members in $_selectedState for a contribution report yet.')),
+      );
+      return;
+    }
+    await showNgmyCivicContributionReportSheet(context, data: data);
+  }
+
   Future<void> _showCivicRegistryBackupSheet() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
@@ -31496,6 +31651,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'Contribution report — print or download',
+                        child: Material(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              unawaited(_openCivicContributionReportSheet());
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.description_outlined,
+                                size: 20,
+                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                              ),
+                            ),
                           ),
                         ),
                       ),
