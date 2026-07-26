@@ -176,6 +176,7 @@ Future<void> ngmyWarmCommunicateAvatarsFromConfig(dynamic config) async {
 bool ngmyUserRequestedChatImage(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
+  // Vague "show me" / "send it" alone is NOT a photo ask — that caused silent failed photo paths.
   return RegExp(
         r'\b(pics?|pictures?|photos?|selfies?|snaps?|images?|nudes?|portraits?)\b',
         caseSensitive: false,
@@ -189,9 +190,6 @@ bool ngmyUserRequestedChatImage(String text) {
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(r'\b(your\s+body|body\s+pics?|body\s+shots?|send\s+.{0,20}\bbody)\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\blet me see\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bshow me\b', caseSensitive: false).hasMatch(t) ||
-      RegExp(r'\bsend (it|that|one)\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bi want (to see|a pic|a photo|the pic|the picture|pics|pictures|photos)\b', caseSensitive: false).hasMatch(t) ||
       RegExp(r'\bsend me (your|some|a|an)?\s*(pics?|pictures?|photos?|selfies?)\b', caseSensitive: false).hasMatch(t) ||
       RegExp(
@@ -203,7 +201,7 @@ bool ngmyUserRequestedChatImage(String text) {
         caseSensitive: false,
       ).hasMatch(t) ||
       RegExp(
-        r'\b(can i see|want to see|wanna see|need to see)\s+(your\s+)?(titties|tits|boobs|breasts|pussy|ass|body|nipples)\b',
+        r'\b(can i see|want to see|wanna see|need to see)\s+(your\s+)?(titties|tits|boobs|breasts|pussy|ass|body|nipples|pics?|photos?|pictures?)\b',
         caseSensitive: false,
       ).hasMatch(t);
 }
@@ -3686,20 +3684,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
 
   Future<void> _fireRomanticNudge(int gen, {required int step}) async {
+    // Never touch [_busy] — that flag is only for user-initiated sends.
+    // Clearing busy from a nudge was wiping the "typing" state mid-reply.
     if (!mounted || gen != _romanticNudgeGen || _busy || !_loaded) return;
     if (_messages.isEmpty || _messages.last['role'] != 'ai') return;
     if (!_recentChatIsIntimate()) return;
 
     final apiKey = await _resolveApiKey();
-    if (apiKey.isEmpty || !mounted || gen != _romanticNudgeGen) return;
+    if (apiKey.isEmpty || !mounted || gen != _romanticNudgeGen || _busy) return;
     if (_messages.isEmpty || _messages.last['role'] != 'ai') return;
 
     try {
-      if (mounted) setState(() => _busy = true);
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       if (!ngmyCommunicateIsExclusivePartner(partner, _email)) return;
+      if (_busy || !mounted || gen != _romanticNudgeGen) return;
       final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
       final girl = widget.profile.gender != 'male';
       final waitHint = step == 1
@@ -3719,7 +3719,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           'OUTPUT RULES: Reply with EXACTLY one short human text message. No asterisks, no little stars. '
           'No numbering, no quotes, no labels. Stay as ${widget.profile.name}.';
       final result = await ngmyAiGenerateWithRetry(creds, prompt);
-      if (!mounted || gen != _romanticNudgeGen) return;
+      if (!mounted || gen != _romanticNudgeGen || _busy) return;
       if (_messages.isNotEmpty && _messages.last['role'] == 'user') return; // they replied mid-flight
       final line = ngmySanitizeAdvisorChatReply((result.text ?? '').trim().split(RegExp(r'\n+')).first.trim());
       if (line.isEmpty) return;
@@ -3729,7 +3729,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       unawaited(_notifyAdvisorMessage(line));
 
       // Second follow-up only if still silent — 2 minutes after the first.
-      if (step == 1 && mounted && gen == _romanticNudgeGen) {
+      if (step == 1 && mounted && gen == _romanticNudgeGen && !_busy) {
         _romanticNudgeTimer?.cancel();
         _romanticNudgeTimer = Timer(const Duration(minutes: 2), () {
           unawaited(_fireRomanticNudge(gen, step: 2));
@@ -3737,8 +3737,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
     } catch (e) {
       debugPrint('[communicate] romantic nudge: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -4075,18 +4073,24 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
 
   /// Persist advisor reply even if user left chat; notify when away.
+  /// Empty text + no photo is rejected so typing never ends on a blank bubble.
   Future<void> _deliverAiReply({
     required int sendGen,
     required String text,
     String? imageB64,
   }) async {
     final photo = (imageB64 ?? '').trim();
+    final body = text.trim();
+    if (body.isEmpty && photo.isEmpty) {
+      debugPrint('[communicate] refused empty AI reply');
+      return;
+    }
     if (photo.isNotEmpty) {
       await NgmyCommunicateMemoryStore.append(
         _email,
         widget.profile.id,
         role: 'ai',
-        text: text,
+        text: body,
         imageB64: photo,
       );
     } else {
@@ -4094,18 +4098,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         _email,
         widget.profile.id,
         role: 'ai',
-        text: text,
+        text: body,
       );
     }
     final away = !mounted || sendGen != _sendGen;
     if (away) {
-      final preview = text.trim().isNotEmpty
-          ? text.trim()
+      final preview = body.isNotEmpty
+          ? body
           : '📷 ${widget.profile.name} sent you a photo';
       unawaited(_notifyAdvisorMessage(preview));
       return;
     }
-    final row = <String, String>{'role': 'ai', 'text': text};
+    final row = <String, String>{'role': 'ai', 'text': body};
     if (photo.isNotEmpty) row['imageB64'] = photo;
     setState(() => _messages.add(row));
     _scrollBottom();
@@ -4497,9 +4501,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 : null;
             if (emergencyB64 != null && emergencyB64.isNotEmpty) {
               await _deliverAiReply(sendGen: sendGen, text: '', imageB64: emergencyB64);
+            } else {
+              // Never leave typing with zero reply — fall back to a real text.
+              await _deliverAiReply(
+                sendGen: sendGen,
+                text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
+              );
             }
           } catch (e) {
             debugPrint('[communicate] emergency photo: $e');
+            await _deliverAiReply(
+              sendGen: sendGen,
+              text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
+            );
           }
         }
       } else {
@@ -4596,7 +4610,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         text: ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
       );
     } finally {
-      if (mounted) {
+      // Never leave the user staring at a vanished "typing" with no reply.
+      if (sendGen == _sendGen &&
+          _messages.isNotEmpty &&
+          _messages.last['role'] == 'user') {
+        try {
+          await _deliverAiReply(
+            sendGen: sendGen,
+            text: ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: 'empty reply'),
+          );
+        } catch (e) {
+          debugPrint('[communicate] fallback deliver: $e');
+        }
+      }
+      if (mounted && sendGen == _sendGen) {
         setState(() {
           _busy = false;
           if (_isDebater) {
