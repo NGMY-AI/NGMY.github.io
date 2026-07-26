@@ -3406,18 +3406,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (ngmyAdvisorWritesPoetry(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedPoetry(text)) {
       buf.writeln(
-        'POEM REQUEST NOW: Write an original RHYMING poem in this reply — end rhymes or couplets, clear meaning, '
-        '4–16 lines unless they asked for longer. Match their topic (life, love, faith, Bible/Old Testament/New '
-        'Testament, a verse theme, or anything they named). One line per row. No asterisks.\n',
+        'POEM REQUEST — SPOKEN WORD: Write an ORIGINAL rhyming poem in this reply (8–20 lines unless they asked '
+        'otherwise). Performance poetry flow — end rhymes AND internal rhyme, real emotion (dreams, love, pain, hope, '
+        'faith, hustle, whatever they asked). Metaphor and alliteration inside the lines — do not label devices. '
+        'Every line must mean something. Never copy famous or pasted poems. One line per row. No asterisks.\n',
       );
     }
     if (ngmyAdvisorWritesAfricanCulturePoetry(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedPoetry(text)) {
       buf.writeln(
-        'AFRICAN POEM REQUEST NOW: Write an original RHYMING poem ONLY about African culture, peoples, or an African '
-        'country and its history (name the nation if they asked — Kenya, Nigeria, DRC, Ghana, Ethiopia, South Africa, '
-        'etc.). Honor ancestors, heritage, struggle, freedom, land, and dignity. 4–16 lines unless they want longer. '
-        'If their topic is not African, decline gently and offer an African culture poem instead. One line per row. No asterisks.\n',
+        'AFRICAN SPOKEN-WORD POEM NOW: Original rhyming poem ONLY about African culture, a named African country, '
+        'its history, peoples, ubuntu, ancestors, freedom, identity, or mother tongues. Elder dignified voice, rhythm '
+        'you can hear, metaphor and alliteration woven in. 8–20 lines. If topic is not African, redirect warmly. '
+        'Never copy pasted or famous work. One line per row. No asterisks.\n',
       );
     }
     return buf.toString();
