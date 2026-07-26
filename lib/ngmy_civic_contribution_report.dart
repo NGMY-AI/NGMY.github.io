@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_civic_member_report_print_stub.dart'
@@ -26,13 +29,12 @@ class NgmyCivicContributionReportStrings {
   String get total => isSwahili ? 'Jumla' : 'Total';
   String get yes => isSwahili ? 'Ndiyo' : 'Yes';
   String get no => isSwahili ? 'Hapana' : 'No';
-  String get campaignStartedPrefix => isSwahili ? 'Ilianza' : 'Current campaign started';
+  String get campaignStartedHeading => isSwahili ? 'Kampeni ya sasa ilianza' : 'Current campaign started';
   String get campaignStartUnknown =>
       isSwahili ? 'Muda wa kuanza haujarekodiwa' : 'Campaign start not recorded';
 
-  /// One campaign label in Swahili — never "Inaendelea sasa" plus "Kampeni ya sasa".
   String campaignStatusLabel({required bool active}) {
-    if (isSwahili) return 'Kampeni ya sasa';
+    if (isSwahili) return campaignStartedHeading;
     return active ? activeNow : currentCampaign;
   }
 
@@ -43,14 +45,16 @@ class NgmyCivicContributionReportStrings {
     return '${local.month}/${local.day}/${local.year} $h:${local.minute.toString().padLeft(2, '0')} $ampm';
   }
 
-  /// Swahili: one line only — "Kampeni ya sasa" or "Kampeni ya sasa · {date}".
-  String campaignHeaderLine({required bool active, DateTime? started}) {
-    if (!isSwahili) {
-      if (started == null) return campaignStatusLabel(active: active);
-      return '${campaignStatusLabel(active: active)}\n${formatCampaignStarted(started)}';
+  String campaignStartedDate(DateTime? started) {
+    if (started == null) return campaignStartUnknown;
+    return _formatWhen(started);
+  }
+
+  List<String> campaignStampLines({required bool active, DateTime? started}) {
+    if (isSwahili) {
+      return [campaignStartedHeading, campaignStartedDate(started)];
     }
-    if (started == null) return 'Kampeni ya sasa';
-    return 'Kampeni ya sasa · ${_formatWhen(started)}';
+    return [campaignStatusLabel(active: active), campaignStartedHeading, campaignStartedDate(started)];
   }
 
   String footer(String state) =>
@@ -58,7 +62,7 @@ class NgmyCivicContributionReportStrings {
 
   String formatCampaignStarted(DateTime? started) {
     if (started == null) return campaignStartUnknown;
-    return '$campaignStartedPrefix ${_formatWhen(started)}';
+    return '$campaignStartedHeading\n${campaignStartedDate(started)}';
   }
 
   String emptyContributed() =>
@@ -200,19 +204,31 @@ String ngmyBuildCivicContributionReportHtml(
   NgmyCivicContributionReportData data, {
   NgmyCivicContributionReportView view = NgmyCivicContributionReportView.split,
   NgmyCivicContributionReportLang lang = NgmyCivicContributionReportLang.english,
+  bool embedPrintScript = false,
 }) {
   final t = NgmyCivicContributionReportStrings(lang);
   final contributed = data.contributed.length;
   final pending = data.notContributed.length;
-  final campaignHeader = t.campaignHeaderLine(active: data.campaignActive, started: data.campaignStartedAt);
-  final campaignHeaderHtml = campaignHeader.split('\n').map(_escapeHtml).join('<br>');
+  final stampLines = t.campaignStampLines(active: data.campaignActive, started: data.campaignStartedAt);
+  final stampHtml = stampLines.map((l) => '<div>${_escapeHtml(l)}</div>').join('\n          ');
+  final printScript = embedPrintScript
+      ? '''
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      try { window.focus(); } catch (e) {}
+      try { window.print(); } catch (e) {}
+    }, 400);
+  });
+</script>'''
+      : '';
 
   return '''
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>NGMY — ${_escapeHtml(data.state)}</title>
   <style>
     @page { size: letter; margin: 10mm; }
@@ -221,60 +237,115 @@ String ngmyBuildCivicContributionReportHtml(
       .document { box-shadow: none; border: none; }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: #fff; color: #111; font-family: Georgia, "Times New Roman", serif; }
-    .document { max-width: 900px; margin: 0 auto; background: #fff; position: relative; padding: 0 2px 10px; }
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #111;
+      font-family: Georgia, "Times New Roman", serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .document {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      position: relative;
+      padding: 0 2px 10px;
+    }
     .ngmy-mark {
-      position: absolute; inset: 0; pointer-events: none;
-      display: flex; align-items: center; justify-content: center;
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-family: system-ui, Arial, sans-serif;
-      font-size: 96px; font-weight: 900; letter-spacing: 0.28em;
-      color: rgba(15, 23, 42, 0.035); transform: rotate(-24deg);
-      user-select: none; z-index: 0;
+      font-size: 72px;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      color: rgba(15, 23, 42, 0.04);
+      user-select: none;
+      z-index: 0;
     }
     .doc-inner { position: relative; z-index: 1; }
     .masthead {
-      display: grid; grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr);
-      align-items: end; gap: 8px; padding-bottom: 8px; margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr);
+      align-items: end;
+      gap: 8px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
       border-bottom: 1.5px solid #111;
     }
-    .stamp { font-family: system-ui, Arial, sans-serif; font-size: 11px; line-height: 1.3; color: #444; }
-    .stamp .date { font-weight: 800; color: #111; font-size: 12px; }
+    .stamp { font-family: system-ui, Arial, sans-serif; font-size: 12px; line-height: 1.35; color: #333; }
+    .stamp .date { font-weight: 800; color: #111; font-size: 13px; }
     .header { text-align: center; }
     .header h1 {
-      margin: 0; font-size: 15px; font-weight: 800; letter-spacing: 0.04em;
-      line-height: 1.25; text-decoration: underline; text-underline-offset: 4px;
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1.25;
+      text-decoration: underline;
+      text-underline-offset: 4px;
     }
-    .header .sub { margin: 3px 0 0; font-family: system-ui, Arial, sans-serif; font-size: 10px; color: #555; line-height: 1.35; }
+    .header .sub { margin: 3px 0 0; font-family: system-ui, Arial, sans-serif; font-size: 11px; color: #444; line-height: 1.35; }
     .counts {
-      justify-self: end; text-align: right; font-family: system-ui, Arial, sans-serif;
-      font-size: 10px; color: #444; line-height: 1.45;
+      justify-self: end;
+      text-align: right;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 11px;
+      color: #333;
+      line-height: 1.45;
     }
-    .counts b { color: #111; font-size: 11px; }
+    .counts b { color: #111; font-size: 12px; }
     .content { padding-top: 4px; }
     .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
-    .panel { border: 1px solid #ccc; overflow: hidden; }
+    .panel { border: 1px solid #bbb; overflow: hidden; }
     .panel-title {
-      padding: 5px 8px; font-family: system-ui, Arial, sans-serif;
-      font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+      padding: 6px 8px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       border-bottom: 1px solid #ddd;
     }
     .panel-title.yes { background: #f3faf6; color: #166534; }
     .panel-title.no { background: #fef7f7; color: #991b1b; }
     .panel-title.neutral { background: #f8fafc; color: #334155; }
     table { width: 100%; border-collapse: collapse; font-family: system-ui, Arial, sans-serif; }
-    th, td { border-bottom: 1px solid #e5e7eb; padding: 3px 5px; font-size: 9.5px; line-height: 1.25; vertical-align: middle; }
-    th { background: #f3f4f6; font-weight: 700; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #555; }
-    td.name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-    td.rid, td.phone { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 9px; }
+    th, td {
+      border-bottom: 1px solid #d1d5db;
+      padding: 5px 6px;
+      font-size: 11px;
+      line-height: 1.3;
+      vertical-align: middle;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 700;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #444;
+    }
+    td.name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+    td.rid, td.phone { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 10px; }
     td.amount { font-weight: 700; color: #166534; }
-    .badge { display: inline-block; padding: 1px 5px; border-radius: 999px; font-size: 8px; font-weight: 800; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 999px; font-size: 9px; font-weight: 800; }
     .badge.yes { background: #dcfce7; color: #166534; }
     .badge.no { background: #fee2e2; color: #991b1b; }
-    .empty { color: #777; font-style: italic; text-align: center; }
-    .footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center; }
-    .motto { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #111; }
-    .footer-note { margin-top: 5px; font-family: system-ui, Arial, sans-serif; font-size: 8px; color: #888; letter-spacing: 0.04em; }
+    .empty { color: #666; font-style: italic; text-align: center; }
+    .footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #ccc; text-align: center; }
+    .motto { font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #111; }
+    .footer-note { margin-top: 5px; font-family: system-ui, Arial, sans-serif; font-size: 9px; color: #666; letter-spacing: 0.04em; }
   </style>
 </head>
 <body>
@@ -284,7 +355,7 @@ String ngmyBuildCivicContributionReportHtml(
       <div class="masthead">
         <div class="stamp">
           <div class="date">${_escapeHtml(data.generatedAt)}</div>
-          <div>$campaignHeaderHtml</div>
+          $stampHtml
         </div>
         <div class="header">
           <h1>${_escapeHtml(data.motto)}</h1>
@@ -303,107 +374,86 @@ String ngmyBuildCivicContributionReportHtml(
       </footer>
     </div>
   </div>
+  $printScript
 </body>
 </html>''';
 }
 
-class _NgmyFlagToggle extends StatelessWidget {
-  const _NgmyFlagToggle({
-    required this.selected,
-    required this.onTap,
-    required this.child,
+class _ContributionReportLanguageFlag extends StatelessWidget {
+  const _ContributionReportLanguageFlag({
+    required this.lang,
+    required this.animation,
+    required this.isDark,
+    required this.onToggle,
   });
 
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget child;
+  final NgmyCivicContributionReportLang lang;
+  final Animation<double> animation;
+  final bool isDark;
+  final VoidCallback onToggle;
+
+  String get _flagEmoji => lang == NgmyCivicContributionReportLang.swahili ? '🇹🇿' : '🇺🇸';
+  String get _languageLabel => lang == NgmyCivicContributionReportLang.swahili ? 'Swahili' : 'English';
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 34,
-        height: 24,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: selected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
-            width: selected ? 2 : 1,
+    final border = isDark ? Colors.white.withValues(alpha: 0.18) : const Color(0xFFCBD5E1);
+    final bg = isDark ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFF1F5F9);
+    final sub = isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B);
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final t = Curves.easeInOutCubic.transform(animation.value);
+            final spin = t * math.pi;
+            final scale = 1.0 + math.sin(t * math.pi) * 0.12;
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateY(spin)
+                ..scale(scale, scale, 1.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: bg,
+                  border: Border.all(color: border),
+                ),
+                child: child,
+              ),
+            );
+          },
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+            child: Row(
+              key: ValueKey<NgmyCivicContributionReportLang>(lang),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_flagEmoji, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 5),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Language', style: TextStyle(color: sub, fontSize: 8, fontWeight: FontWeight.w700)),
+                    Text(_languageLabel, style: TextStyle(color: ink, fontSize: 11, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ],
+            ),
           ),
-          boxShadow: selected
-              ? [BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
-              : null,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
       ),
     );
   }
-}
-
-class _UsFlag extends StatelessWidget {
-  const _UsFlag();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _UsFlagPainter(), size: const Size(34, 24));
-  }
-}
-
-class _UsFlagPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stripes = 7;
-    final stripeH = size.height / stripes;
-    for (var i = 0; i < stripes; i++) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, i * stripeH, size.width, stripeH),
-        Paint()..color = i.isEven ? const Color(0xFFB22234) : Colors.white,
-      );
-    }
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width * 0.42, size.height * 0.54),
-      Paint()..color = const Color(0xFF3C3B6E),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _TzFlag extends StatelessWidget {
-  const _TzFlag();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(painter: _TzFlagPainter(), size: const Size(34, 24));
-  }
-}
-
-class _TzFlagPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF1EB53A));
-    final path = Path()
-      ..moveTo(0, size.height * 0.72)
-      ..lineTo(size.width, size.height * 0.18)
-      ..lineTo(size.width, size.height * 0.38)
-      ..lineTo(0, size.height * 0.92)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFF000000));
-    final path2 = Path()
-      ..moveTo(0, size.height * 0.78)
-      ..lineTo(size.width, size.height * 0.24)
-      ..lineTo(size.width, size.height * 0.32)
-      ..lineTo(0, size.height * 0.86)
-      ..close();
-    canvas.drawPath(path2, Paint()..color = const Color(0xFFFCD116));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class NgmyCivicContributionReportPreview extends StatelessWidget {
@@ -459,7 +509,12 @@ class NgmyCivicContributionReportPreview extends StatelessWidget {
                 Text('${data.campaignTitle} · ${data.scopeLabel}', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: muted)),
                 const SizedBox(height: 6),
                 Text(
-                  t.campaignHeaderLine(active: data.campaignActive, started: data.campaignStartedAt),
+                  t.campaignStartedHeading,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: ink),
+                ),
+                Text(
+                  t.campaignStartedDate(data.campaignStartedAt),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 10, color: muted),
                 ),
@@ -604,12 +659,41 @@ class _NgmyCivicContributionReportSheetHost extends StatefulWidget {
   State<_NgmyCivicContributionReportSheetHost> createState() => _NgmyCivicContributionReportSheetHostState();
 }
 
-class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContributionReportSheetHost> {
+class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContributionReportSheetHost> with SingleTickerProviderStateMixin {
   NgmyCivicContributionReportView _view = NgmyCivicContributionReportView.split;
   NgmyCivicContributionReportLang _lang = NgmyCivicContributionReportLang.english;
+  late final AnimationController _flagFx;
+
+  @override
+  void initState() {
+    super.initState();
+    _flagFx = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+  }
+
+  @override
+  void dispose() {
+    _flagFx.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleLanguage() async {
+    await _flagFx.forward(from: 0);
+    if (!mounted) return;
+    setState(() {
+      _lang = _lang == NgmyCivicContributionReportLang.english
+          ? NgmyCivicContributionReportLang.swahili
+          : NgmyCivicContributionReportLang.english;
+    });
+    _flagFx.reset();
+  }
 
   Future<void> _print() async {
-    final html = ngmyBuildCivicContributionReportHtml(widget.data, view: _view, lang: _lang);
+    final html = ngmyBuildCivicContributionReportHtml(
+      widget.data,
+      view: _view,
+      lang: _lang,
+      embedPrintScript: true,
+    );
     await ngmyPrintCivicMemberReport(
       htmlContent: html,
       plainText: _plainText(widget.data, _view),
@@ -641,7 +725,8 @@ class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContrib
     final buf = StringBuffer()
       ..writeln('NGMY — ${data.state}')
       ..writeln(data.campaignTitle)
-      ..writeln(t.formatCampaignStarted(data.campaignStartedAt))
+      ..writeln(t.campaignStartedHeading)
+      ..writeln(t.campaignStartedDate(data.campaignStartedAt))
       ..writeln('Generated: ${data.generatedAt}')
       ..writeln(data.motto)
       ..writeln(t.footer(data.state))
@@ -717,22 +802,17 @@ class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContrib
                         children: [
                           Text('Contribution Report', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: ink)),
                           Text(
-                            '${widget.data.state} · ${t.campaignStatusLabel(active: widget.data.campaignActive)}',
+                            widget.data.state,
                             style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black54),
                           ),
                         ],
                       ),
                     ),
-                    _NgmyFlagToggle(
-                      selected: _lang == NgmyCivicContributionReportLang.english,
-                      onTap: () => setState(() => _lang = NgmyCivicContributionReportLang.english),
-                      child: const _UsFlag(),
-                    ),
-                    const SizedBox(width: 6),
-                    _NgmyFlagToggle(
-                      selected: _lang == NgmyCivicContributionReportLang.swahili,
-                      onTap: () => setState(() => _lang = NgmyCivicContributionReportLang.swahili),
-                      child: const _TzFlag(),
+                    _ContributionReportLanguageFlag(
+                      lang: _lang,
+                      animation: _flagFx,
+                      isDark: widget.isDark,
+                      onToggle: () => unawaited(_toggleLanguage()),
                     ),
                     const SizedBox(width: 4),
                     IconButton(
