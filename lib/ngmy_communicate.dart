@@ -3410,10 +3410,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       id: widget.profile.id,
       userText: text,
     )) {
+      final styleRef = ngmyUserSharedSpokenWordStyleReference(text)
+          ? 'They shared spoken-word STYLE (immigration, tongue, Black pride, African culture, strong mother, heritage). '
+              'Match that RHYTHM and depth — NEVER copy their pasted lines. '
+          : '';
       buf.writeln(
         'POEM REQUEST — SPOKEN WORD NOW: ${ngmyPoetryLengthInstruction(text)} '
+        '$styleRef'
         'Write the COMPLETE original rhyming poem in THIS reply — not just "okay" or "for you". '
-        'Performance poetry flow — end rhymes AND internal rhyme, real emotion. '
+        'Performance poetry flow — end rhymes AND internal rhyme, real emotion, stage cadence. '
+        'Themes welcome: immigration, accent pride, Black brilliance, African culture, mothers, freedom, identity. '
         'Metaphor and alliteration inside the lines — do not label devices. '
         'Every line must mean something. Never copy famous or pasted poems. One line per row. No asterisks.\n',
       );
