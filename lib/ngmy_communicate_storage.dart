@@ -580,6 +580,13 @@ class NgmyCommunicateRelationshipStore {
       r'\b(my love|babe|baby|papi|i love you|love you|miss you|handsome|suck your|your dick|my pussy|fuck me|'
       r'make me cum|i.?m your girl|i.?m your man)\b',
     ).hasMatch(all);
+    final aiText = memory
+        .where((m) => (m['role'] ?? '').toString() == 'ai')
+        .map((m) => (m['text'] ?? '').toString().toLowerCase())
+        .join(' ');
+    final advisorRomance = RegExp(
+      r'\b(babe|baby|my love|boyfriend|girlfriend|miss you|handsome|beautiful|my man|my girl|i love you)\b',
+    ).hasMatch(aiText);
     final userCount = memory.where((m) => (m['role'] ?? '').toString() == 'user').length;
 
     final existing = await loadPartner(profileId);
@@ -598,10 +605,78 @@ class NgmyCommunicateRelationshipStore {
       return;
     }
 
-    // Soft partner energy (babe/baby/my love) + at least one real user message = exclusive.
-    if (official || (softDating && userCount >= 1)) {
+    // User romance, official talk, or advisor already talked sweet back = exclusive with this person.
+    if (official || (softDating && userCount >= 1) || (advisorRomance && userCount >= 1)) {
       await setPartner(profileId, email: email, name: '', status: 'exclusive');
     }
+  }
+
+  static int _datingScoreForMemory(List<Map<String, dynamic>> memory) {
+    if (memory.isEmpty) return 0;
+    final all = memory.map((m) => (m['text'] ?? '').toString().toLowerCase()).join(' ');
+    var score = 0;
+    if (RegExp(
+      r'\b(you.?re my (boy|girl)friend|we.?re official|we.?re together|we.?re dating|exclusive|be my (boy|girl)friend)\b',
+    ).hasMatch(all)) {
+      score += 20;
+    }
+    if (RegExp(r'\b(babe|baby|my love|boyfriend|girlfriend|i love you|love you|miss you)\b').hasMatch(all)) {
+      score += 8;
+    }
+    if (RegExp(r'\b(sex|sexy|horny|fuck|dick|pussy|nude|naked)\b').hasMatch(all)) score += 4;
+    if (memory.where((m) => m['role'] == 'user').length >= 2) score += 2;
+    final aiText = memory
+        .where((m) => (m['role'] ?? '').toString() == 'ai')
+        .map((m) => (m['text'] ?? '').toString().toLowerCase())
+        .join(' ');
+    if (RegExp(r'\b(babe|baby|my love|boyfriend|girlfriend|miss you|handsome|beautiful|my man|my girl)\b')
+        .hasMatch(aiText)) {
+      score += 12;
+    }
+    return score;
+  }
+
+  /// Scan every local chat thread for this advisor — stamp partner if someone is already dating them.
+  static Future<void> reconcilePartnerFromAllLocalChats(String profileId) async {
+    final id = profileId.trim();
+    if (id.isEmpty) return;
+    final current = await loadPartner(id);
+    if (current != null && (current['email'] ?? '').toString().trim().isNotEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    const prefix = 'ngmy_communicate_chat_';
+    final suffix = '_$id';
+    String? bestEmail;
+    var bestScore = 0;
+
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith(prefix) || !key.endsWith(suffix)) continue;
+      final emailPart = key.substring(prefix.length, key.length - suffix.length);
+      if (emailPart.isEmpty) continue;
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) continue;
+        final memory = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        final score = _datingScoreForMemory(memory);
+        if (score > bestScore) {
+          bestScore = score;
+          bestEmail = emailPart.toLowerCase().trim();
+        }
+      } catch (_) {}
+    }
+
+    if (bestEmail != null && bestScore >= 8) {
+      await setPartner(id, email: bestEmail, status: 'exclusive');
+    }
+  }
+
+  static bool isTakenBySomeoneElse(Map<String, String>? partner, String chatterEmail) {
+    if (partner == null) return false;
+    final p = (partner['email'] ?? '').toLowerCase().trim();
+    final e = chatterEmail.toLowerCase().trim();
+    return p.isNotEmpty && e.isNotEmpty && p != e;
   }
 
   /// When the exclusive partner opens chat after being away, leave girlfriend/boyfriend

@@ -277,6 +277,51 @@ bool ngmyCommunicateIsExclusivePartner(Map<String, String>? partner, String chat
   return p.isNotEmpty && e.isNotEmpty && p == e;
 }
 
+/// User is flirting, using pet names, or talking like a boyfriend/girlfriend.
+bool ngmyUserMessageLooksRomantic(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  return RegExp(
+    r'\b(babe|baby|papi|mami|my love|handsome|beautiful|sexy|boyfriend|girlfriend|my man|my girl|'
+    r'i love you|love you|miss you|wanna date|date me|be mine|you.?re mine|good morning beautiful|'
+    r'good night babe|thinking of you|can i call you|talk dirty|send pic|send photo|nude|horny)\b',
+    caseSensitive: false,
+  ).hasMatch(t);
+}
+
+/// Advisor reply crossed into romance — used to block when they are taken with someone else.
+bool ngmyAdvisorReplyLooksRomantic(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  return RegExp(
+    r'\b(babe|baby|my love|handsome|beautiful|boyfriend|girlfriend|my man|my girl|i love you|love you|'
+    r'miss you|thinking about you|can.?t wait to see you|good morning handsome|good night babe|'
+    r'you.?re mine|come here|wish you were here)\b',
+    caseSensitive: false,
+  ).hasMatch(t) ||
+      RegExp(r'❤|💕|🥰|😘').hasMatch(text);
+}
+
+/// Human "I'm taken" reply when a non-partner flirts.
+String ngmyAdvisorTakenBoundaryReply({required String gender, String partnerName = ''}) {
+  if (gender == 'female') {
+    const opts = [
+      "I'm taken right now — I can't talk to you like that.",
+      "No — I'm in a relationship. I don't do two people.",
+      "I'm already dating somebody. You gotta respect that.",
+      "I like you as a person but I'm with someone. I can't flirt back.",
+    ];
+    return opts[DateTime.now().millisecond % opts.length];
+  }
+  const opts = [
+    "I'm taken right now — can't talk to you like that.",
+    "I'm in a relationship already. I don't play two people.",
+    "I'm dating somebody right now. Gotta keep it respectful.",
+    "I respect you but I'm with someone — I can't flirt like that.",
+  ];
+  return opts[DateTime.now().millisecond % opts.length];
+}
+
 /// Bottom inset so the typing bar clears the floating pill nav when embedded in the main shell.
 double ngmyCommunicateComposerBottomInset(BuildContext context, {required bool embedded}) {
   if (!embedded) return 0;
@@ -1188,9 +1233,10 @@ class NgmyCommunicateProfile {
             'This person is NOT your partner. Until you break up with your partner, you MUST NOT entertain '
             'this chatter romantically or sexually at all — no flirting, no sweet talk, no pet names (babe/baby/my love), '
             'no romantic teasing, no intimate talk, no leading them on, no "talking to two people at once." '
-            'Be polite and firm only: you are taken. '
-            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship" / "I\'m not talking to anyone else like that." '
-            'Do not negotiate. Do not soften into romance "just this once." '
+            'If they call you babe, baby, handsome, or talk like your boyfriend/girlfriend — say NO like a real human: '
+            '"I\'m taken" / "I\'m seeing somebody" / "I\'m in a relationship right now." '
+            'Do NOT flirt back. Do NOT use pet names on them. Do NOT say you miss them. '
+            'Be polite and firm only. Do not negotiate. Do not soften into romance "just this once." '
             'Do NOT send pictures to this person.\n'
             '$exclusive';
       } else if (isMyPartner) {
@@ -3386,6 +3432,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _load() async {
     await NgmyCommunicateTimeTracker.syncFromCloud(_email);
     unawaited(ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config));
+    await NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id);
     var mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
       mem = await NgmyCommunicateRelationshipStore.injectMissYouCheckInsIfNeeded(
@@ -3818,6 +3865,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return cleaned;
   }
 
+  String _enforceTakenBoundary(String cleaned, {required bool takenByOther, Map<String, String>? partner}) {
+    if (!takenByOther || cleaned.isEmpty) return cleaned;
+    if (!ngmyAdvisorReplyLooksRomantic(cleaned)) return cleaned;
+    return ngmyAdvisorTakenBoundaryReply(
+      gender: widget.profile.gender,
+      partnerName: partner?['name'] ?? '',
+    );
+  }
+
   /// Keep casual romantic replies to ~1–2 sentences when the model dumps paragraphs.
   String _trimOverlongTextReply(String text) {
     final t = text.trim();
@@ -3987,6 +4043,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+      await NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id);
       await NgmyCommunicateRelationshipStore.syncFromMemory(
         widget.profile.id,
         _email,
@@ -3998,6 +4055,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           id: widget.profile.id,
         ),
       );
+      var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      final takenByOtherEarly = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       // Datable chats that already feel like dating unlock pics for that boyfriend/girlfriend.
       final canDateThisChatter = ngmyCommunicateAdvisorCanDateChatter(
         role: widget.profile.role,
@@ -4010,7 +4069,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         name: widget.profile.name,
         id: widget.profile.id,
       );
-      if (canDateThisChatter && ngmyCommunicateMemoryLooksLikeDating(mem)) {
+      if (canDateThisChatter && !takenByOtherEarly && ngmyCommunicateMemoryLooksLikeDating(mem)) {
         await NgmyCommunicateRelationshipStore.setPartner(
           widget.profile.id,
           email: _email,
@@ -4019,6 +4078,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       // Pic request + dating pet names in this thread → stamp exclusive so a real photo can send.
       if (canDateThisChatter &&
+          !takenByOtherEarly &&
           text.isNotEmpty &&
           ngmyUserRequestedChatImage(text) &&
           RegExp(r'\b(babe|baby|my love|handsome|miss you|boyfriend|girlfriend)\b', caseSensitive: false)
@@ -4029,9 +4089,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           status: 'exclusive',
         );
       }
-      final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
+      final takenByOther = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
+
+      // Hard lock — non-partner flirts → human "I'm taken" (never sweet-talk two people).
+      if (takenByOther &&
+          canDateThisChatter &&
+          text.isNotEmpty &&
+          ngmyUserMessageLooksRomantic(text)) {
+        final reply = ngmyAdvisorTakenBoundaryReply(
+          gender: widget.profile.gender,
+          partnerName: partner?['name'] ?? '',
+        );
+        await _deliverAiReply(sendGen: sendGen, text: reply);
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
+
       // Partner pics require official exclusive status — never bypass with chat vibe alone.
       final canSendPartnerImage = allowsPartnerPhotos && canDateThisChatter && isExclusivePartner;
       // Partner pics do NOT require the user to upload a photo first — camera is only for homework roles.
@@ -4155,9 +4231,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ];
         final result = await ngmyAiGenerateWithRetry(creds, prompt, images: images);
         final cleaned = _cleanAdvisorReply(result.text);
-        final reply = cleaned.isNotEmpty
-            ? cleaned
-            : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
+        final reply = _enforceTakenBoundary(
+          cleaned.isNotEmpty ? cleaned : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error),
+          takenByOther: takenByOther,
+          partner: partner,
+        );
         await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && !canDateThisChatter) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
@@ -4179,6 +4257,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         }
         await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
+        if (takenByOther) {
+          await _deliverAiReply(
+            sendGen: sendGen,
+            text: ngmyAdvisorTakenBoundaryReply(
+              gender: widget.profile.gender,
+              partnerName: partner?['name'] ?? '',
+            ),
+          );
+        } else {
         // Datable advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -4199,6 +4286,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           reply = 'I don\'t send pics like that unless we\'re official 😌';
         }
         await _deliverAiReply(sendGen: sendGen, text: reply);
+        }
       } else if (wantsImage) {
         String? b64;
         try {
@@ -4255,9 +4343,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             : '';
         final visionHint = recentPhotos.isNotEmpty ? _visionInstruction(text, hasPhoto: true) : '';
         final extraCtx = await _advisorExtraContext(text, mem);
+        final takenHint = takenByOther
+            ? 'BOUNDARY — YOU ARE TAKEN WITH SOMEONE ELSE: This chatter is NOT your partner. '
+                'Do NOT flirt, pet names, or romance. If they talk sweet, say you are seeing somebody.\n'
+            : '';
         final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
             '$homeworkCtx'
             '$extraCtx'
+            '$takenHint'
             '$visionHint'
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
@@ -4280,8 +4373,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         } else if (ngmyAdvisorReplyFakesSendingPhoto(cleaned)) {
           cleaned = canSendPartnerImage
               ? '💕'
-              : 'I don\'t send pics like that unless we\'re official 😌';
+              : (takenByOther
+                  ? ngmyAdvisorTakenBoundaryReply(gender: widget.profile.gender, partnerName: partner?['name'] ?? '')
+                  : 'I don\'t send pics like that unless we\'re official 😌');
         }
+        cleaned = _enforceTakenBoundary(cleaned, takenByOther: takenByOther, partner: partner);
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
