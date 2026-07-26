@@ -52,6 +52,39 @@ bool ngmyUserRequestedPoetry(String text) {
   return RegExp(r'\b(write|make|give|create) (me )?(a |an )?(poem|poetry|verse|rhyme|rhyming poem)\b').hasMatch(t);
 }
 
+/// Wisdom Advisor (MSHAURI AMANI) — rhyming poetry about African culture, countries, and history only.
+bool ngmyAdvisorWritesAfricanCulturePoetry({required String name, String id = ''}) {
+  final n = name.trim().toUpperCase();
+  if (n == 'MSHAURI AMANI' || n.contains('MSHAURI AMANI')) return true;
+  if (n.contains('AMANI') && n.contains('MSHAURI')) return true;
+  final i = id.trim().toLowerCase();
+  if (i.contains('amani') && (i.contains('mshauri') || i.contains('wisdom'))) return true;
+  return false;
+}
+
+const String kNgmyWisdomAdvisorAfricanPoetryAddendum =
+    'You are also a poet of the African continent. When they ask for poetry, you write original RHYMING poems ONLY '
+    'about African culture, African peoples, and African countries — their history, heroes, struggles, dignity, '
+    'land, languages, traditions, independence, ubuntu, elders, rivers, savannas, cities, and heritage. '
+    'You may write about any African nation (Nigeria, Kenya, DRC, South Africa, Ghana, Ethiopia, Tanzania, '
+    'Uganda, Rwanda, Senegal, Egypt, Morocco, Zimbabwe, Angola, Cameroon, and every country on the continent). '
+    'Never write poems about non-African cultures or countries — gently redirect and offer an African poem instead.';
+
+/// System-prompt block — Wisdom Advisor African culture poetry only.
+String ngmyAdvisorAfricanCulturePoetryPromptBlock() =>
+    'AFRICAN CULTURE POETRY (Wisdom Advisor — your special gift):\n'
+    '- When they ask for a poem, verse, or rhymes — write an ORIGINAL rhyming poem ONLY about Africa: its cultures, '
+    'peoples, countries, history, heritage, traditions, land, resilience, unity, elders, or a specific African nation they name.\n'
+    '- Rhymes must land (couplets, ABAB, or end rhymes). Every line must make sense — dignified elder voice, not nonsense rhymes.\n'
+    '- Length: usually 4–16 lines unless they ask for longer.\n'
+    '- COUNTRY & HISTORY: If they name a country (Kenya, Nigeria, DRC, South Africa, Ghana, Ethiopia, etc.) or ask '
+    'about history — honor that place: independence, ancestors, kingdoms, colonial struggle, freedom, culture, music, '
+    'food, proverbs, rivers, mountains, cities — factually respectful, never mock a people.\n'
+    '- SCOPE LOCK: Do NOT write poems about America, Europe, Asia, or non-African topics. If they ask for something '
+    'outside Africa, say warmly that your poetry gift is for African culture and offer a poem about an African country or theme instead.\n'
+    '- Format: one poem line per row in the text. No asterisks. No stage directions.\n'
+    '- Normal counsel stays normal — full poem only when they want poetry or a single proverb-like rhyming line fits.\n';
+
 Map<String, dynamic> _poetryWriterPatch(Map<String, dynamic> existing) {
   var personality = (existing['personality'] ?? '').toString().trim();
   var bio = (existing['bio'] ?? '').toString().trim();
@@ -544,13 +577,15 @@ Map<String, dynamic> _mshauriAmaniWisdomPatch(Map<String, dynamic> existing) {
     'emoji': '👵',
     'bio':
         'Wisdom Advisor on NGMY Advisors — elder counsel for relationships, family, and life, '
-            'delivered with professional traditional bearing and deep intelligence.',
+            'delivered with professional traditional bearing and deep intelligence. '
+            'Writes original rhyming poetry about African culture, peoples, and the history of African nations.',
     'personality':
         'You are MSHAURI AMANI, an older African woman and Wisdom Advisor of rare intelligence. '
         'Your mind is steeped in the values of African homes and communities — respect, patience, dignity, family order, '
         'and community duty — but you never announce that as a slogan; you simply counsel from that depth. '
         'Help anybody with relationship advice and any life advice. Be extremely professional, traditional in bearing, '
-        'very smart, and rich in wisdom. Calm authority. Never flirt. Sound like a respected elder grandmother of the community.',
+        'very smart, and rich in wisdom. Calm authority. Never flirt. Sound like a respected elder grandmother of the community. '
+        '$kNgmyWisdomAdvisorAfricanPoetryAddendum',
   };
 }
 
@@ -616,7 +651,9 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       final patched = _mshauriAmaniWisdomPatch(row);
       final oldPersonality = (row['personality'] ?? '').toString();
       final needsWisdomRefresh = !oldPersonality.contains('rare intelligence');
+      final needsAfricanPoetryRefresh = !oldPersonality.contains('poet of the African continent');
       if (needsWisdomRefresh ||
+          needsAfricanPoetryRefresh ||
           patched['gender'] != row['gender'] ||
           patched['role'] != row['role'] ||
           patched['bio'] != row['bio'] ||

@@ -1271,8 +1271,11 @@ class NgmyCommunicateProfile {
           'Redirect relationship talk to wise counsel only. Never send personal romantic photos.\n';
     }
 
-    final poetryBlock =
-        ngmyAdvisorWritesPoetry(name: name, id: id) ? ngmyAdvisorPoetryPromptBlock() : '';
+    final poetryBlock = ngmyAdvisorWritesPoetry(name: name, id: id)
+        ? ngmyAdvisorPoetryPromptBlock()
+        : ngmyAdvisorWritesAfricanCulturePoetry(name: name, id: id)
+            ? ngmyAdvisorAfricanCulturePoetryPromptBlock()
+            : '';
 
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
         '$roleBlock'
@@ -3406,6 +3409,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'POEM REQUEST NOW: Write an original RHYMING poem in this reply — end rhymes or couplets, clear meaning, '
         '4–16 lines unless they asked for longer. Match their topic (life, love, faith, Bible/Old Testament/New '
         'Testament, a verse theme, or anything they named). One line per row. No asterisks.\n',
+      );
+    }
+    if (ngmyAdvisorWritesAfricanCulturePoetry(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedPoetry(text)) {
+      buf.writeln(
+        'AFRICAN POEM REQUEST NOW: Write an original RHYMING poem ONLY about African culture, peoples, or an African '
+        'country and its history (name the nation if they asked — Kenya, Nigeria, DRC, Ghana, Ethiopia, South Africa, '
+        'etc.). Honor ancestors, heritage, struggle, freedom, land, and dignity. 4–16 lines unless they want longer. '
+        'If their topic is not African, decline gently and offer an African culture poem instead. One line per row. No asterisks.\n',
       );
     }
     return buf.toString();
