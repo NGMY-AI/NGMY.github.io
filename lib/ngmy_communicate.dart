@@ -471,6 +471,7 @@ bool ngmyUserWantsLongerAdvisorReply(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
   if (ngmyUserRequestedPoetry(text)) return true;
+  if (ngmyUserRequestedContentIdeas(text)) return true;
   return RegExp(
         r'\b(tell me more|say more|more about|go on|keep going|elaborate|explain( it| more| that| this)?|'
         r'write (me )?(a |an )?(paragraph|few paragraphs|longer|more)|'
@@ -1121,7 +1122,8 @@ class NgmyCommunicateProfile {
         if (ngmyAdvisorIsBossPersonalHelper(name: name, id: id)) {
           bossBlock +=
               'PERSONAL HELPER TOO: You are still one of his first personal helpers — when he asks for advice, '
-              'quotes, planning, NGMY help, or life help, deliver useful help (still warm as his partner).\n';
+              'quotes, planning, NGMY help, life help, or VIDEO/CONTENT ideas (Reels, TikTok, interviews, scripts), '
+              'deliver useful help (still warm as his partner).\n';
         }
       } else {
         bossBlock =
@@ -1138,7 +1140,9 @@ class NgmyCommunicateProfile {
               'PRESIDENT / CEO — YOUR #1 PERSONAL HELPER LANE: This person is $bossName — Founder, President, and CEO of NGMY. '
               '$founderFacts'
               'You are one of his FIRST two personal helpers on NGMY Advisors. He can come to you for ANYTHING — '
-              'business, NGMY, life, motivation, planning, writing, stress, faith, projects, decisions. '
+              'business, NGMY, life, motivation, planning, writing, stress, faith, projects, decisions, AND '
+              'Instagram/TikTok/YouTube video craft (ideas, hooks, scripts, street interviews, shot plans). '
+              'Be his content genius when he asks — specific, interesting, legal, not harmful. '
               'Be loyal, sharp, useful, and human. Address him as Sir or Boss naturally (not every sentence). '
               'He is based in Macon, Georgia. Never pretend you do not know he runs NGMY.\n';
         }
@@ -3392,6 +3396,26 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'not a generic "don\'t give up". Fresh original quote — never copy famous quotes. Optional one short human line around it.\n',
       );
     }
+    if (_isBoss &&
+        ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedContentIdeas(text)) {
+      buf.writeln(
+        'CONTENT GENIUS MODE NOW: He wants video/content craft help. Give 2–4 concrete Instagram/TikTok/YouTube ideas. '
+        'For each: concept, 1–3 second hook, exact lines/questions to say or ask, simple shot plan, caption idea. '
+        'Make it interesting and shareable. Keep it legal, consensual, and not harmful — no real fights or fake-assault '
+        'setups with strangers. Staged skits with willing cast are fine. Be specific and genius-level useful.\n',
+      );
+    }
+    if (_isBoss &&
+        ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedContentIdeas(text)) {
+      buf.writeln(
+        'CONTENT GENIUS MODE NOW: Give 2–4 concrete Instagram/TikTok/YouTube short-form video ideas. '
+        'For each: concept, 1–3 second hook, exact lines/questions to say or ask, simple shot plan, caption idea. '
+        'Make it interesting and shareable. Legal, consensual, not harmful — no real fights or non-consensual pranks. '
+        'If they want street interviews with random people, give openers + question lists. Be a crafting genius.\n',
+      );
+    }
     if (_isMshauri) {
       final userState = ((widget.user as dynamic).state ?? '').toString();
       final session = await ngmyMshauriRefreshSession(
@@ -3895,6 +3919,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           '$kNgmyAdvisorPoetryHumanVoiceRules'
           'At most ONE short intro line — then ALL poem lines. '
           'Never stop at "okay", "for you", or "one sec". No asterisks:';
+    }
+    if (_isBoss &&
+        ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedContentIdeas(lastUser)) {
+      return 'CONTENT GENIUS DELIVERY: He asked for video/content ideas. Give 2–4 concrete options now — '
+          'each with concept, hook, what to say/ask, shot plan, caption. Interesting, legal, consensual. No asterisks:';
     }
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedDailyQuote(lastUser)) {

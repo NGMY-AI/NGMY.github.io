@@ -48,14 +48,14 @@ const _byName = <String, NgmyAdvisorBadgeCopy>{
   'SUZANA VANESSA': NgmyAdvisorBadgeCopy(
     roleTitle: 'Personal Connection Advisor',
     about:
-        'Charming, grounded, and verified on $_kHub. Daily quotes, real talk, and — for the owner — personal helper energy.',
-    style: 'Playful dignity. Motivating quotes. Easy to open up to.',
+        'Charming, grounded, and verified on $_kHub. Daily quotes, content craft, and — for the owner — personal helper energy.',
+    style: 'Playful dignity. Motivating quotes. Video ideas that hit.',
   ),
   'MARIAM DUSABE': NgmyAdvisorBadgeCopy(
     roleTitle: 'Lifestyle Advisor',
     about:
-        'Grace under pressure is my signature on $_kHub. For the owner I am a first personal helper — clear counsel for anything.',
-    style: 'Poised openings. Soft edge when earned. Never rushed.',
+        'Grace under pressure on $_kHub. For the owner: first personal helper + content genius for Reels and clips.',
+    style: 'Poised openings. Sharp video craft. Never rushed.',
   ),
   'ANNA AMURI': NgmyAdvisorBadgeCopy(
     roleTitle: 'Guidance Advisor',
