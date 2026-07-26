@@ -31457,6 +31457,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }) {
     final normalizedCampaignId = campaignId.trim();
     final stateKey = state.trim().toLowerCase();
+    if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return const {};
+
     final totals = <String, double>{};
 
     void addAmount(String key, double amount) {
@@ -31469,16 +31471,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final cid = (meta['campaignId'] ?? '').toString().trim();
       final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-      final fallbackId =
-          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${_contributionReceiptState(t, meta)}';
-      final matchesCampaignId =
-          normalizedCampaignId.isNotEmpty && (cid == normalizedCampaignId || fallbackId == normalizedCampaignId);
-      final matchesTimeWindow = campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt);
-      final matchesState = stateKey.isEmpty || receiptState.isEmpty || receiptState == stateKey;
-      final isForThisCampaign = normalizedCampaignId.isNotEmpty
-          ? (matchesCampaignId || (matchesTimeWindow && matchesState))
-          : (matchesState && (campaignStartedAt == null || matchesTimeWindow));
-      if (!isForThisCampaign) continue;
+      if (stateKey.isNotEmpty && receiptState.isNotEmpty && receiptState != stateKey) continue;
+
+      // Only the current campaign — never match older campaigns by purpose/scope fallback.
+      final matchesThisCampaign = cid.isNotEmpty
+          ? cid == normalizedCampaignId
+          : (normalizedCampaignId.isNotEmpty &&
+              campaignStartedAt != null &&
+              !t.timestamp.isBefore(campaignStartedAt));
+      if (!matchesThisCampaign) continue;
 
       final emailKey = NgmyCivicRegistryMembers.emailKey(t.userEmail);
       if (emailKey.isNotEmpty) addAmount(emailKey, t.amount);
@@ -31490,23 +31491,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return totals;
   }
 
+  String _formatContributionCampaignStarted(DateTime? started) {
+    if (started == null) return 'Campaign start not recorded';
+    final local = started.toLocal();
+    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return 'Started ${local.month}/${local.day}/${local.year} $h:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
   NgmyCivicContributionReportData? _buildContributionReportData() {
     final state = _selectedState.trim();
     if (state.isEmpty) return null;
 
     final campaignActive = widget.config.helpActiveFor(state);
-    final campaignId = widget.config.helpCampaignIdFor(state).trim();
-    final fallbackCampaignId = _activeHelpCampaignId(state);
-    final resolvedCampaignId = campaignId.isNotEmpty ? campaignId : fallbackCampaignId;
+    final resolvedCampaignId = widget.config.helpCampaignIdFor(state).trim().isNotEmpty
+        ? widget.config.helpCampaignIdFor(state).trim()
+        : _activeHelpCampaignId(state).trim();
     DateTime? campaignStartedAt;
     try {
       final raw = widget.config.helpCampaignStartedAtFor(state).trim();
       if (raw.isNotEmpty) campaignStartedAt = DateTime.parse(raw).toLocal();
     } catch (_) {}
 
+    if (resolvedCampaignId.isEmpty && campaignStartedAt == null) return null;
+
     final campaignTitle = widget.config.helpPurposeFor(state).trim().isNotEmpty
         ? widget.config.helpPurposeFor(state).trim()
-        : 'Community Contribution Campaign';
+        : 'Community Contribution';
 
     final members = _membersForContributionReport(state)
       ..sort((a, b) => (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase()));
@@ -31517,18 +31528,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       campaignId: resolvedCampaignId,
       campaignStartedAt: campaignStartedAt,
     );
-    final contributorKeys = totals.keys.toSet();
 
     final now = DateTime.now().toLocal();
     final generatedAt =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
-        '${now.hour % 12 == 0 ? 12 : now.hour % 12}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+        '${now.month}/${now.day}/${now.year} ${now.hour % 12 == 0 ? 12 : now.hour % 12}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
 
     final rows = members.map((m) {
       final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
       final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
-      final contributed = (emailKey.isNotEmpty && contributorKeys.contains(emailKey)) ||
-          (ridKey != 'rid:' && contributorKeys.contains(ridKey));
+      final contributed = (emailKey.isNotEmpty && totals.containsKey(emailKey)) ||
+          (ridKey != 'rid:' && totals.containsKey(ridKey));
       final amount = (emailKey.isNotEmpty ? totals[emailKey] : null) ??
           (ridKey != 'rid:' ? totals[ridKey] : null) ??
           0.0;
@@ -31553,6 +31562,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       scopeLabel: _helpScopeLabelForState(state),
       generatedAt: generatedAt,
       campaignActive: campaignActive,
+      campaignStartedLabel: _formatContributionCampaignStarted(campaignStartedAt),
       rows: rows,
     );
   }
@@ -31562,7 +31572,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (data == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No members in $_selectedState for a contribution report yet.')),
+        SnackBar(
+          content: Text(
+            widget.config.helpActiveFor(_selectedState)
+                ? 'No members in $_selectedState for this report yet.'
+                : 'Start a contribution in $_selectedState first — the report tracks only the current campaign.',
+          ),
+        ),
       );
       return;
     }
@@ -31640,41 +31656,63 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       Text('Registry Backup', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink, letterSpacing: -0.3)),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
                           borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                         ),
-                        child: Text(
-                          _selectedState,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Tooltip(
-                        message: 'Contribution report — print or download',
-                        child: Material(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              unawaited(_openCivicContributionReportSheet());
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                Icons.description_outlined,
-                                size: 20,
-                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              child: Text(
+                                _selectedState,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF3730A3),
+                                ),
                               ),
                             ),
-                          ),
+                            Container(
+                              width: 1,
+                              height: 16,
+                              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                            ),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  unawaited(_openCivicContributionReportSheet());
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_long_rounded,
+                                        size: 14,
+                                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Report',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

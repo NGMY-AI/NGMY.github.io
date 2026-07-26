@@ -5,11 +5,8 @@ import 'ngmy_civic_member_report_print_stub.dart'
 
 /// How the printable civic contribution report is laid out.
 enum NgmyCivicContributionReportView {
-  /// Contributed members on the left, not yet contributed on the right.
   split,
-  /// Only members who contributed.
   contributedOnly,
-  /// One table with a status column for everyone.
   allCombined,
 }
 
@@ -40,6 +37,7 @@ class NgmyCivicContributionReportData {
     required this.scopeLabel,
     required this.generatedAt,
     required this.campaignActive,
+    required this.campaignStartedLabel,
     required this.rows,
   });
 
@@ -48,6 +46,7 @@ class NgmyCivicContributionReportData {
   final String scopeLabel;
   final String generatedAt;
   final bool campaignActive;
+  final String campaignStartedLabel;
   final List<NgmyCivicContributionReportRow> rows;
 
   List<NgmyCivicContributionReportRow> get contributed =>
@@ -73,12 +72,12 @@ String _tableRows(
   String emptyLabel = 'No members listed.',
 }) {
   if (rows.isEmpty) {
-    return '<tr><td colspan="${showStatus ? 6 : 5}" class="empty">$emptyLabel</td></tr>';
+    return '<tr><td colspan="${showStatus ? 6 : 6}" class="empty">$emptyLabel</td></tr>';
   }
   return rows.map((r) {
     final status = r.contributed
-        ? '<span class="badge yes">Contributed</span>'
-        : '<span class="badge no">Not yet</span>';
+        ? '<span class="badge yes">Yes</span>'
+        : '<span class="badge no">No</span>';
     final amount = r.contributed && r.amount > 0 ? '\$${r.amount.toStringAsFixed(2)}' : '—';
     return '''
 <tr>
@@ -87,63 +86,66 @@ String _tableRows(
   <td>${_escapeHtml(r.city.isEmpty ? '—' : r.city)}</td>
   <td>${_escapeHtml(r.room.isEmpty ? '—' : r.room)}</td>
   <td class="phone">${_escapeHtml(r.phone.isEmpty ? '—' : r.phone)}</td>
-  ${showStatus ? '<td class="status">$status</td>' : ''}
-  ${showStatus ? '' : '<td class="amount">$amount</td>'}
+  ${showStatus ? '<td class="status">$status</td>' : '<td class="amount">$amount</td>'}
 </tr>''';
   }).join('\n');
 }
 
-String ngmyBuildCivicContributionReportHtml(
-  NgmyCivicContributionReportData data, {
-  NgmyCivicContributionReportView view = NgmyCivicContributionReportView.split,
-}) {
+String _bodyTables(
+  NgmyCivicContributionReportData data,
+  NgmyCivicContributionReportView view,
+) {
   final contributed = data.contributed;
   final pending = data.notContributed;
-  final viewKey = switch (view) {
-    NgmyCivicContributionReportView.split => 'split',
-    NgmyCivicContributionReportView.contributedOnly => 'contributed',
-    NgmyCivicContributionReportView.allCombined => 'all',
-  };
 
-  final splitBlock = '''
-<div class="panel-grid split-view view-panel" data-view="split">
-  <div class="panel contributed-panel">
-    <div class="panel-title contributed">Contributed · ${contributed.length}</div>
+  switch (view) {
+    case NgmyCivicContributionReportView.split:
+      return '''
+<div class="panel-grid">
+  <div class="panel">
+    <div class="panel-title yes">Contributed · ${contributed.length}</div>
     <table>
-      <thead><tr><th>Name</th><th>Registry ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amount</th></tr></thead>
-      <tbody>${_tableRows(contributed, emptyLabel: 'No contributions recorded yet.')}</tbody>
+      <thead><tr><th>Name</th><th>ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amt</th></tr></thead>
+      <tbody>${_tableRows(contributed, emptyLabel: 'No contributions yet for this campaign.')}</tbody>
     </table>
   </div>
-  <div class="panel pending-panel">
-    <div class="panel-title pending">Not yet contributed · ${pending.length}</div>
+  <div class="panel">
+    <div class="panel-title no">Not yet · ${pending.length}</div>
     <table>
-      <thead><tr><th>Name</th><th>Registry ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amount</th></tr></thead>
+      <thead><tr><th>Name</th><th>ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amt</th></tr></thead>
       <tbody>${_tableRows(pending, emptyLabel: 'Everyone in scope has contributed.')}</tbody>
     </table>
   </div>
 </div>''';
-
-  final contributedOnlyBlock = '''
-<div class="view-panel contributed-only-view" data-view="contributed">
-  <div class="panel contributed-panel solo">
-    <div class="panel-title contributed">Members who contributed · ${contributed.length}</div>
-    <table>
-      <thead><tr><th>Name</th><th>Registry ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amount</th></tr></thead>
-      <tbody>${_tableRows(contributed, emptyLabel: 'No contributions recorded yet.')}</tbody>
-    </table>
-  </div>
+    case NgmyCivicContributionReportView.contributedOnly:
+      return '''
+<div class="panel solo">
+  <div class="panel-title yes">Contributed · ${contributed.length}</div>
+  <table>
+    <thead><tr><th>Name</th><th>ID</th><th>City</th><th>Room</th><th>Phone</th><th>Amt</th></tr></thead>
+    <tbody>${_tableRows(contributed, emptyLabel: 'No contributions yet for this campaign.')}</tbody>
+  </table>
 </div>''';
-
-  final allBlock = '''
-<div class="view-panel all-view" data-view="all">
-  <div class="panel solo">
-    <div class="panel-title neutral">Full community roster · ${data.rows.length}</div>
-    <table>
-      <thead><tr><th>Name</th><th>Registry ID</th><th>City</th><th>Room</th><th>Phone</th><th>Status</th></tr></thead>
-      <tbody>${_tableRows(data.rows, showStatus: true, emptyLabel: 'No members in this state.')}</tbody>
-    </table>
-  </div>
+    case NgmyCivicContributionReportView.allCombined:
+      return '''
+<div class="panel solo">
+  <div class="panel-title neutral">All members · ${data.rows.length}</div>
+  <table>
+    <thead><tr><th>Name</th><th>ID</th><th>City</th><th>Room</th><th>Phone</th><th>Status</th></tr></thead>
+    <tbody>${_tableRows(data.rows, showStatus: true, emptyLabel: 'No members in scope.')}</tbody>
+  </table>
 </div>''';
+  }
+}
+
+/// Clean export HTML — report only, no toolbar or view switchers.
+String ngmyBuildCivicContributionReportHtml(
+  NgmyCivicContributionReportData data, {
+  NgmyCivicContributionReportView view = NgmyCivicContributionReportView.split,
+}) {
+  final contributed = data.contributed.length;
+  final pending = data.notContributed.length;
+  final statusLine = data.campaignActive ? 'Active now' : 'Current campaign';
 
   return '''
 <!doctype html>
@@ -151,55 +153,27 @@ String ngmyBuildCivicContributionReportHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NGMY Civic Contribution Report — ${_escapeHtml(data.state)}</title>
+  <title>NGMY — ${_escapeHtml(data.state)} Contribution Report</title>
   <style>
     @page { size: letter; margin: 10mm; }
     @media print {
       body { background: #fff; padding: 0; }
-      .toolbar, .view-switch { display: none !important; }
-      .document { box-shadow: none; }
-      .view-panel { display: none !important; }
-      .view-panel.active { display: block !important; }
+      .document { box-shadow: none; border: none; }
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 20px;
-      background: linear-gradient(160deg, #eef4ff 0%, #f8fafc 45%, #fff7ed 100%);
-      color: #0f172a;
-      font-family: "Segoe UI", Arial, sans-serif;
-    }
-    .toolbar, .view-switch {
-      max-width: 980px;
-      margin: 0 auto 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-    .view-switch button, .toolbar button {
-      font-size: 13px;
-      padding: 9px 14px;
-      border-radius: 999px;
-      border: 1px solid #cbd5e1;
+      padding: 0;
       background: #fff;
-      cursor: pointer;
-      font-weight: 700;
-    }
-    .view-switch button.active {
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-      color: #fff;
-      border-color: #1d4ed8;
+      color: #111;
+      font-family: Georgia, "Times New Roman", serif;
     }
     .document {
-      max-width: 980px;
+      max-width: 900px;
       margin: 0 auto;
       background: #fff;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
-      border: 1px solid #dbeafe;
       position: relative;
+      padding: 0 2px 10px;
     }
     .watermark {
       position: absolute;
@@ -208,241 +182,159 @@ String ngmyBuildCivicContributionReportHtml(
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 120px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 96px;
       font-weight: 900;
-      letter-spacing: 0.35em;
-      color: rgba(15, 23, 42, 0.045);
-      transform: rotate(-28deg);
+      letter-spacing: 0.28em;
+      color: rgba(15, 23, 42, 0.035);
+      transform: rotate(-24deg);
       user-select: none;
       z-index: 0;
     }
     .doc-inner { position: relative; z-index: 1; }
-    .hero {
-      padding: 28px 32px 22px;
-      background:
-        linear-gradient(135deg, rgba(0, 127, 255, 0.92) 0%, rgba(29, 78, 216, 0.95) 42%, rgba(206, 16, 33, 0.88) 100%);
-      color: #fff;
-      border-bottom: 5px solid #f7d618;
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(88px, 1fr) auto minmax(88px, 1fr);
+      align-items: end;
+      gap: 8px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1.5px solid #111;
     }
-    .hero-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-    }
-    .brand {
-      font-size: 36px;
-      font-weight: 900;
-      letter-spacing: 0.22em;
-      line-height: 1;
-      text-shadow: 0 2px 18px rgba(0,0,0,0.25);
-    }
-    .seal {
-      min-width: 108px;
-      text-align: center;
-      padding: 10px 12px;
-      border: 2px solid rgba(255,255,255,0.45);
-      border-radius: 14px;
-      background: rgba(255,255,255,0.12);
-      font-size: 10px;
+    .stamp { font-family: system-ui, Arial, sans-serif; font-size: 11px; line-height: 1.3; color: #444; }
+    .stamp .date { font-weight: 800; color: #111; font-size: 12px; }
+    .header { text-align: center; }
+    .header h1 {
+      margin: 0;
+      font-size: 15px;
       font-weight: 800;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.04em;
+      line-height: 1.25;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+    .header .sub {
+      margin: 3px 0 0;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 10px;
+      color: #555;
       line-height: 1.35;
     }
-    .hero h1 {
-      margin: 16px 0 6px;
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 0.03em;
-    }
-    .hero .subtitle {
-      margin: 0;
-      font-size: 14px;
-      opacity: 0.92;
-      max-width: 620px;
+    .counts {
+      justify-self: end;
+      text-align: right;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 10px;
+      color: #444;
       line-height: 1.45;
     }
-    .meta-row {
-      margin-top: 16px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .chip {
-      padding: 7px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.16);
-      border: 1px solid rgba(255,255,255,0.28);
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      padding: 16px 24px;
-      background: linear-gradient(180deg, #f8fafc, #fff);
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .stat {
-      text-align: center;
-      padding: 12px 8px;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      background: #fff;
-    }
-    .stat .label {
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #64748b;
-    }
-    .stat .value {
-      margin-top: 6px;
-      font-size: 24px;
-      font-weight: 900;
-      color: #0f172a;
-    }
-    .stat.yes .value { color: #059669; }
-    .stat.no .value { color: #dc2626; }
-    .content { padding: 18px 22px 8px; }
-    .view-panel { display: none; }
-    .view-panel.active { display: block; }
+    .counts b { color: #111; font-size: 11px; }
+    .content { padding-top: 4px; }
     .panel-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      gap: 10px;
     }
-    @media (max-width: 820px) {
-      .panel-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
     .panel {
-      border: 1px solid #dbeafe;
-      border-radius: 14px;
+      border: 1px solid #ccc;
       overflow: hidden;
-      background: #fafbfd;
     }
     .panel-title {
-      padding: 11px 14px;
-      font-size: 12px;
-      font-weight: 900;
-      letter-spacing: 0.1em;
+      padding: 5px 8px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+      border-bottom: 1px solid #ddd;
     }
-    .panel-title.contributed { background: #ecfdf5; color: #047857; border-bottom: 1px solid #bbf7d0; }
-    .panel-title.pending { background: #fef2f2; color: #b91c1c; border-bottom: 1px solid #fecaca; }
-    .panel-title.neutral { background: #eff6ff; color: #1d4ed8; border-bottom: 1px solid #bfdbfe; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
+    .panel-title.yes { background: #f3faf6; color: #166534; }
+    .panel-title.no { background: #fef7f7; color: #991b1b; }
+    .panel-title.neutral { background: #f8fafc; color: #334155; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: system-ui, Arial, sans-serif;
+    }
     th, td {
-      padding: 8px 10px;
       border-bottom: 1px solid #e5e7eb;
-      font-size: 11px;
-      text-align: left;
-      vertical-align: top;
-      line-height: 1.35;
+      padding: 3px 5px;
+      font-size: 9.5px;
+      line-height: 1.25;
+      vertical-align: middle;
     }
     th {
-      background: #f8fafc;
-      font-weight: 800;
-      color: #475569;
-      font-size: 10px;
-      letter-spacing: 0.06em;
+      background: #f3f4f6;
+      font-weight: 700;
+      font-size: 8.5px;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #555;
     }
-    td.name { font-weight: 700; }
-    td.rid, td.phone { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    td.amount { font-weight: 800; color: #047857; }
+    td.name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+    td.rid, td.phone { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 9px; }
+    td.amount { font-weight: 700; color: #166534; }
     .badge {
       display: inline-block;
-      padding: 3px 8px;
+      padding: 1px 5px;
       border-radius: 999px;
-      font-size: 10px;
+      font-size: 8px;
       font-weight: 800;
-      letter-spacing: 0.04em;
     }
     .badge.yes { background: #dcfce7; color: #166534; }
     .badge.no { background: #fee2e2; color: #991b1b; }
-    .empty { color: #64748b; font-style: italic; text-align: center; }
+    .empty { color: #777; font-style: italic; text-align: center; }
     .footer {
-      padding: 18px 24px 24px;
-      border-top: 1px solid #e2e8f0;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
       text-align: center;
     }
     .motto {
-      display: inline-block;
-      padding: 12px 22px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, rgba(167,139,250,0.14), rgba(34,211,238,0.12));
-      border: 1px solid rgba(29,78,216,0.18);
-      font-size: 15px;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #111;
     }
     .footer-note {
-      margin-top: 12px;
-      font-size: 10px;
-      color: #64748b;
-      letter-spacing: 0.06em;
+      margin-top: 5px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 8px;
+      color: #888;
+      letter-spacing: 0.04em;
     }
   </style>
 </head>
 <body>
-  <div class="toolbar">
-    <button type="button" onclick="window.print()">Print / Save PDF</button>
-  </div>
-  <div class="view-switch no-print">
-    <span style="font-weight:800;font-size:12px;color:#475569;margin-right:4px;">View:</span>
-    <button type="button" data-view-btn="split" onclick="setView('split')">Split tables</button>
-    <button type="button" data-view-btn="contributed" onclick="setView('contributed')">Contributed only</button>
-    <button type="button" data-view-btn="all" onclick="setView('all')">Everyone (status)</button>
-  </div>
   <div class="document">
     <div class="watermark">NGMY</div>
     <div class="doc-inner">
-      <header class="hero">
-        <div class="hero-top">
-          <div class="brand">NGMY</div>
-          <div class="seal">CONGOLESE<br>COMMUNITY<br>CIVIC REGISTRY</div>
+      <div class="masthead">
+        <div class="stamp">
+          <div class="date">${_escapeHtml(data.generatedAt)}</div>
+          <div>$statusLine</div>
+          <div>${_escapeHtml(data.campaignStartedLabel)}</div>
         </div>
-        <h1>Contribution Community Report</h1>
-        <p class="subtitle">${_escapeHtml(data.campaignTitle)} · ${_escapeHtml(data.scopeLabel)}</p>
-        <div class="meta-row">
-          <span class="chip">${_escapeHtml(data.state)}</span>
-          <span class="chip">${data.campaignActive ? 'Active campaign' : 'Community record'}</span>
-          <span class="chip">Generated ${_escapeHtml(data.generatedAt)}</span>
+        <div class="header">
+          <h1>${_escapeHtml(data.motto)}</h1>
+          <p class="sub">${_escapeHtml(data.campaignTitle)} · ${_escapeHtml(data.scopeLabel)}</p>
         </div>
-      </header>
-      <div class="stats">
-        <div class="stat"><div class="label">Total in scope</div><div class="value">${data.rows.length}</div></div>
-        <div class="stat yes"><div class="label">Contributed</div><div class="value">${contributed.length}</div></div>
-        <div class="stat no"><div class="label">Not yet</div><div class="value">${pending.length}</div></div>
+        <div class="counts">
+          <div>Total <b>${data.rows.length}</b></div>
+          <div>Yes <b>$contributed</b></div>
+          <div>Not yet <b>$pending</b></div>
+        </div>
       </div>
       <div class="content">
-        $splitBlock
-        $contributedOnlyBlock
-        $allBlock
+        ${_bodyTables(data, view)}
       </div>
       <footer class="footer">
         <div class="motto">${_escapeHtml(data.motto)}</div>
-        <div class="footer-note">NGMY Civic Registry · Official community document · Share with care · NGMY watermark</div>
+        <div class="footer-note">NGMY Civic Registry · ${_escapeHtml(data.state)} · NGMY watermark</div>
       </footer>
     </div>
   </div>
-  <script>
-    function setView(key) {
-      document.querySelectorAll('.view-panel').forEach(function(el) {
-        el.classList.toggle('active', el.getAttribute('data-view') === key);
-      });
-      document.querySelectorAll('[data-view-btn]').forEach(function(btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-view-btn') === key);
-      });
-    }
-    setView('$viewKey');
-  </script>
 </body>
 </html>''';
 }
@@ -464,171 +356,143 @@ class NgmyCivicContributionReportPreview extends StatelessWidget {
     final contributed = data.contributed;
     final pending = data.notContributed;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final muted = isDark ? Colors.white54 : const Color(0xFF64748B);
+    final border = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111827) : const Color(0xFFEEF2F7),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+        color: isDark ? const Color(0xFF111827) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF007FFF), Color(0xFF1D4ED8), Color(0xFFCE1021)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Text('NGMY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 6)),
-                    Spacer(),
-                    Text('CONGOLESE COMMUNITY', textAlign: TextAlign.right, style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-                  ],
+                Text(
+                  data.motto,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.4, color: ink, decoration: TextDecoration.underline, decorationThickness: 1.2),
                 ),
-                const SizedBox(height: 12),
-                const Text('Contribution Community Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
                 const SizedBox(height: 4),
-                Text('${data.campaignTitle} · ${data.scopeLabel}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+                Text(
+                  '${data.campaignTitle} · ${data.scopeLabel}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: muted),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${data.campaignActive ? 'Active' : 'Campaign'} · ${data.campaignStartedLabel}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, color: muted),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _chip(data.state),
-                    _chip(data.campaignActive ? 'Active' : 'Record'),
-                    _chip('${contributed.length} contributed'),
-                    _chip('${pending.length} pending'),
+                    _countPill('Total ${data.rows.length}', ink, muted),
+                    const SizedBox(width: 6),
+                    _countPill('Yes ${contributed.length}', const Color(0xFF166534), muted),
+                    const SizedBox(width: 6),
+                    _countPill('No ${pending.length}', const Color(0xFF991B1B), muted),
                   ],
                 ),
               ],
             ),
           ),
+          Divider(height: 1, color: border),
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             child: switch (view) {
               NgmyCivicContributionReportView.split => Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _miniTable('Contributed', contributed, true, ink, muted)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _miniTable('Not yet', pending, false, ink, muted)),
+                    Expanded(child: _miniTable('Contributed', contributed, true, ink, muted, border)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _miniTable('Not yet', pending, false, ink, muted, border)),
                   ],
                 ),
               NgmyCivicContributionReportView.contributedOnly =>
-                _miniTable('Contributed', contributed, true, ink, muted),
+                _miniTable('Contributed', contributed, true, ink, muted, border),
               NgmyCivicContributionReportView.allCombined =>
-                _miniTable('Everyone', data.rows, null, ink, muted),
+                _miniTable('Everyone', data.rows, null, ink, muted, border),
             },
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFA78BFA).withValues(alpha: 0.16),
-                    const Color(0xFF22D3EE).withValues(alpha: 0.12),
-                  ],
-                ),
-                border: Border.all(color: const Color(0xFF1D4ED8).withValues(alpha: 0.18)),
-              ),
-              child: Text(
-                data.motto,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.6, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E3A8A)),
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _chip(String label) {
+  Widget _countPill(String label, Color fg, Color muted) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        border: Border.all(color: muted.withValues(alpha: 0.35)),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white30),
       ),
-      child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg)),
     );
   }
 
-  Widget _miniTable(String title, List<NgmyCivicContributionReportRow> rows, bool? contributedOnly, Color ink, Color muted) {
+  Widget _miniTable(
+    String title,
+    List<NgmyCivicContributionReportRow> rows,
+    bool? contributedOnly,
+    Color ink,
+    Color muted,
+    Color border,
+  ) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFDBE3EF)),
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(8),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            color: contributedOnly == true
-                ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                : contributedOnly == false
-                    ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2))
-                    : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)),
-            child: Text('$title · ${rows.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: ink)),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+            child: Text('$title · ${rows.length}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: ink)),
           ),
           if (rows.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text('No members in this section.', style: TextStyle(color: muted, fontStyle: FontStyle.italic, fontSize: 12)),
+              padding: const EdgeInsets.all(10),
+              child: Text('None in this section.', style: TextStyle(color: muted, fontStyle: FontStyle.italic, fontSize: 11)),
             )
           else
-            ...rows.take(8).map(
+            ...rows.take(10).map(
                   (r) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     child: Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(r.name.isEmpty ? '—' : r.name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: ink)),
-                              Text(r.registryId.isEmpty ? r.phone : r.registryId, style: TextStyle(fontSize: 10, color: muted)),
+                              Text(r.name.isEmpty ? '—' : r.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: ink)),
+                              Text(r.registryId.isEmpty ? r.phone : r.registryId, style: TextStyle(fontSize: 9, color: muted)),
                             ],
                           ),
                         ),
                         if (contributedOnly == null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: (r.contributed ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2)).withValues(alpha: isDark ? 0.25 : 1),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              r.contributed ? 'Yes' : 'No',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: r.contributed ? const Color(0xFF166534) : const Color(0xFF991B1B)),
-                            ),
+                          Text(
+                            r.contributed ? 'Yes' : 'No',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: r.contributed ? const Color(0xFF166534) : const Color(0xFF991B1B)),
                           ),
                       ],
                     ),
                   ),
                 ),
-          if (rows.length > 8)
+          if (rows.length > 10)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              child: Text('+ ${rows.length - 8} more on the printable report', style: TextStyle(fontSize: 10, color: muted)),
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: Text('+ ${rows.length - 10} more on saved report', style: TextStyle(fontSize: 9, color: muted)),
             ),
         ],
       ),
@@ -645,9 +509,7 @@ Future<void> showNgmyCivicContributionReportSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return _NgmyCivicContributionReportSheetHost(data: data, isDark: isDark);
-    },
+    builder: (ctx) => _NgmyCivicContributionReportSheetHost(data: data, isDark: isDark),
   );
 }
 
@@ -666,113 +528,149 @@ class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContrib
 
   Future<void> _print() async {
     final html = ngmyBuildCivicContributionReportHtml(widget.data, view: _view);
-    final plain = _plainText(widget.data, _view);
     await ngmyPrintCivicMemberReport(
       htmlContent: html,
-      plainText: plain,
+      plainText: _plainText(widget.data, _view),
       fileName: 'ngmy-contribution-${widget.data.state.replaceAll(RegExp(r'\s+'), '_')}',
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Print dialog opened — save as PDF or print for your community.'),
-          backgroundColor: Color(0xFF059669),
-        ),
+        const SnackBar(content: Text('Print ready — turn off browser headers for a clean page.'), backgroundColor: Color(0xFF059669)),
       );
     }
   }
 
   Future<void> _download() async {
     final html = ngmyBuildCivicContributionReportHtml(widget.data, view: _view);
-    final plain = _plainText(widget.data, _view);
     await ngmyDownloadCivicMemberReport(
       htmlContent: html,
-      plainText: plain,
+      plainText: _plainText(widget.data, _view),
       fileName: 'ngmy-contribution-${widget.data.state.replaceAll(RegExp(r'\s+'), '_')}',
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report downloaded — open or share the HTML file.')),
+        const SnackBar(content: Text('Report saved — open the file to view or share.')),
       );
     }
   }
 
   String _plainText(NgmyCivicContributionReportData data, NgmyCivicContributionReportView view) {
     final buf = StringBuffer()
-      ..writeln('NGMY Civic Contribution Report — ${data.state}')
+      ..writeln('NGMY — ${data.state} Contribution Report')
       ..writeln(data.campaignTitle)
+      ..writeln('Started: ${data.campaignStartedLabel}')
       ..writeln('Generated: ${data.generatedAt}')
       ..writeln(data.motto)
       ..writeln('');
-    Iterable<NgmyCivicContributionReportRow> rows = switch (view) {
+    final rows = switch (view) {
       NgmyCivicContributionReportView.contributedOnly => data.contributed,
       NgmyCivicContributionReportView.allCombined => data.rows,
       NgmyCivicContributionReportView.split => data.rows,
     };
     for (final r in rows) {
-      buf.writeln('${r.contributed ? '[YES]' : '[NO]'} ${r.name} · ${r.registryId} · ${r.city}/${r.room}');
+      buf.writeln('${r.contributed ? 'YES' : 'NO'}  ${r.name}  ${r.registryId}  ${r.city}/${r.room}');
     }
     return buf.toString();
+  }
+
+  Widget _viewChip(String label, NgmyCivicContributionReportView value) {
+    final on = _view == value;
+    final ink = widget.isDark ? Colors.white : const Color(0xFF0F172A);
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _view = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: on
+                ? (widget.isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A))
+                : (widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: on
+                  ? Colors.transparent
+                  : (widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: on ? Colors.white : ink.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final ink = widget.isDark ? Colors.white : const Color(0xFF0F172A);
+    final surface = widget.isDark ? const Color(0xFF0F172A) : Colors.white;
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.92,
-      minChildSize: 0.55,
-      maxChildSize: 0.98,
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: widget.isDark ? const Color(0xFF0F172A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            color: surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
               Container(
-                width: 42,
+                width: 36,
                 height: 4,
-                margin: const EdgeInsets.only(top: 10, bottom: 8),
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
                 decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(99)),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                padding: const EdgeInsets.fromLTRB(16, 4, 12, 0),
                 child: Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Contribution Report', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
-                          Text(widget.data.state, style: TextStyle(fontSize: 13, color: widget.isDark ? Colors.white60 : Colors.black54)),
+                          Text('Contribution Report', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: ink)),
+                          Text(
+                            '${widget.data.state} · ${widget.data.campaignActive ? 'Live campaign' : 'Latest campaign'}',
+                            style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black54),
+                          ),
                         ],
                       ),
                     ),
-                    IconButton(tooltip: 'Print', onPressed: _print, icon: const Icon(Icons.print_outlined)),
-                    IconButton(tooltip: 'Download', onPressed: _download, icon: const Icon(Icons.download_outlined)),
-                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close_rounded, color: ink.withValues(alpha: 0.7)),
+                    ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SegmentedButton<NgmyCivicContributionReportView>(
-                  segments: const [
-                    ButtonSegment(value: NgmyCivicContributionReportView.split, label: Text('Split')),
-                    ButtonSegment(value: NgmyCivicContributionReportView.contributedOnly, label: Text('Contributed')),
-                    ButtonSegment(value: NgmyCivicContributionReportView.allCombined, label: Text('Everyone')),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Row(
+                  children: [
+                    _viewChip('Both sides', NgmyCivicContributionReportView.split),
+                    const SizedBox(width: 6),
+                    _viewChip('Contributed', NgmyCivicContributionReportView.contributedOnly),
+                    const SizedBox(width: 6),
+                    _viewChip('Everyone', NgmyCivicContributionReportView.allCombined),
                   ],
-                  selected: {_view},
-                  onSelectionChanged: (s) => setState(() => _view = s.first),
                 ),
               ),
               const SizedBox(height: 10),
-              const Divider(height: 1),
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                   child: NgmyCivicContributionReportPreview(data: widget.data, view: _view, isDark: widget.isDark),
                 ),
               ),
@@ -783,15 +681,28 @@ class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContrib
                   child: Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(onPressed: _download, icon: const Icon(Icons.download_outlined, size: 18), label: const Text('Download')),
+                        child: TextButton(
+                          onPressed: _download,
+                          style: TextButton.styleFrom(
+                            foregroundColor: ink,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          ),
+                          child: const Text('Save file', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: FilledButton.icon(
+                        child: TextButton(
                           onPressed: _print,
-                          icon: const Icon(Icons.print_outlined, size: 18),
-                          label: const Text('Print / PDF'),
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1D4ED8)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: const Color(0xFF0F172A),
+                          ),
+                          child: const Text('Print', style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
