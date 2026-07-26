@@ -734,7 +734,10 @@ String ngmyCommunicateAiFailureMessage({required String apiKey, String? lastErro
   if (apiKey.trim().isEmpty) {
     return 'Hang tight — I\'m still waking up. Send again in a few seconds 💕';
   }
-  if (ngmyIsOfflineOrNetworkError(err)) {
+  if (ngmyIsOfflineOrNetworkError(err) || err == 'empty reply' || err == 'timeout') {
+    if (err == 'timeout' || err == 'empty reply') {
+      return 'My signal hiccuped — connect to Wi‑Fi and send that one more time 💕';
+    }
     return kNgmyOfflineAiMessage.replaceAll('NGMY AI', 'I');
   }
   return kNgmySoftAiRetryMessage;

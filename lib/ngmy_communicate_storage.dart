@@ -13,11 +13,32 @@ class NgmyCommunicateMemoryStore {
   static const int retentionDays = 365;
   static const int maxStoredMessages = 500;
 
+  /// Serialize all writes — concurrent appends were overwriting each other and deleting messages.
+  static Future<void> _writeChain = Future<void>.value();
+
+  static Future<T> _serialized<T>(Future<T> Function() action) {
+    final gate = Completer<T>();
+    _writeChain = _writeChain.then((_) async {
+      try {
+        gate.complete(await action());
+      } catch (e, st) {
+        gate.completeError(e, st);
+      }
+    });
+    return gate.future;
+  }
+
   static String _chatKey(String email, String profileId) =>
       'ngmy_communicate_chat_${email.toLowerCase().trim()}_${profileId.trim()}';
 
   static Future<List<Map<String, dynamic>>> load(String email, String profileId) async {
     if (email.trim().isEmpty || profileId.trim().isEmpty) return [];
+    // Wait for any in-flight write so we never load a stale snapshot mid-save.
+    await _writeChain;
+    return _loadUnlocked(email, profileId);
+  }
+
+  static Future<List<Map<String, dynamic>>> _loadUnlocked(String email, String profileId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_chatKey(email, profileId));
     if (raw == null || raw.isEmpty) return [];
@@ -66,7 +87,8 @@ class NgmyCommunicateMemoryStore {
         kept.add(row);
       }
       if (kept.length != decoded.length || migratedInlineImages) {
-        await _persist(email, profileId, kept);
+        // Queue rewrite after current work — never write unlocked (causes lost messages).
+        unawaited(_serialized(() => _persistUnlocked(email, profileId, kept)));
       }
       return kept;
     } catch (_) {
@@ -95,32 +117,36 @@ class NgmyCommunicateMemoryStore {
     final trimmed = text.trim();
     final img = (imageB64 ?? '').trim();
     if (trimmed.isEmpty && img.isEmpty) return;
-    final list = await load(email, profileId);
-    final row = <String, dynamic>{
-      'role': role,
-      'text': trimmed,
-      'at': DateTime.now().toUtc().toIso8601String(),
-    };
-    if (img.isNotEmpty) {
-      final imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
-      final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
-      if (ok) {
-        row['imageId'] = imageId;
-        // Keep in-memory for this session; disk load uses imageId.
-        row['imageB64'] = img;
-      } else {
-        // Last resort — still show in session even if durable write failed.
-        row['imageB64'] = img;
+    await _serialized(() async {
+      final list = await _loadUnlocked(email, profileId);
+      final row = <String, dynamic>{
+        'role': role,
+        'text': trimmed,
+        'at': DateTime.now().toUtc().toIso8601String(),
+      };
+      if (img.isNotEmpty) {
+        final imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
+        final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
+        if (ok) {
+          row['imageId'] = imageId;
+          row['imageB64'] = img;
+        } else {
+          row['imageB64'] = img;
+        }
+        final mime = imageMime.trim();
+        if (mime.isNotEmpty) row['imageMime'] = mime;
       }
-      final mime = imageMime.trim();
-      if (mime.isNotEmpty) row['imageMime'] = mime;
-    }
-    list.add(row);
-    await saveAll(email, profileId, list);
+      list.add(row);
+      await _saveAllUnlocked(email, profileId, list);
+    });
   }
 
   static Future<void> saveAll(String email, String profileId, List<Map<String, dynamic>> messages) async {
     if (email.trim().isEmpty || profileId.trim().isEmpty) return;
+    await _serialized(() => _saveAllUnlocked(email, profileId, messages));
+  }
+
+  static Future<void> _saveAllUnlocked(String email, String profileId, List<Map<String, dynamic>> messages) async {
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(days: retentionDays));
     final cleaned = await _cleanMessageRowsAsync(email, profileId, messages, cutoff: cutoff);
@@ -131,7 +157,7 @@ class NgmyCommunicateMemoryStore {
         unawaited(NgmyCommunicateChatImageStore.delete(dropId));
       }
     }
-    await _persist(email, profileId, cleaned);
+    await _persistUnlocked(email, profileId, cleaned);
   }
 
   /// Full history for backup export (no message cap).
@@ -153,7 +179,7 @@ class NgmyCommunicateMemoryStore {
     }
     final merged = byKey.values.toList()
       ..sort((a, b) => (a['at'] ?? '').toString().compareTo((b['at'] ?? '').toString()));
-    await _persist(email, profileId, merged);
+    await saveAll(email, profileId, merged);
   }
 
   static String _messageMergeKey(Map<String, dynamic> m) {
@@ -202,7 +228,7 @@ class NgmyCommunicateMemoryStore {
   }
 
   /// Persist metadata only — image bytes live in [NgmyCommunicateChatImageStore].
-  static Future<void> _persist(String email, String profileId, List<Map<String, dynamic>> list) async {
+  static Future<void> _persistUnlocked(String email, String profileId, List<Map<String, dynamic>> list) async {
     final slim = <Map<String, dynamic>>[];
     for (final m in list) {
       final role = (m['role'] ?? '').toString();

@@ -467,6 +467,15 @@ String ngmyBibleStudyModeHint(String userText) {
 bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(role) == 'romantic';
 
 /// User asked for more detail / a longer answer (paragraph OK).
+bool ngmyUserMessageIsShortChatPing(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty || t.length > 40) return false;
+  return RegExp(
+    r"^(hey+|hi+|hello|yo+|sup|wassup|what'?s up|how are you|how you doing|how you doing today|hru|morning|good morning|good night|gn|wyd|you there|u there)[\s!.?💕❤️]*$",
+  ).hasMatch(t);
+}
+
+/// User asked for more detail / a longer answer (paragraph OK).
 bool ngmyUserWantsLongerAdvisorReply(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
@@ -3328,6 +3337,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   final List<Map<String, String>> _messages = [];
   bool _busy = false;
   bool _loaded = false;
+  /// Outbound texts waiting for an AI reply (never drop while busy).
+  final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
   int _usedSeconds = 0;
   int _sessionSeconds = 0;
@@ -4182,35 +4193,49 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _send() async {
     final text = _controller.text.trim();
     final imageB64 = _pendingImageB64;
-    if ((text.isEmpty && imageB64 == null) || _busy || !_loaded) return;
+    if ((text.isEmpty && imageB64 == null) || !_loaded) return;
     if (!await _ensurePaid()) return;
 
     _cancelRomanticNudge();
     HapticFeedback.lightImpact();
     final displayText = text.isEmpty ? '📷 Homework photo' : text;
     final imageMime = _pendingImageMime;
-    final userRow = <String, String>{'role': 'user', 'text': displayText};
-    if (imageB64 != null) userRow['imageB64'] = imageB64;
+
+    // Clear composer immediately so the next message can be typed.
     setState(() {
-      _messages.add(userRow);
       _controller.clear();
       _pendingImageB64 = null;
       _pendingImageMime = 'image/jpeg';
-      _busy = true;
     });
-    final sendGen = ++_sendGen;
-    var deliveredOk = false;
-    if (imageB64 != null) {
-      await NgmyCommunicateMemoryStore.appendWithMime(
-        _email,
-        widget.profile.id,
-        role: 'user',
-        text: displayText,
-        imageB64: imageB64,
-        imageMime: imageMime,
-      );
-    } else {
-      await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
+
+    // Persist FIRST — never show a bubble that is not saved (leaving the app used to wipe them).
+    try {
+      if (imageB64 != null) {
+        await NgmyCommunicateMemoryStore.appendWithMime(
+          _email,
+          widget.profile.id,
+          role: 'user',
+          text: displayText,
+          imageB64: imageB64,
+          imageMime: imageMime,
+        );
+      } else {
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
+      }
+    } catch (e) {
+      debugPrint('[communicate] persist user message failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save that message. Try again.')),
+        );
+      }
+      return;
+    }
+
+    final userRow = <String, String>{'role': 'user', 'text': displayText};
+    if (imageB64 != null) userRow['imageB64'] = imageB64;
+    if (mounted) {
+      setState(() => _messages.add(userRow));
     }
     unawaited(NgmyCommunicatePromiseStore.syncFromUserText(_email, widget.profile.id, text));
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
@@ -4219,13 +4244,63 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
     _scrollBottom();
 
+    final job = <String, String>{'text': text.isEmpty ? displayText : text};
+    if (imageB64 != null) {
+      job['imageB64'] = imageB64;
+      job['imageMime'] = imageMime;
+    }
+    _outboundQueue.add(job);
+    await _drainOutboundQueue();
+  }
+
+  Future<void> _drainOutboundQueue() async {
+    if (_busy || _outboundQueue.isEmpty) return;
+    if (mounted) setState(() => _busy = true);
+    try {
+      while (_outboundQueue.isNotEmpty) {
+        // Spam "hey" / "how are you" → reply once to the latest.
+        while (_outboundQueue.length > 1) {
+          final a = (_outboundQueue[0]['text'] ?? '').toString();
+          final b = (_outboundQueue[1]['text'] ?? '').toString();
+          if (ngmyUserMessageIsShortChatPing(a) && ngmyUserMessageIsShortChatPing(b)) {
+            _outboundQueue.removeAt(0);
+          } else {
+            break;
+          }
+        }
+        final job = Map<String, String>.from(_outboundQueue.removeAt(0));
+        await _processOutboundJob(job);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          if (_isDebater) {
+            _debatePasteMode = false;
+            _debateAskQuestionNext = false;
+          }
+        });
+        if (_isDebater) unawaited(_saveDebateSession());
+        _scheduleRomanticNudgeIfNeeded();
+      }
+      _scrollBottom();
+      if (_outboundQueue.isNotEmpty) unawaited(_drainOutboundQueue());
+    }
+  }
+
+  Future<void> _processOutboundJob(Map<String, String> job) async {
+    final text = (job['text'] ?? '').trim();
+    final imageB64 = job['imageB64'];
+    final imageMime = job['imageMime'] ?? 'image/jpeg';
+    final sendGen = ++_sendGen;
+    var deliveredOk = false;
+
     final apiKey = await _resolveApiKey();
     if (apiKey.isEmpty) {
       deliveredOk = await _deliverAiReply(
         sendGen: sendGen,
         text: ngmyCommunicateAiFailureMessage(apiKey: ''),
       );
-      if (mounted) setState(() => _busy = false);
       return;
     }
 
@@ -4252,6 +4327,26 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         debugPrint('[communicate] partner sync skipped: $e');
       }
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+
+      // Fast path for hey/hi — tiny prompt, short budget (stops glitch loops on weak signal).
+      if (imageB64 == null && ngmyUserMessageIsShortChatPing(text)) {
+        final girl = widget.profile.gender != 'male';
+        final prompt =
+            'You are ${widget.profile.name} texting on NGMY. Reply with ONE short warm human text message only. '
+            '${girl ? 'Soft girlfriend energy if you two are close, otherwise friendly. ' : ''}'
+            'No asterisks, no paragraphs. They said: "$text"\nReply:';
+        final result = await ngmyAiGenerateCommunicateFast(
+          creds,
+          prompt,
+          budget: const Duration(seconds: 14),
+        );
+        final cleaned = _cleanAdvisorReply(result.text);
+        final reply = cleaned.isNotEmpty
+            ? cleaned
+            : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error ?? 'timeout');
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        return;
+      }
       final takenByOtherEarly = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       // Datable chats that already feel like dating unlock pics for that boyfriend/girlfriend.
       final canDateThisChatter = ngmyCommunicateAdvisorCanDateChatter(
@@ -4300,7 +4395,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           partnerName: partner?['name'] ?? '',
         );
         deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
-        if (mounted) setState(() => _busy = false);
         return;
       }
 
@@ -4308,7 +4402,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final canSendPartnerImage = allowsPartnerPhotos && canDateThisChatter && isExclusivePartner;
       // Partner pics do NOT require the user to upload a photo first — camera is only for homework roles.
       final wantsImage = requestedImage && canSendPartnerImage;
-      final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
+      final userSentPhoto = (imageB64 ?? '').isNotEmpty && _allowsPhotoUpload;
 
       Future<String?> generatePartnerPhotoB64() async {
         Uint8List? portrait;
@@ -4423,7 +4517,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             '${_userPhotoCaption(text)}'
             '${_isTextCoach ? _replyStyleSuffix() : 'Reply as ${widget.profile.name} — helpful teacher energy, plain language:'}';
         final images = <NgmyAiImagePart>[
-          (mimeType: imageMime, data: imageB64),
+          (mimeType: imageMime, data: imageB64 ?? ''),
         ];
         final result = await _generateAndCleanAdvisorReply(
           creds: creds,
@@ -4640,7 +4734,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ) ||
           deliveredOk;
     } finally {
-      // Never leave the user staring at a vanished "typing" with no reply.
+      // Never leave this job without a reply bubble.
       if (!deliveredOk && sendGen == _sendGen) {
         try {
           await _deliverAiReply(
@@ -4651,18 +4745,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           debugPrint('[communicate] fallback deliver: $e');
         }
       }
-      if (mounted && sendGen == _sendGen) {
-        setState(() {
-          _busy = false;
-          if (_isDebater) {
-            _debatePasteMode = false;
-            _debateAskQuestionNext = false;
-          }
-        });
-        if (_isDebater) unawaited(_saveDebateSession());
-        _scheduleRomanticNudgeIfNeeded();
-      }
-      _scrollBottom();
     }
   }
 
