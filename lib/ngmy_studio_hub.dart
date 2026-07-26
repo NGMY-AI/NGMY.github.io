@@ -13,7 +13,6 @@ import 'ngmy_outfit_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
-import 'ngmy_repair_guides.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
 import 'ngmy_ai_client.dart';
@@ -167,13 +166,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Virtual Device',
         subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
         onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
-      ),
-      _CreatorTool(
-        icon: Icons.build_circle_rounded,
-        colors: const [Color(0xFFF97316), Color(0xFFEA580C)],
-        title: 'Fix Manual',
-        subtitle: 'Car repair guides · photos · step-by-step',
-        onTap: () => showNgmyRepairGuides(context: context, userEmail: userEmail),
       ),
     ];
 
