@@ -3406,16 +3406,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'setups with strangers. Staged skits with willing cast are fine. Be specific and genius-level useful.\n',
       );
     }
-    if (_isBoss &&
-        ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
-        ngmyUserRequestedContentIdeas(text)) {
-      buf.writeln(
-        'CONTENT GENIUS MODE NOW: Give 2–4 concrete Instagram/TikTok/YouTube short-form video ideas. '
-        'For each: concept, 1–3 second hook, exact lines/questions to say or ask, simple shot plan, caption idea. '
-        'Make it interesting and shareable. Legal, consensual, not harmful — no real fights or non-consensual pranks. '
-        'If they want street interviews with random people, give openers + question lists. Be a crafting genius.\n',
-      );
-    }
     if (_isMshauri) {
       final userState = ((widget.user as dynamic).state ?? '').toString();
       final session = await ngmyMshauriRefreshSession(
