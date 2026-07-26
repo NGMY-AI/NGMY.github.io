@@ -13,7 +13,6 @@ import 'ngmy_outfit_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
-import 'ngmy_neo_glass_dashboard.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
 import 'ngmy_ai_client.dart';
@@ -167,26 +166,6 @@ class NgmyCreatorHubTab extends StatelessWidget {
         title: 'Virtual Device',
         subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
         onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
-      ),
-      _CreatorTool(
-        icon: Icons.view_in_ar_rounded,
-        colors: const [Color(0xFF2EF6A3), Color(0xFF0D9488)],
-        title: 'Neo Glass',
-        subtitle: '3D futuristic command dashboard',
-        onTap: () {
-          String? name;
-          double? bal;
-          try {
-            name = user?.username?.toString();
-            bal = (user?.accountBalance as num?)?.toDouble();
-          } catch (_) {}
-          showNgmyNeoGlassDashboard(
-            context: context,
-            userEmail: userEmail,
-            displayName: name,
-            balance: bal,
-          );
-        },
       ),
     ];
 
