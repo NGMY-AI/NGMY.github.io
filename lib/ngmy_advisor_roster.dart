@@ -93,7 +93,7 @@ bool ngmyUserRequestedPoetry(String text) {
 String ngmyPoetryLengthInstruction(String userText) {
   final t = userText.trim().toLowerCase();
   if (t.isEmpty) {
-    return 'Write at least 12–20 rhyming lines. Deliver the COMPLETE poem in this reply.';
+    return 'Write 8–12 rhyming lines. Deliver the COMPLETE poem in this reply.';
   }
   final minMatch = RegExp(r'(\d+)\s*(?:min(?:ute)?s?)\b').firstMatch(t);
   if (minMatch != null) {
@@ -116,7 +116,7 @@ String ngmyPoetryLengthInstruction(String userText) {
   if (RegExp(r'\b(long|full|extended|epic)\b').hasMatch(t)) {
     return 'Long poem: 24–36 rhyming lines. Deliver the complete poem in this reply.';
   }
-  return 'Write at least 12–20 rhyming lines. Your reply must BE the poem — not just "okay" or "for you". '
+  return 'Write 8–12 rhyming lines unless they asked for longer. Your reply must BE the poem — not just "okay" or "for you". '
       'Deliver the COMPLETE poem now.';
 }
 

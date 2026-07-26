@@ -3914,6 +3914,44 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return cleaned;
   }
 
+  String _buildCompactPoemPrompt(String userText, String transcript) {
+    final name = widget.profile.name;
+    final african = ngmyAdvisorWritesAfricanCulturePoetry(name: name, id: widget.profile.id);
+    final topicScope = african
+        ? 'Topic: African culture, country, or history ONLY — name Congo/Kenya/etc. if they ask. '
+        : 'Topic: match what they asked — love, Africa, Congo, identity, faith, family, anything. ';
+    final styleRef = ngmyUserSharedSpokenWordStyleReference(userText)
+        ? 'Style: spoken-word pride — immigration, tongue, Black brilliance, strong mothers, heritage when it fits. '
+        : '';
+    return 'You are $name texting on NGMY. POEM ONLY — your entire reply IS the complete rhyming spoken-word poem.\n'
+        '${ngmyPoetryLengthInstruction(userText)}\n'
+        '$topicScope$styleRef'
+        'End rhymes + internal rhyme. One line per row. Original words only. No asterisks. '
+        'FORBIDDEN: stopping at "okay", "for you", or "one sec" without poem lines.\n'
+        '${transcript.isNotEmpty ? 'Recent chat:\n$transcript\n' : ''}'
+        'They asked: $userText\n'
+        'Full poem now:';
+  }
+
+  Future<({String cleaned, String? error})> _generatePoemReplyFast({
+    required NgmyAiCredentials creds,
+    required String prompt,
+    required String userText,
+  }) async {
+    var result = await ngmyAiGenerateCommunicateFast(creds, prompt);
+    var cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    if (ngmyAdvisorPoemReplyLooksIncomplete(cleaned) &&
+        (result.error ?? '').trim().isEmpty &&
+        cleaned.isNotEmpty) {
+      result = await ngmyAiGenerateCommunicateFast(
+        creds,
+        '$prompt\nPOEM LINES ONLY — minimum 8 rhyming lines, one per row. Start with line 1 now:',
+      );
+      cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    }
+    return (cleaned: cleaned, error: result.error);
+  }
+
   Future<({String cleaned, String? error})> _generateAndCleanAdvisorReply({
     required NgmyAiCredentials creds,
     required String prompt,
@@ -3925,6 +3963,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       id: widget.profile.id,
       userText: userText,
     );
+    if (poemMode && images.isEmpty) {
+      return _generatePoemReplyFast(creds: creds, prompt: prompt, userText: userText);
+    }
     var result = images.isNotEmpty
         ? await ngmyAiGenerateWithRetry(creds, prompt, images: images)
         : await ngmyAiGenerateWithRetry(creds, prompt);
@@ -3935,9 +3976,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           '${ngmyPoetryLengthInstruction(userText)} '
           'Minimum 8 lines unless they asked shorter. One line per row. '
           'Do not say "okay", "for you", or "one sec" without delivering every line:';
-      result = images.isNotEmpty
-          ? await ngmyAiGenerateWithRetry(creds, retryPrompt, images: images)
-          : await ngmyAiGenerateWithRetry(creds, retryPrompt);
+      result = await ngmyAiGenerateCommunicateFast(creds, retryPrompt);
       cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
     }
     return (cleaned: cleaned, error: result.error);
@@ -4418,6 +4457,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           }
         }
       } else {
+        final poemRequest = text.isNotEmpty &&
+            ngmyAdvisorShouldWritePoetry(
+              name: widget.profile.name,
+              id: widget.profile.id,
+              userText: text,
+            );
+        if (poemRequest) {
+          final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem, maxMessages: 6);
+          final prompt = _buildCompactPoemPrompt(text, transcript);
+          final result = await _generatePoemReplyFast(creds: creds, prompt: prompt, userText: text);
+          var cleaned = result.cleaned;
+          cleaned = _enforceTakenBoundary(cleaned, takenByOther: takenByOther, partner: partner);
+          final reply = cleaned.isNotEmpty
+              ? cleaned
+              : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
+          await _deliverAiReply(sendGen: sendGen, text: reply);
+        } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final recentPhotos = _allowsPhotoUpload ? NgmyCommunicateMemoryStore.recentUserImages(mem) : const <NgmyAiImagePart>[];
         final homeworkCtx = recentPhotos.isNotEmpty && !_isTextCoach
@@ -4468,6 +4524,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
         await _deliverAiReply(sendGen: sendGen, text: reply);
+        }
       }
     } catch (e) {
       debugPrint('[communicate] send error: $e');

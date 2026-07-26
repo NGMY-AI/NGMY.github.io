@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -180,6 +181,89 @@ Future<({String? text, String? error})> _callGeminiDirect(
     }
   }
   return (text: null, error: _extractApiErrorMessage(lastError, body: lastBody));
+}
+
+/// One fast Gemini model for advisor chat — avoids trying 6 models sequentially.
+Future<({String? text, String? error})> _callGeminiDirectCommunicate(
+  String apiKey,
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+  Duration timeout = const Duration(seconds: 26),
+  int maxOutputTokens = 1400,
+}) async {
+  const model = 'gemini-2.0-flash';
+  try {
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(apiKey)}',
+    );
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'contents': [
+              {'parts': _geminiPartsFor(prompt, images)},
+            ],
+            'generationConfig': {
+              'maxOutputTokens': maxOutputTokens,
+              'temperature': 0.92,
+            },
+          }),
+        )
+        .timeout(timeout);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final candidates = data['candidates'];
+      if (candidates is List && candidates.isNotEmpty) {
+        final parts = candidates[0]['content']?['parts'];
+        if (parts is List && parts.isNotEmpty) {
+          final text = parts[0]['text']?.toString();
+          if (text != null && text.trim().isNotEmpty) {
+            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
+          }
+        }
+      }
+    }
+    return (text: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
+  } catch (e) {
+    return (text: null, error: _extractApiErrorMessage(e));
+  }
+}
+
+/// Fast advisor reply — hard time budget so typing never hangs for minutes.
+Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
+  NgmyAiCredentials creds,
+  String prompt, {
+  List<NgmyAiImagePart> images = const [],
+  Duration budget = const Duration(seconds: 32),
+}) async {
+  if (creds.apiKey.isEmpty) {
+    return (text: null, error: 'No API key configured.');
+  }
+  try {
+    return await () async {
+      if (kIsWeb) {
+        final proxied = await _callAiViaSupabaseProxy(
+          apiKey: creds.apiKey,
+          prompt: prompt,
+          provider: creds.provider,
+          openAiBaseUrl: creds.openAiBaseUrl,
+          images: images,
+        );
+        if (proxied.text != null && proxied.text!.trim().isNotEmpty) return proxied;
+      }
+      if (images.isNotEmpty || creds.provider == NgmyAiProviderKind.gemini) {
+        final gemini = await _callGeminiDirectCommunicate(creds.apiKey, prompt, images: images);
+        if (gemini.text != null && gemini.text!.trim().isNotEmpty) return gemini;
+        if (kIsWeb) return gemini;
+      }
+      return await _callGeminiDirectCommunicate(creds.apiKey, prompt, images: images);
+    }().timeout(budget);
+  } on TimeoutException {
+    return (text: null, error: 'timeout');
+  } catch (e) {
+    return (text: null, error: _extractApiErrorMessage(e));
+  }
 }
 
 /// Stronger Gemini call for App Builder — larger JSON apps, longer timeout.
@@ -417,7 +501,9 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
 
     // Preferred: Supabase Functions client (handles auth headers).
     try {
-      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
+      final res = await client.functions
+          .invoke(kNgmySupabaseAiFunction, body: body)
+          .timeout(const Duration(seconds: 32));
       if (res.status == 200) {
         final data = res.data;
         if (data is Map) {
