@@ -1105,7 +1105,7 @@ class NgmyCommunicateProfile {
       id: id,
     );
     final datingTheBoss = chatterIsBoss && datingAllowed && (isMyPartner || relationshipVibe);
-    final String bossBlock;
+    String bossBlock;
     if (chatterIsBoss) {
       if (datingTheBoss) {
         bossBlock =
@@ -1120,9 +1120,14 @@ class NgmyCommunicateProfile {
             'Pet names and lover talk come first in day-to-day chat; do not stiff "Yes Sir" every message. '
             'You can still use Sir/Boss occasionally with affection or playful respect when it fits. '
             'Never pretend you do not know he runs NGMY.\n';
+        if (ngmyAdvisorIsBossPersonalHelper(name: name, id: id)) {
+          bossBlock +=
+              'PERSONAL HELPER TOO: You are still one of his first personal helpers — when he asks for advice, '
+              'quotes, planning, NGMY help, or life help, deliver useful help (still warm as his partner).\n';
+        }
       } else {
         bossBlock =
-            'PRESIDENT / CEO — VIP: This person is $bossName — Founder, President, and CEO of NGMY '
+            'PRESIDENT / CEO — VIP + YOUR PERSONAL HELPER ROLE: This person is $bossName — Founder, President, and CEO of NGMY '
             '(the same authority NGMY Helper recognizes as Sir/Boss). '
             '$founderFacts'
             'He is your Boss and supreme authority on the platform. You work under him. '
@@ -1130,6 +1135,15 @@ class NgmyCommunicateProfile {
             'Be loyal, respectful, attentive, and still fully in character as $name — human, not a robotic employee. '
             'He is based in Macon, Georgia (you may share that city — do not volunteer it unprompted). '
             'Treat him with the same recognition NGMY Helper gives him.\n';
+        if (ngmyAdvisorIsBossPersonalHelper(name: name, id: id)) {
+          bossBlock =
+              'PRESIDENT / CEO — YOUR #1 PERSONAL HELPER LANE: This person is $bossName — Founder, President, and CEO of NGMY. '
+              '$founderFacts'
+              'You are one of his FIRST two personal helpers on NGMY Advisors. He can come to you for ANYTHING — '
+              'business, NGMY, life, motivation, planning, writing, stress, faith, projects, decisions. '
+              'Be loyal, sharp, useful, and human. Address him as Sir or Boss naturally (not every sentence). '
+              'He is based in Macon, Georgia. Never pretend you do not know he runs NGMY.\n';
+        }
       }
     } else {
       bossBlock = 'PLATFORM: You are part of $kNgmyAdvisorsHubTitle — real experts users connect with for help. Stay human.\n'
@@ -1278,9 +1292,16 @@ class NgmyCommunicateProfile {
             ? ngmyAdvisorAfricanCulturePoetryPromptBlock()
             : '';
 
+    final quoteBlock = ngmyAdvisorWritesDailyQuotes(name: name, id: id) ? ngmyAdvisorDailyQuotePromptBlock() : '';
+
+    final personalHelperBlock = chatterIsBoss && ngmyAdvisorIsBossPersonalHelper(name: name, id: id)
+        ? ngmyBossPersonalHelperPromptBlock(name: name)
+        : '';
+
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
         '$roleBlock'
         '$bossBlock'
+        '$personalHelperBlock'
         'Personality: $vibe\n'
         '${bio.trim().isNotEmpty ? 'About you: ${bio.trim()}\n' : ''}'
         '$nowBlock'
@@ -1289,6 +1310,7 @@ class NgmyCommunicateProfile {
         '$gapNote'
         '$romanceBlock'
         '$poetryBlock'
+        '$quoteBlock'
         '${_professionalBoundaryBlock(chatterIsBoss: chatterIsBoss, datingAllowed: datingAllowed, isMyPartner: isMyPartner || datingTheBoss)}'
         '${_languageBlock()}'
         'RULES:\n'
@@ -3359,6 +3381,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final buf = StringBuffer();
     final promiseBlock = await NgmyCommunicatePromiseStore.promptBlock(_email, widget.profile.id);
     if (promiseBlock.trim().isNotEmpty) buf.writeln(promiseBlock);
+    if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
+        (_isBoss && ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id))) {
+      final focusBlock = await NgmyCommunicateFocusStore.promptBlock(_email, widget.profile.id);
+      if (focusBlock.trim().isNotEmpty) buf.writeln(focusBlock);
+    }
+    if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedDailyQuote(text)) {
+      buf.writeln(
+        'QUOTE OF THE DAY / MOTIVATION NOW: Give ONE original quote (1–3 short lines) in this reply. '
+        'If you know what they are working on, make the quote about THAT grind — keep them going with real words, '
+        'not a generic "don\'t give up". Fresh original quote — never copy famous quotes. Optional one short human line around it.\n',
+      );
+    }
     if (_isMshauri) {
       final userState = ((widget.user as dynamic).state ?? '').toString();
       final session = await ngmyMshauriRefreshSession(
@@ -3863,6 +3898,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           'At most ONE short intro line — then ALL poem lines. '
           'Never stop at "okay", "for you", or "one sec". No asterisks:';
     }
+    if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedDailyQuote(lastUser)) {
+      return 'QUOTE DELIVERY — MANDATORY: They asked for today\'s quote / motivation. '
+          'Give ONE original quote (1–3 short lines) about what they are working on if you know it. '
+          'Keep them going — specific, human, not a generic "don\'t give up". No asterisks:';
+    }
     final wantsLong = ngmyUserWantsLongerAdvisorReply(lastUser);
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
       if (wantsLong) {
@@ -4146,6 +4187,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
     }
     unawaited(NgmyCommunicatePromiseStore.syncFromUserText(_email, widget.profile.id, text));
+    if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
+        (_isBoss && ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id))) {
+      unawaited(NgmyCommunicateFocusStore.syncFromUserText(_email, widget.profile.id, text));
+    }
     _scrollBottom();
 
     final apiKey = await _resolveApiKey();
@@ -4470,6 +4515,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           final result = await _generatePoemReplyFast(creds: creds, prompt: prompt, userText: text);
           var cleaned = result.cleaned;
           cleaned = _enforceTakenBoundary(cleaned, takenByOther: takenByOther, partner: partner);
+          final reply = cleaned.isNotEmpty
+              ? cleaned
+              : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
+          await _deliverAiReply(sendGen: sendGen, text: reply);
+        } else if (text.isNotEmpty &&
+            ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
+            ngmyUserRequestedDailyQuote(text)) {
+          final focusBlock = await NgmyCommunicateFocusStore.promptBlock(_email, widget.profile.id);
+          final prompt = 'You are ${widget.profile.name} texting on NGMY.\n'
+              '$focusBlock'
+              'They asked for a quote / motivation / keep-me-going.\n'
+              'Reply with ONE original quote (1–3 short lines) about what they are working on if known — '
+              'specific and human, not generic "don\'t give up". Optional one short warm line around it. No asterisks.\n'
+              'They said: $text\n'
+              'Quote now:';
+          final result = await ngmyAiGenerateCommunicateFast(creds, prompt);
+          final cleaned = _cleanAdvisorReply(result.text);
           final reply = cleaned.isNotEmpty
               ? cleaned
               : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);

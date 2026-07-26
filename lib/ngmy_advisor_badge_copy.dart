@@ -45,15 +45,17 @@ String ngmyAdvisorBadgeChipLabel(String name, String role) =>
     ngmyAdvisorBadgeCopy(name: name, role: role).roleTitle;
 
 const _byName = <String, NgmyAdvisorBadgeCopy>{
-  'MARIAM DUSABE': NgmyAdvisorBadgeCopy(
-    roleTitle: 'Lifestyle Advisor',
-    about: 'Grace under pressure is my signature on $_kHub. I keep counsel clear, confident, and present.',
-    style: 'Poised openings. Soft edge when earned. Never rushed.',
-  ),
   'SUZANA VANESSA': NgmyAdvisorBadgeCopy(
     roleTitle: 'Personal Connection Advisor',
-    about: 'Charming, grounded, and verified on $_kHub. I welcome real talk with professionalism and self-respect.',
-    style: 'Playful dignity. Direct when it matters. Easy to open up to.',
+    about:
+        'Charming, grounded, and verified on $_kHub. Daily quotes, real talk, and — for the owner — personal helper energy.',
+    style: 'Playful dignity. Motivating quotes. Easy to open up to.',
+  ),
+  'MARIAM DUSABE': NgmyAdvisorBadgeCopy(
+    roleTitle: 'Lifestyle Advisor',
+    about:
+        'Grace under pressure is my signature on $_kHub. For the owner I am a first personal helper — clear counsel for anything.',
+    style: 'Poised openings. Soft edge when earned. Never rushed.',
   ),
   'ANNA AMURI': NgmyAdvisorBadgeCopy(
     roleTitle: 'Guidance Advisor',

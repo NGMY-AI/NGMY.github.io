@@ -3,6 +3,67 @@
 
 const String kNgmyAdvisorSuzanaVanessaId = 'cmp-suzana-vanessa';
 
+/// Grid order #1–#2 — owner's personal helpers (Boss / admin only).
+const List<String> kNgmyBossPersonalHelperNames = <String>[
+  'MARIAM DUSABE',
+  'SUZANA VANESSA',
+];
+
+/// Advisor #2 — daily quotes + remembers what the Boss is working on.
+const List<String> kNgmyDailyQuoteAdvisorNames = <String>[
+  'SUZANA VANESSA',
+];
+
+bool ngmyAdvisorIsBossPersonalHelper({required String name, String id = ''}) {
+  final n = name.trim().toUpperCase();
+  if (kNgmyBossPersonalHelperNames.contains(n)) return true;
+  final i = id.trim().toLowerCase();
+  if (i.contains('mariam') || i.contains('dusabe')) return true;
+  if (i.contains('suzana-vanessa') || i == kNgmyAdvisorSuzanaVanessaId) return true;
+  return false;
+}
+
+bool ngmyAdvisorWritesDailyQuotes({required String name, String id = ''}) {
+  final n = name.trim().toUpperCase();
+  if (kNgmyDailyQuoteAdvisorNames.contains(n)) return true;
+  final i = id.trim().toLowerCase();
+  if (i.contains('suzana-vanessa') || i == kNgmyAdvisorSuzanaVanessaId) return true;
+  return false;
+}
+
+bool ngmyUserRequestedDailyQuote(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  if (RegExp(r"\b(quote of (the )?day|today'?s quote|daily quote|quote for today|motivation(al)? quote)\b")
+      .hasMatch(t)) {
+    return true;
+  }
+  if (RegExp(r'\b(give|send|write|make|share) (me )?(a |an |another )?(quote|motivation|inspirational)\b')
+      .hasMatch(t)) {
+    return true;
+  }
+  if (RegExp(r"\bwhat('?s| is) (the )?(quote|motivation)\b").hasMatch(t)) return true;
+  return RegExp(r'\bkeep me going\b').hasMatch(t) || RegExp(r'\bmotivate me\b').hasMatch(t);
+}
+
+String ngmyAdvisorDailyQuotePromptBlock() =>
+    'DAILY QUOTES (your gift for the Boss / people who ask):\n'
+    '- When they ask for the quote of the day, today\'s quote, a daily quote, motivation, or "keep me going" — '
+    'give ONE original quote in this reply (1–3 short lines). Sound human and wise — not a Hallmark poster.\n'
+    '- If you know what they are working on (house, business, NGMY, school, fitness, etc.), make the quote ABOUT THAT. '
+    'Push them forward on that exact grind — not a generic "don\'t give up".\n'
+    '- Original words only — never copy famous quotes word-for-word. Fresh every day.\n'
+    '- You may add one short human sentence before or after the quote. No asterisks.\n'
+    '- Normal chat stays normal — full quote mode when they ask.\n';
+
+String ngmyBossPersonalHelperPromptBlock({required String name}) =>
+    'PERSONAL HELPER TO THE OWNER (Boss only):\n'
+    '- You ($name) are one of the Boss\'s FIRST two personal helpers on NGMY — go-to for almost anything.\n'
+    '- Help with: business, NGMY decisions, life, motivation, planning, writing, ideas, stress, faith, relationships '
+    '(as appropriate), work projects, reminders, and whatever they bring. Be useful, loyal, sharp, and human.\n'
+    '- Remember what they tell you they are working on and use it. Give real advice, not empty cheerleading.\n'
+    '- Stay in character as $name — warm and present — while being their reliable personal advisor.\n';
+
 /// Grid order #2–#5 (after Mariam Dusabe) — these advisors write original rhyming poetry.
 const List<String> kNgmyAdvisorPoetryWriterNames = <String>[
   'SUZANA VANESSA',
@@ -656,6 +717,8 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
             'hard to get — never desperate. Once exclusive you are deeply romantic and loyal to ONE person only. '
             'When sexual talk starts, be fully open and verbatim — say real body words (pussy, dick, etc.), '
             'never euphemisms like "down there" or "between my legs". Stay open to any conversation. Sound human. '
+            'You also write original daily motivational quotes — especially for the Boss — and remember what he is '
+            'working on so your quotes keep him going on that exact grind. '
             '$kNgmyAdvisorPoetryPersonalityAddendum',
   };
 }

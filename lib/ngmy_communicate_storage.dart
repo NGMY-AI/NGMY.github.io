@@ -888,3 +888,105 @@ class NgmyCommunicatePromiseStore {
     return buf.toString();
   }
 }
+
+/// Remembers what the chatter is working on (projects / grind) — local only.
+/// Shared per user email so Mariam + Suzana (personal helpers) both remember.
+class NgmyCommunicateFocusStore {
+  static String _key(String email, String profileId) =>
+      'ngmy_comm_focus_${email.toLowerCase().trim()}';
+
+  static Future<List<Map<String, dynamic>>> load(String email, String profileId) async {
+    if (email.trim().isEmpty) return [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key(email, profileId));
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> _save(String email, String profileId, List<Map<String, dynamic>> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmed = list.length > 12 ? list.sublist(list.length - 12) : list;
+    await prefs.setString(_key(email, profileId), jsonEncode(trimmed));
+  }
+
+  /// Detect "I'm working on X" / "remember I'm building Y" and save it.
+  static Future<void> syncFromUserText(String email, String profileId, String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    final lower = t.toLowerCase();
+
+    String? focus;
+    final patterns = <RegExp>[
+      RegExp(
+        r"\b(?:i(?:'m| am)?\s+(?:working(?:\s+hard)?\s+on|building|fixing|renovating|starting|launching|trying\s+to|grinding\s+on|focused\s+on))\s+(.+)$",
+        caseSensitive: false,
+      ),
+      RegExp(
+        r"(?:remember(?:\s+that)?(?:\s+i(?:'m| am)?)?|save\s+this|keep\s+in\s+mind)\s*[:\-]?\s*(.+)$",
+        caseSensitive: false,
+      ),
+      RegExp(
+        r"\b(?:my\s+(?:project|goal|grind|focus)\s+(?:is|right\s+now))\s+(.+)$",
+        caseSensitive: false,
+      ),
+    ];
+    for (final p in patterns) {
+      final m = p.firstMatch(lower);
+      if (m != null) {
+        focus = (m.group(1) ?? '').trim();
+        break;
+      }
+    }
+    // Explicit: "I'm working hard on my house"
+    if (focus == null || focus.isEmpty) {
+      final m = RegExp(
+        r"\bworking(?:\s+hard)?\s+on\s+(.{3,120})",
+        caseSensitive: false,
+      ).firstMatch(t);
+      if (m != null) focus = m.group(1)!.trim();
+    }
+    if (focus == null || focus.length < 3) return;
+    // Strip trailing ask-for-quote tails so we don't store the whole message.
+    focus = focus
+        .replaceAll(RegExp(r'[.!?].*$'), '')
+        .replaceAll(RegExp(r'\b(give|send|write|make|quote|motivate|keep me).*$', caseSensitive: false), '')
+        .trim();
+    if (focus.length < 3) return;
+    if (focus.length > 140) focus = '${focus.substring(0, 140)}…';
+
+    final list = await load(email, profileId);
+    final norm = focus.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    list.removeWhere(
+      (e) => (e['text'] ?? '').toString().toLowerCase().replaceAll(RegExp(r'\s+'), ' ') == norm,
+    );
+    list.add({
+      'text': focus,
+      'at': DateTime.now().toUtc().toIso8601String(),
+    });
+    await _save(email, profileId, list);
+  }
+
+  static Future<String> promptBlock(String email, String profileId) async {
+    final list = await load(email, profileId);
+    if (list.isEmpty) return '';
+    final buf = StringBuffer(
+      'WHAT THEY ARE WORKING ON (remember this — quotes and advice should match their grind):\n',
+    );
+    for (final p in list.reversed.take(5)) {
+      final text = (p['text'] ?? '').toString().trim();
+      if (text.isEmpty) continue;
+      buf.writeln('- "$text"');
+    }
+    buf.writeln(
+      'When they ask for a quote / motivation / keep me going — write it ABOUT their current work. '
+      'When advising, reference these projects naturally. Do not dump the list every reply.\n',
+    );
+    return buf.toString();
+  }
+}
