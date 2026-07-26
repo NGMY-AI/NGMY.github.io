@@ -18,7 +18,6 @@ const String kNgmyAdvisorSyncQrPrefix = 'NGMYASYNC1';
 const String kNgmyAdvisorSyncQrPrefixV2 = 'NGMYASYNC2';
 const int kNgmyAdvisorSyncQrMaxUses = 2;
 const String _kCloudSettingsKey = 'ngmy_communicate_backup_codes_v1';
-const String _kQrStashSettingsKey = 'ngmy_communicate_qr_stashes_v1';
 
 /// Cloud activation codes — only codes live in Supabase; conversation data stays local.
 class NgmyCommunicateBackupCodes {
@@ -170,129 +169,44 @@ class NgmyCommunicateBackupCodes {
   }
 }
 
-/// Short-lived cloud stash so QR codes stay small (2 scans total).
+/// Local-only QR payload — advisor chats never uploaded to the database.
 class NgmyCommunicateQrStash {
-  static String _generateToken() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final r = Random.secure();
-    return 'QR${List.generate(10, (_) => chars[r.nextInt(chars.length)]).join()}';
-  }
+  /// Max QR string length (conversations stay in the code or use file download).
+  static const int kMaxLocalQrChars = 2800;
 
-  static Future<Map<String, dynamic>> _loadStashes() async {
-    if (!await ngmyCanReachCloud()) return {};
+  /// Embeds backup JSON directly in the QR — nothing stored in cloud.
+  static ({String qrPayload, int usesRemaining})? createLocalQrFromBundle(NgmyAdvisorSyncBundle bundle) {
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _kQrStashSettingsKey).maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
-      final stashes = value['stashes'];
-      if (stashes is Map) return Map<String, dynamic>.from(stashes);
+      final encoded = base64Url.encode(utf8.encode(bundle.toJson()));
+      final payload = '$kNgmyAdvisorSyncQrPrefix|$encoded';
+      if (payload.length > kMaxLocalQrChars) return null;
+      return (qrPayload: payload, usesRemaining: 1);
     } catch (e) {
-      debugPrint('[advisor qr stash] load: $e');
-    }
-    return {};
-  }
-
-  static Future<void> _saveStashes(Map<String, dynamic> stashes) async {
-    if (!await ngmyCanReachCloud()) return;
-    try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kQrStashSettingsKey,
-          'value': {
-            'stashes': stashes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
-    } catch (e) {
-      debugPrint('[advisor qr stash] save: $e');
+      debugPrint('[advisor qr local] encode: $e');
+      return null;
     }
   }
 
-  /// Creates a cloud stash and returns a compact QR payload (always fits on screen).
+  /// Legacy cloud stashes — read-only for old QR codes; new QRs are local-only.
   static Future<({String qrPayload, String token, int usesRemaining})?> createFromBundle(
     NgmyAdvisorSyncBundle bundle, {
     required bool isAdmin,
   }) async {
-    if (!await ngmyCanReachCloud()) return null;
-    final token = _generateToken();
-    final stashes = await _loadStashes();
-    stashes[token] = {
-      'ownerEmail': bundle.ownerEmail,
-      'code': bundle.code,
-      'payload': base64Encode(utf8.encode(jsonEncode(bundle.toMap()))),
-      'usesRemaining': isAdmin ? 999 : kNgmyAdvisorSyncQrMaxUses,
-      'createdAt': DateTime.now().toUtc().toIso8601String(),
-    };
-    await _saveStashes(stashes);
-    final uses = isAdmin ? 999 : kNgmyAdvisorSyncQrMaxUses;
-    return (
-      qrPayload: '$kNgmyAdvisorSyncQrPrefixV2|$token',
-      token: token,
-      usesRemaining: uses,
-    );
+    final local = createLocalQrFromBundle(bundle);
+    if (local == null) return null;
+    return (qrPayload: local.qrPayload, token: '', usesRemaining: local.usesRemaining);
   }
 
-  /// Removes one advisor transfer stash from cloud (frees space).
-  static Future<void> deleteToken(String token) async {
-    final id = token.trim();
-    if (id.isEmpty) return;
-    final stashes = await _loadStashes();
-    if (!stashes.containsKey(id)) return;
-    stashes.remove(id);
-    await _saveStashes(stashes);
-  }
+  /// No-op — local QR codes do not use cloud tokens.
+  static Future<void> deleteToken(String token) async {}
 
-  static Future<int?> usesRemainingForToken(String token) async {
-    final id = token.trim();
-    if (id.isEmpty) return null;
-    final stashes = await _loadStashes();
-    final row = stashes[id];
-    if (row is! Map) return null;
-    return (row['usesRemaining'] as num?)?.toInt();
-  }
+  static Future<int?> usesRemainingForToken(String token) async => null;
 
+  /// Legacy cloud QR codes are no longer supported — use file backup or local QR (v1).
   static Future<NgmyAdvisorSyncBundle?> consumeToken(String token) async {
-    final id = token.trim();
-    if (id.isEmpty) return null;
-    final stashes = await _loadStashes();
-    final row = stashes[id];
-    if (row is! Map) return null;
-    final uses = (row['usesRemaining'] as num?)?.toInt() ?? 0;
-    if (uses <= 0) return null;
-
-    final ownerEmail = (row['ownerEmail'] ?? '').toString();
-    final code = (row['code'] ?? '').toString();
-    if (!await NgmyCommunicateBackupCodes.isBackupCodeActive(code, ownerEmail: ownerEmail)) {
-      debugPrint('[advisor qr stash] owner code inactive; allowing stash restore');
-    }
-
-    final payloadRaw = (row['payload'] ?? '').toString();
-    if (payloadRaw.isEmpty) return null;
-    NgmyAdvisorSyncBundle? bundle;
-    try {
-      final jsonText = utf8.decode(base64Decode(payloadRaw));
-      bundle = NgmyAdvisorSyncBundle.parse(jsonText);
-    } catch (e) {
-      debugPrint('[advisor qr stash] decode: $e');
-      return null;
-    }
-    if (bundle == null) return null;
-
-    final nextUses = uses - 1;
-    if (nextUses <= 0) {
-      stashes.remove(id);
-    } else {
-      stashes[id] = {
-        ...Map<String, dynamic>.from(row),
-        'usesRemaining': nextUses,
-        'lastUsedAt': DateTime.now().toUtc().toIso8601String(),
-      };
-    }
-    await _saveStashes(stashes);
-    return bundle;
+    if (token.trim().isEmpty) return null;
+    debugPrint('[advisor qr] cloud stash no longer used');
+    return null;
   }
 }
 

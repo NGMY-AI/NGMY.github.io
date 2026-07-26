@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_communicate_chat_images.dart';
-import 'ngmy_network_resilience.dart';
 
 /// Long-term local storage for Communicate companion chats (months on same device).
 class NgmyCommunicateMemoryStore {
@@ -294,98 +291,30 @@ class NgmyCommunicateMemoryStore {
   }
 }
 
-/// Cloud sync — same account shares talk-time across all devices.
-class NgmyCommunicateTimeCloud {
-  static const _settingsKey = 'ngmy_communicate_time_usage_v1';
-
-  static String _norm(String email) => email.toLowerCase().trim();
-
-  static Future<int> fetchSeconds(String email) async {
-    if (!await ngmyCanReachCloud() || email.trim().isEmpty) return 0;
-    try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row == null) return 0;
-      final value = row['value'];
-      if (value is! Map) return 0;
-      final users = value['users'];
-      if (users is! Map) return 0;
-      final entry = users[_norm(email)];
-      if (entry is! Map) return 0;
-      return (entry['usedSeconds'] as num?)?.toInt() ?? 0;
-    } catch (e) {
-      debugPrint('[comm time cloud] fetch: $e');
-      return 0;
-    }
-  }
-
-  static Future<void> pushSeconds(String email, int seconds) async {
-    if (!await ngmyCanReachCloud() || email.trim().isEmpty) return;
-    try {
-      Map<String, dynamic> users = {};
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row != null) {
-        final value = row['value'];
-        if (value is Map) {
-          final raw = value['users'];
-          if (raw is Map) users = Map<String, dynamic>.from(raw);
-        }
-      }
-      final key = _norm(email);
-      final prev = (users[key] is Map) ? Map<String, dynamic>.from(users[key] as Map) : <String, dynamic>{};
-      final prevSec = (prev['usedSeconds'] as num?)?.toInt() ?? 0;
-      users[key] = {
-        'usedSeconds': math.max(prevSec, seconds),
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _settingsKey,
-          'value': {'users': users, 'savedAt': DateTime.now().toUtc().toIso8601String()},
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
-    } catch (e) {
-      debugPrint('[comm time cloud] push: $e');
-    }
-  }
-
-  static Future<void> reset(String email) async {
-    await pushSeconds(email, 0);
-  }
-}
-
-/// Rolling talk-time meter — per account, synced across phones.
+/// Local talk-time meter — per account on this device only (never synced to cloud).
 class NgmyCommunicateTimeTracker {
   static String _key(String email) => 'ngmy_communicate_used_sec_${email.toLowerCase().trim()}';
 
-  /// Pull cloud usage into local cache — call when opening any AI chat.
-  static Future<int> syncFromCloud(String email) async {
+  static Future<int> getUsedSeconds(String email) async {
     if (email.trim().isEmpty) return 0;
     final prefs = await SharedPreferences.getInstance();
-    final local = prefs.getInt(_key(email)) ?? 0;
-    final cloud = await NgmyCommunicateTimeCloud.fetchSeconds(email);
-    final merged = math.max(local, cloud);
-    if (merged != local) await prefs.setInt(_key(email), merged);
-    return merged;
+    return prefs.getInt(_key(email)) ?? 0;
   }
 
-  static Future<int> getUsedSeconds(String email) async => syncFromCloud(email);
+  /// Kept for call sites — reads local usage only (no cloud).
+  static Future<int> syncFromCloud(String email) async => getUsedSeconds(email);
 
   static Future<void> addSeconds(String email, int seconds) async {
     if (email.trim().isEmpty || seconds <= 0) return;
     final prefs = await SharedPreferences.getInstance();
     final cur = prefs.getInt(_key(email)) ?? 0;
-    final cloud = await NgmyCommunicateTimeCloud.fetchSeconds(email);
-    final next = math.max(cur, cloud) + seconds;
-    await prefs.setInt(_key(email), next);
-    unawaited(NgmyCommunicateTimeCloud.pushSeconds(email, next));
+    await prefs.setInt(_key(email), cur + seconds);
   }
 
   static Future<void> resetAfterPayment(String email) async {
     if (email.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_key(email), 0);
-    unawaited(NgmyCommunicateTimeCloud.reset(email));
   }
 }
 
@@ -569,7 +498,7 @@ class NgmyCommunicateAvatarCache {
   }
 }
 
-/// One exclusive partner per companion profile (per device) — AI stays taken.
+/// One exclusive partner per advisor profile — stored locally on this device only.
 class NgmyCommunicateRelationshipStore {
   static String _key(String profileId) => 'ngmy_comm_partner_${profileId.trim()}';
 
@@ -583,7 +512,7 @@ class NgmyCommunicateRelationshipStore {
       final email = (m['email'] ?? '').toString().trim();
       if (email.isEmpty) return null;
       return {
-        'email': email,
+        'email': email.toLowerCase().trim(),
         'name': (m['name'] ?? '').toString(),
         'status': (m['status'] ?? 'dating').toString(),
         'since': (m['since'] ?? '').toString(),
@@ -593,22 +522,35 @@ class NgmyCommunicateRelationshipStore {
     }
   }
 
-  static Future<void> setPartner(String profileId, {required String email, String name = '', String status = 'dating'}) async {
-    if (profileId.trim().isEmpty || email.trim().isEmpty) return;
+  /// Returns false if this advisor is already exclusive with someone else on this device.
+  static Future<bool> setPartner(String profileId, {required String email, String name = '', String status = 'dating'}) async {
+    if (profileId.trim().isEmpty || email.trim().isEmpty) return false;
+    final normalized = email.toLowerCase().trim();
+    final existing = await loadPartner(profileId);
+    if (existing != null) {
+      final exEmail = (existing['email'] ?? '').toLowerCase().trim();
+      if (exEmail.isNotEmpty && exEmail != normalized) return false;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _key(profileId),
       jsonEncode({
-        'email': email.toLowerCase().trim(),
+        'email': normalized,
         'name': name.trim(),
         'status': status,
         'since': DateTime.now().toUtc().toIso8601String(),
       }),
     );
+    return true;
   }
 
-  static Future<void> clearPartner(String profileId) async {
+  static Future<void> clearPartner(String profileId, {String? onlyIfEmail}) async {
     if (profileId.trim().isEmpty) return;
+    if (onlyIfEmail != null) {
+      final current = await loadPartner(profileId);
+      final curEmail = (current?['email'] ?? '').toLowerCase().trim();
+      if (curEmail.isNotEmpty && curEmail != onlyIfEmail.toLowerCase().trim()) return;
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key(profileId));
   }
@@ -642,7 +584,7 @@ class NgmyCommunicateRelationshipStore {
 
     final existing = await loadPartner(profileId);
     if (brokeUp && existing != null && existing['email'] == email) {
-      await clearPartner(profileId);
+      await clearPartner(profileId, onlyIfEmail: email);
       return;
     }
     // Someone else already has this advisor — don't steal the relationship (one partner only).
@@ -658,7 +600,7 @@ class NgmyCommunicateRelationshipStore {
 
     // Soft partner energy (babe/baby/my love) + at least one real user message = exclusive.
     if (official || (softDating && userCount >= 1)) {
-      await setPartner(profileId, email: email, status: 'exclusive');
+      await setPartner(profileId, email: email, name: '', status: 'exclusive');
     }
   }
 

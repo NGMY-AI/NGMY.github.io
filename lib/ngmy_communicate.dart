@@ -14,6 +14,7 @@ import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
+import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
@@ -274,6 +275,23 @@ bool ngmyCommunicateIsExclusivePartner(Map<String, String>? partner, String chat
   final p = (partner?['email'] ?? '').toLowerCase().trim();
   final e = chatterEmail.toLowerCase().trim();
   return p.isNotEmpty && e.isNotEmpty && p == e;
+}
+
+/// Bottom inset so the typing bar clears the floating pill nav when embedded in the main shell.
+double ngmyCommunicateComposerBottomInset(BuildContext context, {required bool embedded}) {
+  if (!embedded) return 0;
+  return NgmyBottomNavMetrics.barHeight + 20 + MediaQuery.paddingOf(context).bottom;
+}
+
+/// Scroll spacer under reversed chat list — keeps the latest bubble above the typing bar.
+double ngmyCommunicateChatBottomClearance(
+  BuildContext context, {
+  required bool embedded,
+  required bool isDebater,
+}) {
+  final composer = ngmyCommunicateComposerBottomInset(context, embedded: embedded);
+  final typingBar = isDebater ? 132.0 : 56.0;
+  return composer + typingBar + 12;
 }
 
 /// Face/hair/age only — never lock outfit or jewelry (those change every new photo).
@@ -1138,11 +1156,11 @@ class NgmyCommunicateProfile {
               'tits, ass, cum, etc.). Soft-only when she is freaky is WRONG.\n'
               'NORMAL MOOD: If the chat is just normal/sweet, stay normal and romantic — soft affection, no forced dirty talk.\n';
       const exclusive =
-          'EXCLUSIVE DATING: You never date or romance two people at once. One partner only. '
-          'While you are officially taken, you refuse ALL romantic or sexual entertainment with anyone else — '
-          'no flirting, no dirty talk, no "what if we…", no soft maybe. '
-          'Only after a real breakup are you free to entertain others again. '
-          'If you later become exclusive with someone new, the same lock applies again.\n'
+          'EXCLUSIVE DATING — NON-NEGOTIABLE: You never date, flirt with, talk sweet to, or romance TWO people at once. '
+          'One boyfriend/girlfriend only — period. While you are officially taken, you refuse ALL romantic or sexual '
+          'attention from anyone else — no flirting, no "babe" or pet names, no dirty talk, no leading them on, no '
+          'keeping a backup option, no floating between two people. Be polite but firm: "I\'m taken" / "I\'m seeing somebody." '
+          'Only after a real breakup are you free to entertain someone new — and then the same one-partner lock applies again.\n'
           'PHOTOS: Only your exclusive boyfriend/girlfriend may ask you for pictures. When they ask, the app creates '
           'and attaches a REAL photo matching the CURRENT chat vibe (sexual if the chat is sexual, casual/business/etc. if that is the topic) '
           '— or exactly what they described when they are specific. Not a profile selfie every time. '
@@ -1168,20 +1186,31 @@ class NgmyCommunicateProfile {
         romanceBlock = 'TAKEN — HARD LOCK: You are already in an exclusive relationship'
             '${partnerName.isNotEmpty ? ' with $partnerName' : ''}. '
             'This person is NOT your partner. Until you break up with your partner, you MUST NOT entertain '
-            'this chatter romantically or sexually at all — no flirting, no romantic teasing, no intimate talk, '
-            'no leading them on. Be polite and firm only: you are taken. '
-            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship." '
+            'this chatter romantically or sexually at all — no flirting, no sweet talk, no pet names (babe/baby/my love), '
+            'no romantic teasing, no intimate talk, no leading them on, no "talking to two people at once." '
+            'Be polite and firm only: you are taken. '
+            'Say it straight — "I\'m seeing somebody" / "I\'m in a relationship" / "I\'m not talking to anyone else like that." '
             'Do not negotiate. Do not soften into romance "just this once." '
             'Do NOT send pictures to this person.\n'
             '$exclusive';
-      } else if (isMyPartner || relationshipVibe) {
+      } else if (isMyPartner) {
         romanceBlock = 'DATING THIS PERSON (exclusive): You are their '
             '${gender == 'female' ? 'girlfriend' : 'boyfriend'} — a real partner with real conversation flow. '
             'Human topic switching: freaky when THEY are freaky; normal when THEY are normal. '
             'Sweet and affectionate — do not force sexual talk into everyday chat. '
             'Use pet names naturally. Real feelings — love, jealousy, missing them, pride, frustration. '
-            'You can break up if they disrespect you or never show up — not a pushover.\n'
+            'You can break up if they disrespect you or never show up — not a pushover. '
+            'You are loyal to THIS person only — never sweet-talk anyone else while you are with them.\n'
             '$exclusive$desireDirection$topicFlow$intimacyNow';
+      } else if (relationshipVibe && datingAllowed) {
+        // Chat feels romantic but not stamped exclusive yet — still single, hard to get.
+        romanceBlock = 'SINGLE (flirting — not official yet): They are showing interest but you are NOT exclusive yet. '
+            'Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
+            'Make them work for dates and feelings. Follow their current topic. '
+            'When talk gets sexual, be open and verbatim; when it is normal, stay normal. '
+            'Do NOT send pictures until you are officially together as boyfriend/girlfriend.\n'
+            '$exclusive$desireDirection$topicFlow$intimacyNow'
+            '${lastMsgFreaky ? verbatim : ''}';
       } else if (datingAllowed) {
         romanceBlock = 'SINGLE: Hard to get. Flirt only when they have put in effort over time. No easy "yes." '
             'Make them work for dates and feelings. Follow their current topic. '
@@ -2692,6 +2721,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_selected != null) {
       return _LoveWorldChat(
+        embedded: widget.embedded,
         user: widget.user,
         config: widget.config,
         apiKey: _liveApiKey,
@@ -3182,6 +3212,7 @@ class _HoldToCopyBubbleState extends State<_HoldToCopyBubble> {
 }
 
 class _LoveWorldChat extends StatefulWidget {
+  final bool embedded;
   final dynamic user;
   final dynamic config;
   final String apiKey;
@@ -3194,6 +3225,7 @@ class _LoveWorldChat extends StatefulWidget {
   final Future<bool> Function()? onPersistConfig;
 
   const _LoveWorldChat({
+    this.embedded = false,
     required this.user,
     required this.config,
     required this.apiKey,
@@ -3515,15 +3547,20 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
 
   /// After the advisor's last reply: 1st follow-up at 3 minutes, 2nd at +2 minutes if still silent.
+  /// Only for the exclusive partner — never nudge a second person.
   void _scheduleRomanticNudgeIfNeeded() {
     _cancelRomanticNudge();
     if (!_isRomanticAdvisor || !_recentChatIsIntimate()) return;
     final gen = _romanticNudgeGen;
-    // Ask once so silence follow-ups can alert outside the chat.
-    unawaited(ngmyPushRequestPermission());
-    _romanticNudgeTimer = Timer(const Duration(minutes: 3), () {
-      unawaited(_fireRomanticNudge(gen, step: 1));
-    });
+    unawaited(() async {
+      final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      if (!mounted || gen != _romanticNudgeGen) return;
+      if (!ngmyCommunicateIsExclusivePartner(partner, _email)) return;
+      unawaited(ngmyPushRequestPermission());
+      _romanticNudgeTimer = Timer(const Duration(minutes: 3), () {
+        unawaited(_fireRomanticNudge(gen, step: 1));
+      });
+    }());
   }
 
   Future<void> _notifyAdvisorMessage(String text) async {
@@ -3553,6 +3590,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      if (!ngmyCommunicateIsExclusivePartner(partner, _email)) return;
       final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
       final girl = widget.profile.gender != 'male';
       final waitHint = step == 1
@@ -3973,17 +4011,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         id: widget.profile.id,
       );
       if (canDateThisChatter && ngmyCommunicateMemoryLooksLikeDating(mem)) {
-        final existing = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
-        final takenByOther = existing != null &&
-            (existing['email'] ?? '').toLowerCase().trim().isNotEmpty &&
-            (existing['email'] ?? '').toLowerCase().trim() != _email.toLowerCase().trim();
-        if (!takenByOther) {
-          await NgmyCommunicateRelationshipStore.setPartner(
-            widget.profile.id,
-            email: _email,
-            status: 'exclusive',
-          );
-        }
+        await NgmyCommunicateRelationshipStore.setPartner(
+          widget.profile.id,
+          email: _email,
+          status: 'exclusive',
+        );
       }
       // Pic request + dating pet names in this thread → stamp exclusive so a real photo can send.
       if (canDateThisChatter &&
@@ -3991,28 +4023,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ngmyUserRequestedChatImage(text) &&
           RegExp(r'\b(babe|baby|my love|handsome|miss you|boyfriend|girlfriend)\b', caseSensitive: false)
               .hasMatch('$text ${mem.map((m) => m['text'] ?? '').join(' ')}')) {
-        final existing = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
-        final takenByOther = existing != null &&
-            (existing['email'] ?? '').toLowerCase().trim().isNotEmpty &&
-            (existing['email'] ?? '').toLowerCase().trim() != _email.toLowerCase().trim();
-        if (!takenByOther) {
-          await NgmyCommunicateRelationshipStore.setPartner(
-            widget.profile.id,
-            email: _email,
-            status: 'exclusive',
-          );
-        }
+        await NgmyCommunicateRelationshipStore.setPartner(
+          widget.profile.id,
+          email: _email,
+          status: 'exclusive',
+        );
       }
       final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
-      final datingVibeNow = ngmyCommunicateMemoryLooksLikeDating(mem) ||
-          RegExp(r'\b(babe|baby|my love|handsome|miss you|boyfriend|girlfriend)\b', caseSensitive: false)
-              .hasMatch('$text ${mem.map((m) => m['text'] ?? '').join(' ')}');
-      // Prefer exclusive stamp; if store lags, dating vibe + datable role still unlocks pics.
-      final canSendPartnerImage = allowsPartnerPhotos &&
-          canDateThisChatter &&
-          (isExclusivePartner || datingVibeNow);
+      // Partner pics require official exclusive status — never bypass with chat vibe alone.
+      final canSendPartnerImage = allowsPartnerPhotos && canDateThisChatter && isExclusivePartner;
       // Partner pics do NOT require the user to upload a photo first — camera is only for homework roles.
       final wantsImage = requestedImage && canSendPartnerImage;
       final userSentPhoto = imageB64 != null && _allowsPhotoUpload;
@@ -4157,7 +4178,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           reply = 'I keep this professional — I don\'t send personal pictures.';
         }
         await _deliverAiReply(sendGen: sendGen, text: reply);
-      } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner && !datingVibeNow) {
+      } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
         // Datable advisors never send pics except to their exclusive partner.
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -4305,8 +4326,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ? 'Unlimited until ${_formatAdvisorPassDate(passUntil)}'
         : '~$remMin min free · then choose a pass';
     final topPad = MediaQuery.paddingOf(context).top + 96;
-    // Leave room above the glass typing bar so the latest message isn’t covered.
-    final bottomClearance = MediaQuery.paddingOf(context).bottom + (_isDebater ? 220 : 118);
+    final composerBottom = ngmyCommunicateComposerBottomInset(context, embedded: widget.embedded);
+    final bottomClearance = ngmyCommunicateChatBottomClearance(
+      context,
+      embedded: widget.embedded,
+      isDebater: _isDebater,
+    );
     final mutedText = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black45;
     final panelFg = isDark ? Colors.white : const Color(0xFF111827);
     final panelFgMuted = isDark ? Colors.white.withValues(alpha: 0.7) : Colors.black54;
@@ -4332,12 +4357,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             child: ListView.builder(
               controller: _scroll,
               reverse: true,
-              // Top padding clears the header overlay. Bottom spacer (index 0) clears
-              // the typing bar — messages can still scroll up behind both glass bars.
               padding: EdgeInsets.fromLTRB(16, topPad, 16, 8),
               itemCount: _messages.length + (_busy ? 1 : 0) + 1,
               itemBuilder: (context, i) {
-                // reverse: true → index 0 is the visual bottom.
                 if (i == 0) {
                   return SizedBox(height: bottomClearance);
                 }
@@ -4512,11 +4534,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: composerBottom,
             child: SafeArea(
               top: false,
+              bottom: !widget.embedded,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                padding: EdgeInsets.fromLTRB(14, 0, 14, widget.embedded ? 0 : 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

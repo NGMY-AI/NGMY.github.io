@@ -212,7 +212,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
       );
       if (!mounted) return;
       if (qr == null) {
-        _toast('No conversations to share yet, or cloud is unavailable.');
+        _toast('No chats yet, or too much history for QR — download the backup file (stays on your device).');
         return;
       }
       await Navigator.of(context).push<void>(
@@ -422,7 +422,7 @@ class _SyncHeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = isAdmin
-        ? 'Backups stay on this device. Admin skips cloud codes.'
+        ? 'Advisor chats, photos, and partners stay on this device only — never in the database.'
         : canExport
             ? 'Messages stay local. QR works 2 times while your pass is active.'
             : 'Scan a QR or upload a file to receive conversations — no pass needed to import.';
