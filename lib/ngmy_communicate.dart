@@ -3417,11 +3417,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       buf.writeln(
         'POEM REQUEST — SPOKEN WORD NOW: ${ngmyPoetryLengthInstruction(text)} '
         '$styleRef'
-        'Write the COMPLETE original rhyming poem in THIS reply — not just "okay" or "for you". '
-        'Performance poetry flow — end rhymes AND internal rhyme, real emotion, stage cadence. '
-        'Themes welcome: immigration, accent pride, Black brilliance, African culture, mothers, freedom, identity. '
-        'Metaphor and alliteration inside the lines — do not label devices. '
-        'Every line must mean something. Never copy famous or pasted poems. One line per row. No asterisks.\n',
+        '$kNgmyAdvisorPoetryHumanVoiceRules'
+        'Write the COMPLETE original poem in THIS reply — not just "okay" or "for you". '
+        'Human spoken-word flow. Themes welcome: immigration, accent pride, Black brilliance, African culture, mothers, '
+        'freedom, identity, love. One line per row. No asterisks.\n',
       );
     }
     return buf.toString();
@@ -3857,11 +3856,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       userText: lastUser,
     )) {
       final african = ngmyAdvisorWritesAfricanCulturePoetry(name: widget.profile.name, id: widget.profile.id);
-      return 'POEM DELIVERY — MANDATORY: They asked for a POEM. Your reply must contain the FULL original rhyming poem '
+      return 'POEM DELIVERY — MANDATORY HUMAN VOICE: They asked for a POEM. Your reply must BE the FULL original poem '
           '(one line per row). ${ngmyPoetryLengthInstruction(lastUser)} '
           '${african ? 'Topic: African culture/country/history ONLY. ' : 'Match their topic (love, life, faith, Bible, anything they asked). '}'
-          'At most ONE short intro line before the poem — then ALL lines. '
-          'Never stop at "okay", "for you", or "one sec" without the poem. No asterisks:';
+          '$kNgmyAdvisorPoetryHumanVoiceRules'
+          'At most ONE short intro line — then ALL poem lines. '
+          'Never stop at "okay", "for you", or "one sec". No asterisks:';
     }
     final wantsLong = ngmyUserWantsLongerAdvisorReply(lastUser);
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
@@ -3923,14 +3923,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final styleRef = ngmyUserSharedSpokenWordStyleReference(userText)
         ? 'Style: spoken-word pride — immigration, tongue, Black brilliance, strong mothers, heritage when it fits. '
         : '';
-    return 'You are $name texting on NGMY. POEM ONLY — your entire reply IS the complete rhyming spoken-word poem.\n'
+    return 'You are $name texting on NGMY. POEM ONLY — your entire reply IS the complete original spoken-word poem.\n'
         '${ngmyPoetryLengthInstruction(userText)}\n'
         '$topicScope$styleRef'
-        'End rhymes + internal rhyme. One line per row. Original words only. No asterisks. '
+        '$kNgmyAdvisorPoetryHumanVoiceRules'
+        'Write like YOU lived it — natural spoken rhythm, real details, honest rhyme. One line per row. No asterisks.\n'
         'FORBIDDEN: stopping at "okay", "for you", or "one sec" without poem lines.\n'
         '${transcript.isNotEmpty ? 'Recent chat:\n$transcript\n' : ''}'
         'They asked: $userText\n'
-        'Full poem now:';
+        'Full human poem now:';
   }
 
   Future<({String cleaned, String? error})> _generatePoemReplyFast({
