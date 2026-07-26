@@ -4006,9 +4006,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (poemMode && images.isEmpty) {
       return _generatePoemReplyFast(creds: creds, prompt: prompt, userText: userText);
     }
-    var result = images.isNotEmpty
-        ? await ngmyAiGenerateWithRetry(creds, prompt, images: images)
-        : await ngmyAiGenerateWithRetry(creds, prompt);
+    // Always use the hard-budget fast path — multi-model retry hangs for minutes on weak signal.
+    var result = await ngmyAiGenerateCommunicateFast(creds, prompt, images: images);
     var cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
     if (poemMode && ngmyAdvisorPoemReplyLooksIncomplete(cleaned)) {
       final retryPrompt = '$prompt\n'
@@ -4074,7 +4073,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   /// Persist advisor reply even if user left chat; notify when away.
   /// Empty text + no photo is rejected so typing never ends on a blank bubble.
-  Future<void> _deliverAiReply({
+  /// Returns true when a reply was accepted (UI and/or memory).
+  Future<bool> _deliverAiReply({
     required int sendGen,
     required String text,
     String? imageB64,
@@ -4083,7 +4083,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final body = text.trim();
     if (body.isEmpty && photo.isEmpty) {
       debugPrint('[communicate] refused empty AI reply');
-      return;
+      return false;
     }
     if (photo.isNotEmpty) {
       await NgmyCommunicateMemoryStore.append(
@@ -4107,12 +4107,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ? body
           : '📷 ${widget.profile.name} sent you a photo';
       unawaited(_notifyAdvisorMessage(preview));
-      return;
+      return true;
     }
     final row = <String, String>{'role': 'ai', 'text': body};
     if (photo.isNotEmpty) row['imageB64'] = photo;
     setState(() => _messages.add(row));
     _scrollBottom();
+    return true;
   }
 
   Future<void> _sendDebateReply(String text) async {
@@ -4178,6 +4179,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _busy = true;
     });
     final sendGen = ++_sendGen;
+    var deliveredOk = false;
     if (imageB64 != null) {
       await NgmyCommunicateMemoryStore.appendWithMime(
         _email,
@@ -4199,7 +4201,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
     final apiKey = await _resolveApiKey();
     if (apiKey.isEmpty) {
-      await _deliverAiReply(
+      deliveredOk = await _deliverAiReply(
         sendGen: sendGen,
         text: ngmyCommunicateAiFailureMessage(apiKey: ''),
       );
@@ -4210,18 +4212,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
-      await NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id);
-      await NgmyCommunicateRelationshipStore.syncFromMemory(
-        widget.profile.id,
-        _email,
-        mem,
-        allowDating: ngmyCommunicateAdvisorCanDateChatter(
-          role: widget.profile.role,
-          name: widget.profile.name,
-          chatterIsBoss: _isBoss,
-          id: widget.profile.id,
-        ),
-      );
+      // Keep partner sync fast — never block the reply for more than a couple seconds.
+      try {
+        await Future.wait([
+          NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id),
+          NgmyCommunicateRelationshipStore.syncFromMemory(
+            widget.profile.id,
+            _email,
+            mem,
+            allowDating: ngmyCommunicateAdvisorCanDateChatter(
+              role: widget.profile.role,
+              name: widget.profile.name,
+              chatterIsBoss: _isBoss,
+              id: widget.profile.id,
+            ),
+          ),
+        ]).timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('[communicate] partner sync skipped: $e');
+      }
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final takenByOtherEarly = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       // Datable chats that already feel like dating unlock pics for that boyfriend/girlfriend.
@@ -4270,7 +4279,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           gender: widget.profile.gender,
           partnerName: partner?['name'] ?? '',
         );
-        await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         if (mounted) setState(() => _busy = false);
         return;
       }
@@ -4408,7 +4417,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           takenByOther: takenByOther,
           partner: partner,
         );
-        await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && !canDateThisChatter) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -4427,10 +4436,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I keep this professional — I don\'t send personal pictures.';
         }
-        await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
       } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
         if (takenByOther) {
-          await _deliverAiReply(
+          deliveredOk = await _deliverAiReply(
             sendGen: sendGen,
             text: ngmyAdvisorTakenBoundaryReply(
               gender: widget.profile.gender,
@@ -4457,7 +4466,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I don\'t send pics like that unless we\'re official 😌';
         }
-        await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         }
       } else if (wantsImage) {
         String? b64;
@@ -4471,7 +4480,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           b64 = null;
         }
         if (b64 != null && b64.isNotEmpty) {
-          await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64);
         } else {
           // Never show "tap send again" — keep trying until a real photo is ready.
           try {
@@ -4500,17 +4509,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 ? base64Encode(emergency.bytes!)
                 : null;
             if (emergencyB64 != null && emergencyB64.isNotEmpty) {
-              await _deliverAiReply(sendGen: sendGen, text: '', imageB64: emergencyB64);
+              deliveredOk = await _deliverAiReply(sendGen: sendGen, text: '', imageB64: emergencyB64);
             } else {
               // Never leave typing with zero reply — fall back to a real text.
-              await _deliverAiReply(
+              deliveredOk = await _deliverAiReply(
                 sendGen: sendGen,
                 text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
               );
             }
           } catch (e) {
             debugPrint('[communicate] emergency photo: $e');
-            await _deliverAiReply(
+            deliveredOk = await _deliverAiReply(
               sendGen: sendGen,
               text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
             );
@@ -4532,7 +4541,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           final reply = cleaned.isNotEmpty
               ? cleaned
               : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-          await _deliverAiReply(sendGen: sendGen, text: reply);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         } else if (text.isNotEmpty &&
             ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
             ngmyUserRequestedDailyQuote(text)) {
@@ -4549,7 +4558,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           final reply = cleaned.isNotEmpty
               ? cleaned
               : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-          await _deliverAiReply(sendGen: sendGen, text: reply);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final recentPhotos = _allowsPhotoUpload ? NgmyCommunicateMemoryStore.recentUserImages(mem) : const <NgmyAiImagePart>[];
@@ -4585,7 +4594,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             onTimeout: () => null,
           );
           if (b64Photo != null && b64Photo.isNotEmpty) {
-            await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64Photo);
+            deliveredOk = await _deliverAiReply(sendGen: sendGen, text: '', imageB64: b64Photo);
             return;
           }
           cleaned = '💕';
@@ -4600,20 +4609,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-        await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         }
       }
     } catch (e) {
       debugPrint('[communicate] send error: $e');
-      await _deliverAiReply(
-        sendGen: sendGen,
-        text: ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
-      );
+      deliveredOk = await _deliverAiReply(
+            sendGen: sendGen,
+            text: ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: e.toString()),
+          ) ||
+          deliveredOk;
     } finally {
       // Never leave the user staring at a vanished "typing" with no reply.
-      if (sendGen == _sendGen &&
-          _messages.isNotEmpty &&
-          _messages.last['role'] == 'user') {
+      if (!deliveredOk && sendGen == _sendGen) {
         try {
           await _deliverAiReply(
             sendGen: sendGen,

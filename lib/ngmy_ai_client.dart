@@ -235,7 +235,7 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
   NgmyAiCredentials creds,
   String prompt, {
   List<NgmyAiImagePart> images = const [],
-  Duration budget = const Duration(seconds: 32),
+  Duration budget = const Duration(seconds: 22),
 }) async {
   if (creds.apiKey.isEmpty) {
     return (text: null, error: 'No API key configured.');
@@ -251,13 +251,19 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
           images: images,
         );
         if (proxied.text != null && proxied.text!.trim().isNotEmpty) return proxied;
+        // On web, if proxy failed with a network error, do not burn more time on direct CORS calls.
+        if (ngmyIsOfflineOrNetworkError(proxied.error ?? '')) {
+          return proxied;
+        }
       }
-      if (images.isNotEmpty || creds.provider == NgmyAiProviderKind.gemini) {
-        final gemini = await _callGeminiDirectCommunicate(creds.apiKey, prompt, images: images);
-        if (gemini.text != null && gemini.text!.trim().isNotEmpty) return gemini;
-        if (kIsWeb) return gemini;
-      }
-      return await _callGeminiDirectCommunicate(creds.apiKey, prompt, images: images);
+      final gemini = await _callGeminiDirectCommunicate(
+        creds.apiKey,
+        prompt,
+        images: images,
+        timeout: const Duration(seconds: 18),
+      );
+      if (gemini.text != null && gemini.text!.trim().isNotEmpty) return gemini;
+      return gemini;
     }().timeout(budget);
   } on TimeoutException {
     return (text: null, error: 'timeout');
@@ -503,7 +509,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
     try {
       final res = await client.functions
           .invoke(kNgmySupabaseAiFunction, body: body)
-          .timeout(const Duration(seconds: 32));
+          .timeout(const Duration(seconds: 20));
       if (res.status == 200) {
         final data = res.data;
         if (data is Map) {
@@ -545,7 +551,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
           },
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 95));
+        .timeout(const Duration(seconds: 20));
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final text = data['text']?.toString();
