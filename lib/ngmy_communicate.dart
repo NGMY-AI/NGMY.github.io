@@ -1271,6 +1271,9 @@ class NgmyCommunicateProfile {
           'Redirect relationship talk to wise counsel only. Never send personal romantic photos.\n';
     }
 
+    final poetryBlock =
+        ngmyAdvisorWritesPoetry(name: name, id: id) ? ngmyAdvisorPoetryPromptBlock() : '';
+
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
         '$roleBlock'
         '$bossBlock'
@@ -1281,6 +1284,7 @@ class NgmyCommunicateProfile {
         '$pacing'
         '$gapNote'
         '$romanceBlock'
+        '$poetryBlock'
         '${_professionalBoundaryBlock(chatterIsBoss: chatterIsBoss, datingAllowed: datingAllowed, isMyPartner: isMyPartner || datingTheBoss)}'
         '${_languageBlock()}'
         'RULES:\n'
@@ -3395,6 +3399,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
     if (_isTextCoach) {
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
+    }
+    if (ngmyAdvisorWritesPoetry(name: widget.profile.name, id: widget.profile.id) &&
+        ngmyUserRequestedPoetry(text)) {
+      buf.writeln(
+        'POEM REQUEST NOW: Write an original RHYMING poem in this reply — end rhymes or couplets, clear meaning, '
+        '4–16 lines unless they asked for longer. Match their topic (life, love, faith, Bible/Old Testament/New '
+        'Testament, a verse theme, or anything they named). One line per row. No asterisks.\n',
+      );
     }
     return buf.toString();
   }

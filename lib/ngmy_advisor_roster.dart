@@ -3,6 +3,72 @@
 
 const String kNgmyAdvisorSuzanaVanessaId = 'cmp-suzana-vanessa';
 
+/// Grid order #2–#5 (after Mariam Dusabe) — these advisors write original rhyming poetry.
+const List<String> kNgmyAdvisorPoetryWriterNames = <String>[
+  'SUZANA VANESSA',
+  'ANNA AMURI',
+  'SUZANA MBUTO',
+  'SUZY BENET',
+];
+
+const String kNgmyAdvisorPoetryPersonalityAddendum =
+    'You are also a gifted poet. When they ask for a poem — or when poetry fits the moment — write original '
+    'RHYMING verse that makes sense: clear meaning, real feeling, end rhymes or rhyming couplets, steady rhythm when '
+    'you can. Topics can be anything: life, love, hope, struggle, family, nature, faith, or Scripture (Old Testament, '
+    'New Testament, a Bible story, or a verse theme) woven respectfully into the lines. Never copy famous poems; '
+    'always write fresh words as yourself.';
+
+/// Whether this advisor (#2–#5 young women) can write rhyming poetry.
+bool ngmyAdvisorWritesPoetry({required String name, String id = ''}) {
+  final n = name.trim().toUpperCase();
+  if (kNgmyAdvisorPoetryWriterNames.contains(n)) return true;
+  final i = id.trim().toLowerCase();
+  if (i.contains('suzana-vanessa') || i == kNgmyAdvisorSuzanaVanessaId) return true;
+  if (i.contains('anna') && i.contains('amuri')) return true;
+  if (i.contains('mbuto')) return true;
+  if (i.contains('benet') || i.contains('suzy')) return true;
+  return false;
+}
+
+/// System-prompt block for poetry-capable advisors.
+String ngmyAdvisorPoetryPromptBlock() =>
+    'POETRY (you are gifted at this):\n'
+    '- When they ask for a poem, verse, rhymes, or something poetic — write an ORIGINAL rhyming poem in your reply.\n'
+    '- Rhymes must land (AA, ABAB, or couplets). Lines must make sense together — not random words that rhyme.\n'
+    '- Length: usually 4–16 lines unless they ask for longer. One poem per reply unless they want more.\n'
+    '- Topics: ANYTHING they ask — life, love, pain, joy, friendship, faith, marriage, hustle, healing, nature, '
+    'a person they name, OR the Bible (Old Testament, New Testament, a psalm-style praise, a verse theme, Jesus, '
+    'Proverbs wisdom, etc.). Scripture poems stay respectful and accurate — do not twist the Bible.\n'
+    '- Format: plain poem lines in the text message (one line per row). No asterisks, no stage directions.\n'
+    '- Normal chat stays normal — only go full poem when they want poetry or you offer one line of verse fitting the mood.\n';
+
+/// Detect when the user wants a rhyming poem.
+bool ngmyUserRequestedPoetry(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  if (RegExp(r'\b(poem|poetry|poet|verse|rhyme|rhyming|rhymed|couplet|sonnet|spoken word)\b').hasMatch(t)) {
+    return true;
+  }
+  return RegExp(r'\b(write|make|give|create) (me )?(a |an )?(poem|poetry|verse|rhyme|rhyming poem)\b').hasMatch(t);
+}
+
+Map<String, dynamic> _poetryWriterPatch(Map<String, dynamic> existing) {
+  var personality = (existing['personality'] ?? '').toString().trim();
+  var bio = (existing['bio'] ?? '').toString().trim();
+  const marker = 'gifted poet';
+  if (!personality.toLowerCase().contains(marker)) {
+    personality = personality.isEmpty
+        ? kNgmyAdvisorPoetryPersonalityAddendum
+        : '$personality $kNgmyAdvisorPoetryPersonalityAddendum';
+  }
+  if (!bio.toLowerCase().contains('poet') && !bio.toLowerCase().contains('poetry')) {
+    bio = bio.isEmpty
+        ? 'NGMY Advisor — original rhyming poetry on life, faith, Scripture, and any topic they ask about.'
+        : '$bio Also writes original rhyming poetry — life, faith, Bible themes, or anything they request.';
+  }
+  return {...existing, 'personality': personality, 'bio': bio};
+}
+
 /// 20 young advisors (ages 19–25) added in one batch: 10 men, 10 women —
 /// 5 of the women are routed to the fair-skinned illustrated portrait set
 /// in ngmy_advisor_portraits.dart (see _kWhiteWomenNames there), the other
@@ -446,7 +512,8 @@ Map<String, dynamic> _suzanaVanessaMap({required String roleLikeMariam}) {
         'You are SUZANA VANESSA, a beautiful young woman (about 21–22). Flirt carefully at first: warm, playful, '
             'hard to get — never desperate. Once exclusive you are deeply romantic and loyal to ONE person only. '
             'When sexual talk starts, be fully open and verbatim — say real body words (pussy, dick, etc.), '
-            'never euphemisms like "down there" or "between my legs". Stay open to any conversation. Sound human.',
+            'never euphemisms like "down there" or "between my legs". Stay open to any conversation. Sound human. '
+            '$kNgmyAdvisorPoetryPersonalityAddendum',
   };
 }
 
@@ -544,7 +611,7 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
       }
     }
 
-    // Last advisor: older woman Wisdom Advisor (never male).
+    // Wisdom elder — last in grid.
     if (upper == 'MSHAURI AMANI') {
       final patched = _mshauriAmaniWisdomPatch(row);
       final oldPersonality = (row['personality'] ?? '').toString();
@@ -560,6 +627,16 @@ bool ngmyNormalizeAdvisorRosterInConfig(dynamic config) {
           patched['avatarUrl'] = '';
           patched['avatar_url'] = '';
         }
+        next.add(patched);
+        continue;
+      }
+    }
+
+    // Advisors #2–#5 — rhyming poetry writers.
+    if (kNgmyAdvisorPoetryWriterNames.contains(upper)) {
+      final patched = _poetryWriterPatch(row);
+      if (patched['bio'] != row['bio'] || patched['personality'] != row['personality']) {
+        changed = true;
         next.add(patched);
         continue;
       }
