@@ -43,7 +43,7 @@ String ngmyAdvisorPoetryPromptBlock() =>
     '- MEANING: Every line earns its place. No filler just to rhyme. Say something true.\n'
     '- TOPICS: ANYTHING they ask — love, heartbreak, marriage, money, streets, education, family, healing, joy, '
     'faith, Bible stories or verse themes (respectful, accurate). Match their topic and mood.\n'
-    '- LENGTH: usually 8–20 lines unless they want shorter or longer.\n'
+    '- LENGTH: ${ngmyPoetryLengthInstruction('')} Use their requested duration if they say minutes.\n'
     '- ORIGINALITY: Never copy famous poems, slam pieces, or text they pasted. Write fresh every time.\n'
     '- FORMAT: one line per row in the message. No asterisks, no stage directions, no "here is your poem" intro — '
     'just the poem (or one short human line then the poem if it fits).\n'
@@ -57,6 +57,62 @@ bool ngmyUserRequestedPoetry(String text) {
     return true;
   }
   return RegExp(r'\b(write|make|give|create) (me )?(a |an )?(poem|poetry|verse|rhyme|rhyming poem)\b').hasMatch(t);
+}
+
+/// How many lines / how long — honors "2 minute", "5 minutes", short, long, etc.
+String ngmyPoetryLengthInstruction(String userText) {
+  final t = userText.trim().toLowerCase();
+  if (t.isEmpty) {
+    return 'Write at least 12–20 rhyming lines. Deliver the COMPLETE poem in this reply.';
+  }
+  final minMatch = RegExp(r'(\d+)\s*(?:min(?:ute)?s?)\b').firstMatch(t);
+  if (minMatch != null) {
+    final mins = int.tryParse(minMatch.group(1) ?? '') ?? 0;
+    if (mins >= 5) {
+      return 'They want about $mins minutes read aloud — write roughly ${mins * 10}–${mins * 12} lines. '
+          'Deliver the FULL poem in this one reply.';
+    }
+    if (mins >= 2) {
+      return 'They want about $mins minutes read aloud — write roughly ${mins * 8}–${mins * 10} lines. '
+          'Deliver the FULL poem in this one reply.';
+    }
+    if (mins >= 1) {
+      return 'They want about one minute read aloud — write roughly 8–12 lines. Deliver the FULL poem.';
+    }
+  }
+  if (RegExp(r'\b(short|brief|quick)\b').hasMatch(t)) {
+    return 'Short poem: 6–8 rhyming lines minimum. Still deliver the whole poem now.';
+  }
+  if (RegExp(r'\b(long|full|extended|epic)\b').hasMatch(t)) {
+    return 'Long poem: 24–36 rhyming lines. Deliver the complete poem in this reply.';
+  }
+  return 'Write at least 12–20 rhyming lines. Your reply must BE the poem — not just "okay" or "for you". '
+      'Deliver the COMPLETE poem now.';
+}
+
+/// True when the model teased a poem but did not actually write one.
+bool ngmyAdvisorPoemReplyLooksIncomplete(String reply) {
+  final t = reply.trim();
+  if (t.isEmpty) return true;
+  final lines = t.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+  if (lines.length >= 6) return false;
+  if (t.length >= 320 && lines.length >= 4) return false;
+  if (lines.length <= 2 && t.length < 140) return true;
+  if (RegExp(
+    r'^(okay|ok|sure|alright|for you|here you go|let me|one sec|give me a sec)',
+    caseSensitive: false,
+  ).hasMatch(t) &&
+      lines.length < 4) {
+    return true;
+  }
+  return lines.length < 4 && t.length < 200;
+}
+
+/// Whether this advisor should deliver a poem for this user message.
+bool ngmyAdvisorShouldWritePoetry({required String name, required String id, required String userText}) {
+  if (!ngmyUserRequestedPoetry(userText)) return false;
+  return ngmyAdvisorWritesPoetry(name: name, id: id) ||
+      ngmyAdvisorWritesAfricanCulturePoetry(name: name, id: id);
 }
 
 /// Wisdom Advisor (MSHAURI AMANI) — rhyming poetry about African culture, countries, and history only.
@@ -90,7 +146,7 @@ String ngmyAdvisorAfricanCulturePoetryPromptBlock() =>
     'and mother tongues — respectful, never mock a people.\n'
     '- IDENTITY: Poetry may touch language, accent, decolonizing the tongue, pride in who we are — always with elder grace.\n'
     '- SCOPE LOCK: No poems about non-African countries or cultures. Redirect and offer an African poem instead.\n'
-    '- LENGTH: usually 8–20 lines unless they want more.\n'
+    '- LENGTH: Honor their requested duration (minutes) or short/long — deliver the FULL poem in one reply.\n'
     '- ORIGINALITY: Never copy famous work or user-pasted poems. Fresh words every time.\n'
     '- FORMAT: one line per row. No asterisks. No stage directions.\n';
 

@@ -472,6 +472,7 @@ bool ngmyCommunicateRoleIsRomantic(String role) => ngmyCommunicateNormalizeRole(
 bool ngmyUserWantsLongerAdvisorReply(String text) {
   final t = text.toLowerCase().trim();
   if (t.isEmpty) return false;
+  if (ngmyUserRequestedPoetry(text)) return true;
   return RegExp(
         r'\b(tell me more|say more|more about|go on|keep going|elaborate|explain( it| more| that| this)?|'
         r'write (me )?(a |an )?(paragraph|few paragraphs|longer|more)|'
@@ -1303,6 +1304,7 @@ class NgmyCommunicateProfile {
         '- Remember every message in the history below — including HOW RECENTLY you talked (timestamps).\n'
         '- TEXT LENGTH: Default = short phone text (1 short sentence, maybe 2). '
         'Match their length for casual hellos — never 2 paragraphs for "good morning." '
+        'EXCEPTION — POETRY: When they ask for a poem, ignore short-text limits — write the FULL poem (all lines) in one reply. '
         'EXCEPTION — LONGER OK: If they ask to hear more, tell you more, explain, write a paragraph, '
         'give details, or clearly want a fuller answer, THEN write a real paragraph (or more) and open up. '
         'Know when they need more from you vs when a short text is enough.\n'
@@ -3403,22 +3405,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isTextCoach) {
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
     }
-    if (ngmyAdvisorWritesPoetry(name: widget.profile.name, id: widget.profile.id) &&
-        ngmyUserRequestedPoetry(text)) {
+    if (ngmyAdvisorShouldWritePoetry(
+      name: widget.profile.name,
+      id: widget.profile.id,
+      userText: text,
+    )) {
       buf.writeln(
-        'POEM REQUEST — SPOKEN WORD: Write an ORIGINAL rhyming poem in this reply (8–20 lines unless they asked '
-        'otherwise). Performance poetry flow — end rhymes AND internal rhyme, real emotion (dreams, love, pain, hope, '
-        'faith, hustle, whatever they asked). Metaphor and alliteration inside the lines — do not label devices. '
+        'POEM REQUEST — SPOKEN WORD NOW: ${ngmyPoetryLengthInstruction(text)} '
+        'Write the COMPLETE original rhyming poem in THIS reply — not just "okay" or "for you". '
+        'Performance poetry flow — end rhymes AND internal rhyme, real emotion. '
+        'Metaphor and alliteration inside the lines — do not label devices. '
         'Every line must mean something. Never copy famous or pasted poems. One line per row. No asterisks.\n',
-      );
-    }
-    if (ngmyAdvisorWritesAfricanCulturePoetry(name: widget.profile.name, id: widget.profile.id) &&
-        ngmyUserRequestedPoetry(text)) {
-      buf.writeln(
-        'AFRICAN SPOKEN-WORD POEM NOW: Original rhyming poem ONLY about African culture, a named African country, '
-        'its history, peoples, ubuntu, ancestors, freedom, identity, or mother tongues. Elder dignified voice, rhythm '
-        'you can hear, metaphor and alliteration woven in. 8–20 lines. If topic is not African, redirect warmly. '
-        'Never copy pasted or famous work. One line per row. No asterisks.\n',
       );
     }
     return buf.toString();
@@ -3848,6 +3845,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         .map((m) => (m['text'] ?? '').toString())
         .cast<String>()
         .firstWhere((t) => t.trim().isNotEmpty, orElse: () => '');
+    if (ngmyAdvisorShouldWritePoetry(
+      name: widget.profile.name,
+      id: widget.profile.id,
+      userText: lastUser,
+    )) {
+      final african = ngmyAdvisorWritesAfricanCulturePoetry(name: widget.profile.name, id: widget.profile.id);
+      return 'POEM DELIVERY — MANDATORY: They asked for a POEM. Your reply must contain the FULL original rhyming poem '
+          '(one line per row). ${ngmyPoetryLengthInstruction(lastUser)} '
+          '${african ? 'Topic: African culture/country/history ONLY. ' : 'Match their topic (love, life, faith, Bible, anything they asked). '}'
+          'At most ONE short intro line before the poem — then ALL lines. '
+          'Never stop at "okay", "for you", or "one sec" without the poem. No asterisks:';
+    }
     final wantsLong = ngmyUserWantsLongerAdvisorReply(lastUser);
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
       if (wantsLong) {
@@ -3872,22 +3881,60 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'emojis only when they fit the moment (usually none), no asterisks or little stars, not overly eager:';
   }
 
-  String _cleanAdvisorReply(String? raw) {
+  String _cleanAdvisorReply(String? raw, {String? userTextForPoetry}) {
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
     var cleaned = ngmySanitizeAdvisorChatReply(t);
+    final poemRequest = userTextForPoetry != null &&
+        ngmyAdvisorShouldWritePoetry(
+          name: widget.profile.name,
+          id: widget.profile.id,
+          userText: userTextForPoetry,
+        );
+    // Never truncate poems — romantic "short text" clamp destroys them.
+    if (poemRequest) return cleaned;
     // Soft clamp runaway multi-paragraph text for romantic partners — unless they asked for more.
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
-      final lastUser = _messages.reversed
-          .where((m) => m['role'] == 'user')
-          .map((m) => (m['text'] ?? '').toString())
-          .cast<String>()
-          .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
+      final lastUser = userTextForPoetry ??
+          _messages.reversed
+              .where((m) => m['role'] == 'user')
+              .map((m) => (m['text'] ?? '').toString())
+              .cast<String>()
+              .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
       if (!ngmyUserWantsLongerAdvisorReply(lastUser)) {
         cleaned = _trimOverlongTextReply(cleaned);
       }
     }
     return cleaned;
+  }
+
+  Future<({String cleaned, String? error})> _generateAndCleanAdvisorReply({
+    required NgmyAiCredentials creds,
+    required String prompt,
+    required String userText,
+    List<NgmyAiImagePart> images = const [],
+  }) async {
+    final poemMode = ngmyAdvisorShouldWritePoetry(
+      name: widget.profile.name,
+      id: widget.profile.id,
+      userText: userText,
+    );
+    var result = images.isNotEmpty
+        ? await ngmyAiGenerateWithRetry(creds, prompt, images: images)
+        : await ngmyAiGenerateWithRetry(creds, prompt);
+    var cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    if (poemMode && ngmyAdvisorPoemReplyLooksIncomplete(cleaned)) {
+      final retryPrompt = '$prompt\n'
+          'CRITICAL — YOU DID NOT WRITE THE POEM YET. Your reply must be the COMPLETE rhyming spoken-word poem. '
+          '${ngmyPoetryLengthInstruction(userText)} '
+          'Minimum 8 lines unless they asked shorter. One line per row. '
+          'Do not say "okay", "for you", or "one sec" without delivering every line:';
+      result = images.isNotEmpty
+          ? await ngmyAiGenerateWithRetry(creds, retryPrompt, images: images)
+          : await ngmyAiGenerateWithRetry(creds, retryPrompt);
+      cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    }
+    return (cleaned: cleaned, error: result.error);
   }
 
   String _enforceTakenBoundary(String cleaned, {required bool takenByOther, Map<String, String>? partner}) {
@@ -4254,8 +4301,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final images = <NgmyAiImagePart>[
           (mimeType: imageMime, data: imageB64),
         ];
-        final result = await ngmyAiGenerateWithRetry(creds, prompt, images: images);
-        final cleaned = _cleanAdvisorReply(result.text);
+        final result = await _generateAndCleanAdvisorReply(
+          creds: creds,
+          prompt: prompt,
+          userText: text,
+          images: images,
+        );
+        final cleaned = result.cleaned;
         final reply = _enforceTakenBoundary(
           cleaned.isNotEmpty ? cleaned : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error),
           takenByOther: takenByOther,
@@ -4272,8 +4324,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             'Refuse politely and stay in your professional / wisdom role.\n'
             'They just texted: $text\n'
             '${_replyStyleSuffix()}';
-        final result = await ngmyAiGenerateWithRetry(creds, prompt);
-        final cleaned = _cleanAdvisorReply(result.text);
+        final result = await _generateAndCleanAdvisorReply(creds: creds, prompt: prompt, userText: text);
+        final cleaned = result.cleaned;
         var reply = cleaned.isNotEmpty
             ? cleaned
             : 'I keep this professional — I don\'t send personal pictures.';
@@ -4302,8 +4354,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             'but make clear pics are only for your boyfriend/girlfriend once you are officially together.\n'
             'They just texted: $text\n'
             '${_replyStyleSuffix()}';
-        final result = await ngmyAiGenerateWithRetry(creds, prompt);
-        final cleaned = _cleanAdvisorReply(result.text);
+        final result = await _generateAndCleanAdvisorReply(creds: creds, prompt: prompt, userText: text);
+        final cleaned = result.cleaned;
         var reply = cleaned.isNotEmpty
             ? cleaned
             : 'I don\'t send pics like that unless we\'re official 😌';
@@ -4380,10 +4432,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             '${transcript.isNotEmpty ? '$transcript\n' : ''}'
             'They just texted: $text\n'
             '${_replyStyleSuffix()}';
-        final result = recentPhotos.isNotEmpty
-            ? await ngmyAiGenerateWithRetry(creds, prompt, images: recentPhotos)
-            : await ngmyAiGenerateWithRetry(creds, prompt);
-        var cleaned = _cleanAdvisorReply(result.text);
+        final result = await _generateAndCleanAdvisorReply(
+          creds: creds,
+          prompt: prompt,
+          userText: text,
+          images: recentPhotos,
+        );
+        var cleaned = result.cleaned;
         // If the model faked sending a photo while we can actually send one, send a real image.
         if (canSendPartnerImage && (requestedImage || ngmyAdvisorReplyFakesSendingPhoto(cleaned))) {
           final b64Photo = await generatePartnerPhotoB64().timeout(
