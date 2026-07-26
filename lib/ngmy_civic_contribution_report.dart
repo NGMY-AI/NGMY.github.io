@@ -22,24 +22,43 @@ class NgmyCivicContributionReportStrings {
   String get notYetContributed => isSwahili ? 'Hawajachangia' : 'Not yet contributed';
   String get notYetShort => isSwahili ? 'Bado' : 'Not yet';
   String get currentCampaign => isSwahili ? 'Kampeni ya sasa' : 'Current campaign';
-  String get activeNow => isSwahili ? 'Inaendelea sasa' : 'Active now';
+  String get activeNow => isSwahili ? 'Kampeni ya sasa' : 'Active now';
   String get total => isSwahili ? 'Jumla' : 'Total';
   String get yes => isSwahili ? 'Ndiyo' : 'Yes';
   String get no => isSwahili ? 'Hapana' : 'No';
-  String get campaignStartedPrefix => isSwahili ? 'Kampeni ya sasa ilianza' : 'Current campaign started';
+  String get campaignStartedPrefix => isSwahili ? 'Ilianza' : 'Current campaign started';
   String get campaignStartUnknown =>
       isSwahili ? 'Muda wa kuanza haujarekodiwa' : 'Campaign start not recorded';
+
+  /// One campaign label in Swahili — never "Inaendelea sasa" plus "Kampeni ya sasa".
+  String campaignStatusLabel({required bool active}) {
+    if (isSwahili) return 'Kampeni ya sasa';
+    return active ? activeNow : currentCampaign;
+  }
+
+  String _formatWhen(DateTime started) {
+    final local = started.toLocal();
+    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '${local.month}/${local.day}/${local.year} $h:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
+
+  /// Swahili: one line only — "Kampeni ya sasa" or "Kampeni ya sasa · {date}".
+  String campaignHeaderLine({required bool active, DateTime? started}) {
+    if (!isSwahili) {
+      if (started == null) return campaignStatusLabel(active: active);
+      return '${campaignStatusLabel(active: active)}\n${formatCampaignStarted(started)}';
+    }
+    if (started == null) return 'Kampeni ya sasa';
+    return 'Kampeni ya sasa · ${_formatWhen(started)}';
+  }
 
   String footer(String state) =>
       isSwahili ? 'Usajili wa Raia wa NGMY · $state · NGMY' : 'NGMY Civic Registry · $state · NGMY';
 
   String formatCampaignStarted(DateTime? started) {
     if (started == null) return campaignStartUnknown;
-    final local = started.toLocal();
-    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final ampm = local.hour >= 12 ? 'PM' : 'AM';
-    final when = '${local.month}/${local.day}/${local.year} $h:${local.minute.toString().padLeft(2, '0')} $ampm';
-    return '$campaignStartedPrefix $when';
+    return '$campaignStartedPrefix ${_formatWhen(started)}';
   }
 
   String emptyContributed() =>
@@ -185,8 +204,8 @@ String ngmyBuildCivicContributionReportHtml(
   final t = NgmyCivicContributionReportStrings(lang);
   final contributed = data.contributed.length;
   final pending = data.notContributed.length;
-  final statusLine = data.campaignActive ? t.activeNow : t.currentCampaign;
-  final startedLine = t.formatCampaignStarted(data.campaignStartedAt);
+  final campaignHeader = t.campaignHeaderLine(active: data.campaignActive, started: data.campaignStartedAt);
+  final campaignHeaderHtml = campaignHeader.split('\n').map(_escapeHtml).join('<br>');
 
   return '''
 <!doctype html>
@@ -265,8 +284,7 @@ String ngmyBuildCivicContributionReportHtml(
       <div class="masthead">
         <div class="stamp">
           <div class="date">${_escapeHtml(data.generatedAt)}</div>
-          <div>${_escapeHtml(statusLine)}</div>
-          <div>${_escapeHtml(startedLine)}</div>
+          <div>$campaignHeaderHtml</div>
         </div>
         <div class="header">
           <h1>${_escapeHtml(data.motto)}</h1>
@@ -441,7 +459,7 @@ class NgmyCivicContributionReportPreview extends StatelessWidget {
                 Text('${data.campaignTitle} · ${data.scopeLabel}', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: muted)),
                 const SizedBox(height: 6),
                 Text(
-                  t.formatCampaignStarted(data.campaignStartedAt),
+                  t.campaignHeaderLine(active: data.campaignActive, started: data.campaignStartedAt),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 10, color: muted),
                 ),
@@ -699,7 +717,7 @@ class _NgmyCivicContributionReportSheetHostState extends State<_NgmyCivicContrib
                         children: [
                           Text('Contribution Report', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: ink)),
                           Text(
-                            '${widget.data.state} · ${widget.data.campaignActive ? t.activeNow : t.currentCampaign}',
+                            '${widget.data.state} · ${t.campaignStatusLabel(active: widget.data.campaignActive)}',
                             style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black54),
                           ),
                         ],
