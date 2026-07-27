@@ -802,7 +802,7 @@ class NgmyCommunicateRelationshipStore {
     } else if (hours >= 8) {
       lines.add(
         girl
-            ? 'Hey you… been a while 😌 Missed you. You good?'
+            ? 'Hey! It’s been a little while 😌 Missed you. You good?'
             : 'Checking in on you. Missed you.',
       );
       lines.add(

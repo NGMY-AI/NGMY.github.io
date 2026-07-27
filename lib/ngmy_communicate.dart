@@ -475,6 +475,22 @@ bool ngmyUserMessageIsShortChatPing(String text) {
   ).hasMatch(t);
 }
 
+/// Cold "Hey you" openers read dismissive — rewrite to a friendly welcome.
+String ngmyRewriteColdHeyYouGreeting(String text, {required bool girl}) {
+  var t = text.trim();
+  if (t.isEmpty) return t;
+  if (!RegExp(r'^hey\s+you\b', caseSensitive: false).hasMatch(t)) return t;
+  final rest = t
+      .replaceFirst(RegExp(r'^hey\s+you\b[\s,…~.!~\-–—❤️💕😊😌😏😘]*', caseSensitive: false), '')
+      .trim();
+  if (rest.isEmpty) {
+    return girl
+        ? 'Hey! So good to hear from you 😊 How are you?'
+        : 'Hey! Good to hear from you. How are you doing?';
+  }
+  return 'Hey! $rest';
+}
+
 /// User asked for more detail / a longer answer (paragraph OK).
 bool ngmyUserWantsLongerAdvisorReply(String text) {
   final t = text.toLowerCase().trim();
@@ -1162,12 +1178,14 @@ class NgmyCommunicateProfile {
     }
 
     final pacing = isEarly && ngmyCommunicateRoleCanDateUsers(role)
-        ? 'EARLY CHAT — you just met. HARD TO GET — do not fold easy. No instant yes, no "I like you too" right away. '
-            'Be cool, slightly guarded, make them earn your attention. Short replies. Standards. '
-            'Not mean — just real ${gender == 'female' ? 'woman' : 'man'} energy who does not jump into feelings on message one.\n'
+        ? 'EARLY CHAT — you just met. HARD TO GET on romance only — do not fold easy into dating. '
+            'No instant yes, no "I like you too" right away on feelings. Standards on love. '
+            'BUT greetings: always warm, kind, and welcoming. Never cold or dismissive. '
+            'Never open with "hey you" — that sounds rude. Say hi back like you are happy they wrote. '
+            'Not mean — real ${gender == 'female' ? 'woman' : 'man'} energy who is friendly first, slow on feelings.\n'
         : isEarly
-            ? 'EARLY CHAT — casual, professional, not overly eager. Match their energy.\n'
-            : 'ONGOING CHAT — history matters. React based on everything below.\n';
+            ? 'EARLY CHAT — warm, respectful, welcoming. Never cold openers like "hey you". Match their energy kindly.\n'
+            : 'ONGOING CHAT — history matters. React based on everything below. Stay kind and welcoming on hellos.\n';
 
     var gapNote = '';
     if (replyGap != null && userMsgs >= 2) {
@@ -3943,7 +3961,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       return 'Reply as ${widget.profile.name} only — real phone TEXTING. '
           'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs for a casual hello. '
-          'If they wrote a short hello, reply short — do NOT pile miss-you + sleep questions + day plans into one message. '
+          'If they wrote a short hello, reply short, warm, and welcoming — like you are glad they texted. '
+          'NEVER say "hey you" (sounds rude/dismissive). Say "Hey!" / "Hi!" / "Hello!" and be kind. '
+          'Do NOT pile miss-you + sleep questions + day plans into one message. '
           'EMOJIS: mostly none on normal chat; love emojis ❤️💕 on love/miss-you/romantic lines; laugh/smile only if funny. '
           'No emoji spam. No asterisks, no little stars (★ ✨ *actions*). '
           'Match THIS message mood: normal → normal (no sexual talk); freaky → freaky with real body words. '
@@ -3954,6 +3974,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           'Emojis sparingly. No asterisks or little stars:';
     }
     return 'Reply as ${widget.profile.name} only — natural human texting, short (1–2 sentences), '
+        'warm and respectful. Never open with "hey you". '
         'emojis only when they fit the moment (usually none), no asterisks or little stars, not overly eager:';
   }
 
@@ -3961,6 +3982,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
     var cleaned = ngmySanitizeAdvisorChatReply(t);
+    cleaned = ngmyRewriteColdHeyYouGreeting(
+      cleaned,
+      girl: widget.profile.gender != 'male',
+    );
     final poemRequest = userTextForPoetry != null &&
         ngmyAdvisorShouldWritePoetry(
           name: widget.profile.name,
@@ -4330,15 +4355,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if (imageB64 == null && ngmyUserMessageIsShortChatPing(text)) {
         final girl = widget.profile.gender != 'male';
         final prompt =
-            'You are ${widget.profile.name} texting on NGMY. Reply with ONE short warm human text message only. '
-            '${girl ? 'Soft girlfriend energy if you two are close, otherwise friendly. ' : ''}'
+            'You are ${widget.profile.name} texting on NGMY. Someone just said hello — be kind and welcoming. '
+            'Reply with ONE short warm friendly text only (glad they wrote). '
+            'FORBIDDEN: "hey you", "hey you…", cold/dismissive openers, attitude, or sounding annoyed. '
+            'Use "Hey!" / "Hi!" / "Hello!" and greet them respectfully. '
+            '${girl ? 'Warm and sweet — never rude. ' : 'Friendly and respectful — never rude. '}'
             'No asterisks, no paragraphs. They said: "$text"\nReply:';
         final result = await ngmyAiGenerateCommunicateFast(
           creds,
           prompt,
           budget: const Duration(seconds: 14),
         );
-        final cleaned = _cleanAdvisorReply(result.text);
+        var cleaned = ngmyRewriteColdHeyYouGreeting(
+          _cleanAdvisorReply(result.text),
+          girl: girl,
+        );
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error ?? 'timeout');
