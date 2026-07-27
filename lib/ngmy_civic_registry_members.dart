@@ -34,10 +34,32 @@ class NgmyCivicRegistryMembers {
   static List<Map<String, dynamic>> listFrom(dynamic config) {
     final raw = (config as dynamic).civicRegistryMembers;
     if (raw is! List) return [];
-    return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final list = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    sortNewestEnrolledFirst(list);
+    return list;
+  }
+
+  /// Newest enrollment first, oldest last. Null / missing `enrolledAt` go to the bottom.
+  static int compareEnrolledAtDesc(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final da = DateTime.tryParse((a['enrolledAt'] ?? '').toString());
+    final db = DateTime.tryParse((b['enrolledAt'] ?? '').toString());
+    if (da == null && db == null) {
+      final ua = DateTime.tryParse((a['updatedAt'] ?? '').toString());
+      final ub = DateTime.tryParse((b['updatedAt'] ?? '').toString());
+      if (ua != null && ub != null) return ub.compareTo(ua);
+      return 0;
+    }
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return db.compareTo(da);
+  }
+
+  static void sortNewestEnrolledFirst(List<Map<String, dynamic>> members) {
+    members.sort(compareEnrolledAtDesc);
   }
 
   static void setList(dynamic config, List<Map<String, dynamic>> members) {
+    sortNewestEnrolledFirst(members);
     (config as dynamic).civicRegistryMembers = members;
   }
 
@@ -150,7 +172,7 @@ class NgmyCivicRegistryMembers {
       members.removeWhere(
         (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid.toUpperCase(),
       );
-      members.add(next);
+      members.insert(0, next);
       setList(config, members);
       return;
     }
@@ -192,7 +214,7 @@ class NgmyCivicRegistryMembers {
     } else {
       next['enrolledAt'] = next['enrolledAt'] ?? now;
       next['updatedAt'] = now;
-      members.add(next);
+      members.insert(0, next);
     }
     setList(config, members);
   }
@@ -987,6 +1009,7 @@ class NgmyCivicRegistryMembers {
         .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == key)
         .map((m) => Map<String, dynamic>.from(m)..['state'] = st)
         .toList();
+    sortNewestEnrolledFirst(members);
     return {
       'type': 'ngmy_civic_registry_backup',
       'version': 1,
@@ -1020,7 +1043,7 @@ class NgmyCivicRegistryMembers {
     final list = map['members'] ?? map['civicRegistryMembers'];
     if (list is! List) return const [];
     final want = (requireState ?? fileState).trim().toLowerCase();
-    return list
+    final members = list
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .where((m) {
@@ -1029,6 +1052,8 @@ class NgmyCivicRegistryMembers {
           return ms == want;
         })
         .toList();
+    sortNewestEnrolledFirst(members);
+    return members;
   }
 
   /// Smart restore: only add members that are not already enrolled (by email, registry ID, or identity).

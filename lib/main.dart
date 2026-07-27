@@ -31149,8 +31149,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final members = NgmyCivicRegistryMembers.listFrom(widget.config)
         .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == state.toLowerCase())
-        .toList()
-      ..sort((a, b) => (a['fullName'] ?? '').toString().toLowerCase().compareTo((b['fullName'] ?? '').toString().toLowerCase()));
+        .toList();
+    NgmyCivicRegistryMembers.sortNewestEnrolledFirst(members);
     if (members.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No members in $state to print.')));
@@ -31511,8 +31511,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ? widget.config.helpPurposeFor(state).trim()
         : 'Community Contribution';
 
-    final members = _membersForContributionReport(state)
-      ..sort((a, b) => (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase()));
+    final members = _membersForContributionReport(state);
+    Map<String, dynamic>? rawOf(UserData u) {
+      final byEmail = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      if (byEmail != null) return byEmail;
+      final rid = (u.registryId ?? '').trim();
+      if (rid.isEmpty) return null;
+      return NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+    }
+    members.sort((a, b) => NgmyCivicRegistryMembers.compareEnrolledAtDesc(rawOf(a) ?? const {}, rawOf(b) ?? const {}));
     if (members.isEmpty) return null;
 
     final totals = _contributionTotalsForCampaign(
