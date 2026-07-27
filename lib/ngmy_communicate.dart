@@ -4208,41 +4208,39 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _pendingImageMime = 'image/jpeg';
     });
 
-    // Persist FIRST — never show a bubble that is not saved (leaving the app used to wipe them).
-    try {
-      if (imageB64 != null) {
-        await NgmyCommunicateMemoryStore.appendWithMime(
-          _email,
-          widget.profile.id,
-          role: 'user',
-          text: displayText,
-          imageB64: imageB64,
-          imageMime: imageMime,
-        );
-      } else {
-        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
-      }
-    } catch (e) {
-      debugPrint('[communicate] persist user message failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save that message. Try again.')),
-        );
-      }
-      return;
-    }
-
     final userRow = <String, String>{'role': 'user', 'text': displayText};
     if (imageB64 != null) userRow['imageB64'] = imageB64;
+    // Show immediately — never block chat on storage.
     if (mounted) {
       setState(() => _messages.add(userRow));
     }
+    _scrollBottom();
+
+    // Save locally in the background; never surface "could not save" to the user.
+    unawaited(() async {
+      try {
+        if (imageB64 != null) {
+          await NgmyCommunicateMemoryStore.appendWithMime(
+            _email,
+            widget.profile.id,
+            role: 'user',
+            text: displayText,
+            imageB64: imageB64,
+            imageMime: imageMime,
+          );
+        } else {
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
+        }
+      } catch (e) {
+        debugPrint('[communicate] persist user message: $e');
+      }
+    }());
+
     unawaited(NgmyCommunicatePromiseStore.syncFromUserText(_email, widget.profile.id, text));
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
         (_isBoss && ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id))) {
       unawaited(NgmyCommunicateFocusStore.syncFromUserText(_email, widget.profile.id, text));
     }
-    _scrollBottom();
 
     final job = <String, String>{'text': text.isEmpty ? displayText : text};
     if (imageB64 != null) {

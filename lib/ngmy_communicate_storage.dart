@@ -18,13 +18,19 @@ class NgmyCommunicateMemoryStore {
 
   static Future<T> _serialized<T>(Future<T> Function() action) {
     final gate = Completer<T>();
-    _writeChain = _writeChain.then((_) async {
+    // Always continue the chain — a prior failure must never block future saves.
+    _writeChain = _writeChain
+        .catchError((_) {})
+        .then((_) async {
       try {
-        gate.complete(await action());
+        final value = await action();
+        if (!gate.isCompleted) gate.complete(value);
       } catch (e, st) {
-        gate.completeError(e, st);
+        if (!gate.isCompleted) gate.completeError(e, st);
       }
     });
+    // Keep the chain itself healthy even if this job failed.
+    _writeChain = _writeChain.catchError((_) {});
     return gate.future;
   }
 
@@ -32,10 +38,16 @@ class NgmyCommunicateMemoryStore {
       'ngmy_communicate_chat_${email.toLowerCase().trim()}_${profileId.trim()}';
 
   static Future<List<Map<String, dynamic>>> load(String email, String profileId) async {
-    if (email.trim().isEmpty || profileId.trim().isEmpty) return [];
+    if (profileId.trim().isEmpty) return [];
     // Wait for any in-flight write so we never load a stale snapshot mid-save.
-    await _writeChain;
-    return _loadUnlocked(email, profileId);
+    await _writeChain.catchError((_) {});
+    return _loadUnlocked(_storageEmail(email), profileId);
+  }
+
+  /// Prefer account email; fall back so chats still persist on-device without login email.
+  static String _storageEmail(String email) {
+    final e = email.toLowerCase().trim();
+    return e.isEmpty ? 'local' : e;
   }
 
   static Future<List<Map<String, dynamic>>> _loadUnlocked(String email, String profileId) async {
@@ -113,37 +125,57 @@ class NgmyCommunicateMemoryStore {
     String? imageB64,
     String imageMime = 'image/jpeg',
   }) async {
-    if (email.trim().isEmpty || profileId.trim().isEmpty) return;
+    if (profileId.trim().isEmpty) return;
+    final storeEmail = _storageEmail(email);
     final trimmed = text.trim();
     final img = (imageB64 ?? '').trim();
     if (trimmed.isEmpty && img.isEmpty) return;
-    await _serialized(() async {
-      final list = await _loadUnlocked(email, profileId);
-      final row = <String, dynamic>{
-        'role': role,
-        'text': trimmed,
-        'at': DateTime.now().toUtc().toIso8601String(),
-      };
-      if (img.isNotEmpty) {
-        final imageId = NgmyCommunicateChatImageStore.newId(email: email, profileId: profileId);
-        final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
-        if (ok) {
-          row['imageId'] = imageId;
-          row['imageB64'] = img;
-        } else {
-          row['imageB64'] = img;
+    try {
+      await _serialized(() async {
+        final list = await _loadUnlocked(storeEmail, profileId);
+        final row = <String, dynamic>{
+          'role': role,
+          'text': trimmed,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        };
+        if (img.isNotEmpty) {
+          final imageId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);
+          final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
+          if (ok) {
+            row['imageId'] = imageId;
+            row['imageB64'] = img;
+          } else {
+            row['imageB64'] = img;
+          }
+          final mime = imageMime.trim();
+          if (mime.isNotEmpty) row['imageMime'] = mime;
         }
-        final mime = imageMime.trim();
-        if (mime.isNotEmpty) row['imageMime'] = mime;
+        list.add(row);
+        await _saveAllUnlocked(storeEmail, profileId, list);
+      });
+    } catch (e) {
+      // Never fail the chat UX — try a direct best-effort write.
+      debugPrint('[communicate] append serialized failed, fallback: $e');
+      try {
+        final list = await _loadUnlocked(storeEmail, profileId);
+        list.add({
+          'role': role,
+          'text': trimmed,
+          'at': DateTime.now().toUtc().toIso8601String(),
+          if (img.isNotEmpty) 'imageB64': img,
+          if (img.isNotEmpty && imageMime.trim().isNotEmpty) 'imageMime': imageMime.trim(),
+        });
+        await _persistUnlocked(storeEmail, profileId, list);
+      } catch (e2) {
+        debugPrint('[communicate] append fallback failed: $e2');
       }
-      list.add(row);
-      await _saveAllUnlocked(email, profileId, list);
-    });
+    }
   }
 
   static Future<void> saveAll(String email, String profileId, List<Map<String, dynamic>> messages) async {
-    if (email.trim().isEmpty || profileId.trim().isEmpty) return;
-    await _serialized(() => _saveAllUnlocked(email, profileId, messages));
+    if (profileId.trim().isEmpty) return;
+    final storeEmail = _storageEmail(email);
+    await _serialized(() => _saveAllUnlocked(storeEmail, profileId, messages));
   }
 
   static Future<void> _saveAllUnlocked(String email, String profileId, List<Map<String, dynamic>> messages) async {
@@ -254,10 +286,23 @@ class NgmyCommunicateMemoryStore {
       slim.add(row);
     }
     final prefs = await SharedPreferences.getInstance();
-    final ok = await prefs.setString(_chatKey(email, profileId), jsonEncode(slim));
-    if (!ok) {
-      debugPrint('[communicate] chat prefs write failed (quota?) for $profileId');
+    final key = _chatKey(email, profileId);
+    var payload = slim;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        final ok = await prefs.setString(key, jsonEncode(payload));
+        if (ok) return;
+      } catch (e) {
+        debugPrint('[communicate] prefs write attempt $attempt: $e');
+      }
+      // Quota / size pressure — drop oldest half and retry.
+      if (payload.length <= 20) {
+        payload = payload.isEmpty ? payload : [payload.last];
+      } else {
+        payload = payload.sublist(payload.length ~/ 2);
+      }
     }
+    debugPrint('[communicate] chat prefs write failed after retries for $profileId');
   }
 
   static String transcriptForPrompt(List<Map<String, dynamic>> memory, {int maxMessages = 40}) {
