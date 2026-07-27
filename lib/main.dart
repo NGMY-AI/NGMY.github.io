@@ -35973,23 +35973,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return (a.fullName ?? a.username).toLowerCase().compareTo((b.fullName ?? b.username).toLowerCase());
       });
     } else {
-      // Newest-enrolled-first — sort by the registry's own `enrolledAt`
-      // timestamp rather than list position, since list order isn't
-      // guaranteed to track enrollment order once cloud syncs/merges from
-      // multiple registrars interleave records.
-      DateTime? enrolledAtOf(UserData u) {
-        final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
-        return DateTime.tryParse((raw?['enrolledAt'] ?? '').toString());
+      // Newest-enrolled-first — use canonical compare with email + registryId lookup
+      // so members without email (registrar manual enroll) still sort correctly.
+      Map<String, dynamic>? rawOf(UserData u) {
+        final byEmail = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+        if (byEmail != null) return byEmail;
+        final rid = (u.registryId ?? '').trim();
+        if (rid.isEmpty) return null;
+        return NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
       }
 
-      members.sort((a, b) {
-        final da = enrolledAtOf(a);
-        final db = enrolledAtOf(b);
-        if (da == null && db == null) return 0;
-        if (da == null) return 1;
-        if (db == null) return -1;
-        return db.compareTo(da);
-      });
+      members.sort((a, b) =>
+          NgmyCivicRegistryMembers.compareEnrolledAtDesc(rawOf(a) ?? const {}, rawOf(b) ?? const {}));
     }
 
     return Column(

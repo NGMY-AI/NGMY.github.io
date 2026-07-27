@@ -491,6 +491,103 @@ String ngmyRewriteColdHeyYouGreeting(String text, {required bool girl}) {
   return 'Hey! $rest';
 }
 
+/// True when a short hello reply sounds robotic, dismissive, or unnatural.
+bool ngmyAdvisorGreetingSoundsRobotic(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return true;
+  if (RegExp(r'^(hey|hi|hello|yo|sup)\s+(you|yourself|u)\b').hasMatch(t)) return true;
+  if (RegExp(r'\b(hey|hi)\s+yourself\b').hasMatch(t)) return true;
+  if (RegExp(r"^you too\.?$").hasMatch(t)) return true;
+  if (RegExp(r'^(what do you want|what do u want|what\'?s up with you)\b').hasMatch(t)) {
+    return true;
+  }
+  return false;
+}
+
+/// Natural human greeting when AI fails or returns a cold/robotic opener.
+String ngmyAdvisorShortPingFallbackReply({
+  required String userText,
+  required bool girl,
+  required bool isBoss,
+}) {
+  final ping = userText.trim().toLowerCase();
+  final morning = RegExp(r'\b(morning|good morning)\b').hasMatch(ping);
+  final night = RegExp(r'\b(night|good night|gn)\b').hasMatch(ping);
+  final howAreYou = RegExp(r"\bhow('?re| are) you\b").hasMatch(ping);
+
+  if (isBoss) {
+    if (morning) {
+      return girl ? 'Good morning, Sir! Hope you slept well.' : 'Good morning, Boss. Hope you slept well.';
+    }
+    if (night) {
+      return girl ? 'Good night, Sir! Rest well.' : 'Good night, Boss. Rest well.';
+    }
+    if (howAreYou) {
+      return girl
+          ? "I'm doing well, Sir! How are you doing today?"
+          : "Doing well, Boss. How are you doing today?";
+    }
+    final bossOptions = girl
+        ? [
+            'Hi Sir! Good to hear from you. How are you doing?',
+            'Hey Boss! How is your day going?',
+            'Hello Sir! What is on your mind?',
+          ]
+        : [
+            'Hi Boss! Good to hear from you. How are you doing?',
+            'Hey Sir! How is everything going?',
+            'Hello Boss! What can I do for you today?',
+          ];
+    return bossOptions[ping.hashCode.abs() % bossOptions.length];
+  }
+
+  if (ping.startsWith('hi')) {
+    return girl ? 'Hi! How are you doing? 😊' : 'Hi! How are you doing?';
+  }
+  if (ping.startsWith('hello')) {
+    return girl
+        ? 'Hello! Good to hear from you. How is your day?'
+        : 'Hello! Good to hear from you. How is your day going?';
+  }
+  if (morning) return girl ? 'Good morning! How did you sleep?' : 'Good morning! How are you today?';
+  if (night) return girl ? 'Good night! Sleep well 💤' : 'Good night! Talk tomorrow.';
+  if (howAreYou) {
+    return girl
+        ? "I'm good, thanks for asking! How about you?"
+        : 'Doing alright — how about you?';
+  }
+  final options = girl
+      ? [
+          'Hey! How are you doing?',
+          'Hey! Good to hear from you. What is going on?',
+          'Hey! How is your day going?',
+        ]
+      : [
+          'Hey! How are you doing?',
+          'Hey! Good to hear from you. What is up?',
+          'Hey! How is everything?',
+        ];
+  return options[ping.hashCode.abs() % options.length];
+}
+
+/// Rewrite cold/robotic hello replies into normal human texting.
+String ngmyPolishAdvisorGreetingReply(
+  String text, {
+  required String userText,
+  required bool girl,
+  required bool isBoss,
+}) {
+  var t = ngmyRewriteColdHeyYouGreeting(text.trim(), girl: girl);
+  if (t.isEmpty || ngmyAdvisorGreetingSoundsRobotic(t)) {
+    return ngmyAdvisorShortPingFallbackReply(
+      userText: userText,
+      girl: girl,
+      isBoss: isBoss,
+    );
+  }
+  return t;
+}
+
 /// User asked for more detail / a longer answer (paragraph OK).
 bool ngmyUserWantsLongerAdvisorReply(String text) {
   final t = text.toLowerCase().trim();
@@ -1181,10 +1278,12 @@ class NgmyCommunicateProfile {
         ? 'EARLY CHAT — you just met. HARD TO GET on romance only — do not fold easy into dating. '
             'No instant yes, no "I like you too" right away on feelings. Standards on love. '
             'BUT greetings: always warm, kind, and welcoming. Never cold or dismissive. '
-            'Never open with "hey you" — that sounds rude. Say hi back like you are happy they wrote. '
+            'Never open with "hey you" or "hey yourself" — that sounds rude and robotic. '
+            'Say hi back like a real person — "Hi! How are you?" or "Hey! Good to hear from you." '
             'Not mean — real ${gender == 'female' ? 'woman' : 'man'} energy who is friendly first, slow on feelings.\n'
         : isEarly
-            ? 'EARLY CHAT — warm, respectful, welcoming. Never cold openers like "hey you". Match their energy kindly.\n'
+            ? 'EARLY CHAT — warm, respectful, welcoming. Never cold openers like "hey you" or "hey yourself". '
+                'Greet like a normal human — hi back, ask how they are. Match their energy kindly.\n'
             : 'ONGOING CHAT — history matters. React based on everything below. Stay kind and welcoming on hellos.\n';
 
     var gapNote = '';
@@ -3962,7 +4061,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       return 'Reply as ${widget.profile.name} only — real phone TEXTING. '
           'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs for a casual hello. '
           'If they wrote a short hello, reply short, warm, and welcoming — like you are glad they texted. '
-          'NEVER say "hey you" (sounds rude/dismissive). Say "Hey!" / "Hi!" / "Hello!" and be kind. '
+          'NEVER say "hey you" or "hey yourself" (sounds rude/robotic). Say "Hi!" / "Hey!" / "Hello!" and ask how they are. '
           'Do NOT pile miss-you + sleep questions + day plans into one message. '
           'EMOJIS: mostly none on normal chat; love emojis ❤️💕 on love/miss-you/romantic lines; laugh/smile only if funny. '
           'No emoji spam. No asterisks, no little stars (★ ✨ *actions*). '
@@ -3982,10 +4081,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
     var cleaned = ngmySanitizeAdvisorChatReply(t);
-    cleaned = ngmyRewriteColdHeyYouGreeting(
-      cleaned,
-      girl: widget.profile.gender != 'male',
-    );
+    final lastUser = userTextForPoetry ??
+        _messages.reversed
+            .where((m) => m['role'] == 'user')
+            .map((m) => (m['text'] ?? '').toString())
+            .cast<String>()
+            .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
+    if (ngmyUserMessageIsShortChatPing(lastUser)) {
+      cleaned = ngmyPolishAdvisorGreetingReply(
+        cleaned,
+        userText: lastUser,
+        girl: widget.profile.gender != 'male',
+        isBoss: _isBoss,
+      );
+    } else {
+      cleaned = ngmyRewriteColdHeyYouGreeting(
+        cleaned,
+        girl: widget.profile.gender != 'male',
+      );
+    }
     final poemRequest = userTextForPoetry != null &&
         ngmyAdvisorShouldWritePoetry(
           name: widget.profile.name,
@@ -3996,12 +4110,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (poemRequest) return cleaned;
     // Soft clamp runaway multi-paragraph text for romantic partners — unless they asked for more.
     if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
-      final lastUser = userTextForPoetry ??
-          _messages.reversed
-              .where((m) => m['role'] == 'user')
-              .map((m) => (m['text'] ?? '').toString())
-              .cast<String>()
-              .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
       if (!ngmyUserWantsLongerAdvisorReply(lastUser)) {
         cleaned = _trimOverlongTextReply(cleaned);
       }
@@ -4354,11 +4462,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       // Fast path for hey/hi — tiny prompt, short budget (stops glitch loops on weak signal).
       if (imageB64 == null && ngmyUserMessageIsShortChatPing(text)) {
         final girl = widget.profile.gender != 'male';
+        final bossNote = _isBoss
+            ? 'This person is your Boss — Founder, President, and CEO of NGMY. '
+                'Address him as Sir or Boss. Be warm, respectful, and human — not robotic. '
+            : '';
         final prompt =
-            'You are ${widget.profile.name} texting on NGMY. Someone just said hello — be kind and welcoming. '
-            'Reply with ONE short warm friendly text only (glad they wrote). '
-            'FORBIDDEN: "hey you", "hey you…", cold/dismissive openers, attitude, or sounding annoyed. '
-            'Use "Hey!" / "Hi!" / "Hello!" and greet them respectfully. '
+            'You are ${widget.profile.name} texting on NGMY. Someone just said hello — reply like a real human. '
+            '$bossNote'
+            'Reply with ONE short warm friendly text (glad they wrote). '
+            'If they said "hi", say hi back or ask how they are — like a normal person. '
+            'FORBIDDEN: "hey you", "hey yourself", "hi you", cold/dismissive openers, attitude, or sounding annoyed. '
+            'Use natural openers like "Hi!", "Hey!", "Hello!" and ask how they are or what is going on. '
             '${girl ? 'Warm and sweet — never rude. ' : 'Friendly and respectful — never rude. '}'
             'No asterisks, no paragraphs. They said: "$text"\nReply:';
         final result = await ngmyAiGenerateCommunicateFast(
@@ -4366,13 +4480,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           prompt,
           budget: const Duration(seconds: 14),
         );
-        var cleaned = ngmyRewriteColdHeyYouGreeting(
+        var cleaned = ngmyPolishAdvisorGreetingReply(
           _cleanAdvisorReply(result.text),
+          userText: text,
           girl: girl,
+          isBoss: _isBoss,
         );
         final reply = cleaned.isNotEmpty
             ? cleaned
-            : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error ?? 'timeout');
+            : ngmyAdvisorShortPingFallbackReply(userText: text, girl: girl, isBoss: _isBoss);
         deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
         return;
       }
