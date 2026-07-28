@@ -261,15 +261,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Widget _compactQrForTemplate(String payload) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: _accent.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3))],
-      ),
-      child: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 148),
-    );
+    return NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 132, showLogo: false);
   }
 
   Future<Uint8List?> _captureQrOffscreen(String payload) async {
@@ -995,11 +987,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             ],
           ),
           const SizedBox(height: 10),
-          _field(controller: _templateTitleC, label: 'Headline (editable)', hint: 'Title on your template', icon: Icons.title_rounded, onChanged: () => setState(() {})),
+          _field(controller: _templateTitleC, label: 'Subtitle (editable)', hint: 'Scan to connect to our Wi‑Fi', icon: Icons.subtitles_rounded, onChanged: () => setState(() {})),
           const SizedBox(height: 10),
-          _field(controller: _templateBodyC, label: 'Message (editable)', hint: 'Beautiful words for your audience…', icon: Icons.notes_rounded, maxLines: 4, onChanged: () => setState(() {})),
-          const SizedBox(height: 10),
-          _field(controller: _templateFooterC, label: 'Footer line (editable)', hint: 'Scan · Visit · Connect', icon: Icons.short_text_rounded, onChanged: () => setState(() {})),
+          _field(controller: _templateFooterC, label: 'Closing line (editable)', hint: 'Enjoy your connection!', icon: Icons.favorite_border_rounded, onChanged: () => setState(() {})),
         ],
       ),
     );
@@ -1017,7 +1007,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       child: Column(
         children: [
           Text(
-            'Invoice-style template · QR at bottom',
+            'Premium access card · QR in center · Steps at bottom',
             style: TextStyle(color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w800, fontSize: 13),
           ),
           const SizedBox(height: 14),
@@ -1026,9 +1016,10 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             child: NgmyQrTemplateCard(
               captureKey: _templateCaptureKey,
               template: template,
-              title: _templateTitleC.text.trim().isEmpty ? 'Your Title' : _templateTitleC.text.trim(),
-              body: _templateBodyC.text.trim().isEmpty ? 'Your message appears here.' : _templateBodyC.text.trim(),
-              footer: _templateFooterC.text.trim().isEmpty ? 'Scan below' : _templateFooterC.text.trim(),
+              title: _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim(),
+              body: _templateBodyC.text.trim(),
+              footer: _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim(),
+              fieldVars: _templateFieldVars(),
               qrWidget: _compactQrForTemplate(payload),
             ),
           ),

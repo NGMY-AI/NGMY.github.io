@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ngmy_qr_templates.dart';
@@ -7,6 +9,7 @@ class NgmyQrTemplateCard extends StatelessWidget {
   final String title;
   final String body;
   final String footer;
+  final Map<String, String> fieldVars;
   final Widget qrWidget;
   final bool compact;
   final GlobalKey? captureKey;
@@ -17,17 +20,18 @@ class NgmyQrTemplateCard extends StatelessWidget {
     required this.title,
     required this.body,
     required this.footer,
+    this.fieldVars = const {},
     required this.qrWidget,
     this.compact = false,
     this.captureKey,
   });
 
   static const _paperW = 340.0;
-  static const _paperH = 480.0;
+  static const _paperH = 520.0;
 
   @override
   Widget build(BuildContext context) {
-    final scale = compact ? 0.42 : 1.0;
+    final scale = compact ? 0.40 : 1.0;
     return RepaintBoundary(
       key: captureKey,
       child: Transform.scale(
@@ -36,401 +40,90 @@ class NgmyQrTemplateCard extends StatelessWidget {
         child: SizedBox(
           width: _paperW,
           height: _paperH,
-          child: _buildStyledCard(),
+          child: _AccessCardLayout(
+            template: template,
+            subtitle: title.trim().isNotEmpty ? title : template.theme.subtitleTemplate,
+            tagline: body.trim(),
+            closing: footer.trim().isNotEmpty ? footer : template.theme.closingTemplate,
+            fieldVars: fieldVars,
+            qrWidget: qrWidget,
+          ),
         ),
       ),
     );
   }
-
-  Widget _buildStyledCard() {
-    switch (template.style) {
-      case NgmyQrTemplateStyle.classicInvoice:
-        return _ClassicInvoiceLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.modernMinimal:
-        return _ModernMinimalLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.boldGradient:
-        return _BoldGradientLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.thermalReceipt:
-        return _ThermalReceiptLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.elegantDark:
-        return _ElegantDarkLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.ngmyCyan:
-        return _NgmyCyanLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.letterhead:
-        return _LetterheadLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.framedCard:
-        return _FramedCardLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.neonHud:
-        return _NeonHudLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-      case NgmyQrTemplateStyle.premiumGold:
-        return _PremiumGoldLayout(template: template, title: title, body: body, footer: footer, qrWidget: qrWidget);
-    }
-  }
 }
 
-class _QrTemplateBottom extends StatelessWidget {
-  final String footer;
+class _AccessCardLayout extends StatelessWidget {
+  final NgmyQrTemplateDef template;
+  final String subtitle;
+  final String tagline;
+  final String closing;
+  final Map<String, String> fieldVars;
   final Widget qrWidget;
-  final Color accent;
-  final Color dividerColor;
-  final Color footerColor;
 
-  const _QrTemplateBottom({
-    required this.footer,
+  const _AccessCardLayout({
+    required this.template,
+    required this.subtitle,
+    required this.tagline,
+    required this.closing,
+    required this.fieldVars,
     required this.qrWidget,
-    required this.accent,
-    required this.dividerColor,
-    required this.footerColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(height: 1, color: dividerColor),
-        const SizedBox(height: 10),
-        Text(
-          footer,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: footerColor, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6),
-        ),
-        const SizedBox(height: 12),
-        Center(child: qrWidget),
-        const SizedBox(height: 8),
-        Text(
-          'Powered by NGMY',
-          style: TextStyle(color: footerColor.withValues(alpha: 0.65), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8),
-        ),
-      ],
-    );
-  }
-}
+    final theme = template.theme;
+    final accent = template.accent;
+    final navy = template.accentDark;
+    final vars = ngmyQrDefaultTemplateVars(template.categoryIndex, fieldVars);
+    final field1 = ngmyQrApplyTemplateVars(theme.field1Template, vars);
+    final field2 = ngmyQrApplyTemplateVars(theme.field2Template, vars);
 
-class _ClassicInvoiceLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _ClassicInvoiceLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(color: template.accent, borderRadius: const BorderRadius.vertical(top: Radius.circular(11))),
-            child: Row(
-              children: [
-                Icon(template.icon, color: template.onAccent, size: 22),
-                const SizedBox(width: 10),
-                Expanded(child: Text('INVOICE', style: TextStyle(color: template.onAccent, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 2))),
-                Icon(Icons.qr_code_2_rounded, color: template.onAccent.withValues(alpha: 0.85), size: 20),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: template.accent, fontWeight: FontWeight.w900, fontSize: 22, height: 1.2)),
-                  const SizedBox(height: 12),
-                  Text(body, style: const TextStyle(color: Color(0xFF334155), fontSize: 13.5, height: 1.55, fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: const Color(0xFFE2E8F0), footerColor: const Color(0xFF64748B)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModernMinimalLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _ModernMinimalLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: const Color(0xFFFAFAFA), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE5E7EB))),
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: template.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                child: Icon(template.icon, color: template.accent, size: 20),
-              ),
-              const Spacer(),
-              Container(width: 48, height: 3, decoration: BoxDecoration(color: template.accent, borderRadius: BorderRadius.circular(99))),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 24, height: 1.15)),
-          const SizedBox(height: 14),
-          Text(body, style: const TextStyle(color: Color(0xFF475569), fontSize: 14, height: 1.6)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: const Color(0xFFE5E7EB), footerColor: const Color(0xFF94A3B8)),
-        ],
-      ),
-    );
-  }
-}
-
-class _BoldGradientLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _BoldGradientLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: template.gradient),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: template.accent.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 8))],
-      ),
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(template.icon, color: Colors.white.withValues(alpha: 0.9), size: 28),
-          const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26, height: 1.1)),
-          const SizedBox(height: 12),
-          Text(body, style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 14, height: 1.55, fontWeight: FontWeight.w500)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: Colors.white, dividerColor: Colors.white24, footerColor: Colors.white70),
+        border: Border.all(color: accent.withValues(alpha: 0.55), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, 10)),
         ],
       ),
-    );
-  }
-}
-
-class _ThermalReceiptLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _ThermalReceiptLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: const Color(0xFFFFFDF7), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFD6D3D1))),
-      child: Column(
-        children: [
-          for (var i = 0; i < 6; i++)
-            Container(height: 5, margin: EdgeInsets.only(top: i == 0 ? 0 : 2), color: i.isEven ? const Color(0xFFE7E5E4) : Colors.transparent),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
-              child: Column(
-                children: [
-                  Text('— — — — — — — —', style: TextStyle(color: template.accent, fontWeight: FontWeight.w700, letterSpacing: 2)),
-                  const SizedBox(height: 10),
-                  Text(title.toUpperCase(), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
-                  const SizedBox(height: 10),
-                  Text(body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, height: 1.5, color: Color(0xFF44403C))),
-                  const Spacer(),
-                  _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: const Color(0xFFD6D3D1), footerColor: const Color(0xFF78716C)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ElegantDarkLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _ElegantDarkLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: template.accent.withValues(alpha: 0.45)),
-      ),
-      padding: const EdgeInsets.fromLTRB(22, 26, 22, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [Icon(template.icon, color: template.accent, size: 22), const SizedBox(width: 8), Text('NGMY', style: TextStyle(color: template.accent, fontWeight: FontWeight.w900, letterSpacing: 2))]),
-          const SizedBox(height: 20),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24)),
-          const SizedBox(height: 12),
-          Text(body, style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 13.5, height: 1.55)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: Colors.white12, footerColor: Colors.white60),
-        ],
-      ),
-    );
-  }
-}
-
-class _NgmyCyanLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _NgmyCyanLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0B0E18), Color(0xFF12182A)]),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.5)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF06B6D4).withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(template.icon, color: const Color(0xFF06B6D4), size: 16),
-                const SizedBox(width: 6),
-                const Text('NGMY QR', style: TextStyle(color: Color(0xFF06B6D4), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.2)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
-          const SizedBox(height: 10),
-          Text(body, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13, height: 1.55)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: const Color(0xFF06B6D4), dividerColor: const Color(0xFF06B6D4).withValues(alpha: 0.25), footerColor: const Color(0xFF06B6D4)),
-        ],
-      ),
-    );
-  }
-}
-
-class _LetterheadLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _LetterheadLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(height: 6, color: template.accent),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Icon(template.icon, color: template.accent, size: 32),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: TextStyle(color: template.accent, fontWeight: FontWeight.w900, fontSize: 20)),
-                      Container(margin: const EdgeInsets.only(top: 6), height: 2, width: 64, color: template.accent.withValues(alpha: 0.5)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(body, style: const TextStyle(color: Color(0xFF334155), fontSize: 14, height: 1.65)),
-                  const Spacer(),
-                  _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: const Color(0xFFE2E8F0), footerColor: const Color(0xFF64748B)),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FramedCardLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _FramedCardLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(gradient: LinearGradient(colors: [template.accent.withValues(alpha: 0.08), Colors.white]), borderRadius: BorderRadius.circular(20)),
-      padding: const EdgeInsets.all(14),
-      child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: template.accent, width: 2)),
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
         child: Column(
           children: [
-            Icon(template.icon, color: template.accent, size: 36),
-            const SizedBox(height: 14),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(color: template.accent, fontWeight: FontWeight.w900, fontSize: 21)),
-            const SizedBox(height: 12),
-            Text(body, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.55)),
-            const Spacer(),
-            _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: template.accent.withValues(alpha: 0.2), footerColor: const Color(0xFF64748B)),
+            _HeaderSection(template: template, subtitle: subtitle, navy: navy, accent: accent),
+            _InfoField(label: theme.field1Label, value: field1, icon: theme.field1Icon, accent: accent),
+            const SizedBox(height: 8),
+            _InfoField(label: theme.field2Label, value: field2, icon: theme.field2Icon, accent: accent),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
+                  _SideChevron(left: true, color: accent),
+                  _SideChevron(left: false, color: accent),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: accent, width: 2),
+                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.15), blurRadius: 12)],
+                      ),
+                      child: qrWidget,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _StepsSection(theme: theme, accent: accent, navy: navy),
+            _ClosingFooter(text: closing, accent: accent),
+            const SizedBox(height: 10),
           ],
         ),
       ),
@@ -438,79 +131,329 @@ class _FramedCardLayout extends StatelessWidget {
   }
 }
 
-class _NeonHudLayout extends StatelessWidget {
+class _HeaderSection extends StatelessWidget {
   final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _NeonHudLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
+  final String subtitle;
+  final Color navy;
+  final Color accent;
+
+  const _HeaderSection({
+    required this.template,
+    required this.subtitle,
+    required this.navy,
+    required this.accent,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B0E18),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: template.accent.withValues(alpha: 0.45)),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+    final theme = template.theme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: template.accent, boxShadow: [BoxShadow(color: template.accent, blurRadius: 8)])),
-              const SizedBox(width: 8),
-              Text('SCAN READY', style: TextStyle(color: template.accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 2)),
-            ],
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent,
+              boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Icon(template.icon, color: Colors.white, size: 26),
           ),
-          const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 23)),
           const SizedBox(height: 10),
-          Text(body, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, height: 1.5)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: template.accent, dividerColor: template.accent.withValues(alpha: 0.3), footerColor: template.accent),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: const TextStyle(fontFamily: 'Roboto', height: 1.1),
+              children: [
+                TextSpan(
+                  text: '${theme.headlinePrimary} ',
+                  style: TextStyle(color: navy, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 0.5),
+                ),
+                TextSpan(
+                  text: theme.headlineAccent,
+                  style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 26, letterSpacing: 0.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: navy.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w600, height: 1.3),
+          ),
         ],
       ),
     );
   }
 }
 
-class _PremiumGoldLayout extends StatelessWidget {
-  final NgmyQrTemplateDef template;
-  final String title;
-  final String body;
-  final String footer;
-  final Widget qrWidget;
-  const _PremiumGoldLayout({required this.template, required this.title, required this.body, required this.footer, required this.qrWidget});
+class _InfoField extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color accent;
+
+  const _InfoField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1C1917), Color(0xFF0C0A09), Color(0xFF1C1917)]),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD97706), width: 1.5),
-      ),
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final display = value.length > 36 ? '${value.substring(0, 33)}…' : value;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.topCenter,
         children: [
-          Row(children: [Icon(template.icon, color: const Color(0xFFFBBF24), size: 24), const Spacer(), const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 14)]),
-          const SizedBox(height: 18),
-          ShaderMask(
-            shaderCallback: (r) => const LinearGradient(colors: [Color(0xFFFDE68A), Color(0xFFD97706)]).createShader(r),
-            child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24)),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 9),
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withValues(alpha: 0.45), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: accent.withValues(alpha: 0.75), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    display,
+                    style: TextStyle(color: accent.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(body, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 13.5, height: 1.55)),
-          const Spacer(),
-          _QrTemplateBottom(footer: footer, qrWidget: qrWidget, accent: const Color(0xFFD97706), dividerColor: const Color(0xFFD97706).withValues(alpha: 0.35), footerColor: const Color(0xFFFBBF24)),
+          Positioned(
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 1.1),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _SideChevron extends StatelessWidget {
+  final bool left;
+  final Color color;
+
+  const _SideChevron({required this.left, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: left ? 0 : null,
+      right: left ? null : 0,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: CustomPaint(
+          size: const Size(28, 56),
+          painter: _ChevronPainter(color: color, pointingRight: left),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepsSection extends StatelessWidget {
+  final NgmyQrCategoryTheme theme;
+  final Color accent;
+  final Color navy;
+
+  const _StepsSection({required this.theme, required this.accent, required this.navy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: Container(height: 1, color: accent.withValues(alpha: 0.35))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  theme.stepsTitle,
+                  style: TextStyle(color: navy, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 1.2),
+                ),
+              ),
+              Expanded(child: Container(height: 1, color: accent.withValues(alpha: 0.35))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 0; i < theme.steps.length; i++) ...[
+                if (i > 0) const SizedBox(width: 2),
+                Expanded(child: _StepTile(step: theme.steps[i], number: i + 1, accent: accent, navy: navy)),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepTile extends StatelessWidget {
+  final NgmyQrStepDef step;
+  final int number;
+  final Color accent;
+  final Color navy;
+
+  const _StepTile({required this.step, required this.number, required this.accent, required this.navy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent.withValues(alpha: 0.1),
+                border: Border.all(color: accent.withValues(alpha: 0.25)),
+              ),
+              child: Icon(step.icon, color: navy.withValues(alpha: 0.7), size: 18),
+            ),
+            Positioned(
+              top: -4,
+              right: -2,
+              child: Container(
+                width: 16,
+                height: 16,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
+                child: Text('$number', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          step.text,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: navy.withValues(alpha: 0.75), fontSize: 7.5, fontWeight: FontWeight.w600, height: 1.2),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+class _ClosingFooter extends StatelessWidget {
+  final String text;
+  final Color accent;
+
+  const _ClosingFooter({required this.text, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.favorite_rounded, color: accent, size: 14),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11.5),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WaveBgPainter extends CustomPainter {
+  final Color accent;
+
+  _WaveBgPainter({required this.accent});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = accent.withValues(alpha: 0.07)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    for (var w = 0; w < 5; w++) {
+      final path = Path();
+      final yBase = size.height * (0.15 + w * 0.14);
+      path.moveTo(0, yBase);
+      for (var x = 0.0; x <= size.width; x += 8) {
+        path.lineTo(x, yBase + math.sin((x / size.width) * math.pi * 3 + w) * 6);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveBgPainter oldDelegate) => oldDelegate.accent != accent;
+}
+
+class _ChevronPainter extends CustomPainter {
+  final Color color;
+  final bool pointingRight;
+
+  _ChevronPainter({required this.color, required this.pointingRight});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color.withValues(alpha: 0.85);
+    final path = Path();
+    if (pointingRight) {
+      path.moveTo(0, 0);
+      path.lineTo(size.width, size.height / 2);
+      path.lineTo(0, size.height);
+    } else {
+      path.moveTo(size.width, 0);
+      path.lineTo(0, size.height / 2);
+      path.lineTo(size.width, size.height);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChevronPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.pointingRight != pointingRight;
 }
 
 Future<void> showNgmyQrTemplateGallery({
@@ -557,7 +500,7 @@ Future<void> showNgmyQrTemplateGallery({
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('$categoryLabel Templates', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-                            Text('10 designs · QR at bottom · Edit words after you pick', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                            Text('10 premium designs · Pick a color · Edit your words', style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
                           ],
                         ),
                       ),
@@ -573,7 +516,7 @@ Future<void> showNgmyQrTemplateGallery({
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.62,
+                      childAspectRatio: 0.58,
                     ),
                     itemCount: templates.length,
                     itemBuilder: (_, i) {
@@ -594,7 +537,7 @@ Future<void> showNgmyQrTemplateGallery({
                             decoration: BoxDecoration(
                               color: const Color(0xFF12182A),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: t.accent.withValues(alpha: 0.35)),
+                              border: Border.all(color: t.accent.withValues(alpha: 0.45)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -604,12 +547,13 @@ Future<void> showNgmyQrTemplateGallery({
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
                                     child: OverflowBox(
                                       alignment: Alignment.topCenter,
-                                      maxHeight: 220,
+                                      maxHeight: 230,
                                       child: NgmyQrTemplateCard(
                                         template: t,
                                         title: title,
                                         body: body,
                                         footer: footer,
+                                        fieldVars: fieldVars,
                                         qrWidget: qrWidget,
                                         compact: true,
                                       ),
