@@ -800,78 +800,58 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              child: Row(
                 children: [
-                  Text('Family Tree', style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText)),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: _canEdit && _undoStack.isNotEmpty ? _undo : null,
-                          icon: const Icon(Icons.undo, size: 16),
-                          label: const Text('Undo'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _openFamilyBook,
-                          style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-                          icon: const Icon(Icons.menu_book_outlined, size: 16),
-                          label: const Text('Family Book'),
-                        ),
-                        if (_canEdit) ...[
-                          const SizedBox(width: 8),
-                          FilledButton.icon(
-                            onPressed: _openTreeSettings,
-                            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.greenDark),
-                            icon: const Icon(Icons.tune, size: 16),
-                            label: const Text('Display'),
-                          ),
-                        ],
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: _openSync,
-                          icon: const Icon(Icons.sync_rounded, size: 16),
-                          label: const Text('Sync'),
-                        ),
-                        if (_tree.isViewOnly) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            tooltip: 'Remove shared tree from this device',
-                            onPressed: _deleteThisTree,
-                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.redAccent.withValues(alpha: 0.08),
-                              padding: const EdgeInsets.all(10),
-                            ),
-                          ),
-                        ] else if (familyTreeIsOwner(_tree, widget.userEmail)) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            tooltip: 'Delete family tree',
-                            onPressed: _deleteThisTree,
-                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.redAccent.withValues(alpha: 0.08),
-                              padding: const EdgeInsets.all(10),
-                            ),
-                          ),
-                        ],
-                        if (_canEdit) ...[
-                          const SizedBox(width: 8),
-                          FilledButton.icon(
-                            onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
-                            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Add Member'),
-                          ),
-                        ],
-                      ],
-                    ),
+                  Text(
+                    'Family Tree',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: p.primaryText),
                   ),
+                  const Spacer(),
+                  if (_canEdit && _undoStack.isNotEmpty)
+                    _FamilyTreeMiniTool(
+                      tooltip: 'Undo',
+                      icon: Icons.undo_rounded,
+                      onPressed: _undo,
+                      p: p,
+                    ),
+                  _FamilyTreeMiniTool(
+                    tooltip: 'Family Book',
+                    icon: Icons.menu_book_outlined,
+                    onPressed: _openFamilyBook,
+                    p: p,
+                    tint: Colors.orange.shade700,
+                  ),
+                  if (_canEdit)
+                    _FamilyTreeMiniTool(
+                      tooltip: 'Display settings',
+                      icon: Icons.tune_rounded,
+                      onPressed: _openTreeSettings,
+                      p: p,
+                      tint: WorksheetPalette.greenDark,
+                    ),
+                  _FamilyTreeMiniTool(
+                    tooltip: 'Sync',
+                    icon: Icons.sync_rounded,
+                    onPressed: _openSync,
+                    p: p,
+                  ),
+                  if (_tree.isViewOnly || familyTreeIsOwner(_tree, widget.userEmail))
+                    _FamilyTreeMiniTool(
+                      tooltip: _tree.isViewOnly ? 'Remove shared tree' : 'Delete tree',
+                      icon: Icons.delete_outline_rounded,
+                      onPressed: _deleteThisTree,
+                      p: p,
+                      tint: Colors.redAccent,
+                    ),
+                  if (_canEdit)
+                    _FamilyTreeMiniTool(
+                      tooltip: 'Add member',
+                      icon: Icons.person_add_alt_1_rounded,
+                      onPressed: () => _addMember(parentId: rootMember(_tree)?.id),
+                      p: p,
+                      tint: WorksheetPalette.teal,
+                    ),
                 ],
               ),
             ),
@@ -2448,6 +2428,46 @@ class _MemberViewDialog extends StatelessWidget {
                 child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FamilyTreeMiniTool extends StatelessWidget {
+  const _FamilyTreeMiniTool({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    required this.p,
+    this.tint,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final WorksheetPalette p;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = tint ?? p.secondaryText;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: color.withValues(alpha: p.isDark ? 0.14 : 0.08),
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: Icon(icon, size: 16, color: color),
+            ),
           ),
         ),
       ),

@@ -14,6 +14,24 @@ const String _projectsIndexV3Prefix = 'ngmy_worksheets_index_v3_';
 const String _projectItemV3Prefix = 'ngmy_worksheet_item_v3_';
 const String _projectThumbV3Prefix = 'ngmy_worksheet_thumb_v3_';
 const String _familyTreesKeyPrefix = 'ngmy_worksheets_family_trees_v1_';
+const String _deviceWorksheetOwnerKey = 'ngmy_worksheet_device_owner_v1';
+
+String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
+
+/// Worksheet projects save locally — works offline. Falls back to cached session or device id.
+Future<String> ngmyWorksheetEffectiveEmail(String userEmail) async {
+  final email = _normalizedEmail(userEmail);
+  if (email.isNotEmpty) return email;
+  final prefs = await SharedPreferences.getInstance();
+  final cached = (prefs.getString('ngmy_last_session_email') ?? '').trim().toLowerCase();
+  if (cached.isNotEmpty) return cached;
+  var device = prefs.getString(_deviceWorksheetOwnerKey);
+  if (device == null || device.trim().isEmpty) {
+    device = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    await prefs.setString(_deviceWorksheetOwnerKey, device);
+  }
+  return device.trim();
+}
 
 String _emailSlug(String userEmail) {
   final email = userEmail.toLowerCase().trim();
@@ -66,8 +84,6 @@ WorksheetProject _projectWithStoredThumbnail(
 
 String _familyTreesKey(String userEmail) =>
     '$_familyTreesKeyPrefix${userEmail.toLowerCase().trim().hashCode.abs()}';
-
-String _normalizedEmail(String userEmail) => userEmail.toLowerCase().trim();
 
 class BudgetItem {
   final String id;
@@ -515,7 +531,7 @@ String generateFamilyTreeCode(String name) {
 }
 
 Future<List<WorksheetProject>> loadWorksheetProjects(String userEmail) async {
-  final email = _normalizedEmail(userEmail);
+  final email = await ngmyWorksheetEffectiveEmail(userEmail);
   if (email.isEmpty) return [];
 
   final prefs = await SharedPreferences.getInstance();
@@ -584,7 +600,7 @@ Future<WorksheetProject?> loadWorksheetProjectById(
   String userEmail,
   String projectId,
 ) async {
-  final email = _normalizedEmail(userEmail);
+  final email = await ngmyWorksheetEffectiveEmail(userEmail);
   final id = projectId.trim();
   if (email.isEmpty || id.isEmpty) return null;
   final list = await loadWorksheetProjects(email);
@@ -613,7 +629,7 @@ Future<bool> saveWorksheetProjects(
   String userEmail,
   List<WorksheetProject> projects,
 ) async {
-  final email = _normalizedEmail(userEmail);
+  final email = await ngmyWorksheetEffectiveEmail(userEmail);
   if (email.isEmpty) return false;
 
   final prefs = await SharedPreferences.getInstance();
@@ -801,11 +817,7 @@ Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
   }
   await _persistFamilyTreesLocally(userEmail, list);
   if (familyTreeCanWriteCloud(normalized, userEmail)) {
-    final ownerEmail = familyTreeOwnerEmail(normalized, userEmail);
-    final cloudOk = await _upsertFamilyTreeCloud(ownerEmail, normalized);
-    if (!cloudOk) {
-      debugPrint('[family_trees] saved locally; cloud sync will retry on next load.');
-    }
+    unawaited(_upsertFamilyTreeCloud(familyTreeOwnerEmail(normalized, userEmail), normalized));
   }
 }
 
