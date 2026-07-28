@@ -498,7 +498,7 @@ bool ngmyAdvisorGreetingSoundsRobotic(String text) {
   if (RegExp(r'^(hey|hi|hello|yo|sup)\s+(you|yourself|u)\b').hasMatch(t)) return true;
   if (RegExp(r'\b(hey|hi)\s+yourself\b').hasMatch(t)) return true;
   if (RegExp(r"^you too\.?$").hasMatch(t)) return true;
-  if (RegExp(r'^(what do you want|what do u want|what\'?s up with you)\b').hasMatch(t)) {
+  if (RegExp(r"^(what do you want|what do u want|what's up with you)\b").hasMatch(t)) {
     return true;
   }
   return false;
