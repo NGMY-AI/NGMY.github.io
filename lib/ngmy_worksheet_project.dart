@@ -551,6 +551,7 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
     final moneyOnly = item.name.trim().isEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      constraints: const BoxConstraints(minHeight: 64),
       decoration: BoxDecoration(
         color: p.cardBg,
         borderRadius: BorderRadius.circular(16),
@@ -564,51 +565,46 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 5,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [WorksheetPalette.green, WorksheetPalette.teal],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 5,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [WorksheetPalette.green, WorksheetPalette.teal],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.22 : 0.12),
-                        borderRadius: BorderRadius.circular(12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.22 : 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          moneyOnly ? Icons.payments_rounded : Icons.receipt_long_rounded,
+                          color: WorksheetPalette.greenDark,
+                          size: 20,
+                        ),
                       ),
-                      child: Icon(
-                        moneyOnly ? Icons.payments_rounded : Icons.receipt_long_rounded,
-                        color: WorksheetPalette.greenDark,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: moneyOnly
-                            ? ngmyWorksheetMoneyText(
-                                item.lineTotal,
-                                color: p.primaryText,
-                                large: false,
-                                weight: FontWeight.w900,
-                              )
+                            ? const SizedBox.shrink()
                             : Column(
                                 mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
@@ -636,8 +632,6 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                                 ],
                               ),
                       ),
-                    ),
-                    if (!moneyOnly) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -656,17 +650,17 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                           weight: FontWeight.w900,
                         ),
                       ),
+                      IconButton(
+                        onPressed: () => _deleteItem(item),
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(Icons.close_rounded, color: p.secondaryText.withValues(alpha: 0.75), size: 20),
+                      ),
                     ],
-                    IconButton(
-                      onPressed: () => _deleteItem(item),
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(Icons.close_rounded, color: p.secondaryText.withValues(alpha: 0.75), size: 20),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
