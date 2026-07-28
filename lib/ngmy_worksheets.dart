@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project.dart';
@@ -446,7 +447,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                         child: SizedBox(
                           width: 48,
                           height: 48,
-                          child: ngmyImageOrPlaceholder(
+                          child: ngmyWorksheetThumbnail(
                             imageRef: project.thumbnailPath,
                             width: 48,
                             height: 48,
@@ -1053,7 +1054,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: ngmyImageOrPlaceholder(
+                  child: ngmyWorksheetThumbnail(
                     imageRef: project.thumbnailPath,
                     width: double.infinity,
                     height: double.infinity,

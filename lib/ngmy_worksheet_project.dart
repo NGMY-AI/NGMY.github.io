@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'ngmy_nav.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project_share.dart';
@@ -54,9 +55,59 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
   }
 
   Future<void> _pickThumbnail() async {
-    final img = await ngmyPickImageBase64(maxWidth: 1920);
-    if (img == null) return;
-    setState(() => _project = _project.copyWith(thumbnailPath: img));
+    final p = WorksheetPalette.of(context);
+    final picked = await showDialog<String?>(
+      context: context,
+      builder: (ctx) {
+        var thumb = _project.thumbnailPath;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return Dialog(
+              backgroundColor: p.cardBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Project thumbnail', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: p.primaryText)),
+                    const SizedBox(height: 6),
+                    Text('Tap circle for themes · tap frame for gallery', style: TextStyle(fontSize: 11, color: p.secondaryText)),
+                    const SizedBox(height: 12),
+                    NgmyWorksheetThumbnailPickerFrame(
+                      thumbnailPath: thumb,
+                      onThumbnailChanged: (ref) => setLocal(() => thumb = ref),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(ctx, thumb),
+                            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.green),
+                            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _project = _project.copyWith(thumbnailPath: picked));
     await _persist();
   }
 
@@ -137,7 +188,7 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ngmyImageOrPlaceholder(
+                ngmyWorksheetThumbnail(
                   imageRef: _project.thumbnailPath,
                   width: double.infinity,
                   height: double.infinity,

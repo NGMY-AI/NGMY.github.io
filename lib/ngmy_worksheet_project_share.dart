@@ -8,6 +8,7 @@ import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project_qr_stash.dart';
 import 'ngmy_worksheets_storage.dart';
@@ -448,7 +449,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
                         ],
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: ngmyImageOrPlaceholder(
+                      child: ngmyWorksheetThumbnail(
                         imageRef: project.thumbnailPath,
                         width: 64,
                         height: 64,

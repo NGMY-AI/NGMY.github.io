@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 class CreateProjectDialogResult {
@@ -163,50 +164,14 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
               ),
               const SizedBox(height: 16),
               Text('Project thumbnail (16:9)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.secondaryText)),
+              const SizedBox(height: 4),
+              Text('Tap the circle for themes · tap the frame for your gallery', style: TextStyle(fontSize: 11, color: p.secondaryText, fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Material(
-                  color: p.mutedSurface,
-                  borderRadius: BorderRadius.circular(14),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () async {
-                      final img = await ngmyPickImageBase64(maxWidth: 1920);
-                      if (img != null && mounted) setState(() => _thumbnailPath = img);
-                    },
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ngmyImageOrPlaceholder(
-                          imageRef: _thumbnailPath,
-                          width: double.infinity,
-                          height: double.infinity,
-                          icon: Icons.add_photo_alternate_outlined,
-                          iconColor: p.secondaryText,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        Positioned(
-                          right: 8,
-                          bottom: 8,
-                          child: FilledButton.icon(
-                            onPressed: () async {
-                              final img = await ngmyPickImageBase64(maxWidth: 1920);
-                              if (img != null && mounted) setState(() => _thumbnailPath = img);
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: WorksheetPalette.green,
-                              foregroundColor: Colors.white,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            icon: const Icon(Icons.photo_library_outlined, size: 16),
-                            label: const Text('Choose photo'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              NgmyWorksheetThumbnailPickerFrame(
+                thumbnailPath: _thumbnailPath,
+                onThumbnailChanged: (ref) {
+                  if (mounted) setState(() => _thumbnailPath = ref);
+                },
               ),
               const SizedBox(height: 16),
               TextField(
