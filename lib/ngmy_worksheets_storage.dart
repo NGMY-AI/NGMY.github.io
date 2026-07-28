@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
@@ -656,26 +657,36 @@ Future<bool> saveWorksheetProjects(
       final thumbnail = project.thumbnailPath?.trim();
       WorksheetProject coreProject = project;
       if (thumbnail != null && thumbnail.isNotEmpty) {
-        var thumbToStore = thumbnail;
-        var thumbSaved = await _safePrefsSetString(
-          prefs,
-          _projectThumbV3Key(email, project.id),
-          thumbToStore,
-        );
-        if (!thumbSaved) {
-          final shrunk = await ngmyWorksheetShareThumbnail(thumbnail, forQr: false);
-          if (shrunk != null && shrunk.isNotEmpty) {
-            thumbToStore = shrunk;
-            thumbSaved = await _safePrefsSetString(
-              prefs,
-              _projectThumbV3Key(email, project.id),
-              thumbToStore,
-            );
+        // Built-in theme ids are tiny — keep in project JSON so animations survive reload.
+        if (ngmyIsBuiltinThumbnail(thumbnail)) {
+          await _safePrefsSetString(
+            prefs,
+            _projectThumbV3Key(email, project.id),
+            thumbnail,
+          );
+          coreProject = project;
+        } else {
+          var thumbToStore = thumbnail;
+          var thumbSaved = await _safePrefsSetString(
+            prefs,
+            _projectThumbV3Key(email, project.id),
+            thumbToStore,
+          );
+          if (!thumbSaved) {
+            final shrunk = await ngmyWorksheetShareThumbnail(thumbnail, forQr: false);
+            if (shrunk != null && shrunk.isNotEmpty) {
+              thumbToStore = shrunk;
+              thumbSaved = await _safePrefsSetString(
+                prefs,
+                _projectThumbV3Key(email, project.id),
+                thumbToStore,
+              );
+            }
           }
+          coreProject = thumbSaved
+              ? project.copyWith(thumbnailPath: null)
+              : project.copyWith(thumbnailPath: thumbToStore);
         }
-        coreProject = thumbSaved
-            ? project.copyWith(thumbnailPath: null)
-            : project.copyWith(thumbnailPath: thumbToStore);
       } else {
         await _safePrefsRemove(prefs, _projectThumbV3Key(email, project.id));
       }

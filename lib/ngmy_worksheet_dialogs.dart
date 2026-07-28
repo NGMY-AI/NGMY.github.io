@@ -165,7 +165,7 @@ class _CreateProjectDialogState extends State<_CreateProjectDialog> {
               const SizedBox(height: 16),
               Text('Project thumbnail (16:9)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.secondaryText)),
               const SizedBox(height: 4),
-              Text('Tap the circle for themes · tap the frame for your gallery', style: TextStyle(fontSize: 11, color: p.secondaryText, fontWeight: FontWeight.w500)),
+              Text('Full animated preview — use Themes or Your photos below', style: TextStyle(fontSize: 11, color: p.secondaryText, fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
               NgmyWorksheetThumbnailPickerFrame(
                 thumbnailPath: _thumbnailPath,
@@ -478,15 +478,9 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
 
   void _submit() {
     final name = _nameC.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an item name.')),
-      );
-      return;
-    }
     if (_unitPrice <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a unit price greater than zero.')),
+        const SnackBar(content: Text('Enter an amount greater than zero.')),
       );
       return;
     }
@@ -540,7 +534,7 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
                       children: [
                         Text('Add Budget Item', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: p.primaryText)),
                         const SizedBox(height: 2),
-                        Text('Name, units, and price per unit', style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w500)),
+                        Text('Amount required · name optional', style: TextStyle(fontSize: 12, color: p.secondaryText, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ),
@@ -553,10 +547,9 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
               const SizedBox(height: 18),
               TextField(
                 controller: _nameC,
-                autofocus: true,
                 textCapitalization: TextCapitalization.sentences,
                 style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w600),
-                decoration: _fieldDecoration(p, 'Item name', hint: 'Lumber, paint, labor…', icon: Icons.label_outline_rounded),
+                decoration: _fieldDecoration(p, 'Item name (optional)', hint: 'Lumber, paint, labor…', icon: Icons.label_outline_rounded),
               ),
               const SizedBox(height: 14),
               Text('Units', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: p.secondaryText, letterSpacing: 0.3)),
@@ -605,9 +598,10 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
                   Expanded(
                     child: TextField(
                       controller: _priceC,
+                      autofocus: true,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700, fontSize: 16),
-                      decoration: _fieldDecoration(p, 'Price per unit', hint: '0.00', icon: Icons.attach_money_rounded),
+                      decoration: _fieldDecoration(p, 'Amount', hint: '0.00', icon: Icons.attach_money_rounded),
                       onChanged: (_) => setState(() {}),
                     ),
                   ),

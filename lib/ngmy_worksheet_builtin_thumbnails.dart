@@ -42,6 +42,16 @@ const kNgmyBuiltinThumbnails = <NgmyBuiltinThumbnailDef>[
   NgmyBuiltinThumbnailDef(id: 'plumbing', label: 'Plumbing', subtitle: 'Pipes & water', icon: Icons.water_drop_rounded),
   NgmyBuiltinThumbnailDef(id: 'electrical', label: 'Electrical', subtitle: 'Wiring & power', icon: Icons.bolt_rounded),
   NgmyBuiltinThumbnailDef(id: 'store', label: 'Retail Shop', subtitle: 'Daily business', icon: Icons.storefront_rounded),
+  NgmyBuiltinThumbnailDef(id: 'paint_remodel', label: 'Paint & Remodel', subtitle: 'Colors & walls', icon: Icons.format_paint_rounded),
+  NgmyBuiltinThumbnailDef(id: 'roofing', label: 'Roofing', subtitle: 'Roofs & exteriors', icon: Icons.roofing_rounded),
+  NgmyBuiltinThumbnailDef(id: 'warehouse', label: 'Warehouse', subtitle: 'Storage & stock', icon: Icons.warehouse_rounded),
+  NgmyBuiltinThumbnailDef(id: 'vehicles', label: 'Vehicles', subtitle: 'Fleet & transport', icon: Icons.local_shipping_rounded),
+  NgmyBuiltinThumbnailDef(id: 'farm', label: 'Farm', subtitle: 'Crops & livestock', icon: Icons.agriculture_rounded),
+  NgmyBuiltinThumbnailDef(id: 'restaurant', label: 'Restaurant', subtitle: 'Food & catering', icon: Icons.restaurant_rounded),
+  NgmyBuiltinThumbnailDef(id: 'tools', label: 'Tools', subtitle: 'Workshop gear', icon: Icons.handyman_rounded),
+  NgmyBuiltinThumbnailDef(id: 'wallet', label: 'Cash & Wallet', subtitle: 'Quick spending', icon: Icons.account_balance_wallet_rounded),
+  NgmyBuiltinThumbnailDef(id: 'concrete', label: 'Concrete', subtitle: 'Foundation work', icon: Icons.foundation_rounded),
+  NgmyBuiltinThumbnailDef(id: 'blueprint', label: 'Blueprint', subtitle: 'Plans & design', icon: Icons.architecture_rounded),
 ];
 
 NgmyBuiltinThumbnailDef? ngmyBuiltinThumbnailDef(String? ref) {
@@ -77,7 +87,7 @@ class _NgmyBuiltinThumbnailArtState extends State<NgmyBuiltinThumbnailArt>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
+      duration: const Duration(milliseconds: 2800),
     );
     if (widget.animate) _ctrl.repeat();
   }
@@ -157,6 +167,26 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
         _paintElectrical(canvas, size);
       case 'store':
         _paintStore(canvas, size);
+      case 'paint_remodel':
+        _paintPaintRemodel(canvas, size);
+      case 'roofing':
+        _paintRoofing(canvas, size);
+      case 'warehouse':
+        _paintWarehouse(canvas, size);
+      case 'vehicles':
+        _paintVehicles(canvas, size);
+      case 'farm':
+        _paintFarm(canvas, size);
+      case 'restaurant':
+        _paintRestaurant(canvas, size);
+      case 'tools':
+        _paintTools(canvas, size);
+      case 'wallet':
+        _paintWallet(canvas, size);
+      case 'concrete':
+        _paintConcrete(canvas, size);
+      case 'blueprint':
+        _paintBlueprint(canvas, size);
       default:
         _paintConstruction(canvas, size);
     }
@@ -196,10 +226,34 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
     }
   }
 
+  void _orbitDots(Canvas canvas, Size size, Color color, {int count = 8, double inset = 10}) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2 - inset;
+    for (var i = 0; i < count; i++) {
+      final a = t * math.pi * 2 + (i / count) * math.pi * 2;
+      final dot = Offset(center.dx + math.cos(a) * radius, center.dy + math.sin(a) * radius);
+      canvas.drawCircle(dot, 3.5, Paint()..color = color.withValues(alpha: 0.55 + 0.35 * math.sin(a * 2)));
+    }
+  }
+
+  void _sparkles(Canvas canvas, Size size, {int count = 10}) {
+    for (var i = 0; i < count; i++) {
+      final phase = t * math.pi * 2 + i * 0.8;
+      final alpha = (math.sin(phase) + 1) / 2;
+      canvas.drawCircle(
+        Offset(size.width * ((i * 0.17) % 0.9 + 0.05), size.height * ((i * 0.23) % 0.85 + 0.08)),
+        1.5 + alpha * 2.5,
+        Paint()..color = Colors.white.withValues(alpha: 0.2 + alpha * 0.6),
+      );
+    }
+  }
+
   void _paintConstruction(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFFF59E0B), Color(0xFFEA580C), Color(0xFF78350F)]);
     _ring(canvas, size, Colors.white.withValues(alpha: 0.55), t * math.pi * 2, inset: 12);
+    _ring(canvas, size, const Color(0xFFFDE68A).withValues(alpha: 0.45), -t * math.pi * 1.4, inset: 22);
     _drawBeams(canvas, size, const Color(0xFFFFFBEB), t);
+    _orbitDots(canvas, size, Colors.white.withValues(alpha: 0.7), count: 6, inset: 8);
   }
 
   void _drawBeams(Canvas canvas, Size size, Color c, double t) {
@@ -219,17 +273,20 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
       Paint()..color = Colors.white.withValues(alpha: 0.18 + pulse * 0.12),
     );
     _ring(canvas, size, Colors.white.withValues(alpha: 0.4), -t * math.pi * 2, inset: 20);
+    _sparkles(canvas, size, count: 12);
+    _orbitDots(canvas, size, const Color(0xFFBFDBFE), count: 5, inset: 14);
   }
 
   void _paintGrocery(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF34D399), Color(0xFF059669), Color(0xFF064E3B)]);
     const items = [Color(0xFFFDE68A), Color(0xFFF87171), Color(0xFF93C5FD), Color(0xFFFBBF24)];
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 10; i++) {
       final phase = t * math.pi * 2 + i * 1.1;
-      final x = size.width * (0.15 + (i % 3) * 0.28) + math.sin(phase) * 8;
-      final y = size.height * (0.18 + (i ~/ 3) * 0.55) + math.cos(phase * 0.8) * 10;
-      canvas.drawCircle(Offset(x, y), 7 + (i % 2) * 2.0, Paint()..color = items[i % items.length].withValues(alpha: 0.85));
+      final x = size.width * (0.12 + (i % 4) * 0.22) + math.sin(phase) * 10;
+      final y = size.height * (0.14 + (i ~/ 4) * 0.38) + math.cos(phase * 0.8) * 12;
+      canvas.drawCircle(Offset(x, y), 6 + (i % 3) * 2.0, Paint()..color = items[i % items.length].withValues(alpha: 0.85));
     }
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.35), t * math.pi * 2, inset: 16);
   }
 
   void _paintCalculator(Canvas canvas, Size size) {
@@ -275,7 +332,7 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
 
   void _paintKitchen(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFFFB7185), Color(0xFFF97316), Color(0xFFBE123C)]);
-    for (var i = 0; i < 8; i++) {
+    for (var i = 0; i < 12; i++) {
       final phase = t * math.pi * 2 + i * 0.75;
       final alpha = (math.sin(phase) + 1) / 2;
       canvas.drawCircle(
@@ -287,6 +344,7 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
         Paint()..color = Colors.white.withValues(alpha: 0.25 + alpha * 0.55),
       );
     }
+    _ring(canvas, size, const Color(0xFFFDE68A).withValues(alpha: 0.4), -t * math.pi * 2.2, inset: 11);
   }
 
   void _paintLandscape(Canvas canvas, Size size) {
@@ -309,21 +367,24 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
       ..lineTo(0, size.height)
       ..close();
     canvas.drawPath(wave, Paint()..color = const Color(0xFF15803D).withValues(alpha: 0.85));
+    _sparkles(canvas, size, count: 8);
+    _orbitDots(canvas, size, const Color(0xFFBBF7D0), count: 4, inset: 18);
   }
 
   void _paintPlumbing(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF22D3EE), Color(0xFF0891B2), Color(0xFF164E63)]);
-    for (var i = 0; i < 3; i++) {
-      final r = size.shortestSide * (0.12 + i * 0.14 + (t * 0.08) % 0.12);
+    for (var i = 0; i < 5; i++) {
+      final r = size.shortestSide * (0.1 + i * 0.12 + (t * 0.1) % 0.1);
       canvas.drawCircle(
         Offset(size.width / 2, size.height * 0.55),
         r,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2
-          ..color = Colors.white.withValues(alpha: 0.45 - i * 0.12),
+          ..color = Colors.white.withValues(alpha: 0.5 - i * 0.08),
       );
     }
+    _orbitDots(canvas, size, const Color(0xFFA5F3FC), count: 6, inset: 12);
   }
 
   void _paintElectrical(Canvas canvas, Size size) {
@@ -338,17 +399,178 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
 
   void _paintStore(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF818CF8), Color(0xFF6366F1), Color(0xFF312E81)]);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 6; i++) {
       final lit = (math.sin(t * math.pi * 2 + i * 1.5) + 1) / 2;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(14 + i * (size.width - 28) / 4, 14, (size.width - 28) / 4 - 4, 8),
+          Rect.fromLTWH(14 + i * (size.width - 28) / 6, 14, (size.width - 28) / 6 - 3, 8),
           const Radius.circular(4),
         ),
         Paint()..color = Color.lerp(const Color(0xFF312E81), const Color(0xFFFDE68A), lit)!,
       );
     }
     _ring(canvas, size, Colors.white.withValues(alpha: 0.3), t * math.pi * 2, inset: 16);
+    _sparkles(canvas, size);
+  }
+
+  void _paintPaintRemodel(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFFF472B6), Color(0xFFDB2777), Color(0xFF831843)]);
+    for (var i = 0; i < 4; i++) {
+      final drip = (t + i * 0.2) % 1.0;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * (0.18 + i * 0.18), size.height * (0.15 + drip * 0.55), 8, 18 + drip * 22),
+          const Radius.circular(6),
+        ),
+        Paint()..color = [const Color(0xFFFBCFE8), const Color(0xFF93C5FD), const Color(0xFFFDE68A), const Color(0xFF86EFAC)][i].withValues(alpha: 0.85),
+      );
+    }
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.45), t * math.pi * 2.5, inset: 13);
+  }
+
+  void _paintRoofing(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF64748B), Color(0xFF334155), Color(0xFF0F172A)]);
+    for (var i = 0; i < 8; i++) {
+      final y = size.height * (0.12 + (t * 0.35 + i * 0.12) % 0.75);
+      canvas.drawLine(
+        Offset(size.width * (0.1 + (i % 4) * 0.22), y),
+        Offset(size.width * (0.18 + (i % 4) * 0.22), y + 10),
+        Paint()..color = Colors.white.withValues(alpha: 0.25)..strokeWidth = 1.5,
+      );
+    }
+    _orbitDots(canvas, size, const Color(0xFFCBD5E1), count: 7, inset: 11);
+  }
+
+  void _paintWarehouse(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF94A3B8), Color(0xFF475569), Color(0xFF1E293B)]);
+    for (var i = 0; i < 4; i++) {
+      final lift = math.sin(t * math.pi * 2 + i) * 4;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(22 + i * 16.0, size.height * 0.55 - i * 14 + lift, size.width - 44 - i * 8, 16),
+          const Radius.circular(3),
+        ),
+        Paint()..color = Color.lerp(const Color(0xFFCBD5E1), const Color(0xFFF8FAFC), (math.sin(t * math.pi * 2 + i) + 1) / 2)!,
+      );
+    }
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.35), -t * math.pi * 1.8, inset: 15);
+  }
+
+  void _paintVehicles(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF60A5FA), Color(0xFF2563EB), Color(0xFF1E3A8A)]);
+    for (var i = 0; i < 5; i++) {
+      final x = size.width * ((t * 0.45 + i * 0.18) % 1.1 - 0.05);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, size.height * (0.62 + (i % 2) * 0.08), 28, 8), const Radius.circular(3)),
+        Paint()..color = Colors.white.withValues(alpha: 0.35 + i * 0.08),
+      );
+    }
+    _sparkles(canvas, size, count: 6);
+  }
+
+  void _paintFarm(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFFFBBF24), Color(0xFF84CC16), Color(0xFF365314)]);
+    final sunPulse = 0.5 + 0.5 * math.sin(t * math.pi * 2);
+    canvas.drawCircle(
+      Offset(size.width * 0.82, size.height * 0.18),
+      14 + sunPulse * 4,
+      Paint()..color = const Color(0xFFFEF08A).withValues(alpha: 0.75),
+    );
+    for (var i = 0; i < 6; i++) {
+      final sway = math.sin(t * math.pi * 2 + i) * 6;
+      canvas.drawLine(
+        Offset(size.width * (0.12 + i * 0.14), size.height * 0.72),
+        Offset(size.width * (0.12 + i * 0.14) + sway, size.height * 0.52),
+        Paint()..color = const Color(0xFF166534).withValues(alpha: 0.85)..strokeWidth = 3,
+      );
+    }
+    _ring(canvas, size, const Color(0xFFFEF08A).withValues(alpha: 0.35), t * math.pi * 2, inset: 14);
+  }
+
+  void _paintRestaurant(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFFFB923C), Color(0xFFEA580C), Color(0xFF7C2D12)]);
+    for (var i = 0; i < 4; i++) {
+      final steam = math.sin(t * math.pi * 2 + i * 0.9) * 8;
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(size.width * (0.28 + i * 0.16), size.height * 0.42 + steam), width: 10, height: 18),
+        Paint()..color = Colors.white.withValues(alpha: 0.22),
+      );
+    }
+    _orbitDots(canvas, size, const Color(0xFFFED7AA), count: 5, inset: 16);
+    _sparkles(canvas, size, count: 7);
+  }
+
+  void _paintTools(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF78716C), Color(0xFF44403C), Color(0xFF1C1917)]);
+    _ring(canvas, size, const Color(0xFFFCD34D).withValues(alpha: 0.55), t * math.pi * 3, inset: 10);
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.25), -t * math.pi * 2, inset: 24);
+    for (var i = 0; i < 3; i++) {
+      final a = t * math.pi * 2 + i * 2.1;
+      canvas.drawCircle(
+        Offset(size.width / 2 + math.cos(a) * 34, size.height / 2 + math.sin(a) * 22),
+        4,
+        Paint()..color = const Color(0xFFFCD34D).withValues(alpha: 0.8),
+      );
+    }
+  }
+
+  void _paintWallet(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF4ADE80), Color(0xFF16A34A), Color(0xFF14532D)]);
+    for (var i = 0; i < 5; i++) {
+      final flip = (math.sin(t * math.pi * 2 + i * 1.2) + 1) / 2;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * (0.2 + i * 0.03), size.height * (0.28 + flip * 0.08), 36, 22),
+          const Radius.circular(4),
+        ),
+        Paint()..color = Color.lerp(const Color(0xFFBBF7D0), const Color(0xFFFEF08A), flip)!,
+      );
+    }
+    _sparkles(canvas, size, count: 9);
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.4), t * math.pi * 2.2, inset: 12);
+  }
+
+  void _paintConcrete(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF9CA3AF), Color(0xFF6B7280), Color(0xFF374151)]);
+    final spin = t * math.pi * 2;
+    canvas.drawArc(
+      Rect.fromCircle(center: Offset(size.width / 2, size.height * 0.55), radius: 34),
+      spin,
+      math.pi * 1.2,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..color = Colors.white.withValues(alpha: 0.45),
+    );
+    for (var i = 0; i < 6; i++) {
+      final a = spin + i * 1.05;
+      canvas.drawCircle(
+        Offset(size.width / 2 + math.cos(a) * 34, size.height * 0.55 + math.sin(a) * 34),
+        3,
+        Paint()..color = const Color(0xFFE5E7EB).withValues(alpha: 0.85),
+      );
+    }
+  }
+
+  void _paintBlueprint(Canvas canvas, Size size) {
+    _bg(canvas, size, const [Color(0xFF1D4ED8), Color(0xFF1E3A8A), Color(0xFF172554)]);
+    final grid = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..strokeWidth = 1;
+    const step = 18.0;
+    for (var x = 0.0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (var y = 0.0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    final scanY = size.height * ((t * 0.85) % 1.0);
+    canvas.drawRect(
+      Rect.fromLTWH(0, scanY, size.width, 6),
+      Paint()..color = const Color(0xFF93C5FD).withValues(alpha: 0.45),
+    );
+    _ring(canvas, size, const Color(0xFFBFDBFE).withValues(alpha: 0.45), -t * math.pi * 2, inset: 11);
   }
 
   @override
@@ -475,19 +697,17 @@ Future<String?> showNgmyBuiltinThumbnailPicker(BuildContext context) {
   );
 }
 
-/// 16:9 frame with center circle (built-in themes) and outer tap (gallery).
+/// 16:9 full-frame animated preview with Themes / Your photos actions.
 class NgmyWorksheetThumbnailPickerFrame extends StatelessWidget {
   final String? thumbnailPath;
   final ValueChanged<String?> onThumbnailChanged;
   final BorderRadius borderRadius;
-  final double circleSize;
 
   const NgmyWorksheetThumbnailPickerFrame({
     super.key,
     required this.thumbnailPath,
     required this.onThumbnailChanged,
     this.borderRadius = const BorderRadius.all(Radius.circular(14)),
-    this.circleSize = 76,
   });
 
   Future<void> _pickGallery() async {
@@ -504,6 +724,7 @@ class NgmyWorksheetThumbnailPickerFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = WorksheetPalette.of(context);
     final hasThumb = thumbnailPath != null && thumbnailPath!.trim().isNotEmpty;
+    final previewRef = hasThumb ? thumbnailPath : ngmyBuiltinThumbnailRef('construction');
 
     return AspectRatio(
       aspectRatio: 16 / 9,
@@ -514,104 +735,76 @@ class NgmyWorksheetThumbnailPickerFrame extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (hasThumb)
-              ngmyWorksheetThumbnail(
-                imageRef: thumbnailPath,
-                width: double.infinity,
-                height: double.infinity,
-                borderRadius: borderRadius,
-                animate: true,
-              )
-            else
+            ngmyWorksheetThumbnail(
+              imageRef: previewRef,
+              width: double.infinity,
+              height: double.infinity,
+              borderRadius: borderRadius,
+              animate: true,
+            ),
+            if (!hasThumb)
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                     colors: [
-                      p.mutedSurface,
-                      WorksheetPalette.green.withValues(alpha: p.isDark ? 0.08 : 0.06),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.35),
                     ],
                   ),
                 ),
-              ),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _pickGallery,
-                child: Container(
-                  alignment: Alignment.bottomCenter,
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'Tap frame for your photos',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: hasThumb ? Colors.white.withValues(alpha: 0.9) : p.secondaryText,
-                      shadows: hasThumb ? const [Shadow(color: Colors.black45, blurRadius: 6)] : null,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: GestureDetector(
-                onTap: () => _pickBuiltin(context),
-                child: Container(
-                  width: circleSize,
-                  height: circleSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: WorksheetPalette.green.withValues(alpha: 0.45),
-                        blurRadius: 16,
-                        spreadRadius: 1,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Pick a theme or your own photo',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.92),
+                        shadows: const [Shadow(color: Colors.black45, blurRadius: 6)],
                       ),
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (hasThumb)
-                          ngmyWorksheetThumbnail(
-                            imageRef: thumbnailPath,
-                            width: circleSize,
-                            height: circleSize,
-                            animate: true,
-                          )
-                        else
-                          Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF34D399), Color(0xFF059669)],
-                              ),
-                            ),
-                            child: Icon(Icons.palette_rounded, color: Colors.white.withValues(alpha: 0.95), size: 32),
-                          ),
-                        Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: WorksheetPalette.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: const Icon(Icons.auto_awesome_rounded, size: 12, color: Colors.white),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
+              ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _pickBuiltin(context),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: WorksheetPalette.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                      label: const Text('Themes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickGallery,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.black.withValues(alpha: 0.35),
+                        side: const BorderSide(color: Colors.white70),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.photo_library_outlined, size: 16),
+                      label: const Text('Your photos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

@@ -142,9 +142,41 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
   }
 
   Widget _thumbnailHero(WorksheetPalette p) {
+    final isBuiltin = ngmyIsBuiltinThumbnail(_project.thumbnailPath);
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: Container(
+      child: isBuiltin
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: ngmyWorksheetThumbnail(
+                    imageRef: _project.thumbnailPath,
+                    width: double.infinity,
+                    height: double.infinity,
+                    borderRadius: BorderRadius.circular(22),
+                    animate: true,
+                  ),
+                ),
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: FilledButton.icon(
+                    onPressed: _pickThumbnail,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.black.withValues(alpha: 0.45),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 17),
+                    label: const Text('Change', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                  ),
+                ),
+              ],
+            )
+          : Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
           gradient: const LinearGradient(
@@ -515,6 +547,7 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
   }
 
   Widget _budgetRow(BudgetItem item, WorksheetPalette p) {
+    final moneyOnly = item.name.trim().isEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -556,56 +589,71 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                           color: WorksheetPalette.green.withValues(alpha: p.isDark ? 0.22 : 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.receipt_long_rounded, color: WorksheetPalette.greenDark, size: 20),
+                        child: Icon(
+                          moneyOnly ? Icons.payments_rounded : Icons.receipt_long_rounded,
+                          color: WorksheetPalette.greenDark,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              item.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
+                            if (moneyOnly)
+                              ngmyWorksheetMoneyText(
+                                item.lineTotal,
                                 color: p.primaryText,
-                                height: 1.25,
-                              ),
-                            ),
-                            if (item.quantity != 1 || item.unitLabel != 'each') ...[
-                              const SizedBox(height: 4),
+                                large: false,
+                                weight: FontWeight.w900,
+                              )
+                            else ...[
                               Text(
-                                '${item.quantityLabel} ${ngmyFormatMoney(item.unitPrice)}',
+                                item.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: p.secondaryText,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: p.primaryText,
+                                  height: 1.25,
                                 ),
                               ),
+                              if (item.quantity != 1 || item.unitLabel != 'each') ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${item.quantityLabel} ${ngmyFormatMoney(item.unitPrice)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.secondaryText,
+                                  ),
+                                ),
+                              ],
                             ],
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              WorksheetPalette.green.withValues(alpha: 0.14),
-                              WorksheetPalette.teal.withValues(alpha: 0.1),
-                            ],
+                      if (!moneyOnly) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                WorksheetPalette.green.withValues(alpha: 0.14),
+                                WorksheetPalette.teal.withValues(alpha: 0.1),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          child: ngmyWorksheetMoneyText(
+                            item.lineTotal,
+                            color: WorksheetPalette.greenDark,
+                            weight: FontWeight.w900,
+                          ),
                         ),
-                        child: ngmyWorksheetMoneyText(
-                          item.lineTotal,
-                          color: WorksheetPalette.greenDark,
-                          weight: FontWeight.w900,
-                        ),
-                      ),
+                      ],
                       IconButton(
                         onPressed: () => _deleteItem(item),
                         visualDensity: VisualDensity.compact,
