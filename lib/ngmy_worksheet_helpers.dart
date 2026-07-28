@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'ngmy_worksheet_thumb_store.dart';
 
 String ngmyFormatMoney(double amount) {
   final abs = amount.abs();
@@ -59,6 +62,27 @@ Future<String?> ngmyPickImageBase64({
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
 }
 
+/// Pick a gallery photo and save it locally (IndexedDB / device files).
+Future<String?> ngmyPickWorksheetPhotoRef() async {
+  final picked = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 85,
+    maxWidth: 1280,
+  );
+  if (picked == null) return null;
+  try {
+    final bytes = await picked.readAsBytes();
+    if (bytes.isEmpty) return null;
+    final id = NgmyWorksheetThumbStore.newId();
+    final ok = await NgmyWorksheetThumbStore.putBytes(id, bytes);
+    if (!ok) return null;
+    return ngmyWorksheetThumbBlobRef(id);
+  } catch (e) {
+    debugPrint('[worksheets] pick photo failed: $e');
+    return null;
+  }
+}
+
 /// Shrinks a data-URL image for file sharing (skipped for QR — QR uses instant path).
 Future<String?> ngmyWorksheetShareThumbnail(
   String? ref, {
@@ -66,6 +90,9 @@ Future<String?> ngmyWorksheetShareThumbnail(
 }) async {
   final raw = ref?.trim();
   if (raw == null || raw.isEmpty) return null;
+  if (ngmyIsWorksheetThumbBlobRef(raw)) {
+    return NgmyWorksheetThumbStore.dataUrlForRef(raw);
+  }
   if (!raw.startsWith('data:image')) return raw;
   if (forQr) return raw.length <= 2000 ? raw : null;
 
@@ -95,6 +122,7 @@ Future<String?> ngmyWorksheetShareThumbnail(
 
 ImageProvider? ngmyImageFromRef(String? ref) {
   if (ref == null || ref.trim().isEmpty) return null;
+  if (ngmyIsWorksheetThumbBlobRef(ref)) return null;
   if (ref.startsWith('data:image')) {
     try {
       return MemoryImage(base64Decode(ref.split(',').last));
@@ -130,8 +158,21 @@ Widget ngmyImageOrPlaceholder({
   Color? iconColor,
   BorderRadius? borderRadius,
 }) {
-  final provider = ngmyCachedImageFromRef(imageRef);
   final radius = borderRadius ?? BorderRadius.circular(12);
+  if (ngmyIsWorksheetThumbBlobRef(imageRef)) {
+    return ClipRRect(
+      borderRadius: radius,
+      child: _NgmyWorksheetBlobImage(
+        imageRef: imageRef!,
+        width: width,
+        height: height,
+        fit: fit,
+        icon: icon,
+        iconColor: iconColor,
+      ),
+    );
+  }
+  final provider = ngmyCachedImageFromRef(imageRef);
   if (provider != null) {
     return ClipRRect(
       borderRadius: radius,
@@ -154,6 +195,68 @@ Widget ngmyImageOrPlaceholder({
     ),
     child: Icon(icon, color: iconColor ?? Colors.grey, size: 32),
   );
+}
+
+class _NgmyWorksheetBlobImage extends StatefulWidget {
+  final String imageRef;
+  final double width;
+  final double height;
+  final BoxFit fit;
+  final IconData icon;
+  final Color? iconColor;
+
+  const _NgmyWorksheetBlobImage({
+    required this.imageRef,
+    required this.width,
+    required this.height,
+    required this.fit,
+    required this.icon,
+    this.iconColor,
+  });
+
+  @override
+  State<_NgmyWorksheetBlobImage> createState() => _NgmyWorksheetBlobImageState();
+}
+
+class _NgmyWorksheetBlobImageState extends State<_NgmyWorksheetBlobImage> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NgmyWorksheetBlobImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageRef != widget.imageRef) _load();
+  }
+
+  Future<void> _load() async {
+    final bytes = await NgmyWorksheetThumbStore.getBytesForRef(widget.imageRef);
+    if (mounted) setState(() => _bytes = bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_bytes != null && _bytes!.isNotEmpty) {
+      return Image(
+        image: MemoryImage(_bytes!),
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+      );
+    }
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      color: Colors.grey.withValues(alpha: 0.12),
+      child: Icon(widget.icon, color: widget.iconColor ?? Colors.grey, size: 32),
+    );
+  }
 }
 
 class WorksheetPalette {

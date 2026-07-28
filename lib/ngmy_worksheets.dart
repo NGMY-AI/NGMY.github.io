@@ -85,15 +85,32 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not save project on this device. Try again without a photo, or free up browser storage.'),
+          content: Text('Could not save project on this device. Please try again.'),
         ),
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Project "${result.name}" saved on this device.')),
-    );
-    _openProject(project);
+    WorksheetProject toOpen = project;
+    for (final p in _projects) {
+      if (p.id == project.id) {
+        toOpen = p;
+        break;
+      }
+    }
+    if (result.thumbnailPath != null &&
+        result.thumbnailPath!.trim().isNotEmpty &&
+        (toOpen.thumbnailPath == null || toOpen.thumbnailPath!.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Project saved, but the photo could not be stored. Try choosing the photo again.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Project "${result.name}" saved on this device.')),
+      );
+    }
+    _openProject(toOpen);
   }
 
   Future<void> _openProject(WorksheetProject project) async {

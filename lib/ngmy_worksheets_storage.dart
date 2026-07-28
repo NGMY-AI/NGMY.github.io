@@ -8,7 +8,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_worksheet_thumb_store.dart';
 
 const String _projectsKeyPrefix = 'ngmy_worksheets_projects_v2_';
 const String _projectsIndexV3Prefix = 'ngmy_worksheets_index_v3_';
@@ -86,6 +88,22 @@ WorksheetProject _projectWithStoredThumbnail(
     return project;
   }
   return project;
+}
+
+Future<String?> _normalizeWorksheetThumbnailForSave(String? thumbnail) async {
+  final raw = thumbnail?.trim();
+  if (raw == null || raw.isEmpty) return null;
+  if (ngmyIsBuiltinThumbnail(raw) || ngmyIsWorksheetThumbBlobRef(raw)) return raw;
+  if (raw.startsWith('data:image')) {
+    final blobRef = await NgmyWorksheetThumbStore.persistDataUrl(raw);
+    if (blobRef != null) return blobRef;
+    final shrunk = await ngmyWorksheetShareThumbnail(raw, forQr: false);
+    if (shrunk != null && shrunk.startsWith('data:image') && shrunk.length <= 120000) {
+      return shrunk;
+    }
+    return null;
+  }
+  return raw;
 }
 
 String _familyTreesKey(String userEmail) =>
@@ -580,6 +598,7 @@ Future<List<WorksheetProject>> _loadWorksheetProjectsV3(
     final decoded = jsonDecode(rawIndex);
     if (decoded is! List) return [];
     final projects = <WorksheetProject>[];
+    var migratedPhotos = false;
     for (final rawId in decoded) {
       final id = rawId.toString().trim();
       if (id.isEmpty) continue;
@@ -591,11 +610,23 @@ Future<List<WorksheetProject>> _loadWorksheetProjectsV3(
         final project = WorksheetProject.fromJson(Map<String, dynamic>.from(map));
         if (project.id.isNotEmpty && project.name.isNotEmpty) {
           final storedThumb = prefs.getString(_projectThumbV3Key(email, id));
-          projects.add(_projectWithStoredThumbnail(project, storedThumb));
+          var merged = _projectWithStoredThumbnail(project, storedThumb);
+          final thumb = merged.thumbnailPath?.trim();
+          if (thumb != null && thumb.startsWith('data:image')) {
+            final blobRef = await NgmyWorksheetThumbStore.persistDataUrl(thumb);
+            if (blobRef != null) {
+              merged = merged.copyWith(thumbnailPath: blobRef);
+              migratedPhotos = true;
+            }
+          }
+          projects.add(merged);
         }
       } catch (_) {}
     }
     projects.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (migratedPhotos && projects.isNotEmpty) {
+      unawaited(saveWorksheetProjects(email, projects));
+    }
     return projects;
   } catch (_) {
     return [];
@@ -649,6 +680,17 @@ Future<bool> saveWorksheetProjects(
         final keep = projects.map((p) => p.id).where((id) => id.isNotEmpty).toSet();
         for (final oldId in oldIds) {
           if (!keep.contains(oldId)) {
+            final oldThumb = prefs.getString(_projectThumbV3Key(email, oldId));
+            await NgmyWorksheetThumbStore.deleteRef(oldThumb);
+            try {
+              final oldRaw = prefs.getString(_projectItemV3Key(email, oldId));
+              if (oldRaw != null && oldRaw.isNotEmpty) {
+                final map = jsonDecode(oldRaw);
+                if (map is Map) {
+                  await NgmyWorksheetThumbStore.deleteRef(map['thumbnailPath']?.toString());
+                }
+              }
+            } catch (_) {}
             await _safePrefsRemove(prefs, _projectItemV3Key(email, oldId));
             await _safePrefsRemove(prefs, _projectThumbV3Key(email, oldId));
           }
@@ -662,35 +704,18 @@ Future<bool> saveWorksheetProjects(
       final thumbnail = project.thumbnailPath?.trim();
       WorksheetProject coreProject = project;
       if (thumbnail != null && thumbnail.isNotEmpty) {
-        // Built-in theme ids are tiny — keep in project JSON so animations survive reload.
-        if (ngmyIsBuiltinThumbnail(thumbnail)) {
+        final thumbRef = await _normalizeWorksheetThumbnailForSave(thumbnail);
+        if (thumbRef != null && thumbRef.isNotEmpty) {
           await _safePrefsSetString(
             prefs,
             _projectThumbV3Key(email, project.id),
-            thumbnail,
+            thumbRef,
           );
-          coreProject = project;
+          coreProject = project.copyWith(thumbnailPath: thumbRef);
         } else {
-          var thumbToStore = thumbnail;
-          var thumbSaved = await _safePrefsSetString(
-            prefs,
-            _projectThumbV3Key(email, project.id),
-            thumbToStore,
-          );
-          if (!thumbSaved) {
-            final shrunk = await ngmyWorksheetShareThumbnail(thumbnail, forQr: false);
-            if (shrunk != null && shrunk.isNotEmpty) {
-              thumbToStore = shrunk;
-              thumbSaved = await _safePrefsSetString(
-                prefs,
-                _projectThumbV3Key(email, project.id),
-                thumbToStore,
-              );
-            }
-          }
-          coreProject = thumbSaved
-              ? project.copyWith(thumbnailPath: null)
-              : project.copyWith(thumbnailPath: thumbToStore);
+          debugPrint('[worksheets] photo not saved for ${project.id} — saving project without thumbnail');
+          await _safePrefsRemove(prefs, _projectThumbV3Key(email, project.id));
+          coreProject = project.copyWith(thumbnailPath: null);
         }
       } else {
         await _safePrefsRemove(prefs, _projectThumbV3Key(email, project.id));

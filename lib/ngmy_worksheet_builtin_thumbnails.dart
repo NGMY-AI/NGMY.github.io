@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_worksheet_thumb_store.dart';
 
 /// Stored in project JSON — tiny string, works offline, no base64.
 const kNgmyBuiltinThumbPrefix = 'ngmy:thumb:';
@@ -775,8 +776,13 @@ class NgmyWorksheetThumbnailPickerFrame extends StatelessWidget {
   });
 
   Future<void> _pickGallery() async {
-    final img = await ngmyPickImageBase64(maxWidth: 1920);
-    if (img != null) onThumbnailChanged(img);
+    final ref = await ngmyPickWorksheetPhotoRef();
+    if (ref == null) return;
+    final old = thumbnailPath;
+    if (old != null && old != ref) {
+      await NgmyWorksheetThumbStore.deleteRef(old);
+    }
+    onThumbnailChanged(ref);
   }
 
   Future<void> _pickBuiltin(BuildContext context) async {

@@ -7,6 +7,7 @@ import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project_share.dart';
+import 'ngmy_worksheet_thumb_store.dart';
 import 'ngmy_worksheets_storage.dart';
 
 class NgmyWorksheetProjectScreen extends StatefulWidget {
@@ -107,6 +108,10 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
       },
     );
     if (picked == null || !mounted) return;
+    final old = _project.thumbnailPath;
+    if (old != null && old != picked) {
+      await NgmyWorksheetThumbStore.deleteRef(old);
+    }
     setState(() => _project = _project.copyWith(thumbnailPath: picked));
     await _persist();
   }
