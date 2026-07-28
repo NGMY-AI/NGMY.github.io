@@ -77,8 +77,13 @@ WorksheetProject _projectWithStoredThumbnail(
   WorksheetProject project,
   String? storedThumb,
 ) {
-  if (storedThumb != null && storedThumb.isNotEmpty) {
-    return project.copyWith(thumbnailPath: storedThumb);
+  final stored = storedThumb?.trim();
+  if (stored != null && stored.isNotEmpty) {
+    return project.copyWith(thumbnailPath: stored);
+  }
+  final inline = project.thumbnailPath?.trim();
+  if (inline != null && inline.isNotEmpty) {
+    return project;
   }
   return project;
 }

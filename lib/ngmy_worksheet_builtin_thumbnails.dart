@@ -79,32 +79,43 @@ class NgmyBuiltinThumbnailArt extends StatefulWidget {
 }
 
 class _NgmyBuiltinThumbnailArtState extends State<NgmyBuiltinThumbnailArt>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _ctrl;
+  late AnimationController _ctrlFast;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: 3200),
     );
-    if (widget.animate) _ctrl.repeat();
+    _ctrlFast = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (widget.animate) {
+      _ctrl.repeat();
+      _ctrlFast.repeat();
+    }
   }
 
   @override
   void didUpdateWidget(covariant NgmyBuiltinThumbnailArt oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.animate && !_ctrl.isAnimating) {
-      _ctrl.repeat();
-    } else if (!widget.animate) {
+    if (widget.animate) {
+      if (!_ctrl.isAnimating) _ctrl.repeat();
+      if (!_ctrlFast.isAnimating) _ctrlFast.repeat();
+    } else {
       _ctrl.stop();
+      _ctrlFast.stop();
     }
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _ctrlFast.dispose();
     super.dispose();
   }
 
@@ -114,26 +125,30 @@ class _NgmyBuiltinThumbnailArtState extends State<NgmyBuiltinThumbnailArt>
       (d) => d.id == widget.id,
       orElse: () => kNgmyBuiltinThumbnails.first,
     );
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        return CustomPaint(
-          painter: _NgmyBuiltinThumbPainter(
-            id: widget.id,
-            t: widget.animate ? _ctrl.value : 0,
-          ),
-          child: Center(
-            child: Icon(
-              def.icon,
-              size: 44,
-              color: Colors.white.withValues(alpha: 0.95),
-              shadows: const [
-                Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-              ],
+    return TickerMode(
+      enabled: widget.animate,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_ctrl, _ctrlFast]),
+        builder: (context, _) {
+          return CustomPaint(
+            painter: _NgmyBuiltinThumbPainter(
+              id: widget.id,
+              t: widget.animate ? _ctrl.value : 0,
+              tFast: widget.animate ? _ctrlFast.value : 0,
             ),
-          ),
-        );
-      },
+            child: Center(
+              child: Icon(
+                def.icon,
+                size: 44,
+                color: Colors.white.withValues(alpha: 0.95),
+                shadows: const [
+                  Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -141,8 +156,9 @@ class _NgmyBuiltinThumbnailArtState extends State<NgmyBuiltinThumbnailArt>
 class _NgmyBuiltinThumbPainter extends CustomPainter {
   final String id;
   final double t;
+  final double tFast;
 
-  _NgmyBuiltinThumbPainter({required this.id, required this.t});
+  _NgmyBuiltinThumbPainter({required this.id, required this.t, this.tFast = 0});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -280,18 +296,26 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
   void _paintGrocery(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF34D399), Color(0xFF059669), Color(0xFF064E3B)]);
     const items = [Color(0xFFFDE68A), Color(0xFFF87171), Color(0xFF93C5FD), Color(0xFFFBBF24)];
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 6; i++) {
       final phase = t * math.pi * 2 + i * 1.1;
-      final x = size.width * (0.12 + (i % 4) * 0.22) + math.sin(phase) * 10;
-      final y = size.height * (0.14 + (i ~/ 4) * 0.38) + math.cos(phase * 0.8) * 12;
-      canvas.drawCircle(Offset(x, y), 6 + (i % 3) * 2.0, Paint()..color = items[i % items.length].withValues(alpha: 0.85));
+      final x = size.width * (0.15 + (i % 3) * 0.28) + math.sin(phase) * 8;
+      final y = size.height * (0.18 + (i ~/ 3) * 0.55) + math.cos(phase * 0.8) * 10;
+      canvas.drawCircle(Offset(x, y), 7 + (i % 2) * 2.0, Paint()..color = items[i % items.length].withValues(alpha: 0.85));
     }
     _ring(canvas, size, Colors.white.withValues(alpha: 0.35), t * math.pi * 2, inset: 16);
+    _orbitDots(canvas, size, const Color(0xFFBBF7D0), count: 5, inset: 12);
   }
 
   void _paintCalculator(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFFA78BFA), Color(0xFF7C3AED), Color(0xFF4C1D95)]);
+    final pulse = 0.5 + 0.5 * math.sin(t * math.pi * 2);
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      size.shortestSide * (0.18 + pulse * 0.08),
+      Paint()..color = Colors.white.withValues(alpha: 0.1 + pulse * 0.12),
+    );
     const nums = ['7', '3', '+', '42', 'π', '∑'];
+    const extraNums = ['×', '÷', '100', '0', '∞', '%'];
     final tp = TextPainter(textDirection: TextDirection.ltr);
     for (var i = 0; i < nums.length; i++) {
       final phase = t * math.pi * 2 + i * 0.9;
@@ -312,7 +336,40 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
         ),
       );
     }
+    for (var i = 0; i < extraNums.length; i++) {
+      final phase = tFast * math.pi * 2 + i * 0.85;
+      tp.text = TextSpan(
+        text: extraNums[i],
+        style: TextStyle(
+          color: const Color(0xFFE9D5FF).withValues(alpha: 0.28 + 0.3 * math.sin(phase)),
+          fontSize: 12 + (i % 2) * 3,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+      tp.layout();
+      tp.paint(
+        canvas,
+        Offset(
+          size.width * (0.55 + (i % 3) * 0.12) + math.cos(phase) * 7,
+          size.height * (0.08 + (i ~/ 3) * 0.38) + math.sin(phase) * 6,
+        ),
+      );
+    }
     _ring(canvas, size, Colors.white.withValues(alpha: 0.35), t * math.pi * 1.5, inset: 14);
+    _ring(canvas, size, const Color(0xFFC4B5FD).withValues(alpha: 0.55), -tFast * math.pi * 2, inset: 8);
+    _ring(canvas, size, const Color(0xFFDDD6FE).withValues(alpha: 0.4), tFast * math.pi * 2.8, inset: 22);
+    _orbitDots(canvas, size, const Color(0xFFF5F3FF), count: 8, inset: 10);
+    _sparkles(canvas, size, count: 14);
+    for (var i = 0; i < 4; i++) {
+      final scanY = size.height * ((tFast * 0.35 + i * 0.22) % 0.9);
+      canvas.drawLine(
+        Offset(12, scanY),
+        Offset(size.width - 12, scanY),
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.08 + 0.06 * math.sin(tFast * math.pi * 2 + i))
+          ..strokeWidth = 1.2,
+      );
+    }
   }
 
   void _paintLumber(Canvas canvas, Size size) {
@@ -328,11 +385,13 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
         Paint()..color = Color.lerp(const Color(0xFFFEF3C7), const Color(0xFFFCD34D), shimmer)!,
       );
     }
+    _ring(canvas, size, const Color(0xFFFEF3C7).withValues(alpha: 0.35), t * math.pi * 2, inset: 15);
+    _sparkles(canvas, size, count: 8);
   }
 
   void _paintKitchen(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFFFB7185), Color(0xFFF97316), Color(0xFFBE123C)]);
-    for (var i = 0; i < 12; i++) {
+    for (var i = 0; i < 8; i++) {
       final phase = t * math.pi * 2 + i * 0.75;
       final alpha = (math.sin(phase) + 1) / 2;
       canvas.drawCircle(
@@ -345,6 +404,7 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
       );
     }
     _ring(canvas, size, const Color(0xFFFDE68A).withValues(alpha: 0.4), -t * math.pi * 2.2, inset: 11);
+    _orbitDots(canvas, size, const Color(0xFFFED7AA), count: 4, inset: 14);
   }
 
   void _paintLandscape(Canvas canvas, Size size) {
@@ -373,18 +433,19 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
 
   void _paintPlumbing(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF22D3EE), Color(0xFF0891B2), Color(0xFF164E63)]);
-    for (var i = 0; i < 5; i++) {
-      final r = size.shortestSide * (0.1 + i * 0.12 + (t * 0.1) % 0.1);
+    for (var i = 0; i < 3; i++) {
+      final r = size.shortestSide * (0.12 + i * 0.14 + (t * 0.08) % 0.12);
       canvas.drawCircle(
         Offset(size.width / 2, size.height * 0.55),
         r,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2
-          ..color = Colors.white.withValues(alpha: 0.5 - i * 0.08),
+          ..color = Colors.white.withValues(alpha: 0.45 - i * 0.12),
       );
     }
     _orbitDots(canvas, size, const Color(0xFFA5F3FC), count: 6, inset: 12);
+    _ring(canvas, size, Colors.white.withValues(alpha: 0.3), -tFast * math.pi * 2, inset: 18);
   }
 
   void _paintElectrical(Canvas canvas, Size size) {
@@ -395,22 +456,25 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
       Paint()..color = Colors.white.withValues(alpha: flash * 0.12),
     );
     _ring(canvas, size, Colors.white.withValues(alpha: 0.5 + flash * 0.3), -t * math.pi * 3, inset: 10);
+    _ring(canvas, size, const Color(0xFFFEF08A).withValues(alpha: 0.35 + flash * 0.2), tFast * math.pi * 4, inset: 18);
+    _sparkles(canvas, size, count: 10);
   }
 
   void _paintStore(Canvas canvas, Size size) {
     _bg(canvas, size, const [Color(0xFF818CF8), Color(0xFF6366F1), Color(0xFF312E81)]);
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 4; i++) {
       final lit = (math.sin(t * math.pi * 2 + i * 1.5) + 1) / 2;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(14 + i * (size.width - 28) / 6, 14, (size.width - 28) / 6 - 3, 8),
+          Rect.fromLTWH(14 + i * (size.width - 28) / 4, 14, (size.width - 28) / 4 - 4, 8),
           const Radius.circular(4),
         ),
         Paint()..color = Color.lerp(const Color(0xFF312E81), const Color(0xFFFDE68A), lit)!,
       );
     }
     _ring(canvas, size, Colors.white.withValues(alpha: 0.3), t * math.pi * 2, inset: 16);
-    _sparkles(canvas, size);
+    _sparkles(canvas, size, count: 8);
+    _orbitDots(canvas, size, const Color(0xFFE0E7FF), count: 5, inset: 13);
   }
 
   void _paintPaintRemodel(Canvas canvas, Size size) {
@@ -575,7 +639,7 @@ class _NgmyBuiltinThumbPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _NgmyBuiltinThumbPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.id != id;
+      oldDelegate.t != t || oldDelegate.tFast != tFast || oldDelegate.id != id;
 }
 
 Future<String?> showNgmyBuiltinThumbnailPicker(BuildContext context) {

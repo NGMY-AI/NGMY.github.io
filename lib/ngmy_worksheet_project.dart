@@ -226,6 +226,7 @@ class _NgmyWorksheetProjectScreenState extends State<NgmyWorksheetProjectScreen>
                   height: double.infinity,
                   icon: Icons.photo_camera_outlined,
                   borderRadius: BorderRadius.circular(16),
+                  animate: true,
                 ),
                 // Inner vignette for depth
                 DecoratedBox(
