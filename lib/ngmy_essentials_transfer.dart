@@ -245,7 +245,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
                     ),
                   ),
                   Expanded(
-                    child: Text('Transfer Essentials', textAlign: TextAlign.center, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 18)),
+                    child: Text('Transfer Essentials', textAlign: TextAlign.center, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 14)),
                   ),
                   const SizedBox(width: 48),
                 ],

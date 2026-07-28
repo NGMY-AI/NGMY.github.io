@@ -226,8 +226,8 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                       if (imported == true) await _reload();
                     },
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -240,21 +240,21 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
                           color: NgmyHudInk.icon(
                             context,
                           ).withValues(alpha: 0.45),
-                          width: 1.4,
+                          width: 1.1,
                         ),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(
                               0xFF38BDF8,
-                            ).withValues(alpha: 0.25),
-                            blurRadius: 10,
+                            ).withValues(alpha: 0.18),
+                            blurRadius: 6,
                           ),
                         ],
                       ),
                       child: Icon(
                         Icons.sync_alt_rounded,
                         color: NgmyHudInk.icon(context),
-                        size: 18,
+                        size: 13,
                       ),
                     ),
                   ),

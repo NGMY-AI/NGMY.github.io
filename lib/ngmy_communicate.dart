@@ -128,6 +128,41 @@ bool ngmyCommunicateRoleIsRespectableOccupation(String role) {
   return r == 'therapist' || r == 'counselor';
 }
 
+/// Lawyer, Bible Study, and other male professional advisors must not flirt or use pet names.
+bool ngmyCommunicateAdvisorNeedsProfessionalTone({
+  required String role,
+  required String gender,
+  required String name,
+  required bool isExclusivePartner,
+  String id = '',
+}) {
+  if (ngmyCommunicateIsWisdomAdvisor(name: name, role: role, id: id)) return true;
+  if (isExclusivePartner && ngmyCommunicateRoleCanDateUsers(role)) return false;
+  final r = ngmyCommunicateNormalizeRole(role);
+  if (r == 'lawyer' || r == 'bible_study_teacher' || r == 'debater' || r == 'pastor') return true;
+  if (ngmyCommunicateRoleCanDateUsers(r) || r == 'friend' || r == 'companion') return false;
+  if (gender == 'male') return true;
+  if (ngmyCommunicateRoleIsRespectableOccupation(r)) return true;
+  return false;
+}
+
+/// Strip romantic pet names from professional advisor replies.
+String ngmyPolishProfessionalAdvisorReply(String text) {
+  var t = text.trim();
+  if (t.isEmpty) return t;
+  t = t.replaceFirst(
+    RegExp(r'^(hey\s+)?(darling|sweetheart|honey|babe|baby|love|dear|handsome|beautiful)[,\s!…\-–—]+', caseSensitive: false),
+    'Hi, ',
+  );
+  t = t.replaceAll(
+    RegExp(r'\b(my darling|darling|sweetheart|honey|babe|baby|my love|handsome|beautiful|sexy)\b', caseSensitive: false),
+    '',
+  );
+  t = t.replaceAll(RegExp(r'\s{2,}'), ' ').replaceAll(RegExp(r'^,\s*'), '').trim();
+  if (t.isEmpty) return 'Hello — how can I help you today?';
+  return t;
+}
+
 /// Wisdom Advisor (MSHAURI AMANI) — never dates anyone.
 bool ngmyCommunicateIsWisdomAdvisor({required String name, required String role, String id = ''}) {
   final n = name.trim().toUpperCase();
@@ -1426,10 +1461,32 @@ class NgmyCommunicateProfile {
         ? ngmyBossPersonalHelperPromptBlock(name: name)
         : '';
 
+    final professionalToneBlock = ngmyCommunicateAdvisorNeedsProfessionalTone(
+          role: role,
+          gender: gender,
+          name: name,
+          id: id,
+          isExclusivePartner: isMyPartner || datingTheBoss,
+        )
+        ? (ngmyCommunicateNormalizeRole(role) == 'lawyer' ||
+                ngmyCommunicateNormalizeRole(role) == 'bible_study_teacher'
+            ? 'PROFESSIONAL TONE — MANDATORY: You are a ${ngmyCommunicateRoleLabel(role)} — a trusted professional and spiritual leader. '
+                'Speak with formal dignity, respect, and clarity. NEVER flirt. NEVER use romantic or sexual language. '
+                'FORBIDDEN pet names: Darling, Babe, Baby, Honey, Sweetheart, Love, Handsome, Beautiful, Sexy. '
+                'Use their name, or neutral greetings like Hello / Hi / Good to hear from you.\n'
+            : gender == 'male'
+                ? 'PROFESSIONAL TONE — MANDATORY: You are a male ${ngmyCommunicateRoleLabel(role)} on NGMY Advisors. '
+                    'Stay respectful and professional — no flirtation, no sexual talk, no romantic pet names (Darling, Babe, Baby, Honey, Sweetheart). '
+                    'Talk like a real expert in your field, not a dating app.\n'
+                : 'PROFESSIONAL TONE — MANDATORY: Stay in your ${ngmyCommunicateRoleLabel(role)} role — warm but professional. '
+                    'No flirtation or romantic pet names with regular users.\n')
+        : '';
+
     return 'You are $name — a real ${gender == 'male' ? 'man' : 'woman'} texting on NGMY Communicate.\n'
         '$roleBlock'
         '$bossBlock'
         '$personalHelperBlock'
+        '$professionalToneBlock'
         'Personality: $vibe\n'
         '${bio.trim().isNotEmpty ? 'About you: ${bio.trim()}\n' : ''}'
         '$nowBlock'
@@ -1527,12 +1584,18 @@ class NgmyCommunicateProfile {
           'Use markdown tables, bullet lists, numbered steps, and outline structures (like slides) when it helps — you cannot attach files but format clearly in text.\n'
           'For math: show each step. For reading/writing: break down the idea.\n',
         'lawyer' =>
-          'ROLE: Experienced attorney. Professional, analytical, confident. Explain legal concepts, options, and risks clearly. Not a substitute for formal representation.\n',
+          'ROLE: Experienced attorney. VERY professional — formal, calm, precise, respectful. '
+          'Explain legal concepts, options, and risks clearly. Never flirt. Never use pet names (Darling, Babe, Honey, Sweetheart). '
+          'Address people by name or neutral greetings only. Not a substitute for formal representation.\n',
         'financial_advisor' =>
           'ROLE: Financial advisor. Professional, practical, trustworthy. Help with money, budgeting, debt, saving, and planning — clear actionable advice.\n',
         'pastor' => 'ROLE: Pastor / spiritual leader. Compassionate, wise, faithful. Offer prayerful support, scripture when fitting, hope and guidance.\n',
         'bible_study_teacher' =>
-          'ROLE: Bible Study Teacher — you teach, explain, and DEFEND what the Scriptures teach about God and Christ. You are a skilled apologist and instructor, NOT a generic pastor bot.\n'
+          'ROLE: Bible Study Teacher — you teach, explain, and DEFEND what the Scriptures teach about God and Christ. '
+          'VERY PROFESSIONAL TONE: You are a religious teacher and spiritual leader — speak with dignity, respect, and pastoral professionalism. '
+          'NEVER flirt. NEVER use romantic pet names (Darling, Babe, Baby, Honey, Sweetheart, Love). '
+          'NEVER use sexual language. Address people respectfully by name or with neutral greetings (Hello, Hi, Good to hear from you). '
+          'You are a skilled apologist and instructor, NOT a generic pastor bot.\n'
           'CORE BELIEF (what you teach and stand on):\n'
           '- There is only ONE God — God the Father is the only true God.\n'
           '- Jesus Christ is the Son of God — sent by the Father. Eternal life is knowing the only true God AND Jesus Christ whom He sent.\n'
@@ -1687,6 +1750,8 @@ class NgmyCommunicateProfile {
                 'Exception: you may date the President/CEO of NGMY only, one partner at a time.\n';
           }
           return 'BOUNDARIES: Stay strictly in your ${ngmyCommunicateRoleLabel(role)} role. '
+              'NEVER use romantic pet names — no Darling, Babe, Baby, Honey, Sweetheart, Love, Handsome, or Sexy. '
+              'NEVER flirt or use sexual language with regular users. '
               'If the user flirts, confesses attraction, or steers the chat romantic or off-topic, kindly redirect back to your professional expertise only. '
               'Never flirt back, date, or act as a romantic partner with regular users.\n';
         }
@@ -2975,7 +3040,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
             fillAlpha: 0.5,
             blur: 14,
             child: SizedBox(
-              height: 64,
+              height: 52,
               child: Row(
                 children: [
                   if (_canSync)
@@ -2986,13 +3051,13 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
                         customBorder: const CircleBorder(),
                         onTap: _openSyncSheet,
                         child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Icon(Icons.sync_rounded, size: 22, color: mutedIcon),
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(Icons.sync_rounded, size: 16, color: mutedIcon),
                         ),
                       ),
                     )
                   else
-                    const SizedBox(width: 44),
+                    const SizedBox(width: 28),
                   Expanded(
                     child: Center(
                       child: Text(
@@ -4099,6 +4164,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         cleaned,
         girl: widget.profile.gender != 'male',
       );
+    }
+    if (ngmyCommunicateAdvisorNeedsProfessionalTone(
+      role: widget.profile.role,
+      gender: widget.profile.gender,
+      name: widget.profile.name,
+      id: widget.profile.id,
+      isExclusivePartner: false,
+    )) {
+      cleaned = ngmyPolishProfessionalAdvisorReply(cleaned);
     }
     final poemRequest = userTextForPoetry != null &&
         ngmyAdvisorShouldWritePoetry(

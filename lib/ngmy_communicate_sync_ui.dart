@@ -299,7 +299,7 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         ),
         title: Text(
           'Conversation sync',
-          style: TextStyle(color: palette.title, fontWeight: FontWeight.w900, fontSize: 17),
+          style: TextStyle(color: palette.title, fontWeight: FontWeight.w800, fontSize: 14),
         ),
         centerTitle: true,
       ),
@@ -470,21 +470,21 @@ class _SyncHeroBanner extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
                   ),
-                  child: const Icon(Icons.sync_rounded, color: Colors.white, size: 28),
+                  child: const Icon(Icons.sync_rounded, color: Colors.white, size: 18),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -493,18 +493,18 @@ class _SyncHeroBanner extends StatelessWidget {
                         'Move your advisor chats',
                         style: TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
                           height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         subtitle,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 13,
-                          height: 1.45,
+                          fontSize: 11.5,
+                          height: 1.4,
                         ),
                       ),
                     ],
