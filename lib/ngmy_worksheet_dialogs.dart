@@ -547,6 +547,7 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
               const SizedBox(height: 18),
               TextField(
                 controller: _nameC,
+                autofocus: true,
                 textCapitalization: TextCapitalization.sentences,
                 style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w600),
                 decoration: _fieldDecoration(p, 'Item name (optional)', hint: 'Lumber, paint, labor…', icon: Icons.label_outline_rounded),
@@ -598,7 +599,6 @@ class _AddBudgetItemDialogState extends State<_AddBudgetItemDialog> {
                   Expanded(
                     child: TextField(
                       controller: _priceC,
-                      autofocus: true,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w700, fontSize: 16),
                       decoration: _fieldDecoration(p, 'Amount', hint: '0.00', icon: Icons.attach_money_rounded),
