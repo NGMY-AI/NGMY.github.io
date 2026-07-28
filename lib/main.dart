@@ -312,7 +312,10 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     if (configJson != null) {
       try {
         final map = jsonDecode(configJson);
-        if (map is Map<String, dynamic>) config = AppConfig.fromJson(map);
+        if (map is Map<String, dynamic>) {
+          config = AppConfig.fromJson(map);
+          await _hydrateCivicCitiesAndRoomsFromLocalBackup(config);
+        }
       } catch (_) {}
     }
 
@@ -2539,20 +2542,59 @@ Future<void> _mergeCivicCitiesAndRoomsIntoConfig(AppConfig config) async {
     if (row == null) return;
     final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(row['civicCitiesByState']);
     if (remoteByState.isNotEmpty) {
-      final merged = Map<String, List<String>>.from(config.civicCitiesByState);
-      for (final entry in remoteByState.entries) {
-        final local = merged[entry.key] ?? const <String>[];
-        merged[entry.key] = <String>{...local, ...entry.value}.toList();
-      }
-      config.civicCitiesByState = merged;
+      config.civicCitiesByState =
+          NgmyCivicRegistryStats.mergeCitiesByState(config.civicCitiesByState, remoteByState);
       config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
     }
     final remoteRooms = row['rooms'];
     if (remoteRooms is List && remoteRooms.isNotEmpty) {
-      config.rooms = <String>{...config.rooms, ...remoteRooms.map((e) => e.toString())}.toList();
+      config.rooms = NgmyCivicRegistryStats.mergeRooms(
+        config.rooms,
+        remoteRooms.map((e) => e.toString()).toList(),
+      );
     }
   } catch (e) {
     debugPrint('[config] merge cities/rooms: $e');
+  }
+}
+
+Future<void> _hydrateCivicCitiesAndRoomsFromLocalBackup(AppConfig config) async {
+  final backup = await NgmyCivicRegistryStats.loadCitiesRoomsLocalBackup();
+  if (backup.byState.isNotEmpty) {
+    config.civicCitiesByState =
+        NgmyCivicRegistryStats.mergeCitiesByState(config.civicCitiesByState, backup.byState);
+    config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
+  }
+  if (backup.rooms.isNotEmpty) {
+    config.rooms = NgmyCivicRegistryStats.mergeRooms(config.rooms, backup.rooms);
+  }
+}
+
+/// Immediate save for Manage Cities & Rooms — local backup + app_config + cloud.
+Future<void> _persistCivicCitiesAndRoomsNow(AppConfig config) async {
+  config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
+  await NgmyCivicRegistryStats.saveCitiesRoomsLocalBackup(
+    civicCitiesByState: config.civicCitiesByState,
+    rooms: config.rooms,
+  );
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[config] civic cities/rooms local save: $e');
+  }
+  if (!await ngmyCanReachCloud()) return;
+  final client = Supabase.instance.client;
+  final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
+    'id': kNgmyConfigRowId,
+    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+    'cities': config.cities,
+    'rooms': config.rooms,
+  });
+  try {
+    await client.from('config').upsert(combined);
+  } catch (e) {
+    debugPrint('[config] civic cities/rooms upsert: $e');
   }
 }
 
@@ -2993,6 +3035,23 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     next.civicRegistryPinsByState = NgmyCivicRegistryPins.mergeMaps(keep.civicRegistryPinsByState, remotePins);
   } else if (keep.civicRegistryPinsByState.isNotEmpty) {
     next.civicRegistryPinsByState = Map<String, String>.from(keep.civicRegistryPinsByState);
+  }
+
+  if (record.containsKey('civicCitiesByState') && record['civicCitiesByState'] is Map) {
+    final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(record['civicCitiesByState']);
+    next.civicCitiesByState =
+        NgmyCivicRegistryStats.mergeCitiesByState(keep.civicCitiesByState, remoteByState);
+    next.cities = NgmyCivicRegistryStats.allCitiesUnion(next.civicCitiesByState);
+  } else if (keep.civicCitiesByState.isNotEmpty) {
+    next.civicCitiesByState = Map<String, List<String>>.from(keep.civicCitiesByState);
+    next.cities = NgmyCivicRegistryStats.allCitiesUnion(next.civicCitiesByState);
+  }
+
+  if (record.containsKey('rooms') && record['rooms'] is List) {
+    final remoteRooms = (record['rooms'] as List).map((e) => e.toString()).toList();
+    next.rooms = NgmyCivicRegistryStats.mergeRooms(keep.rooms, remoteRooms);
+  } else if (keep.rooms.isNotEmpty) {
+    next.rooms = List<String>.from(keep.rooms);
   }
 
   if (record.containsKey('civicRegistrarApplications')) {
@@ -12223,6 +12282,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _config.civicRegistrarApplications,
           );
           await _mergeCivicRegistryPinsIntoConfig(_config);
+          await _mergeCivicCitiesAndRoomsIntoConfig(_config);
+          await _hydrateCivicCitiesAndRoomsFromLocalBackup(_config);
           await ngmyApplyGameCenterSettingsBackup(
             apply: (limits, dice, invites) {
               _config.gameTimeLimits = _mergeGameTimeLimitsPreferCustom(_config.gameTimeLimits, limits);
@@ -29847,6 +29908,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.config.cities = NgmyCivicRegistryStats.allCitiesUnion(widget.config.civicCitiesByState);
   }
 
+  Future<void> _saveCivicCitiesAndRooms() async {
+    await _persistCivicCitiesAndRoomsNow(widget.config);
+    widget.onDataChanged();
+  }
+
   int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
 
   Future<void> _hydrateRegistrarApplication() async {
@@ -32975,7 +33041,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               final value = cityC.text.trim();
                               if (value.isEmpty) return;
                               final stateCities = _citiesForSelectedState();
@@ -32983,7 +33049,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 setState(() {
                                   _setCitiesForSelectedState([...stateCities, value]);
                                 });
-                                widget.onDataChanged();
+                                await _saveCivicCitiesAndRooms();
                               }
                               cityC.clear();
                               setSheetState(() {});
@@ -32999,13 +33065,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         children: _citiesForSelectedState().map((c) {
                           return Chip(
                             label: Text(c),
-                            onDeleted: () {
+                            onDeleted: () async {
                               setState(() {
                                 _setCitiesForSelectedState(_citiesForSelectedState()..remove(c));
                               });
                               if (_selectedCity == c) _selectedCity = 'All Cities';
                               if (_cityC.text == c) _cityC.clear();
-                              widget.onDataChanged();
+                              await _saveCivicCitiesAndRooms();
                               setSheetState(() {});
                             },
                           );
@@ -33043,12 +33109,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                           const SizedBox(width: 10),
                           ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               final value = roomC.text.trim();
                               if (value.isEmpty) return;
                               if (!widget.config.rooms.contains(value)) {
                                 setState(() => widget.config.rooms.add(value));
-                                widget.onDataChanged();
+                                await _saveCivicCitiesAndRooms();
                               }
                               roomC.clear();
                               setSheetState(() {});
@@ -33064,11 +33130,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         children: widget.config.rooms.map((r) {
                           return Chip(
                             label: Text(r),
-                            onDeleted: () {
+                            onDeleted: () async {
                               setState(() => widget.config.rooms.remove(r));
                               if (_selectedRoom == r) _selectedRoom = 'All Rooms';
                               if (_roomC.text == r) _roomC.clear();
-                              widget.onDataChanged();
+                              await _saveCivicCitiesAndRooms();
                               setSheetState(() {});
                             },
                           );

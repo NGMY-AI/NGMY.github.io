@@ -1,7 +1,75 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 const int kNgmyMaxRegistrarsPerState = 15;
 
 /// Civic Registry per-state registrar caps and lists.
 class NgmyCivicRegistryStats {
+  static const _citiesRoomsBackupKey = 'ngmy_civic_cities_rooms_backup';
+
+  static Future<void> saveCitiesRoomsLocalBackup({
+    required Map<String, List<String>> civicCitiesByState,
+    required List<String> rooms,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _citiesRoomsBackupKey,
+        jsonEncode({
+          'civicCitiesByState': civicCitiesByState.map((k, v) => MapEntry(k, v)),
+          'rooms': rooms,
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+        }),
+      );
+    } catch (_) {}
+  }
+
+  static Future<({Map<String, List<String>> byState, List<String> rooms})> loadCitiesRoomsLocalBackup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_citiesRoomsBackupKey);
+      if (raw == null || raw.isEmpty) {
+        return (byState: <String, List<String>>{}, rooms: <String>[]);
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return (byState: <String, List<String>>{}, rooms: <String>[]);
+      final byState = parseCivicCitiesByState(decoded['civicCitiesByState']);
+      final roomsRaw = decoded['rooms'];
+      final rooms = roomsRaw is List
+          ? roomsRaw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList()
+          : <String>[];
+      return (byState: byState, rooms: rooms);
+    } catch (_) {
+      return (byState: <String, List<String>>{}, rooms: <String>[]);
+    }
+  }
+
+  /// Union remote additions into local — used on read/bootstrap, not on explicit delete writes.
+  static Map<String, List<String>> mergeCitiesByState(
+    Map<String, List<String>> local,
+    Map<String, List<String>> remote,
+  ) {
+    final out = Map<String, List<String>>.from(local);
+    for (final entry in remote.entries) {
+      final st = entry.key.trim();
+      if (st.isEmpty) continue;
+      final localList = out[st] ?? const <String>[];
+      out[st] = <String>{
+        ...localList,
+        ...entry.value.map((c) => c.trim()).where((c) => c.isNotEmpty),
+      }.toList();
+    }
+    return out;
+  }
+
+  static List<String> mergeRooms(List<String> local, List<String> remote) {
+    return <String>{
+      ...local.map((r) => r.trim()).where((r) => r.isNotEmpty),
+      ...remote.map((r) => r.trim()).where((r) => r.isNotEmpty),
+    }.toList();
+  }
+
   static Map<String, List<String>> parseCivicCitiesByState(dynamic raw) {
     if (raw is! Map) return {};
     final out = <String, List<String>>{};
