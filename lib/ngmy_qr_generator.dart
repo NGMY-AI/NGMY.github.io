@@ -8,6 +8,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_storage.dart';
+import 'ngmy_qr_template_ui.dart';
+import 'ngmy_qr_templates.dart';
 
 const String _kNgmyLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
@@ -66,8 +68,14 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   final _emailBodyC = TextEditingController();
   final _phoneC = TextEditingController();
   final _smsBodyC = TextEditingController();
+  final _templateTitleC = TextEditingController();
+  final _templateBodyC = TextEditingController();
+  final _templateFooterC = TextEditingController();
+
+  NgmyQrTemplateDef? _activeTemplate;
 
   final GlobalKey _qrCaptureKey = GlobalKey();
+  final GlobalKey _templateCaptureKey = GlobalKey();
 
   @override
   void initState() {
@@ -75,6 +83,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     for (final c in [
       _labelC, _linkC, _textC, _wifiSsidC, _wifiPassC, _contactNameC, _contactPhoneC,
       _contactEmailC, _contactOrgC, _emailToC, _emailSubjectC, _emailBodyC, _phoneC, _smsBodyC,
+      _templateTitleC, _templateBodyC, _templateFooterC,
     ]) {
       c.addListener(_onFieldsChanged);
     }
@@ -94,6 +103,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     for (final c in [
       _labelC, _linkC, _textC, _wifiSsidC, _wifiPassC, _contactNameC, _contactPhoneC,
       _contactEmailC, _contactOrgC, _emailToC, _emailSubjectC, _emailBodyC, _phoneC, _smsBodyC,
+      _templateTitleC, _templateBodyC, _templateFooterC,
     ]) {
       c.removeListener(_onFieldsChanged);
       c.dispose();
@@ -188,11 +198,78 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   Future<Uint8List?> _captureVisibleQr() async {
     await Future.delayed(const Duration(milliseconds: 80));
     await WidgetsBinding.instance.endOfFrame;
-    final boundary = _qrCaptureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    final key = _activeTemplate != null ? _templateCaptureKey : _qrCaptureKey;
+    final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
     final image = await boundary.toImage(pixelRatio: 3.0);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     return data?.buffer.asUint8List();
+  }
+
+  Map<String, String> _templateFieldVars() {
+    return ngmyQrDefaultTemplateVars(_type, {
+      'url': _linkC.text.trim(),
+      'link': _linkC.text.trim(),
+      'label': _labelC.text.trim(),
+      'ssid': _wifiSsidC.text.trim(),
+      'network': _wifiSsidC.text.trim(),
+      'password': _wifiPassC.text.trim(),
+      'name': _contactNameC.text.trim(),
+      'phone': _contactPhoneC.text.trim().isNotEmpty ? _contactPhoneC.text.trim() : _phoneC.text.trim(),
+      'email': _contactEmailC.text.trim().isNotEmpty ? _contactEmailC.text.trim() : _emailToC.text.trim(),
+      'org': _contactOrgC.text.trim(),
+      'message': _textC.text.trim().isNotEmpty ? _textC.text.trim() : _smsBodyC.text.trim(),
+      'text': _textC.text.trim(),
+      'to': _emailToC.text.trim(),
+      'subject': _emailSubjectC.text.trim(),
+    });
+  }
+
+  void _clearTemplate() {
+    setState(() {
+      _activeTemplate = null;
+      _templateTitleC.clear();
+      _templateBodyC.clear();
+      _templateFooterC.clear();
+    });
+  }
+
+  void _applyTemplate(NgmyQrTemplateDef template, String title, String body, String footer) {
+    setState(() {
+      _activeTemplate = template;
+      _templateTitleC.text = title;
+      _templateBodyC.text = body;
+      _templateFooterC.text = footer;
+    });
+  }
+
+  Future<void> _openTemplateGallery(String payload) async {
+    if (payload.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fill in the required fields first.')),
+      );
+      return;
+    }
+    await showNgmyQrTemplateGallery(
+      context: context,
+      categoryIndex: _type,
+      categoryLabel: _typeLabel(),
+      fieldVars: _templateFieldVars(),
+      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 148),
+      onSelected: _applyTemplate,
+    );
+  }
+
+  Widget _compactQrForTemplate(String payload) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: _accent.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      child: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 148),
+    );
   }
 
   Future<Uint8List?> _captureQrOffscreen(String payload) async {
@@ -345,6 +422,22 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                   pulse: pulse,
                   orbit: orbit,
                   icon: Icons.qr_code_2_rounded,
+                  trailing: onSavedTab
+                      ? null
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: hasQr ? () => _openTemplateGallery(payload) : null,
+                              tooltip: 'Templates',
+                              icon: Icon(
+                                Icons.dashboard_customize_rounded,
+                                color: hasQr ? _accent : Colors.white24,
+                                size: 22,
+                              ),
+                            ),
+                          ],
+                        ),
                   onClose: () => Navigator.of(context).pop(),
                 ),
                 Flexible(
@@ -386,14 +479,26 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                             ),
                           ],
                           const SizedBox(height: 18),
-                          NgmyToolkitAliveSection(
-                            colors: colors,
-                            pulse: pulse,
-                            scan: scan,
-                            orbit: orbit,
-                            phase: 0.35,
-                            child: _qrPreview(payload, hasQr),
-                          ),
+                          if (_activeTemplate != null && hasQr) ...[
+                            _templateEditor(),
+                            const SizedBox(height: 12),
+                            NgmyToolkitAliveSection(
+                              colors: colors,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.35,
+                              child: _templatePreview(payload),
+                            ),
+                          ] else
+                            NgmyToolkitAliveSection(
+                              colors: colors,
+                              pulse: pulse,
+                              scan: scan,
+                              orbit: orbit,
+                              phase: 0.35,
+                              child: _qrPreview(payload, hasQr),
+                            ),
                           if (hasQr) ...[
                             const SizedBox(height: 12),
                             Row(
@@ -467,7 +572,10 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           return Padding(
             padding: EdgeInsets.only(right: i == types.length - 1 ? 0 : 8),
             child: GestureDetector(
-              onTap: () => setState(() => _type = i),
+              onTap: () => setState(() {
+                _type = i;
+                _clearTemplate();
+              }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -792,6 +900,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     required IconData icon,
     int maxLines = 1,
     bool obscure = false,
+    VoidCallback? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -802,6 +911,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           controller: controller,
           maxLines: maxLines,
           obscureText: obscure,
+          onChanged: onChanged == null ? null : (_) => onChanged(),
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: hint,
@@ -848,6 +958,88 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _templateEditor() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _accent.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _activeTemplate?.name ?? 'Template',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _clearTemplate,
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text('Plain QR'),
+                style: TextButton.styleFrom(foregroundColor: Colors.white54),
+              ),
+              TextButton.icon(
+                onPressed: () => _openTemplateGallery(_buildPayload()),
+                icon: const Icon(Icons.grid_view_rounded, size: 16),
+                label: const Text('Change'),
+                style: TextButton.styleFrom(foregroundColor: _accent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _field(controller: _templateTitleC, label: 'Headline (editable)', hint: 'Title on your template', icon: Icons.title_rounded, onChanged: () => setState(() {})),
+          const SizedBox(height: 10),
+          _field(controller: _templateBodyC, label: 'Message (editable)', hint: 'Beautiful words for your audience…', icon: Icons.notes_rounded, maxLines: 4, onChanged: () => setState(() {})),
+          const SizedBox(height: 10),
+          _field(controller: _templateFooterC, label: 'Footer line (editable)', hint: 'Scan · Visit · Connect', icon: Icons.short_text_rounded, onChanged: () => setState(() {})),
+        ],
+      ),
+    );
+  }
+
+  Widget _templatePreview(String payload) {
+    final template = _activeTemplate!;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _accent.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Invoice-style template · QR at bottom',
+            style: TextStyle(color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: NgmyQrTemplateCard(
+              captureKey: _templateCaptureKey,
+              template: template,
+              title: _templateTitleC.text.trim().isEmpty ? 'Your Title' : _templateTitleC.text.trim(),
+              body: _templateBodyC.text.trim().isEmpty ? 'Your message appears here.' : _templateBodyC.text.trim(),
+              footer: _templateFooterC.text.trim().isEmpty ? 'Scan below' : _templateFooterC.text.trim(),
+              qrWidget: _compactQrForTemplate(payload),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Download saves the full template with your words and QR code.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
+          ),
+        ],
+      ),
     );
   }
 
