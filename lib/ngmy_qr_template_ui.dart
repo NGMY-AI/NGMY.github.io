@@ -41,6 +41,7 @@ class NgmyQrTemplateCard extends StatelessWidget {
         closing: footer.trim().isNotEmpty ? footer : template.theme.closingTemplate,
         fieldVars: fieldVars,
         qrWidget: qrWidget,
+        compact: compact,
       ),
     );
 
@@ -66,6 +67,7 @@ class _AccessCardLayout extends StatelessWidget {
   final String closing;
   final Map<String, String> fieldVars;
   final Widget qrWidget;
+  final bool compact;
 
   const _AccessCardLayout({
     required this.template,
@@ -74,6 +76,7 @@ class _AccessCardLayout extends StatelessWidget {
     required this.closing,
     required this.fieldVars,
     required this.qrWidget,
+    this.compact = false,
   });
 
   @override
@@ -138,24 +141,145 @@ class _AccessCardLayout extends StatelessWidget {
             ],
           ),
           Positioned(
-            top: 10,
-            right: 12,
-            child: Opacity(
-              opacity: 0.16,
-              child: Text(
-                'NGMY',
-                style: TextStyle(
-                  color: navy,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 10,
-                  letterSpacing: 2,
-                ),
-              ),
+            top: 6,
+            right: 8,
+            left: 8,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: _NgmyAnimatedWatermark(accent: accent, navy: navy, compact: compact),
             ),
           ),
         ],
       ),
       ),
+    );
+  }
+}
+
+class _NgmyAnimatedWatermark extends StatefulWidget {
+  final Color accent;
+  final Color navy;
+  final bool compact;
+
+  const _NgmyAnimatedWatermark({
+    required this.accent,
+    required this.navy,
+    this.compact = false,
+  });
+
+  @override
+  State<_NgmyAnimatedWatermark> createState() => _NgmyAnimatedWatermarkState();
+}
+
+class _NgmyAnimatedWatermarkState extends State<_NgmyAnimatedWatermark> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = widget.compact ? 16.0 : 26.0;
+    final hPad = widget.compact ? 10.0 : 16.0;
+    final vPad = widget.compact ? 5.0 : 8.0;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value * math.pi * 2;
+        final breathe = 1.0 + math.sin(t) * 0.05;
+        final glow = 0.22 + (math.sin(t) * 0.5 + 0.5) * 0.28;
+        final shimmer = _ctrl.value * 2.4 - 0.8;
+        final ringTurns = _ctrl.value;
+
+        return Transform.scale(
+          scale: breathe,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: hPad + 6, vertical: vPad + 6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.accent.withValues(alpha: glow),
+                      blurRadius: 18,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+              Transform.rotate(
+                angle: ringTurns * math.pi * 2,
+                child: Container(
+                  width: fontSize * 3.6,
+                  height: fontSize * 1.55,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: widget.accent.withValues(alpha: 0.35), width: 1.5),
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(99),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      widget.accent.withValues(alpha: 0.22),
+                      widget.navy.withValues(alpha: 0.14),
+                      widget.accent.withValues(alpha: 0.18),
+                    ],
+                  ),
+                  border: Border.all(color: widget.accent.withValues(alpha: 0.55), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(color: widget.navy.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: ShaderMask(
+                  shaderCallback: (bounds) {
+                    return LinearGradient(
+                      begin: Alignment(shimmer - 1.2, -0.4),
+                      end: Alignment(shimmer, 0.4),
+                      colors: [
+                        widget.navy,
+                        widget.accent,
+                        Colors.white,
+                        widget.accent,
+                        widget.navy,
+                      ],
+                      stops: const [0.0, 0.38, 0.5, 0.62, 1.0],
+                    ).createShader(bounds);
+                  },
+                  blendMode: BlendMode.srcIn,
+                  child: Text(
+                    'NGMY',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: fontSize,
+                      letterSpacing: widget.compact ? 2.5 : 4,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
