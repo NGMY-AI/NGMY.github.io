@@ -255,18 +255,18 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 200, tightFrame: true, showLogo: true),
+      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 210, tightFrame: true, showLogo: true),
       onSelected: _applyTemplate,
     );
   }
 
-  Widget _compactQrForTemplate(String payload) {
+  Widget _compactQrForTemplate(String payload, {Color? borderColor}) {
     return NgmyBrandedQrWidget(
       data: payload,
-      compact: true,
-      sizeOverride: 232,
+      sizeOverride: 248,
       tightFrame: true,
       showLogo: true,
+      borderColor: borderColor,
     );
   }
 
@@ -1026,7 +1026,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
               body: _templateBodyC.text.trim(),
               footer: _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim(),
               fieldVars: _templateFieldVars(),
-              qrWidget: _compactQrForTemplate(payload),
+              qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
             ),
           ),
           const SizedBox(height: 10),
@@ -1099,6 +1099,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final bool showLogo;
   /// Snug frame for template cards — minimal padding around the QR.
   final bool tightFrame;
+  final Color? borderColor;
   /// Larger, bolder QR modules for easy phone scanning (short payloads only).
   final bool coarseScan;
 
@@ -1112,6 +1113,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     this.sizeOverride,
     this.showLogo = true,
     this.tightFrame = false,
+    this.borderColor,
     this.coarseScan = false,
   });
 
@@ -1132,10 +1134,14 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = sizeOverride ?? (large ? 300.0 : (compact ? 130.0 : 248.0));
-    final logoSize = tightFrame ? size * 0.24 : (large ? 64.0 : (compact ? 28.0 : 52.0));
-    final ring = tightFrame ? 0.0 : (large ? 26.0 : (compact ? 14.0 : 22.0));
-    final outerPad = tightFrame ? 4.0 : (large ? 36.0 : 28.0);
-    final qrPad = tightFrame ? 6.0 : 10.0;
+
+    if (tightFrame) {
+      return _buildTightTemplateQr(size);
+    }
+
+    final ring = large ? 26.0 : (compact ? 14.0 : 22.0);
+    final outerPad = large ? 36.0 : 28.0;
+    final qrPad = 10.0;
 
     return RepaintBoundary(
       key: captureKey,
@@ -1145,20 +1151,18 @@ class NgmyBrandedQrWidget extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (ring > 0) ...[
-            Positioned(top: 0, left: 0, child: _CornerRing(size: ring)),
-            Positioned(top: 0, right: 0, child: _CornerRing(size: ring)),
-            Positioned(bottom: 0, left: 0, child: _CornerRing(size: ring)),
-            Positioned(bottom: 0, right: 0, child: _CornerRing(size: ring)),
-          ],
+          Positioned(top: 0, left: 0, child: _CornerRing(size: ring)),
+          Positioned(top: 0, right: 0, child: _CornerRing(size: ring)),
+          Positioned(bottom: 0, left: 0, child: _CornerRing(size: ring)),
+          Positioned(bottom: 0, right: 0, child: _CornerRing(size: ring)),
           Container(
             width: size,
             height: size,
             padding: EdgeInsets.all(qrPad),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(tightFrame ? 10 : 16),
-              boxShadow: tightFrame ? null : [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 16, spreadRadius: 1)],
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 16, spreadRadius: 1)],
             ),
             child: Stack(
               alignment: Alignment.center,
@@ -1189,25 +1193,88 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                   ),
                   gapless: coarseScan ? false : true,
                 ),
-                if (showLogo)
-                  Container(
-                    width: logoSize + 10,
-                    height: logoSize + 10,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _accent.withValues(alpha: 0.35), width: 2),
-                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                if (showLogo) _centerLogo(size - qrPad * 2),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+    );
+  }
+
+  Widget _buildTightTemplateQr(double size) {
+    final frame = borderColor ?? _accent;
+    const inset = 5.0;
+    final qrSize = size - inset * 2;
+    final logoSize = qrSize * 0.21;
+
+    return RepaintBoundary(
+      key: captureKey,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: frame, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(inset),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Center(
+                    child: QrImageView(
+                      data: data,
+                      version: QrVersions.auto,
+                      size: qrSize,
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.white,
+                      errorCorrectionLevel: errorCorrectionLevel ?? QrErrorCorrectLevel.H,
+                      errorStateBuilder: (context, error) => Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          'QR too large',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _ink.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 10),
+                        ),
+                      ),
+                      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.circle, color: _ink),
+                      dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: _ink),
+                      gapless: true,
                     ),
-                    padding: const EdgeInsets.all(5),
-                    child: ClipOval(
-                      child: Image.network(
-                        _kNgmyLogoUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: _accent.withValues(alpha: 0.12),
-                          alignment: Alignment.center,
-                          child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: large ? 13 : (compact ? 8 : 11), color: _accentDeep)),
+                  ),
+                ),
+                if (showLogo)
+                  Positioned.fill(
+                    child: Center(
+                      child: Container(
+                        width: logoSize,
+                        height: logoSize,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _accent.withValues(alpha: 0.35), width: 1.5),
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        ),
+                        padding: EdgeInsets.all(logoSize * 0.12),
+                        child: ClipOval(
+                          child: Image.network(
+                            _kNgmyLogoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: _accent.withValues(alpha: 0.12),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'NGMY',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: logoSize * 0.22, color: _accentDeep),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1215,9 +1282,34 @@ class NgmyBrandedQrWidget extends StatelessWidget {
               ],
             ),
           ),
-        ],
+        ),
       ),
-    ),
+    );
+  }
+
+  Widget _centerLogo(double qrSide) {
+    final logoSize = qrSide * 0.22;
+    return Container(
+      width: logoSize,
+      height: logoSize,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: _accent.withValues(alpha: 0.35), width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+      ),
+      padding: EdgeInsets.all(logoSize * 0.12),
+      child: ClipOval(
+        child: Image.network(
+          _kNgmyLogoUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: _accent.withValues(alpha: 0.12),
+            alignment: Alignment.center,
+            child: Text('NGMY', style: TextStyle(fontWeight: FontWeight.w900, fontSize: logoSize * 0.22, color: _accentDeep)),
+          ),
+        ),
+      ),
     );
   }
 }
