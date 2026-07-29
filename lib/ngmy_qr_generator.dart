@@ -255,13 +255,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 148),
+      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 168, showLogo: false),
       onSelected: _applyTemplate,
     );
   }
 
   Widget _compactQrForTemplate(String payload) {
-    return NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 132, showLogo: false);
+    return NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 196, showLogo: false);
   }
 
   Future<Uint8List?> _captureQrOffscreen(String payload) async {

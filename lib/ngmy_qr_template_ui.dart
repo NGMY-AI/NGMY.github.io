@@ -31,25 +31,30 @@ class NgmyQrTemplateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = compact ? 0.40 : 1.0;
+    final content = SizedBox(
+      width: _paperW,
+      height: _paperH,
+      child: _AccessCardLayout(
+        template: template,
+        subtitle: title.trim().isNotEmpty ? title : template.theme.subtitleTemplate,
+        tagline: body.trim(),
+        closing: footer.trim().isNotEmpty ? footer : template.theme.closingTemplate,
+        fieldVars: fieldVars,
+        qrWidget: qrWidget,
+      ),
+    );
+
+    if (compact) {
+      return FittedBox(
+        fit: BoxFit.contain,
+        alignment: Alignment.topCenter,
+        child: content,
+      );
+    }
+
     return RepaintBoundary(
       key: captureKey,
-      child: Transform.scale(
-        scale: scale,
-        alignment: Alignment.topCenter,
-        child: SizedBox(
-          width: _paperW,
-          height: _paperH,
-          child: _AccessCardLayout(
-            template: template,
-            subtitle: title.trim().isNotEmpty ? title : template.theme.subtitleTemplate,
-            tagline: body.trim(),
-            closing: footer.trim().isNotEmpty ? footer : template.theme.closingTemplate,
-            fieldVars: fieldVars,
-            qrWidget: qrWidget,
-          ),
-        ),
-      ),
+      child: content,
     );
   }
 }
@@ -99,23 +104,26 @@ class _AccessCardLayout extends StatelessWidget {
             _InfoField(label: theme.field2Label, value: field2, icon: theme.field2Icon, accent: accent),
             const SizedBox(height: 6),
             Expanded(
+              flex: 3,
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
                   Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
                   _SideChevron(left: true, color: accent),
                   _SideChevron(left: false, color: accent),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                     child: Container(
-                      padding: const EdgeInsets.all(10),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: accent, width: 2),
-                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.15), blurRadius: 12)],
+                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.15), blurRadius: 10)],
                       ),
-                      child: qrWidget,
+                      child: Center(child: qrWidget),
                     ),
                   ),
                 ],
@@ -271,7 +279,7 @@ class _SideChevron extends StatelessWidget {
       bottom: 0,
       child: Center(
         child: CustomPaint(
-          size: const Size(28, 56),
+          size: const Size(18, 40),
           painter: _ChevronPainter(color: color, pointingRight: left),
         ),
       ),
@@ -514,9 +522,9 @@ Future<void> showNgmyQrTemplateGallery({
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.58,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 0.62,
                     ),
                     itemCount: templates.length,
                     itemBuilder: (_, i) {
@@ -543,11 +551,10 @@ Future<void> showNgmyQrTemplateGallery({
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-                                    child: OverflowBox(
-                                      alignment: Alignment.topCenter,
-                                      maxHeight: 230,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
                                       child: NgmyQrTemplateCard(
                                         template: t,
                                         title: title,
@@ -561,8 +568,8 @@ Future<void> showNgmyQrTemplateGallery({
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  child: Text(t.name, style: TextStyle(color: t.accent, fontWeight: FontWeight.w800, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+                                  child: Text(t.name, style: TextStyle(color: t.accent, fontWeight: FontWeight.w800, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
                                 ),
                               ],
                             ),
