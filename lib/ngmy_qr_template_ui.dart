@@ -96,44 +96,61 @@ class _AccessCardLayout extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(17),
-        child: Column(
-          children: [
-            _HeaderSection(template: template, subtitle: subtitle, navy: navy, accent: accent),
-            _InfoField(label: theme.field1Label, value: field1, icon: theme.field1Icon, accent: accent),
-            const SizedBox(height: 8),
-            _InfoField(label: theme.field2Label, value: field2, icon: theme.field2Icon, accent: accent),
-            const SizedBox(height: 6),
-            Expanded(
-              flex: 3,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
-                  _SideChevron(left: true, color: accent),
-                  _SideChevron(left: false, color: accent),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: accent, width: 2),
-                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.15), blurRadius: 10)],
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              _HeaderSection(template: template, subtitle: subtitle, navy: navy, accent: accent),
+              _InfoField(label: theme.field1Label, value: field1, icon: theme.field1Icon, accent: accent),
+              const SizedBox(height: 8),
+              _InfoField(label: theme.field2Label, value: field2, icon: theme.field2Icon, accent: accent),
+              const SizedBox(height: 6),
+              Expanded(
+                flex: 3,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
+                    _SideChevron(left: true, color: accent),
+                    _SideChevron(left: false, color: accent),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: accent, width: 2),
+                        ),
+                        child: qrWidget,
                       ),
-                      child: Center(child: qrWidget),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              ),
+              _StepsSection(theme: theme, accent: accent, navy: navy),
+              _ClosingFooter(text: closing, accent: accent),
+              const SizedBox(height: 10),
+            ],
+          ),
+          Positioned(
+            top: 10,
+            right: 12,
+            child: Opacity(
+              opacity: 0.16,
+              child: Text(
+                'NGMY',
+                style: TextStyle(
+                  color: navy,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 10,
+                  letterSpacing: 2,
+                ),
               ),
             ),
-            _StepsSection(theme: theme, accent: accent, navy: navy),
-            _ClosingFooter(text: closing, accent: accent),
-            const SizedBox(height: 10),
-          ],
-        ),
+          ),
+        ],
+      ),
       ),
     );
   }

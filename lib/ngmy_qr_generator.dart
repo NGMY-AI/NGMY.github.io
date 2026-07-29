@@ -255,13 +255,19 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 168, showLogo: false),
+      qrWidget: NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 200, tightFrame: true, showLogo: true),
       onSelected: _applyTemplate,
     );
   }
 
   Widget _compactQrForTemplate(String payload) {
-    return NgmyBrandedQrWidget(data: payload, compact: true, sizeOverride: 196, showLogo: false);
+    return NgmyBrandedQrWidget(
+      data: payload,
+      compact: true,
+      sizeOverride: 232,
+      tightFrame: true,
+      showLogo: true,
+    );
   }
 
   Future<Uint8List?> _captureQrOffscreen(String payload) async {
@@ -1091,6 +1097,8 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final int? errorCorrectionLevel;
   final double? sizeOverride;
   final bool showLogo;
+  /// Snug frame for template cards — minimal padding around the QR.
+  final bool tightFrame;
   /// Larger, bolder QR modules for easy phone scanning (short payloads only).
   final bool coarseScan;
 
@@ -1103,6 +1111,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     this.errorCorrectionLevel,
     this.sizeOverride,
     this.showLogo = true,
+    this.tightFrame = false,
     this.coarseScan = false,
   });
 
@@ -1123,30 +1132,33 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = sizeOverride ?? (large ? 300.0 : (compact ? 130.0 : 248.0));
-    final logoSize = large ? 64.0 : (compact ? 28.0 : 52.0);
-    final ring = large ? 26.0 : (compact ? 14.0 : 22.0);
-    final outerPad = large ? 36.0 : 28.0;
+    final logoSize = tightFrame ? size * 0.24 : (large ? 64.0 : (compact ? 28.0 : 52.0));
+    final ring = tightFrame ? 0.0 : (large ? 26.0 : (compact ? 14.0 : 22.0));
+    final outerPad = tightFrame ? 4.0 : (large ? 36.0 : 28.0);
+    final qrPad = tightFrame ? 6.0 : 10.0;
 
     return RepaintBoundary(
       key: captureKey,
       child: SizedBox(
-      width: size + outerPad,
-      height: size + outerPad,
+      width: size + outerPad * 2,
+      height: size + outerPad * 2,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned(top: 0, left: 0, child: _CornerRing(size: ring)),
-          Positioned(top: 0, right: 0, child: _CornerRing(size: ring)),
-          Positioned(bottom: 0, left: 0, child: _CornerRing(size: ring)),
-          Positioned(bottom: 0, right: 0, child: _CornerRing(size: ring)),
+          if (ring > 0) ...[
+            Positioned(top: 0, left: 0, child: _CornerRing(size: ring)),
+            Positioned(top: 0, right: 0, child: _CornerRing(size: ring)),
+            Positioned(bottom: 0, left: 0, child: _CornerRing(size: ring)),
+            Positioned(bottom: 0, right: 0, child: _CornerRing(size: ring)),
+          ],
           Container(
             width: size,
             height: size,
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(qrPad),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 16, spreadRadius: 1)],
+              borderRadius: BorderRadius.circular(tightFrame ? 10 : 16),
+              boxShadow: tightFrame ? null : [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 16, spreadRadius: 1)],
             ),
             child: Stack(
               alignment: Alignment.center,
@@ -1154,7 +1166,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                 QrImageView(
                   data: data,
                   version: QrVersions.auto,
-                  size: size - 20,
+                  size: size - qrPad * 2,
                   padding: EdgeInsets.zero,
                   backgroundColor: Colors.white,
                   errorCorrectionLevel: errorCorrectionLevel ?? (coarseScan ? QrErrorCorrectLevel.L : QrErrorCorrectLevel.H),
