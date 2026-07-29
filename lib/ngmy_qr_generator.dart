@@ -74,8 +74,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
 
   NgmyQrTemplateDef? _activeTemplate;
 
-  final GlobalKey _qrCaptureKey = GlobalKey();
-  final GlobalKey _templateCaptureKey = GlobalKey();
+  /// Bumped after download capture so preview layers rebuild crisp (web toImage fix).
+  int _previewGeneration = 0;
 
   @override
   void initState() {
@@ -195,15 +195,89 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     return 'ngmy_${base}_${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  Future<Uint8List?> _captureVisibleQr() async {
-    await Future.delayed(const Duration(milliseconds: 80));
-    await WidgetsBinding.instance.endOfFrame;
-    final key = _activeTemplate != null ? _templateCaptureKey : _qrCaptureKey;
-    final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-    if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
+  Future<Uint8List?> _captureDownloadImage(String payload) async {
+    if (!mounted) return null;
+    final boundaryKey = GlobalKey();
+    late OverlayEntry entry;
+
+    final Widget captureChild;
+    if (_activeTemplate != null) {
+      final template = _activeTemplate!;
+      captureChild = NgmyQrTemplateCard(
+        template: template,
+        title: _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim(),
+        body: _templateBodyC.text.trim(),
+        footer: _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim(),
+        fieldVars: _templateFieldVars(),
+        qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
+      );
+    } else {
+      captureChild = NgmyBrandedQrWidget(data: payload, large: true);
+    }
+
+    entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        left: -12000,
+        top: -12000,
+        child: Material(
+          type: MaterialType.transparency,
+          child: RepaintBoundary(
+            key: boundaryKey,
+            child: captureChild,
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    try {
+      await Future.delayed(const Duration(milliseconds: 320));
+      await WidgetsBinding.instance.endOfFrame;
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final dpr = MediaQuery.of(context).devicePixelRatio.clamp(2.0, 3.0);
+      final image = await boundary.toImage(pixelRatio: dpr);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        return data?.buffer.asUint8List();
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      entry.remove();
+      entry.dispose();
+    }
+  }
+
+  void _refreshPreviewAfterCapture() {
+    if (!mounted) return;
+    WidgetsBinding.instance.scheduleFrameCallback((_) {
+      if (mounted) WidgetsBinding.instance.ensureVisualUpdate();
+    });
+  }
+
+  Future<void> _downloadQr({required String payload, required String label}) async {
+    if (_busy || payload.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final bytes = await _captureDownloadImage(payload);
+      if (bytes == null) throw Exception('Could not render QR image.');
+      final msg = await downloadNgmyQrImage(bytes, _defaultFilename(label));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _previewGeneration++;
+          _busy = false;
+        });
+        _refreshPreviewAfterCapture();
+      }
+    }
   }
 
   Map<String, String> _templateFieldVars() {
@@ -268,55 +342,6 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       showLogo: true,
       borderColor: borderColor,
     );
-  }
-
-  Future<Uint8List?> _captureQrOffscreen(String payload) async {
-    if (!mounted) return null;
-    final key = GlobalKey();
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) => Positioned(
-        left: -4000,
-        top: -4000,
-        child: Material(
-          color: Colors.transparent,
-          child: RepaintBoundary(
-            key: key,
-            child: NgmyBrandedQrWidget(data: payload),
-          ),
-        ),
-      ),
-    );
-    Overlay.of(context).insert(entry);
-    try {
-      await Future.delayed(const Duration(milliseconds: 200));
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return null;
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      return data?.buffer.asUint8List();
-    } finally {
-      entry.remove();
-    }
-  }
-
-  Future<void> _downloadQr({required String payload, required String label}) async {
-    if (_busy || payload.isEmpty) return;
-    setState(() => _busy = true);
-    try {
-      var bytes = await _captureVisibleQr();
-      bytes ??= await _captureQrOffscreen(payload);
-      if (bytes == null) throw Exception('Could not render QR image.');
-      final msg = await downloadNgmyQrImage(bytes, _defaultFilename(label));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _downloadCurrent() async {
@@ -1020,7 +1045,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: NgmyQrTemplateCard(
-              captureKey: _templateCaptureKey,
+              key: ValueKey('template-preview-$_previewGeneration'),
               template: template,
               title: _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim(),
               body: _templateBodyC.text.trim(),
@@ -1069,9 +1094,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             )
           else
             Center(
-              child: RepaintBoundary(
-                key: _qrCaptureKey,
-                child: NgmyBrandedQrWidget(data: payload),
+              child: NgmyBrandedQrWidget(
+                key: ValueKey('qr-preview-$_previewGeneration'),
+                data: payload,
               ),
             ),
           if (hasQr) ...[
@@ -1123,8 +1148,12 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     final boundary = ctx.findRenderObject();
     if (boundary is! RenderRepaintBoundary) return null;
     final image = await boundary.toImage(pixelRatio: pixelRatio);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    return bytes?.buffer.asUint8List();
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      return bytes?.buffer.asUint8List();
+    } finally {
+      image.dispose();
+    }
   }
 
   static const _accent = Color(0xFF06B6D4);
