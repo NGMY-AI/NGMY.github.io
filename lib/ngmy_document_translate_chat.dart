@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_elevenlabs_tts.dart';
 import 'ngmy_modern_chat_prefix.dart';
+import 'ngmy_offline_icons.dart';
 import 'ngmy_translate_payments.dart';
 
 String ngmyLangLabel(String code) => code == 'sw' ? 'Swahili' : 'English';
@@ -440,7 +441,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(ngmyLangFlag(code), style: const TextStyle(fontSize: 22)),
+                  NgmyLangFlagBadge(langCode: code, height: 22),
                   const SizedBox(width: 8),
                   Text(
                     ngmyLangLabel(code),
@@ -600,16 +601,6 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.07),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                          suffixIcon: Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: _speakButton(
-                              text: _inputC.text,
-                              langCode: _replyMode ? _myLang : _theirLang,
-                              key: 'input',
-                              color: _cyan,
-                              tooltip: 'Listen to your message',
-                            ),
-                          ),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),

@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_document_translate_chat.dart';
+import 'ngmy_offline_icons.dart';
 import 'ngmy_document_scan_payments.dart';
 import 'ngmy_gemini_vision.dart';
 import 'ngmy_modern_chat_prefix.dart';
@@ -719,8 +720,6 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
     );
   }
 
-  String get _flagEmoji => _responseLanguage == 'sw' ? '🇹🇿' : '🇺🇸';
-
   String get _languageLabel => _responseLanguage == 'sw' ? 'Swahili' : 'English';
 
   Future<void> _toggleLanguageFlag() async {
@@ -768,7 +767,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
               key: ValueKey<String>(_responseLanguage),
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_flagEmoji, style: const TextStyle(fontSize: 22)),
+                NgmyLangFlagBadge(langCode: _responseLanguage, height: 22),
                 const SizedBox(width: 5),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
