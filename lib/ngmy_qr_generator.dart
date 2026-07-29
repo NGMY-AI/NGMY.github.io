@@ -255,7 +255,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 210, tightFrame: true, showLogo: true),
+      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 220, tightFrame: true, showLogo: true),
       onSelected: _applyTemplate,
     );
   }
@@ -263,7 +263,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   Widget _compactQrForTemplate(String payload, {Color? borderColor}) {
     return NgmyBrandedQrWidget(
       data: payload,
-      sizeOverride: 248,
+      sizeOverride: 256,
       tightFrame: true,
       showLogo: true,
       borderColor: borderColor,
@@ -1203,86 +1203,83 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildTightTemplateQr(double size) {
+  Widget _buildTightTemplateQr(double qrSize) {
     final frame = borderColor ?? _accent;
-    const inset = 5.0;
-    final qrSize = size - inset * 2;
-    final logoSize = qrSize * 0.21;
+    const framePad = 3.0;
+    final logoSize = qrSize * 0.20;
 
     return RepaintBoundary(
       key: captureKey,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: frame, width: 2),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(inset),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: Center(
-                    child: QrImageView(
-                      data: data,
-                      version: QrVersions.auto,
-                      size: qrSize,
-                      padding: EdgeInsets.zero,
-                      backgroundColor: Colors.white,
-                      errorCorrectionLevel: errorCorrectionLevel ?? QrErrorCorrectLevel.H,
-                      errorStateBuilder: (context, error) => Container(
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: frame, width: 2),
+            ),
+            padding: const EdgeInsets.all(framePad),
+            child: SizedBox(
+              width: qrSize,
+              height: qrSize,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  QrImageView(
+                    data: data,
+                    version: QrVersions.auto,
+                    size: qrSize,
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.white,
+                    errorCorrectionLevel: errorCorrectionLevel ?? QrErrorCorrectLevel.H,
+                    errorStateBuilder: (context, error) => SizedBox(
+                      width: qrSize,
+                      height: qrSize,
+                      child: Center(
                         child: Text(
                           'QR too large',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _ink.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 10),
                         ),
                       ),
-                      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.circle, color: _ink),
-                      dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: _ink),
-                      gapless: true,
                     ),
+                    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.circle, color: _ink),
+                    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.circle, color: _ink),
+                    gapless: true,
                   ),
-                ),
-                if (showLogo)
-                  Positioned.fill(
-                    child: Center(
-                      child: Container(
-                        width: logoSize,
-                        height: logoSize,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: _accent.withValues(alpha: 0.35), width: 1.5),
-                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                        ),
-                        padding: EdgeInsets.all(logoSize * 0.12),
-                        child: ClipOval(
-                          child: Image.network(
-                            _kNgmyLogoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: _accent.withValues(alpha: 0.12),
-                              alignment: Alignment.center,
-                              child: Text(
-                                'NGMY',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: logoSize * 0.22, color: _accentDeep),
-                              ),
+                  if (showLogo)
+                    Container(
+                      width: logoSize,
+                      height: logoSize,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _accent.withValues(alpha: 0.35), width: 1.5),
+                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                      ),
+                      padding: EdgeInsets.all(logoSize * 0.12),
+                      child: ClipOval(
+                        child: Image.network(
+                          _kNgmyLogoUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: _accent.withValues(alpha: 0.12),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'NGMY',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: logoSize * 0.22, color: _accentDeep),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

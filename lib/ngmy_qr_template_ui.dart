@@ -114,7 +114,12 @@ class _AccessCardLayout extends StatelessWidget {
                     Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
                     _SideChevron(left: true, color: accent),
                     _SideChevron(left: false, color: accent),
-                    Center(child: qrWidget),
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [qrWidget],
+                      ),
+                    ),
                   ],
                 ),
               ),
