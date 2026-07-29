@@ -141,7 +141,7 @@ class _AccessCardLayout extends StatelessWidget {
             ],
           ),
           Positioned(
-            bottom: 10,
+            top: 10,
             right: 10,
             child: _NgmyAnimatedWatermark(accent: accent, navy: navy, compact: compact),
           ),
