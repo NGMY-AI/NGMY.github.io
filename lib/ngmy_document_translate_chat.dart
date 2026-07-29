@@ -441,7 +441,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  NgmyLangFlagBadge(langCode: code, height: 22),
+                  NgmyOfflineEmoji(ngmyLangFlag(code), fontSize: 22),
                   const SizedBox(width: 8),
                   Text(
                     ngmyLangLabel(code),

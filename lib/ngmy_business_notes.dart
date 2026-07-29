@@ -1503,10 +1503,9 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                                               color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04),
                                               borderRadius: BorderRadius.circular(12),
                                             ),
-                                            child: NgmyNoteCoverIcon(
-                                              emoji: n.icon.trim().isEmpty ? '📝' : n.icon.trim(),
-                                              size: 22,
-                                              color: dark ? const Color(0xFFA78BFA) : const Color(0xFF6366F1),
+                                            child: NgmyOfflineEmoji(
+                                              n.icon.trim().isEmpty ? '📝' : n.icon.trim(),
+                                              fontSize: 22,
                                             ),
                                           ),
                                           const SizedBox(width: 14),
@@ -1779,7 +1778,7 @@ class _NoteTemplatePickerPageState extends State<_NoteTemplatePickerPage> with S
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      NgmyNoteCoverIcon(emoji: t.emoji, size: 28, color: Colors.white),
+                                      NgmyOfflineEmoji(t.emoji, fontSize: 28),
                                       const Spacer(),
                                       Text(t.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
                                       const SizedBox(height: 4),
@@ -2469,7 +2468,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                     ? Border.all(color: const Color(0xFFA78BFA), width: 1.4)
                                     : null,
                               ),
-                              child: NgmyNoteCoverIcon(emoji: e, size: 22, color: const Color(0xFFA78BFA)),
+                              child: NgmyOfflineEmoji(e, fontSize: 22),
                             ),
                           );
                         }).toList(),
@@ -2528,7 +2527,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                               height: 40,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-                              child: NgmyNoteCoverIcon(emoji: e, size: 22, color: const Color(0xFFA78BFA)),
+                              child: NgmyOfflineEmoji(e, fontSize: 22),
                             ),
                           );
                         }).toList(),
@@ -2570,7 +2569,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                 itemBuilder: (_, i) {
                   final t = _noteTemplates.where((t) => t.id != 'blank').elementAt(i);
                   return ListTile(
-                    leading: NgmyNoteCoverIcon(emoji: t.emoji, size: 24, color: const Color(0xFFA78BFA)),
+                    leading: NgmyOfflineEmoji(t.emoji, fontSize: 24),
                     title: Text(t.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                     subtitle: Text(t.body.split('\n').take(2).join(' '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white38, fontSize: 11)),
                     onTap: () => Navigator.pop(ctx, t),
@@ -2864,10 +2863,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                           onPressed: _onWillPop,
                         ),
                         if (_previewMode) ...[
-                          NgmyNoteCoverIcon(
-                            emoji: _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
-                            size: 20,
-                            color: fg,
+                          NgmyOfflineEmoji(
+                            _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
+                            fontSize: 20,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -2900,10 +2898,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: dark ? Colors.white24 : Colors.black12),
                                 ),
-                                child: NgmyNoteCoverIcon(
-                                  emoji: _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
-                                  size: 18,
-                                  color: fg,
+                                child: NgmyOfflineEmoji(
+                                  _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
+                                  fontSize: 18,
                                 ),
                               ),
                             ),

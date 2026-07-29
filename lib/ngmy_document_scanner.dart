@@ -767,7 +767,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
               key: ValueKey<String>(_responseLanguage),
               mainAxisSize: MainAxisSize.min,
               children: [
-                NgmyLangFlagBadge(langCode: _responseLanguage, height: 22),
+                NgmyOfflineEmoji(_responseLanguage == 'sw' ? '🇹🇿' : '🇺🇸', fontSize: 22),
                 const SizedBox(width: 5),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
