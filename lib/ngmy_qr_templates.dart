@@ -1,5 +1,31 @@
 import 'package:flutter/material.dart';
 
+enum NgmyQrTemplateLayout {
+  accessCard,
+  topBanner,
+  qrHero,
+  splitPanel,
+  ticketStub,
+  gradientBold,
+  sidebarRail,
+  posterFrame,
+  darkNeon,
+  ribbonTag,
+}
+
+const kNgmyQrLayoutNames = [
+  'Access Card',
+  'Top Banner',
+  'QR Hero',
+  'Split Panel',
+  'Ticket Stub',
+  'Gradient Bold',
+  'Sidebar Rail',
+  'Poster Frame',
+  'Dark Neon',
+  'Ribbon Tag',
+];
+
 /// Category-specific copy and field layout for premium access-card templates.
 class NgmyQrCategoryTheme {
   final String headlinePrimary;
@@ -50,6 +76,7 @@ class NgmyQrTemplateDef {
   final Color onAccent;
   final IconData icon;
   final NgmyQrCategoryTheme theme;
+  final NgmyQrTemplateLayout layout;
 
   const NgmyQrTemplateDef({
     required this.id,
@@ -63,20 +90,21 @@ class NgmyQrTemplateDef {
     this.onAccent = Colors.white,
     required this.icon,
     required this.theme,
+    required this.layout,
   });
 }
 
-const _kColorVariants = [
-  (name: 'Classic Blue', accent: Color(0xFF2563EB), dark: Color(0xFF1E3A8A)),
-  (name: 'Ocean Cyan', accent: Color(0xFF0891B2), dark: Color(0xFF164E63)),
-  (name: 'Royal Indigo', accent: Color(0xFF4F46E5), dark: Color(0xFF312E81)),
-  (name: 'Emerald', accent: Color(0xFF059669), dark: Color(0xFF064E3B)),
-  (name: 'Sunset Orange', accent: Color(0xFFEA580C), dark: Color(0xFF7C2D12)),
-  (name: 'Rose Red', accent: Color(0xFFE11D48), dark: Color(0xFF881337)),
-  (name: 'Violet', accent: Color(0xFF7C3AED), dark: Color(0xFF4C1D95)),
-  (name: 'Slate Pro', accent: Color(0xFF475569), dark: Color(0xFF1E293B)),
-  (name: 'Navy Gold', accent: Color(0xFFD97706), dark: Color(0xFF1E3A8A)),
-  (name: 'Teal Mint', accent: Color(0xFF0D9488), dark: Color(0xFF134E4A)),
+const _kDesignVariants = [
+  (layout: NgmyQrTemplateLayout.accessCard, accent: Color(0xFF2563EB), dark: Color(0xFF1E3A8A)),
+  (layout: NgmyQrTemplateLayout.topBanner, accent: Color(0xFF0891B2), dark: Color(0xFF164E63)),
+  (layout: NgmyQrTemplateLayout.qrHero, accent: Color(0xFF7C3AED), dark: Color(0xFF4C1D95)),
+  (layout: NgmyQrTemplateLayout.splitPanel, accent: Color(0xFF059669), dark: Color(0xFF064E3B)),
+  (layout: NgmyQrTemplateLayout.ticketStub, accent: Color(0xFF475569), dark: Color(0xFF1E293B)),
+  (layout: NgmyQrTemplateLayout.gradientBold, accent: Color(0xFFEA580C), dark: Color(0xFF7C2D12)),
+  (layout: NgmyQrTemplateLayout.sidebarRail, accent: Color(0xFFE11D48), dark: Color(0xFF881337)),
+  (layout: NgmyQrTemplateLayout.posterFrame, accent: Color(0xFF4F46E5), dark: Color(0xFF312E81)),
+  (layout: NgmyQrTemplateLayout.darkNeon, accent: Color(0xFF06B6D4), dark: Color(0xFF0F172A)),
+  (layout: NgmyQrTemplateLayout.ribbonTag, accent: Color(0xFFD97706), dark: Color(0xFF78350F)),
 ];
 
 String ngmyQrApplyTemplateVars(String template, Map<String, String> vars) {
@@ -284,12 +312,12 @@ List<NgmyQrTemplateDef> _buildCategoryTemplates({
 }) {
   final cat = ['link', 'wifi', 'contact', 'text', 'email', 'phone', 'sms'][categoryIndex];
   final theme = _kCategoryThemes[categoryIndex];
-  return List.generate(_kColorVariants.length, (i) {
-    final v = _kColorVariants[i];
+  return List.generate(_kDesignVariants.length, (i) {
+    final v = _kDesignVariants[i];
     return NgmyQrTemplateDef(
       id: '${cat}_${i + 1}',
       categoryIndex: categoryIndex,
-      name: v.name,
+      name: kNgmyQrLayoutNames[i],
       titleTemplate: theme.subtitleTemplate,
       bodyTemplate: '',
       footerTemplate: theme.closingTemplate,
@@ -297,6 +325,7 @@ List<NgmyQrTemplateDef> _buildCategoryTemplates({
       accentDark: v.dark,
       icon: icon,
       theme: theme,
+      layout: v.layout,
     );
   });
 }

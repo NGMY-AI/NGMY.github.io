@@ -1028,6 +1028,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
 
   Widget _templatePreview(String payload) {
     final template = _activeTemplate!;
+    final title = _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim();
+    final footer = _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim();
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1037,9 +1039,45 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       ),
       child: Column(
         children: [
-          Text(
-            'Premium access card · QR in center · Steps at bottom',
-            style: TextStyle(color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w800, fontSize: 13),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 28),
+                child: Text(
+                  '${template.name} · ${template.theme.headlinePrimary} ${template.theme.headlineAccent}',
+                  style: TextStyle(color: Colors.white.withOpacity(0.75), fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              ),
+              Positioned(
+                top: -2,
+                right: 0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => showNgmyQrTemplateFullscreen(
+                      context: context,
+                      template: template,
+                      title: title,
+                      body: _templateBodyC.text.trim(),
+                      footer: footer,
+                      fieldVars: _templateFieldVars(),
+                      qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _accent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: _accent.withOpacity(0.45)),
+                      ),
+                      child: Icon(Icons.fullscreen_rounded, size: 14, color: _accent),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           SingleChildScrollView(
@@ -1047,9 +1085,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             child: NgmyQrTemplateCard(
               key: ValueKey('template-preview-$_previewGeneration'),
               template: template,
-              title: _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim(),
+              title: title,
               body: _templateBodyC.text.trim(),
-              footer: _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim(),
+              footer: footer,
               fieldVars: _templateFieldVars(),
               qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
             ),
