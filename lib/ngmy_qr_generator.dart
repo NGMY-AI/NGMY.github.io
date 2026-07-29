@@ -255,7 +255,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 220, tightFrame: true, showLogo: true),
+      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 168, tightFrame: true, showLogo: true),
       onSelected: _applyTemplate,
     );
   }
@@ -263,7 +263,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   Widget _compactQrForTemplate(String payload, {Color? borderColor}) {
     return NgmyBrandedQrWidget(
       data: payload,
-      sizeOverride: 256,
+      sizeOverride: 178,
       tightFrame: true,
       showLogo: true,
       borderColor: borderColor,

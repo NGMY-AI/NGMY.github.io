@@ -104,23 +104,32 @@ class _AccessCardLayout extends StatelessWidget {
               _InfoField(label: theme.field1Label, value: field1, icon: theme.field1Icon, accent: accent),
               const SizedBox(height: 8),
               _InfoField(label: theme.field2Label, value: field2, icon: theme.field2Icon, accent: accent),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Expanded(
-                flex: 3,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
-                    _SideChevron(left: true, color: accent),
-                    _SideChevron(left: false, color: accent),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [qrWidget],
-                      ),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final slotH = constraints.maxHeight;
+                    final slotW = constraints.maxWidth;
+                    final maxSide = math.min(slotH - 2, slotW - 32).clamp(96.0, 188.0);
+                    return Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned.fill(child: CustomPaint(painter: _WaveBgPainter(accent: accent))),
+                        _SideChevron(left: true, color: accent),
+                        _SideChevron(left: false, color: accent),
+                        Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxSide, maxHeight: maxSide),
+                            child: FittedBox(
+                              fit: BoxFit.contain,
+                              child: qrWidget,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               _StepsSection(theme: theme, accent: accent, navy: navy),
