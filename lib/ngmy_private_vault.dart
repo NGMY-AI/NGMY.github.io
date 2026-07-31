@@ -463,14 +463,19 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
 
   Future<void> _addVideo() async {
     try {
-      final picked = await ngmyVaultPickVideoBytes();
+      final picked = await ngmyVaultPickVideoForStore();
       if (picked == null) return;
       final id = '${DateTime.now().microsecondsSinceEpoch}_v';
-      final ok = await NgmyVaultBlobStore.put(id, picked.bytes, mime: picked.mime);
+      final blob = picked.webBlob;
+      final ok = blob != null
+          ? await NgmyVaultBlobStore.putBlob(id, blob, mime: picked.mime)
+          : picked.bytes != null
+              ? await NgmyVaultBlobStore.put(id, picked.bytes!, mime: picked.mime)
+              : false;
       if (!ok) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save video. Storage may be full — try a shorter clip.')),
+          const SnackBar(content: Text('Could not save video. Storage may be full — free space and try again.')),
         );
         return;
       }
@@ -485,7 +490,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not add that video. Try MP4 or a shorter clip.')),
+        const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (3+ minutes supported).')),
       );
     }
   }
@@ -561,7 +566,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
             _addOption(ctx, emoji: '🖼️', title: 'Add photos', subtitle: 'Choose one or more from your gallery', onTap: _addPhotos),
-            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Choose a clip from your gallery', onTap: _addVideo),
+            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Gallery clips — 3+ minutes supported', onTap: _addVideo),
             const SizedBox(height: 12),
           ],
         ),

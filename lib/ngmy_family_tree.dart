@@ -7,6 +7,7 @@ import 'ngmy_family_book_ui.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_family_tree_sync_ui.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -19,6 +20,9 @@ class NgmyFamilyTreeTab extends StatefulWidget {
   final Future<bool> Function(double amount, String description) onChargeWallet;
   final VoidCallback onDataChanged;
   final VoidCallback onChanged;
+  final double? hudPulse;
+  final double? hudScan;
+  final double? hudOrbit;
 
   const NgmyFamilyTreeTab({
     super.key,
@@ -28,6 +32,9 @@ class NgmyFamilyTreeTab extends StatefulWidget {
     required this.onChargeWallet,
     required this.onDataChanged,
     required this.onChanged,
+    this.hudPulse,
+    this.hudScan,
+    this.hudOrbit,
   });
 
   @override
@@ -190,54 +197,80 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   }
 
   Widget _emptyState(WorksheetPalette p) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
-      decoration: BoxDecoration(
-        color: p.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.cardBorder),
-        boxShadow: [BoxShadow(color: p.shadow, blurRadius: 14, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _openImportSync,
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: WorksheetPalette.green.withValues(alpha: 0.12),
-                  border: Border.all(color: WorksheetPalette.green, width: 2),
-                ),
-                child: const Icon(Icons.park_outlined, color: WorksheetPalette.green, size: 32),
+    Widget framed(double pulse, double scan, double orbit) {
+      return NgmyHudTechFrame(
+        colors: const [WorksheetPalette.green, WorksheetPalette.teal],
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        phase: 0.16,
+        borderRadius: 16,
+        padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: p.cardBg,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: _emptyStateContent(p, pulse),
+        ),
+      );
+    }
+
+    if (widget.hudPulse != null && widget.hudScan != null && widget.hudOrbit != null) {
+      return framed(widget.hudPulse!, widget.hudScan!, widget.hudOrbit!);
+    }
+    return NgmyHudMotion(
+      builder: (context, pulse, scan, orbit) => framed(pulse, scan, orbit),
+    );
+  }
+
+  Widget _emptyStateContent(WorksheetPalette p, double pulse) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openImportSync,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: WorksheetPalette.green.withValues(alpha: 0.12),
+                border: Border.all(color: WorksheetPalette.green, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: WorksheetPalette.green.withValues(alpha: 0.25 + pulse * 0.2),
+                    blurRadius: 16 + pulse * 10,
+                    spreadRadius: pulse,
+                  ),
+                ],
               ),
+              child: const Icon(Icons.park_outlined, color: WorksheetPalette.green, size: 32),
             ),
           ),
-          const SizedBox(height: 16),
-          Text('No Family Trees Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
-          const SizedBox(height: 8),
-          Text(
-            'Create a family tree with names, photos, notes, and generations.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
+        ),
+        const SizedBox(height: 16),
+        Text('No Family Trees Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
+        const SizedBox(height: 8),
+        Text(
+          'Create a family tree with names, photos, notes, and generations.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
+        ),
+        const SizedBox(height: 22),
+        FilledButton(
+          onPressed: _createTree,
+          style: FilledButton.styleFrom(
+            backgroundColor: WorksheetPalette.teal,
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          const SizedBox(height: 22),
-          FilledButton(
-            onPressed: _createTree,
-            style: FilledButton.styleFrom(
-              backgroundColor: WorksheetPalette.teal,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Create Family Tree', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+          child: const Text('Create Family Tree', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      ],
     );
   }
 

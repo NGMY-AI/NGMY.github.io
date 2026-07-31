@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree.dart';
+import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
@@ -656,45 +657,78 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: WorksheetPalette.green))
-            : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _backRow(p),
-                    const SizedBox(height: 12),
-                    _headerCard(p),
-                    const SizedBox(height: 16),
-                    _tabBar(p),
-                    const SizedBox(height: 18),
-                    if (_tab == _WorksheetTab.projects) ...[
-                      _projectsHeader(p),
-                      const SizedBox(height: 14),
-                      _projectsBody(p),
-                    ] else if (_tab == _WorksheetTab.cashier)
-                      _placeholderTab(
-                        p: p,
-                        icon: Icons.calculate_outlined,
-                        title: 'Cashier',
-                        subtitle: 'Track daily spending and receipts here.',
-                      )
-                    else
-                      NgmyFamilyTreeTab(
-                        key: ValueKey(_familyTreeVersion),
-                        userEmail: widget.userEmail,
-                        user: widget.user,
-                        config: widget.config,
-                        onChargeWallet: widget.onChargeWallet,
-                        onDataChanged: () {
-                          widget.onDataChanged();
-                          setState(() => _familyTreeVersion++);
-                        },
-                        onChanged: () => setState(() => _familyTreeVersion++),
-                      ),
-                  ],
-                ),
+            : NgmyHudMotion(
+                builder: (context, pulse, scan, orbit) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _backRow(p),
+                        const SizedBox(height: 12),
+                        _headerCard(p, pulse: pulse, scan: scan, orbit: orbit),
+                        const SizedBox(height: 16),
+                        _tabBar(p, pulse: pulse, scan: scan, orbit: orbit),
+                        const SizedBox(height: 18),
+                        if (_tab == _WorksheetTab.projects) ...[
+                          _projectsHeader(p),
+                          const SizedBox(height: 14),
+                          _projectsBody(p, pulse: pulse, scan: scan, orbit: orbit),
+                        ] else if (_tab == _WorksheetTab.cashier)
+                          _placeholderTab(
+                            p: p,
+                            icon: Icons.calculate_outlined,
+                            title: 'Cashier',
+                            subtitle: 'Track daily spending and receipts here.',
+                            pulse: pulse,
+                            scan: scan,
+                            orbit: orbit,
+                            phase: 0.12,
+                          )
+                        else
+                          NgmyFamilyTreeTab(
+                            key: ValueKey(_familyTreeVersion),
+                            userEmail: widget.userEmail,
+                            user: widget.user,
+                            config: widget.config,
+                            onChargeWallet: widget.onChargeWallet,
+                            onDataChanged: () {
+                              widget.onDataChanged();
+                              setState(() => _familyTreeVersion++);
+                            },
+                            onChanged: () => setState(() => _familyTreeVersion++),
+                            hudPulse: pulse,
+                            hudScan: scan,
+                            hudOrbit: orbit,
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
       ),
+    );
+  }
+
+  static const _worksheetHudColors = [WorksheetPalette.green, WorksheetPalette.greenDark];
+
+  Widget _worksheetAnimatedFrame({
+    required double pulse,
+    required double scan,
+    required double orbit,
+    required Widget child,
+    double phase = 0,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+  }) {
+    return NgmyHudTechFrame(
+      colors: _worksheetHudColors,
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
+      borderRadius: 16,
+      padding: padding,
+      child: child,
     );
   }
 
@@ -719,8 +753,13 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _headerCard(WorksheetPalette p) {
-    return Container(
+  Widget _headerCard(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
+    return _worksheetAnimatedFrame(
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: 0,
+      child: Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: WorksheetPalette.green,
@@ -829,23 +868,29 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
           ),
         ],
       ),
+    ),
     );
   }
 
-  Widget _tabBar(WorksheetPalette p) {
-    return Container(
+  Widget _tabBar(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
+    return _worksheetAnimatedFrame(
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: 0.06,
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: p.isDark ? p.mutedSurface : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.cardBorder),
-      ),
-      child: Row(
-        children: [
-          _tabChip(p: p, tab: _WorksheetTab.projects, icon: Icons.folder_outlined, label: 'Projects'),
-          _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.calculate_outlined, label: 'Cashier'),
-          _tabChip(p: p, tab: _WorksheetTab.familyTree, icon: Icons.account_tree_outlined, label: 'Family Tree'),
-        ],
+      child: Container(
+        decoration: BoxDecoration(
+          color: p.isDark ? p.mutedSurface : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            _tabChip(p: p, tab: _WorksheetTab.projects, icon: Icons.folder_outlined, label: 'Projects', pulse: pulse),
+            _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.calculate_outlined, label: 'Cashier', pulse: pulse),
+            _tabChip(p: p, tab: _WorksheetTab.familyTree, icon: Icons.account_tree_outlined, label: 'Family Tree', pulse: pulse),
+          ],
+        ),
       ),
     );
   }
@@ -855,6 +900,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     required _WorksheetTab tab,
     required IconData icon,
     required String label,
+    required double pulse,
   }) {
     final active = _tab == tab;
     return Expanded(
@@ -863,11 +909,21 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
         child: InkWell(
           onTap: () => setState(() => _tab = tab),
           borderRadius: BorderRadius.circular(12),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
             decoration: BoxDecoration(
               color: active ? WorksheetPalette.green : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: WorksheetPalette.green.withValues(alpha: 0.35 + pulse * 0.25),
+                        blurRadius: 12 + pulse * 8,
+                        spreadRadius: pulse * 1.5,
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -928,17 +984,20 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _projectsBody(WorksheetPalette p) {
+  Widget _projectsBody(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
     if (_projects.isEmpty) {
-      return Container(
-        width: double.infinity,
+      return _worksheetAnimatedFrame(
+        pulse: pulse,
+        scan: scan,
+        orbit: orbit,
+        phase: 0.18,
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
-        decoration: BoxDecoration(
-          color: p.cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: p.cardBorder),
-          boxShadow: [BoxShadow(color: p.shadow, blurRadius: 14, offset: const Offset(0, 4))],
-        ),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: p.cardBg,
+            borderRadius: BorderRadius.circular(16),
+          ),
         child: Column(
           children: [
             Container(
@@ -1005,10 +1064,18 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
             ),
           ],
         ),
+        ),
       );
     }
 
-    return Column(children: _projects.map((proj) => _projectTile(proj, p)).toList());
+    return _worksheetAnimatedFrame(
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: 0.24,
+      padding: const EdgeInsets.all(10),
+      child: Column(children: _projects.map((proj) => _projectTile(proj, p)).toList()),
+    );
   }
 
   Widget _emptyImportAction({
@@ -1120,16 +1187,23 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     required IconData icon,
     required String title,
     required String subtitle,
+    required double pulse,
+    required double scan,
+    required double orbit,
+    double phase = 0.14,
   }) {
-    return Container(
-      width: double.infinity,
+    return _worksheetAnimatedFrame(
+      pulse: pulse,
+      scan: scan,
+      orbit: orbit,
+      phase: phase,
       padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
-      decoration: BoxDecoration(
-        color: p.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.cardBorder),
-        boxShadow: [BoxShadow(color: p.shadow, blurRadius: 14, offset: const Offset(0, 4))],
-      ),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: p.cardBg,
+          borderRadius: BorderRadius.circular(16),
+        ),
       child: Column(
         children: [
           Icon(icon, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
@@ -1138,6 +1212,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
           const SizedBox(height: 8),
           Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
         ],
+      ),
       ),
     );
   }

@@ -99,6 +99,26 @@ class NgmyVaultBlobStore {
     }
   }
 
+  /// Store a browser [html.Blob] / [html.File] directly — no Dart memory copy (long videos).
+  static Future<bool> putBlob(String id, Object blob, {String mime = 'application/octet-stream'}) async {
+    if (id.trim().isEmpty) return false;
+    if (blob is! html.Blob) return false;
+    final htmlBlob = blob;
+    try {
+      final db = await _open();
+      final tx = db.transaction(_storeName, 'readwrite');
+      final type = mime.trim().isEmpty ? 'application/octet-stream' : mime.trim();
+      final stored = (htmlBlob.type.trim().isEmpty || !htmlBlob.type.startsWith('video/'))
+          ? html.Blob([htmlBlob], type)
+          : htmlBlob;
+      tx.objectStore(_storeName).put(stored, id);
+      await tx.completed;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<Uint8List?> getBytes(String id) async {
     try {
       final db = await _open();

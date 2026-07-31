@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'ngmy_vault_pick_video_types.dart';
 
 /// Non-web: no vault video pick (app ships as web).
-Future<({Uint8List bytes, String mime, String name})?> ngmyVaultPickVideoBytes() async => null;
+Future<NgmyVaultPickedVideo?> ngmyVaultPickVideoForStore() async => null;

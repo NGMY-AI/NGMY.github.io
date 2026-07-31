@@ -5,7 +5,10 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
-const int kNgmyVaultMaxVideoBytes = 80 * 1024 * 1024;
+import 'ngmy_vault_pick_video_types.dart';
+
+/// 280 MB — supports 3+ minute clips (and longer at typical phone bitrates).
+const int kNgmyVaultMaxVideoBytes = 280 * 1024 * 1024;
 
 String ngmyVaultVideoMime(String? mime, String name) {
   final m = (mime ?? '').trim().toLowerCase();
@@ -19,28 +22,17 @@ String ngmyVaultVideoMime(String? mime, String name) {
   return 'video/mp4';
 }
 
-Future<Uint8List?> _readFileAsBytes(html.File file) async {
-  final reader = html.FileReader();
-  final done = Completer<Uint8List?>();
-  reader.onLoad.listen((_) {
-    final r = reader.result;
-    if (r is ByteBuffer) {
-      done.complete(Uint8List.view(r));
-    } else if (r is Uint8List) {
-      done.complete(Uint8List.fromList(r));
-    } else {
-      done.complete(null);
-    }
-  });
-  reader.onError.listen((_) {
-    if (!done.isCompleted) done.complete(null);
-  });
-  reader.readAsArrayBuffer(file);
-  return done.future;
+void _checkVideoSize(int size) {
+  if (size > kNgmyVaultMaxVideoBytes) {
+    throw StateError(
+      'Video is too large (max ${kNgmyVaultMaxVideoBytes ~/ (1024 * 1024)} MB). '
+      'Try a shorter clip or lower quality.',
+    );
+  }
 }
 
-/// Native browser file input — most reliable path for gallery videos on mobile web.
-Future<({Uint8List bytes, String mime, String name})?> _pickWithHtmlInput() async {
+/// Native browser file input — stores [html.File] as Blob without reading into RAM.
+Future<NgmyVaultPickedVideo?> _pickWithHtmlInput() async {
   final input = html.FileUploadInputElement()
     ..accept = 'video/mp4,video/quicktime,video/webm,video/x-m4v,video/*'
     ..style.display = 'none';
@@ -62,54 +54,76 @@ Future<({Uint8List bytes, String mime, String name})?> _pickWithHtmlInput() asyn
   input.click();
 
   final file = await completer.future.timeout(
-    const Duration(minutes: 5),
+    const Duration(minutes: 10),
     onTimeout: () {
       cleanup();
       return null;
     },
   );
   if (file == null) return null;
-  if (file.size > kNgmyVaultMaxVideoBytes) {
-    throw StateError('Video is too large (max ${kNgmyVaultMaxVideoBytes ~/ (1024 * 1024)} MB).');
-  }
-  final bytes = await _readFileAsBytes(file);
-  if (bytes == null || bytes.isEmpty) return null;
+  _checkVideoSize(file.size);
   final name = file.name;
   final mime = ngmyVaultVideoMime(file.type, name);
-  return (bytes: bytes, mime: mime, name: name);
+  return NgmyVaultPickedVideo(
+    mime: mime,
+    name: name,
+    sizeBytes: file.size,
+    webBlob: file,
+  );
 }
 
-Future<({Uint8List bytes, String mime, String name})?> _pickWithFilePicker() async {
+Future<NgmyVaultPickedVideo?> _pickWithFilePicker() async {
   final result = await FilePicker.platform.pickFiles(
     type: FileType.video,
     allowMultiple: false,
-    withData: true,
+    withData: false,
   );
   if (result == null || result.files.isEmpty) return null;
   final f = result.files.single;
-  final bytes = f.bytes;
-  if (bytes == null || bytes.isEmpty) return null;
-  if (bytes.length > kNgmyVaultMaxVideoBytes) {
-    throw StateError('Video is too large (max ${kNgmyVaultMaxVideoBytes ~/ (1024 * 1024)} MB).');
+  final size = f.size;
+  if (size <= 0) return null;
+  _checkVideoSize(size);
+
+  // Small clips only — FilePicker on web may still load bytes.
+  if (size <= 48 * 1024 * 1024 && f.bytes != null && f.bytes!.isNotEmpty) {
+    return NgmyVaultPickedVideo(
+      mime: ngmyVaultVideoMime(null, f.name),
+      name: f.name,
+      sizeBytes: size,
+      bytes: Uint8List.fromList(f.bytes!),
+    );
   }
-  final name = f.name;
-  final mime = ngmyVaultVideoMime(null, name);
-  return (bytes: Uint8List.fromList(bytes), mime: mime, name: name);
+
+  // Large file picked without bytes — ask user to use gallery picker again.
+  if (f.bytes == null || f.bytes!.isEmpty) {
+    throw StateError(
+      'That video is too large to load all at once. '
+      'Use Add video again and pick from your gallery (3+ minute clips are supported).',
+    );
+  }
+
+  final bytes = f.bytes!;
+  return NgmyVaultPickedVideo(
+    mime: ngmyVaultVideoMime(null, f.name),
+    name: f.name,
+    sizeBytes: bytes.length,
+    bytes: Uint8List.fromList(bytes),
+  );
 }
 
-/// Pick a gallery video and return its bytes for private vault storage.
-Future<({Uint8List bytes, String mime, String name})?> ngmyVaultPickVideoBytes() async {
+/// Pick a gallery video for private vault storage (Quick Dial).
+Future<NgmyVaultPickedVideo?> ngmyVaultPickVideoForStore() async {
   try {
-    final fromPicker = await _pickWithFilePicker();
-    if (fromPicker != null) return fromPicker;
+    final fromHtml = await _pickWithHtmlInput();
+    if (fromHtml != null) return fromHtml;
   } catch (e) {
-    debugPrint('[vault] file_picker video: $e');
+    debugPrint('[vault] html video pick: $e');
     if (e is StateError) rethrow;
   }
   try {
-    return await _pickWithHtmlInput();
+    return await _pickWithFilePicker();
   } catch (e) {
-    debugPrint('[vault] html video pick: $e');
+    debugPrint('[vault] file_picker video: $e');
     rethrow;
   }
 }
