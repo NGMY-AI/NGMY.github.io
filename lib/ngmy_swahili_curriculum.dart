@@ -84,7 +84,9 @@ SwahiliWord _w(
 
 /// Full Kiswahili school path — Basics uses your screenshot word lists.
 const kSwahiliPassPercent = 70;
-const kSwahiliTestQuestionCount = 10;
+/// ~5 questions per day × 5 days — Swahili prompt, English answers.
+const kSwahiliTestQuestionCount = 25;
+const kSwahiliQuestionsPerDay = 5;
 
 final List<SwahiliLevel> kSwahiliLevels = [
   SwahiliLevel(
@@ -540,7 +542,26 @@ List<SwahiliLessonDay> _swahiliGeneratedDays(
   return days;
 }
 
-/// Build a level test from its vocabulary (mixed Swahili ↔ English).
+String _englishAnswer(SwahiliWord word) {
+  final en = word.english.trim();
+  if (en.contains('/')) {
+    return en.split('/').first.trim();
+  }
+  return en;
+}
+
+String _swahiliTestPrompt(SwahiliWord word, SwahiliLessonDay day, int dayNumber) {
+  final dayLabel = day.title.replaceFirst(RegExp(r'^Day \d+ — '), '').trim();
+  if (word.example.trim().isNotEmpty) {
+    return 'Siku $dayNumber ($dayLabel): "${word.swahili}" — chagua maana ya Kiingereza.';
+  }
+  if (word.grammar.trim().isNotEmpty) {
+    return 'Siku $dayNumber: "${word.swahili}" (${word.grammar}) linamaanisha nini kwa Kiingereza?';
+  }
+  return 'Siku $dayNumber ($dayLabel): "${word.swahili}" linamaanisha nini kwa Kiingereza?';
+}
+
+/// Level test — Swahili questions, English answer choices (~5 per day).
 List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int count = kSwahiliTestQuestionCount}) {
   final allWords = <SwahiliWord>[];
   for (final day in level.days) {
@@ -549,38 +570,57 @@ List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int coun
   if (allWords.isEmpty) return [];
 
   final questions = <SwahiliTestQuestion>[];
-  final used = <int>{};
-  final rng = List<int>.generate(allWords.length, (i) => i)..shuffle();
+  final usedSwahili = <String>{};
 
-  for (var i = 0; i < count && i < rng.length; i++) {
-    final idx = rng[i];
-    if (used.contains(idx)) continue;
-    used.add(idx);
-    final word = allWords[idx];
-    final reverse = i.isOdd;
-    if (reverse) {
-      final wrong = _pickWrong(allWords, word.english, (w) => w.english);
-      final options = [word.english, ...wrong]..shuffle();
+  for (var d = 0; d < level.days.length; d++) {
+    final day = level.days[d];
+    final pool = List<SwahiliWord>.from(day.words)..shuffle();
+    var added = 0;
+    for (final word in pool) {
+      if (added >= kSwahiliQuestionsPerDay) break;
+      final key = word.swahili.trim().toLowerCase();
+      if (key.isEmpty || usedSwahili.contains(key)) continue;
+      usedSwahili.add(key);
+      final correct = _englishAnswer(word);
+      if (correct.isEmpty) continue;
+      final wrong = _pickWrong(allWords, correct, (w) => _englishAnswer(w));
+      final options = [correct, ...wrong]..shuffle();
       questions.add(
         SwahiliTestQuestion(
-          prompt: 'What does "${word.swahili}" mean?',
+          prompt: _swahiliTestPrompt(word, day, d + 1),
           options: options,
-          correctIndex: options.indexOf(word.english),
+          correctIndex: options.indexOf(correct),
         ),
       );
-    } else {
-      final wrong = _pickWrong(allWords, word.swahili, (w) => w.swahili);
-      final options = [word.swahili, ...wrong]..shuffle();
+      added++;
+    }
+  }
+
+  if (questions.length < count) {
+    final extra = List<SwahiliWord>.from(allWords)..shuffle();
+    for (final word in extra) {
+      if (questions.length >= count) break;
+      final key = word.swahili.trim().toLowerCase();
+      if (usedSwahili.contains(key)) continue;
+      usedSwahili.add(key);
+      final correct = _englishAnswer(word);
+      if (correct.isEmpty) continue;
+      final wrong = _pickWrong(allWords, correct, (w) => _englishAnswer(w));
+      final options = [correct, ...wrong]..shuffle();
+      final dayIndex = level.days.indexWhere((day) => day.words.contains(word));
+      final day = dayIndex >= 0 ? level.days[dayIndex] : level.days.first;
       questions.add(
         SwahiliTestQuestion(
-          prompt: 'How do you say "${word.english}" in Swahili?',
+          prompt: _swahiliTestPrompt(word, day, dayIndex >= 0 ? dayIndex + 1 : 1),
           options: options,
-          correctIndex: options.indexOf(word.swahili),
+          correctIndex: options.indexOf(correct),
         ),
       );
     }
   }
-  return questions;
+
+  questions.shuffle();
+  return questions.take(count).toList();
 }
 
 List<String> _pickWrong(List<SwahiliWord> pool, String correct, String Function(SwahiliWord) field) {

@@ -1665,6 +1665,16 @@ class _SwahiliTestPageState extends State<_SwahiliTestPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Chagua jibu la Kiingereza / Choose the English answer',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 ...List.generate(q.options.length, (i) {
                   final opt = q.options[i];

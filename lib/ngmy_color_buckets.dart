@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_offline_icons.dart';
 
 Future<void> showNgmyColorBucketsDialog(
   BuildContext context, {
@@ -248,7 +249,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                       ],
                     ),
                     child: const Center(
-                      child: Text('🎨', style: TextStyle(fontSize: 22)),
+                      child: NgmyOfflineEmoji('🎨', fontSize: 22),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -331,10 +332,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                                     ),
                                   ],
                                 ),
-                                child: Text(
-                                  p.emoji,
-                                  style: const TextStyle(fontSize: 20),
-                                ),
+                                child: NgmyOfflineEmoji(p.emoji, fontSize: 20),
                               ),
                               const SizedBox(height: 5),
                               Text(
@@ -402,16 +400,26 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                       borderRadius: BorderRadius.circular(16),
                       onTap: (_a.volume == 0 && _b.volume == 0) ? null : _mix,
                       child: Center(
-                        child: Text(
-                          'Mix it up! 🎉',
-                          style: TextStyle(
-                            color: (_a.volume == 0 && _b.volume == 0)
-                                ? muted
-                                : Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                        child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Mix it up! ',
+                            style: TextStyle(
+                              color: (_a.volume == 0 && _b.volume == 0)
+                                  ? muted
+                                  : Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
+                          NgmyOfflineEmoji(
+                            '🎉',
+                            fontSize: 16,
+                            color: (_a.volume == 0 && _b.volume == 0) ? muted : Colors.white,
+                          ),
+                        ],
+                      ),
                       ),
                     ),
                   ),
@@ -494,13 +502,19 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                         color: labelBg,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        '🪣 Bucket ${bucket.label}',
-                        style: TextStyle(
-                          color: labelInk,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const NgmyOfflineEmoji('🪣', fontSize: 12),
+                          Text(
+                            ' Bucket ${bucket.label}',
+                            style: TextStyle(
+                              color: labelInk,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const Spacer(),
@@ -615,7 +629,7 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
                   ),
                   child: !has
                       ? const Center(
-                          child: Text('🖌️', style: TextStyle(fontSize: 26)),
+                          child: NgmyOfflineEmoji('🖌️', fontSize: 26),
                         )
                       : null,
                 ),
@@ -624,17 +638,32 @@ class _NgmyColorBucketsScreenState extends State<NgmyColorBucketsScreen> {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              has
-                  ? (_note ?? _hexOf(_result!))
-                  : 'Pour some colors in, then hit Mix it up! ✨',
-              style: TextStyle(
-                color: has ? hub.title : hub.subtitle,
-                fontSize: 12.5,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: has
+                ? Text(
+                    _note ?? _hexOf(_result!),
+                    style: TextStyle(
+                      color: hub.title,
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Pour some colors in, then hit Mix it up! ',
+                          style: TextStyle(
+                            color: hub.subtitle,
+                            fontSize: 12.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const NgmyOfflineEmoji('✨', fontSize: 14),
+                    ],
+                  ),
           ),
         ],
       ),

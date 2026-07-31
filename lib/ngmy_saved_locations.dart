@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_hub_form_ui.dart';
+import 'ngmy_store_location.dart';
 
 const _kStorageKey = 'ngmy_saved_locations_v2';
 
@@ -505,6 +506,9 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
     _lat = e?.lat;
     _lng = e?.lng;
     _lastVisited = e?.lastVisited;
+    if (widget.existing == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _captureGps());
+    }
   }
 
   @override
@@ -518,17 +522,32 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
   Future<void> _captureGps() async {
     setState(() => _locating = true);
     try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Allow location to save GPS pin')));
+      final result = await ngmyFetchCurrentGpsDetailed();
+      if (result.failure != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ngmyGpsFailureMessage(result.failure!))),
+          );
+        }
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final reading = result.reading;
+      if (reading == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read GPS. Try again outdoors or allow location.')),
+          );
+        }
+        return;
+      }
+      final label = reading.label.trim();
       setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
+        _lat = reading.lat;
+        _lng = reading.lng;
       });
+      if (label.isNotEmpty) {
+        _address.text = label;
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('GPS failed: $e')));
     } finally {
@@ -572,16 +591,6 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          NgmyModernField(controller: _name, label: 'Name', hint: 'Office, client site, warehouse…', icon: Icons.label_outline_rounded, accent: _accent),
-          NgmyModernField(controller: _address, label: 'Address', hint: 'Street, suite, landmark', icon: Icons.location_on_outlined, accent: _accent),
-          Text('TYPE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
-          const SizedBox(height: 8),
-          NgmyModernChipRow(
-            options: const ['Client Site', 'Office', 'Warehouse', 'Delivery', 'Meeting', 'Other'],
-            selected: _category,
-            accent: _accent,
-            onSelected: (v) => setState(() => _category = v),
-          ),
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -590,26 +599,49 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
               child: Ink(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _accent.withValues(alpha: 0.45)),
-                  gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.15), _accent.withValues(alpha: 0.05)]),
+                  border: Border.all(color: _accent.withValues(alpha: 0.55)),
+                  gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.22), _accent.withValues(alpha: 0.08)]),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 child: Row(
                   children: [
-                    Icon(_locating ? Icons.hourglass_top_rounded : Icons.my_location_rounded, color: _accent),
+                    Icon(_locating ? Icons.hourglass_top_rounded : Icons.my_location_rounded, color: _accent, size: 26),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        _locating
-                            ? 'Getting GPS…'
-                            : (_lat != null ? 'GPS pinned: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}' : 'Tap to drop GPS pin here'),
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600, fontSize: 13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _locating ? 'Getting GPS & address…' : 'Drop GPS pin here',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _locating
+                                ? 'Please wait…'
+                                : (_lat != null
+                                    ? 'Pinned · address filled automatically'
+                                    : 'Uses your location and fills the address for you'),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontWeight: FontWeight.w500, fontSize: 11),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+          NgmyModernField(controller: _name, label: 'Name', hint: 'Office, client site, warehouse…', icon: Icons.label_outline_rounded, accent: _accent),
+          NgmyModernField(controller: _address, label: 'Address', hint: 'Filled from GPS — edit if needed', icon: Icons.location_on_outlined, accent: _accent),
+          Text('TYPE', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
+          const SizedBox(height: 8),
+          NgmyModernChipRow(
+            options: const ['Client Site', 'Office', 'Warehouse', 'Delivery', 'Meeting', 'Other'],
+            selected: _category,
+            accent: _accent,
+            onSelected: (v) => setState(() => _category = v),
           ),
           const SizedBox(height: 14),
           NgmyModernDateField(label: 'Last visit', value: _lastVisited, accent: _accent, onChanged: (d) => setState(() => _lastVisited = d)),
