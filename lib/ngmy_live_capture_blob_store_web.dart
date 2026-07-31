@@ -61,7 +61,8 @@ class NgmyLiveCaptureBlobStore {
     }
   }
 
-  static Future<bool> putBlob(String id, html.Blob blob) async {
+  static Future<bool> putBlob(String id, Object blob) async {
+    if (blob is! html.Blob) return false;
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readwrite');

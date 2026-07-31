@@ -117,9 +117,17 @@ class NgmyLiveCaptureStore {
     }
     var mediaOk = true;
     for (final item in trimmed) {
-      if (item.dataUrl.isNotEmpty) {
-        final ok = await NgmyLiveCaptureBlobStore.putMedia(item.id, item.dataUrl, mimeType: item.mimeType);
-        if (!ok) mediaOk = false;
+      if (item.dataUrl.isEmpty) {
+        // Media already in IndexedDB (photos putBytes, recordings putBlob).
+        final existing = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id);
+        if (existing == null || existing.isEmpty) mediaOk = false;
+        continue;
+      }
+      final ok = await NgmyLiveCaptureBlobStore.putMedia(item.id, item.dataUrl, mimeType: item.mimeType);
+      if (ok) {
+        item.dataUrl = '';
+      } else {
+        mediaOk = false;
       }
     }
     try {
@@ -198,23 +206,35 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       return null;
     }
     final email = _userEmail ?? '';
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    var mediaOk = true;
+    final blob = result.captureBlob;
+    if (blob != null) {
+      mediaOk = await NgmyLiveCaptureBlobStore.putBlob(id, blob);
+    } else if (result.dataUrl.isNotEmpty) {
+      mediaOk = await NgmyLiveCaptureBlobStore.putMedia(id, result.dataUrl, mimeType: result.mimeType);
+    }
+    final playUrl = mediaOk ? (await NgmyLiveCaptureBlobStore.getPlayableUrl(id) ?? result.dataUrl) : result.dataUrl;
     final item = NgmyLiveCaptureItem(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      title: '${videoMode ? 'Video' : 'New Recording'} ${NgmyLiveCaptureSession._formatClock(elapsedSec)}',
+      id: id,
+      title: '${videoMode ? 'Video' : 'Voice Memo'} ${NgmyLiveCaptureSession._formatClock(elapsedSec)}',
       kind: videoMode ? 'video' : 'audio',
       createdAt: DateTime.now(),
-      dataUrl: result.dataUrl,
+      dataUrl: mediaOk ? '' : playUrl,
       mimeType: result.mimeType,
       durationSec: elapsedSec,
     );
     final existing = await NgmyLiveCaptureStore.load(email);
-    final saved = await NgmyLiveCaptureStore.save(email, [item, ...existing]);
-    // Do not auto-download — that was blurring the app. User downloads from the player.
-    if (saved) {
+    final indexOk = await NgmyLiveCaptureStore.save(email, [item, ...existing]);
+    if (mediaOk) item.dataUrl = playUrl;
+    if (mediaOk && indexOk) {
+      lastError = null;
       lastStatus = 'Saved. Open it below to play, edit, or download.';
+    } else if (!mediaOk) {
+      lastError = 'Captured, but could not save on this device — download it from the player before you leave.';
+      lastStatus = null;
     } else {
-      lastError = 'Captured, but your device is out of storage to keep it saved — '
-          'download it now below before you leave this screen.';
+      lastStatus = 'Saved. Open it below to play, edit, or download.';
     }
     notifyListeners();
     return item;

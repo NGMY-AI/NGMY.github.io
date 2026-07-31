@@ -1,7 +1,8 @@
 class NgmyLiveCaptureResult {
-  const NgmyLiveCaptureResult({required this.dataUrl, required this.mimeType});
+  const NgmyLiveCaptureResult({required this.dataUrl, required this.mimeType, this.captureBlob});
   final String dataUrl;
   final String mimeType;
+  final Object? captureBlob;
 }
 
 class NgmyLiveCaptureEngine {

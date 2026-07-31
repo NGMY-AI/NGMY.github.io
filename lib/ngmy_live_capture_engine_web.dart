@@ -6,9 +6,15 @@ import 'package:flutter/foundation.dart';
 import 'ngmy_live_capture_media.dart';
 
 class NgmyLiveCaptureResult {
-  const NgmyLiveCaptureResult({required this.dataUrl, required this.mimeType});
+  const NgmyLiveCaptureResult({
+    required this.dataUrl,
+    required this.mimeType,
+    this.captureBlob,
+  });
   final String dataUrl;
   final String mimeType;
+  /// Raw [html.Blob] on web — avoids iOS Safari failing to re-fetch blob: URLs.
+  final Object? captureBlob;
 }
 
 /// Web MediaRecorder engine — reliable capture on Chrome, Firefox, Safari, iOS.
@@ -22,6 +28,9 @@ class NgmyLiveCaptureEngine {
   StreamSubscription<html.Event>? _errorSub;
   NgmyLiveCaptureResult? _last;
   bool _video = false;
+  /// iOS voice memos: mux mic + tiny canvas video so MediaRecorder emits MP4 data.
+  bool _appleVoiceMux = false;
+  Timer? _muxCanvasTimer;
 
   Object? get previewStream => _stream;
 
@@ -41,6 +50,7 @@ class NgmyLiveCaptureEngine {
     lastError = null;
     await dispose();
     _video = video;
+    _appleVoiceMux = false;
     try {
       _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
       _ensureTracksLive(_stream!);
@@ -55,7 +65,7 @@ class NgmyLiveCaptureEngine {
         return false;
       }
 
-      _mime = _pickMime(video: video);
+      _mime = _pickMime(video: video || _appleVoiceMux);
       _chunks.clear();
 
       final recorder = _createRecorder(_stream!, _mime);
@@ -80,19 +90,25 @@ class NgmyLiveCaptureEngine {
         debugPrint('[live_capture] recorder error: $e');
       });
 
-      // Timeslice keeps chunks flowing — empty captures usually mean stop fired with no dataavailable.
+      // iOS Safari needs ≥1000ms timeslice for valid MP4 segments.
       try {
-        recorder.start(1000);
+        recorder.start(_isAppleWebKit ? 1000 : 500);
       } catch (_) {
-        recorder.start();
+        try {
+          recorder.start();
+        } catch (e) {
+          lastError = 'Could not start recorder: $e';
+          await dispose();
+          return false;
+        }
       }
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await Future<void>.delayed(const Duration(milliseconds: 120));
       if (recorder.state != 'recording') {
         lastError = 'Recorder did not enter recording state (state=${recorder.state}).';
         await dispose();
         return false;
       }
-      debugPrint('[live_capture] recording started mime=$_mime video=$_video tracks=${_stream!.getTracks().length}');
+      debugPrint('[live_capture] recording started mime=$_mime video=$_video appleMux=$_appleVoiceMux tracks=${_stream!.getTracks().length}');
       return true;
     } catch (e) {
       lastError = _describeStartError(e);
@@ -136,6 +152,37 @@ class NgmyLiveCaptureEngine {
     });
   }
 
+  html.MediaStream _muxAppleVoiceStream(html.MediaStream audioStream) {
+    _appleVoiceMux = true;
+    final canvas = html.CanvasElement(width: 4, height: 4);
+    final ctx = canvas.context2D;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, 4, 4);
+    _muxCanvasTimer?.cancel();
+    _muxCanvasTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      try {
+        ctx.fillRect(0, 0, 4, 4);
+      } catch (_) {}
+    });
+
+    html.MediaStream? canvasStream;
+    try {
+      canvasStream = canvas.captureStream(1);
+    } catch (e) {
+      debugPrint('[live_capture] canvas captureStream failed: $e');
+      return audioStream;
+    }
+
+    final out = html.MediaStream();
+    for (final t in audioStream.getAudioTracks()) {
+      out.addTrack(t);
+    }
+    for (final t in canvasStream.getVideoTracks()) {
+      out.addTrack(t);
+    }
+    return out;
+  }
+
   Future<html.MediaStream> _openStream({
     required bool video,
     required String facingMode,
@@ -163,15 +210,23 @@ class NgmyLiveCaptureEngine {
         },
       ];
       Object? lastErr;
+      html.MediaStream? audioStream;
       for (final c in audioAttempts) {
         try {
-          return await devices.getUserMedia(c);
+          audioStream = await devices.getUserMedia(c);
+          break;
         } catch (e) {
           lastErr = e;
           debugPrint('[live_capture] getUserMedia audio failed: $e');
         }
       }
-      throw lastErr ?? StateError('Could not open microphone');
+      if (audioStream == null) {
+        throw lastErr ?? StateError('Could not open microphone');
+      }
+      if (_isAppleWebKit) {
+        return _muxAppleVoiceStream(audioStream);
+      }
+      return audioStream;
     }
 
     final facing = facingMode == 'environment' ? 'environment' : 'user';
@@ -276,8 +331,20 @@ class NgmyLiveCaptureEngine {
   String _pickMime({required bool video}) {
     final candidates = _isAppleWebKit
         ? (video
-            ? <String>['video/mp4', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/webm']
-            : <String>['audio/mp4', 'audio/aac', 'audio/mpeg', 'audio/wav', 'audio/webm;codecs=opus', 'audio/webm'])
+            ? <String>[
+                'video/mp4',
+                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                'video/webm;codecs=vp8,opus',
+                'video/webm',
+              ]
+            : <String>[
+                'video/mp4',
+                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                'audio/mp4',
+                'audio/aac',
+                'audio/webm;codecs=opus',
+                'audio/webm',
+              ])
         : (video
             ? <String>['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
             : <String>['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4']);
@@ -296,20 +363,25 @@ class NgmyLiveCaptureEngine {
       return null;
     }
 
+    _muxCanvasTimer?.cancel();
+    _muxCanvasTimer = null;
+
     final stopDone = Completer<void>();
     late final StreamSubscription<html.Event> stopSub;
     stopSub = html.EventStreamProvider<html.Event>('stop').forTarget(recorder).listen((_) {
       if (!stopDone.isCompleted) stopDone.complete();
     });
 
-    // Keep tracks alive until stop finishes — killing them early can drop the final chunk.
     try {
       final state = recorder.state;
       if (state == 'recording' || state == 'paused') {
         try {
           recorder.requestData();
         } catch (_) {}
-        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 200 : 120));
+        try {
+          recorder.requestData();
+        } catch (_) {}
         recorder.stop();
       } else if (!stopDone.isCompleted) {
         stopDone.complete();
@@ -321,30 +393,30 @@ class NgmyLiveCaptureEngine {
     }
 
     try {
-      await stopDone.future.timeout(const Duration(seconds: 12));
+      await stopDone.future.timeout(const Duration(seconds: 15));
     } catch (_) {
       debugPrint('[live_capture] stop event timeout — using buffered chunks');
     }
-    // Allow a late final dataavailable after stop.
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+
+    // iOS Safari often delivers the final MP4 chunk late — wait before tearing down.
+    await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 2200 : 450));
     try {
       await stopSub.cancel();
     } catch (_) {}
 
     final blobMime = (_mime.trim().isNotEmpty
             ? _mime
-            : (recorder.mimeType ?? (_video ? 'video/webm' : 'audio/webm')))
+            : (recorder.mimeType ?? ((_video || _appleVoiceMux) ? 'video/mp4' : 'audio/webm')))
         .trim();
     final cleanMime = ngmyCleanMediaMime(blobMime);
 
     await _cancelSubs();
-    // Release hardware only after chunks are collected.
     await _releaseStream();
     _recorder = null;
 
     if (_chunks.isEmpty) {
       lastError =
-          'No audio/video data was captured. Make sure the mic/camera permission is allowed, keep this tab open while recording, speak for a second, then stop.';
+          'No audio/video data was captured. Allow mic/camera for ngmy.org, record at least 2 seconds, then tap Stop & Save.';
       debugPrint('[live_capture] empty chunks after stop');
       return null;
     }
@@ -356,46 +428,16 @@ class NgmyLiveCaptureEngine {
     }
     debugPrint('[live_capture] blob ready size=${blob.size} mime=$blobMime chunks=${_chunks.length}');
 
-    String dataUrl;
-    // Large captures: skip base64 data URL — store blob URL and persist blob in IndexedDB.
-    if (blob.size > 4 * 1024 * 1024) {
-      dataUrl = html.Url.createObjectUrlFromBlob(blob);
-    } else {
-      try {
-        dataUrl = await _blobToDataUrl(blob).timeout(const Duration(seconds: 90));
-      } catch (e) {
-        debugPrint('[live_capture] dataUrl convert failed, using object URL: $e');
-        dataUrl = html.Url.createObjectUrlFromBlob(blob);
-      }
-    }
+    final dataUrl = html.Url.createObjectUrlFromBlob(blob);
     if (dataUrl.isEmpty) {
       lastError = 'Captured, but could not read the recording data.';
       return null;
     }
 
     _mime = cleanMime;
-    _last = NgmyLiveCaptureResult(dataUrl: dataUrl, mimeType: cleanMime);
+    _last = NgmyLiveCaptureResult(dataUrl: dataUrl, mimeType: cleanMime, captureBlob: blob);
     _chunks.clear();
     return _last;
-  }
-
-  Future<String> _blobToDataUrl(html.Blob blob) async {
-    final reader = html.FileReader();
-    final done = Completer<String>();
-    late StreamSubscription loadSub;
-    late StreamSubscription errSub;
-    loadSub = reader.onLoadEnd.listen((_) {
-      loadSub.cancel();
-      errSub.cancel();
-      done.complete(reader.result?.toString() ?? '');
-    });
-    errSub = reader.onError.listen((e) {
-      loadSub.cancel();
-      errSub.cancel();
-      done.completeError(e);
-    });
-    reader.readAsDataUrl(blob);
-    return done.future;
   }
 
   Future<void> downloadLast() async {
@@ -431,6 +473,8 @@ class NgmyLiveCaptureEngine {
   }
 
   Future<void> dispose() async {
+    _muxCanvasTimer?.cancel();
+    _muxCanvasTimer = null;
     try {
       if (_recorder != null && _recorder!.state != 'inactive') {
         _recorder!.stop();

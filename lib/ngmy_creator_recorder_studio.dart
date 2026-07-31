@@ -79,6 +79,8 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   void _setMode(_StudioMode mode) {
     if (_session.recording) return;
+    _session.lastError = null;
+    _session.lastStatus = null;
     setState(() {
       _mode = mode;
       _session.videoMode = mode == _StudioMode.video;
@@ -87,6 +89,8 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   Future<void> _startRecording() async {
     if (_busy || _session.recording || _mode == _StudioMode.photo) return;
+    _session.lastError = null;
+    _session.lastStatus = null;
     setState(() => _busy = true);
     await _session.start(userEmail: widget.userEmail, video: _mode == _StudioMode.video);
     if (mounted) setState(() => _busy = false);
@@ -106,20 +110,30 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   Future<void> _capturePhoto({required ImageSource source}) async {
     if (_busy || _session.recording) return;
+    _session.lastError = null;
+    _session.lastStatus = null;
     setState(() => _busy = true);
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(source: source, imageQuality: 90, maxWidth: 4096);
       if (picked == null || !mounted) return;
       final bytes = await picked.readAsBytes();
-      if (bytes.isEmpty) return;
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo was empty — try again.'), backgroundColor: Color(0xFFDC2626)),
+          );
+        }
+        return;
+      }
       final id = DateTime.now().microsecondsSinceEpoch.toString();
       final title = 'Photo · ${_photoTitleStamp(DateTime.now())}';
-      final ok = await NgmyLiveCaptureBlobStore.putBytes(id, bytes, mimeType: 'image/jpeg');
+      final stored = await NgmyLiveCaptureBlobStore.putBytes(id, bytes, mimeType: 'image/jpeg');
       var playUrl = '';
-      if (ok) {
+      if (stored) {
         playUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(id) ?? '';
-      } else if (bytes.length <= 800000) {
+      }
+      if (playUrl.isEmpty && bytes.length <= 700000) {
         playUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       }
       if (playUrl.isEmpty) {
@@ -139,12 +153,15 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
         title: title,
         kind: 'photo',
         createdAt: DateTime.now(),
-        dataUrl: playUrl,
+        dataUrl: stored ? '' : playUrl,
         mimeType: 'image/jpeg',
         durationSec: 0,
       );
       final existing = await NgmyLiveCaptureStore.load(widget.userEmail);
       await NgmyLiveCaptureStore.save(widget.userEmail, [item, ...existing]);
+      if (stored) item.dataUrl = playUrl;
+      _session.lastError = null;
+      _session.lastStatus = 'Photo saved to your studio library.';
       await _reload();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -755,7 +772,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = widget.item.kind == 'video';
+    final isVideo = widget.item.kind == 'video' || widget.item.mimeType.startsWith('video/');
     final isPhoto = widget.item.kind == 'photo';
     final maxH = MediaQuery.sizeOf(context).height * 0.88;
     return SafeArea(
@@ -792,6 +809,13 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
                     height: 240,
+                  )
+                else if (widget.item.mimeType.startsWith('video/'))
+                  NgmyLiveCaptureMedia.playbackVideo(
+                    key: ValueKey('vm-${widget.item.id}'),
+                    src: widget.item.dataUrl,
+                    mimeType: widget.item.mimeType,
+                    height: 54,
                   )
                 else
                   NgmyLiveCaptureMedia.playbackAudio(
