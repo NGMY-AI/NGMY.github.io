@@ -4,8 +4,8 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
-/// Vault video player — play/pause must run synchronously inside the user's
-/// tap/pointer handler on mobile Safari (async Flutter callbacks cannot start video).
+/// Full-screen vault player — one play/pause path only (no double-toggle).
+/// Tap the video or use the bottom bar; no extra center play icon.
 class NgmyVaultHtmlVideo extends StatefulWidget {
   const NgmyVaultHtmlVideo({super.key, required this.source, this.mimeType = 'video/mp4'});
 
@@ -19,8 +19,8 @@ class NgmyVaultHtmlVideo extends StatefulWidget {
 class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
   late final String _viewType;
   html.VideoElement? _video;
-  html.DivElement? _root;
   final Completer<void> _viewReady = Completer<void>();
+  void Function()? _togglePlaySync;
   bool _ready = false;
   bool _playing = false;
   bool _muted = false;
@@ -39,7 +39,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         ..style.height = '100%'
         ..style.position = 'relative'
         ..style.backgroundColor = '#000'
-        ..style.overflow = 'hidden';
+        ..style.overflow = 'hidden'
+        ..style.cursor = 'pointer';
 
       final v = html.VideoElement()
         ..controls = false
@@ -60,57 +61,28 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         ..type = mime);
       v.src = widget.source;
 
-      final playHint = html.DivElement()
-        ..style.position = 'absolute'
-        ..style.left = '50%'
-        ..style.top = '50%'
-        ..style.transform = 'translate(-50%, -50%)'
-        ..style.width = '72px'
-        ..style.height = '72px'
-        ..style.borderRadius = '50%'
-        ..style.backgroundColor = 'rgba(0,0,0,0.55)'
-        ..style.border = '1.5px solid rgba(255,255,255,0.24)'
-        ..style.display = 'flex'
-        ..style.alignItems = 'center'
-        ..style.justifyContent = 'center'
-        ..style.pointerEvents = 'none'
-        ..style.color = '#fff'
-        ..style.fontSize = '44px'
-        ..style.lineHeight = '1'
-        ..text = '▶';
-
       root.append(v);
-      root.append(playHint);
       _video = v;
-      _root = root;
-
-      void syncPlayHint() {
-        playHint.style.display = (v.paused || v.ended) ? 'flex' : 'none';
-        playHint.text = v.paused || v.ended ? '▶' : '❚❚';
-      }
 
       void togglePlaySync() {
         try {
           if (v.paused || v.ended) {
             if (v.ended) v.currentTime = 0;
-            final p = v.play();
-            if (p != null) {
-              unawaited(p.catchError((_) {
-                v.muted = true;
-                unawaited(v.play().then((_) {
-                  v.muted = _muted;
-                }));
+            unawaited(v.play().catchError((_) {
+              v.muted = true;
+              unawaited(v.play().then((_) {
+                v.muted = _muted;
               }));
-            }
+            }));
           } else {
             v.pause();
           }
-          syncPlayHint();
         } catch (e) {
-          debugPrint('[vault html video] togglePlaySync: $e');
+          debugPrint('[vault html video] toggle: $e');
         }
       }
 
+      _togglePlaySync = togglePlaySync;
       root.onClick.listen((_) => togglePlaySync());
 
       void markReady() {
@@ -122,22 +94,18 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
             _duration = Duration(milliseconds: (durSec * 1000).round());
           }
         });
-        syncPlayHint();
       }
 
       v.onLoadedMetadata.listen((_) => markReady());
       v.onLoadedData.listen((_) => markReady());
       v.onCanPlay.listen((_) => markReady());
       v.onPlay.listen((_) {
-        syncPlayHint();
         if (mounted) setState(() => _playing = true);
       });
       v.onPause.listen((_) {
-        syncPlayHint();
         if (mounted) setState(() => _playing = false);
       });
       v.onEnded.listen((_) {
-        syncPlayHint();
         if (mounted) {
           setState(() {
             _playing = false;
@@ -157,8 +125,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         });
       });
       v.onError.listen((_) {
-        final code = v.error?.code;
-        debugPrint('[vault html video] error code=$code src=${widget.source} mime=$mime');
+        debugPrint('[vault html video] error code=${v.error?.code} src=${widget.source}');
         if (mounted) {
           setState(() => _error = 'Could not play this video. Try re-adding an MP4 clip from your gallery.');
         }
@@ -180,38 +147,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     super.dispose();
   }
 
-  /// Must stay synchronous — called directly from pointer/tap handlers.
-  void _togglePlayFromGesture() {
-    final v = _video;
-    if (v == null) {
-      try {
-        _root?.click();
-      } catch (_) {}
-      return;
-    }
-    try {
-      if (v.paused || v.ended) {
-        if (v.ended) v.currentTime = 0;
-        final p = v.play();
-        if (p != null) {
-          unawaited(p.catchError((_) {
-            v.muted = true;
-            unawaited(v.play().then((_) {
-              v.muted = _muted;
-            }));
-          }));
-        }
-        if (mounted) setState(() => _playing = true);
-      } else {
-        v.pause();
-        if (mounted) setState(() => _playing = false);
-      }
-    } catch (e) {
-      debugPrint('[vault html video] gesture play: $e');
-      if (mounted) {
-        setState(() => _error = 'Tap Play again — your browser blocked playback.');
-      }
-    }
+  void _tapPlayPause() {
+    _togglePlaySync?.call();
   }
 
   Future<void> _toggleMute() async {
@@ -262,7 +199,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
                 TextButton(
                   onPressed: () {
                     setState(() => _error = null);
-                    _togglePlayFromGesture();
+                    _tapPlayPause();
                   },
                   child: const Text('Try play again'),
                 ),
@@ -288,39 +225,6 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
               ),
             ),
           ),
-        // Flutter tap target — play() runs synchronously in this pointer handler.
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 96,
-          child: Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerUp: (_) => _togglePlayFromGesture(),
-            child: Center(
-              child: IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: (!_playing || !_ready) ? 1 : 0.0,
-                  duration: const Duration(milliseconds: 180),
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24, width: 1.5),
-                    ),
-                    child: Icon(
-                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 44,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
         Positioned(
           left: 12,
           right: 12,
@@ -355,7 +259,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
                     children: [
                       _barBtn(
                         _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        _togglePlayFromGesture,
+                        _tapPlayPause,
                       ),
                       const SizedBox(width: 4),
                       _barBtn(
@@ -372,7 +276,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
                         final v = _video;
                         if (v == null) return;
                         v.currentTime = 0;
-                        _togglePlayFromGesture();
+                        _tapPlayPause();
                       }),
                     ],
                   ),

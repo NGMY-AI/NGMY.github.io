@@ -15,7 +15,6 @@ import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
 import 'ngmy_vault_html_video.dart';
 import 'ngmy_vault_pick_video.dart';
-import 'ngmy_vault_video_preview.dart';
 import 'ngmy_vault_video_thumb.dart';
 import 'ngmy_vault_web_io.dart';
 
@@ -486,13 +485,14 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
       _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.video, mime: picked.mime, createdAt: DateTime.now()));
       await _saveIndex(widget.userEmail, _items);
       if (!mounted) return;
-      setState(() {});
-      unawaited(_storeVideoThumbnail(
+      await _storeVideoThumbnail(
         id,
         webBlob: blob,
         bytes: picked.bytes,
         mime: picked.mime,
-      ));
+      );
+      if (!mounted) return;
+      setState(() {});
       _notice('Saved 1 video privately.');
     } on StateError catch (e) {
       if (!mounted) return;
@@ -923,7 +923,6 @@ class _VaultVideoThumbTile extends StatefulWidget {
 
 class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
   Uint8List? _jpegThumb;
-  String? _previewUrl;
   bool _loading = true;
 
   @override
@@ -932,50 +931,23 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
     _load();
   }
 
-  @override
-  void dispose() {
-    final url = _previewUrl;
-    if (url != null) NgmyVaultBlobStore.revokeObjectUrl(url);
-    super.dispose();
-  }
-
   Future<void> _load() async {
     final key = NgmyVaultBlobStore.thumbKey(widget.itemId);
-    final cached = await NgmyVaultBlobStore.getBytes(key);
-    if (cached != null && cached.isNotEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _jpegThumb = cached;
-        _loading = false;
-      });
-      return;
+    var bytes = await NgmyVaultBlobStore.getBytes(key);
+    if (bytes == null || bytes.isEmpty) {
+      final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, widget.mime);
+      if (url != null && url.isNotEmpty) {
+        bytes = await ngmyVaultCaptureVideoThumbnail(objectUrl: url, mime: widget.mime);
+        NgmyVaultBlobStore.revokeObjectUrl(url);
+        if (bytes != null && bytes.isNotEmpty) {
+          await NgmyVaultBlobStore.put(key, bytes, mime: 'image/jpeg');
+        }
+      }
     }
-
-    final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, widget.mime);
     if (!mounted) return;
-    if (url == null || url.isEmpty) {
-      setState(() => _loading = false);
-      return;
-    }
-
-    setState(() {
-      _previewUrl = url;
-      _loading = false;
-    });
-
-    unawaited(_cacheJpegThumb(key, url));
-  }
-
-  Future<void> _cacheJpegThumb(String key, String url) async {
-    final bytes = await ngmyVaultCaptureVideoThumbnail(objectUrl: url, mime: widget.mime);
-    if (bytes == null || bytes.isEmpty || !mounted) return;
-    await NgmyVaultBlobStore.put(key, bytes, mime: 'image/jpeg');
-    if (!mounted) return;
-    final liveUrl = _previewUrl;
-    if (liveUrl != null) NgmyVaultBlobStore.revokeObjectUrl(liveUrl);
     setState(() {
       _jpegThumb = bytes;
-      _previewUrl = null;
+      _loading = false;
     });
   }
 
@@ -1008,17 +980,11 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return _fallback(spinner: true);
+    if (_jpegThumb == null || _jpegThumb!.isEmpty) return _fallback();
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (_jpegThumb != null)
-          Image.memory(_jpegThumb!, fit: BoxFit.cover)
-        else if (_previewUrl != null)
-          IgnorePointer(
-            child: NgmyVaultVideoPreview(source: _previewUrl!, mimeType: widget.mime),
-          )
-        else
-          _fallback(),
+        Image.memory(_jpegThumb!, fit: BoxFit.cover, gaplessPlayback: true),
         Container(color: Colors.black.withValues(alpha: 0.10)),
         _playBadge(),
       ],
