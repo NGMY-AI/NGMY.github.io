@@ -129,8 +129,8 @@ class NgmyVaultBlobStore {
     } catch (e) {
       debugPrint('[ngmy_vault_blob] putBlob: $e');
     }
-    // Fallback for medium clips — read into bytes (reliable playback on all browsers).
-    if (htmlBlob.size > 0 && htmlBlob.size <= 180 * 1024 * 1024) {
+    // Small clips only — never load multi‑hundred‑MB videos into Dart memory.
+    if (htmlBlob.size > 0 && htmlBlob.size <= 64 * 1024 * 1024) {
       final bytes = await _blobToBytes(htmlBlob);
       if (bytes != null && bytes.isNotEmpty) {
         return put(id, bytes, mime: type);

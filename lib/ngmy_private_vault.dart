@@ -485,14 +485,13 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
       _items.insert(0, NgmyVaultItem(id: id, kind: NgmyVaultKind.video, mime: picked.mime, createdAt: DateTime.now()));
       await _saveIndex(widget.userEmail, _items);
       if (!mounted) return;
-      await _storeVideoThumbnail(
+      setState(() {});
+      unawaited(_storeVideoThumbnail(
         id,
         webBlob: blob,
         bytes: picked.bytes,
         mime: picked.mime,
-      );
-      if (!mounted) return;
-      setState(() {});
+      ));
       _notice('Saved 1 video privately.');
     } on StateError catch (e) {
       if (!mounted) return;
@@ -500,7 +499,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (4+ minutes supported).')),
+        const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (long clips supported).')),
       );
     }
   }
@@ -588,7 +587,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
             _addOption(ctx, emoji: '🖼️', title: 'Add photos', subtitle: 'Choose one or more from your gallery', onTap: _addPhotos),
-            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Gallery clips — 4+ minutes supported', onTap: _addVideo),
+            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Saved on your device — 5+ min, very large files OK', onTap: _addVideo),
             const SizedBox(height: 12),
           ],
         ),

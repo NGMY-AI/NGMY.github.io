@@ -5,8 +5,9 @@ import 'package:flutter/foundation.dart';
 
 import 'ngmy_vault_pick_video_types.dart';
 
-/// 512 MB — 4+ minute clips at typical phone quality.
-const int kNgmyVaultMaxVideoBytes = 512 * 1024 * 1024;
+/// Local device storage via IndexedDB — long clips, up to ~2 GB per video.
+/// Actual limit depends on free space on the user's phone/browser.
+const int kNgmyVaultMaxVideoBytes = 2 * 1024 * 1024 * 1024;
 
 String ngmyVaultVideoMime(String? mime, String name) {
   final m = (mime ?? '').trim().toLowerCase();
@@ -22,8 +23,8 @@ String ngmyVaultVideoMime(String? mime, String name) {
 void _checkVideoSize(int size) {
   if (size > kNgmyVaultMaxVideoBytes) {
     throw StateError(
-      'Video is too large (max ${kNgmyVaultMaxVideoBytes ~/ (1024 * 1024)} MB). '
-      'Try a lower quality export or trim the clip.',
+      'Video is too large (max ${kNgmyVaultMaxVideoBytes ~/ (1024 * 1024 * 1024)} GB). '
+      'Free up space on your device and try a smaller export.',
     );
   }
 }
@@ -51,7 +52,7 @@ Future<NgmyVaultPickedVideo?> _pickWithHtmlInput() async {
   input.click();
 
   final file = await completer.future.timeout(
-    const Duration(minutes: 15),
+    const Duration(hours: 2),
     onTimeout: () {
       cleanup();
       return null;
