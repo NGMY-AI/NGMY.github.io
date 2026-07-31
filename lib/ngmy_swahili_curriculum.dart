@@ -550,7 +550,11 @@ String _englishAnswer(SwahiliWord word) {
   return en;
 }
 
-String _swahiliTestPrompt(SwahiliWord word) => word.swahili.trim();
+String _swahiliTestPrompt(SwahiliWord word) {
+  final s = word.swahili.trim();
+  if (s.isEmpty) return 'Chagua jibu sahihi la Kiingereza.';
+  return '"$s" linamaanisha nini kwa Kiingereza?';
+}
 
 /// Level test — Swahili questions, English answer choices (~5 per day).
 List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int count = kSwahiliTestQuestionCount}) {
@@ -623,7 +627,7 @@ List<String> _pickWrong(List<SwahiliWord> pool, String correct, String Function(
     }
   }
   while (out.length < 3) {
-    out.add('—');
+    out.add('(other)');
   }
   return out.take(3).toList();
 }
