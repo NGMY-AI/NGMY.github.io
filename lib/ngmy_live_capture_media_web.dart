@@ -35,6 +35,8 @@ Uint8List? _decodeDataUrlBytes(String dataUrl) {
 }
 
 class NgmyLiveCaptureMedia {
+  static Uint8List? decodeDataUrlBytes(String dataUrl) => _decodeDataUrlBytes(dataUrl);
+
   static Widget liveCameraPreview({required Object? stream, double height = 200, bool mirror = true}) {
     return _StableCameraPreview(stream: stream, height: height, mirror: mirror);
   }
@@ -163,6 +165,9 @@ class NgmyLiveCaptureMedia {
 
   static String _extFor(String mime) {
     final m = ngmyCleanMediaMime(mime);
+    if (m.contains('jpeg') || m.contains('jpg')) return 'jpg';
+    if (m.contains('png')) return 'png';
+    if (m.contains('audio/mp4') || m.contains('audio/aac') || m.contains('audio/m4a')) return 'm4a';
     if (m.contains('mp4')) return 'mp4';
     if (m.contains('ogg')) return 'ogg';
     if (m.contains('wav')) return 'wav';

@@ -40,6 +40,8 @@ class NgmyLiveCaptureMedia {
 
   static String toPlayableUrl(String src, String mimeType) => src;
 
+  static Uint8List? decodeDataUrlBytes(String dataUrl) => null;
+
   static Future<NgmyCapturePlayer?> createPlayer(String src, {required bool video, String? mimeType}) async => null;
 
   static void downloadSync(String dataUrl, String mimeType, String title) {}

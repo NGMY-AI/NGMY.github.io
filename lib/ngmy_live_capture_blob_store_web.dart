@@ -135,6 +135,72 @@ class NgmyLiveCaptureBlobStore {
     }
   }
 
+  static Future<Uint8List?> getBytes(String id) async {
+    try {
+      final db = await _open();
+      final tx = db.transaction(_storeName, 'readonly');
+      final result = await tx.objectStore(_storeName).getObject(id);
+      return await _objectToBytes(result);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Uint8List?> fetchBlobUrlBytes(String blobUrl) async {
+    if (!blobUrl.startsWith('blob:')) return null;
+    try {
+      final req = await html.HttpRequest.request(blobUrl, responseType: 'blob');
+      final blob = req.response;
+      if (blob is html.Blob) return _blobToBytes(blob);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<Uint8List?> _objectToBytes(Object? result) async {
+    if (result is html.Blob) return _blobToBytes(result);
+    if (result is String && result.startsWith('data:')) {
+      try {
+        final comma = result.indexOf(',');
+        if (comma < 0) return null;
+        final header = result.substring(0, comma).toLowerCase();
+        final payload = result.substring(comma + 1);
+        if (header.contains(';base64')) {
+          var cleaned = payload.replaceAll(RegExp(r'\s'), '');
+          cleaned = cleaned.replaceAll('-', '+').replaceAll('_', '/');
+          final pad = cleaned.length % 4;
+          if (pad > 0) cleaned = cleaned.padRight(cleaned.length + (4 - pad), '=');
+          return base64Decode(cleaned);
+        }
+        return Uint8List.fromList(Uri.decodeComponent(payload).codeUnits);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (result is Uint8List) return Uint8List.fromList(result);
+    if (result is List<int>) return Uint8List.fromList(result);
+    return null;
+  }
+
+  static Future<Uint8List?> _blobToBytes(html.Blob blob) async {
+    final reader = html.FileReader();
+    final done = Completer<Uint8List?>();
+    reader.onLoadEnd.listen((_) {
+      final r = reader.result;
+      if (r is ByteBuffer) {
+        done.complete(Uint8List.view(r));
+      } else if (r is Uint8List) {
+        done.complete(Uint8List.fromList(r));
+      } else {
+        done.complete(null);
+      }
+    });
+    reader.onError.listen((_) {
+      if (!done.isCompleted) done.complete(null);
+    });
+    reader.readAsArrayBuffer(blob);
+    return done.future;
+  }
+
   static Future<void> delete(String id) async {
     try {
       final db = await _open();

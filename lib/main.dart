@@ -193,6 +193,7 @@ import 'ngmy_medicine_reminder_service.dart';
 import 'ngmy_swahili_reminders.dart';
 import 'ngmy_tool_hub_nav_icon.dart';
 import 'ngmy_platform_graphics.dart';
+import 'ngmy_recorder_background_overlay.dart';
 import 'ngmy_investment_plans.dart';
 import 'ngmy_legal_content.dart';
 import 'ngmy_auth_dialogs.dart';
@@ -12840,7 +12841,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   ),
                 ),
               );
-          return ngmyCrispAppWrapper(context, body);
+          return ngmyWrapRecorderBackgroundOverlay(context, ngmyCrispAppWrapper(context, body));
         },
         home: _currentUser == null
             ? AuthScreen(

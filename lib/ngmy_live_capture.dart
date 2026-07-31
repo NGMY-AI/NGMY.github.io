@@ -167,6 +167,10 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   Object? get previewStream => _engine.previewStream;
 
+  String? get activeUserEmail => _userEmail;
+
+  bool get isBackgroundRecording => recording;
+
   Future<bool> start({required String userEmail, required bool video}) async {
     lastError = null;
     lastStatus = null;
@@ -191,7 +195,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       elapsedSec = DateTime.now().difference(_startedAt!).inSeconds;
       notifyListeners();
     });
-    lastStatus = 'Recording — leave open, take a call, or switch apps. Capture keeps going when allowed.';
+    lastStatus = 'Recording — leave the studio anytime. Use the green bar at the bottom to stop.';
     notifyListeners();
     return true;
   }

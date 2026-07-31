@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_live_capture.dart';
 import 'ngmy_live_capture_blob_store.dart';
+import 'ngmy_live_capture_export.dart';
 import 'ngmy_live_capture_media.dart';
 
 /// Cool green studio palette — photos, voice memos, and video in one place.
@@ -185,6 +186,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   Future<void> _openItem(NgmyLiveCaptureItem item) async {
+    if (item.dataUrl.isEmpty) {
+      item.dataUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id) ?? '';
+    }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -270,7 +274,19 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (recording) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Still recording — browse NGMY freely. Use the bar at the bottom to stop.'),
+                    backgroundColor: Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+              Navigator.pop(context);
+            },
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           ),
           Expanded(
@@ -279,7 +295,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               children: [
                 const Text('Recorder Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
                 Text(
-                  recording ? 'Recording — you can leave this screen open.' : 'Photos · voice memos · video — like a pocket studio.',
+                  recording
+                      ? 'Recording — leave anytime. Green bar at bottom keeps it going.'
+                      : 'Photos · voice memos · video — like a pocket studio.',
                   style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
                 ),
               ],
@@ -417,6 +435,30 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                         ),
                       ),
                     ),
+                    if (recording) ...[
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Recording continues — use the bottom bar anywhere in NGMY to stop.'),
+                                backgroundColor: Color(0xFF059669),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: NgmyRecorderStudioColors.mint,
+                            side: BorderSide(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.7)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Leave open', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -700,11 +742,21 @@ class _StudioCaptureSheet extends StatefulWidget {
 
 class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
   late final TextEditingController _titleC;
+  bool _exporting = false;
 
   @override
   void initState() {
     super.initState();
     _titleC = TextEditingController(text: widget.item.title);
+    unawaited(_ensureMediaUrl());
+  }
+
+  Future<void> _ensureMediaUrl() async {
+    if (widget.item.dataUrl.isNotEmpty) return;
+    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
+    if (url != null && url.isNotEmpty && mounted) {
+      setState(() => widget.item.dataUrl = url);
+    }
   }
 
   @override
@@ -755,8 +807,36 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
     if (mounted) setState(() {});
   }
 
-  void _download() {
-    NgmyLiveCaptureMedia.downloadSync(widget.item.dataUrl, widget.item.mimeType, widget.item.title);
+  Future<void> _download() async {
+    setState(() => _exporting = true);
+    final ok = await ngmyLiveCaptureDownload(widget.item);
+    if (mounted) {
+      setState(() => _exporting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Download started — check Files or Downloads.' : 'Could not download this item.'),
+          backgroundColor: ok ? NgmyRecorderStudioColors.emerald : const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _share() async {
+    setState(() => _exporting = true);
+    final ok = await ngmyLiveCaptureShare(widget.item);
+    if (mounted) {
+      setState(() => _exporting = false);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not share — try Download instead.'),
+            backgroundColor: Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _delete() async {
@@ -829,7 +909,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: widget.item.dataUrl.isEmpty ? null : _download,
+                        onPressed: _exporting ? null : _download,
                         style: FilledButton.styleFrom(
                           backgroundColor: NgmyRecorderStudioColors.forest,
                           foregroundColor: Colors.white,
@@ -841,6 +921,24 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                       ),
                     ),
                     const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _exporting ? null : _share,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: NgmyRecorderStudioColors.emerald,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.ios_share_rounded),
+                        label: const Text('Share', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _rename,
