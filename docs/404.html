@@ -24,7 +24,7 @@
 
   <script>
     (function () {
-      var embedded = '20260731045403';
+      var embedded = '20260731173757';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -430,9 +430,15 @@
 
       overscroll-behavior-x: none;
 
-      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
 
-      -moz-osx-font-smoothing: grayscale;
+      text-size-adjust: 100%;
+
+      text-rendering: geometricPrecision;
+
+      -webkit-font-smoothing: subpixel-antialiased;
+
+      -moz-osx-font-smoothing: auto;
 
     }
 
@@ -446,9 +452,25 @@
 
       background-color: #121212;
 
+      display: block;
+
+      width: 100%;
+
+      height: 100%;
+
+      touch-action: manipulation;
+
       -webkit-user-select: text;
 
       user-select: text;
+
+    }
+
+    flutter-view canvas,
+    flt-scene-host canvas,
+    flt-glass-pane canvas {
+
+      outline: none;
 
     }
 
@@ -655,7 +677,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260731045403";
+      var CURRENT = "20260731173757";
 
       function showError(msg) {
 
@@ -707,7 +729,7 @@
 
   <script>
     (function () {
-      var deployId = '20260731045403';
+      var deployId = '20260731173757';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
