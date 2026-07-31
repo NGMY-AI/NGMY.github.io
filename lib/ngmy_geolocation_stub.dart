@@ -1,1 +1,1 @@
-Future<({double lat, double lng})?> ngmyPlatformGeolocationFallback() async => null;
+Future<({double lat, double lng, double? accuracyM})?> ngmyPlatformGeolocationFallback() async => null;

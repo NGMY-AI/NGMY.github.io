@@ -200,7 +200,8 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
   String _filter = 'All';
   bool _loading = true;
   bool _sortByDistance = false;
-  Position? _here;
+  double? _hereLat;
+  double? _hereLng;
 
   @override
   void initState() {
@@ -220,11 +221,13 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
 
   Future<void> _refreshGps() async {
     try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
-      final pos = await Geolocator.getCurrentPosition();
-      if (mounted) setState(() => _here = pos);
+      final result = await ngmyFetchCurrentGpsDetailed();
+      final reading = result.reading;
+      if (reading == null || !mounted) return;
+      setState(() {
+        _hereLat = reading.lat;
+        _hereLng = reading.lng;
+      });
     } catch (_) {}
   }
 
@@ -234,13 +237,13 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
   }
 
   double? _distanceKm(NgmySavedLocation loc) {
-    if (_here == null || !loc.hasGps) return null;
-    return Geolocator.distanceBetween(_here!.latitude, _here!.longitude, loc.lat!, loc.lng!) / 1000;
+    if (_hereLat == null || _hereLng == null || !loc.hasGps) return null;
+    return Geolocator.distanceBetween(_hereLat!, _hereLng!, loc.lat!, loc.lng!) / 1000;
   }
 
   List<NgmySavedLocation> get _visible {
     var list = _locations.where((l) => _filter == 'All' || l.category == _filter).toList();
-    if (_sortByDistance && _here != null) {
+    if (_sortByDistance && _hereLat != null && _hereLng != null) {
       list.sort((a, b) {
         final da = _distanceKm(a) ?? double.infinity;
         final db = _distanceKm(b) ?? double.infinity;
@@ -506,9 +509,6 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
     _lat = e?.lat;
     _lng = e?.lng;
     _lastVisited = e?.lastVisited;
-    if (widget.existing == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _captureGps());
-    }
   }
 
   @override
@@ -620,8 +620,8 @@ class _LocationEditorPageState extends State<_LocationEditorPage> {
                             _locating
                                 ? 'Please wait…'
                                 : (_lat != null
-                                    ? 'Pinned · address filled automatically'
-                                    : 'Uses your location and fills the address for you'),
+                                    ? 'Pinned · tap again to refresh address'
+                                    : 'Tap for your live location — wait outdoors for best accuracy'),
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontWeight: FontWeight.w500, fontSize: 11),
                           ),
                         ],

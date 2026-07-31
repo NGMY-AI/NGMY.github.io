@@ -81,72 +81,139 @@ Future<Position?> _readPositionViaGeolocator({bool highAccuracy = true}) async {
   }
 }
 
-Future<({double lat, double lng})?> _readCoordsWithFallback() async {
+Future<({double lat, double lng, double? accuracyM})?> _readFreshCoords() async {
+  ({double lat, double lng, double? accuracyM})? best;
+
+  Future<void> consider(double lat, double lng, double? accuracyM) async {
+    final candidate = (lat: lat, lng: lng, accuracyM: accuracyM);
+    if (best == null) {
+      best = candidate;
+      return;
+    }
+    final prev = best!.accuracyM;
+    if (accuracyM != null && (prev == null || accuracyM < prev)) {
+      best = candidate;
+    }
+  }
+
   if (kIsWeb) {
     final web = await ngmyPlatformGeolocationFallback();
-    if (web != null) return web;
+    if (web != null) await consider(web.lat, web.lng, web.accuracyM);
   }
 
   final permission = await _requestLocationPermission();
-  if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-    return null;
+  if (permission != LocationPermission.denied && permission != LocationPermission.deniedForever) {
+    if (!kIsWeb) {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        return best;
+      }
+    }
+
+    for (var i = 0; i < 3; i++) {
+      final pos = await _readPositionViaGeolocator(highAccuracy: true);
+      if (pos != null) {
+        await consider(pos.latitude, pos.longitude, pos.accuracy);
+        if (pos.accuracy <= 40) break;
+      }
+      if (i < 2) await Future<void>.delayed(const Duration(milliseconds: 450));
+    }
   }
 
-  if (!kIsWeb) {
-    final enabled = await Geolocator.isLocationServiceEnabled();
-    if (!enabled) return null;
-  }
-
-  var pos = await _readPositionViaGeolocator(highAccuracy: true);
-  pos ??= await _readPositionViaGeolocator(highAccuracy: false);
-
-  if (pos != null) {
-    return (lat: pos.latitude, lng: pos.longitude);
-  }
+  if (best != null) return best;
 
   if (kIsWeb) {
-    final web = await ngmyPlatformGeolocationFallback();
-    if (web != null) return web;
+    return ngmyPlatformGeolocationFallback();
   }
-
-  try {
-    final last = await Geolocator.getLastKnownPosition();
-    if (last != null) return (lat: last.latitude, lng: last.longitude);
-  } catch (_) {}
-
   return null;
 }
 
-Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
+bool _looksLikePoorAddress(String label) {
+  final s = label.trim();
+  if (s.length < 6) return true;
+  final lower = s.toLowerCase();
+  if (lower.startsWith('live gps')) return true;
+  if (RegExp(r'^\d{1,3}\.\d{4,},').hasMatch(s) && !lower.contains('street') && !lower.contains('road') && !lower.contains(' ave')) {
+    return true;
+  }
+  // Plus codes alone (e.g. "H93F+2Q Dallas") — not a street address.
+  if (RegExp(r'^[2-9CFGHJMPQRVWX]{4,8}\+[2-9CFGHJMPQRVWX]{2,3}\b', caseSensitive: false).hasMatch(s)) {
+    return true;
+  }
+  if (lower.contains('approximate') || lower.contains('ip address')) return true;
+  if (RegExp(r'^\d+\.\d+\.\d+\.\d+').hasMatch(s)) return true;
+  return false;
+}
+
+String _joinParts(Iterable<String> parts) => parts.map((p) => p.trim()).where((p) => p.isNotEmpty).join(', ');
+
+String? _addressFromNominatimMap(Map<dynamic, dynamic> addr) {
+  final house = (addr['house_number'] ?? '').toString().trim();
+  final road = (addr['road'] ?? addr['pedestrian'] ?? addr['footway'] ?? addr['residential'] ?? '').toString().trim();
+  final line1 = _joinParts([house, road]);
+  final area = (addr['neighbourhood'] ?? addr['suburb'] ?? addr['quarter'] ?? '').toString().trim();
+  final city = (addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['hamlet'] ?? '').toString().trim();
+  final state = (addr['state'] ?? addr['region'] ?? '').toString().trim();
+  final postcode = (addr['postcode'] ?? '').toString().trim();
+  final built = _joinParts([line1, area, city, state, postcode]);
+  return built.isEmpty ? null : built;
+}
+
+Future<String?> _reverseGeocodeBigDataCloud(double lat, double lng) async {
   try {
     final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=16&addressdetails=1',
+      'https://api.bigdatacloud.net/data/reverse-geocode-client'
+      '?latitude=$lat&longitude=$lng&localityLanguage=en',
+    );
+    final resp = await http.get(url).timeout(const Duration(seconds: 10));
+    if (resp.statusCode != 200) return null;
+    final data = jsonDecode(resp.body);
+    if (data is! Map) return null;
+    final house = (data['houseNumber'] ?? '').toString().trim();
+    final street = (data['street'] ?? data['streetName'] ?? '').toString().trim();
+    final line1 = _joinParts([house, street]);
+    final city = (data['city'] ?? data['locality'] ?? '').toString().trim();
+    final state = (data['principalSubdivision'] ?? '').toString().trim();
+    final postcode = (data['postcode'] ?? '').toString().trim();
+    final built = _joinParts([line1, city, state, postcode]);
+    if (built.isNotEmpty && !_looksLikePoorAddress(built)) return built;
+  } catch (e) {
+    debugPrint('[ngmy_store_location] bigdatacloud geocode: $e');
+  }
+  return null;
+}
+
+Future<String?> _reverseGeocodeNominatim(double lat, double lng) async {
+  try {
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
     );
     final resp = await http
         .get(
           url,
-          headers: const {'User-Agent': 'NGMY-Store/1.0 (live-tracking)'},
+          headers: const {'User-Agent': 'NGMY-SiteMap/1.0 (live-gps-address)'},
         )
         .timeout(const Duration(seconds: 12));
     if (resp.statusCode != 200) return null;
     final data = jsonDecode(resp.body);
     if (data is! Map) return null;
-    final display = (data['display_name'] ?? '').toString().trim();
-    if (display.isNotEmpty) return display;
     final addr = data['address'];
     if (addr is Map) {
-      final parts = <String>[
-        (addr['house_number'] ?? '').toString(),
-        (addr['road'] ?? addr['pedestrian'] ?? '').toString(),
-        (addr['city'] ?? addr['town'] ?? addr['village'] ?? '').toString(),
-        (addr['state'] ?? '').toString(),
-      ].where((s) => s.trim().isNotEmpty).toList();
-      if (parts.isNotEmpty) return parts.join(', ');
+      final structured = _addressFromNominatimMap(addr);
+      if (structured != null && !_looksLikePoorAddress(structured)) return structured;
     }
+    final display = (data['display_name'] ?? '').toString().trim();
+    if (display.isNotEmpty && !_looksLikePoorAddress(display)) return display;
   } catch (e) {
-    debugPrint('[ngmy_store_location] reverse geocode: $e');
+    debugPrint('[ngmy_store_location] nominatim geocode: $e');
   }
   return null;
+}
+
+Future<String?> _reverseGeocodeAddress(double lat, double lng) async {
+  final cloud = await _reverseGeocodeBigDataCloud(lat, lng);
+  if (cloud != null && cloud.isNotEmpty) return cloud;
+  return _reverseGeocodeNominatim(lat, lng);
 }
 
 Future<({NgmyGpsReading? reading, NgmyGpsFailure? failure})> ngmyFetchCurrentGpsDetailed() async {
@@ -167,9 +234,13 @@ Future<({NgmyGpsReading? reading, NgmyGpsFailure? failure})> ngmyFetchCurrentGps
       }
     }
 
-    final coords = await _readCoordsWithFallback();
+    final coords = await _readFreshCoords();
     if (coords == null) {
       return (reading: null, failure: NgmyGpsFailure.unavailable);
+    }
+
+    if (coords.accuracyM != null && coords.accuracyM! > 250) {
+      debugPrint('[ngmy_store_location] weak GPS accuracy: ${coords.accuracyM}m');
     }
 
     final address = await _reverseGeocodeAddress(coords.lat, coords.lng);

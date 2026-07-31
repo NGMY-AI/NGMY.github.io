@@ -550,16 +550,7 @@ String _englishAnswer(SwahiliWord word) {
   return en;
 }
 
-String _swahiliTestPrompt(SwahiliWord word, SwahiliLessonDay day, int dayNumber) {
-  final dayLabel = day.title.replaceFirst(RegExp(r'^Day \d+ — '), '').trim();
-  if (word.example.trim().isNotEmpty) {
-    return 'Siku $dayNumber ($dayLabel): "${word.swahili}" — chagua maana ya Kiingereza.';
-  }
-  if (word.grammar.trim().isNotEmpty) {
-    return 'Siku $dayNumber: "${word.swahili}" (${word.grammar}) linamaanisha nini kwa Kiingereza?';
-  }
-  return 'Siku $dayNumber ($dayLabel): "${word.swahili}" linamaanisha nini kwa Kiingereza?';
-}
+String _swahiliTestPrompt(SwahiliWord word) => word.swahili.trim();
 
 /// Level test — Swahili questions, English answer choices (~5 per day).
 List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int count = kSwahiliTestQuestionCount}) {
@@ -587,7 +578,7 @@ List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int coun
       final options = [correct, ...wrong]..shuffle();
       questions.add(
         SwahiliTestQuestion(
-          prompt: _swahiliTestPrompt(word, day, d + 1),
+          prompt: _swahiliTestPrompt(word),
           options: options,
           correctIndex: options.indexOf(correct),
         ),
@@ -607,11 +598,9 @@ List<SwahiliTestQuestion> buildSwahiliTestForLevel(SwahiliLevel level, {int coun
       if (correct.isEmpty) continue;
       final wrong = _pickWrong(allWords, correct, (w) => _englishAnswer(w));
       final options = [correct, ...wrong]..shuffle();
-      final dayIndex = level.days.indexWhere((day) => day.words.contains(word));
-      final day = dayIndex >= 0 ? level.days[dayIndex] : level.days.first;
       questions.add(
         SwahiliTestQuestion(
-          prompt: _swahiliTestPrompt(word, day, dayIndex >= 0 ? dayIndex + 1 : 1),
+          prompt: _swahiliTestPrompt(word),
           options: options,
           correctIndex: options.indexOf(correct),
         ),
