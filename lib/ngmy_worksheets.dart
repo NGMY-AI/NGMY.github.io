@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree.dart';
-import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
+import 'ngmy_worksheet_glow_frame.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project.dart';
 import 'ngmy_worksheet_project_share.dart';
@@ -657,78 +657,45 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: WorksheetPalette.green))
-            : NgmyHudMotion(
-                builder: (context, pulse, scan, orbit) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _backRow(p),
-                        const SizedBox(height: 12),
-                        _headerCard(p, pulse: pulse, scan: scan, orbit: orbit),
-                        const SizedBox(height: 16),
-                        _tabBar(p, pulse: pulse, scan: scan, orbit: orbit),
-                        const SizedBox(height: 18),
-                        if (_tab == _WorksheetTab.projects) ...[
-                          _projectsHeader(p),
-                          const SizedBox(height: 14),
-                          _projectsBody(p, pulse: pulse, scan: scan, orbit: orbit),
-                        ] else if (_tab == _WorksheetTab.cashier)
-                          _placeholderTab(
-                            p: p,
-                            icon: Icons.calculate_outlined,
-                            title: 'Cashier',
-                            subtitle: 'Track daily spending and receipts here.',
-                            pulse: pulse,
-                            scan: scan,
-                            orbit: orbit,
-                            phase: 0.12,
-                          )
-                        else
-                          NgmyFamilyTreeTab(
-                            key: ValueKey(_familyTreeVersion),
-                            userEmail: widget.userEmail,
-                            user: widget.user,
-                            config: widget.config,
-                            onChargeWallet: widget.onChargeWallet,
-                            onDataChanged: () {
-                              widget.onDataChanged();
-                              setState(() => _familyTreeVersion++);
-                            },
-                            onChanged: () => setState(() => _familyTreeVersion++),
-                            hudPulse: pulse,
-                            hudScan: scan,
-                            hudOrbit: orbit,
-                          ),
-                      ],
-                    ),
-                  );
-                },
+            : SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _backRow(p),
+                    const SizedBox(height: 12),
+                    _headerCard(p),
+                    const SizedBox(height: 16),
+                    _tabBar(p),
+                    const SizedBox(height: 18),
+                    if (_tab == _WorksheetTab.projects) ...[
+                      _projectsHeader(p),
+                      const SizedBox(height: 14),
+                      _projectsBody(p),
+                    ] else if (_tab == _WorksheetTab.cashier)
+                      _placeholderTab(
+                        p: p,
+                        icon: Icons.calculate_outlined,
+                        title: 'Cashier',
+                        subtitle: 'Track daily spending and receipts here.',
+                      )
+                    else
+                      NgmyFamilyTreeTab(
+                        key: ValueKey(_familyTreeVersion),
+                        userEmail: widget.userEmail,
+                        user: widget.user,
+                        config: widget.config,
+                        onChargeWallet: widget.onChargeWallet,
+                        onDataChanged: () {
+                          widget.onDataChanged();
+                          setState(() => _familyTreeVersion++);
+                        },
+                        onChanged: () => setState(() => _familyTreeVersion++),
+                      ),
+                  ],
+                ),
               ),
       ),
-    );
-  }
-
-  static const _worksheetHudColors = [WorksheetPalette.green, WorksheetPalette.greenDark];
-
-  Widget _worksheetAnimatedFrame({
-    required double pulse,
-    required double scan,
-    required double orbit,
-    required Widget child,
-    double phase = 0,
-    EdgeInsetsGeometry padding = EdgeInsets.zero,
-  }) {
-    return NgmyHudTechFrame(
-      colors: _worksheetHudColors,
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: phase,
-      borderRadius: 16,
-      padding: padding,
-      child: child,
     );
   }
 
@@ -753,142 +720,137 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _headerCard(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
-    return _worksheetAnimatedFrame(
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: 0,
+  Widget _headerCard(WorksheetPalette p) {
+    return WorksheetGlowFrame(
+      glowStrength: 0.85,
       child: Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: WorksheetPalette.green,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: WorksheetPalette.green.withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(12),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: WorksheetPalette.green,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: WorksheetPalette.green.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.folder_open_rounded, color: Colors.white, size: 24),
                   ),
-                  child: const Icon(Icons.folder_open_rounded, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Worksheets',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          height: 1.1,
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Worksheets',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Track your project spending',
-                        style: TextStyle(
-                          color: Color(0xD9FFFFFF),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                        SizedBox(height: 4),
+                        Text(
+                          'Track your project spending',
+                          style: TextStyle(
+                            color: Color(0xD9FFFFFF),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _openSettings(p),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: WorksheetPalette.greenDark.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total All Projects',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _openSettings(p),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  ngmyFormatMoney(_totalAll),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: WorksheetPalette.greenDark.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total All Projects',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    ngmyFormatMoney(_totalAll),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  Widget _tabBar(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
-    return _worksheetAnimatedFrame(
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: 0.06,
+  Widget _tabBar(WorksheetPalette p) {
+    return WorksheetGlowFrame(
+      glowStrength: 0.65,
+      borderRadius: 14,
       padding: const EdgeInsets.all(4),
       child: Container(
         decoration: BoxDecoration(
           color: p.isDark ? p.mutedSurface : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(13),
         ),
         child: Row(
           children: [
-            _tabChip(p: p, tab: _WorksheetTab.projects, icon: Icons.folder_outlined, label: 'Projects', pulse: pulse),
-            _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.calculate_outlined, label: 'Cashier', pulse: pulse),
-            _tabChip(p: p, tab: _WorksheetTab.familyTree, icon: Icons.account_tree_outlined, label: 'Family Tree', pulse: pulse),
+            _tabChip(p: p, tab: _WorksheetTab.projects, icon: Icons.folder_outlined, label: 'Projects'),
+            _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.calculate_outlined, label: 'Cashier'),
+            _tabChip(p: p, tab: _WorksheetTab.familyTree, icon: Icons.account_tree_outlined, label: 'Family Tree'),
           ],
         ),
       ),
@@ -900,7 +862,6 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     required _WorksheetTab tab,
     required IconData icon,
     required String label,
-    required double pulse,
   }) {
     final active = _tab == tab;
     return Expanded(
@@ -911,6 +872,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
             decoration: BoxDecoration(
               color: active ? WorksheetPalette.green : Colors.transparent,
@@ -918,9 +880,9 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: WorksheetPalette.green.withValues(alpha: 0.35 + pulse * 0.25),
-                        blurRadius: 12 + pulse * 8,
-                        spreadRadius: pulse * 1.5,
+                        color: WorksheetPalette.green.withValues(alpha: 0.28),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ]
                   : null,
@@ -984,21 +946,17 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _projectsBody(WorksheetPalette p, {required double pulse, required double scan, required double orbit}) {
+  Widget _projectsBody(WorksheetPalette p) {
     if (_projects.isEmpty) {
-      return _worksheetAnimatedFrame(
-        pulse: pulse,
-        scan: scan,
-        orbit: orbit,
-        phase: 0.18,
+      return WorksheetGlowFrame(
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
             color: p.cardBg,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(15),
           ),
-        child: Column(
+          child: Column(
           children: [
             Container(
               width: 108,
@@ -1068,11 +1026,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
       );
     }
 
-    return _worksheetAnimatedFrame(
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: 0.24,
+    return WorksheetGlowFrame(
       padding: const EdgeInsets.all(10),
       child: Column(children: _projects.map((proj) => _projectTile(proj, p)).toList()),
     );
@@ -1187,32 +1141,24 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     required IconData icon,
     required String title,
     required String subtitle,
-    required double pulse,
-    required double scan,
-    required double orbit,
-    double phase = 0.14,
   }) {
-    return _worksheetAnimatedFrame(
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: phase,
+    return WorksheetGlowFrame(
       padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           color: p.cardBg,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(15),
         ),
-      child: Column(
-        children: [
-          Icon(icon, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
-          const SizedBox(height: 16),
-          Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
-          const SizedBox(height: 8),
-          Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
-        ],
-      ),
+        child: Column(
+          children: [
+            Icon(icon, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
+            const SizedBox(height: 16),
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
+            const SizedBox(height: 8),
+            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
+          ],
+        ),
       ),
     );
   }

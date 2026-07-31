@@ -490,7 +490,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (3+ minutes supported).')),
+        const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (4+ minutes supported).')),
       );
     }
   }
@@ -566,7 +566,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
             _addOption(ctx, emoji: '🖼️', title: 'Add photos', subtitle: 'Choose one or more from your gallery', onTap: _addPhotos),
-            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Gallery clips — 3+ minutes supported', onTap: _addVideo),
+            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Gallery clips — 4+ minutes supported', onTap: _addVideo),
             const SizedBox(height: 12),
           ],
         ),
@@ -1178,7 +1178,9 @@ class _VaultVideoPageState extends State<_VaultVideoPage> {
     }
     // Dedicated vault player with native controls — studio cover player is not
     // reliable for full-clip private vault playback.
-    if (kIsWeb) return NgmyVaultHtmlVideo(source: url);
+    if (kIsWeb) {
+      return NgmyVaultHtmlVideo(source: url, mimeType: ngmyVaultPlaybackMime(widget.mime));
+    }
     return NgmyStudioSlotVideo(source: url);
   }
 }

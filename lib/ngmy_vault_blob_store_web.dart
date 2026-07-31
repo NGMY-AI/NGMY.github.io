@@ -3,6 +3,10 @@ import 'dart:html' as html;
 import 'dart:indexed_db' as idb;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
+import 'ngmy_vault_pick_video_types.dart';
+
 /// Raw photo/video bytes for the private vault, kept in IndexedDB instead of
 /// SharedPreferences/localStorage — a single photo or clip can easily blow
 /// past the ~5-10MB per-origin quota that backs those.
@@ -104,19 +108,32 @@ class NgmyVaultBlobStore {
     if (id.trim().isEmpty) return false;
     if (blob is! html.Blob) return false;
     final htmlBlob = blob;
+    final type = ngmyVaultPlaybackMime(mime);
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readwrite');
-      final type = mime.trim().isEmpty ? 'application/octet-stream' : mime.trim();
-      final stored = (htmlBlob.type.trim().isEmpty || !htmlBlob.type.startsWith('video/'))
-          ? html.Blob([htmlBlob], type)
-          : htmlBlob;
-      tx.objectStore(_storeName).put(stored, id);
+      html.Blob toStore;
+      if (htmlBlob is html.File) {
+        toStore = htmlBlob.type.trim().isEmpty ? html.File([htmlBlob], htmlBlob.name, {'type': type}) : htmlBlob;
+      } else if (htmlBlob.type.trim().isEmpty || !htmlBlob.type.startsWith('video/')) {
+        toStore = html.Blob([htmlBlob], type);
+      } else {
+        toStore = htmlBlob;
+      }
+      tx.objectStore(_storeName).put(toStore, id);
       await tx.completed;
       return true;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      debugPrint('[ngmy_vault_blob] putBlob: $e');
     }
+    // Fallback for medium clips — read into bytes (reliable playback on all browsers).
+    if (htmlBlob.size > 0 && htmlBlob.size <= 180 * 1024 * 1024) {
+      final bytes = await _blobToBytes(htmlBlob);
+      if (bytes != null && bytes.isNotEmpty) {
+        return put(id, bytes, mime: type);
+      }
+    }
+    return false;
   }
 
   static Future<Uint8List?> getBytes(String id) async {
@@ -138,10 +155,8 @@ class NgmyVaultBlobStore {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readonly');
       final result = await tx.objectStore(_storeName).getObject(id);
-      final type = mime.trim().isEmpty ? 'video/mp4' : mime.trim();
-      if (result is html.Blob) {
-        // IndexedDB may return a Blob with an empty/wrong type — browsers then
-        // refuse to decode. Re-wrap with the stored MIME when needed.
+      final type = ngmyVaultPlaybackMime(mime);
+      if (result is html.Blob && result.size > 0) {
         final blob = (result.type.trim().isEmpty || !result.type.startsWith('video/'))
             ? html.Blob([result], type)
             : result;
@@ -150,7 +165,8 @@ class NgmyVaultBlobStore {
       final bytes = await _asBytesAsync(result);
       if (bytes == null || bytes.isEmpty) return null;
       return html.Url.createObjectUrlFromBlob(html.Blob([bytes], type));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ngmy_vault_blob] getObjectUrl: $e');
       return null;
     }
   }

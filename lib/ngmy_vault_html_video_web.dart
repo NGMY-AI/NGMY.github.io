@@ -9,9 +9,10 @@ import 'package:flutter/material.dart';
 /// Native HTML controls are unreliable inside Flutter HtmlElementView on web
 /// (parent overlays steal taps), so we keep controls in Flutter.
 class NgmyVaultHtmlVideo extends StatefulWidget {
-  const NgmyVaultHtmlVideo({super.key, required this.source});
+  const NgmyVaultHtmlVideo({super.key, required this.source, this.mimeType = 'video/mp4'});
 
   final String source;
+  final String mimeType;
 
   @override
   State<NgmyVaultHtmlVideo> createState() => _NgmyVaultHtmlVideoState();
@@ -43,6 +44,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         ..muted = false
         ..setAttribute('playsinline', 'true')
         ..setAttribute('webkit-playsinline', 'true')
+        ..setAttribute('type', widget.mimeType)
         ..setAttribute('x-webkit-airplay', 'deny')
         ..style.width = '100%'
         ..style.height = '100%'
