@@ -50,16 +50,33 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   NgmyLiveCaptureSession get _session => ngmyLiveCaptureSession;
 
+  /// While recording, always reflect the active capture kind from the session
+  /// (survives leaving and re-entering Recorder Studio).
+  _StudioMode get _displayMode {
+    if (_session.recording) {
+      return _session.videoMode ? _StudioMode.video : _StudioMode.voice;
+    }
+    return _mode;
+  }
+
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
+    if (_session.recording) {
+      _mode = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
+    }
     _session.addListener(_onSession);
     unawaited(_reload());
   }
 
   void _onSession() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (_session.recording) {
+      final synced = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
+      if (_mode != synced) _mode = synced;
+    }
+    setState(() {});
   }
 
   @override
@@ -332,13 +349,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
             children: [
               Row(
                 children: [
-                  _modeChip('Photo', _mode == _StudioMode.photo, Icons.photo_camera_rounded, () => _setMode(_StudioMode.photo)),
+                  _modeChip('Photo', _displayMode == _StudioMode.photo, Icons.photo_camera_rounded, () => _setMode(_StudioMode.photo)),
                   const SizedBox(width: 8),
-                  _modeChip('Voice', _mode == _StudioMode.voice, Icons.mic_rounded, () => _setMode(_StudioMode.voice)),
+                  _modeChip('Voice', _displayMode == _StudioMode.voice, Icons.mic_rounded, () => _setMode(_StudioMode.voice)),
                   const SizedBox(width: 8),
-                  _modeChip('Video', _mode == _StudioMode.video, Icons.videocam_rounded, () => _setMode(_StudioMode.video)),
+                  _modeChip('Video', _displayMode == _StudioMode.video, Icons.videocam_rounded, () => _setMode(_StudioMode.video)),
                   const Spacer(),
-                  if (_mode != _StudioMode.photo)
+                  if (_displayMode != _StudioMode.photo)
                     Text(
                       _session.clockLabel(),
                       style: TextStyle(
@@ -350,7 +367,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                     ),
                 ],
               ),
-              if (_mode == _StudioMode.video && !recording) ...[
+              if (_displayMode == _StudioMode.video && !recording) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -371,9 +388,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 ),
               ],
               const SizedBox(height: 16),
-              if (_mode == _StudioMode.photo)
+              if (_displayMode == _StudioMode.photo)
                 _photoControls()
-              else if (recording && _mode == _StudioMode.video)
+              else if (recording && _displayMode == _StudioMode.video)
                 KeyedSubtree(
                   key: ValueKey('cam-${identityHashCode(_session.previewStream)}'),
                   child: NgmyLiveCaptureMedia.liveCameraPreview(
@@ -382,24 +399,24 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                     mirror: _session.facingMode == 'user',
                   ),
                 )
-              else if (recording && _mode == _StudioMode.voice)
+              else if (recording && _displayMode == _StudioMode.voice)
                 _WaveBars(active: true, pulse: p)
               else
                 _idleHint(),
               const SizedBox(height: 16),
-              if (_mode == _StudioMode.photo)
+              if (_displayMode == _StudioMode.photo)
                 const SizedBox.shrink()
               else if (recording)
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
                 Text(
-                  _mode == _StudioMode.video
+                  _displayMode == _StudioMode.video
                       ? 'Record video with front or back camera. Play back after you stop.'
                       : 'Record voice memos — clear audio like iPhone Voice Memos.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
-              if (_mode != _StudioMode.photo) ...[
+              if (_displayMode != _StudioMode.photo) ...[
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -411,9 +428,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    icon: Icon(recording ? Icons.stop_rounded : (_mode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
+                    icon: Icon(recording ? Icons.stop_rounded : (_displayMode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
                     label: Text(
-                      recording ? 'Stop & Save' : 'Start ${_mode == _StudioMode.video ? 'Video' : 'Voice'}',
+                      recording ? 'Stop & Save' : 'Start ${_displayMode == _StudioMode.video ? 'Video' : 'Voice'}',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ),
@@ -856,7 +873,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                     key: ValueKey('media-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
-                    height: isVideo ? 240 : 160,
+                    height: isVideo ? 280 : 200,
                   )
                 else
                   NgmyLiveCaptureMedia.playbackAudio(

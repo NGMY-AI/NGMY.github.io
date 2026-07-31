@@ -815,7 +815,7 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
                     key: ValueKey('vid-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: mime,
-                    height: 240,
+                    height: 280,
                   )
                 else ...[
                   const Text(

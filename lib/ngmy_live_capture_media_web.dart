@@ -6,6 +6,8 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_vault_html_video.dart';
+
 String ngmyCleanMediaMime(String mime) {
   final base = mime.split(';').first.trim().toLowerCase();
   if (base.startsWith('audio/') || base.startsWith('video/') || base.startsWith('application/')) {
@@ -42,7 +44,12 @@ class NgmyLiveCaptureMedia {
   }
 
   static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
-    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: true, height: height < 180 ? 220 : height);
+    return _VaultStyleVideoPlayback(
+      key: key,
+      src: src,
+      mimeType: mimeType,
+      height: height < 180 ? 240 : height,
+    );
   }
 
   static Widget playbackAudio({required String src, required String mimeType, double height = 52, Key? key}) {
@@ -258,6 +265,67 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
         height: widget.height,
         width: double.infinity,
         child: HtmlElementView(viewType: _viewType),
+      ),
+    );
+  }
+}
+
+/// Recorder / live-capture video playback — same HTML controls as Quick Dial vault
+/// (center play, scrubber, mute, replay) so taps work on Flutter web.
+class _VaultStyleVideoPlayback extends StatelessWidget {
+  const _VaultStyleVideoPlayback({
+    super.key,
+    required this.src,
+    required this.mimeType,
+    required this.height,
+  });
+
+  final String src;
+  final String mimeType;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final mime = ngmyCleanMediaMime(mimeType);
+    if (src.trim().isEmpty) {
+      return Container(
+        height: height,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'Loading video…',
+          style: TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+      );
+    }
+    final url = NgmyLiveCaptureMedia.toPlayableUrl(src, mime);
+    if (url.isEmpty) {
+      return Container(
+        height: height,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'Could not load this video.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: ColoredBox(
+        color: Colors.black,
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: NgmyVaultHtmlVideo(source: url, mimeType: mime),
+        ),
       ),
     );
   }
