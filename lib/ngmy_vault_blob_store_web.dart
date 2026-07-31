@@ -17,6 +17,9 @@ class NgmyVaultBlobStore {
   static const _dbName = 'ngmy_vault_blobs_v1';
   static const _storeName = 'blobs';
 
+  /// IndexedDB key for a video's grid thumbnail JPEG.
+  static String thumbKey(String videoId) => '${videoId}__thumb';
+
   static Future<idb.Database>? _opening;
 
   static Future<idb.Database> _open() {
@@ -184,7 +187,9 @@ class NgmyVaultBlobStore {
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readwrite');
-      tx.objectStore(_storeName).delete(id);
+      final store = tx.objectStore(_storeName);
+      store.delete(id);
+      store.delete(thumbKey(id));
       await tx.completed;
     } catch (_) {}
   }

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -13,6 +15,7 @@ import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
 import 'ngmy_vault_html_video.dart';
 import 'ngmy_vault_pick_video.dart';
+import 'ngmy_vault_video_thumb.dart';
 import 'ngmy_vault_web_io.dart';
 
 const _kPinKey = 'ngmy_vault_pin_v1';
@@ -483,6 +486,12 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
       await _saveIndex(widget.userEmail, _items);
       if (!mounted) return;
       setState(() {});
+      unawaited(_storeVideoThumbnail(
+        id,
+        webBlob: blob,
+        bytes: picked.bytes,
+        mime: picked.mime,
+      ));
       _notice('Saved 1 video privately.');
     } on StateError catch (e) {
       if (!mounted) return;
@@ -493,6 +502,18 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
         const SnackBar(content: Text('Could not add that video. Try MP4 from your gallery (4+ minutes supported).')),
       );
     }
+  }
+
+  Future<void> _storeVideoThumbnail(
+    String videoId, {
+    Object? webBlob,
+    Uint8List? bytes,
+    required String mime,
+  }) async {
+    final thumb = await ngmyVaultCaptureVideoThumbnail(webBlob: webBlob, bytes: bytes, mime: mime);
+    if (thumb == null || thumb.isEmpty) return;
+    await NgmyVaultBlobStore.put(NgmyVaultBlobStore.thumbKey(videoId), thumb, mime: 'image/jpeg');
+    if (mounted) setState(() {});
   }
 
   void _notice(String saved) {
@@ -795,7 +816,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(15),
-                  child: item.kind == NgmyVaultKind.video ? _videoTile() : _photoTile(item),
+                  child: item.kind == NgmyVaultKind.video ? _VaultVideoThumbTile(itemId: item.id, mime: item.mime) : _photoTile(item),
                 ),
                 if (selected)
                   ClipRRect(
@@ -839,20 +860,6 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
         }
         return Image.memory(bytes, fit: BoxFit.cover);
       },
-    );
-  }
-
-  Widget _videoTile() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF241B3A), Color(0xFF151024)]),
-      ),
-      alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), shape: BoxShape.circle),
-        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-      ),
     );
   }
 
@@ -900,6 +907,86 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _VaultVideoThumbTile extends StatefulWidget {
+  const _VaultVideoThumbTile({required this.itemId, required this.mime});
+  final String itemId;
+  final String mime;
+
+  @override
+  State<_VaultVideoThumbTile> createState() => _VaultVideoThumbTileState();
+}
+
+class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
+  Uint8List? _thumb;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final key = NgmyVaultBlobStore.thumbKey(widget.itemId);
+    var bytes = await NgmyVaultBlobStore.getBytes(key);
+    if (bytes == null || bytes.isEmpty) {
+      final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, widget.mime);
+      if (url != null && url.isNotEmpty) {
+        bytes = await ngmyVaultCaptureVideoThumbnail(objectUrl: url, mime: widget.mime);
+        NgmyVaultBlobStore.revokeObjectUrl(url);
+        if (bytes != null && bytes.isNotEmpty) {
+          await NgmyVaultBlobStore.put(key, bytes, mime: 'image/jpeg');
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _thumb = bytes;
+      _loading = false;
+    });
+  }
+
+  Widget _playBadge() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
+        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  Widget _fallback({bool spinner = false}) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF241B3A), Color(0xFF151024)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: spinner
+          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.white24))
+          : _playBadge(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return _fallback(spinner: true);
+    if (_thumb == null || _thumb!.isEmpty) return _fallback();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.memory(_thumb!, fit: BoxFit.cover),
+        Container(color: Colors.black.withValues(alpha: 0.12)),
+        _playBadge(),
+      ],
     );
   }
 }
