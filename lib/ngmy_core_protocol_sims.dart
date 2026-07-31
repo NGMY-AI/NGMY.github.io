@@ -2229,20 +2229,23 @@ class _UnfoldBox3D extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Grounding contact shadow — makes the box read as a real
-              // object sitting in space instead of a flat sticker.
+              // Grounding contact shadow — crisp solid shadow (no GPU blur filter).
               Positioned(
                 left: width * 0.06,
                 top: totalH - depth * 0.35,
                 width: width,
                 height: depth * 1.3,
-                child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 7),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.38 * opacity),
-                      borderRadius: BorderRadius.circular(depth),
-                    ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.28 * opacity),
+                    borderRadius: BorderRadius.circular(depth),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.22 * opacity),
+                        blurRadius: 6,
+                        offset: Offset(0, depth * 0.15),
+                      ),
+                    ],
                   ),
                 ),
               ),

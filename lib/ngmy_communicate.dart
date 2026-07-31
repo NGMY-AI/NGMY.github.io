@@ -2391,7 +2391,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         height: widget.size,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.high,
         errorBuilder: (_, __, ___) {
           if (_memoryProvider != null) {
             return Image(
@@ -2441,7 +2441,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
           height: widget.size,
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          filterQuality: FilterQuality.medium,
+          filterQuality: FilterQuality.high,
           errorBuilder: (_, __, ___) => _bundledAssetFace(),
         ),
       );
@@ -2697,7 +2697,7 @@ Future<void> showNgmyAdvisorPhotoGallery(
                                     fit: BoxFit.cover,
                                     width: double.infinity,
                                     height: double.infinity,
-                                    filterQuality: FilterQuality.medium,
+                                    filterQuality: FilterQuality.high,
                                     gaplessPlayback: true,
                                   )
                                 : Container(

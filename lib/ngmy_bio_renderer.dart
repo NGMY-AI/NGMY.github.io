@@ -1151,7 +1151,7 @@ class NgmyBioPreview extends StatelessWidget {
                 fit: BoxFit.cover,
                 alignment: Alignment.topCenter,
                 gaplessPlayback: true,
-                filterQuality: FilterQuality.medium,
+                filterQuality: FilterQuality.high,
                 cacheWidth: lightweight ? 900 : null,
               ),
             ),
@@ -1420,7 +1420,7 @@ class NgmyBioPreview extends StatelessWidget {
         cacheWidth: cacheW,
         cacheHeight: cacheH,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.high,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
       );
     } catch (_) {

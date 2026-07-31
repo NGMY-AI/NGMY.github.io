@@ -8,7 +8,7 @@ Widget? ngmyStudioImageFromPath(String? path) {
     File(path),
     fit: BoxFit.contain,
     gaplessPlayback: true,
-    filterQuality: FilterQuality.medium,
+    filterQuality: FilterQuality.high,
     errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
   );
 }

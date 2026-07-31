@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_overlay_guard.dart';
+import 'ngmy_platform_graphics.dart';
 
 Timer? _medicineReminderPollTimer;
 String? _medicineWatcherEmail;
@@ -273,13 +273,9 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
       canPop: _canDismiss,
       child: Stack(
         children: [
-          // Frosted backdrop — the home screen stays visible (blurred) behind
-          // the card instead of being blacked out.
+          // Solid dim — BackdropFilter blurs the whole home screen on web PWA.
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(color: Colors.black.withValues(alpha: 0.16)),
-            ),
+            child: ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
           ),
           Material(
             color: Colors.transparent,
@@ -294,27 +290,19 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
                     ),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 22),
-                      child: ClipRRect(
+                      child: ngmyClipBackdrop(
                         borderRadius: BorderRadius.circular(32),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 26, sigmaY: 26),
-                          child: Container(
+                        child: Container(
                             padding: const EdgeInsets.fromLTRB(24, 16, 24, 22),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(32),
-                              gradient: LinearGradient(
+                              gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  const Color(
-                                    0xFF500724,
-                                  ).withValues(alpha: 0.88),
-                                  const Color(
-                                    0xFF831843,
-                                  ).withValues(alpha: 0.88),
-                                  const Color(
-                                    0xFFBE185D,
-                                  ).withValues(alpha: 0.85),
+                                  Color(0xFF500724),
+                                  Color(0xFF831843),
+                                  Color(0xFFBE185D),
                                 ],
                               ),
                               border: Border.all(
@@ -480,7 +468,6 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

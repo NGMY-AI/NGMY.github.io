@@ -430,9 +430,15 @@
 
       overscroll-behavior-x: none;
 
-      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
 
-      -moz-osx-font-smoothing: grayscale;
+      text-size-adjust: 100%;
+
+      text-rendering: geometricPrecision;
+
+      -webkit-font-smoothing: subpixel-antialiased;
+
+      -moz-osx-font-smoothing: auto;
 
     }
 
@@ -446,9 +452,25 @@
 
       background-color: #121212;
 
+      display: block;
+
+      width: 100%;
+
+      height: 100%;
+
+      touch-action: manipulation;
+
       -webkit-user-select: text;
 
       user-select: text;
+
+    }
+
+    flutter-view canvas,
+    flt-scene-host canvas,
+    flt-glass-pane canvas {
+
+      outline: none;
 
     }
 

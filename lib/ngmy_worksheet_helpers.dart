@@ -182,7 +182,7 @@ Widget ngmyImageOrPlaceholder({
         height: height,
         fit: fit,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.high,
       ),
     );
   }
@@ -247,7 +247,7 @@ class _NgmyWorksheetBlobImageState extends State<_NgmyWorksheetBlobImage> {
         height: widget.height,
         fit: widget.fit,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.high,
       );
     }
     return Container(

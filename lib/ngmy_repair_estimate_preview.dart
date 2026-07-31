@@ -157,7 +157,7 @@ class NgmyRepairEstimatePreview extends StatelessWidget {
                         width: double.infinity,
                         fit: BoxFit.cover,
                         gaplessPlayback: true,
-                        filterQuality: FilterQuality.medium,
+                        filterQuality: FilterQuality.high,
                       ),
                     ),
                   ],

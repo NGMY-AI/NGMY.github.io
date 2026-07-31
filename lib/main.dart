@@ -408,6 +408,7 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ngmyInitCrispRendering();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[flutter] ${details.exceptionAsString()}\n${details.stack}');
@@ -12829,16 +12830,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         builder: (context, child) {
           // Never cache [child] — reusing a stale navigator subtree caused black
           // blink loops on web/PWA after cloud sync or any parent rebuild.
-          if (child != null) return child;
           final bg = Theme.of(context).scaffoldBackgroundColor;
-          return ColoredBox(
-            color: bg,
-            child: Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          );
+          final body = child ??
+              ColoredBox(
+                color: bg,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              );
+          return ngmyCrispAppWrapper(context, body);
         },
         home: _currentUser == null
             ? AuthScreen(

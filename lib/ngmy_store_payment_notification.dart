@@ -708,7 +708,7 @@ class _NgmyPaymentProofImageState extends State<NgmyPaymentProofImage> {
           key: ValueKey('proof_mem_$p'),
           fit: BoxFit.contain,
           gaplessPlayback: true,
-          filterQuality: FilterQuality.medium,
+          filterQuality: FilterQuality.high,
         ),
       );
     }

@@ -541,7 +541,7 @@ class _RepairEstimateSheetState extends State<_RepairEstimateSheet> {
                                   height: 148,
                                   fit: BoxFit.cover,
                                   gaplessPlayback: true,
-                                  filterQuality: FilterQuality.medium,
+                                  filterQuality: FilterQuality.high,
                                 ),
                                 Positioned(
                                   right: 8,
