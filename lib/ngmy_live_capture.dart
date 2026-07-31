@@ -665,11 +665,24 @@ class _VoiceMemoSheet extends StatefulWidget {
 
 class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
   late final TextEditingController _titleC;
+  bool _mediaLoading = true;
 
   @override
   void initState() {
     super.initState();
     _titleC = TextEditingController(text: widget.item.title);
+    unawaited(_ensureMediaUrl());
+  }
+
+  Future<void> _ensureMediaUrl() async {
+    if (widget.item.dataUrl.isNotEmpty) {
+      if (mounted) setState(() => _mediaLoading = false);
+      return;
+    }
+    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
+    if (!mounted) return;
+    if (url != null && url.isNotEmpty) widget.item.dataUrl = url;
+    setState(() => _mediaLoading = false);
   }
 
   @override
@@ -776,7 +789,14 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
                   style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
-                if (widget.item.dataUrl.isEmpty)
+                if (_mediaLoading)
+                  SizedBox(
+                    height: isVideo ? 240 : 140,
+                    child: const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF22D3EE), strokeWidth: 2.5),
+                    ),
+                  )
+                else if (widget.item.dataUrl.isEmpty)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -792,22 +812,21 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
                   )
                 else if (isVideo)
                   NgmyLiveCaptureMedia.playbackVideo(
-                    key: ValueKey('vid-${widget.item.id}'),
+                    key: ValueKey('vid-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: mime,
                     height: 240,
                   )
                 else ...[
                   const Text(
-                    'Use the player below to listen',
+                    'Tap the play button to listen',
                     style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                   const SizedBox(height: 10),
                   NgmyLiveCaptureMedia.playbackAudio(
-                    key: ValueKey('aud-${widget.item.id}'),
+                    key: ValueKey('aud-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: mime,
-                    height: 54,
                   ),
                 ],
                 const SizedBox(height: 20),

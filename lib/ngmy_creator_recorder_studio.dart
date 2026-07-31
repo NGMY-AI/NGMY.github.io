@@ -700,6 +700,7 @@ class _StudioCaptureSheet extends StatefulWidget {
 class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
   late final TextEditingController _titleC;
   bool _exporting = false;
+  bool _mediaLoading = true;
 
   @override
   void initState() {
@@ -709,11 +710,14 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
   }
 
   Future<void> _ensureMediaUrl() async {
-    if (widget.item.dataUrl.isNotEmpty) return;
-    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
-    if (url != null && url.isNotEmpty && mounted) {
-      setState(() => widget.item.dataUrl = url);
+    if (widget.item.dataUrl.isNotEmpty) {
+      if (mounted) setState(() => _mediaLoading = false);
+      return;
     }
+    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
+    if (!mounted) return;
+    if (url != null && url.isNotEmpty) widget.item.dataUrl = url;
+    setState(() => _mediaLoading = false);
   }
 
   @override
@@ -836,23 +840,29 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                   style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
-                if (widget.item.dataUrl.isEmpty)
+                if (_mediaLoading)
+                  SizedBox(
+                    height: isPhoto ? 120 : (isVideo ? 240 : 140),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: NgmyRecorderStudioColors.mint, strokeWidth: 2.5),
+                    ),
+                  )
+                else if (widget.item.dataUrl.isEmpty)
                   const Text('Media unavailable — storage was full when saved.', style: TextStyle(color: Colors.white54, fontSize: 12))
                 else if (isPhoto)
                   _photoPreview(widget.item.dataUrl)
                 else if (isVideo || widget.item.mimeType.startsWith('video/'))
                   NgmyLiveCaptureMedia.playbackVideo(
-                    key: ValueKey('media-${widget.item.id}'),
+                    key: ValueKey('media-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
-                    height: isVideo ? 240 : 120,
+                    height: isVideo ? 240 : 160,
                   )
                 else
                   NgmyLiveCaptureMedia.playbackAudio(
-                    key: ValueKey('aud-${widget.item.id}'),
+                    key: ValueKey('aud-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
-                    height: 54,
                   ),
                 const SizedBox(height: 20),
                 Row(

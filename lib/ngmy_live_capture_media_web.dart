@@ -42,13 +42,13 @@ class NgmyLiveCaptureMedia {
   }
 
   static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
-    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: true, height: height);
+    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: true, height: height < 180 ? 220 : height);
   }
 
   static Widget playbackAudio({required String src, required String mimeType, double height = 52, Key? key}) {
     final mime = ngmyCleanMediaMime(mimeType);
     final asVideo = mime.startsWith('video/');
-    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: asVideo, height: asVideo ? 120 : height);
+    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: asVideo, height: asVideo ? 160 : 140);
   }
 
   static String toPlayableUrl(String src, String mimeType) {
@@ -282,22 +282,53 @@ class _StableMediaPlayback extends StatefulWidget {
 }
 
 class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
-  late final String _viewType;
+  late String _viewType;
   late String _playUrl;
   late final String _mime;
   bool _registered = false;
   String? _loadError;
 
+  bool get _isVideo => widget.video || _mime.startsWith('video/');
+
   @override
   void initState() {
     super.initState();
     _mime = ngmyCleanMediaMime(widget.mimeType);
-    _playUrl = NgmyLiveCaptureMedia.toPlayableUrl(widget.src, _mime);
-    _viewType = 'ngmy-play-${widget.video ? 'v' : 'a'}-${_playUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
+    _playUrl = _resolveUrl(widget.src);
+    _viewType = _newViewType();
     _register();
-    if (_playUrl.isEmpty) {
+    if (_playUrl.isEmpty && widget.src.trim().isNotEmpty) {
       _loadError = 'Could not load this recording.';
     }
+  }
+
+  String _newViewType() => 'ngmy-play-${_isVideo ? 'v' : 'a'}-${widget.src.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
+
+  @override
+  void didUpdateWidget(covariant _StableMediaPlayback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.src != widget.src) {
+      final next = _resolveUrl(widget.src);
+      if (next.isNotEmpty && next != _playUrl) {
+        setState(() {
+          _playUrl = next;
+          _loadError = null;
+          _viewType = _newViewType();
+          _registered = false;
+        });
+        _register();
+      } else if (next.isEmpty && widget.src.trim().isEmpty) {
+        setState(() {
+          _playUrl = '';
+          _loadError = null;
+        });
+      }
+    }
+  }
+
+  String _resolveUrl(String src) {
+    if (src.trim().isEmpty) return '';
+    return NgmyLiveCaptureMedia.toPlayableUrl(src, _mime);
   }
 
   void _register() {
@@ -305,38 +336,217 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
     _registered = true;
     final url = _playUrl;
     final mime = _mime;
-    final isVideo = widget.video || mime.startsWith('video/');
-    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
-      final el = isVideo
-          ? html.VideoElement()
-          : html.AudioElement();
-      el
-        ..controls = true
-        ..preload = 'auto'
-        ..setAttribute('playsinline', 'true')
-        ..setAttribute('webkit-playsinline', 'true')
+    final isVideo = _isVideo;
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) => _buildDomPlayer(url: url, mime: mime, isVideo: isVideo));
+  }
+
+  html.Element _buildDomPlayer({required String url, required String mime, required bool isVideo}) {
+    final root = html.DivElement()
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.position = 'relative'
+      ..style.backgroundColor = '#0F172A'
+      ..style.overflow = 'hidden'
+      ..style.borderRadius = '12px'
+      ..style.touchAction = 'manipulation';
+
+    final el = isVideo ? html.VideoElement() : html.AudioElement();
+    el
+      ..preload = 'auto'
+      ..controls = false
+      ..setAttribute('playsinline', 'true')
+      ..setAttribute('webkit-playsinline', 'true')
+      ..style.pointerEvents = 'none';
+    if (isVideo) {
+      (el as html.VideoElement)
         ..style.width = '100%'
         ..style.height = '100%'
-        ..style.outline = 'none'
-        ..style.backgroundColor = '#0F172A';
-      if (isVideo) {
-        (el as html.VideoElement).style.objectFit = 'contain';
+        ..style.objectFit = 'contain'
+        ..style.display = 'block'
+        ..style.backgroundColor = '#000';
+    } else {
+      el.style.display = 'none';
+    }
+    el.src = url;
+    root.append(el);
+
+    const playSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+    const pauseSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    const centerPlaySvg = '<svg width="44" height="44" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+
+    final centerBtn = html.DivElement()
+      ..style.position = 'absolute'
+      ..style.left = '50%'
+      ..style.top = isVideo ? '50%' : '42%'
+      ..style.transform = 'translate(-50%, -50%)'
+      ..style.width = '72px'
+      ..style.height = '72px'
+      ..style.borderRadius = '50%'
+      ..style.backgroundColor = 'rgba(5, 150, 105, 0.85)'
+      ..style.border = '2px solid rgba(255,255,255,0.35)'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center'
+      ..style.pointerEvents = 'none'
+      ..style.zIndex = '3'
+      ..style.transition = 'opacity 0.2s'
+      ..innerHtml = centerPlaySvg;
+
+    if (!isVideo) {
+      final label = html.DivElement()
+        ..style.position = 'absolute'
+        ..style.left = '0'
+        ..style.right = '0'
+        ..style.top = '58%'
+        ..style.textAlign = 'center'
+        ..style.color = 'rgba(255,255,255,0.65)'
+        ..style.fontSize = '12px'
+        ..style.fontWeight = '600'
+        ..style.pointerEvents = 'none'
+        ..text = 'Voice memo — tap to play';
+      root.append(label);
+    }
+
+    final tapLayer = html.DivElement()
+      ..style.position = 'absolute'
+      ..style.left = '0'
+      ..style.right = '0'
+      ..style.top = '0'
+      ..style.bottom = '52px'
+      ..style.zIndex = '2'
+      ..style.cursor = 'pointer';
+
+    final bar = html.DivElement()
+      ..style.position = 'absolute'
+      ..style.left = '8px'
+      ..style.right = '8px'
+      ..style.bottom = '8px'
+      ..style.padding = '6px 8px'
+      ..style.borderRadius = '12px'
+      ..style.backgroundColor = 'rgba(0,0,0,0.55)'
+      ..style.zIndex = '4';
+
+    final seek = html.InputElement(type: 'range')
+      ..style.width = '100%'
+      ..style.margin = '0 0 4px 0'
+      ..min = '0'
+      ..max = '1000'
+      ..value = '0';
+    seek.style.setProperty('accent-color', '#14B8A6');
+
+    final row = html.DivElement()
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.gap = '6px';
+
+    late html.ButtonElement barPlayBtn;
+    late html.SpanElement timeLabel;
+
+    void syncUi() {
+      final dur = el.duration;
+      final pos = el.currentTime;
+      final playing = !el.paused && !el.ended;
+      centerBtn.style.opacity = playing && isVideo ? '0' : '1';
+      barPlayBtn.innerHtml = playing ? pauseSvg : playSvg;
+      if (dur.isFinite && dur > 0) {
+        seek.value = ((pos / dur) * 1000).round().clamp(0, 1000).toString();
       }
+      String fmt(num sec) {
+        final s = sec.floor().clamp(0, 99999);
+        final m = (s ~/ 60).toString().padLeft(2, '0');
+        final r = (s % 60).toString().padLeft(2, '0');
+        return '$m:$r';
+      }
+      final durSec = dur.isFinite && dur > 0 ? dur.toDouble() : 0.0;
+      timeLabel.text = '${fmt(pos.toDouble())} / ${fmt(durSec)}';
+    }
+
+    void togglePlay() {
       try {
-        el.append(html.SourceElement()
-          ..src = url
-          ..type = mime);
-      } catch (_) {
-        el.src = url;
-      }
-      el.load();
-      return el;
+        if (el.paused || el.ended) {
+          if (el.ended) el.currentTime = 0;
+          final p = el.play();
+          if (p != null) {
+            p.catchError((_) {
+              el.muted = true;
+              final p2 = el.play();
+              if (p2 != null) {
+                p2.then((_) {
+                  el.muted = false;
+                  syncUi();
+                });
+              }
+            });
+          }
+        } else {
+          el.pause();
+        }
+      } catch (_) {}
+      syncUi();
+    }
+
+    tapLayer.onClick.listen((e) {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePlay();
     });
+
+    barPlayBtn = html.ButtonElement()
+      ..type = 'button'
+      ..style.background = 'transparent'
+      ..style.border = 'none'
+      ..style.padding = '6px'
+      ..style.cursor = 'pointer'
+      ..innerHtml = playSvg
+      ..onClick.listen((e) {
+        e.preventDefault();
+        togglePlay();
+      });
+
+    timeLabel = html.SpanElement()
+      ..style.color = 'rgba(255,255,255,0.75)'
+      ..style.fontSize = '11px'
+      ..style.fontWeight = '600'
+      ..style.flex = '1'
+      ..text = '00:00 / 00:00';
+
+    seek.onInput.listen((_) {
+      final dur = el.duration;
+      if (!dur.isFinite || dur <= 0) return;
+      final val = int.tryParse(seek.value ?? '0') ?? 0;
+      el.currentTime = dur * (val / 1000.0);
+      syncUi();
+    });
+
+    row
+      ..append(barPlayBtn)
+      ..append(timeLabel);
+
+    bar
+      ..append(seek)
+      ..append(row);
+
+    root
+      ..append(tapLayer)
+      ..append(centerBtn)
+      ..append(bar);
+
+    el.onLoadedMetadata.listen((_) => syncUi());
+    el.onPlay.listen((_) => syncUi());
+    el.onPause.listen((_) => syncUi());
+    el.onTimeUpdate.listen((_) => syncUi());
+    el.onEnded.listen((_) => syncUi());
+    el.onError.listen((_) {
+      debugPrint('[live_capture] playback error code=${el.error?.code} url=$url mime=$mime');
+    });
+    el.load();
+    syncUi();
+    return root;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loadError != null) {
+    if (_loadError != null || _playUrl.isEmpty) {
       return Container(
         height: widget.height,
         alignment: Alignment.center,
@@ -345,7 +555,11 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
           borderRadius: BorderRadius.circular(widget.video ? 16 : 12),
         ),
         padding: const EdgeInsets.all(12),
-        child: Text(_loadError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        child: Text(
+          _loadError ?? 'Loading recording…',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        ),
       );
     }
     return ClipRRect(
