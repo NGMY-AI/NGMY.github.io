@@ -97,8 +97,9 @@ class NgmyLiveCaptureStore {
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       for (final item in items) {
-        if (item.dataUrl.isEmpty) {
-          item.dataUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id) ?? '';
+        final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id);
+        if (url != null && url.isNotEmpty) {
+          item.dataUrl = url;
         }
       }
       return items;
@@ -195,7 +196,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       elapsedSec = DateTime.now().difference(_startedAt!).inSeconds;
       notifyListeners();
     });
-    lastStatus = 'Recording — leave the studio anytime. Use the green bar at the bottom to stop.';
+    lastStatus = 'Recording — tap Stop & Save when finished.';
     notifyListeners();
     return true;
   }

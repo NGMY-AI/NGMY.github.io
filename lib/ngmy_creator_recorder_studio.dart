@@ -274,19 +274,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       child: Row(
         children: [
           IconButton(
-            onPressed: () {
-              if (recording) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Still recording — browse NGMY freely. Use the bar at the bottom to stop.'),
-                    backgroundColor: Color(0xFF059669),
-                    behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 4),
-                  ),
-                );
-              }
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           ),
           Expanded(
@@ -295,9 +283,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               children: [
                 const Text('Recorder Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
                 Text(
-                  recording
-                      ? 'Recording — leave anytime. Green bar at bottom keeps it going.'
-                      : 'Photos · voice memos · video — like a pocket studio.',
+                  recording ? 'Recording in progress — come back here to stop & save.' : 'Photos · voice memos · video — like a pocket studio.',
                   style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
                 ),
               ],
@@ -415,51 +401,22 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 ),
               if (_mode != _StudioMode.photo) ...[
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 52,
-                        child: FilledButton.icon(
-                          onPressed: _busy ? null : (recording ? _stopRecording : _startRecording),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: recording ? const Color(0xFFDC2626) : NgmyRecorderStudioColors.emerald,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                          icon: Icon(recording ? Icons.stop_rounded : (_mode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
-                          label: Text(
-                            recording ? 'Stop & Save' : 'Start ${_mode == _StudioMode.video ? 'Video' : 'Voice'}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                          ),
-                        ),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : (recording ? _stopRecording : _startRecording),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: recording ? const Color(0xFFDC2626) : NgmyRecorderStudioColors.emerald,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    if (recording) ...[
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Recording continues — use the bottom bar anywhere in NGMY to stop.'),
-                                backgroundColor: Color(0xFF059669),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            Navigator.pop(context);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: NgmyRecorderStudioColors.mint,
-                            side: BorderSide(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.7)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                          child: const Text('Leave open', style: TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                      ),
-                    ],
-                  ],
+                    icon: Icon(recording ? Icons.stop_rounded : (_mode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
+                    label: Text(
+                      recording ? 'Stop & Save' : 'Start ${_mode == _StudioMode.video ? 'Video' : 'Voice'}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -883,19 +840,12 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                   const Text('Media unavailable — storage was full when saved.', style: TextStyle(color: Colors.white54, fontSize: 12))
                 else if (isPhoto)
                   _photoPreview(widget.item.dataUrl)
-                else if (isVideo)
+                else if (isVideo || widget.item.mimeType.startsWith('video/'))
                   NgmyLiveCaptureMedia.playbackVideo(
-                    key: ValueKey('vid-${widget.item.id}'),
+                    key: ValueKey('media-${widget.item.id}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
-                    height: 240,
-                  )
-                else if (widget.item.mimeType.startsWith('video/'))
-                  NgmyLiveCaptureMedia.playbackVideo(
-                    key: ValueKey('vm-${widget.item.id}'),
-                    src: widget.item.dataUrl,
-                    mimeType: widget.item.mimeType,
-                    height: 54,
+                    height: isVideo ? 240 : 120,
                   )
                 else
                   NgmyLiveCaptureMedia.playbackAudio(

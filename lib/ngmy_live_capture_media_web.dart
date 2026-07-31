@@ -46,7 +46,9 @@ class NgmyLiveCaptureMedia {
   }
 
   static Widget playbackAudio({required String src, required String mimeType, double height = 52, Key? key}) {
-    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: false, height: height);
+    final mime = ngmyCleanMediaMime(mimeType);
+    final asVideo = mime.startsWith('video/');
+    return _StableMediaPlayback(key: key, src: src, mimeType: mimeType, video: asVideo, height: asVideo ? 120 : height);
   }
 
   static String toPlayableUrl(String src, String mimeType) {
@@ -281,147 +283,81 @@ class _StableMediaPlayback extends StatefulWidget {
 
 class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
   late final String _viewType;
-  late final String _blobUrl;
+  late String _playUrl;
   late final String _mime;
   bool _registered = false;
-  NgmyCapturePlayer? _player;
-  bool _playing = false;
-  String? _playError;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
     _mime = ngmyCleanMediaMime(widget.mimeType);
-    _blobUrl = NgmyLiveCaptureMedia.toPlayableUrl(widget.src, _mime);
-    _viewType = 'ngmy-play-${widget.video ? 'v' : 'a'}-${_blobUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
+    _playUrl = NgmyLiveCaptureMedia.toPlayableUrl(widget.src, _mime);
+    _viewType = 'ngmy-play-${widget.video ? 'v' : 'a'}-${_playUrl.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
     _register();
-    unawaited(_bootPlayer());
-  }
-
-  Future<void> _bootPlayer() async {
-    final p = await NgmyLiveCaptureMedia.createPlayer(widget.src, video: widget.video, mimeType: _mime);
-    if (!mounted) {
-      p?.dispose();
-      return;
+    if (_playUrl.isEmpty) {
+      _loadError = 'Could not load this recording.';
     }
-    setState(() => _player = p);
   }
 
   void _register() {
-    if (_registered) return;
+    if (_registered || _playUrl.isEmpty) return;
     _registered = true;
+    final url = _playUrl;
+    final mime = _mime;
+    final isVideo = widget.video || mime.startsWith('video/');
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
-      if (widget.video) {
-        final v = html.VideoElement()
-          ..controls = true
-          ..preload = 'auto'
-          ..setAttribute('playsinline', 'true')
-          ..setAttribute('webkit-playsinline', 'true')
-          ..setAttribute('controls', 'true')
-          ..style.width = '100%'
-          ..style.height = '100%'
-          ..style.objectFit = 'contain'
-          ..style.backgroundColor = '#000'
-          ..style.borderRadius = '16px';
-        try {
-          v.append(html.SourceElement()
-            ..src = _blobUrl
-            ..type = _mime);
-        } catch (_) {
-          v.src = _blobUrl;
-        }
-        v.load();
-        return v;
-      }
-      final a = html.AudioElement()
+      final el = isVideo
+          ? html.VideoElement()
+          : html.AudioElement();
+      el
         ..controls = true
         ..preload = 'auto'
+        ..setAttribute('playsinline', 'true')
+        ..setAttribute('webkit-playsinline', 'true')
         ..style.width = '100%'
-        ..style.height = '44px'
-        ..style.outline = 'none';
+        ..style.height = '100%'
+        ..style.outline = 'none'
+        ..style.backgroundColor = '#0F172A';
+      if (isVideo) {
+        (el as html.VideoElement).style.objectFit = 'contain';
+      }
       try {
-        a.append(html.SourceElement()
-          ..src = _blobUrl
-          ..type = _mime);
+        el.append(html.SourceElement()
+          ..src = url
+          ..type = mime);
       } catch (_) {
-        a.src = _blobUrl;
+        el.src = url;
       }
-      a.load();
-      return a;
+      el.load();
+      return el;
     });
-  }
-
-  Future<void> _togglePlay() async {
-    final p = _player;
-    if (p == null) {
-      setState(() => _playError = 'Player is still loading… tap again in a moment.');
-      return;
-    }
-    try {
-      if (_playing) {
-        await p.pause();
-        if (mounted) setState(() => _playing = false);
-      } else {
-        await p.play();
-        if (mounted) {
-          setState(() {
-            _playing = true;
-            _playError = p.lastError;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) setState(() => _playError = 'Could not play. Use the native controls above.');
-    }
-  }
-
-  @override
-  void dispose() {
-    _player?.dispose();
-    final url = _blobUrl;
-    if (url.startsWith('blob:')) {
-      Timer(const Duration(seconds: 45), () {
-        try {
-          html.Url.revokeObjectUrl(url);
-        } catch (_) {}
-      });
-    }
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ClipRRect(
+    if (_loadError != null) {
+      return Container(
+        height: widget.height,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
           borderRadius: BorderRadius.circular(widget.video ? 16 : 12),
-          child: ColoredBox(
-            color: const Color(0xFF0F172A),
-            child: SizedBox(
-              height: widget.height,
-              width: double.infinity,
-              child: HtmlElementView(viewType: _viewType),
-            ),
-          ),
         ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          onPressed: _togglePlay,
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF2563EB),
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(44),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-          label: Text(_playing ? 'Pause' : 'Play', style: const TextStyle(fontWeight: FontWeight.w800)),
+        padding: const EdgeInsets.all(12),
+        child: Text(_loadError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.video ? 16 : 12),
+      child: ColoredBox(
+        color: const Color(0xFF0F172A),
+        child: SizedBox(
+          height: widget.height,
+          width: double.infinity,
+          child: HtmlElementView(viewType: _viewType),
         ),
-        if (_playError != null) ...[
-          const SizedBox(height: 6),
-          Text(_playError!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 11)),
-        ],
-      ],
+      ),
     );
   }
 }
