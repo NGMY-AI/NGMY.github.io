@@ -15,6 +15,7 @@ import 'ngmy_studio_slot_video.dart';
 import 'ngmy_vault_blob_store.dart';
 import 'ngmy_vault_html_video.dart';
 import 'ngmy_vault_pick_video.dart';
+import 'ngmy_vault_video_preview.dart';
 import 'ngmy_vault_video_thumb.dart';
 import 'ngmy_vault_web_io.dart';
 
@@ -921,7 +922,8 @@ class _VaultVideoThumbTile extends StatefulWidget {
 }
 
 class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
-  Uint8List? _thumb;
+  Uint8List? _jpegThumb;
+  String? _previewUrl;
   bool _loading = true;
 
   @override
@@ -930,23 +932,50 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
     _load();
   }
 
+  @override
+  void dispose() {
+    final url = _previewUrl;
+    if (url != null) NgmyVaultBlobStore.revokeObjectUrl(url);
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final key = NgmyVaultBlobStore.thumbKey(widget.itemId);
-    var bytes = await NgmyVaultBlobStore.getBytes(key);
-    if (bytes == null || bytes.isEmpty) {
-      final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, widget.mime);
-      if (url != null && url.isNotEmpty) {
-        bytes = await ngmyVaultCaptureVideoThumbnail(objectUrl: url, mime: widget.mime);
-        NgmyVaultBlobStore.revokeObjectUrl(url);
-        if (bytes != null && bytes.isNotEmpty) {
-          await NgmyVaultBlobStore.put(key, bytes, mime: 'image/jpeg');
-        }
-      }
+    final cached = await NgmyVaultBlobStore.getBytes(key);
+    if (cached != null && cached.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _jpegThumb = cached;
+        _loading = false;
+      });
+      return;
     }
+
+    final url = await NgmyVaultBlobStore.getObjectUrl(widget.itemId, widget.mime);
     if (!mounted) return;
+    if (url == null || url.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+
     setState(() {
-      _thumb = bytes;
+      _previewUrl = url;
       _loading = false;
+    });
+
+    unawaited(_cacheJpegThumb(key, url));
+  }
+
+  Future<void> _cacheJpegThumb(String key, String url) async {
+    final bytes = await ngmyVaultCaptureVideoThumbnail(objectUrl: url, mime: widget.mime);
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    await NgmyVaultBlobStore.put(key, bytes, mime: 'image/jpeg');
+    if (!mounted) return;
+    final liveUrl = _previewUrl;
+    if (liveUrl != null) NgmyVaultBlobStore.revokeObjectUrl(liveUrl);
+    setState(() {
+      _jpegThumb = bytes;
+      _previewUrl = null;
     });
   }
 
@@ -979,12 +1008,18 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return _fallback(spinner: true);
-    if (_thumb == null || _thumb!.isEmpty) return _fallback();
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.memory(_thumb!, fit: BoxFit.cover),
-        Container(color: Colors.black.withValues(alpha: 0.12)),
+        if (_jpegThumb != null)
+          Image.memory(_jpegThumb!, fit: BoxFit.cover)
+        else if (_previewUrl != null)
+          IgnorePointer(
+            child: NgmyVaultVideoPreview(source: _previewUrl!, mimeType: widget.mime),
+          )
+        else
+          _fallback(),
+        Container(color: Colors.black.withValues(alpha: 0.10)),
         _playBadge(),
       ],
     );
@@ -1266,10 +1301,12 @@ class _VaultVideoPageState extends State<_VaultVideoPage> {
     // Dedicated vault player with native controls — studio cover player is not
     // reliable for full-clip private vault playback.
     if (kIsWeb) {
-      return NgmyVaultHtmlVideo(
-        key: ValueKey(widget.itemId),
-        source: url,
-        mimeType: ngmyVaultPlaybackMime(widget.mime),
+      return SizedBox.expand(
+        child: NgmyVaultHtmlVideo(
+          key: ValueKey(widget.itemId),
+          source: url,
+          mimeType: ngmyVaultPlaybackMime(widget.mime),
+        ),
       );
     }
     return NgmyStudioSlotVideo(source: url);

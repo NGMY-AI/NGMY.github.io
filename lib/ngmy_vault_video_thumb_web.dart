@@ -52,23 +52,31 @@ Future<Uint8List?> _captureFromUrl(String url, String mime) async {
     v.src = url;
     v.load();
 
-    await v.onLoadedMetadata.first.timeout(const Duration(seconds: 15));
+    await v.onLoadedMetadata.first.timeout(const Duration(seconds: 20));
 
+    final candidates = <double>[0.05, 0.25, 0.5, 1.0];
     final dur = v.duration;
-    final seekTo = dur.isFinite && dur > 0 ? (dur * 0.08).clamp(0.12, 1.5) : 0.12;
-    v.currentTime = seekTo;
-    try {
-      await v.onSeeked.first.timeout(const Duration(seconds: 8));
-    } catch (_) {}
+    if (dur.isFinite && dur > 0) {
+      candidates.insert(0, (dur * 0.08).clamp(0.05, 2.0));
+    }
 
-    // Some mobile browsers only decode a frame after a muted play/pause.
-    try {
-      await v.play();
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-      v.pause();
-    } catch (_) {}
+    for (final t in candidates) {
+      try {
+        v.currentTime = t;
+        await v.onSeeked.first.timeout(const Duration(seconds: 6));
+      } catch (_) {}
 
-    return await _frameToJpeg(v);
+      try {
+        await v.play();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        v.pause();
+      } catch (_) {}
+
+      final frame = await _frameToJpeg(v);
+      if (frame != null && frame.isNotEmpty) return frame;
+    }
+
+    return null;
   } catch (e) {
     debugPrint('[vault video thumb] capture failed: $e');
     return null;
