@@ -357,11 +357,16 @@ class NgmyLiveCaptureEngine {
     debugPrint('[live_capture] blob ready size=${blob.size} mime=$blobMime chunks=${_chunks.length}');
 
     String dataUrl;
-    try {
-      dataUrl = await _blobToDataUrl(blob).timeout(const Duration(seconds: 90));
-    } catch (e) {
-      debugPrint('[live_capture] dataUrl convert failed, using object URL: $e');
+    // Large captures: skip base64 data URL — store blob URL and persist blob in IndexedDB.
+    if (blob.size > 4 * 1024 * 1024) {
       dataUrl = html.Url.createObjectUrlFromBlob(blob);
+    } else {
+      try {
+        dataUrl = await _blobToDataUrl(blob).timeout(const Duration(seconds: 90));
+      } catch (e) {
+        debugPrint('[live_capture] dataUrl convert failed, using object URL: $e');
+        dataUrl = html.Url.createObjectUrlFromBlob(blob);
+      }
     }
     if (dataUrl.isEmpty) {
       lastError = 'Captured, but could not read the recording data.';

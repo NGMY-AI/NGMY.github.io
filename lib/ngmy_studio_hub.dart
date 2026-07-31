@@ -9,14 +9,12 @@ import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_iron_triangle_panel.dart';
 import 'ngmy_invoice_creator.dart';
 import 'ngmy_swahili_school.dart';
-import 'ngmy_outfit_studio.dart';
+import 'ngmy_creator_recorder_studio.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
-import 'ngmy_ai_client.dart';
-
 export 'ngmy_studio_colors.dart';
 
 /// Bottom-nav icon for the Creator Toolkit tab.
@@ -81,7 +79,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
     @override
     Widget build(BuildContext context) {
-      // Pinned order: Doc Share → Quote Calc → QR Generator → Play Zone → Kiswahili School → AI Outfit → rest.
+      // Pinned order: Doc Share → Quote Calc → QR Generator → Play Zone → Kiswahili School → Recorder Studio → rest.
       final tools = <_CreatorTool>[
         _CreatorTool(
           icon: Icons.folder_shared_rounded,
@@ -142,15 +140,12 @@ class NgmyCreatorHubTab extends StatelessWidget {
         onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
       ),
       _CreatorTool(
-        icon: Icons.style_rounded,
-        colors: const [Color(0xFFDB2777), Color(0xFF9333EA)],
-        title: 'AI Outfit',
-        subtitle: 'Virtual dress try-on',
+        icon: Icons.mic_rounded,
+        colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
+        title: 'Recorder Studio',
+        subtitle: 'Photos · voice memos · video',
         onTap: () {
-          showNgmyOutfitStudio(
-            context: context,
-            resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
-          );
+          showNgmyCreatorRecorderStudio(context, userEmail: userEmail);
         },
       ),
       _CreatorTool(

@@ -98,7 +98,7 @@ class NgmyLiveCaptureStore {
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       for (final item in items) {
         if (item.dataUrl.isEmpty) {
-          item.dataUrl = await NgmyLiveCaptureBlobStore.getDataUrl(item.id) ?? '';
+          item.dataUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id) ?? '';
         }
       }
       return items;
@@ -110,15 +110,15 @@ class NgmyLiveCaptureStore {
   /// Returns false if the recording could not be persisted for later — the
   /// caller should still let the user play/download it in this session.
   static Future<bool> save(String email, List<NgmyLiveCaptureItem> items) async {
-    final trimmed = items.take(12).toList();
-    final dropped = items.skip(12);
+    final trimmed = items.take(24).toList();
+    final dropped = items.skip(24);
     if (dropped.isNotEmpty) {
       unawaited(NgmyLiveCaptureBlobStore.deleteMany(dropped.map((e) => e.id)));
     }
     var mediaOk = true;
     for (final item in trimmed) {
       if (item.dataUrl.isNotEmpty) {
-        final ok = await NgmyLiveCaptureBlobStore.putDataUrl(item.id, item.dataUrl);
+        final ok = await NgmyLiveCaptureBlobStore.putMedia(item.id, item.dataUrl, mimeType: item.mimeType);
         if (!ok) mediaOk = false;
       }
     }
@@ -220,7 +220,9 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     return item;
   }
 
-  String clockLabel() => _formatClock(elapsedSec);
+  String clockLabel() => formatClock(elapsedSec);
+
+  static String formatClock(int sec) => _formatClock(sec);
 
   static String _formatClock(int sec) {
     final m = (sec ~/ 60).toString().padLeft(2, '0');

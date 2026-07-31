@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
-import 'ngmy_invoice_creator.dart';
 import 'ngmy_studio_hub.dart' show showNgmyStandaloneQuoteCalc;
 import 'ngmy_swahili_school.dart';
-import 'ngmy_outfit_studio.dart';
+import 'ngmy_creator_recorder_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_virtual_device_launcher.dart';
-import 'ngmy_ai_client.dart';
 
 void ngmyRegisterAiAppTools({
   required BuildContext Function() context,
@@ -48,12 +46,9 @@ void ngmyRegisterAiAppTools({
         showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
         return 'Opened Kiswahili School.';
       },
-      'ai_outfit': (ctx) async {
-        showNgmyOutfitStudio(
-          context: ctx,
-          resolveApiKey: () => ngmyResolveGeminiApiKey(config: config),
-        );
-        return 'Opened AI Outfit studio.';
+      'recorder_studio': (ctx) async {
+        showNgmyCreatorRecorderStudio(ctx, userEmail: userEmail);
+        return 'Opened Recorder Studio — photos, voice memos, and video.';
       },
       'qr_generator': (ctx) async {
         showNgmyQrGeneratorDialog(ctx, userEmail: userEmail.isEmpty ? null : userEmail);
