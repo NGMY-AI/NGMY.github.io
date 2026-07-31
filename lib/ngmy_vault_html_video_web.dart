@@ -115,10 +115,10 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     final seek = html.InputElement(type: 'range')
       ..style.width = '100%'
       ..style.margin = '0 0 6px 0'
-      ..style.accentColor = '#818CF8'
       ..min = '0'
       ..max = '1000'
       ..value = '0';
+    seek.style.setProperty('accent-color', '#818CF8');
 
     final row = html.DivElement()
       ..style.display = 'flex'
@@ -156,15 +156,15 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       if (dur.isFinite && dur > 0) {
         seek.value = ((pos / dur) * 1000).round().clamp(0, 1000).toString();
       }
-      String fmt(double sec) {
+      String fmt(num sec) {
         final s = sec.floor().clamp(0, 99999);
         final m = (s ~/ 60).toString().padLeft(2, '0');
         final r = (s % 60).toString().padLeft(2, '0');
         return '$m:$r';
       }
 
-      final durSec = dur.isFinite && dur > 0 ? dur : 0.0;
-      timeLabel.text = '${fmt(pos)} / ${fmt(durSec)}';
+      final durSec = dur.isFinite && dur > 0 ? dur.toDouble() : 0.0;
+      timeLabel.text = '${fmt(pos.toDouble())} / ${fmt(durSec)}';
     }
 
     void showError(String msg) {
