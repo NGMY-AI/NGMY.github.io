@@ -99,7 +99,7 @@ class NgmyHelpCenterSendMoneyReceipt {
       ..writeln('$feeDescription: \$${serviceFee.toStringAsFixed(2)}')
       ..writeln('Recipient receives: \$${recipientGets.toStringAsFixed(2)}')
       ..writeln()
-      ..writeln('This is a fee quote from NGMY Help Center. Confirm amounts before sending payment.')
+      ..writeln('This is a fee quote from NGMY Help Center.')
       ..writeln('NGMY.ORG');
     return buf.toString().trim();
   }

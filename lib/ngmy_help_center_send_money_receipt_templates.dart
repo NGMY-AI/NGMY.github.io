@@ -327,7 +327,7 @@ class NgmyTransferReceiptPreview extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Fee quote from NGMY Help Center. Confirm before payment.',
+                    'Fee quote from NGMY Help Center.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: t.mutedText, fontSize: 9, height: 1.35),
                   ),

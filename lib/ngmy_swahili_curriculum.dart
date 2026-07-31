@@ -542,11 +542,26 @@ List<SwahiliLessonDay> _swahiliGeneratedDays(
   return days;
 }
 
-String _englishAnswer(SwahiliWord word) {
-  final en = word.english.trim();
-  if (en.contains('/')) {
-    return en.split('/').first.trim();
+String _englishAnswer(SwahiliWord word) => ngmySwahiliTestEnglishAnswer(word);
+
+/// English answer shown on level tests (Swahili prompt → English choices).
+String ngmySwahiliTestEnglishAnswer(SwahiliWord word) {
+  var en = word.english.trim();
+  if (en.isEmpty) return en;
+
+  // "He/She is …" must stay a full English phrase — never truncate to "He" or "She".
+  en = en.replaceAll(RegExp(r'\bShe/He\b', caseSensitive: false), 'He');
+  en = en.replaceAll(RegExp(r'\bHe/She\b', caseSensitive: false), 'He');
+
+  // Simple synonym pairs like "I / me" — first short option is enough for the test.
+  if (en.contains(' / ')) {
+    final parts = en.split(' / ').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2 && parts.every((p) => !p.contains(' '))) {
+      return parts.first;
+    }
+    if (parts.isNotEmpty) return parts.first;
   }
+
   return en;
 }
 
