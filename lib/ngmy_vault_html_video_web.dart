@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Vault video player — Flutter play button drives a native &lt;video&gt;.
-/// Native HTML controls are unreliable inside Flutter HtmlElementView on web
-/// (parent overlays steal taps), so we keep controls in Flutter.
+/// Vault video player — play/pause runs inside the HTML platform view so
+/// mobile browsers treat taps as a real user gesture (Flutter overlays alone
+/// cannot start playback on iOS Safari / many Android WebViews).
 class NgmyVaultHtmlVideo extends StatefulWidget {
   const NgmyVaultHtmlVideo({super.key, required this.source, this.mimeType = 'video/mp4'});
 
@@ -21,6 +20,8 @@ class NgmyVaultHtmlVideo extends StatefulWidget {
 class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
   late final String _viewType;
   html.VideoElement? _video;
+  final Completer<void> _viewReady = Completer<void>();
+  void Function()? _domTogglePlay;
   bool _ready = false;
   bool _playing = false;
   bool _muted = false;
@@ -28,32 +29,97 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
   double _progress = 0;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  StreamSubscription<html.Event>? _timeSub;
-  StreamSubscription<html.Event>? _metaSub;
 
   @override
   void initState() {
     super.initState();
     _viewType = 'ngmy-vault-vid-${widget.source.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
+      final root = html.DivElement()
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.position = 'relative'
+        ..style.backgroundColor = '#000'
+        ..style.overflow = 'hidden'
+        ..style.cursor = 'pointer';
+
       final v = html.VideoElement()
-        ..src = widget.source
         ..controls = false
         ..preload = 'auto'
         ..autoplay = false
         ..muted = false
         ..setAttribute('playsinline', 'true')
         ..setAttribute('webkit-playsinline', 'true')
-        ..setAttribute('type', widget.mimeType)
-        ..setAttribute('x-webkit-airplay', 'deny')
         ..style.width = '100%'
         ..style.height = '100%'
         ..style.objectFit = 'contain'
-        ..style.backgroundColor = '#000'
-        ..style.border = '0'
-        // Let Flutter overlays handle taps; video is display-only.
+        ..style.display = 'block'
         ..style.pointerEvents = 'none';
+
+      final mime = widget.mimeType.trim().isEmpty ? 'video/mp4' : widget.mimeType.trim();
+      v.append(html.SourceElement()
+        ..src = widget.source
+        ..type = mime);
+      v.src = widget.source;
+
+      final playHint = html.DivElement()
+        ..style.position = 'absolute'
+        ..style.left = '50%'
+        ..style.top = '50%'
+        ..style.transform = 'translate(-50%, -50%)'
+        ..style.width = '72px'
+        ..style.height = '72px'
+        ..style.borderRadius = '50%'
+        ..style.backgroundColor = 'rgba(0,0,0,0.55)'
+        ..style.border = '1.5px solid rgba(255,255,255,0.24)'
+        ..style.display = 'flex'
+        ..style.alignItems = 'center'
+        ..style.justifyContent = 'center'
+        ..style.pointerEvents = 'none'
+        ..style.color = '#fff'
+        ..style.fontSize = '44px'
+        ..style.lineHeight = '1'
+        ..text = '▶';
+
+      root.append(v);
+      root.append(playHint);
       _video = v;
+
+      void syncPlayHint() {
+        playHint.style.display = (v.paused || v.ended) ? 'flex' : 'none';
+        playHint.text = v.paused || v.ended ? '▶' : '❚❚';
+      }
+
+      Future<void> togglePlay() async {
+        try {
+          if (v.paused || v.ended) {
+            if (v.ended) v.currentTime = 0;
+            try {
+              await v.play();
+            } catch (_) {
+              v.muted = true;
+              await v.play();
+              v.muted = _muted;
+            }
+          } else {
+            v.pause();
+          }
+          syncPlayHint();
+        } catch (e) {
+          debugPrint('[vault html video] togglePlay: $e');
+          if (mounted) {
+            setState(() => _error = 'Could not start playback. Tap the video again.');
+          }
+        }
+      }
+
+      _domTogglePlay = () {
+        unawaited(togglePlay());
+      };
+
+      root.onClick.listen((_) {
+        unawaited(togglePlay());
+      });
 
       void markReady() {
         if (!mounted) return;
@@ -64,18 +130,22 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
             _duration = Duration(milliseconds: (durSec * 1000).round());
           }
         });
+        syncPlayHint();
       }
 
       v.onLoadedMetadata.listen((_) => markReady());
       v.onLoadedData.listen((_) => markReady());
       v.onCanPlay.listen((_) => markReady());
       v.onPlay.listen((_) {
+        syncPlayHint();
         if (mounted) setState(() => _playing = true);
       });
       v.onPause.listen((_) {
+        syncPlayHint();
         if (mounted) setState(() => _playing = false);
       });
       v.onEnded.listen((_) {
+        syncPlayHint();
         if (mounted) {
           setState(() {
             _playing = false;
@@ -96,20 +166,20 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       });
       v.onError.listen((_) {
         final code = v.error?.code;
-        debugPrint('[vault html video] error code=$code src=${widget.source}');
+        debugPrint('[vault html video] error code=$code src=${widget.source} mime=$mime');
         if (mounted) {
-          setState(() => _error = 'Could not play this video. Try downloading it, or re-add an MP4 clip.');
+          setState(() => _error = 'Could not play this video. Try re-adding an MP4 clip from your gallery.');
         }
       });
+
+      if (!_viewReady.isCompleted) _viewReady.complete();
       v.load();
-      return v;
+      return root;
     });
   }
 
   @override
   void dispose() {
-    _timeSub?.cancel();
-    _metaSub?.cancel();
     try {
       _video?.pause();
       _video?.removeAttribute('src');
@@ -119,33 +189,28 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
   }
 
   Future<void> _togglePlay() async {
-    final v = _video;
-    if (v == null) return;
-    try {
-      if (v.paused || v.ended) {
-        if (v.ended) v.currentTime = 0;
-        // Some mobile browsers require a short muted kickstart, then unmute.
-        try {
-          await v.play();
-        } catch (_) {
-          v.muted = true;
-          await v.play();
-          v.muted = _muted;
+    if (!_viewReady.isCompleted) {
+      try {
+        await _viewReady.future.timeout(const Duration(seconds: 8));
+      } catch (_) {
+        if (mounted) {
+          setState(() => _error = 'Video player is still loading. Wait a moment and tap again.');
         }
-        if (mounted) setState(() => _playing = true);
-      } else {
-        v.pause();
-        if (mounted) setState(() => _playing = false);
-      }
-    } catch (e) {
-      debugPrint('[vault html video] play: $e');
-      if (mounted) {
-        setState(() => _error = 'Tap Play again — the browser blocked autoplay.');
+        return;
       }
     }
+    final toggle = _domTogglePlay;
+    if (toggle == null) {
+      if (mounted) {
+        setState(() => _error = 'Video player not ready. Close and reopen the clip.');
+      }
+      return;
+    }
+    toggle();
   }
 
   Future<void> _toggleMute() async {
+    if (!_viewReady.isCompleted) await _viewReady.future;
     final v = _video;
     if (v == null) return;
     final next = !v.muted;
@@ -209,43 +274,16 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         const ColoredBox(color: Colors.black),
         HtmlElementView(viewType: _viewType),
         if (!_ready)
-          const Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white54),
-            ),
-          ),
-        // Big center play/pause — always tappable (Flutter layer, not HTML).
-        Positioned.fill(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => unawaited(_togglePlay()),
-              child: Center(
-                child: AnimatedOpacity(
-                  opacity: (!_playing || !_ready) ? 1 : 0.0,
-                  duration: const Duration(milliseconds: 180),
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24, width: 1.5),
-                    ),
-                    child: Icon(
-                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 44,
-                    ),
-                  ),
-                ),
+          const IgnorePointer(
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white54),
               ),
             ),
           ),
-        ),
-        // Bottom transport bar
+        // Bottom transport bar — forwards to the same DOM play handler.
         Positioned(
           left: 12,
           right: 12,

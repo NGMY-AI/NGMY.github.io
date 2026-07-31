@@ -1179,7 +1179,11 @@ class _VaultVideoPageState extends State<_VaultVideoPage> {
     // Dedicated vault player with native controls — studio cover player is not
     // reliable for full-clip private vault playback.
     if (kIsWeb) {
-      return NgmyVaultHtmlVideo(source: url, mimeType: ngmyVaultPlaybackMime(widget.mime));
+      return NgmyVaultHtmlVideo(
+        key: ValueKey(widget.itemId),
+        source: url,
+        mimeType: ngmyVaultPlaybackMime(widget.mime),
+      );
     }
     return NgmyStudioSlotVideo(source: url);
   }

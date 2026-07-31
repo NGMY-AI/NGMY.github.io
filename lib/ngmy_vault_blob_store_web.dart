@@ -162,6 +162,9 @@ class NgmyVaultBlobStore {
             : result;
         return html.Url.createObjectUrlFromBlob(blob);
       }
+      if (result is html.Blob && result.size == 0) {
+        debugPrint('[ngmy_vault_blob] getObjectUrl: empty blob for $id');
+      }
       final bytes = await _asBytesAsync(result);
       if (bytes == null || bytes.isEmpty) return null;
       return html.Url.createObjectUrlFromBlob(html.Blob([bytes], type));
