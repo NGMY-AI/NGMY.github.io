@@ -299890,56 +299890,56 @@ r.d!==$&&A.aG()
 r.d=s
 $.wU()
 $.o9().pr(s,new A.d4F(r),!0)},
-b8i(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0=this,a1="100%",a2="none",a3="pointer-events",a4="absolute",a5="transparent",a6="flex",a7="center",a8="align-items",a9={},b0=document,b1=b0.createElement("div"),b2=b1.style
-b2.width=a1
-b2=b1.style
-b2.height=a1
-b2=b1.style
-b2.position="relative"
-b2=b1.style
-b2.backgroundColor="#000"
-b2=b1.style
-b2.overflow="hidden"
-b2=b1.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"touch-action"),"manipulation","")
-q=b0.createElement("video")
+b8i(){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0=this,a1="100%",a2="pointer-events",a3="absolute",a4="border-radius",a5="flex",a6="center",a7="align-items",a8={},a9=document,b0=a9.createElement("div"),b1=b0.style
+b1.width=a1
+b1=b0.style
+b1.height=a1
+b1=b0.style
+b1.position="relative"
+b1=b0.style
+b1.backgroundColor="#000"
+b1=b0.style
+b1.overflow="hidden"
+b1=b0.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,"touch-action"),"manipulation","")
+q=a9.createElement("video")
 q.controls=!1
 q.preload="auto"
 q.autoplay=!1
 q.muted=!1
 q.setAttribute("playsinline","true")
 q.setAttribute("webkit-playsinline","true")
-b2=q.style
-b2.width=a1
-b2=q.style
-b2.height=a1
-b2=q.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"object-fit"),"contain","")
-b2=q.style
-b2.display="block"
-b2=q.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,a3),a2,"")
+b1=q.style
+b1.width=a1
+b1=q.style
+b1.height=a1
+b1=q.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,"object-fit"),"contain","")
+b1=q.style
+b1.display="block"
+b1=q.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,a2),"none","")
 s=q
-b2=a0.a
-p=B.b.i(b2.d)
+b1=a0.a
+p=B.b.i(b1.d)
 r=p.length===0?"video/mp4":p
-s.src=b2.c
-try{b2=b0.createElement("source")
-b2.toString
-b2.src=a0.a.c
-b2.type=r
-J.dYI(s,b2)}catch(o){}a0.e=s
-b1.appendChild(s).toString
-a9.a=!1
-b2=new A.d4u()
-n=new A.d4w(b2)
-m=new A.d4t(a9,s)
-l=b0.createElement("div")
+s.src=b1.c
+try{b1=a9.createElement("source")
+b1.toString
+b1.src=a0.a.c
+b1.type=r
+J.dYI(s,b1)}catch(o){}a0.e=s
+b0.appendChild(s).toString
+a8.a=!1
+b1=new A.d4u()
+n=new A.d4w(b1)
+m=new A.d4t(a8,s)
+l=a9.createElement("div")
 k=l.style
-k.position=a4
+k.position=a3
 k=l.style
 k.left="0"
 k=l.style
@@ -299953,10 +299953,10 @@ k.zIndex="2"
 k=l.style
 k.cursor="pointer"
 k=l.style
-k.backgroundColor=a5
-j=b0.createElement("div")
+k.backgroundColor="transparent"
+j=a9.createElement("div")
 k=j.style
-k.position=a4
+k.position=a3
 k=j.style
 k.left="50%"
 k=j.style
@@ -299965,73 +299965,77 @@ k=j.style
 k.toString
 B.bc.dv(k,B.bc.dj(k,"transform"),"translate(-50%, -50%)","")
 k=j.style
-k.display=a6
+k.width="72px"
+k=j.style
+k.height="72px"
 k=j.style
 k.toString
-B.bc.dv(k,B.bc.dj(k,a8),a7,"")
+B.bc.dv(k,B.bc.dj(k,a4),"50%","")
+k=j.style
+k.backgroundColor="rgba(0,0,0,0.55)"
+k=j.style
+k.border="1.5px solid rgba(255,255,255,0.24)"
+k=j.style
+k.display=a5
 k=j.style
 k.toString
-B.bc.dv(k,B.bc.dj(k,"justify-content"),a7,"")
+B.bc.dv(k,B.bc.dj(k,a7),a6,"")
 k=j.style
 k.toString
-B.bc.dv(k,B.bc.dj(k,a3),a2,"")
+B.bc.dv(k,B.bc.dj(k,"justify-content"),a6,"")
+k=j.style
+k.toString
+B.bc.dv(k,B.bc.dj(k,a2),"none","")
 k=j.style
 k.toString
 B.bc.dv(k,B.bc.dj(k,"transition"),"opacity 0.2s","")
 k=j.style
 k.zIndex="3"
-k=j.style
-k.backgroundColor=a5
-k=j.style
-k.border=a2
-i=b2.$2$size("\u25b6",52)
-b2=i.style
-b2.marginLeft="6px"
-b2=i.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"text-shadow"),"0 2px 14px rgba(0,0,0,0.9)","")
+i=b1.$2$size("\u25b6",22)
+b1=i.style
+b1.marginLeft="3px"
 j.appendChild(i).toString
-h=b0.createElement("div")
-b2=h.style
-b2.position=a4
-b2=h.style
-b2.left="12px"
-b2=h.style
-b2.right="12px"
-b2=h.style
-b2.bottom="16px"
-b2=h.style
-b2.padding="8px 10px"
-b2=h.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"border-radius"),"16px","")
-b2=h.style
-b2.backgroundColor="rgba(0,0,0,0.62)"
-b2=h.style
-b2.border="1px solid rgba(255,255,255,0.12)"
-b2=h.style
-b2.zIndex="4"
+h=a9.createElement("div")
+b1=h.style
+b1.position=a3
+b1=h.style
+b1.left="12px"
+b1=h.style
+b1.right="12px"
+b1=h.style
+b1.bottom="16px"
+b1=h.style
+b1.padding="8px 10px"
+b1=h.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,a4),"16px","")
+b1=h.style
+b1.backgroundColor="rgba(0,0,0,0.62)"
+b1=h.style
+b1.border="1px solid rgba(255,255,255,0.12)"
+b1=h.style
+b1.zIndex="4"
 g=A.a5D("range")
-b2=g.style
-b2.width=a1
-b2=g.style
-b2.margin="0 0 6px 0"
+b1=g.style
+b1.width=a1
+b1=g.style
+b1.margin="0 0 6px 0"
 g.min="0"
 g.max="1000"
 g.value="0"
-b2=g.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"accent-color"),"#818CF8",null)
-f=b0.createElement("div")
-b2=f.style
-b2.display=a6
-b2=f.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,a8),a7,"")
-b2=f.style
-b2.toString
-B.bc.dv(b2,B.bc.dj(b2,"gap"),"4px","")
-b2=new A.d4v(n)
+b1=g.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,"accent-color"),"#818CF8",null)
+f=a9.createElement("div")
+b1=f.style
+b1.display=a5
+b1=f.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,a7),a6,"")
+b1=f.style
+b1.toString
+B.bc.dv(b1,B.bc.dj(b1,"gap"),"4px","")
+b1=new A.d4v(n)
 e=A.cE()
 d=A.cE()
 c=A.cE()
@@ -300040,34 +300044,34 @@ n=new A.d4z(s,j,n,e,d,g,b)
 k=new A.d4x(a0)
 a=new A.d4B(s,m,k,n)
 A.es(l,"click",new A.d4f(a),!1,t.dP.c)
-e.b=b2.$2("\u25b6",new A.d4g(a))
-d.b=b2.$2("\ud83d\udd0a",new A.d4h(a9,s,n))
-c.b=b2.$2("\u21ba",new A.d4l(s,a))
+e.b=b1.$2("\u25b6",new A.d4g(a))
+d.b=b1.$2("\ud83d\udd0a",new A.d4h(a8,s,n))
+c.b=b1.$2("\u21ba",new A.d4l(s,a))
 a=t.TV.c
 A.es(g,"input",new A.d4m(s,g,n),!1,a)
-b0=b0.createElement("span")
-b2=b0.style
-b2.color="rgba(255,255,255,0.7)"
-a9=b0.style
-a9.fontSize="11px"
-a9=b0.style
-a9.fontWeight="600"
-a9=b0.style
-a9.marginLeft="8px"
-a9=b0.style
-a9.toString
-B.bc.dv(a9,B.bc.dj(a9,a6),"1","")
-b0.textContent="00:00 / 00:00"
-b.b=b0
+a9=a9.createElement("span")
+b1=a9.style
+b1.color="rgba(255,255,255,0.7)"
+a8=a9.style
+a8.fontSize="11px"
+a8=a9.style
+a8.fontWeight="600"
+a8=a9.style
+a8.marginLeft="8px"
+a8=a9.style
+a8.toString
+B.bc.dv(a8,B.bc.dj(a8,a5),"1","")
+a9.textContent="00:00 / 00:00"
+b.b=a9
 f.appendChild(e.aX()).toString
 f.appendChild(d.aX()).toString
 f.appendChild(b.aX()).toString
 f.appendChild(c.aX()).toString
 h.appendChild(g).toString
 h.appendChild(f).toString
-b1.appendChild(l).toString
-b1.appendChild(j).toString
-b1.appendChild(h).toString
+b0.appendChild(l).toString
+b0.appendChild(j).toString
+b0.appendChild(h).toString
 A.es(s,"play",new A.d4n(m,n),!1,a)
 A.es(s,"loadedmetadata",new A.d4o(n),!1,a)
 A.es(s,"loadeddata",new A.d4p(n),!1,a)
@@ -300079,7 +300083,7 @@ A.es(s,"timeupdate",new A.d4j(n),!1,a)
 A.es(s,"error",new A.d4k(a0,s,k),!1,a)
 J.dOO(s)
 n.$0()
-return b1},
+return b0},
 p(){var s,r,q=this
 try{s=q.e
 if(s!=null)s.pause()
