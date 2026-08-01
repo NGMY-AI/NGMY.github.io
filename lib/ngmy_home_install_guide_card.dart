@@ -137,23 +137,27 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final phoneH = constraints.maxHeight.isFinite && constraints.maxHeight > 0
-                ? constraints.maxHeight
+            const phoneTopInset = 10.0;
+            final phoneH = constraints.maxHeight.isFinite && constraints.maxHeight > phoneTopInset
+                ? constraints.maxHeight - phoneTopInset
                 : _kPhoneHDefault;
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Transform.translate(
-                  offset: Offset(8 * (1 - pop), 0),
-                  child: Opacity(
-                    opacity: 0.4 + pop * 0.6,
-                    child: _PhoneStage(
-                      slide: slide,
-                      pulse: _pulse.value,
-                      orbit: _orbit.value,
-                      isDark: widget.isDark,
-                      height: phoneH,
+                Padding(
+                  padding: const EdgeInsets.only(top: phoneTopInset),
+                  child: Transform.translate(
+                    offset: Offset(8 * (1 - pop), 0),
+                    child: Opacity(
+                      opacity: 0.4 + pop * 0.6,
+                      child: _PhoneStage(
+                        slide: slide,
+                        pulse: _pulse.value,
+                        orbit: _orbit.value,
+                        isDark: widget.isDark,
+                        height: phoneH,
+                      ),
                     ),
                   ),
                 ),
@@ -333,7 +337,7 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
@@ -342,10 +346,10 @@ class _HeroBadge extends StatelessWidget {
           colors: [slide.accent, slide.accent2, slide.accent],
         ),
         boxShadow: [
-          BoxShadow(color: slide.accent.withValues(alpha: glow), blurRadius: 16, spreadRadius: 0),
-          BoxShadow(color: slide.accent2.withValues(alpha: glow * 0.65), blurRadius: 22, spreadRadius: -2),
+          BoxShadow(color: slide.accent.withValues(alpha: glow), blurRadius: 12, spreadRadius: 0),
+          BoxShadow(color: slide.accent2.withValues(alpha: glow * 0.65), blurRadius: 16, spreadRadius: -2),
         ],
-        border: Border.all(color: Colors.white.withValues(alpha: 0.32 + pulse * 0.18), width: 1.1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.32 + pulse * 0.18), width: 1.0),
       ),
       child: ShaderMask(
         blendMode: BlendMode.srcIn,
@@ -354,9 +358,21 @@ class _HeroBadge extends StatelessWidget {
           end: Alignment(1 - shimmer * 2.5, 0),
           colors: const [Colors.white, Color(0xFFE0F2FE), Colors.white],
         ).createShader(bounds),
-        child: const Text(
-          'SAVE NGMY LIKE AN APP',
-          style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+        child: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            'SAVE NGMY LIKE AN APP',
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.45,
+              height: 1.0,
+            ),
+          ),
         ),
       ),
     );

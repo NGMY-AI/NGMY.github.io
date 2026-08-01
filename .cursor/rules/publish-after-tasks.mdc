@@ -1,0 +1,19 @@
+---
+description: Always deploy ngmy.org after completing code changes
+alwaysApply: true
+---
+
+# Publish after every task
+
+When you finish any task that changes the NGMY app, **always publish** to https://ngmy.org/ before ending the turn.
+
+## Deploy steps
+
+1. Build web: `flutter build web --release -t lib/main.dart -o docs`
+2. Commit changed source + `docs/` to `main`
+3. Push to `origin/main`
+4. If rebase conflicts in `docs/`, rebuild web, `git add docs/`, then `git rebase --continue`
+
+Do not skip publish unless the user explicitly says not to deploy, or the task was question-only with zero code changes.
+
+Confirm in the final message that the app was published.
