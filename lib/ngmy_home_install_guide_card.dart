@@ -22,7 +22,7 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
       accent2: Color(0xFF2563EB),
       title: 'Open Safari',
       body: 'On your iPhone, open the Safari app first.',
-      detail: 'Type ngmy.org in the address bar and load the site. Use Safari — not Chrome or an in-app browser.',
+      detail: 'Type ngmy.org in the address bar. Use Safari — not Chrome or an in-app browser.',
       phoneHint: 'safari',
     ),
     _InstallSlide(
@@ -62,18 +62,8 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
       accent2: Color(0xFF059669),
       title: 'Add to Home Screen',
       body: 'Tap Add to Home Screen in the list.',
-      detail: 'You may need to scroll down a little to find it.',
+      detail: 'NGMY will appear on your home screen — open it anytime like a real app.',
       phoneHint: 'add',
-    ),
-    _InstallSlide(
-      id: 'home',
-      icon: Icons.apps_rounded,
-      accent: Color(0xFF22D3EE),
-      accent2: Color(0xFF8B5CF6),
-      title: 'Tap Add',
-      body: 'Confirm Add — NGMY appears on your home screen.',
-      detail: 'Open it anytime with one tap, full screen like a real app.',
-      phoneHint: 'home',
     ),
   ];
 
@@ -92,7 +82,7 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
     _orbit = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
     _slidePop = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
     _slidePop.forward();
-    _timer = Timer.periodic(const Duration(milliseconds: 4500), (_) => _advanceSlide());
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _advanceSlide());
   }
 
   void _advanceSlide() {
@@ -117,8 +107,8 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
   @override
   Widget build(BuildContext context) {
     final slide = _slides[_index];
-    final subColor = widget.isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF475569);
     final titleColor = widget.isDark ? Colors.white : const Color(0xFF0F172A);
+    final bodyColor = widget.isDark ? Colors.white.withValues(alpha: 0.88) : const Color(0xFF334155);
 
     return AnimatedBuilder(
       animation: Listenable.merge([_pulse, _shimmer, _orbit, _slidePop]),
@@ -129,8 +119,14 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(child: _HeroBadge(shimmer: _shimmer.value, pulse: _pulse.value, slide: slide)),
-            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 54),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _HeroBadge(shimmer: _shimmer.value, pulse: _pulse.value, slide: slide),
+              ),
+            ),
+            const SizedBox(height: 4),
             Expanded(
               child: Transform.translate(
                 offset: Offset(8 * (1 - pop), 0),
@@ -145,37 +141,52 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
                         orbit: _orbit.value,
                         isDark: widget.isDark,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              slide.title,
-                              style: TextStyle(
-                                color: titleColor,
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w900,
-                                height: 1.12,
-                                shadows: widget.isDark
-                                    ? [Shadow(color: slide.accent.withValues(alpha: 0.4 * breathe), blurRadius: 12)]
-                                    : null,
+                            _LightTextFrame(
+                              isDark: widget.isDark,
+                              slide: slide,
+                              pulse: _pulse.value,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    slide.title,
+                                    style: TextStyle(
+                                      color: titleColor,
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.1,
+                                      shadows: widget.isDark
+                                          ? [Shadow(color: slide.accent.withValues(alpha: 0.35 * breathe), blurRadius: 10)]
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    slide.body,
+                                    style: TextStyle(color: bodyColor, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              slide.body,
-                              style: TextStyle(color: subColor, fontSize: 12.5, height: 1.32, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              slide.detail,
-                              style: TextStyle(
-                                color: slide.accent.withValues(alpha: widget.isDark ? 0.95 : 0.88),
-                                fontSize: 10.5,
-                                height: 1.35,
-                                fontWeight: FontWeight.w600,
+                            const SizedBox(height: 6),
+                            _AccentTextFrame(
+                              isDark: widget.isDark,
+                              slide: slide,
+                              pulse: _pulse.value,
+                              child: Text(
+                                slide.detail,
+                                style: TextStyle(
+                                  color: slide.accent.withValues(alpha: widget.isDark ? 1 : 0.92),
+                                  fontSize: 10.5,
+                                  height: 1.32,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
@@ -193,6 +204,88 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
   }
 }
 
+class _LightTextFrame extends StatelessWidget {
+  const _LightTextFrame({
+    required this.isDark,
+    required this.slide,
+    required this.pulse,
+    required this.child,
+  });
+
+  final bool isDark;
+  final _InstallSlide slide;
+  final double pulse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  Colors.white.withValues(alpha: 0.14 + pulse * 0.04),
+                  Colors.white.withValues(alpha: 0.06),
+                ]
+              : [
+                  Colors.white.withValues(alpha: 0.95),
+                  const Color(0xFFF1F5F9).withValues(alpha: 0.9),
+                ],
+        ),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.22 + pulse * 0.08) : Colors.white,
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(color: slide.accent.withValues(alpha: 0.12 + pulse * 0.08), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _AccentTextFrame extends StatelessWidget {
+  const _AccentTextFrame({
+    required this.isDark,
+    required this.slide,
+    required this.pulse,
+    required this.child,
+  });
+
+  final bool isDark;
+  final _InstallSlide slide;
+  final double pulse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            slide.accent.withValues(alpha: isDark ? 0.22 + pulse * 0.06 : 0.14),
+            slide.accent2.withValues(alpha: isDark ? 0.14 + pulse * 0.04 : 0.08),
+          ],
+        ),
+        border: Border.all(color: slide.accent.withValues(alpha: 0.65 + pulse * 0.15), width: 1.3),
+        boxShadow: [
+          BoxShadow(color: slide.accent.withValues(alpha: 0.25 + pulse * 0.12), blurRadius: 14, spreadRadius: -2),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
 class _HeroBadge extends StatelessWidget {
   const _HeroBadge({required this.shimmer, required this.pulse, required this.slide});
 
@@ -204,7 +297,7 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
@@ -227,7 +320,7 @@ class _HeroBadge extends StatelessWidget {
         ).createShader(bounds),
         child: const Text(
           'SAVE NGMY LIKE AN APP',
-          style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.9),
+          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.85),
         ),
       ),
     );
@@ -247,33 +340,36 @@ class _PhoneStage extends StatelessWidget {
   final double orbit;
   final bool isDark;
 
+  static const _phoneW = 84.0;
+  static const _phoneH = 192.0;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 88,
-      height: 168,
+      width: 92,
+      height: _phoneH,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          ...List.generate(4, (i) {
-            final angle = orbit * math.pi * 2 + i * math.pi / 2;
-            final r = 46 + math.sin(orbit * math.pi * 2 + i) * 4;
+          ...List.generate(3, (i) {
+            final angle = orbit * math.pi * 2 + i * 2.1;
+            final r = 50 + math.sin(orbit * math.pi * 2 + i) * 5;
             return Positioned(
-              left: 44 + math.cos(angle) * r - 4,
-              top: 84 + math.sin(angle) * r * 0.45 - 4,
+              left: 46 + math.cos(angle) * r - 3,
+              top: 96 + math.sin(angle) * r * 0.4 - 3,
               child: Container(
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (i.isEven ? slide.accent : slide.accent2).withValues(alpha: 0.2 + pulse * 0.3),
-                  boxShadow: [BoxShadow(color: slide.accent.withValues(alpha: 0.45), blurRadius: 8)],
+                  color: (i.isEven ? slide.accent : slide.accent2).withValues(alpha: 0.18 + pulse * 0.28),
+                  boxShadow: [BoxShadow(color: slide.accent.withValues(alpha: 0.4), blurRadius: 8)],
                 ),
               ),
             );
           }),
-          _PhoneMockup(slide: slide, pulse: pulse, isDark: isDark),
+          _PhoneMockup(slide: slide, pulse: pulse, isDark: isDark, width: _phoneW, height: _phoneH),
         ],
       ),
     );
@@ -302,20 +398,28 @@ class _InstallSlide {
 }
 
 class _PhoneMockup extends StatelessWidget {
-  const _PhoneMockup({required this.slide, required this.pulse, required this.isDark});
+  const _PhoneMockup({
+    required this.slide,
+    required this.pulse,
+    required this.isDark,
+    required this.width,
+    required this.height,
+  });
 
   final _InstallSlide slide;
   final double pulse;
   final bool isDark;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     final glow = 0.38 + pulse * 0.3;
     return Container(
-      width: 82,
-      height: 162,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(17),
         border: Border.all(
           color: Color.lerp(slide.accent, Colors.white, 0.3)!.withValues(alpha: 0.5 + pulse * 0.22),
           width: 1.8,
@@ -332,27 +436,27 @@ class _PhoneMockup extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(15),
         child: Stack(
           children: [
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    center: const Alignment(0, -0.35),
-                    radius: 1.1,
-                    colors: [slide.accent.withValues(alpha: 0.18 + pulse * 0.1), Colors.transparent],
+                    center: const Alignment(0, -0.2),
+                    radius: 1.0,
+                    colors: [slide.accent.withValues(alpha: 0.14 + pulse * 0.08), Colors.transparent],
                   ),
                 ),
               ),
             ),
             Positioned(
-              top: 6,
+              top: 7,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  width: 30,
+                  width: 32,
                   height: 4,
                   decoration: BoxDecoration(
                     color: isDark ? Colors.white24 : Colors.black12,
@@ -361,143 +465,119 @@ class _PhoneMockup extends StatelessWidget {
                 ),
               ),
             ),
-            if (slide.phoneHint == 'safari') ...[
-              Positioned(
-                top: 18,
-                left: 10,
-                right: 10,
-                child: Container(
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'ngmy.org',
-                    style: TextStyle(
-                      color: slide.accent,
-                      fontSize: 7.5,
-                      fontWeight: FontWeight.w800,
+            ...switch (slide.phoneHint) {
+              'safari' => [
+                Positioned(
+                  top: 20,
+                  left: 10,
+                  right: 10,
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(color: slide.accent.withValues(alpha: 0.35)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'ngmy.org',
+                      style: TextStyle(color: slide.accent, fontSize: 8, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 44,
-                left: 0,
-                right: 0,
-                child: _IconBubble(slide: slide, size: 36, iconSize: 20),
-              ),
-            ],
-            if (slide.phoneHint == 'dots')
-              Positioned(
-                bottom: 12,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ToolbarDot(active: true, accent: slide.accent, icon: Icons.more_horiz_rounded),
-                    const SizedBox(width: 12),
-                    _ToolbarDot(active: false, accent: slide.accent, icon: Icons.ios_share_rounded),
-                  ],
+                Positioned(
+                  top: 72,
+                  left: 0,
+                  right: 0,
+                  child: _IconBubble(slide: slide, size: 40, iconSize: 22),
                 ),
-              ),
-            if (slide.phoneHint == 'share')
-              Positioned(
-                bottom: 12,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _ToolbarDot(active: false, accent: slide.accent, icon: Icons.more_horiz_rounded),
-                    const SizedBox(width: 12),
-                    _ToolbarDot(active: true, accent: slide.accent, icon: Icons.ios_share_rounded),
-                  ],
-                ),
-              ),
-            if (slide.phoneHint == 'more')
-              Positioned(
-                bottom: 14,
-                left: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: slide.accent, width: 1.4),
-                    color: slide.accent.withValues(alpha: 0.15),
-                  ),
+              ],
+              'dots' => [
+                Positioned(
+                  bottom: 18,
+                  left: 0,
+                  right: 0,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.more_horiz_rounded, color: slide.accent, size: 14),
-                      const SizedBox(width: 3),
-                      Text('More', style: TextStyle(color: slide.accent, fontSize: 8.5, fontWeight: FontWeight.w900)),
+                      _ToolbarDot(active: true, accent: slide.accent, icon: Icons.more_horiz_rounded),
+                      const SizedBox(width: 14),
+                      _ToolbarDot(active: false, accent: slide.accent, icon: Icons.ios_share_rounded),
                     ],
                   ),
                 ),
-              ),
-            if (slide.phoneHint == 'add')
-              Positioned(
-                bottom: 28,
-                left: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: slide.accent, width: 1.4),
-                    color: slide.accent.withValues(alpha: 0.12),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+              ],
+              'share' => [
+                Positioned(
+                  bottom: 18,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_to_home_screen_rounded, color: slide.accent, size: 16),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Add to\nHome Screen',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: slide.accent, fontSize: 7.5, fontWeight: FontWeight.w900, height: 1.1),
-                      ),
+                      _ToolbarDot(active: false, accent: slide.accent, icon: Icons.more_horiz_rounded),
+                      const SizedBox(width: 14),
+                      _ToolbarDot(active: true, accent: slide.accent, icon: Icons.ios_share_rounded),
                     ],
                   ),
                 ),
-              ),
-            if (slide.phoneHint == 'home')
-              Positioned(
-                bottom: 18,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _HomeIcon(accent: slide.accent2, size: 20),
-                    const SizedBox(width: 10),
-                    _HomeIcon(accent: slide.accent, size: 26, label: 'N', highlight: true),
-                    const SizedBox(width: 10),
-                    _HomeIcon(accent: slide.accent2, size: 20),
-                  ],
+              ],
+              'more' => [
+                Positioned(
+                  bottom: 22,
+                  left: 10,
+                  right: 10,
+                  child: Container(
+                    height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: slide.accent, width: 1.5),
+                      color: slide.accent.withValues(alpha: 0.14),
+                      boxShadow: [BoxShadow(color: slide.accent.withValues(alpha: 0.35), blurRadius: 10)],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.more_horiz_rounded, color: slide.accent, size: 16),
+                        const SizedBox(width: 4),
+                        Text('More', style: TextStyle(color: slide.accent, fontSize: 9, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            // Single focal icon for steps that use bottom controls (kept high so nothing overlaps).
-            if (slide.phoneHint != 'safari' && slide.phoneHint != 'home')
-              Positioned(
-                top: 36,
-                left: 0,
-                right: 0,
-                child: _IconBubble(slide: slide, size: 32, iconSize: 17),
-              ),
-            if (slide.phoneHint == 'home')
-              Positioned(
-                top: 32,
-                left: 0,
-                right: 0,
-                child: _IconBubble(slide: slide, size: 30, iconSize: 16),
-              ),
+              ],
+              'add' => [
+                Positioned(
+                  bottom: 24,
+                  left: 8,
+                  right: 8,
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: slide.accent, width: 1.5),
+                      color: slide.accent.withValues(alpha: 0.12),
+                      boxShadow: [BoxShadow(color: slide.accent.withValues(alpha: 0.4), blurRadius: 12)],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_to_home_screen_rounded, color: slide.accent, size: 18),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Add to Home Screen',
+                            style: TextStyle(color: slide.accent, fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.1),
+                            maxLines: 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              _ => const <Widget>[],
+            },
           ],
         ),
       ),
@@ -539,46 +619,14 @@ class _ToolbarDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: active ? accent : Colors.white.withValues(alpha: 0.1),
         boxShadow: active ? [BoxShadow(color: accent.withValues(alpha: 0.55), blurRadius: 8)] : null,
         border: active ? null : Border.all(color: Colors.white24),
       ),
-      child: Icon(icon, size: 11, color: active ? Colors.white : Colors.white70),
-    );
-  }
-}
-
-class _HomeIcon extends StatelessWidget {
-  const _HomeIcon({required this.accent, required this.size, this.label, this.highlight = false});
-
-  final Color accent;
-  final double size;
-  final String? label;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(highlight ? 7 : 5),
-        gradient: highlight ? LinearGradient(colors: [const Color(0xFF60A5FA), accent]) : null,
-        color: highlight ? null : accent.withValues(alpha: 0.22),
-        boxShadow: highlight ? [BoxShadow(color: accent.withValues(alpha: 0.55), blurRadius: 10)] : null,
-        border: highlight ? Border.all(color: Colors.white54) : null,
-      ),
-      child: label == null
-          ? null
-          : Center(
-              child: Text(
-                label!,
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: size * 0.42),
-              ),
-            ),
+      child: Icon(icon, size: 12, color: active ? Colors.white : Colors.white70),
     );
   }
 }

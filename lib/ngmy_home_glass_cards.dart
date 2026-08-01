@@ -2319,7 +2319,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
         onAdd: _openAddSheet,
         child: SizedBox(
-          height: 148,
+          height: 158,
           child: NgmyHomeInstallGuideCard(isDark: isDark),
         ),
       ),
