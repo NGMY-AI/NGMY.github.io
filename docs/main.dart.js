@@ -108846,7 +108846,7 @@ $S:11}
 A.drR.prototype={
 $1(a){var s=A.jA().b
 s=s==null?null:s.canvasKitBaseUrl
-return(s==null?"https://www.gstatic.com/flutter-canvaskit/4c525dac5ebe5971c5708ef73558ed8edcf4a362/":s)+a},
+return(s==null?"canvaskit/":s)+a},
 $S:16}
 A.aAa.prototype={
 gJ(a){var s=this.a
