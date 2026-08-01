@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
-import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_glow_frame.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -1134,8 +1133,8 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   Widget _cashierTab(WorksheetPalette p) {
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.cashier,
-      glowStrength: 1.45,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      glowStrength: 1.25,
+      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -1144,47 +1143,14 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
         ),
         child: Column(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: AspectRatio(
-                aspectRatio: 16 / 7,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    const NgmyBuiltinThumbnailArt(id: 'calculator', animate: true),
-                    Positioned(
-                      left: 16,
-                      bottom: 14,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                        ),
-                        child: const Text(
-                          'Daily register preview',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-              child: Column(
-                children: [
-                  Text('Cashier', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: p.primaryText)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Track daily spending, receipts, and quick totals — coming soon to this tab.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.45),
-                  ),
-                ],
-              ),
+            Icon(Icons.calculate_outlined, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
+            const SizedBox(height: 16),
+            Text('Cashier', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
+            const SizedBox(height: 8),
+            Text(
+              'Track daily spending and receipts here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
             ),
           ],
         ),

@@ -2894,6 +2894,8 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
     final timesPerDay = m?.timesPerDay ?? _timesPerDayFromBody(bodyLines);
     final remindersOn = m?.remindersEnabled ?? bodyLines.any((l) => l.toLowerCase().contains('reminders: on'));
 
+    const topReserve = 76.0;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2906,10 +2908,26 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
             ),
           ),
         ),
+        // Solid top band — nothing from the card shows behind Welcome back / date chips.
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: topReserve,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFF1F7), Color(0xFFFCE7F3)],
+              ),
+            ),
+          ),
+        ),
         Positioned(
           right: -8,
-          bottom: -20,
-          child: Icon(Icons.medication_liquid_rounded, size: 120, color: accent.withValues(alpha: 0.12)),
+          bottom: 28,
+          child: Icon(Icons.medication_liquid_rounded, size: 96, color: accent.withValues(alpha: 0.10)),
         ),
         Positioned(
           left: 0,
@@ -2943,7 +2961,7 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 38),
+          padding: const EdgeInsets.fromLTRB(14, topReserve + 4, 14, 38),
           child: _loading
               ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: accent)))
               : Column(
@@ -2953,34 +2971,34 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
+                          width: 42,
+                          height: 42,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                             gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.72)]),
                             boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
                           ),
-                          child: const Icon(Icons.medication_rounded, color: Colors.white, size: 26),
+                          child: const Icon(Icons.medication_rounded, color: Colors.white, size: 22),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 19, height: 1.15)),
-                              const SizedBox(height: 4),
+                              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17, height: 1.15)),
+                              const SizedBox(height: 3),
                               Text(
                                 dosage.isEmpty ? 'Dosage not set' : dosage,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: inkSoft.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
+                                style: TextStyle(color: inkSoft.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 12),
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
