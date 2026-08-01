@@ -15,7 +15,7 @@ class NgmyLiveCaptureMedia {
     bool mirror = true,
     BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
     String objectFit = 'cover',
-    double zoomOut = 1.18,
+    double zoomOut = 1.0,
   }) {
     return Container(
       height: height,

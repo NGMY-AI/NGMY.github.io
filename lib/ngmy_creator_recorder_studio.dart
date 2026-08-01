@@ -519,7 +519,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 height: previewHeight,
                 mirror: _session.facingMode == 'user',
                 objectFit: 'cover',
-                zoomOut: 1.18,
+                zoomOut: 1.0,
               ),
             ),
           ),

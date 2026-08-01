@@ -89,6 +89,7 @@ class NgmyLiveCaptureEngine {
     try {
       _stream = await _openStream(video: true, facingMode: facingMode, aspect: aspect);
       _ensureTracksLive(_stream!);
+      await _applyMinimumCameraZoom(_stream!);
       if (_noiseCancellation) {
         await _applyNoiseCancellation(_stream!, true);
       }
@@ -537,16 +538,35 @@ class NgmyLiveCaptureEngine {
     };
   }
 
+  Map<String, dynamic> _wideCameraConstraints(String facing) {
+    return {
+      'facingMode': {'ideal': facing},
+      'aspectRatio': {'ideal': 4 / 3},
+      'width': {'ideal': 640, 'min': 320},
+      'height': {'ideal': 480, 'min': 240},
+      'frameRate': {'ideal': 30, 'max': 30},
+      'zoom': {'ideal': 1.0},
+    };
+  }
+
   Map<String, dynamic> _videoConstraintsForAspect(String facing, String aspect) {
     final sizes = _sizesForAspect(aspect);
     return {
       'facingMode': {'ideal': facing},
-      'width': {'ideal': sizes.$1, 'max': sizes.$1},
-      'height': {'ideal': sizes.$2, 'max': sizes.$2},
+      'width': {'ideal': sizes.$1},
+      'height': {'ideal': sizes.$2},
       'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
       'frameRate': {'ideal': 30, 'max': 30},
       'zoom': {'ideal': 1.0},
     };
+  }
+
+  Future<void> _applyMinimumCameraZoom(html.MediaStream stream) async {
+    for (final t in stream.getVideoTracks()) {
+      try {
+        await t.applyConstraints(<String, dynamic>{'zoom': 1.0});
+      } catch (_) {}
+    }
   }
 
   List<Map<String, dynamic>> _streamAttempts({
@@ -556,7 +576,9 @@ class NgmyLiveCaptureEngine {
   }) {
     final sizes = _sizesForAspect(aspect);
     return [
-      {'audio': audio, 'video': _videoConstraintsForAspect(facing, aspect)},
+      {'audio': audio, 'video': _wideCameraConstraints(facing)},
+      {'audio': audio, 'video': _nativeVideoConstraints(facing)},
+      {'audio': audio, 'video': {'facingMode': facing}},
       {
         'audio': audio,
         'video': {
@@ -566,8 +588,7 @@ class NgmyLiveCaptureEngine {
           'frameRate': {'ideal': 30, 'max': 30},
         },
       },
-      {'audio': audio, 'video': _nativeVideoConstraints(facing)},
-      {'audio': audio, 'video': {'facingMode': facing}},
+      {'audio': audio, 'video': _videoConstraintsForAspect(facing, aspect)},
       if (audio != false) {'audio': audio, 'video': true},
     ];
   }
@@ -602,7 +623,7 @@ class NgmyLiveCaptureEngine {
 
   (int, int) _canvasSizeForAspect(String aspect) => _sizesForAspect(aspect);
 
-  static const double _recordZoomOut = 1.18;
+  static const double _recordZoomOut = 1.0;
 
   Future<html.MediaStream?> _startCompositeStream(
     html.MediaStream main,
@@ -817,6 +838,7 @@ class NgmyLiveCaptureEngine {
       _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
 
       _ensureTracksLive(_stream!);
+      await _applyMinimumCameraZoom(_stream!);
       if (_noiseCancellation) {
         await _applyNoiseCancellation(_stream!, true);
       }

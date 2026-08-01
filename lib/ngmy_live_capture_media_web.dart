@@ -45,7 +45,7 @@ class NgmyLiveCaptureMedia {
     bool mirror = true,
     BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
     String objectFit = 'cover',
-    double zoomOut = 1.18,
+    double zoomOut = 1.0,
   }) {
     return _StableCameraPreview(
       stream: stream,
@@ -221,7 +221,7 @@ class _StableCameraPreview extends StatefulWidget {
     this.mirror = true,
     this.borderRadius = const BorderRadius.all(Radius.circular(18)),
     this.objectFit = 'cover',
-    this.zoomOut = 1.18,
+    this.zoomOut = 1.0,
   });
   final Object? stream;
   final double height;
