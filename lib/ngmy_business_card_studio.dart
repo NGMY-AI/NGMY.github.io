@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
@@ -1000,20 +1001,10 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
   }
 
   Future<void> _deleteCard(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete business card?'),
-        content: const Text('This removes the saved card from this device.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete business card?',
+      message: 'This removes the saved card from this device.',
     );
     if (ok != true || !mounted) return;
     await deleteNgmyBusinessCard(id, userEmail: widget.userEmail);

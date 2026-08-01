@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
 const _kStorageKey = 'ngmy_medicine_organizer_v1';
@@ -213,20 +214,10 @@ class _MedicineOrganizerScreenState extends State<_MedicineOrganizerScreen> {
   }
 
   Future<void> _delete(NgmyMedicineEntry item) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final t = NgmyHubTheme.of(ctx);
-        return AlertDialog(
-          backgroundColor: t.dialogBg,
-          title: Text('Remove medicine?', style: TextStyle(color: t.title)),
-          content: Text('Delete ${item.name}?', style: TextStyle(color: t.subtitle)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)), child: const Text('Delete')),
-          ],
-        );
-      },
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Remove medicine?',
+      message: 'Delete ${item.name}?',
     );
     if (ok != true) return;
     await _persist(_items.where((e) => e.id != item.id).toList());

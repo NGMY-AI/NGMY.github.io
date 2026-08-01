@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_storage.dart';
@@ -388,20 +389,12 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _deleteSaved(NgmySavedQrRecord record) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete saved QR?'),
-        content: Text(
-          record.isSyncQr
-              ? 'Remove “${record.label}” from your saved sync QRs? You can save a new ${record.label} QR after this.'
-              : 'Remove “${record.label}” from this device?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete saved QR?',
+      message: record.isSyncQr
+          ? 'Remove “${record.label}” from your saved sync QRs? You can save a new ${record.label} QR after this.'
+          : 'Remove “${record.label}” from this device?',
     );
     if (ok != true) return;
     await deleteNgmySavedQr(record.id, userEmail: widget.userEmail);

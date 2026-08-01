@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_offline_close_button.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
 
@@ -545,17 +546,10 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
           ),
           if (trailing != null) trailing!,
           if (onClose != null)
-            IconButton(
-              onPressed: onClose,
-              icon: Text(
-                '✕',
-                style: TextStyle(
-                  color: NgmyHudInk.muted(context),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
-                ),
-              ),
+            NgmyOfflineCloseButton(
+              onPressed: onClose!,
+              color: NgmyHudInk.muted(context),
+              size: 40,
             ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_family_book_ui.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_family_tree_sync.dart';
@@ -582,27 +583,13 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     }
 
     if (!mounted) return;
-    final p = WorksheetPalette.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.cardBg,
-        title: Text('Remove family tree?', style: TextStyle(color: p.primaryText, fontWeight: FontWeight.w900)),
-        content: Text(
-          _tree.isViewOnly
-              ? 'This removes "${_tree.name}" from this phone only. The creator\'s copy is not affected.'
-              : 'Delete "${_tree.name}" permanently? This cannot be undone.',
-          style: TextStyle(color: p.secondaryText, height: 1.35),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Remove family tree?',
+      message: _tree.isViewOnly
+          ? 'This removes "${_tree.name}" from this phone only. The creator\'s copy is not affected.'
+          : 'Delete "${_tree.name}" permanently? This cannot be undone.',
+      confirmLabel: 'Remove',
     );
     if (ok != true || !mounted) return;
     await deleteFamilyTree(widget.userEmail, _tree.id);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_storage.dart';
 import 'ngmy_bio_studio.dart';
@@ -269,24 +270,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Future<void> _confirmDeleteMenu(NgmyMenuDocument m) async {
     final name = m.restaurantName.trim().isEmpty ? 'this menu' : m.restaurantName.trim();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete menu?'),
-        content: Text(
-          m.isPublished || m.slug.trim().isNotEmpty
-              ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
-              : 'Delete "$name" from this device?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete menu?',
+      message: m.isPublished || m.slug.trim().isNotEmpty
+          ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
+          : 'Delete "$name" from this device?',
     );
     if (ok != true || !mounted) return;
     if (widget._isLocal) {
@@ -304,24 +293,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Future<void> _confirmDeleteBio(NgmyBioDocument b) async {
     final name = b.displayName.trim().isEmpty ? 'this Bio' : b.displayName.trim();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Bio?'),
-        content: Text(
-          b.isPublished || b.slug.trim().isNotEmpty
-              ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
-              : 'Delete "$name" from this device?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete Bio?',
+      message: b.isPublished || b.slug.trim().isNotEmpty
+          ? 'Delete "$name" and remove its public link from the cloud so guests can no longer open it?'
+          : 'Delete "$name" from this device?',
     );
     if (ok != true || !mounted) return;
     if (widget._isLocal) {

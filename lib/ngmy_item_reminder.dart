@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_item_reminder_storage.dart';
 
 Future<void> showNgmyItemReminderDialog(BuildContext context, {required String userEmail}) {
@@ -449,6 +450,12 @@ class _ItemReminderDialogState extends State<_ItemReminderDialog> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () async {
+                final ok = await showNgmyDeleteConfirm(
+                  context,
+                  title: 'Delete reminder?',
+                  message: 'Remove this “Where I Put It” reminder?',
+                );
+                if (ok != true) return;
                 await deleteNgmyItemReminder(r.id, userEmail: widget.userEmail);
                 await _reload();
               },

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
 const _kStorageKey = 'ngmy_quick_support_v2';
@@ -235,20 +236,10 @@ class _QuickSupportScreenState extends State<_QuickSupportScreen> {
   }
 
   Future<void> _delete(NgmySupportLine line) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final t = NgmyHubTheme.of(ctx);
-        return AlertDialog(
-          backgroundColor: t.dialogBg,
-          title: Text('Remove support line?', style: TextStyle(color: t.title)),
-          content: Text('Delete ${line.title}?', style: TextStyle(color: t.subtitle)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-          ],
-        );
-      },
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Remove support line?',
+      message: 'Delete ${line.title}?',
     );
     if (ok != true) return;
     await _persist(_lines.where((e) => e.id != line.id).toList());

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_admin_invoice_publisher.dart';
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_app_builder_layout_utils.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_templates.dart';
@@ -424,21 +425,10 @@ class _NgmyAppStudioDashboardState extends State<NgmyAppStudioDashboard> {
   }
 
   Future<void> _confirmDeleteProject(NgmyAppProject p) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1F2937),
-        title: const Text('Delete app?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        content: Text('Delete "${p.name}" from My Projects? This cannot be undone.', style: TextStyle(color: Colors.white.withValues(alpha: 0.85))),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete app?',
+      message: 'Delete "${p.name}" from My Projects? This cannot be undone.',
     );
     if (ok == true && mounted) await widget.onDeleteProject(p);
   }

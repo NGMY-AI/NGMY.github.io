@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_loan_phone.dart';
 import 'ngmy_network_resilience.dart';
@@ -2925,22 +2926,11 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
   Future<bool> _confirmDeleteLoan(BuildContext context, Map<String, dynamic> app, {bool popDetail = false}) async {
     final id = (app['id'] ?? '').toString();
     final name = (app['fullLegalName'] ?? app['username'] ?? 'this loan').toString();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Delete loan permanently?'),
-        content: Text(
-          'Remove $name from Loan Center and the user\'s Loan Services? All photos and payment history for this loan will be deleted everywhere. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Delete forever'),
-          ),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete loan permanently?',
+      message: 'Remove $name from Loan Center and the user\'s Loan Services? All photos and payment history for this loan will be deleted everywhere. This cannot be undone.',
+      confirmLabel: 'Delete forever',
     );
     if (ok != true || id.isEmpty) return false;
     final deleted = await NgmyLoanDelete.deleteLoan(apps: widget.config.loanApplications, loanId: id);

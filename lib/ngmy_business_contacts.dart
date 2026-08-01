@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
 const _kStorageKey = 'ngmy_business_contacts_v2';
@@ -254,20 +255,10 @@ class _BusinessContactsScreenState extends State<_BusinessContactsScreen> {
   }
 
   Future<void> _delete(NgmyBusinessContact c) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final t = NgmyHubTheme.of(ctx);
-        return AlertDialog(
-          backgroundColor: t.dialogBg,
-          title: Text('Delete contact?', style: TextStyle(color: t.title)),
-          content: Text('Remove ${c.name.isEmpty ? c.company : c.name}?', style: TextStyle(color: t.subtitle)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-        );
-      },
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete contact?',
+      message: 'Remove ${c.name.isEmpty ? c.company : c.name}?',
     );
     if (ok != true) return;
     await _persist(_contacts.where((e) => e.id != c.id).toList());

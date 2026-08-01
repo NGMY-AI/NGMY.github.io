@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
+
 /// Centered light notice popup (validation / info) — replaces bottom snackbars.
 Future<void> showNgmyLightNotice(
   BuildContext context, {
@@ -43,34 +45,14 @@ Future<bool> showNgmyLightConfirm(
   String confirmLabel = 'Delete',
   IconData icon = Icons.delete_outline_rounded,
   bool destructive = true,
-}) async {
-  final result = await showGeneralDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Dismiss',
-    barrierColor: Colors.black.withValues(alpha: 0.38),
-    transitionDuration: const Duration(milliseconds: 380),
-    pageBuilder: (ctx, anim, secondary) => const SizedBox.shrink(),
-    transitionBuilder: (ctx, anim, secondary, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
-      return FadeTransition(
-        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.88, end: 1).animate(curved),
-          child: _NgmyLightNoticeCard(
-            title: title,
-            message: message,
-            okLabel: confirmLabel,
-            cancelLabel: cancelLabel,
-            icon: icon,
-            confirm: true,
-            destructive: destructive,
-          ),
-        ),
-      );
-    },
+}) {
+  return showNgmyDeleteConfirm(
+    context,
+    title: title,
+    message: message,
+    cancelLabel: cancelLabel,
+    confirmLabel: confirmLabel,
   );
-  return result == true;
 }
 
 class _NgmyLightNoticeCard extends StatefulWidget {

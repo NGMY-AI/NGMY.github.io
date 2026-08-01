@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
@@ -577,67 +578,10 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   }
 
   Future<void> _confirmDeleteProject(WorksheetProject project, WorksheetPalette p) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => Dialog(
-        backgroundColor: p.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withValues(alpha: p.isDark ? 0.18 : 0.08),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.28)),
-                ),
-                child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 30),
-              ),
-              const SizedBox(height: 16),
-              Text('Delete project?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: p.primaryText)),
-              const SizedBox(height: 8),
-              Text(
-                'Remove “${project.name}” and all of its budget items from this device?',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, height: 1.4, color: p.secondaryText),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(c, false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: p.primaryText,
-                        side: BorderSide(color: p.cardBorder),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(c, true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete project?',
+      message: 'Remove “${project.name}” and all of its budget items from this device?',
     );
     if (ok == true) {
       await deleteWorksheetProject(widget.userEmail, project.id);

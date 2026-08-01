@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 
 const _kStorageKey = 'ngmy_business_tasks_v1';
@@ -176,18 +177,10 @@ class _BusinessTasksScreenState extends State<_BusinessTasksScreen> {
 
   Future<void> _deleteTask(NgmyBusinessTask task) async {
     if (!task.done) return;
-    final t = NgmyHubTheme.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: t.dialogBg,
-        title: Text('Delete completed task?', style: TextStyle(color: t.title)),
-        content: Text(task.title, style: TextStyle(color: t.subtitle)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete completed task?',
+      message: task.title,
     );
     if (ok != true) return;
     final items = await _loadTasks(widget.userEmail);

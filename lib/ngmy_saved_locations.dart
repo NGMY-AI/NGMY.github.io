@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_store_location.dart';
 
@@ -290,20 +291,10 @@ class _SavedLocationsScreenState extends State<_SavedLocationsScreen> {
   }
 
   Future<void> _delete(NgmySavedLocation loc) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final t = NgmyHubTheme.of(ctx);
-        return AlertDialog(
-          backgroundColor: t.dialogBg,
-          title: Text('Delete location?', style: TextStyle(color: t.title)),
-          content: Text('Remove ${loc.name}?', style: TextStyle(color: t.subtitle)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-          ],
-        );
-      },
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete location?',
+      message: 'Remove ${loc.name}?',
     );
     if (ok != true) return;
     await _persist(_locations.where((e) => e.id != loc.id).toList());

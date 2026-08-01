@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_doc_share_folder.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_share_image.dart';
@@ -1027,98 +1028,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   Future<void> _deleteItem(NgmyDocShareItem item) async {
-    final c = _docShareColors(context);
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: c.card,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border(top: BorderSide(color: const Color(0xFFEF4444).withValues(alpha: 0.35))),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 18),
-                      decoration: BoxDecoration(
-                        color: c.muted.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 52,
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 26),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Delete this file?',
-                    style: TextStyle(color: c.fg, fontWeight: FontWeight.w900, fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: c.fg, fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Removes it from this device and clears any shared cloud copy.',
-                    style: TextStyle(color: c.muted, fontSize: 13, height: 1.4),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: c.fg,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: c.border),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          child: const Text('Keep file', style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFEF4444),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete this file?',
+      message: '${item.name}\n\nRemoves it from this device and clears any shared cloud copy.',
     );
     if (ok != true) return;
     final token = (item.stashToken ?? '').trim();

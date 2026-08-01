@@ -207,7 +207,7 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
               colors: _kEssentialsHudColors,
               pulse: pulse,
               orbit: orbit,
-              icon: Icons.business_center_rounded,
+              emoji: '💼',
               onClose: () => Navigator.pop(context),
               trailing: Tooltip(
                 message: 'Transfer / backup',
